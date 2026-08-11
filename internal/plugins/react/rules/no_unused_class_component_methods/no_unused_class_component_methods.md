@@ -64,4 +64,5 @@ always ignored, even when unused.
 
 ## Original Documentation
 
-- [react/no-unused-class-component-methods](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-unused-class-component-methods.md)
+- [eslint-plugin-react: no-unused-class-component-methods](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-unused-class-component-methods.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-unused-class-component-methods.js)

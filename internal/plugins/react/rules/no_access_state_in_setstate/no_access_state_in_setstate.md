@@ -70,4 +70,5 @@ class Hello extends React.Component {
 
 ## Original Documentation
 
-- ESLint rule: https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-access-state-in-setstate.md
+- [eslint-plugin-react: no-access-state-in-setstate](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-access-state-in-setstate.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-access-state-in-setstate.js)

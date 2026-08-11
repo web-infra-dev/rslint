@@ -28,4 +28,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [react/style-prop-object](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/style-prop-object.md)
+- [eslint-plugin-react: style-prop-object](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/style-prop-object.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/style-prop-object.js)

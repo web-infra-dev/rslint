@@ -25,4 +25,5 @@ Examples of **correct** code with the default `"never"` option:
 
 ## Original Documentation
 
-- [react/jsx-equals-spacing](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-equals-spacing.md)
+- [eslint-plugin-react: jsx-equals-spacing](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-equals-spacing.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-equals-spacing.js)

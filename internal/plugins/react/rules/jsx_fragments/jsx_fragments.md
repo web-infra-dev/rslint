@@ -58,4 +58,5 @@ when an older React version is specified in shared settings.
 
 ## Original Documentation
 
-- [react/jsx-fragments](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-fragments.md)
+- [eslint-plugin-react: jsx-fragments](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-fragments.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-fragments.js)

@@ -80,4 +80,5 @@ Combine several properties to cover more cases:
 
 ## Original Documentation
 
-- [eslint-plugin-react/forbid-component-props](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/forbid-component-props.md)
+- [eslint-plugin-react: forbid-component-props](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/forbid-component-props.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/forbid-component-props.js)

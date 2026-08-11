@@ -49,5 +49,5 @@ class MyComponent extends React.Component {
 
 ## Original Documentation
 
-- [eslint-plugin-react/no-unused-state](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-unused-state.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/no-unused-state.js)
+- [eslint-plugin-react: no-unused-state](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-unused-state.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-unused-state.js)

@@ -87,5 +87,5 @@ If you prefer to declare multiple components per file you can disable this rule.
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-multi-comp](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-multi-comp.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/no-multi-comp.js)
+- [eslint-plugin-react: no-multi-comp](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-multi-comp.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-multi-comp.js)

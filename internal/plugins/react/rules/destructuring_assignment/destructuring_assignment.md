@@ -130,4 +130,5 @@ function Foo(props) {
 
 ## Original Documentation
 
-- [eslint-plugin-react `destructuring-assignment`](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/destructuring-assignment.md)
+- [eslint-plugin-react: destructuring-assignment](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/destructuring-assignment.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/destructuring-assignment.js)

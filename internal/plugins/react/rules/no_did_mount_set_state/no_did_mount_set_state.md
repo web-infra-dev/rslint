@@ -95,4 +95,5 @@ The rule is a no-op when `settings.react.version` is explicitly set to
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-did-mount-set-state](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-did-mount-set-state.md)
+- [eslint-plugin-react: no-did-mount-set-state](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-did-mount-set-state.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-did-mount-set-state.js)
