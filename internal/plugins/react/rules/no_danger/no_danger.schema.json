@@ -12,7 +12,8 @@
           "type": "array",
           "uniqueItems": true
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "minItems": 0,
