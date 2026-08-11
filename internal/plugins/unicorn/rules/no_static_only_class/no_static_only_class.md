@@ -90,5 +90,7 @@ is still reported in all of them.
 
 ## Original Documentation
 
+<!-- upstream: eslint-plugin-unicorn@v64.0.0 -->
+
 - [eslint-plugin-unicorn: no-static-only-class](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/no-static-only-class.md)
 - [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/no-static-only-class.js)

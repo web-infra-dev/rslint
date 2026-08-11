@@ -21,5 +21,7 @@ const foo = React.Children.map(children, fn).flat();
 
 ## Original Documentation
 
+<!-- upstream: eslint-plugin-unicorn@v70.0.0 -->
+
 - [eslint-plugin-unicorn: prefer-array-flat-map](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/prefer-array-flat-map.md)
 - [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/prefer-array-flat-map.js)

@@ -52,4 +52,6 @@ type fs = import('node:fs');
 
 ## Original Documentation
 
-[eslint-plugin-unicorn/prefer-node-protocol](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v72.0.0/docs/rules/prefer-node-protocol.md)
+<!-- upstream: eslint-plugin-unicorn@v72.0.0 -->
+
+[eslint-plugin-unicorn/prefer-node-protocol](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/prefer-node-protocol.md)

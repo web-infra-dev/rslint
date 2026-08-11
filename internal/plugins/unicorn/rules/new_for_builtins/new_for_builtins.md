@@ -31,5 +31,7 @@ const text = String("value");
 
 ## Original Documentation
 
+<!-- upstream: eslint-plugin-unicorn@v70.0.0 -->
+
 - [eslint-plugin-unicorn: new-for-builtins](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/new-for-builtins.md)
 - [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/new-for-builtins.js)

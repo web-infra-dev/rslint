@@ -94,4 +94,6 @@ const hasValue = value => array.includes(value);
 
 ## Original Documentation
 
+<!-- upstream: eslint-plugin-unicorn@v73.0.0 -->
+
 - [`unicorn/prefer-set-has`](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/prefer-set-has.md)
