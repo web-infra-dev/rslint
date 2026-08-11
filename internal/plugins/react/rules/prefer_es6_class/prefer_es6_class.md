@@ -80,4 +80,5 @@ The rule honors the shared React settings:
 
 ## Original Documentation
 
-- [eslint-plugin-react `prefer-es6-class`](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/prefer-es6-class.md)
+- [eslint-plugin-react: prefer-es6-class](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/prefer-es6-class.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/prefer-es6-class.js)

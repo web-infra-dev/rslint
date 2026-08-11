@@ -77,4 +77,5 @@ var Hello = createReactClass({
 
 ## Original Documentation
 
-- https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-string-refs.md
+- [eslint-plugin-react: no-string-refs](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-string-refs.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-string-refs.js)

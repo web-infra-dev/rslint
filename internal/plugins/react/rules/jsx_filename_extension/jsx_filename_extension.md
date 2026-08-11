@@ -28,4 +28,5 @@ var Hello = <div>Hello</div>;
 
 ## Original Documentation
 
-- [react/jsx-filename-extension](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-filename-extension.md)
+- [eslint-plugin-react: jsx-filename-extension](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-filename-extension.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-filename-extension.js)

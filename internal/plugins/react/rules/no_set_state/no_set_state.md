@@ -78,4 +78,5 @@ class Hello extends React.Component {
 
 ## Original Documentation
 
-- [eslint-plugin-react `no-set-state`](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-set-state.md)
+- [eslint-plugin-react: no-set-state](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-set-state.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-set-state.js)

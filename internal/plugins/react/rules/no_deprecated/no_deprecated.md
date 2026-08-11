@@ -94,4 +94,5 @@ rslint flags these forms; ESLint does not:
 
 ## Original Documentation
 
-- https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-deprecated.md
+- [eslint-plugin-react: no-deprecated](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-deprecated.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-deprecated.js)

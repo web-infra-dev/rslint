@@ -39,4 +39,5 @@ When `false` (default), a JSX tag identifier in a module (a file with `import`/`
 
 ## Original Documentation
 
-- https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-undef.md
+- [eslint-plugin-react: jsx-no-undef](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-no-undef.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-no-undef.js)

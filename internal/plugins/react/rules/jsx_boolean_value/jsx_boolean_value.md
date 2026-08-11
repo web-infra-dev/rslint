@@ -28,4 +28,5 @@ Examples of **correct** code with the default `"never"` option:
 
 ## Original Documentation
 
-- [react/jsx-boolean-value](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-boolean-value.md)
+- [eslint-plugin-react: jsx-boolean-value](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-boolean-value.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-boolean-value.js)
