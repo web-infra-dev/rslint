@@ -13,8 +13,9 @@ import (
 )
 
 // TestNoUndefRuleTypeCheckerInvariant is the regression barrier against the
-// old hybrid semantics: acquiring a TypeChecker must not make DOM, ambient, or
-// TypeScript-only names become defined for an ESLint scope rule.
+// old hybrid semantics: acquiring a TypeChecker must not expose host/runtime,
+// ambient, cross-file, or non-default type names to an ESLint scope rule. The
+// parser's default TypeScript type globals remain available in either mode.
 func TestNoUndefRuleTypeCheckerInvariant(t *testing.T) {
 	t.Parallel()
 	root := fixtures.GetRootDir()
@@ -26,6 +27,9 @@ console.log(1);
 window;
 crossFileGlobal123;
 externalAmbientGlobal123;
+type DefaultTypeGlobal123 = AsyncIterator<string>;
+type CrossFileTypeUse123 = crossFileType123;
+type ExternalAmbientTypeUse123 = externalAmbientType123;
 Promise.resolve();
 var buf = new Float16Array(8);
 Temporal;
@@ -37,8 +41,8 @@ undeclaredName123;
 `
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{
 		filePath:      code,
-		crossFilePath: "var crossFileGlobal123 = 1;",
-		ambientPath:   "declare var externalAmbientGlobal123: string;",
+		crossFilePath: "var crossFileGlobal123 = 1; interface crossFileType123 {}",
+		ambientPath:   "declare var externalAmbientGlobal123: string; interface externalAmbientType123 {}",
 	})
 	program, err := utils.CreateProgram(
 		true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs),
@@ -63,6 +67,8 @@ undeclaredName123;
 		"'window' is not defined.",
 		"'crossFileGlobal123' is not defined.",
 		"'externalAmbientGlobal123' is not defined.",
+		"'crossFileType123' is not defined.",
+		"'externalAmbientType123' is not defined.",
 		"'AsyncIterator' is not defined.",
 		"'myOffGlobal' is not defined.",
 		"'undeclaredName123' is not defined.",
@@ -84,8 +90,8 @@ undeclaredName123;
 				SourceFile:  sourceFile,
 				Program:     program,
 				TypeChecker: tc,
-				Refs:        rule.NewRefStore(sourceFile, program.Options(), tc),
-				Globals: rule.NewGlobals(rule.LanguageOptions{}, map[string]utils.GlobalAccess{
+				Refs:        rule.NewRefStore(sourceFile, program.Options(), tc, rule.RefStoreInit{}),
+				Globals: rule.NewGlobals(rule.LanguageOptions{}, rule.GlobalsInit{}, map[string]utils.GlobalAccess{
 					"myConfiguredGlobal": utils.GlobalAccessReadonly,
 					"myOffGlobal":        utils.GlobalAccessOff,
 					"myOffLocal":         utils.GlobalAccessOff,

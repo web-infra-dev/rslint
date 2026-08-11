@@ -26,4 +26,5 @@ export { foo };
 
 ## Original Documentation
 
-https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-default-export.md
+- [eslint-plugin-import: no-default-export](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-default-export.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-default-export.js)

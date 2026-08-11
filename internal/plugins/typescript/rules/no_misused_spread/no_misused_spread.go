@@ -2,7 +2,6 @@ package no_misused_spread
 
 import (
 	_ "embed"
-	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -81,21 +80,19 @@ func buildReplaceMapSpreadInObjectMessage() rule.RuleMessage {
 }
 
 type NoMisusedSpreadOptions struct {
-	Allow []utils.TypeOrValueSpecifier `json:"allow"`
+	Allow []utils.TypeOrValueSpecifier
 }
 
 func parseOptions(options []any) NoMisusedSpreadOptions {
-	opts := NoMisusedSpreadOptions{}
-	if len(options) > 0 {
-		if optsMap, ok := options[0].(map[string]interface{}); ok {
-			// Convert the configured option object to JSON and back into the struct.
-			if optsJSON, err := json.Marshal(optsMap); err == nil {
-				_ = json.Unmarshal(optsJSON, &opts)
-			}
-		}
+	opts := NoMisusedSpreadOptions{
+		Allow: []utils.TypeOrValueSpecifier{},
 	}
-	if opts.Allow == nil {
-		opts.Allow = []utils.TypeOrValueSpecifier{}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if specifiers := utils.ParseTypeOrValueSpecifiers(optsMap["allow"]); specifiers != nil {
+		opts.Allow = specifiers
 	}
 	return opts
 }

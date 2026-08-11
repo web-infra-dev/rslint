@@ -30,7 +30,19 @@ func buildUnboundWithoutThisAnnotationMessage() rule.RuleMessage {
 }
 
 type UnboundMethodOptions struct {
-	IgnoreStatic *bool
+	IgnoreStatic bool
+}
+
+func parseOptions(options []any) UnboundMethodOptions {
+	opts := UnboundMethodOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["ignoreStatic"].(bool); ok {
+		opts.IgnoreStatic = value
+	}
+	return opts
 }
 
 func isNodeInsideTypeDeclaration(node *ast.Node) bool {
@@ -199,16 +211,7 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := UnboundMethodOptions{}
-		if len(options) > 0 {
-			optsMap, _ := options[0].(map[string]interface{})
-			if ignoreStatic, ok := optsMap["ignoreStatic"].(bool); ok {
-				opts.IgnoreStatic = utils.Ref(ignoreStatic)
-			}
-		}
-		if opts.IgnoreStatic == nil {
-			opts.IgnoreStatic = utils.Ref(false)
-		}
+		opts := parseOptions(options)
 
 		isNativelyBound := func(object *ast.Node, property *ast.Node) bool {
 			// We can't rely entirely on the type-level checks made at the end of this
@@ -241,7 +244,7 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			dangerous, firstParamIsThis := checkIfMethod(symbol, *opts.IgnoreStatic)
+			dangerous, firstParamIsThis := checkIfMethod(symbol, opts.IgnoreStatic)
 
 			if !dangerous {
 				return false

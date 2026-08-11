@@ -7,20 +7,22 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
-	"github.com/web-infra-dev/rslint/internal/rule"
-	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
+	utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestResolveSourceFileFromSourceFile(t *testing.T) {
 	t.Parallel()
 
-	ctx, specifier := contextForImport(t, "./bar")
+	program, sourceFile, specifier := programForImport(t, map[string]string{
+		"/import-fixture/file.ts": "import value from \"./bar\";\nvoid value;\n",
+		"/import-fixture/bar.ts":  "export default 1;\n",
+	}, "/import-fixture/file.ts")
 
-	resolvedPath, target, ok := import_utils.ResolveSourceFileFromSourceFile(ctx, ctx.SourceFile, specifier)
+	resolvedPath, target, ok := utils.ResolveModuleFile(program, sourceFile, specifier)
 	if !ok {
 		t.Fatal("ResolveSourceFileFromSourceFile() did not resolve ./bar")
 	}
@@ -39,9 +41,12 @@ func TestResolveSourceFileFromSourceFile(t *testing.T) {
 func TestResolveSourceFileFromSourceFileInvalidInput(t *testing.T) {
 	t.Parallel()
 
-	ctx, _ := contextForImport(t, "./bar")
+	program, sourceFile, _ := programForImport(t, map[string]string{
+		"/import-fixture/file.ts": "import value from \"./bar\";\nvoid value;\n",
+		"/import-fixture/bar.ts":  "export default 1;\n",
+	}, "/import-fixture/file.ts")
 
-	if resolvedPath, target, ok := import_utils.ResolveSourceFileFromSourceFile(ctx, ctx.SourceFile, nil); ok || resolvedPath != "" || target != nil {
+	if resolvedPath, target, ok := utils.ResolveModuleFile(program, sourceFile, nil); ok || resolvedPath != "" || target != nil {
 		t.Fatalf("ResolveSourceFileFromSourceFile(nil) = (%q, %#v, %v), want empty result", resolvedPath, target, ok)
 	}
 }
@@ -89,12 +94,12 @@ func TestResolveFromSourceFileRequire(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx, specifier := contextForRequire(t, files, test.fileName, &core.CompilerOptions{
+			program, sourceFile, specifier := programForRequire(t, files, test.fileName, &core.CompilerOptions{
 				Module:  core.ModuleKindCommonJS,
 				AllowJs: core.TSTrue,
 			})
 
-			resolvedPath, ok := import_utils.ResolveFromSourceFile(ctx, ctx.SourceFile, specifier)
+			resolvedPath, ok := utils.ResolveModulePath(program, sourceFile, specifier)
 			if ok != (test.wantPath != "") {
 				t.Fatalf("ResolveFromSourceFile() ok = %v, want %v (path %q)", ok, test.wantPath != "", resolvedPath)
 			}
@@ -119,12 +124,12 @@ func TestResolveFromSourceFileModuleSuffixes(t *testing.T) {
 		"/suffix-fixture/consumer.ts": `const dep = require("./dep");`,
 	}
 
-	ctx, specifier := contextForRequire(t, files, "/suffix-fixture/consumer.ts", &core.CompilerOptions{
+	program, sourceFile, specifier := programForRequire(t, files, "/suffix-fixture/consumer.ts", &core.CompilerOptions{
 		Module:         core.ModuleKindCommonJS,
 		ModuleSuffixes: []string{".ios", ""},
 	})
 
-	resolvedPath, ok := import_utils.ResolveFromSourceFile(ctx, ctx.SourceFile, specifier)
+	resolvedPath, ok := utils.ResolveModulePath(program, sourceFile, specifier)
 	if !ok {
 		t.Fatal("ResolveFromSourceFile() did not resolve ./dep")
 	}
@@ -151,12 +156,12 @@ func TestResolveFromSourceFileUnloadedTarget(t *testing.T) {
 
 	// dep.ios.ts stays out of the Program, the way `exclude` or a narrow `files`
 	// list would keep it out, so the resolved file has no source file to report.
-	ctx, specifier := contextForRequireRoots(t, files, []string{consumer, loadedDep}, consumer, &core.CompilerOptions{
+	program, sourceFile, specifier := programForRequireRoots(t, files, []string{consumer, loadedDep}, consumer, &core.CompilerOptions{
 		Module:         core.ModuleKindCommonJS,
 		ModuleSuffixes: []string{".ios", ""},
 	})
 
-	resolvedPath, ok := import_utils.ResolveFromSourceFile(ctx, ctx.SourceFile, specifier)
+	resolvedPath, ok := utils.ResolveModulePath(program, sourceFile, specifier)
 	if !ok {
 		t.Fatal("ResolveFromSourceFile() did not resolve ./dep")
 	}
@@ -164,7 +169,7 @@ func TestResolveFromSourceFileUnloadedTarget(t *testing.T) {
 		t.Fatalf("resolvedPath = %q, want %q", got, want)
 	}
 
-	if resolvedPath, target, ok := import_utils.ResolveSourceFileFromSourceFile(ctx, ctx.SourceFile, specifier); ok || target != nil {
+	if resolvedPath, target, ok := utils.ResolveModuleFile(program, sourceFile, specifier); ok || target != nil {
 		t.Fatalf("ResolveSourceFileFromSourceFile() = (%q, %#v, %v), want empty result", resolvedPath, target, ok)
 	}
 }
@@ -188,12 +193,12 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 		consumer:    `const pkg = (require)("some-package");`,
 	}
 
-	ctx, specifier := contextForRequireRoots(t, files, []string{consumer}, consumer, &core.CompilerOptions{
+	program, sourceFile, specifier := programForRequireRoots(t, files, []string{consumer}, consumer, &core.CompilerOptions{
 		Module:           core.ModuleKindNodeNext,
 		ModuleResolution: core.ModuleResolutionKindNodeNext,
 	})
 
-	resolvedPath, ok := import_utils.ResolveFromSourceFile(ctx, ctx.SourceFile, specifier)
+	resolvedPath, ok := utils.ResolveModulePath(program, sourceFile, specifier)
 	if !ok {
 		t.Fatal("ResolveFromSourceFile() did not resolve some-package")
 	}
@@ -204,7 +209,7 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 
 // contextForRequire parses fileName out of an in-memory tree and returns the
 // argument of the first `require()` call in it.
-func contextForRequire(t *testing.T, files map[string]string, fileName string, options *core.CompilerOptions) (rule.RuleContext, *ast.Node) {
+func programForRequire(t *testing.T, files map[string]string, fileName string, options *core.CompilerOptions) (*compiler.Program, *ast.SourceFile, *ast.Node) {
 	t.Helper()
 
 	// Every file outside node_modules is a root, the way a tsconfig covering the
@@ -218,18 +223,18 @@ func contextForRequire(t *testing.T, files map[string]string, fileName string, o
 	}
 	slices.Sort(rootFiles)
 
-	return contextForRequireRoots(t, files, rootFiles, fileName, options)
+	return programForRequireRoots(t, files, rootFiles, fileName, options)
 }
 
 // contextForRequireRoots parses fileName out of an in-memory tree the Program
 // loads rootFiles from, and returns the argument of the first `require()` call
 // in it.
-func contextForRequireRoots(t *testing.T, files map[string]string, rootFiles []string, fileName string, options *core.CompilerOptions) (rule.RuleContext, *ast.Node) {
+func programForRequireRoots(t *testing.T, files map[string]string, rootFiles []string, fileName string, options *core.CompilerOptions) (*compiler.Program, *ast.SourceFile, *ast.Node) {
 	t.Helper()
 
-	fs := rslint_utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), files)
-	host := rslint_utils.CreateCompilerHost("/", fs)
-	program, err := rslint_utils.CreateProgramFromOptions(true, options, rootFiles, host)
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), files)
+	host := utils.CreateCompilerHost("/", fs)
+	program, err := utils.CreateProgramFromOptions(true, options, rootFiles, host)
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptions: %v", err)
 	}
@@ -237,7 +242,7 @@ func contextForRequireRoots(t *testing.T, files map[string]string, rootFiles []s
 	sourceFile := program.GetSourceFile(fileName)
 	if sourceFile == nil {
 		t.Fatalf("%s was not parsed", fileName)
-		return rule.RuleContext{}, nil
+		return nil, nil, nil
 	}
 
 	var specifier *ast.Node
@@ -258,5 +263,37 @@ func contextForRequireRoots(t *testing.T, files map[string]string, rootFiles []s
 	if specifier == nil {
 		t.Fatalf("%s has no require() call", fileName)
 	}
-	return rule.RuleContext{Program: program, SourceFile: sourceFile}, specifier
+	return program, sourceFile, specifier
+}
+
+// programForImport parses fileName out of an in-memory tree and returns the
+// module specifier of the first import declaration in it.
+func programForImport(t *testing.T, files map[string]string, fileName string) (*compiler.Program, *ast.SourceFile, *ast.Node) {
+	t.Helper()
+
+	rootFiles := make([]string, 0, len(files))
+	for path := range files {
+		rootFiles = append(rootFiles, path)
+	}
+	slices.Sort(rootFiles)
+
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), files)
+	host := utils.CreateCompilerHost("/", fs)
+	program, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{}, rootFiles, host)
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptions: %v", err)
+	}
+
+	sourceFile := program.GetSourceFile(fileName)
+	if sourceFile == nil {
+		t.Fatalf("%s was not parsed", fileName)
+		return nil, nil, nil
+	}
+	for _, stmt := range sourceFile.Statements.Nodes {
+		if stmt != nil && stmt.Kind == ast.KindImportDeclaration {
+			return program, sourceFile, stmt.AsImportDeclaration().ModuleSpecifier
+		}
+	}
+	t.Fatalf("%s has no import declaration", fileName)
+	return nil, nil, nil
 }

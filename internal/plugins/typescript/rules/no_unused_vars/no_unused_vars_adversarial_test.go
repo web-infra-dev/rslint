@@ -185,7 +185,7 @@ console.log(mutateParameter);
 		SourceFile:  sourceFile,
 		Program:     program,
 		TypeChecker: typeChecker,
-		Refs:        rule.NewRefStore(sourceFile, program.Options(), typeChecker),
+		Refs:        rule.NewRefStore(sourceFile, program.Options(), typeChecker, rule.RefStoreInit{}),
 	}
 	globalSourceFile := ast.IsGlobalSourceFile(sourceFile.AsNode())
 	selfModifyingCount := 0

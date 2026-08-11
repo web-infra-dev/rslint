@@ -473,7 +473,8 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 	}
 
 	globals := newProgramGlobalDeclarations(ctx, o, variant.builtinMode)
-	isModule := ast.IsExternalModule(ctx.SourceFile)
+	hasNonGlobalTopLevelScope := ast.IsExternalModule(ctx.SourceFile) ||
+		(ctx.Refs != nil && ctx.Refs.HasNonGlobalTopLevelScope())
 	var handled map[string]bool
 	if len(globals.inlineOrder) > 0 {
 		handled = make(map[string]bool, len(s.order))
@@ -483,7 +484,7 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 	for _, name := range s.order {
 		decls := filterMergeDeclarations(s.decls[name], o.ignoreDeclarationMerge)
 		inline := globals.inlineByName[name]
-		reportProgramDeclarations(ctx, &reports, globals, name, decls, inline.NameRanges, isModule, variant.commentsBeforeSyntax)
+		reportProgramDeclarations(ctx, &reports, globals, name, decls, inline.NameRanges, hasNonGlobalTopLevelScope, variant.commentsBeforeSyntax)
 		if handled != nil {
 			handled[name] = true
 		}
@@ -495,7 +496,7 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 			continue
 		}
 		inline := globals.inlineByName[name]
-		reportProgramDeclarations(ctx, &reports, globals, name, nil, inline.NameRanges, isModule, variant.commentsBeforeSyntax)
+		reportProgramDeclarations(ctx, &reports, globals, name, nil, inline.NameRanges, hasNonGlobalTopLevelScope, variant.commentsBeforeSyntax)
 	}
 
 	sort.SliceStable(reports, func(i, j int) bool {
@@ -523,12 +524,12 @@ func reportProgramDeclarations(
 	name string,
 	syntax []declInfo,
 	comments []core.TextRange,
-	isModule bool,
+	hasNonGlobalTopLevelScope bool,
 	commentsBeforeSyntax bool,
 ) {
-	// A module's syntax declarations live in its module scope, while config and
-	// inline globals remain in the outer global scope.
-	if isModule {
+	// Module and implicit-wrapper syntax declarations live in a non-global file
+	// scope, while config and inline globals remain in the outer global scope.
+	if hasNonGlobalTopLevelScope {
 		reportDeclarationSequence(ctx, reports, name, syntax, nil, false, commentsBeforeSyntax)
 		if len(comments) > 0 {
 			reportDeclarationSequence(ctx, reports, name, nil, comments, globals.isImplicitBuiltin(name), commentsBeforeSyntax)

@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -384,17 +383,17 @@ func TestTypeMatchesSomeSpecifierDistinguishesOmittedAndEmptyFilePath(t *testing
 	defer done()
 
 	demo := typeOfTestAlias(t, program, c, filePath)
-	decode := func(raw string) TypeOrValueSpecifier {
+	decode := func(raw map[string]any) TypeOrValueSpecifier {
 		t.Helper()
-		var specifier TypeOrValueSpecifier
-		assert.NilError(t, json.Unmarshal([]byte(raw), &specifier))
+		specifier, ok := ParseTypeOrValueSpecifier(raw)
+		assert.Assert(t, ok)
 		return specifier
 	}
 
 	assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{
-		decode(`{"from":"file","name":"Demo"}`),
+		decode(map[string]any{"from": "file", "name": "Demo"}),
 	}, nil, program), true)
 	assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{
-		decode(`{"from":"file","name":"Demo","path":""}`),
+		decode(map[string]any{"from": "file", "name": "Demo", "path": ""}),
 	}, nil, program), false)
 }

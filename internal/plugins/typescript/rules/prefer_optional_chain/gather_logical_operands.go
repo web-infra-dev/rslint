@@ -452,22 +452,22 @@ func (a *OperandAnalyzer) isValidBooleanCheckType(node *ast.Node) bool {
 
 	allowed := checker.TypeFlagsNull | checker.TypeFlagsUndefined | checker.TypeFlagsObject
 	opts := a.opts
-	if derefBoolDefault(opts.CheckAny, true) {
+	if opts.CheckAny {
 		allowed |= checker.TypeFlagsAny
 	}
-	if derefBoolDefault(opts.CheckUnknown, true) {
+	if opts.CheckUnknown {
 		allowed |= checker.TypeFlagsUnknown
 	}
-	if derefBoolDefault(opts.CheckString, true) {
+	if opts.CheckString {
 		allowed |= checker.TypeFlagsStringLike
 	}
-	if derefBoolDefault(opts.CheckNumber, true) {
+	if opts.CheckNumber {
 		allowed |= checker.TypeFlagsNumberLike
 	}
-	if derefBoolDefault(opts.CheckBoolean, true) {
+	if opts.CheckBoolean {
 		allowed |= checker.TypeFlagsBooleanLike
 	}
-	if derefBoolDefault(opts.CheckBigInt, true) {
+	if opts.CheckBigInt {
 		allowed |= checker.TypeFlagsBigIntLike
 	}
 

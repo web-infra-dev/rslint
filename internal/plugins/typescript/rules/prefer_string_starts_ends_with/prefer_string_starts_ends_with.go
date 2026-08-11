@@ -29,11 +29,21 @@ func buildPreferEndsWithMessage() rule.RuleMessage {
 }
 
 type Options struct {
-	AllowSingleElementEquality *string `json:"allowSingleElementEquality"`
+	AllowSingleElementEquality string
 }
 
-var defaultOpts = Options{
-	AllowSingleElementEquality: utils.Ref("never"),
+func parseOptions(options []any) Options {
+	opts := Options{
+		AllowSingleElementEquality: "never",
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["allowSingleElementEquality"].(string); ok {
+		opts.AllowSingleElementEquality = value
+	}
+	return opts
 }
 
 // callInfo holds parsed call expression info
@@ -417,18 +427,11 @@ var PreferStringStartsEndsWithRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := defaultOpts
-
-		if len(options) > 0 {
-			optsMap, _ := options[0].(map[string]interface{})
-			if allowSingleElementEquality, ok := optsMap["allowSingleElementEquality"].(string); ok {
-				opts.AllowSingleElementEquality = utils.Ref(allowSingleElementEquality)
-			}
-		}
+		opts := parseOptions(options)
 
 		h := &ruleHelper{
 			ctx:                        ctx,
-			allowSingleElementEquality: opts.AllowSingleElementEquality != nil && *opts.AllowSingleElementEquality == "always",
+			allowSingleElementEquality: opts.AllowSingleElementEquality == "always",
 		}
 
 		return rule.RuleListeners{

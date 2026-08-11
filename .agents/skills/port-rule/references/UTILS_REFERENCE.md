@@ -121,9 +121,6 @@ result := utils.NaturalCompare("item2", "item10") // -1
 ### Other Utilities
 
 ```go
-// Create a pointer (useful for optional fields)
-ptr := utils.Ref(value) // *T
-
 // Check if a character is a JS whitespace character
 isWhite := utils.IsStrWhiteSpace(r)
 ```

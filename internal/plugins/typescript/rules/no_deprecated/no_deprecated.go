@@ -3,7 +3,6 @@ package no_deprecated
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -451,27 +450,13 @@ func deprecatedReasonFromDeclaration(declaration *ast.Node) string {
 }
 
 // parseAllowSpecifiers decodes the `allow` option — type specifiers written
-// either in the string shorthand or in object form — through
-// TypeOrValueSpecifier's own UnmarshalJSON rather than re-deriving both shapes
-// by hand.
+// either in the string shorthand or in object form.
 func parseAllowSpecifiers(options []any) []utils.TypeOrValueSpecifier {
 	if len(options) == 0 {
 		return nil
 	}
-	optsMap, _ := options[0].(map[string]interface{})
-	raw, ok := optsMap["allow"]
-	if !ok {
-		return nil
-	}
-	rawJSON, err := json.Marshal(raw)
-	if err != nil {
-		return nil
-	}
-	var allow []utils.TypeOrValueSpecifier
-	if err := json.Unmarshal(rawJSON, &allow); err != nil {
-		return nil
-	}
-	return allow
+	optsMap, _ := options[0].(map[string]any)
+	return utils.ParseTypeOrValueSpecifiers(optsMap["allow"])
 }
 
 func mostSpecificNodeContainingRange(node *ast.Node, position int, end int) *ast.Node {

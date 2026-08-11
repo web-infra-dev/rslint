@@ -475,7 +475,7 @@ func (ca *ChainAnalyzer) orphanedCloseParens(boundary *ast.Node, reportRange cor
 // optional chain evaluates to `undefined` where the original short-circuited,
 // so it is only an auto-fix when that cannot change the expression's value.
 func (ca *ChainAnalyzer) shouldUseFix(chain []Operand, hasLastChain bool, operator ast.Kind) bool {
-	if derefBoolDefault(ca.opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing, false) {
+	if ca.opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing {
 		return true
 	}
 	// A trailing comparison against an arbitrary value can start answering
@@ -507,7 +507,7 @@ func (ca *ChainAnalyzer) shouldUseFix(chain []Operand, hasLastChain bool, operat
 }
 
 func (ca *ChainAnalyzer) shouldSkipForRequireNullish(operands []Operand) bool {
-	if !derefBoolDefault(ca.opts.RequireNullish, false) {
+	if !ca.opts.RequireNullish {
 		return false
 	}
 	if ca.ctx.TypeChecker == nil {
@@ -984,7 +984,7 @@ func (ca *ChainAnalyzer) getNodeText(node *ast.Node) string {
 }
 
 func (ca *ChainAnalyzer) CheckNullishAndReport(node *ast.Node) bool {
-	if !derefBoolDefault(ca.opts.RequireNullish, false) {
+	if !ca.opts.RequireNullish {
 		return false
 	}
 

@@ -2,7 +2,6 @@ package require_array_sort_compare
 
 import (
 	_ "embed"
-	"encoding/json"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -21,23 +20,19 @@ func buildRequireCompareMessage() rule.RuleMessage {
 }
 
 type RequireArraySortCompareOptions struct {
-	IgnoreStringArrays *bool `json:"ignoreStringArrays"`
+	IgnoreStringArrays bool
 }
 
 func parseOptions(options []any) RequireArraySortCompareOptions {
 	opts := RequireArraySortCompareOptions{
-		IgnoreStringArrays: utils.Ref(true),
+		IgnoreStringArrays: true,
 	}
 	if len(options) == 0 {
 		return opts
 	}
-	if optsMap, ok := options[0].(map[string]interface{}); ok {
-		if optsJSON, err := json.Marshal(optsMap); err == nil {
-			_ = json.Unmarshal(optsJSON, &opts)
-		}
-	}
-	if opts.IgnoreStringArrays == nil {
-		opts.IgnoreStringArrays = utils.Ref(true)
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["ignoreStringArrays"].(bool); ok {
+		opts.IgnoreStringArrays = value
 	}
 	return opts
 }
@@ -67,7 +62,7 @@ var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
 
 				calleeObjType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, callee.Expression())
 
-				if *opts.IgnoreStringArrays && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, calleeObjType) {
+				if opts.IgnoreStringArrays && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, calleeObjType) {
 					if utils.Every(checker.Checker_getTypeArguments(ctx.TypeChecker, calleeObjType), func(t *checker.Type) bool {
 						return utils.IsTypeFlagSet(t, checker.TypeFlagsString)
 					}) {

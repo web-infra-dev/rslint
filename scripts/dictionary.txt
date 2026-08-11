@@ -530,6 +530,7 @@ tablist
 Taml
 tanstack
 tarask
+tarjan
 tascript
 tekuri
 Telu

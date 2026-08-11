@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.allow-js.json",
+  "compilerOptions": {
+    "moduleDetection": "legacy"
+  }
+}

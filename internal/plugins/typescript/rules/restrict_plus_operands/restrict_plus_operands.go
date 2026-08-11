@@ -34,58 +34,44 @@ func buildMismatchedMessage(stringLike, left, right string) rule.RuleMessage {
 }
 
 type RestrictPlusOperandsOptions struct {
-	AllowAny                *bool `json:"allowAny"`
-	AllowBoolean            *bool `json:"allowBoolean"`
-	AllowNullish            *bool `json:"allowNullish"`
-	AllowNumberAndString    *bool `json:"allowNumberAndString"`
-	AllowRegExp             *bool `json:"allowRegExp"`
-	SkipCompoundAssignments *bool `json:"skipCompoundAssignments"`
+	AllowAny                bool
+	AllowBoolean            bool
+	AllowNullish            bool
+	AllowNumberAndString    bool
+	AllowRegExp             bool
+	SkipCompoundAssignments bool
 }
 
 func parseOptions(options []any) RestrictPlusOperandsOptions {
-	opts := RestrictPlusOperandsOptions{}
-	if len(options) > 0 {
-		if optsMap, ok := options[0].(map[string]any); ok {
-			if value, ok := optsMap["allowAny"].(bool); ok {
-				opts.AllowAny = utils.Ref(value)
-			}
-			if value, ok := optsMap["allowBoolean"].(bool); ok {
-				opts.AllowBoolean = utils.Ref(value)
-			}
-			if value, ok := optsMap["allowNullish"].(bool); ok {
-				opts.AllowNullish = utils.Ref(value)
-			}
-			if value, ok := optsMap["allowNumberAndString"].(bool); ok {
-				opts.AllowNumberAndString = utils.Ref(value)
-			}
-			if value, ok := optsMap["allowRegExp"].(bool); ok {
-				opts.AllowRegExp = utils.Ref(value)
-			}
-			if value, ok := optsMap["skipCompoundAssignments"].(bool); ok {
-				opts.SkipCompoundAssignments = utils.Ref(value)
-			}
-		}
+	opts := RestrictPlusOperandsOptions{
+		AllowAny:             true,
+		AllowBoolean:         true,
+		AllowNullish:         true,
+		AllowNumberAndString: true,
+		AllowRegExp:          true,
 	}
-
-	if opts.AllowAny == nil {
-		opts.AllowAny = utils.Ref(true)
+	if len(options) == 0 {
+		return opts
 	}
-	if opts.AllowBoolean == nil {
-		opts.AllowBoolean = utils.Ref(true)
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["allowAny"].(bool); ok {
+		opts.AllowAny = value
 	}
-	if opts.AllowNullish == nil {
-		opts.AllowNullish = utils.Ref(true)
+	if value, ok := optsMap["allowBoolean"].(bool); ok {
+		opts.AllowBoolean = value
 	}
-	if opts.AllowNumberAndString == nil {
-		opts.AllowNumberAndString = utils.Ref(true)
+	if value, ok := optsMap["allowNullish"].(bool); ok {
+		opts.AllowNullish = value
 	}
-	if opts.AllowRegExp == nil {
-		opts.AllowRegExp = utils.Ref(true)
+	if value, ok := optsMap["allowNumberAndString"].(bool); ok {
+		opts.AllowNumberAndString = value
 	}
-	if opts.SkipCompoundAssignments == nil {
-		opts.SkipCompoundAssignments = utils.Ref(false)
+	if value, ok := optsMap["allowRegExp"].(bool); ok {
+		opts.AllowRegExp = value
 	}
-
+	if value, ok := optsMap["skipCompoundAssignments"].(bool); ok {
+		opts.SkipCompoundAssignments = value
+	}
 	return opts
 }
 
@@ -97,19 +83,19 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 
 		stringLikes := make([]string, 0, 5)
-		if *opts.AllowAny {
+		if opts.AllowAny {
 			stringLikes = append(stringLikes, "`any`")
 		}
-		if *opts.AllowBoolean {
+		if opts.AllowBoolean {
 			stringLikes = append(stringLikes, "`boolean`")
 		}
-		if *opts.AllowNullish {
+		if opts.AllowNullish {
 			stringLikes = append(stringLikes, "`null`")
 		}
-		if *opts.AllowRegExp {
+		if opts.AllowRegExp {
 			stringLikes = append(stringLikes, "`RegExp`")
 		}
-		if *opts.AllowNullish {
+		if opts.AllowNullish {
 			stringLikes = append(stringLikes, "`undefined`")
 		}
 		var stringLike string
@@ -131,13 +117,13 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 		invalidFlags := checker.TypeFlagsESSymbolLike |
 			checker.TypeFlagsNever |
 			checker.TypeFlagsUnknown
-		if !*opts.AllowAny {
+		if !opts.AllowAny {
 			invalidFlags |= checker.TypeFlagsAny
 		}
-		if !*opts.AllowBoolean {
+		if !opts.AllowBoolean {
 			invalidFlags |= checker.TypeFlagsBooleanLike
 		}
-		if !*opts.AllowNullish {
+		if !opts.AllowNullish {
 			invalidFlags |= checker.TypeFlagsNullable
 		}
 
@@ -160,10 +146,10 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 
 				// RegExps also contain checker.TypeFlagsAny & checker.TypeFlagsObject
 				if part == globalRegexpType {
-					if *opts.AllowRegExp && !utils.IsTypeFlagSet(otherType, checker.TypeFlagsNumberLike) {
+					if opts.AllowRegExp && !utils.IsTypeFlagSet(otherType, checker.TypeFlagsNumberLike) {
 						continue
 					}
-				} else if (*opts.AllowAny || !utils.IsTypeAnyType(part)) && !utils.Every(utils.IntersectionTypeParts(part), utils.IsObjectType) {
+				} else if (opts.AllowAny || !utils.IsTypeAnyType(part)) && !utils.Every(utils.IntersectionTypeParts(part), utils.IsObjectType) {
 					continue
 				}
 				foundRegexp = true
@@ -200,7 +186,7 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 			}
 
 			checkMismatchedPlusOperands := func(baseTypeFlags, otherTypeFlags checker.TypeFlags) bool {
-				if !*opts.AllowNumberAndString &&
+				if !opts.AllowNumberAndString &&
 					baseTypeFlags&checker.TypeFlagsStringLike != 0 &&
 					otherTypeFlags&(checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) != 0 {
 					ctx.ReportNode(&node.Node, buildMismatchedMessage(stringLike, ctx.TypeChecker.TypeToString(leftType), ctx.TypeChecker.TypeToString(rightType)))
@@ -224,7 +210,7 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				expr := node.AsBinaryExpression()
-				if expr.OperatorToken.Kind == ast.KindPlusToken || (!*opts.SkipCompoundAssignments && expr.OperatorToken.Kind == ast.KindPlusEqualsToken) {
+				if expr.OperatorToken.Kind == ast.KindPlusToken || (!opts.SkipCompoundAssignments && expr.OperatorToken.Kind == ast.KindPlusEqualsToken) {
 					checkPlusOperands(expr)
 				}
 			},

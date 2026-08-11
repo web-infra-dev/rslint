@@ -2,7 +2,6 @@ package no_confusing_void_expression
 
 import (
 	_ "embed"
-	"encoding/json"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -63,9 +62,9 @@ func buildVoidExprWrapVoidMessage() rule.RuleMessage {
 }
 
 type NoConfusingVoidExpressionOptions struct {
-	IgnoreArrowShorthand         bool `json:"ignoreArrowShorthand,omitempty"`
-	IgnoreVoidOperator           bool `json:"ignoreVoidOperator,omitempty"`
-	IgnoreVoidReturningFunctions bool `json:"ignoreVoidReturningFunctions,omitempty"`
+	IgnoreArrowShorthand         bool
+	IgnoreVoidOperator           bool
+	IgnoreVoidReturningFunctions bool
 }
 
 func parseOptions(options []any) NoConfusingVoidExpressionOptions {
@@ -73,9 +72,15 @@ func parseOptions(options []any) NoConfusingVoidExpressionOptions {
 	if len(options) == 0 {
 		return opts
 	}
-	// Convert the configured option object to JSON and back into the struct.
-	if optsJSON, err := json.Marshal(options[0]); err == nil {
-		_ = json.Unmarshal(optsJSON, &opts)
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["ignoreArrowShorthand"].(bool); ok {
+		opts.IgnoreArrowShorthand = value
+	}
+	if value, ok := optsMap["ignoreVoidOperator"].(bool); ok {
+		opts.IgnoreVoidOperator = value
+	}
+	if value, ok := optsMap["ignoreVoidReturningFunctions"].(bool); ok {
+		opts.IgnoreVoidReturningFunctions = value
 	}
 	return opts
 }
