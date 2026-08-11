@@ -47,4 +47,5 @@ class D extends A {
 
 ## Original Documentation
 
-- [ESLint no-useless-constructor](https://eslint.org/docs/latest/rules/no-useless-constructor)
+- [ESLint: no-useless-constructor](https://eslint.org/docs/latest/rules/no-useless-constructor)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/no-useless-constructor.js)

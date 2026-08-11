@@ -37,4 +37,5 @@ class Bar {
 
 ## Original Documentation
 
-- [ESLint no-empty-static-block](https://eslint.org/docs/latest/rules/no-empty-static-block)
+- [ESLint: no-empty-static-block](https://eslint.org/docs/latest/rules/no-empty-static-block)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-empty-static-block.js)

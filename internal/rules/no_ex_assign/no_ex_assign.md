@@ -50,4 +50,7 @@ try {
 
 ## Original Documentation
 
+- [ESLint: no-ex-assign](https://eslint.org/docs/latest/rules/no-ex-assign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-ex-assign.js)
+
 https://eslint.org/docs/latest/rules/no-ex-assign

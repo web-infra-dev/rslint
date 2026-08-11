@@ -74,4 +74,7 @@ class A {
 
 ## Original Documentation
 
+- [ESLint: no-dupe-class-members](https://eslint.org/docs/latest/rules/no-dupe-class-members)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-dupe-class-members.js)
+
 https://eslint.org/docs/latest/rules/no-dupe-class-members

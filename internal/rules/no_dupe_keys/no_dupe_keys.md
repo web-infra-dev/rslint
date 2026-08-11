@@ -35,4 +35,7 @@ var foo = {
 
 ## Original Documentation
 
+- [ESLint: no-dupe-keys](https://eslint.org/docs/latest/rules/no-dupe-keys)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-dupe-keys.js)
+
 https://eslint.org/docs/latest/rules/no-dupe-keys

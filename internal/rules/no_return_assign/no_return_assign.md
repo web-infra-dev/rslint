@@ -81,4 +81,5 @@ function doSomething() {
 
 ## Original Documentation
 
-- [ESLint rule: no-return-assign](https://eslint.org/docs/latest/rules/no-return-assign)
+- [ESLint: no-return-assign](https://eslint.org/docs/latest/rules/no-return-assign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-return-assign.js)

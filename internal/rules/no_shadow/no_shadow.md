@@ -90,4 +90,7 @@ Ignores shadowing for parameters declared inside a function type. Default:
 
 ## Original Documentation
 
+- [ESLint: no-shadow](https://eslint.org/docs/latest/rules/no-shadow)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-shadow.js)
+
 [https://eslint.org/docs/latest/rules/no-shadow](https://eslint.org/docs/latest/rules/no-shadow)

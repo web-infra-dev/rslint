@@ -47,4 +47,5 @@ if (!isNaN(foo)) {
 
 ## Original Documentation
 
-- [ESLint use-isnan](https://eslint.org/docs/latest/rules/use-isnan)
+- [ESLint: use-isnan](https://eslint.org/docs/latest/rules/use-isnan)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/use-isnan.js)

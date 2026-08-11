@@ -35,4 +35,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [ESLint no-loss-of-precision](https://eslint.org/docs/latest/rules/no-loss-of-precision)
+- [ESLint: no-loss-of-precision](https://eslint.org/docs/latest/rules/no-loss-of-precision)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-loss-of-precision.js)

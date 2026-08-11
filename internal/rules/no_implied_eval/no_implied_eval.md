@@ -42,4 +42,7 @@ window.setTimeout(handler, 100);
 
 ## Original Documentation
 
+- [ESLint: no-implied-eval](https://eslint.org/docs/latest/rules/no-implied-eval)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-implied-eval.js)
+
 https://eslint.org/docs/latest/rules/no-implied-eval

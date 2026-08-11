@@ -48,4 +48,5 @@ behavior — a radix argument is always required regardless of the option.
 
 ## Original Documentation
 
-- [ESLint rule documentation](https://eslint.org/docs/latest/rules/radix)
+- [ESLint: radix](https://eslint.org/docs/latest/rules/radix)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/radix.js)

@@ -139,4 +139,5 @@ let foo = () => ({ foo: 0 });
 
 ## Original Documentation
 
-- [ESLint arrow-body-style](https://eslint.org/docs/latest/rules/arrow-body-style)
+- [ESLint: arrow-body-style](https://eslint.org/docs/latest/rules/arrow-body-style)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/arrow-body-style.js)

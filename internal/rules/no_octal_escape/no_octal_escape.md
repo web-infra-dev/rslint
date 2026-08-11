@@ -26,4 +26,7 @@ var foo = '\\1';
 
 ## Original Documentation
 
+- [ESLint: no-octal-escape](https://eslint.org/docs/latest/rules/no-octal-escape)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-octal-escape.js)
+
 https://eslint.org/docs/latest/rules/no-octal-escape

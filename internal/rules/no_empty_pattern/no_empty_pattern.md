@@ -38,4 +38,7 @@ function foo([a]) {}
 
 ## Original Documentation
 
+- [ESLint: no-empty-pattern](https://eslint.org/docs/latest/rules/no-empty-pattern)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-empty-pattern.js)
+
 https://eslint.org/docs/latest/rules/no-empty-pattern

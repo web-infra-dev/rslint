@@ -29,3 +29,4 @@ var d = 'foo' + bar;
 ## Original Documentation
 
 - [ESLint: no-useless-concat](https://eslint.org/docs/latest/rules/no-useless-concat)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-useless-concat.js)

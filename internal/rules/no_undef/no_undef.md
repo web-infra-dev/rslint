@@ -44,3 +44,8 @@ f();
 
 typeof maybeUndefined === 'string';
 ```
+
+## Original Documentation
+
+- [ESLint: no-undef](https://eslint.org/docs/latest/rules/no-undef)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-undef.js)

@@ -53,4 +53,5 @@ class B {
 
 ## Original Documentation
 
-- [ESLint no-setter-return](https://eslint.org/docs/latest/rules/no-setter-return)
+- [ESLint: no-setter-return](https://eslint.org/docs/latest/rules/no-setter-return)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-setter-return.js)

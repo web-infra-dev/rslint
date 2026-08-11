@@ -43,4 +43,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [ESLint rule: no-unused-labels](https://eslint.org/docs/latest/rules/no-unused-labels)
+- [ESLint: no-unused-labels](https://eslint.org/docs/latest/rules/no-unused-labels)
+- [Source code](https://github.com/eslint/eslint/blob/v10.6.0/lib/rules/no-unused-labels.js)

@@ -60,5 +60,5 @@ Object.prototype.g = 0;
 
 ## Original Documentation
 
-- [ESLint rule documentation](https://eslint.org/docs/latest/rules/no-extend-native)
-- [Source code](https://github.com/eslint/eslint/blob/main/lib/rules/no-extend-native.js)
+- [ESLint: no-extend-native](https://eslint.org/docs/latest/rules/no-extend-native)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-extend-native.js)

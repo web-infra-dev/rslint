@@ -157,4 +157,7 @@ try {
 
 ## Original Documentation
 
+- [ESLint: preserve-caught-error](https://eslint.org/docs/latest/rules/preserve-caught-error)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/preserve-caught-error.js)
+
 [https://eslint.org/docs/latest/rules/preserve-caught-error](https://eslint.org/docs/latest/rules/preserve-caught-error)

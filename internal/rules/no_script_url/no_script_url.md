@@ -22,4 +22,7 @@ location.href = 'https://example.com';
 
 ## Original Documentation
 
+- [ESLint: no-script-url](https://eslint.org/docs/latest/rules/no-script-url)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-script-url.js)
+
 https://eslint.org/docs/latest/rules/no-script-url

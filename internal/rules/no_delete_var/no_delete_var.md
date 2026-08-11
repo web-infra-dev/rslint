@@ -22,4 +22,7 @@ delete obj.x;
 
 ## Original Documentation
 
+- [ESLint: no-delete-var](https://eslint.org/docs/latest/rules/no-delete-var)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-delete-var.js)
+
 https://eslint.org/docs/latest/rules/no-delete-var

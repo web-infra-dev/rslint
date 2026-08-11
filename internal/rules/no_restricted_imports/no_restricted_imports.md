@@ -67,4 +67,7 @@ The rule accepts either an array of strings/objects or an object with `paths` an
 
 ## Original Documentation
 
+- [ESLint: no-restricted-imports](https://eslint.org/docs/latest/rules/no-restricted-imports)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-restricted-imports.js)
+
 [ESLint: no-restricted-imports](https://eslint.org/docs/latest/rules/no-restricted-imports)

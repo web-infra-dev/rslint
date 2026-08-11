@@ -92,4 +92,7 @@ When set to `true`, reports fallthrough comments on cases that cannot actually f
 
 ## Original Documentation
 
+- [ESLint: no-fallthrough](https://eslint.org/docs/latest/rules/no-fallthrough)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-fallthrough.js)
+
 https://eslint.org/docs/latest/rules/no-fallthrough

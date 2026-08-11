@@ -38,4 +38,5 @@ async function foo(things) {
 
 ## Original Documentation
 
-- [ESLint no-await-in-loop](https://eslint.org/docs/latest/rules/no-await-in-loop)
+- [ESLint: no-await-in-loop](https://eslint.org/docs/latest/rules/no-await-in-loop)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-await-in-loop.js)

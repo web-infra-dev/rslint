@@ -35,4 +35,5 @@ for (key in foo) {
 
 ## Original Documentation
 
-- https://eslint.org/docs/latest/rules/guard-for-in
+- [ESLint: guard-for-in](https://eslint.org/docs/latest/rules/guard-for-in)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/guard-for-in.js)
