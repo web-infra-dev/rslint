@@ -115,4 +115,5 @@ These mirror the upstream `eslint-plugin-jsx-a11y` settings exactly.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/autocomplete-valid](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/autocomplete-valid.md)
+- [eslint-plugin-jsx-a11y: autocomplete-valid](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/autocomplete-valid.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/autocomplete-valid.js)

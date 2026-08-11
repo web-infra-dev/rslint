@@ -141,4 +141,5 @@ Examples of **incorrect** code with `{ "iframe": ["onError", "onLoad"] }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-noninteractive-element-interactions](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-noninteractive-element-interactions.md)
+- [eslint-plugin-jsx-a11y: no-noninteractive-element-interactions](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-noninteractive-element-interactions.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-noninteractive-element-interactions.js)

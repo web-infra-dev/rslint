@@ -54,4 +54,5 @@ This rule takes no options.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/aria-activedescendant-has-tabindex](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-activedescendant-has-tabindex.md)
+- [eslint-plugin-jsx-a11y: aria-activedescendant-has-tabindex](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/aria-activedescendant-has-tabindex.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/aria-activedescendant-has-tabindex.js)

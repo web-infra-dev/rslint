@@ -61,4 +61,5 @@ These mirror the upstream `eslint-plugin-jsx-a11y` settings exactly.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/scope](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/scope.md)
+- [eslint-plugin-jsx-a11y: scope](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/scope.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/scope.js)
