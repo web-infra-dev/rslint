@@ -30,4 +30,5 @@ window.setTimeout(() => doSomething(), 100);
 
 ## Original Documentation
 
-- [typescript-eslint no-implied-eval](https://typescript-eslint.io/rules/no-implied-eval)
+- [typescript-eslint: no-implied-eval](https://typescript-eslint.io/rules/no-implied-eval)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-implied-eval.ts)

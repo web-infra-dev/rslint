@@ -30,4 +30,5 @@ function fn(x?: string) {}
 
 ## Original Documentation
 
-- [typescript-eslint no-duplicate-type-constituents](https://typescript-eslint.io/rules/no-duplicate-type-constituents)
+- [typescript-eslint: no-duplicate-type-constituents](https://typescript-eslint.io/rules/no-duplicate-type-constituents)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-duplicate-type-constituents.ts)

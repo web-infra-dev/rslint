@@ -18,4 +18,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/prefer-ts-expect-error
+- [typescript-eslint: prefer-ts-expect-error](https://typescript-eslint.io/rules/prefer-ts-expect-error)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.57.0/packages/eslint-plugin/src/rules/prefer-ts-expect-error.ts)

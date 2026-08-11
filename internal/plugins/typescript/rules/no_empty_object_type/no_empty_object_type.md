@@ -86,4 +86,5 @@ type DialogProps = {};
 
 ## Original Documentation
 
-- [typescript-eslint no-empty-object-type](https://typescript-eslint.io/rules/no-empty-object-type)
+- [typescript-eslint: no-empty-object-type](https://typescript-eslint.io/rules/no-empty-object-type)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-empty-object-type.ts)

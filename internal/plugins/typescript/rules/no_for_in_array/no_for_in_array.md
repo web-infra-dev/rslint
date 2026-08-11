@@ -36,4 +36,5 @@ for (let i = 0; i < arr.length; i++) {
 
 ## Original Documentation
 
-- [typescript-eslint no-for-in-array](https://typescript-eslint.io/rules/no-for-in-array)
+- [typescript-eslint: no-for-in-array](https://typescript-eslint.io/rules/no-for-in-array)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-for-in-array.ts)

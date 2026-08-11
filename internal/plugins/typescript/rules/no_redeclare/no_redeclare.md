@@ -84,5 +84,6 @@ namespace A {}
 
 ## Original Documentation
 
-- [https://typescript-eslint.io/rules/no-redeclare](https://typescript-eslint.io/rules/no-redeclare)
-- [https://eslint.org/docs/latest/rules/no-redeclare](https://eslint.org/docs/latest/rules/no-redeclare)
+- [typescript-eslint: no-redeclare](https://typescript-eslint.io/rules/no-redeclare)
+- [ESLint: no-redeclare](https://eslint.org/docs/latest/rules/no-redeclare)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-redeclare.ts)

@@ -89,5 +89,6 @@ for (var item of items) {
 
 ## Original Documentation
 
-- [typescript-eslint init-declarations](https://typescript-eslint.io/rules/init-declarations)
-- [ESLint init-declarations](https://eslint.org/docs/latest/rules/init-declarations)
+- [typescript-eslint: init-declarations](https://typescript-eslint.io/rules/init-declarations)
+- [ESLint: init-declarations](https://eslint.org/docs/latest/rules/init-declarations)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/init-declarations.ts)

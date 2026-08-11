@@ -23,4 +23,5 @@ const z = value as const;
 
 ## Original Documentation
 
-- [typescript-eslint consistent-type-assertions](https://typescript-eslint.io/rules/consistent-type-assertions)
+- [typescript-eslint: consistent-type-assertions](https://typescript-eslint.io/rules/consistent-type-assertions)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/consistent-type-assertions.ts)

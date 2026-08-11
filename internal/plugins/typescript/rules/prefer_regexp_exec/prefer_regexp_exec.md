@@ -22,4 +22,5 @@ value.match(/foo/g);
 
 ## Original Documentation
 
-- https://typescript-eslint.io/rules/prefer-regexp-exec
+- [typescript-eslint: prefer-regexp-exec](https://typescript-eslint.io/rules/prefer-regexp-exec)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-regexp-exec.ts)

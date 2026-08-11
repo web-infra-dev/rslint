@@ -44,4 +44,5 @@ function bar(): void {
 
 ## Original Documentation
 
-- [typescript-eslint consistent-return](https://typescript-eslint.io/rules/consistent-return)
+- [typescript-eslint: consistent-return](https://typescript-eslint.io/rules/consistent-return)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/consistent-return.ts)

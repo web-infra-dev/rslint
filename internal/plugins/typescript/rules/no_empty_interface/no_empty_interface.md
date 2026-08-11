@@ -31,4 +31,5 @@ type Bar = Baz;
 
 ## Original Documentation
 
-- [typescript-eslint no-empty-interface](https://typescript-eslint.io/rules/no-empty-interface)
+- [typescript-eslint: no-empty-interface](https://typescript-eslint.io/rules/no-empty-interface)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-empty-interface.ts)

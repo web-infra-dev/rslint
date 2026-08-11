@@ -23,4 +23,5 @@ if (arr.includes(value)) {
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/prefer-includes
+- [typescript-eslint: prefer-includes](https://typescript-eslint.io/rules/prefer-includes)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-includes.ts)

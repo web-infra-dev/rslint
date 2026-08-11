@@ -85,4 +85,5 @@ Default: `false`. By default the rule errors on every file when `strictNullCheck
 
 ## Original Documentation
 
-[`@typescript-eslint/prefer-nullish-coalescing`](https://typescript-eslint.io/rules/prefer-nullish-coalescing)
+- [typescript-eslint: prefer-nullish-coalescing](https://typescript-eslint.io/rules/prefer-nullish-coalescing)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-nullish-coalescing.ts)

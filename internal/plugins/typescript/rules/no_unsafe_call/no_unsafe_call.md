@@ -33,4 +33,5 @@ tag`hello`;
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-call](https://typescript-eslint.io/rules/no-unsafe-call)
+- [typescript-eslint: no-unsafe-call](https://typescript-eslint.io/rules/no-unsafe-call)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/no-unsafe-call.ts)

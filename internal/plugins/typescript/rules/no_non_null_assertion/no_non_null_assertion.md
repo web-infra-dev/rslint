@@ -28,4 +28,5 @@ const includesBaz = example.property?.includes('baz') ?? false;
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/no-non-null-assertion
+- [typescript-eslint: no-non-null-assertion](https://typescript-eslint.io/rules/no-non-null-assertion)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-non-null-assertion.ts)

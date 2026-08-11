@@ -32,4 +32,5 @@ class Baz {
 
 ## Original Documentation
 
-- [typescript-eslint promise-function-async](https://typescript-eslint.io/rules/promise-function-async)
+- [typescript-eslint: promise-function-async](https://typescript-eslint.io/rules/promise-function-async)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.29.1/packages/eslint-plugin/src/rules/promise-function-async.ts)

@@ -24,4 +24,5 @@ import { readFile } from 'fs';
 
 ## Original Documentation
 
-- [typescript-eslint no-require-imports](https://typescript-eslint.io/rules/no-require-imports)
+- [typescript-eslint: no-require-imports](https://typescript-eslint.io/rules/no-require-imports)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-require-imports.ts)

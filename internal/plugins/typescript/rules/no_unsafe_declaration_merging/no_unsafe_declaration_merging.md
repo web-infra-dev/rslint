@@ -69,4 +69,5 @@ class Foo {}
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-declaration-merging](https://typescript-eslint.io/rules/no-unsafe-declaration-merging)
+- [typescript-eslint: no-unsafe-declaration-merging](https://typescript-eslint.io/rules/no-unsafe-declaration-merging)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unsafe-declaration-merging.ts)

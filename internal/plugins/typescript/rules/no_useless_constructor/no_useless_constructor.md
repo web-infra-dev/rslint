@@ -49,5 +49,6 @@ class C extends D {
 
 ## Original Documentation
 
-- [typescript-eslint no-useless-constructor](https://typescript-eslint.io/rules/no-useless-constructor)
-- [ESLint no-useless-constructor](https://eslint.org/docs/latest/rules/no-useless-constructor)
+- [typescript-eslint: no-useless-constructor](https://typescript-eslint.io/rules/no-useless-constructor)
+- [ESLint: no-useless-constructor](https://eslint.org/docs/latest/rules/no-useless-constructor)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-useless-constructor.ts)

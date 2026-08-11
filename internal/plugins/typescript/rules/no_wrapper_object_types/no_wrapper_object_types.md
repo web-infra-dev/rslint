@@ -37,4 +37,5 @@ let value: Number;
 
 ## Original Documentation
 
-- [typescript-eslint no-wrapper-object-types](https://typescript-eslint.io/rules/no-wrapper-object-types)
+- [typescript-eslint: no-wrapper-object-types](https://typescript-eslint.io/rules/no-wrapper-object-types)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-wrapper-object-types.ts)
