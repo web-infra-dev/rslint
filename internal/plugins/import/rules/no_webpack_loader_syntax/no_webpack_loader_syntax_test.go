@@ -101,6 +101,15 @@ func TestNoWebpackLoaderSyntaxRule(t *testing.T) {
 					},
 				},
 			},
+			{
+				// Parentheses are absent from ESTree, and this rule intentionally
+				// accepts extra arguments while inspecting the first static one.
+				Code:     `var data = ((require))((("json!data")), options)`,
+				FileName: "foo.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "import/no-webpack-loader-syntax"},
+				},
+			},
 		},
 	)
 }

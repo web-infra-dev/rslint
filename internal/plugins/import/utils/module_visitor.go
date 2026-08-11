@@ -54,26 +54,10 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 
 	// for CommonJS `require` calls
 	checkCommon := func(call *ast.CallExpression) {
-		// ESTree has no parenthesized-expression node, so upstream sees a bare
-		// `require` identifier through any number of parentheses.
-		callee := ast.SkipParentheses(call.Expression)
-
-		if !ast.IsIdentifier(callee) {
+		if GetRequireCall(call.AsNode(), true) == nil {
 			return
 		}
-
-		if callee.AsIdentifier().Text != "require" {
-			return
-		}
-
-		if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
-			return
-		}
-
-		modulePath := call.Arguments.Nodes[0]
-		if modulePath == nil || !ast.IsStringLiteralLike(modulePath) {
-			return
-		}
+		modulePath := ast.SkipParentheses(call.Arguments.Nodes[0])
 
 		checkSourceValue(modulePath, call.AsNode())
 	}

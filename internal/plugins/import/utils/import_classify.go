@@ -102,19 +102,15 @@ func IsIndexImport(name string) bool {
 
 // ClassifyImport returns import-js's import type for a module specifier.
 func ClassifyImport(ctx rule.RuleContext, name string, specifier *ast.Node, internalRegex *regexp.Regexp) string {
-	resolvedPath := ""
-	if specifier != nil && ast.IsStringLiteralLike(specifier) {
-		resolvedPath, _ = Resolve(specifier, ctx)
-	}
-
+	// These categories depend only on the written specifier. Resolve bare
+	// names below because a project-local resolution can suppress builtin or
+	// external classification, but avoid resolver work that cannot change a
+	// relative or absolute path's result.
 	if internalRegex != nil && internalRegex.MatchString(name) {
 		return "internal"
 	}
 	if IsAbsolutePath(name) {
 		return "absolute"
-	}
-	if IsBuiltinModule(name, ctx.Settings, resolvedPath) {
-		return "builtin"
 	}
 	if IsRelativeToParent(name) {
 		return "parent"
@@ -124,6 +120,15 @@ func ClassifyImport(ctx rule.RuleContext, name string, specifier *ast.Node, inte
 	}
 	if IsRelativeToSibling(name) {
 		return "sibling"
+	}
+
+	resolvedPath := ""
+	if specifier != nil && ast.IsStringLiteralLike(specifier) {
+		resolvedPath, _ = Resolve(specifier, ctx)
+	}
+
+	if IsBuiltinModule(name, ctx.Settings, resolvedPath) {
+		return "builtin"
 	}
 
 	packagePath := contextPackagePath(ctx)
@@ -154,16 +159,11 @@ func contextPackagePath(ctx rule.RuleContext) string {
 	if ctx.SourceFile != nil {
 		start = tspath.GetDirectoryPath(ctx.SourceFile.FileName())
 	}
-	if ctx.Program != nil {
-		for dir := start; dir != ""; {
-			if ctx.Program.FileExists(tspath.CombinePaths(dir, "package.json")) {
-				return tspath.NormalizePath(dir)
-			}
-			parent := tspath.GetDirectoryPath(dir)
-			if parent == dir || parent == "" {
-				break
-			}
-			dir = parent
+	if ctx.Program != nil && start != "" {
+		// Reuse TypeScript's package-scope cache instead of walking and probing
+		// package.json ancestors for every classified import.
+		if packageDir := ctx.Program.GetNearestAncestorDirectoryWithPackageJson(start); packageDir != "" {
+			return tspath.NormalizePath(packageDir)
 		}
 	}
 	if ctx.Cwd != "" {

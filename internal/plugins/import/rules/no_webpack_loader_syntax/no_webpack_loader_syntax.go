@@ -39,16 +39,19 @@ var NoWebpackLoaderSyntax = rule.Rule{
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
 				callExpression := node.AsCallExpression()
-				expr := callExpression.Expression
-				if expr.Kind != ast.KindIdentifier || expr.AsIdentifier().Text != "require" {
+				// This rule cannot use importutil.GetRequireCall: upstream accepts
+				// require("path", extra) as long as the first argument is static,
+				// whereas the shared helper deliberately requires exactly one.
+				expr := ast.SkipParentheses(callExpression.Expression)
+				if expr == nil || expr.Kind != ast.KindIdentifier || expr.AsIdentifier().Text != "require" {
 					return
 				}
 				// ensure there is at least one argument
 				if len(callExpression.Arguments.Nodes) == 0 {
 					return
 				}
-				arg := callExpression.Arguments.Nodes[0]
-				if arg.Kind != ast.KindStringLiteral {
+				arg := ast.SkipParentheses(callExpression.Arguments.Nodes[0])
+				if arg == nil || arg.Kind != ast.KindStringLiteral {
 					return
 				}
 				modulePath := arg.AsStringLiteral().Text

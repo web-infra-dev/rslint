@@ -273,6 +273,14 @@ func TestNewlineAfterImportRule(t *testing.T) {
 					MessageId: "newlineAfterRequire", Line: 1, Column: 1,
 				}},
 			},
+			// ESTree erases parentheses around the require callee and argument.
+			{
+				Code:   "var foo = ((require))((('foo-module')));\nvar something = 123;",
+				Output: []string{"var foo = ((require))((('foo-module')));\n\nvar something = 123;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "newlineAfterRequire", Line: 1, Column: 1,
+				}},
+			},
 			// Consecutive requires → code
 			{
 				Code:   "var path = require('path');\nvar foo = require('foo');\nvar bar = 42;",

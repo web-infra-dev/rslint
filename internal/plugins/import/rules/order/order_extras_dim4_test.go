@@ -6,6 +6,7 @@
 package order_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
@@ -23,6 +24,7 @@ func TestOrderDimension4(t *testing.T) {
 		"named":       map[string]any{"enabled": true, "cjsExports": true},
 		"alphabetize": map[string]any{"order": "asc"},
 	}
+	commentChain := strings.Repeat(" /* kept */", 101)
 
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -48,12 +50,12 @@ func TestOrderDimension4(t *testing.T) {
 			{Code: `const { b = 1, a } = require("pkg");`, Options: namedRequire},
 			{Code: `const { b: { value }, a } = require("pkg");`, Options: namedRequire},
 
-			// ---- Dimension 4: string, numeric, computed, method, and spread CJS keys bail out ----
+			// ---- Dimension 4: string, numeric, method, and spread CJS keys bail out ----
 			{Code: `module.exports = { "b": b, a };`, Options: namedCJS},
 			{Code: `module.exports = { 1: b, a };`, Options: namedCJS},
-			{Code: `module.exports = { [key]: b, a };`, Options: namedCJS},
 			{Code: `module.exports = { b() {}, a };`, Options: namedCJS},
 			{Code: `module.exports = { ...b, a };`, Options: namedCJS},
+			{Code: `module.exports = { b = fallback, a };`, Options: namedCJS},
 
 			// ---- Dimension 4: nested require module ordering is outside Program/TSModuleBlock ----
 			{Code: "function f() {\n  const sibling = require('./z');\n  const fs = require('fs');\n}", Options: alphabetize},
@@ -99,6 +101,13 @@ func TestOrderDimension4(t *testing.T) {
 				Output:  []string{"module.exports.A = 1;\nexports[B] = 1;\n"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "order"}},
 			},
+			// ---- Dimension 4: a computed Identifier key stays an Identifier in ESTree ----
+			{
+				Code:    `module.exports = { [key]: b, a };`,
+				Options: namedCJS,
+				Output:  []string{`module.exports = { a, [key]: b };`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "order", Line: 1, Column: 30}},
+			},
 			// ---- Dimension 4: named require listeners traverse nested function blocks ----
 			{
 				Code:    "function f() {\n  const { b, a } = require('pkg');\n}",
@@ -125,6 +134,14 @@ func TestOrderDimension4(t *testing.T) {
 				Code:    "import β from 'β'; // β\r\nimport α from 'α'; // α\r\n",
 				Options: alphabetize,
 				Output:  []string{"import α from 'α'; // α\r\nimport β from 'β'; // β\r\n"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "order", Line: 2, Column: 1}},
+			},
+			// Upstream only inspects 100 neighboring tokens/comments. The shared
+			// comment index has no arbitrary cutoff, so every attached comment moves.
+			{
+				Code:    "import b from 'b';" + commentChain + "\nimport a from 'a';\n",
+				Options: alphabetize,
+				Output:  []string{"import a from 'a';\nimport b from 'b';" + commentChain + "\n"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "order", Line: 2, Column: 1}},
 			},
 		},

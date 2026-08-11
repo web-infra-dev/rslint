@@ -87,24 +87,11 @@ func resolveModule(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpeci
 // and a package's `require` condition stays selected for both.
 func resolutionMode(ctx rule.RuleContext, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) core.ResolutionMode {
 	mode := ctx.Program.GetModeForUsageLocation(sourceFile, moduleSpecifier)
-	if mode == core.ResolutionModeESM && isRequireCall(moduleSpecifier.Parent) {
+	usage := ast.WalkUpParenthesizedExpressions(moduleSpecifier.Parent)
+	if mode == core.ResolutionModeESM && GetRequireCall(usage, false) != nil {
 		return core.ResolutionModeCommonJS
 	}
 	return mode
-}
-
-func isRequireCall(node *ast.Node) bool {
-	if node == nil || !ast.IsCallExpression(node) {
-		return false
-	}
-
-	call := node.AsCallExpression()
-	if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
-		return false
-	}
-
-	callee := ast.SkipParentheses(call.Expression)
-	return ast.IsIdentifier(callee) && callee.Text() == "require"
 }
 
 // resolveWithModuleResolver runs TypeScript's own module resolution for a

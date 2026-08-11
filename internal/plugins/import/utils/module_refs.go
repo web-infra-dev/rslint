@@ -79,7 +79,7 @@ func collectCallModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFil
 	}
 
 	calleeName := callee.AsIdentifier().Text
-	if options.CommonJS && ast.IsRequireCall(call.AsNode(), false) {
+	if options.CommonJS && GetRequireCall(call.AsNode(), false) != nil {
 		arg := ast.SkipParentheses(call.Arguments.Nodes[0])
 		if arg != nil && ast.IsStringLiteralLike(arg) {
 			addModuleReference(ctx, sourceFile, refs, arg, call.AsNode(), false, false)

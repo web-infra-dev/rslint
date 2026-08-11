@@ -2,11 +2,9 @@
 //
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/order.md
 //
-// Compared to upstream the implementation differs only where rslint cannot
-// match ESLint's behaviour at all — those gaps are documented in `order.md`'s
-// "Differences from ESLint" section. The rule's public contract (option
-// schema, message text, report position) is byte-for-byte aligned where the
-// upstream is observable to the user.
+// Observable differences from upstream are documented in `order.md`. The
+// option schema, messages, report locations, and fixes otherwise follow the
+// upstream rule's public behavior.
 package order
 
 import (
@@ -17,11 +15,11 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/stringutil"
 	importutil "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -67,6 +65,7 @@ type pathGroup struct {
 	pattern           string
 	patternOptions    importutil.MinimatchOptions
 	patternOptionsSet bool
+	matcher           *importutil.Minimatcher
 	group             string
 	positionRaw       string // "before" | "after" | ""
 	position          float64
@@ -251,7 +250,15 @@ func parsePathGroups(raw []any) []pathGroup {
 			pg.patternOptions.NoExt, _ = rawOptions["noext"].(bool)
 			pg.patternOptions.NoBrace, _ = rawOptions["nobrace"].(bool)
 			pg.patternOptions.Dot, _ = rawOptions["dot"].(bool)
+			pg.patternOptions.Partial, _ = rawOptions["partial"].(bool)
+			pg.patternOptions.FlipNegate, _ = rawOptions["flipNegate"].(bool)
+			pg.patternOptions.AllowWindowsEscape, _ = rawOptions["allowWindowsEscape"].(bool)
 		}
+		matcherOptions := pg.patternOptions
+		if !pg.patternOptionsSet {
+			matcherOptions.NoComment = true
+		}
+		pg.matcher = importutil.CompileMinimatch(pg.pattern, matcherOptions)
 		out = append(out, pg)
 	}
 	return out
@@ -362,13 +369,12 @@ func convertPathGroupsForRanks(in []pathGroup) ([]pathGroup, int) {
 // ---------------------------------------------------------------------------
 
 type importEntry struct {
-	// node is the root statement we report on (ImportDeclaration,
-	// ImportEqualsDeclaration, or VariableStatement for top-level requires).
+	// node is the syntax node upstream reports and uses for source locations:
+	// an import/export declaration, require call, or CommonJS assignment.
 	node *ast.Node
-	// reportNode is the node passed to ctx.ReportNode — usually the same as
-	// `node`, but for a `require()` we report on the `CallExpression` to keep
-	// upstream's column behaviour.
-	reportNode *ast.Node
+	// root is the enclosing statement moved by a fixer. It differs from node
+	// for require calls and CommonJS assignments.
+	root *ast.Node
 
 	value        string
 	displayName  string
@@ -392,6 +398,35 @@ type namedEntry struct {
 	kind        string // "type", "value", ""
 
 	rank float64
+}
+
+// sourceInfo keeps source-derived data lazy. Most files need the text for
+// import names, but line maps and comments are only needed by newline checks
+// or when the diagnostic consumer actually requests an autofix.
+type sourceInfo struct {
+	file           *ast.SourceFile
+	commentStore   *rule.CommentStore
+	text           string
+	lineStarts     []core.TextPos
+	comments       []*ast.CommentRange
+	commentsLoaded bool
+}
+
+func (source *sourceInfo) lines() []core.TextPos {
+	if source.lineStarts == nil && source.file != nil {
+		source.lineStarts = source.file.ECMALineMap()
+	}
+	return source.lineStarts
+}
+
+func (source *sourceInfo) allComments() []*ast.CommentRange {
+	if !source.commentsLoaded {
+		source.commentsLoaded = true
+		if source.commentStore != nil {
+			source.comments = source.commentStore.All()
+		}
+	}
+	return source.comments
 }
 
 // ---------------------------------------------------------------------------
@@ -451,17 +486,10 @@ func computePathRank(r ranks, path string) float64 {
 }
 
 func matchPathGroup(path string, pg pathGroup) bool {
-	if pg.pattern == "" {
-		return false
+	if pg.matcher != nil {
+		return pg.matcher.Match(path)
 	}
-	pattern := pg.pattern
-	opts := pg.patternOptions
-	// import/order supplies {nocomment: true} only when patternOptions is
-	// absent. An explicitly empty object gets minimatch's ordinary defaults.
-	if !pg.patternOptionsSet {
-		opts.NoComment = true
-	}
-	return importutil.MatchMinimatch(path, pattern, opts)
+	return false
 }
 
 // ---------------------------------------------------------------------------
@@ -498,7 +526,7 @@ func reverseRanks(in []*importEntry) []*importEntry {
 	return out
 }
 
-func makeOutOfOrderReports(ctx rule.RuleContext, imported []*importEntry, opts options, sourceText string, lineStarts []core.TextPos, comments []*ast.CommentRange) {
+func makeOutOfOrderReports(ctx rule.RuleContext, imported []*importEntry, source *sourceInfo) {
 	out := findOutOfOrder(imported)
 	if len(out) == 0 {
 		return
@@ -510,16 +538,16 @@ func makeOutOfOrderReports(ctx rule.RuleContext, imported []*importEntry, opts o
 		// `found = imp.rank > X` predicate works against negated ranks too.
 		// The entries in `rev` carry the same node identity as the originals,
 		// so report positions still come from the original AST.
-		reportOutOfOrder(ctx, rev, revOut, "after", sourceText, lineStarts, comments, opts)
+		reportOutOfOrder(ctx, rev, revOut, "after", source)
 		return
 	}
-	reportOutOfOrder(ctx, imported, out, "before", sourceText, lineStarts, comments, opts)
+	reportOutOfOrder(ctx, imported, out, "before", source)
 }
 
-func reportOutOfOrder(ctx rule.RuleContext, imported []*importEntry, outOfOrder []*importEntry, order string, sourceText string, lineStarts []core.TextPos, comments []*ast.CommentRange, opts options) {
+func reportOutOfOrder(ctx rule.RuleContext, imported []*importEntry, outOfOrder []*importEntry, order string, source *sourceInfo) {
 	ordered := append([]*importEntry(nil), outOfOrder...)
 	sort.SliceStable(ordered, func(i, j int) bool {
-		return ordered[i].reportNode.Pos() < ordered[j].reportNode.Pos()
+		return ast.CompareNodePositions(ordered[i].node, ordered[j].node) < 0
 	})
 	for _, imp := range ordered {
 		var found *importEntry
@@ -532,11 +560,11 @@ func reportOutOfOrder(ctx rule.RuleContext, imported []*importEntry, outOfOrder 
 		if found == nil {
 			continue
 		}
-		makeOutOfOrderReport(ctx, found, imp, order, sourceText, lineStarts, comments, opts)
+		makeOutOfOrderReport(ctx, found, imp, order, source)
 	}
 }
 
-func makeOutOfOrderReport(ctx rule.RuleContext, first, second *importEntry, order string, sourceText string, lineStarts []core.TextPos, comments []*ast.CommentRange, opts options) {
+func makeOutOfOrderReport(ctx rule.RuleContext, first, second *importEntry, order string, source *sourceInfo) {
 	firstDisplay := first.displayName
 	secondDisplay := second.displayName
 	// Disambiguate when two specifiers share a name (alphabetize-named only).
@@ -567,8 +595,8 @@ func makeOutOfOrderReport(ctx rule.RuleContext, first, second *importEntry, orde
 		},
 	}
 
-	ctx.ReportNodeWithDeferredFixes(second.reportNode, msg, func() []rule.RuleFix {
-		return buildSwapFix(ctx, first, second, order, sourceText, lineStarts, comments, opts)
+	ctx.ReportNodeWithDeferredFixes(second.node, msg, func() []rule.RuleFix {
+		return buildSwapFix(first, second, order, source)
 	})
 }
 
@@ -596,14 +624,19 @@ func makeImportDescription(e *importEntry) string {
 //   - `canReorder` returns false (an unrelated statement sits between them)
 //   - the two entries are already in different scopes (defensive)
 //   - any of the line bounds are unresolvable
-func buildSwapFix(ctx rule.RuleContext, first, second *importEntry, order string, sourceText string, lineStarts []core.TextPos, comments []*ast.CommentRange, opts options) []rule.RuleFix {
+func buildSwapFix(first, second *importEntry, order string, source *sourceInfo) []rule.RuleFix {
+	if first == nil || second == nil || first.root == nil || second.root == nil {
+		return nil
+	}
 	isExports := first.typ == "export" && second.typ == "export"
-	if !isExports && !canReorder(ctx, first.node, second.node) {
+	if !isExports && !canReorder(first.root, second.root) {
 		return nil
 	}
 
-	firstStart, firstEnd := importutil.LineRangeWithComments(sourceText, first.node, lineStarts, comments)
-	secondStart, secondEnd := importutil.LineRangeWithComments(sourceText, second.node, lineStarts, comments)
+	lineStarts := source.lines()
+	comments := source.allComments()
+	firstStart, firstEnd := importutil.LineRangeWithComments(source.text, first.root, lineStarts, comments)
+	secondStart, secondEnd := importutil.LineRangeWithComments(source.text, second.root, lineStarts, comments)
 	if firstStart < 0 || firstEnd < 0 || secondStart < 0 || secondEnd < 0 {
 		return nil
 	}
@@ -612,27 +645,27 @@ func buildSwapFix(ctx rule.RuleContext, first, second *importEntry, order string
 	//   - "before": firstRoot appears earlier than secondRoot in source.
 	//   - "after":  secondRoot appears earlier than firstRoot in source.
 	// If either direction is violated, the caller paired entries wrong.
-	if order == "before" && first.node.Pos() > second.node.Pos() {
+	if order == "before" && ast.CompareNodePositions(first.root, second.root) > 0 {
 		return nil
 	}
-	if order == "after" && second.node.Pos() > first.node.Pos() {
+	if order == "after" && ast.CompareNodePositions(second.root, first.root) > 0 {
 		return nil
 	}
 
-	newCode := sourceText[secondStart:secondEnd]
+	newCode := source.text[secondStart:secondEnd]
 	if !strings.HasSuffix(newCode, "\n") {
 		newCode += "\n"
 	}
 
 	if order == "before" {
-		replacement := newCode + sourceText[firstStart:secondStart]
+		replacement := newCode + source.text[firstStart:secondStart]
 		return []rule.RuleFix{{
 			Range: core.NewTextRange(firstStart, secondEnd),
 			Text:  replacement,
 		}}
 	}
 	// order == "after"
-	gap := sourceText[secondEnd:firstEnd]
+	gap := source.text[secondEnd:firstEnd]
 	if gap != "" && !strings.HasSuffix(gap, "\n") && !strings.HasSuffix(gap, "\r") {
 		lineEnding := "\n"
 		if strings.HasSuffix(newCode, "\r\n") {
@@ -654,7 +687,7 @@ func buildSwapFix(ctx rule.RuleContext, first, second *importEntry, order string
 // `node` here is the statement node passed during collection — we look it up
 // in the parent block's statement list. Both sides MUST share a parent block;
 // callers that detect cross-block pairs should refuse the fix earlier.
-func canReorder(ctx rule.RuleContext, first, second *ast.Node) bool {
+func canReorder(first, second *ast.Node) bool {
 	body := siblingsOf(first)
 	if body == nil {
 		return false
@@ -675,19 +708,14 @@ func canReorder(ctx rule.RuleContext, first, second *ast.Node) bool {
 	return true
 }
 
-// siblingsOf returns the SourceFile / ModuleBlock statement list that holds
-// `node`. Imports are only collected at module top level, so these are the
-// only two containers we ever need to inspect.
+// siblingsOf returns the statement list that directly contains node. The
+// tsgo AST owns the complete set of statement containers, so this keeps the
+// rule correct if another supported container is added later.
 func siblingsOf(node *ast.Node) []*ast.Node {
-	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		switch parent.Kind {
-		case ast.KindSourceFile:
-			return parent.AsSourceFile().Statements.Nodes
-		case ast.KindModuleBlock:
-			return parent.AsModuleBlock().Statements.Nodes
-		}
+	if node == nil || node.Parent == nil || !node.Parent.CanHaveStatements() {
+		return nil
 	}
-	return nil
+	return node.Parent.Statements()
 }
 
 // canCrossWhileReorder mirrors upstream `canCrossNodeWhileReorder`: only
@@ -777,17 +805,12 @@ func findRequireCall(n *ast.Node) *ast.CallExpression {
 }
 
 func staticRequireCall(node *ast.Node) *ast.CallExpression {
-	node = ast.SkipParentheses(node)
-	if node == nil || node.Kind != ast.KindCallExpression {
+	call := importutil.GetRequireCall(node, false)
+	if call == nil || call.QuestionDotToken != nil {
 		return nil
 	}
-	call := node.AsCallExpression()
-	if call.QuestionDotToken != nil || call.Arguments == nil || len(call.Arguments.Nodes) != 1 ||
-		call.Arguments.Nodes[0].Kind != ast.KindStringLiteral {
-		return nil
-	}
-	callee := ast.SkipParentheses(call.Expression)
-	if callee == nil || callee.Kind != ast.KindIdentifier || callee.AsIdentifier().Text != "require" {
+	argument := ast.SkipParentheses(call.Arguments.Nodes[0])
+	if argument == nil || argument.Kind != ast.KindStringLiteral {
 		return nil
 	}
 	return call
@@ -797,7 +820,9 @@ func staticRequireCall(node *ast.Node) *ast.CallExpression {
 // Newlines-between report
 // ---------------------------------------------------------------------------
 
-func makeNewlinesBetweenReport(ctx rule.RuleContext, imported []*importEntry, opts options, sourceText string, lineStarts []core.TextPos, comments []*ast.CommentRange) {
+func makeNewlinesBetweenReport(ctx rule.RuleContext, imported []*importEntry, opts options, source *sourceInfo) {
+	sourceText := source.text
+	lineStarts := source.lines()
 	if len(imported) < 2 {
 		return
 	}
@@ -813,7 +838,7 @@ func makeNewlinesBetweenReport(ctx rule.RuleContext, imported []*importEntry, op
 			if ln+1 < len(lineStarts) {
 				lineEnd = int(lineStarts[ln+1])
 			}
-			if isBlank(sourceText[lineStart:lineEnd]) {
+			if utils.IsECMABlankLine(sourceText[lineStart:lineEnd]) {
 				count++
 			}
 		}
@@ -869,13 +894,13 @@ func makeNewlinesBetweenReport(ctx rule.RuleContext, imported []*importEntry, op
 			if cur.rank != prev.rank && empty == 0 {
 				if opts.distinctGroup || distinctStart {
 					alreadyReported = true
-					ctx.ReportNodeWithDeferredFixes(prev.reportNode,
+					ctx.ReportNodeWithDeferredFixes(prev.node,
 						rule.RuleMessage{
 							Id:          "groupNewline",
 							Description: "There should be at least one empty line between import groups",
 						},
 						func() []rule.RuleFix {
-							return []rule.RuleFix{fixInsertNewlineAfter(prev.node, sourceText, lineStarts, comments)}
+							return []rule.RuleFix{fixInsertNewlineAfter(prev.root, source)}
 						},
 					)
 				}
@@ -894,23 +919,23 @@ func makeNewlinesBetweenReport(ctx rule.RuleContext, imported []*importEntry, op
 
 		if !alreadyReported && opts.consolidating {
 			if empty == 0 && cur.isMultiline {
-				ctx.ReportNodeWithDeferredFixes(prev.reportNode,
+				ctx.ReportNodeWithDeferredFixes(prev.node,
 					rule.RuleMessage{
 						Id:          "consolidate",
 						Description: "There should be at least one empty line between this import and the multi-line import that follows it",
 					},
 					func() []rule.RuleFix {
-						return []rule.RuleFix{fixInsertNewlineAfter(prev.node, sourceText, lineStarts, comments)}
+						return []rule.RuleFix{fixInsertNewlineAfter(prev.root, source)}
 					},
 				)
 			} else if empty == 0 && prev.isMultiline {
-				ctx.ReportNodeWithDeferredFixes(prev.reportNode,
+				ctx.ReportNodeWithDeferredFixes(prev.node,
 					rule.RuleMessage{
 						Id:          "consolidate",
 						Description: "There should be at least one empty line between this multi-line import and the import that follows it",
 					},
 					func() []rule.RuleFix {
-						return []rule.RuleFix{fixInsertNewlineAfter(prev.node, sourceText, lineStarts, comments)}
+						return []rule.RuleFix{fixInsertNewlineAfter(prev.root, source)}
 					},
 				)
 			} else if empty > 0 && !prev.isMultiline && !cur.isMultiline && isSameGroup {
@@ -925,8 +950,8 @@ func makeNewlinesBetweenReport(ctx rule.RuleContext, imported []*importEntry, op
 
 func reportRemoveBlankLine(ctx rule.RuleContext, prev, cur *importEntry, sourceText string, lineStarts []core.TextPos, msgId, msgText string) {
 	msg := rule.RuleMessage{Id: msgId, Description: msgText}
-	ctx.ReportNodeWithDeferredFixes(prev.reportNode, msg, func() []rule.RuleFix {
-		fix := fixRemoveBlankLineBetween(sourceText, prev.node, cur.node, lineStarts)
+	ctx.ReportNodeWithDeferredFixes(prev.node, msg, func() []rule.RuleFix {
+		fix := fixRemoveBlankLineBetween(sourceText, prev.root, cur.root, lineStarts)
 		if fix == nil {
 			return nil
 		}
@@ -934,8 +959,8 @@ func reportRemoveBlankLine(ctx rule.RuleContext, prev, cur *importEntry, sourceT
 	})
 }
 
-func fixInsertNewlineAfter(node *ast.Node, sourceText string, lineStarts []core.TextPos, comments []*ast.CommentRange) rule.RuleFix {
-	end := importutil.SameLineEndWithComments(sourceText, node, lineStarts, comments)
+func fixInsertNewlineAfter(node *ast.Node, source *sourceInfo) rule.RuleFix {
+	end := importutil.SameLineEndWithComments(source.text, node, source.lines(), source.allComments())
 	return rule.RuleFix{
 		Range: core.NewTextRange(end, end),
 		Text:  "\n",
@@ -956,27 +981,14 @@ func fixRemoveBlankLineBetween(text string, prev, cur *ast.Node, lineStarts []co
 		prevLineEnd = int(lineStarts[prevEndLine+1])
 	}
 	curLineStart := int(lineStarts[curStartLine])
-	for i := prevLineEnd; i < curLineStart; i++ {
-		c := text[i]
-		if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
-			return nil
-		}
+	if !utils.IsECMABlankLine(text[prevLineEnd:curLineStart]) {
+		return nil
 	}
 	// Remove (curStartLine - prevEndLine - 1) blank lines.
 	removeFrom := prevLineEnd
 	removeTo := curLineStart
 	f := rule.RuleFix{Range: core.NewTextRange(removeFrom, removeTo), Text: ""}
 	return &f
-}
-
-func isBlank(s string) bool {
-	for i := range len(s) {
-		c := s[i]
-		if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
-			return false
-		}
-	}
-	return true
 }
 
 // ---------------------------------------------------------------------------
@@ -1044,12 +1056,12 @@ func makeAlphaComparator(caseInsensitive bool, multiplier, multiplierKind int) f
 	return func(av, ak, bv, bk string) int {
 		va, vb := av, bv
 		if caseInsensitive {
-			va = strings.ToLower(va)
-			vb = strings.ToLower(vb)
+			va = stringutil.ToLowerJS(va)
+			vb = stringutil.ToLowerJS(vb)
 		}
 		var result int
 		if !strings.Contains(va, "/") && !strings.Contains(vb, "/") {
-			result = strings.Compare(va, vb)
+			result = utils.CompareJSStrings(va, vb)
 		} else {
 			A := strings.Split(va, "/")
 			B := strings.Split(vb, "/")
@@ -1060,12 +1072,12 @@ func makeAlphaComparator(caseInsensitive bool, multiplier, multiplierKind int) f
 			for i := range minLen {
 				if i == 0 && (A[i] == "." || A[i] == "..") && (B[i] == "." || B[i] == "..") {
 					if A[i] != B[i] {
-						result = strings.Compare(va, vb)
+						result = utils.CompareJSStrings(va, vb)
 						break
 					}
 					continue
 				}
-				if c := strings.Compare(A[i], B[i]); c != 0 {
+				if c := utils.CompareJSStrings(A[i], B[i]); c != 0 {
 					result = c
 					break
 				}
@@ -1088,7 +1100,7 @@ func makeAlphaComparator(caseInsensitive bool, multiplier, multiplierKind int) f
 			if kb == "" {
 				kb = "value"
 			}
-			result = multiplierKind * strings.Compare(ka, kb)
+			result = multiplierKind * utils.CompareJSStrings(ka, kb)
 		}
 		return result
 	}
@@ -1137,7 +1149,7 @@ func makeNamedOrderReport(ctx rule.RuleContext, named []*namedEntry, opts option
 	for i, n := range named {
 		imps[i] = &importEntry{
 			node:        n.node,
-			reportNode:  n.node,
+			root:        n.node,
 			value:       n.value + ":" + n.alias,
 			displayName: n.displayName,
 			alias:       n.alias,
@@ -1240,7 +1252,7 @@ func buildNamedSwapFix(sourceFile *ast.SourceFile, sourceText string, first, sec
 		if firstRange.Pos() > secondRange.Pos() || secondStart == 0 || firstEnd > secondStart-1 {
 			return nil
 		}
-		trimmedTrivia := strings.TrimRightFunc(secondTrivia, unicode.IsSpace)
+		trimmedTrivia := strings.TrimRightFunc(secondTrivia, utils.IsStrWhiteSpace)
 		gapCode := sourceText[firstEnd : secondStart-1]
 		whitespaces := secondTrivia[len(trimmedTrivia):]
 		return []rule.RuleFix{{
@@ -1251,7 +1263,7 @@ func buildNamedSwapFix(sourceFile *ast.SourceFile, sourceText string, first, sec
 		if secondRange.Pos() > firstRange.Pos() || secondEnd >= len(sourceText) || secondEnd+1 > firstStart {
 			return nil
 		}
-		trimmedTrivia := strings.TrimRightFunc(firstTrivia, unicode.IsSpace)
+		trimmedTrivia := strings.TrimRightFunc(firstTrivia, utils.IsStrWhiteSpace)
 		gapCode := sourceText[secondEnd+1 : firstStart]
 		whitespaces := firstTrivia[len(trimmedTrivia):]
 		return []rule.RuleFix{{
@@ -1380,7 +1392,7 @@ func handleImportDeclaration(ctx rule.RuleContext, stmt *ast.Node, opts options,
 	kind := importKindOf(stmt)
 	entry := &importEntry{
 		node:         stmt,
-		reportNode:   stmt,
+		root:         stmt,
 		value:        value,
 		displayName:  value,
 		typ:          "import",
@@ -1413,13 +1425,18 @@ func collectNamedImports(ni *ast.NamedImports) []*namedEntry {
 			continue
 		}
 		s := spec.AsImportSpecifier()
-		propName, localName := importSpecNames(s)
+		propName, localName, ok := importSpecNames(s)
+		if !ok {
+			// One unsupported entry makes the list non-deterministic, so match
+			// the require/CommonJS paths and leave the whole list untouched.
+			return nil
+		}
 		kind := ""
 		if s.IsTypeOnly {
 			kind = "type"
 		}
 		alias := ""
-		if propName != localName {
+		if s.PropertyName != nil {
 			alias = localName
 		}
 		out = append(out, &namedEntry{
@@ -1434,14 +1451,20 @@ func collectNamedImports(ni *ast.NamedImports) []*namedEntry {
 	return out
 }
 
-func importSpecNames(s *ast.ImportSpecifier) (propName, localName string) {
-	if s.PropertyName != nil {
-		propName = s.PropertyName.AsIdentifier().Text
-	} else {
-		propName = s.Name().AsIdentifier().Text
+func importSpecNames(s *ast.ImportSpecifier) (propName, localName string, ok bool) {
+	if s == nil || s.Name() == nil {
+		return "", "", false
 	}
-	localName = s.Name().AsIdentifier().Text
-	return
+	if s.PropertyName != nil {
+		propName, ok = utils.GetStaticPropertyName(s.PropertyName)
+	} else {
+		propName, ok = utils.GetStaticPropertyName(s.Name())
+	}
+	if !ok {
+		return "", "", false
+	}
+	localName, ok = utils.GetStaticPropertyName(s.Name())
+	return propName, localName, ok
 }
 
 func handleImportEqualsDeclaration(ctx rule.RuleContext, stmt *ast.Node, opts options, bs *blockState) {
@@ -1471,7 +1494,7 @@ func handleImportEqualsDeclaration(ctx rule.RuleContext, stmt *ast.Node, opts op
 	}
 	bs.addImport(&importEntry{
 		node:         stmt,
-		reportNode:   stmt,
+		root:         stmt,
 		value:        value,
 		displayName:  displayName,
 		typ:          typ,
@@ -1496,19 +1519,26 @@ func handleVariableStatement(ctx rule.RuleContext, stmt *ast.Node, opts options,
 		if ce == nil || ce.Arguments == nil || len(ce.Arguments.Nodes) != 1 {
 			continue
 		}
-		arg := ce.Arguments.Nodes[0]
-		if arg.Kind != ast.KindStringLiteral {
+		arg := ast.SkipParentheses(ce.Arguments.Nodes[0])
+		if arg == nil || arg.Kind != ast.KindStringLiteral {
 			continue
 		}
 		value := arg.AsStringLiteral().Text
+		multilineNode := ce.AsNode()
+		// ESTree's registerNode promotes only a require call that is the direct
+		// VariableDeclarator initializer to the whole declaration. A call inside
+		// `require("x").member` stays the CallExpression for multiline checks.
+		if ast.SkipParentheses(d.Initializer) == ce.AsNode() {
+			multilineNode = stmt
+		}
 		bs.addImport(&importEntry{
-			node:         stmt,
-			reportNode:   ce.AsNode(),
+			node:         ce.AsNode(),
+			root:         stmt,
 			value:        value,
 			displayName:  value,
 			typ:          "require",
 			classifyType: importutil.ClassifyImport(ctx, value, arg, opts.internalRegex),
-			isMultiline:  isMultiline(stmt, ctx.SourceFile),
+			isMultiline:  isMultiline(multilineNode, ctx.SourceFile),
 		})
 
 	}
@@ -1546,7 +1576,7 @@ func collectNamedFromBindingPattern(pat *ast.Node) []*namedEntry {
 		}
 		local = be.Name().AsIdentifier().Text
 		alias := ""
-		if prop != local {
+		if be.PropertyName != nil {
 			alias = local
 		}
 		out = append(out, &namedEntry{
@@ -1554,7 +1584,7 @@ func collectNamedFromBindingPattern(pat *ast.Node) []*namedEntry {
 			value:       prop,
 			displayName: prop,
 			alias:       alias,
-			typ:         "import",
+			typ:         "require",
 		})
 	}
 	return out
@@ -1582,14 +1612,21 @@ func handleExportDeclaration(ctx rule.RuleContext, stmt *ast.Node, opts options,
 			continue
 		}
 		var prop, exp string
+		var ok bool
 		if s.PropertyName != nil {
-			prop = s.PropertyName.AsIdentifier().Text
+			prop, ok = utils.GetStaticPropertyName(s.PropertyName)
 		} else {
-			prop = s.Name().AsIdentifier().Text
+			prop, ok = utils.GetStaticPropertyName(s.Name())
 		}
-		exp = s.Name().AsIdentifier().Text
+		if !ok {
+			return
+		}
+		exp, ok = utils.GetStaticPropertyName(s.Name())
+		if !ok {
+			return
+		}
 		alias := ""
-		if prop != exp {
+		if s.PropertyName != nil {
 			alias = exp
 		}
 		kind := ""
@@ -1624,7 +1661,7 @@ func handleExpressionStatement(ctx rule.RuleContext, stmt *ast.Node, opts option
 	if !opts.named.cjsExports {
 		return
 	}
-	expr := stmt.AsExpressionStatement().Expression
+	expr := ast.SkipParentheses(stmt.AsExpressionStatement().Expression)
 	if expr == nil || expr.Kind != ast.KindBinaryExpression {
 		return
 	}
@@ -1637,8 +1674,8 @@ func handleExpressionStatement(ctx rule.RuleContext, stmt *ast.Node, opts option
 		if len(nameParts) > 0 {
 			name := strings.Join(nameParts, ".")
 			bs.addExport(&importEntry{
-				node:        stmt,
-				reportNode:  expr,
+				node:        expr,
+				root:        stmt,
 				value:       name,
 				displayName: name,
 				typ:         "export",
@@ -1647,10 +1684,11 @@ func handleExpressionStatement(ctx rule.RuleContext, stmt *ast.Node, opts option
 		}
 		return
 	}
-	if be.Right == nil || be.Right.Kind != ast.KindObjectLiteralExpression {
+	right := ast.SkipParentheses(be.Right)
+	if right == nil || right.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
-	ole := be.Right.AsObjectLiteralExpression()
+	ole := right.AsObjectLiteralExpression()
 	if ole.Properties == nil {
 		return
 	}
@@ -1663,16 +1701,21 @@ func handleExpressionStatement(ctx rule.RuleContext, stmt *ast.Node, opts option
 		switch p.Kind {
 		case ast.KindPropertyAssignment:
 			pa := p.AsPropertyAssignment()
-			if pa.Name() == nil || pa.Name().Kind != ast.KindIdentifier {
+			var ok bool
+			keyText, ok = cjsIdentifierPropertyName(pa.Name())
+			if !ok {
 				return
 			}
-			keyText = pa.Name().AsIdentifier().Text
-			if pa.Initializer == nil || pa.Initializer.Kind != ast.KindIdentifier {
+			initializer := ast.SkipParentheses(pa.Initializer)
+			if initializer == nil || initializer.Kind != ast.KindIdentifier {
 				return
 			}
-			valText = pa.Initializer.AsIdentifier().Text
+			valText = initializer.AsIdentifier().Text
 		case ast.KindShorthandPropertyAssignment:
 			spa := p.AsShorthandPropertyAssignment()
+			if spa.ObjectAssignmentInitializer != nil || spa.PostfixToken != nil || spa.Type != nil {
+				return
+			}
 			if spa.Name() == nil || spa.Name().Kind != ast.KindIdentifier {
 				return
 			}
@@ -1680,7 +1723,7 @@ func handleExpressionStatement(ctx rule.RuleContext, stmt *ast.Node, opts option
 			valText = keyText
 		}
 		alias := ""
-		if keyText != valText {
+		if p.Kind == ast.KindPropertyAssignment {
 			alias = valText
 		}
 		out = append(out, &namedEntry{
@@ -1696,41 +1739,47 @@ func handleExpressionStatement(ctx rule.RuleContext, stmt *ast.Node, opts option
 	}
 }
 
-// collectNamedExpressions mirrors the VariableDeclarator and
-// AssignmentExpression listeners. Unlike module ordering, these listeners run
-// in every nested statement container, not only Program and TSModuleBlock.
-func collectNamedExpressions(ctx rule.RuleContext, node *ast.Node, opts options, results map[*ast.Node]*blockState) {
-	if node == nil {
-		return
+// cjsIdentifierPropertyName implements the deliberately narrow ESTree shape
+// accepted upstream: the property key itself must be an Identifier. In tsgo a
+// computed identifier such as [name] is wrapped in ComputedPropertyName, so we
+// peel only that wrapper; string/numeric/static computed keys still bail out.
+func cjsIdentifierPropertyName(name *ast.Node) (string, bool) {
+	if name == nil {
+		return "", false
 	}
-	if opts.named.require && node.Kind == ast.KindVariableDeclaration {
-		declaration := node.AsVariableDeclaration()
-		if declaration.Initializer != nil && staticRequireCall(declaration.Initializer) != nil &&
-			declaration.Name() != nil && declaration.Name().Kind == ast.KindObjectBindingPattern {
-			named := collectNamedFromBindingPattern(declaration.Name())
-			if len(named) > 1 {
-				container := nearestStatementContainer(node)
-				stateForContainer(results, container).addNamed(named)
-			}
-		}
+	if name.Kind == ast.KindComputedPropertyName {
+		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
 	}
-	if opts.named.cjsExports && node.Kind == ast.KindExpressionStatement {
-		expression := node.AsExpressionStatement().Expression
-		if expression != nil && expression.Kind == ast.KindBinaryExpression {
-			container := node.Parent
-			handleExpressionStatement(ctx, node, opts, stateForContainer(results, container))
-		}
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return "", false
 	}
-	node.ForEachChild(func(child *ast.Node) bool {
-		collectNamedExpressions(ctx, child, opts, results)
-		return false
-	})
+	return name.AsIdentifier().Text, true
 }
 
-func nearestStatementContainer(node *ast.Node) *ast.Node {
+// handleNamedRequireDeclaration mirrors upstream's VariableDeclarator
+// listener. It intentionally accepts direct object-destructuring requires in
+// every lexical scope, while module ordering itself remains Program-only.
+func handleNamedRequireDeclaration(node *ast.Node, results map[*ast.Node]*blockState) {
+	declaration := node.AsVariableDeclaration()
+	if declaration.Initializer == nil || staticRequireCall(declaration.Initializer) == nil ||
+		declaration.Name() == nil || declaration.Name().Kind != ast.KindObjectBindingPattern {
+		return
+	}
+	named := collectNamedFromBindingPattern(declaration.Name())
+	if len(named) > 1 {
+		container := nearestStatementListContainer(node)
+		if container == nil {
+			return
+		}
+		stateForContainer(results, container).addNamed(named)
+	}
+}
+
+// nearestStatementListContainer delegates the set of valid statement-list
+// owners to tsgo instead of duplicating its SourceFile/Block/CaseBlock kinds.
+func nearestStatementListContainer(node *ast.Node) *ast.Node {
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		switch parent.Kind {
-		case ast.KindSourceFile, ast.KindBlock, ast.KindModuleBlock, ast.KindCaseBlock:
+		if parent.CanHaveStatements() {
 			return parent
 		}
 	}
@@ -1749,12 +1798,10 @@ func stateForContainer(results map[*ast.Node]*blockState, container *ast.Node) *
 // isCJSExportsTarget returns true when the LHS of an assignment refers to the
 // global `module.exports` or `exports` identifier without local shadowing.
 //
-// Strategy: ast.IsModuleExportsAccessExpression handles the structural check
-// (rejects `foo.bar`, `module.foo`, `module['exports']`), then we use the
-// TypeChecker to verify `module` is not declared in user code. When the
-// TypeChecker is unavailable (rule running without type info), we fall back
-// to "trust the structural form" — same as ESLint when no scope manager is
-// available, which never happens in practice for this rule.
+// ESTree treats `module.exports` and `module[exports]` alike here because both
+// expose an Identifier property; string-literal element access remains a
+// Literal and is intentionally rejected. The reference store then determines
+// whether `module` / `exports` resolves to a value declared in this file.
 func isCJSExportsTarget(ctx rule.RuleContext, node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -1768,20 +1815,26 @@ func isCJSExportsTarget(ctx rule.RuleContext, node *ast.Node) bool {
 	if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == "exports" {
 		return !isShadowedGlobal(ctx, node)
 	}
-	// `module.exports`.
-	if node.Kind == ast.KindPropertyAccessExpression {
+	// `module.exports` / `module[exports]`.
+	var receiver, property *ast.Node
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
 		access := node.AsPropertyAccessExpression()
-		if access.Name() == nil || access.Name().Kind != ast.KindIdentifier || access.Name().Text() != "exports" {
-			return false
-		}
-		moduleIdent := access.Expression
-		moduleIdent = ast.SkipParentheses(moduleIdent)
-		if moduleIdent == nil || moduleIdent.Kind != ast.KindIdentifier || moduleIdent.AsIdentifier().Text != "module" {
-			return false
-		}
-		return !isShadowedGlobal(ctx, moduleIdent)
+		receiver, property = access.Expression, access.Name()
+	case ast.KindElementAccessExpression:
+		access := node.AsElementAccessExpression()
+		receiver, property = access.Expression, ast.SkipParentheses(access.ArgumentExpression)
+	default:
+		return false
 	}
-	return false
+	if property == nil || property.Kind != ast.KindIdentifier || property.Text() != "exports" {
+		return false
+	}
+	moduleIdent := ast.SkipParentheses(receiver)
+	if moduleIdent == nil || moduleIdent.Kind != ast.KindIdentifier || moduleIdent.Text() != "module" {
+		return false
+	}
+	return !isShadowedGlobal(ctx, moduleIdent)
 }
 
 func getNamedCJSExportParts(ctx rule.RuleContext, node *ast.Node) []string {
@@ -1806,6 +1859,7 @@ func getNamedCJSExportParts(ctx rule.RuleContext, node *ast.Node) []string {
 		default:
 			goto done
 		}
+		property = ast.SkipParentheses(property)
 		if property == nil || property.Kind != ast.KindIdentifier {
 			return nil
 		}
@@ -1827,13 +1881,13 @@ done:
 // isShadowedGlobal returns true when the identifier resolves to a user-
 // declared symbol (i.e. NOT the ambient/global `module` or `exports`).
 //
-// A value symbol declared in this source file shadows the CommonJS global;
-// ambient declarations do not.
+// A value declaration authored in this source file shadows the CommonJS
+// global; library declarations and ambient augmentations outside it do not.
 func isShadowedGlobal(ctx rule.RuleContext, ident *ast.Node) bool {
 	if ctx.Refs == nil || ctx.SourceFile == nil {
 		return false
 	}
-	return utils.IsValueSymbolDeclaredInFile(ctx.Refs.ResolveInFile(ident), ctx.SourceFile)
+	return utils.IsValueSymbolDeclaredInFile(ctx.Refs.Resolve(ident), ctx.SourceFile)
 }
 
 // importKindOf returns "type" for `import type X from 'mod'` (whole-declaration
@@ -1911,34 +1965,45 @@ var OrderRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		sourceText := sf.Text()
-		lineStarts := sf.ECMALineMap()
-		var comments []*ast.CommentRange
-		if ctx.Comments != nil {
-			comments = ctx.Comments.All()
-		}
+		source := &sourceInfo{file: sf, commentStore: ctx.Comments, text: sf.Text()}
 
-		// Walk top-level + each declare-module body as its own block.
+		// Collect module ordering from statement lists. Named require/CommonJS
+		// forms use the linter's shared traversal below so nested scopes are
+		// visited without a second recursive walk of the file.
 		results := map[*ast.Node]*blockState{}
 		processBlock(ctx, sf.Statements.Nodes, opts, results, sf.AsNode())
-		if opts.named.require || opts.named.cjsExports {
-			collectNamedExpressions(ctx, sf.AsNode(), opts, results)
-		}
 
-		// Apply per-block reports in document order to keep diagnostics
-		// stable (matters for test snapshots).
-		blockKeys := blockKeysInDocOrder(sf, results)
-		for _, k := range blockKeys {
-			bs := results[k]
-			finalizeBlock(ctx, bs, opts, sourceText, lineStarts, comments)
+		listeners := rule.RuleListeners{}
+		if opts.named.require {
+			listeners[ast.KindVariableDeclaration] = func(node *ast.Node) {
+				handleNamedRequireDeclaration(node, results)
+			}
 		}
-		return rule.RuleListeners{}
+		if opts.named.cjsExports {
+			listeners[ast.KindExpressionStatement] = func(node *ast.Node) {
+				// Upstream keys exportMap by AssignmentExpression.parent.parent,
+				// which is the ExpressionStatement's direct parent. This matters
+				// for unbraced if/loop bodies: distinct control-flow statements must
+				// never be merged into the SourceFile export sequence.
+				if node.Parent != nil {
+					handleExpressionStatement(ctx, node, opts, stateForContainer(results, node.Parent))
+				}
+			}
+		}
+		listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(*ast.Node) {
+			// Apply per-block reports in document order to keep diagnostics
+			// stable (matters for test snapshots).
+			for _, container := range blockKeysInDocOrder(results) {
+				finalizeBlock(ctx, results[container], opts, source)
+			}
+		}
+		return listeners
 	},
 }
 
 // finalizeBlock runs newlines-between, alphabetize, out-of-order, and named
 // reports for one block, in upstream's order.
-func finalizeBlock(ctx rule.RuleContext, bs *blockState, opts options, sourceText string, lineStarts []core.TextPos, comments []*ast.CommentRange) {
+func finalizeBlock(ctx rule.RuleContext, bs *blockState, opts options, source *sourceInfo) {
 	// Compute ranks; drop entries that fail to classify (rank == -1).
 	imported := bs.imports[:0]
 	for _, e := range bs.imports {
@@ -1951,40 +2016,39 @@ func finalizeBlock(ctx rule.RuleContext, bs *blockState, opts options, sourceTex
 	}
 
 	if opts.newlinesBetween != "ignore" || opts.newlinesBetweenTypes != "ignore" {
-		makeNewlinesBetweenReport(ctx, imported, opts, sourceText, lineStarts, comments)
+		makeNewlinesBetweenReport(ctx, imported, opts, source)
 	}
 
 	if opts.alphabetize.order != "ignore" {
 		mutateRanksToAlphabetize(imported, opts.alphabetize)
 	}
 
-	makeOutOfOrderReports(ctx, imported, opts, sourceText, lineStarts, comments)
+	makeOutOfOrderReports(ctx, imported, source)
 
-	// The rule gathers ES import/export lists while walking statement lists and
-	// CommonJS require/export lists during a second generic AST walk. Restore
-	// visitor order before reporting so mixed syntaxes remain source-ordered.
+	// ES lists are gathered from statement lists and CommonJS lists from the
+	// linter's traversal. Restore source order before reporting mixed syntax.
 	sort.SliceStable(bs.namedLists, func(i, j int) bool {
-		return bs.namedLists[i][0].node.Pos() < bs.namedLists[j][0].node.Pos()
+		return ast.CompareNodePositions(bs.namedLists[i][0].node, bs.namedLists[j][0].node) < 0
 	})
 	for _, list := range bs.namedLists {
-		makeNamedOrderReport(ctx, list, opts, sourceText)
+		makeNamedOrderReport(ctx, list, opts, source.text)
 	}
 
 	if opts.alphabetize.order != "ignore" && len(bs.exports) > 1 {
 		mutateRanksToAlphabetize(bs.exports, opts.alphabetize)
-		makeOutOfOrderReports(ctx, bs.exports, opts, sourceText, lineStarts, comments)
+		makeOutOfOrderReports(ctx, bs.exports, source)
 	}
 }
 
 // blockKeysInDocOrder returns the block-container nodes sorted by their start
 // position. Iterating in this order keeps reports aligned with the source.
-func blockKeysInDocOrder(sf *ast.SourceFile, results map[*ast.Node]*blockState) []*ast.Node {
+func blockKeysInDocOrder(results map[*ast.Node]*blockState) []*ast.Node {
 	keys := make([]*ast.Node, 0, len(results))
 	for k := range results {
 		keys = append(keys, k)
 	}
 	sort.SliceStable(keys, func(i, j int) bool {
-		return keys[i].Pos() < keys[j].Pos()
+		return ast.CompareNodePositions(keys[i], keys[j]) < 0
 	})
 	return keys
 }

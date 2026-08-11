@@ -7,13 +7,69 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	tsstringutil "github.com/microsoft/typescript-go/shim/stringutil"
 )
+
+// CompareJSStrings compares strings in the same order as JavaScript's abstract
+// relational comparison: lexicographically by UTF-16 code units. It also
+// recognizes the WTF-8 sentinel tsgo uses to preserve lone surrogates from
+// JavaScript string literals.
+func CompareJSStrings(a, b string) int {
+	if isASCIIString(a) && isASCIIString(b) {
+		return strings.Compare(a, b)
+	}
+	aUnits := jsStringUTF16Units(a)
+	bUnits := jsStringUTF16Units(b)
+	limit := min(len(aUnits), len(bUnits))
+	for index := range limit {
+		if aUnits[index] < bUnits[index] {
+			return -1
+		}
+		if aUnits[index] > bUnits[index] {
+			return 1
+		}
+	}
+	if len(aUnits) < len(bUnits) {
+		return -1
+	}
+	if len(aUnits) > len(bUnits) {
+		return 1
+	}
+	return 0
+}
+
+func isASCIIString(value string) bool {
+	for index := range len(value) {
+		if value[index] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
+}
+
+func jsStringUTF16Units(value string) []uint16 {
+	result := make([]uint16, 0, len(value))
+	for offset := 0; offset < len(value); {
+		// DecodeJSStringRune is tsgo's shared UTF-8/WTF-8 decoder, so lone
+		// surrogate sentinels retain their original JavaScript code unit.
+		char, size := tsstringutil.DecodeJSStringRune(value[offset:])
+		offset += size
+		if char <= 0xFFFF {
+			result = append(result, uint16(char))
+			continue
+		}
+		high, low := utf16.EncodeRune(char)
+		result = append(result, uint16(high), uint16(low))
+	}
+	return result
+}
 
 func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())

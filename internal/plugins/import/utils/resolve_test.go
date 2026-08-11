@@ -185,7 +185,7 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 		"/condition-fixture/node_modules/some-package/package.json": `{"name": "some-package", "exports": {".": {"import": "./esm.d.mts", "require": "./cjs.d.cts"}}}`,
 		"/condition-fixture/node_modules/some-package/esm.d.mts":    "export const value: unknown;\n",
 		requireFile: "declare const value: unknown;\nexport = value;\n",
-		consumer:    `const pkg = (require)("some-package");`,
+		consumer:    `const pkg = ((require))((("some-package")));`,
 	}
 
 	ctx, specifier := contextForRequireRoots(t, files, []string{consumer}, consumer, &core.CompilerOptions{
@@ -247,8 +247,11 @@ func contextForRequireRoots(t *testing.T, files map[string]string, rootFiles []s
 			call := node.AsCallExpression()
 			callee := ast.SkipParentheses(call.Expression)
 			if ast.IsIdentifier(callee) && callee.Text() == "require" && len(call.Arguments.Nodes) == 1 {
-				specifier = call.Arguments.Nodes[0]
-				return true
+				argument := ast.SkipParentheses(call.Arguments.Nodes[0])
+				if ast.IsStringLiteralLike(argument) {
+					specifier = argument
+					return true
+				}
 			}
 		}
 		return node.ForEachChild(visit)

@@ -7,7 +7,38 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/stringutil"
 )
+
+func TestCompareJSStrings(t *testing.T) {
+	t.Parallel()
+	loneHighSurrogate := stringutil.EncodeJSStringRune(0xD800)
+
+	tests := []struct {
+		name string
+		a    string
+		b    string
+		want int
+	}{
+		{name: "equal", a: "module", b: "module", want: 0},
+		{name: "ASCII", a: "a", b: "b", want: -1},
+		{name: "prefix", a: "pkg", b: "pkg/subpath", want: -1},
+		// U+10000 starts with UTF-16 high surrogate D800, which sorts before
+		// BMP U+E000 even though its Unicode scalar value is greater.
+		{name: "UTF-16 order", a: "\U00010000", b: "\uE000", want: -1},
+		{name: "UTF-16 reverse", a: "\uE000", b: "\U00010000", want: 1},
+		{name: "tsgo lone surrogate sentinel", a: loneHighSurrogate, b: "\uE000", want: -1},
+		{name: "lone surrogate is astral prefix", a: loneHighSurrogate, b: "\U00010000", want: -1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := CompareJSStrings(test.a, test.b); got != test.want {
+				t.Fatalf("CompareJSStrings(%q, %q) = %d, want %d", test.a, test.b, got, test.want)
+			}
+		})
+	}
+}
 
 func TestExtractRegexPatternAndFlags(t *testing.T) {
 	tests := []struct {

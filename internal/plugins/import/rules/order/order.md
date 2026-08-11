@@ -60,7 +60,7 @@ Each entry has a `pattern`, a target `group`, and an optional `position`
 
 `patternOptions` accepts minimatch's string-matching controls, including
 `dot`, `matchBase`, `nobrace`, `nocase`, `nocomment`, `noext`, `noglobstar`,
-and `nonegate`.
+`nonegate`, `partial`, `flipNegate`, and `allowWindowsEscape`.
 
 ```json
 {
@@ -98,9 +98,9 @@ When `false`, they slot back into the parent group.
 Controls newlines between import groups:
 
 - `"ignore"` — no enforcement
-- `"always"` — exactly one empty line between different groups, none within
+- `"always"` — at least one empty line between different groups, none within
 - `"never"` — no empty lines between any imports
-- `"always-and-inside-groups"` — one empty line between groups, allowed within
+- `"always-and-inside-groups"` — at least one empty line between groups, allowed within
 
 ```json
 { "import/order": ["error", { "newlines-between": "always" }] }
@@ -213,10 +213,22 @@ notes live in the source, not here.
 - **Flow `import typeof` is not parsed.** The TypeScript parser rejects this
   Flow-only syntax before rules run. Ordinary Flow-compatible JavaScript
   covered by the upstream suite behaves normally.
+- **CommonJS shadowing follows the full lexical chain.** A `module` or
+  `exports` binding in any enclosing scope suppresses CommonJS export sorting.
+  Upstream only checks variables declared by the immediate ESLint scope, which
+  can mistake an ancestor binding for the CommonJS global.
+- **String-named specifiers sort by their literal value.** Modern JavaScript
+  permits forms such as `import { "name" as local } from "pkg"`. Upstream reads
+  the Identifier-only `name` field and therefore does not order these
+  consistently; rslint uses the shared static-property-name helper.
 - **Reverse autofixes are EOF-safe.** When moving the first import after a
   later import in a file without a final newline, rslint inserts the missing
-  line break. This avoids concatenating the two statements, which the pinned
-  upstream fixer can do in that edge case.
+  line break. This avoids concatenating the two statements, which the upstream
+  fixer can do in that edge case.
+- **Autofixes preserve every adjacent same-line comment.** Upstream inspects at
+  most 100 tokens or comments on either side of a statement when choosing its
+  movable range. Rslint uses the file's shared comment index without that cap,
+  so only lines with more than 100 adjacent comments differ.
 
 ## Original Documentation
 
