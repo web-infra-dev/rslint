@@ -13,8 +13,8 @@ import (
 
 const globalNamespace = "global"
 
-var typeOnlySymbolExemptions = map[string]struct{}{
-	"JSX.IntrinsicElements": {},
+var acceptedTypeOnlySymbols = []string{
+	"JSX.IntrinsicElements",
 }
 
 type externalModuleRoot struct {
@@ -124,17 +124,10 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 }
 
 func (c *externalSymbolCollector) collect(namespace string, name string, symbol *ast.Symbol) {
-	isTypeOnlySymbolExemption := func(name string) bool {
-		for exemption := range typeOnlySymbolExemptions {
-			for prefix := exemption; ; {
-				if name == prefix || strings.HasSuffix(name, "."+prefix) {
-					return true
-				}
-				index := strings.LastIndexByte(prefix, '.')
-				if index == -1 {
-					break
-				}
-				prefix = prefix[:index]
+	isAcceptedTypeOnlySymbol := func(symbolName string) bool {
+		for _, accepted := range acceptedTypeOnlySymbols {
+			if strings.Contains(accepted, symbolName) {
+				return true
 			}
 		}
 		return false
@@ -148,9 +141,9 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 			symbol = target
 		}
 	}
-	followsTypeOnlyExemption := isTypeOnlySymbolExemption(name)
-	isTypeOnlyExempt := symbol != nil && symbol.Flags&ast.SymbolFlagsValue == 0 && followsTypeOnlyExemption
-	if symbol == nil || symbol.Flags&ast.SymbolFlagsValue == 0 && !isTypeOnlyExempt {
+	isAcceptedTypeOnly := isAcceptedTypeOnlySymbol(symbol.Name)
+	isTypeOnly := symbol != nil && symbol.Flags&ast.SymbolFlagsValue == 0
+	if symbol == nil || isTypeOnly && !isAcceptedTypeOnly {
 		return
 	}
 
@@ -169,18 +162,17 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 			return properties[i].Name < properties[j].Name
 		})
 		for _, property := range properties {
-			propertyName := joinExternalName(name, property.Name)
-			if isTypeOnlySymbolExemption(propertyName) {
-				c.collect(namespace, propertyName, property)
+			if isAcceptedTypeOnlySymbol(property.Name) {
+				c.collect(namespace, joinExternalName(name, property.Name), property)
 			}
 		}
-		if isTypeOnlyExempt {
+		if isTypeOnly {
 			return
 		}
 	}
 
 	var ty *checker.Type
-	if isTypeOnlyExempt {
+	if isTypeOnly {
 		ty = c.tc.GetDeclaredTypeOfSymbol(symbol)
 	} else {
 		ty = c.tc.GetTypeOfSymbol(symbol)
