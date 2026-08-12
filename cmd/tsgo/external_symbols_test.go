@@ -8,12 +8,33 @@ import (
 
 func TestGlobalSymbols(t *testing.T) {
 	fixture := buildSemanticFixture(t, "export const value = Math.abs(-1);")
-
 	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "globalThis")
 	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "Math")
 	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "Math.abs")
 	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "Object.prototype.hasOwnProperty")
 	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "console.log")
+}
+
+func TestJSXIntrinsicElementSymbols(t *testing.T) {
+	tmpDir := t.TempDir()
+	dependencyDir := filepath.Join(tmpDir, "node_modules", "react")
+	_ = os.MkdirAll(dependencyDir, 0o755)
+
+	files := map[string]string{
+		filepath.Join(tmpDir, "tsconfig.json"):       "{\n\t\"compilerOptions\": {\"moduleResolution\": \"node\"},\n\t\"include\": [\"./index.ts\"]\n}",
+		filepath.Join(tmpDir, "index.ts"):            `import "react";`,
+		filepath.Join(dependencyDir, "package.json"): "{\n\t\"name\": \"react\",\n\t\"version\": \"1.0.0\",\n\t\"types\": \"index.d.ts\"\n}",
+		filepath.Join(dependencyDir, "index.d.ts"):   "export namespace JSX {\ninterface IntrinsicElements {\ndiv: unknown;\n}\n}",
+	}
+	for path, contents := range files {
+		_ = os.WriteFile(path, []byte(contents), 0o644)
+	}
+
+	t.Chdir(tmpDir)
+	program, _ := CreateProgram("tsconfig.json")
+	semantic := CollectSemantic(program)
+
+	expectSymbol(t, semantic.ExternalSymbols, "react", "JSX.IntrinsicElements.div")
 }
 
 func TestDependencySymbols(t *testing.T) {

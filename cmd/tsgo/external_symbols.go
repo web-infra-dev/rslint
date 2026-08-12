@@ -13,6 +13,10 @@ import (
 
 const globalNamespace = "global"
 
+var typeOnlySymbolExemptions = map[string]struct{}{
+	"JSX.IntrinsicElements": {},
+}
+
 type externalModuleRoot struct {
 	namespace string
 	prefix    string
@@ -128,7 +132,20 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 			symbol = target
 		}
 	}
-	if symbol == nil || symbol.Flags&ast.SymbolFlagsValue == 0 {
+	isTypeOnlyExempt := false
+	if symbol != nil && symbol.Flags&ast.SymbolFlagsValue == 0 {
+		if _, ok := typeOnlySymbolExemptions[name]; ok {
+			isTypeOnlyExempt = true
+		} else {
+			for exemption := range typeOnlySymbolExemptions {
+				if strings.HasPrefix(exemption, name+".") {
+					isTypeOnlyExempt = true
+					break
+				}
+			}
+		}
+	}
+	if symbol == nil || symbol.Flags&ast.SymbolFlagsValue == 0 && !isTypeOnlyExempt {
 		return
 	}
 
@@ -141,7 +158,23 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 	}
 	c.expanded[expandedKey] = name
 
-	ty := c.tc.GetTypeOfSymbol(symbol)
+	if isTypeOnlyExempt && symbol.Flags&ast.SymbolFlagsModule != 0 {
+		properties := c.tc.GetExportsAndPropertiesOfModule(symbol)
+		sort.Slice(properties, func(i int, j int) bool {
+			return properties[i].Name < properties[j].Name
+		})
+		for _, property := range properties {
+			c.collect(namespace, joinExternalName(name, property.Name), property)
+		}
+		return
+	}
+
+	var ty *checker.Type
+	if isTypeOnlyExempt {
+		ty = c.tc.GetDeclaredTypeOfSymbol(symbol)
+	} else {
+		ty = c.tc.GetTypeOfSymbol(symbol)
+	}
 	if ty == nil {
 		return
 	}
@@ -153,7 +186,6 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 		c.collect(namespace, joinExternalName(name, property.Name), property)
 	}
 }
-
 func (c *externalSymbolCollector) record(namespace string, name string, symbol *ast.Symbol) {
 	symbolID := ast.GetSymbolId(symbol)
 	external := ExternalSymbol{
