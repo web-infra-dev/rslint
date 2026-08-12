@@ -15,10 +15,8 @@
           "items": { "type": "string" },
           "uniqueItems": true,
           "additionalItems": false
-        },
-        "allowExpressionValues": {}
-      },
-      "additionalProperties": false
+        }
+      }
     }
   ],
   "minItems": 0,

@@ -31,7 +31,7 @@
               "type": "boolean"
             }
           },
-          "additionalProperties": false
+          "additionalItems": false
         }
       ],
       "additionalItems": false
@@ -46,7 +46,7 @@
               "type": "boolean"
             }
           },
-          "additionalProperties": false
+          "additionalItems": false
         }
       ],
       "additionalItems": false

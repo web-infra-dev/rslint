@@ -15,11 +15,9 @@
             "objectLiterals": {
               "enum": ["always", "never"]
             }
-          },
-          "additionalProperties": false
+          }
         }
-      },
-      "additionalProperties": false
+      }
     },
     "basicConfigOrBoolean": {
       "anyOf": [
@@ -37,31 +35,22 @@
     {
       "anyOf": [
         {
-          "type": "object",
-          "properties": {
-            "when": {
-              "enum": ["always", "never"]
+          "allOf": [
+            {
+              "$ref": "#/definitions/basicConfig"
             },
-            "allowMultiline": {
-              "type": "boolean"
-            },
-            "spacing": {
+            {
               "type": "object",
               "properties": {
-                "objectLiterals": {
-                  "enum": ["always", "never"]
+                "attributes": {
+                  "$ref": "#/definitions/basicConfigOrBoolean"
+                },
+                "children": {
+                  "$ref": "#/definitions/basicConfigOrBoolean"
                 }
-              },
-              "additionalProperties": false
-            },
-            "attributes": {
-              "$ref": "#/definitions/basicConfigOrBoolean"
-            },
-            "children": {
-              "$ref": "#/definitions/basicConfigOrBoolean"
+              }
             }
-          },
-          "additionalProperties": false
+          ]
         },
         {
           "enum": ["always", "never"]
@@ -80,8 +69,7 @@
             "objectLiterals": {
               "enum": ["always", "never"]
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
