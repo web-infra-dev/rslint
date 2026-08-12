@@ -18,7 +18,7 @@ var hookParseProbe = rule.Rule{
 	Name:             "rstest/hook-parse-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				parsed := analysis.ParseFnCall(node)
@@ -128,33 +128,28 @@ func TestParseRstestFnCallHooks(t *testing.T) {
 	)
 }
 
-// hookKindProbe reports IsTypeOfRstestFnCall results for every parsed
-// registration call: single-kind, multi-kind variadic, and the zero-kind
-// degenerate form.
+// hookKindProbe reports the semantic kind returned by the shared call analysis.
 var hookKindProbe = rule.Rule{
 	Name:             "rstest/hook-kind-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if analysis.ParseFnCall(node) == nil {
+				parsed := analysis.ParseFnCall(node)
+				if parsed == nil {
 					return
 				}
 				ctx.ReportNode(node, probeMessage("kinds", fmt.Sprintf(
-					"hook=%t test=%t testOrHook=%t zeroKinds=%t",
-					rstestUtils.IsTypeOfRstestFnCall(node, ctx, rstestUtils.RstestFnTypeHook),
-					rstestUtils.IsTypeOfRstestFnCall(node, ctx, rstestUtils.RstestFnTypeTest),
-					rstestUtils.IsTypeOfRstestFnCall(node, ctx,
-						rstestUtils.RstestFnTypeTest, rstestUtils.RstestFnTypeHook),
-					rstestUtils.IsTypeOfRstestFnCall(node, ctx),
+					"kind=%s",
+					parsed.Kind,
 				)))
 			},
 		}
 	},
 }
 
-func TestIsTypeOfRstestFnCall(t *testing.T) {
+func TestRstestCallAnalysisFnKinds(t *testing.T) {
 	kindsError := func(message string) []rule_tester.InvalidTestCaseError {
 		return []rule_tester.InvalidTestCaseError{{MessageId: "kinds", Message: message}}
 	}
@@ -166,19 +161,19 @@ func TestIsTypeOfRstestFnCall(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{
 				Code:   `beforeEach(() => {});`,
-				Errors: kindsError("hook=true test=false testOrHook=true zeroKinds=false"),
+				Errors: kindsError("kind=hook"),
 			},
 			{
 				Code:   `import { test } from '@rstest/playwright'; test.beforeEach(() => {});`,
-				Errors: kindsError("hook=true test=false testOrHook=true zeroKinds=false"),
+				Errors: kindsError("kind=hook"),
 			},
 			{
 				Code:   `test("case", () => {});`,
-				Errors: kindsError("hook=false test=true testOrHook=true zeroKinds=false"),
+				Errors: kindsError("kind=test"),
 			},
 			{
 				Code:   `describe("suite", () => {});`,
-				Errors: kindsError("hook=false test=false testOrHook=false zeroKinds=false"),
+				Errors: kindsError("kind=describe"),
 			},
 		},
 	)

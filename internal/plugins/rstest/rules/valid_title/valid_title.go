@@ -423,7 +423,7 @@ var ValidTitleRule = rule.Rule{
 			}
 			return rule.RuleListeners{}
 		}
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

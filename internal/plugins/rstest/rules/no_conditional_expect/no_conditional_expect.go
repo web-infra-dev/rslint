@@ -21,7 +21,7 @@ var NoConditionalExpectRule = shared.NewRule(shared.Config{
 		if !sourceMayContainConditionalRstestExpect(ctx.SourceFile) {
 			return shared.Runtime{Skip: true}
 		}
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return shared.Runtime{
 			TestCallbackFunctions: analysis.Callbacks().Functions,
 			IsTestCall: func(node *ast.Node) bool {

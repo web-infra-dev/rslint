@@ -23,7 +23,7 @@ const expectAlias = importedExpect;
 const check = expectAlias;`,
 		core.ScriptKindTS,
 	)
-	analysis := NewRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
+	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
 	for _, name := range []string{"importedTest", "testAlias", "testCase"} {
 		if analysis.candidates[name]&rstestCandidateFn == 0 {
 			t.Errorf("registration candidate %q was not propagated", name)
@@ -50,7 +50,7 @@ describe("late suite", () => {});
 beforeEach(() => {});`,
 		core.ScriptKindTS,
 	)
-	analysis := NewRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
+	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
 	lateCalls := make([]*ast.Node, 0, 3)
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {
@@ -94,7 +94,7 @@ func TestRstestCallAnalysisCallbacksWidenExpectCandidates(t *testing.T) {
 });`,
 		core.ScriptKindTS,
 	)
-	analysis := NewRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
+	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
 	var checkCall *ast.Node
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {
@@ -130,7 +130,7 @@ func TestRstestCallAnalysisCallbacksSkipFilesWithoutTests(t *testing.T) {
 		`expect(value).toBe(1); helper();`,
 		core.ScriptKindTS,
 	)
-	analysis := NewRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
+	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
 	if analysis.hasTests {
 		t.Fatal("expect-only file unexpectedly has a test candidate")
 	}
@@ -154,7 +154,7 @@ func TestRstestCallAnalysisParseExpectCallFillsIdentityCache(t *testing.T) {
 		`expect(value).toBe(1);`,
 		core.ScriptKindTS,
 	)
-	analysis := NewRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
+	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
 	var expectCall *ast.Node
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {

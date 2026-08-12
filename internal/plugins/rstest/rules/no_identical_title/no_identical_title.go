@@ -10,7 +10,7 @@ import (
 var NoIdenticalTitleRule = shared.NewRule(shared.Config{
 	Name: "rstest/no-identical-title",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
-		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ParsedCall {
 				parsed := analysis.ParseFnCall(node)
