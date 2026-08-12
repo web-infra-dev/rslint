@@ -176,7 +176,7 @@ func isPromiseMethodCall(node *ast.Node) bool {
 	}
 
 	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
-	if !isMemberAccessNode(callee) {
+	if !rstestUtils.IsMemberAccessNode(callee) {
 		return false
 	}
 
@@ -215,7 +215,7 @@ func getParentIfPromiseChained(node *ast.Node) *ast.Node {
 	}
 
 	grandParent := node.Parent.Parent
-	if grandParent.Kind != ast.KindCallExpression || !isMemberAccessNode(grandParent.AsCallExpression().Expression) {
+	if grandParent.Kind != ast.KindCallExpression || !rstestUtils.IsMemberAccessNode(grandParent.AsCallExpression().Expression) {
 		return node
 	}
 
@@ -298,20 +298,6 @@ func reportAsyncDescriptor(
 		return
 	}
 	ctx.ReportNode(descriptor.node, msg)
-}
-
-// --- Rstest-specific helpers ---
-
-func isMemberAccessNode(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		return true
-	default:
-		return false
-	}
 }
 
 // expectFactoryOpenParenRange locates the `(` of the assertion factory call so

@@ -457,7 +457,7 @@ func classifyRstestExpectCall(
 	parsed.Reason = reason
 	if reason == RstestExpectParseReasonMatcherNotFound &&
 		len(chain) > 0 &&
-		isMemberAccessNode(expression) &&
+		IsMemberAccessNode(expression) &&
 		!hasComputedDynamicRstestExpectMember(chain) {
 		parsed.Reason = RstestExpectParseReasonMatcherNotCalled
 	}
@@ -676,7 +676,8 @@ func isComputedDynamicMemberName(node *ast.Node) bool {
 		parent.AsElementAccessExpression().Expression != node
 }
 
-func isMemberAccessNode(node *ast.Node) bool {
+// IsMemberAccessNode reports whether node is a property or element access.
+func IsMemberAccessNode(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
