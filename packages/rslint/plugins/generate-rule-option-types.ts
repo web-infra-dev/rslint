@@ -169,11 +169,6 @@ async function compileRuleOptionTypes(rules: RuleSchemaEntry[]) {
     }
 
     const requestedName = `${ruleIdToTypeName(ruleId)}Options`;
-    // No `additionalProperties` override: json-schema-to-typescript's own
-    // default (true) applies whenever a schema doesn't set the keyword
-    // itself, so the generated type stays as permissive as the runtime
-    // validator. Forcing it to `false` here would reject option keys the
-    // rule actually accepts at runtime.
     const ts = await compile(schema, requestedName, {
       bannerComment: '',
       style: { semi: true },
