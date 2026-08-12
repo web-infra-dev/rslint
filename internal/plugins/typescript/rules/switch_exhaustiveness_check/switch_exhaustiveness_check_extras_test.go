@@ -46,6 +46,24 @@ switch (((value))) {
     break;
 }
 `},
+			// ---- Dimension 4: empty defaultCaseCommentPattern matches any comment ----
+			// An explicitly configured empty pattern compiles to a regex that matches
+			// every comment, so the trailing comment stands in for a `default:` clause.
+			// Verified against ESLint: reports nothing here.
+			{
+				Code: `
+declare const value: 'a' | 'b';
+switch (value) {
+  case 'a':
+    break;
+  // whatever
+}
+`,
+				Options: map[string]any{
+					"considerDefaultExhaustiveForUnions": true,
+					"defaultCaseCommentPattern":          "",
+				},
+			},
 			// ---- Dimension 4: TS non-null assertion discriminant ----
 			{Code: `
 type Direction = 'north' | 'south';
@@ -151,6 +169,79 @@ switch (value) {
 `, Options: map[string]any{"allowDefaultCaseForExhaustiveSwitch": true}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Dimension 4: parenthesized discriminant reports the inner expression ----
+			// ESTree has no parenthesized-expression node, so ESLint's `node.discriminant`
+			// is always the unwrapped expression. Verified against ESLint: the diagnostic
+			// covers `value` (4:10-4:15), not `(value)`.
+			{
+				Code: `
+type Direction = 'north' | 'south';
+declare const value: Direction;
+switch ((value)) {
+  case 'north':
+    break;
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "switchIsNotExhaustive",
+						Line:      4,
+						Column:    10,
+						EndLine:   4,
+						EndColumn: 15,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "addMissingCases",
+								Output: `
+type Direction = 'north' | 'south';
+declare const value: Direction;
+switch ((value)) {
+  case 'north':
+    break;
+  case "south": { throw new Error('Not implemented yet: "south" case') }
+}
+`,
+							},
+						},
+					},
+				},
+			},
+			// ---- Dimension 4: multi-level parenthesized discriminant unwraps fully ----
+			// Verified against ESLint: the diagnostic covers the innermost `value`
+			// (4:11-4:16).
+			{
+				Code: `
+type Direction = 'north' | 'south';
+declare const value: Direction;
+switch (((value))) {
+  case 'north':
+    break;
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "switchIsNotExhaustive",
+						Line:      4,
+						Column:    11,
+						EndLine:   4,
+						EndColumn: 16,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "addMissingCases",
+								Output: `
+type Direction = 'north' | 'south';
+declare const value: Direction;
+switch (((value))) {
+  case 'north':
+    break;
+  case "south": { throw new Error('Not implemented yet: "south" case') }
+}
+`,
+							},
+						},
+					},
+				},
+			},
 			// ---- Dimension 4: computed enum member name via multi-line template literal ----
 			{
 				Code: `

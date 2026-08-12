@@ -21,7 +21,10 @@ type SwitchExhaustivenessCheckOptions struct {
 	AllowDefaultCaseForExhaustiveSwitch bool
 	RequireDefaultForNonUnion           bool
 	ConsiderDefaultExhaustiveForUnions  bool
-	DefaultCaseCommentPattern           string
+	// DefaultCaseCommentPattern is nil when the option was not configured at
+	// all. An explicitly configured empty string is distinct: it compiles to a
+	// regex that matches every comment, mirroring upstream's `!= null` check.
+	DefaultCaseCommentPattern *string
 }
 
 // SwitchExhaustivenessCheckRule implements the switch-exhaustiveness-check rule
@@ -57,7 +60,7 @@ func parseOptions(options []any) SwitchExhaustivenessCheckOptions {
 		opts.ConsiderDefaultExhaustiveForUnions = v
 	}
 	if v, ok := optsMap["defaultCaseCommentPattern"].(string); ok {
-		opts.DefaultCaseCommentPattern = v
+		opts.DefaultCaseCommentPattern = &v
 	}
 	return opts
 }
@@ -95,6 +98,11 @@ type switchMetadata struct {
 	defaultCase               defaultCaseRef
 	missingLiteralBranchTypes []*checker.Type
 	symbolName                string
+	// discriminant is the switch expression with parentheses skipped. ESTree
+	// has no parenthesized-expression node, so upstream's `node.discriminant`
+	// is always the unwrapped expression — both for the type lookup and for
+	// the reported range.
+	discriminant *ast.Node
 }
 
 // missingCase is either a concrete missing union constituent (typ != nil) or
@@ -109,11 +117,10 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 
 	commentPattern := defaultCommentPattern
-	if opts.DefaultCaseCommentPattern != "" {
-		// An invalid pattern is defensive here (the schema has no format
-		// constraint, unlike core `default-case`); fall back to the default
-		// pattern rather than failing the whole file.
-		if compiled, err := utils.CompileRegexp2(opts.DefaultCaseCommentPattern, utils.JSUnicodeRegexOptions); err == nil {
+	if opts.DefaultCaseCommentPattern != nil {
+		// An invalid pattern is rejected by the schema's `format: "regex"`
+		// before linting starts, so this compile error is only defensive.
+		if compiled, err := utils.CompileRegexp2(*opts.DefaultCaseCommentPattern, utils.JSUnicodeRegexOptions); err == nil {
 			commentPattern = compiled
 		}
 	}
@@ -157,7 +164,8 @@ func getSwitchMetadata(
 		}
 	}
 
-	discriminantType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, switchStmt.Expression)
+	discriminant := ast.SkipParentheses(switchStmt.Expression)
+	discriminantType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, discriminant)
 
 	symbolName := ""
 	if sym := discriminantType.Symbol(); sym != nil {
@@ -173,7 +181,7 @@ func getSwitchMetadata(
 			// A `default:` clause has no test expression.
 			continue
 		}
-		caseTypes[utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, clauseData.Expression)] = true
+		caseTypes[utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, ast.SkipParentheses(clauseData.Expression))] = true
 	}
 
 	// "missing", "optional" and "undefined" types are different runtime
@@ -210,6 +218,7 @@ func getSwitchMetadata(
 		defaultCase:               defaultCase,
 		missingLiteralBranchTypes: missing,
 		symbolName:                symbolName,
+		discriminant:              discriminant,
 	}
 }
 
@@ -332,7 +341,7 @@ func checkSwitchExhaustive(
 	symbolName := meta.symbolName
 
 	ctx.ReportNodeWithDeferredSuggestions(
-		switchStmt.Expression,
+		meta.discriminant,
 		rule.RuleMessage{
 			Id:          "switchIsNotExhaustive",
 			Description: "Switch is not exhaustive. Cases not matched: " + missingBranches,
@@ -390,7 +399,7 @@ func checkSwitchNoUnionDefaultCase(
 	defaultCase := meta.defaultCase
 
 	ctx.ReportNodeWithDeferredSuggestions(
-		switchStmt.Expression,
+		meta.discriminant,
 		rule.RuleMessage{
 			Id:          "switchIsNotExhaustive",
 			Description: "Switch is not exhaustive. Cases not matched: default",
