@@ -1,4 +1,4 @@
-# rstest/valid-expect-in-promise
+# valid-expect-in-promise
 
 Require promise chains containing Rstest assertions to be returned, awaited, or consumed by a safe promise sink.
 

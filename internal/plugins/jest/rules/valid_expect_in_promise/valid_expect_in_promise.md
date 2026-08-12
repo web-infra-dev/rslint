@@ -1,4 +1,4 @@
-# jest/valid-expect-in-promise
+# valid-expect-in-promise
 
 Require promise chains containing Jest `expect` calls to be returned, awaited, or consumed by a safe promise sink.
 
