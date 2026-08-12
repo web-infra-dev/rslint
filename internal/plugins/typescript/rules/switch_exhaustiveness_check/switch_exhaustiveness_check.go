@@ -21,10 +21,7 @@ type SwitchExhaustivenessCheckOptions struct {
 	AllowDefaultCaseForExhaustiveSwitch bool
 	RequireDefaultForNonUnion           bool
 	ConsiderDefaultExhaustiveForUnions  bool
-	// DefaultCaseCommentPattern is nil when the option was not configured at
-	// all. An explicitly configured empty string is distinct: it compiles to a
-	// regex that matches every comment, mirroring upstream's `!= null` check.
-	DefaultCaseCommentPattern *string
+	DefaultCaseCommentPattern           *string
 }
 
 // SwitchExhaustivenessCheckRule implements the switch-exhaustiveness-check rule
