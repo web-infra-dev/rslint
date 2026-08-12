@@ -9,6 +9,7 @@ const recommended: RslintConfigEntry = {
     'rstest/no-identical-title': 'error',
     'rstest/no-interpolation-in-snapshots': 'error',
     'rstest/no-mocks-import': 'error',
+    'rstest/valid-expect-in-promise': 'error',
     'rstest/valid-title': 'error',
   },
 };
