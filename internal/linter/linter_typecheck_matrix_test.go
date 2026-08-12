@@ -42,7 +42,7 @@ func runProgramTypeCheck(t *testing.T, program *compiler.Program) []rule.RuleDia
 	t.Helper()
 	var out []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -287,7 +287,7 @@ export type T = typeof M;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{progA, progB},
+		Programs:        wrapTestPrograms(progA, progB),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -330,7 +330,7 @@ export type T = typeof M;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{progA, progB},
+		Programs:        wrapTestPrograms(progA, progB),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -456,7 +456,7 @@ func TestMatrix_TypeInfoFilesDoesNotRestrictTypeCheck(t *testing.T) {
 	collect := func(infoFiles map[string]struct{}) []rule.RuleDiagnostic {
 		var out []rule.RuleDiagnostic
 		_, err := RunLinter(RunLinterOptions{
-			Programs:        []*compiler.Program{program},
+			Programs:        wrapTestPrograms(program),
 			SingleThreaded:  true,
 			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 			TypeCheck:       true,
@@ -517,7 +517,7 @@ func TestMatrix_StrictOnlyDiagAcrossPrograms_KeptExactlyOnce(t *testing.T) {
 
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{strict, loose},
+		Programs:        wrapTestPrograms(strict, loose),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -561,7 +561,7 @@ func TestMatrix_TypeCheckFalse_NoPhaseTwo(t *testing.T) {
 	// TypeCheck=false → 0.
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{build()},
+		Programs:        wrapTestPrograms(build()),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       false,

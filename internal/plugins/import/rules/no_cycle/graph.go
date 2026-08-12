@@ -67,7 +67,7 @@ func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
 		ignoreExternal:     opts.ignoreExternal,
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
 	}
-	return rule.CachedBySourceRuntime(ctx, key, func() *moduleGraph {
+	return rule.CachedByProgram(ctx, key, func() *moduleGraph {
 		return buildModuleGraph(ctx, settings, opts)
 	})
 }

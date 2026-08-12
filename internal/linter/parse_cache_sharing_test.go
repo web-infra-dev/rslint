@@ -70,7 +70,7 @@ func collectDiags(t *testing.T, programs []*compiler.Program, singleThreaded boo
 	var mu sync.Mutex
 	var got []diagKey
 	opts := RunLinterOptions{
-		Programs:       programs,
+		Programs:       wrapTestPrograms(programs...),
 		SingleThreaded: singleThreaded,
 		TypeCheck:      typeCheck,
 		Consumer: rule.DiagnosticConsumer{

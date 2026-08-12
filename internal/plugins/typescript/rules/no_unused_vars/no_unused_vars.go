@@ -1870,10 +1870,10 @@ func implicitJSXReference(
 	definition *ast.Node,
 	ac *analysisContext,
 ) *ast.Node {
-	if !isImportDefinition(definition) || ctx.Program == nil {
+	if !isImportDefinition(definition) || ctx.TypeScriptProgram() == nil {
 		return nil
 	}
-	opts := ctx.Program.Options()
+	opts := ctx.TypeScriptProgram().Options()
 	if opts == nil {
 		return nil
 	}

@@ -15,10 +15,10 @@ import (
 
 type programCacheTestKey struct{}
 
-// TestCachedByProgramReusesWithinOneProgram locks in the point of the cache:
+// TestCachedByTypeScriptProgramReusesWithinOneProgram locks in the point of the cache:
 // two callers asking about the same Program under the same key get the value
 // the first of them built.
-func TestCachedByProgramReusesWithinOneProgram(t *testing.T) {
+func TestCachedByTypeScriptProgramReusesWithinOneProgram(t *testing.T) {
 	program := programCacheTestProgram(t)
 
 	builds := 0
@@ -28,8 +28,8 @@ func TestCachedByProgramReusesWithinOneProgram(t *testing.T) {
 		return &value
 	}
 
-	first := CachedByProgram(program, programCacheTestKey{}, build)
-	second := CachedByProgram(program, programCacheTestKey{}, build)
+	first := CachedByTypeScriptProgram(program, programCacheTestKey{}, build)
+	second := CachedByTypeScriptProgram(program, programCacheTestKey{}, build)
 
 	if builds != 1 {
 		t.Fatalf("build ran %d times, want 1", builds)
@@ -40,11 +40,11 @@ func TestCachedByProgramReusesWithinOneProgram(t *testing.T) {
 	runtime.KeepAlive(program)
 }
 
-// TestCachedByProgramReleasesCollectedPrograms locks in that an entry never
+// TestCachedByTypeScriptProgramReleasesCollectedPrograms locks in that an entry never
 // outlives the Program it belongs to. The cache is reachable for the life of
 // the process, so an entry that kept its Program alive would hold every source
 // file of every Program the process ever linted.
-func TestCachedByProgramReleasesCollectedPrograms(t *testing.T) {
+func TestCachedByTypeScriptProgramReleasesCollectedPrograms(t *testing.T) {
 	var key weak.Pointer[compiler.Program]
 
 	// The Program is confined to this call so that nothing in the test frame
@@ -52,7 +52,7 @@ func TestCachedByProgramReleasesCollectedPrograms(t *testing.T) {
 	func() {
 		program := programCacheTestProgram(t)
 		key = weak.Make(program)
-		CachedByProgram(program, programCacheTestKey{}, func() *int {
+		CachedByTypeScriptProgram(program, programCacheTestKey{}, func() *int {
 			value := 1
 			return &value
 		})

@@ -7,11 +7,11 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -216,7 +216,7 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 	}()
 
 	if _, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       []*lintprogram.Program{lintprogram.NewTypeScript(program)},
 		SingleThreaded: true,
 		Scope:          linter.FileScope{Files: []string{tsxPath}},
 		ExcludePaths:   []string{},

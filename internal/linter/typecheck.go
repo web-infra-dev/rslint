@@ -10,12 +10,13 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // typeCheckRequest bundles the inputs for runTypeCheckAcrossPrograms.
 type typeCheckRequest struct {
-	Programs       []*compiler.Program
+	Programs       []*program.Program
 	Skip           []bool // parallel to Programs; nil → check all
 	SingleThreaded bool
 	OnDiagnostic   DiagnosticHandler
@@ -46,8 +47,12 @@ func runTypeCheckAcrossPrograms(req typeCheckRequest) {
 		if i < len(req.Skip) && req.Skip[i] {
 			continue
 		}
+		typeScriptProgram := prog.TypeScriptProgram()
+		if typeScriptProgram == nil {
+			continue
+		}
 		programIndex := i
-		program := prog
+		program := typeScriptProgram
 		wg.Queue(func() {
 			collected[programIndex] = runTypeCheckForProgram(program)
 		})

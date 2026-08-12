@@ -1,10 +1,8 @@
 package rule
 
 import (
-	"reflect"
-
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -47,8 +45,8 @@ type ModuleEdge struct {
 	Declaration *ast.Node
 	// From is the file the specifier was written in.
 	From *ast.SourceFile
-	// Target is the file it names, nil when nothing in the source runtime answers
-	// for it. A specifier can resolve to a path the runtime never loaded, in
+	// Target is the file it names, nil when nothing in the Program answers
+	// for it. A specifier can resolve to a path the Program never materialized, in
 	// which case ResolvedPath is set and Target is not.
 	Target *ast.SourceFile
 	// ResolvedPath is the path the specifier resolves to, empty when it
@@ -95,11 +93,9 @@ func (edge ModuleEdge) Dynamic() bool {
 // a rule treats as a dependency — whether type-only imports count, whether
 // anything under node_modules counts — is the rule's own question.
 type ModuleGraph struct {
-	program *compiler.Program
-	runtime utils.ModuleResolutionRuntime
-	files   []*ast.SourceFile
-	// Standalone source sets have no Program identity for CachedByProgram.
-	// Their run-scoped derived structures share this cache instead.
+	program *program.Program
+	// Standalone Programs have no ts-go Program identity for the weak derived
+	// cache. Their run-scoped derived structures share this cache instead.
 	cache programCache
 	// Collection is pure, so LazyMap's build-outside-the-lock contract holds:
 	// two files racing on their first request for one key cost one redundant
@@ -111,19 +107,6 @@ type ModuleGraph struct {
 	cacheModuleSpecifiers bool
 }
 
-// sourceRuntime returns the graph's standalone source environment.
-// Standalone rule contexts use the graph as their single shared runtime
-// carrier, avoiding one interface field in every per-rule context.
-func (graph *ModuleGraph) sourceRuntime() SourceRuntime {
-	if graph == nil || graph.runtime == nil {
-		return nil
-	}
-	if runtime, ok := graph.runtime.(SourceRuntime); ok {
-		return runtime
-	}
-	return nil
-}
-
 // moduleEdgeKey pairs a file with the syntaxes the caller asked about, which
 // is what decides the answer.
 type moduleEdgeKey struct {
@@ -131,83 +114,40 @@ type moduleEdgeKey struct {
 	syntax ModuleSyntax
 }
 
-func NewModuleGraph(program *compiler.Program) *ModuleGraph {
-	if program == nil {
+func NewModuleGraph(sourceProgram *program.Program) *ModuleGraph {
+	if !sourceProgram.IsValid() {
 		return &ModuleGraph{}
 	}
 	// The Program owns an immutable source-file slice for the graph's lifetime,
 	// so retain that owner instead of copying every file pointer per lint pass.
-	return &ModuleGraph{program: program, runtime: program}
+	return &ModuleGraph{program: sourceProgram}
 }
 
 // NewCachedModuleGraph returns a graph that shares its syntax-only collection
 // with other graphs holding the exact same SourceFile objects. Each graph
-// still resolves those specifiers against its own source runtime.
-func NewCachedModuleGraph(program *compiler.Program) *ModuleGraph {
-	if program == nil {
+// still resolves those specifiers against its own Program.
+func NewCachedModuleGraph(sourceProgram *program.Program) *ModuleGraph {
+	if !sourceProgram.IsValid() {
 		return &ModuleGraph{}
 	}
-	return &ModuleGraph{program: program, runtime: program, cacheModuleSpecifiers: true}
-}
-
-// NewStandaloneModuleGraph returns a run-scoped graph over one standalone
-// source set. The caller owns files and runtime for at least as long as the
-// graph; the copied slice fixes the graph's stable file order.
-func NewStandaloneModuleGraph(files []*ast.SourceFile, runtime SourceRuntime) *ModuleGraph {
-	return newStandaloneModuleGraph(files, runtime, true)
-}
-
-// NewOwnedStandaloneModuleGraph avoids a second pointer-slice copy when the
-// caller owns an immutable files slice for the graph's full lifetime. Prefer
-// NewStandaloneModuleGraph for caller-owned or mutable input.
-func NewOwnedStandaloneModuleGraph(files []*ast.SourceFile, runtime SourceRuntime) *ModuleGraph {
-	return newStandaloneModuleGraph(files, runtime, false)
-}
-
-func newStandaloneModuleGraph(files []*ast.SourceFile, runtime SourceRuntime, copyFiles bool) *ModuleGraph {
-	if isNilSourceRuntime(runtime) {
-		return &ModuleGraph{}
-	}
-	if copyFiles {
-		files = append([]*ast.SourceFile(nil), files...)
-	}
-	return &ModuleGraph{
-		runtime: runtime,
-		files:   files,
-	}
-}
-
-func isNilSourceRuntime(runtime SourceRuntime) bool {
-	if runtime == nil {
-		return true
-	}
-	value := reflect.ValueOf(runtime)
-	switch value.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
-		return value.IsNil()
-	default:
-		return false
-	}
+	return &ModuleGraph{program: sourceProgram, cacheModuleSpecifiers: true}
 }
 
 // Files returns every file of the source set in its stable input order. A
 // file's position in this slice is stable for the lifetime of the graph, so
 // callers that need a dense numbering can adopt it. The result is read-only.
 func (graph *ModuleGraph) Files() []*ast.SourceFile {
-	if graph == nil || graph.runtime == nil {
+	if graph == nil || graph.program == nil {
 		return nil
 	}
-	if graph.program != nil {
-		return graph.program.SourceFiles()
-	}
-	return graph.files
+	return graph.program.SourceFiles()
 }
 
 // Edges returns the module references file writes in the given syntaxes, in
 // source order. The result is shared with every other caller and must not be
 // modified.
 func (graph *ModuleGraph) Edges(file *ast.SourceFile, syntax ModuleSyntax) []ModuleEdge {
-	if graph == nil || graph.runtime == nil || file == nil || syntax.none() {
+	if graph == nil || graph.program == nil || file == nil || syntax.none() {
 		return nil
 	}
 
@@ -243,7 +183,7 @@ func (graph *ModuleGraph) resolveAll(file *ast.SourceFile, specifiers []moduleSp
 			TypeOnly:    specifiers[i].typeOnly,
 		}
 		edges[i].ResolvedPath, edges[i].Target, _ =
-			utils.ResolveModuleFile(graph.runtime, file, specifiers[i].specifier)
+			utils.ResolveModuleFile(graph.program, file, specifiers[i].specifier)
 	}
 	return edges
 }

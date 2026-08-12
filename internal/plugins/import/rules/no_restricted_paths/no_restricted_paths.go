@@ -46,7 +46,7 @@ var NoRestrictedPathsRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-		if len(opts.zones) == 0 || !ctx.HasSourceRuntime() {
+		if len(opts.zones) == 0 || !ctx.HasProgram() {
 			return rule.RuleListeners{}
 		}
 

@@ -53,7 +53,7 @@ func cacheFor(program *compiler.Program) *programCache {
 	return entry
 }
 
-// CachedByProgram returns the value stored for one Program under key, calling
+// CachedByTypeScriptProgram returns the value stored for one ts-go Program under key, calling
 // build on the first request for it. build runs at most once per key even
 // when rules on different files run concurrently, and only its key is
 // untyped: what comes back is whatever T the caller asked for.
@@ -65,20 +65,20 @@ func cacheFor(program *compiler.Program) *programCache {
 //
 // The value is shared with every later caller, and rules on different files
 // run concurrently, so build must return something no caller will mutate.
-func CachedByProgram[T any](program *compiler.Program, key any, build func() T) T {
+func CachedByTypeScriptProgram[T any](program *compiler.Program, key any, build func() T) T {
 	if program == nil {
 		return build()
 	}
 	return cachedValueFor(cacheFor(program), key, build)
 }
 
-// CachedBySourceRuntime shares derived state across every rule context backed
-// by the same effective source set. Real Programs retain their weak lifetime
-// cache; standalone source sets use the cache owned by their run-scoped module
-// graph and cannot leak beyond that lint run.
-func CachedBySourceRuntime[T any](ctx RuleContext, key any, build func() T) T {
-	if ctx.Program != nil {
-		return CachedByProgram(ctx.Program, key, build)
+// CachedByProgram shares derived state across every rule context backed by the
+// same rslint Program. Compiler-backed Programs retain their weak ts-go
+// lifetime cache; standalone Programs use the cache owned by their run-scoped
+// module graph and cannot leak beyond that lint run.
+func CachedByProgram[T any](ctx RuleContext, key any, build func() T) T {
+	if typeScriptProgram := ctx.TypeScriptProgram(); typeScriptProgram != nil {
+		return CachedByTypeScriptProgram(typeScriptProgram, key, build)
 	}
 	if ctx.Modules == nil {
 		return build()

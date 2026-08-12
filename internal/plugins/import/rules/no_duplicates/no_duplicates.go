@@ -241,7 +241,7 @@ func (r *importResolver) resolve(importDecl *ast.ImportDeclaration) string {
 }
 
 func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, moduleSpecifier *ast.Node) (string, bool) {
-	if !r.ctx.HasSourceRuntime() {
+	if !r.ctx.HasProgram() {
 		return "", false
 	}
 

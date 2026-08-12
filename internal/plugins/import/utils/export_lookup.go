@@ -24,10 +24,10 @@ func HasDefaultExport(ctx rule.RuleContext, moduleSpecifier *ast.Node) (bool, bo
 // the resolved module statically exports exportName. The second result is false
 // when the target is unresolved or is not an ES module.
 func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName string) (bool, bool) {
-	if !ctx.HasSourceRuntime() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+	if !ctx.HasProgram() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return false, false
 	}
-	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.ModuleResolutionRuntime()))
+	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.Program))
 }
 
 // exportKey is one (file, name) lookup in flight, so a re-export chain that
@@ -39,7 +39,7 @@ type exportKey struct {
 }
 
 func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName string, builder *exportBuilder) (bool, bool) {
-	link := resolveExportLinkForLookup(builder.sourceRuntime(), origin, builder.index.settings, moduleSpecifier)
+	link := resolveExportLinkForLookup(builder.moduleRuntime(), origin, builder.index.settings, moduleSpecifier)
 	if link.Target == nil {
 		return false, false
 	}
@@ -85,11 +85,11 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 
 		switch stmt.Kind {
 		case ast.KindExportAssignment:
-			if exportName == defaultExportName && exportAssignmentHasDefault(builder.sourceRuntime(), sourceFile, stmt.AsExportAssignment()) {
+			if exportName == defaultExportName && exportAssignmentHasDefault(builder.moduleRuntime(), sourceFile, stmt.AsExportAssignment()) {
 				return true, true
 			}
 		case ast.KindNamespaceExportDeclaration:
-			if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.sourceRuntime()) {
+			if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.moduleRuntime()) {
 				return true, true
 			}
 		case ast.KindExportDeclaration:
@@ -100,7 +100,7 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 		}
 	}
 
-	if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.sourceRuntime()) && sourceFileHasDirectNamespaceExport(sourceFile) {
+	if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.moduleRuntime()) && sourceFileHasDirectNamespaceExport(sourceFile) {
 		return true, true
 	}
 

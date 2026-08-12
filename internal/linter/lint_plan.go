@@ -5,9 +5,8 @@ import (
 	"runtime"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -17,20 +16,17 @@ import (
 // for LintedFileCount, while resolving each eligible file's complete rule set
 // exactly once.
 type LintPlan struct {
-	programs   []programLintPlan
-	standalone []programLintPlan
+	programs []programLintPlan
 }
 
 type programLintPlan struct {
-	program     *compiler.Program
-	runtime     rule.SourceRuntime
-	sourceFiles []*ast.SourceFile
+	program     *program.Program
 	files       []*ast.SourceFile
 	rules       [][]ConfiguredRule
+	hasTypeInfo []bool
 }
 
 type lintPlanFileRef struct {
-	standalone   bool
 	programIndex int
 	fileIndex    int
 }
@@ -46,24 +42,24 @@ type LintTarget struct {
 // PrepareLintPlan collects the Phase 1 target files and resolves their rules.
 // Rule resolution uses at most GOMAXPROCS workers unless SingleThreaded is set.
 // GetRulesForFile must therefore support concurrent calls whenever the caller
-	// requests normal parallel execution, matching Consumer.Report's run-scoped
-	// concurrency requirement. It rejects a standalone source set that contains
-	// different AST objects for one non-empty ts-go Path, because its Runtime can
-	// resolve that identity to only one object.
+// requests normal parallel execution, matching Consumer.Report's run-scoped
+// concurrency requirement. Standalone source validation happens once in
+// program.NewStandalone, before the Program can reach this planner.
 func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 	if opts.GetRulesForFile == nil {
 		return &LintPlan{}, nil
+	}
+	// Validate the complete ordered input before target projection invokes a
+	// caller-supplied FileFilter for any earlier Program.
+	if err := validatePrograms(opts.Programs); err != nil {
+		return nil, err
 	}
 	if opts.ExcludePaths == nil {
 		opts.ExcludePaths = utils.ExcludePaths
 	}
 
-	plan := &LintPlan{
-		programs:   make([]programLintPlan, len(opts.Programs)),
-		standalone: make([]programLintPlan, len(opts.Standalone)),
-	}
+	plan := &LintPlan{programs: make([]programLintPlan, len(opts.Programs))}
 	programOpts := make([]runProgramOptions, len(opts.Programs))
-	standaloneOpts := make([]runProgramOptions, len(opts.Standalone))
 	totalFiles := 0
 	for programIndex := range opts.Programs {
 		programOpts[programIndex] = runProgramOptionsFor(opts, programIndex, nil)
@@ -73,15 +69,6 @@ func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 		}
 		plan.programs[programIndex] = programPlan
 		totalFiles += len(plan.programs[programIndex].files)
-	}
-	for sourceSetIndex := range opts.Standalone {
-		standaloneOpts[sourceSetIndex] = runStandaloneOptionsFor(opts, sourceSetIndex, nil)
-		sourceSetPlan, err := newProgramLintPlan(standaloneOpts[sourceSetIndex])
-		if err != nil {
-			return nil, err
-		}
-		plan.standalone[sourceSetIndex] = sourceSetPlan
-		totalFiles += len(plan.standalone[sourceSetIndex].files)
 	}
 
 	refs := make([]lintPlanFileRef, 0, totalFiles)
@@ -93,22 +80,8 @@ func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 			})
 		}
 	}
-	for sourceSetIndex, sourceSetPlan := range plan.standalone {
-		for fileIndex := range sourceSetPlan.files {
-			refs = append(refs, lintPlanFileRef{
-				standalone:   true,
-				programIndex: sourceSetIndex,
-				fileIndex:    fileIndex,
-			})
-		}
-	}
 
 	resolve := func(ref lintPlanFileRef, ctx context.Context) {
-		if ref.standalone {
-			sourceSetPlan := &plan.standalone[ref.programIndex]
-			resolveProgramLintPlanFile(standaloneOpts[ref.programIndex], sourceSetPlan, ref.fileIndex, ctx)
-			return
-		}
 		programPlan := &plan.programs[ref.programIndex]
 		resolveProgramLintPlanFile(programOpts[ref.programIndex], programPlan, ref.fileIndex, ctx)
 	}
@@ -143,28 +116,15 @@ func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 }
 
 func newProgramLintPlan(opts runProgramOptions) (programLintPlan, error) {
-	var sourceFiles []*ast.SourceFile
-	var files []*ast.SourceFile
-	if opts.Standalone {
-		if opts.SourceFilesValidated {
-			sourceFiles = opts.SourceFiles
-		} else {
-			var err error
-			sourceFiles, err = validateStandaloneSourceSet(opts.SourceFiles, opts.Runtime)
-			if err != nil {
-				return programLintPlan{}, err
-			}
-		}
-		files = collectStandaloneFilesToLint(sourceFiles, opts.ExcludePaths)
-	} else {
-		files = collectFilesToLint(opts)
+	if err := validateProgram(opts.Program); err != nil {
+		return programLintPlan{}, err
 	}
+	files := collectFilesToLint(opts)
 	return programLintPlan{
 		program:     opts.Program,
-		runtime:     opts.Runtime,
-		sourceFiles: sourceFiles,
 		files:       files,
 		rules:       make([][]ConfiguredRule, len(files)),
+		hasTypeInfo: make([]bool, len(files)),
 	}, nil
 }
 
@@ -186,19 +146,16 @@ func resolveProgramLintPlanFile(opts runProgramOptions, plan *programLintPlan, f
 		return
 	}
 	rules := opts.GetRulesForFile(file)
-	// Standalone source sets never have a Program or TypeChecker. Enforce that
-	// invariant here instead of relying on callers to encode it indirectly as a
-	// non-nil, empty TypeInfoFiles set: nil is the public option's zero value and
-	// otherwise means "do not filter" for Program-backed files.
-	if opts.Standalone {
+	if opts.Program.IsStandalone() {
 		plan.rules[fileIndex] = FilterNonTypeAwareRules(rules)
 		return
 	}
-	plan.rules[fileIndex] = filterRulesForTypeInfo(
-		rules,
-		file.FileName(),
-		opts.TypeInfoFiles,
-	)
+	plan.hasTypeInfo[fileIndex] = fileHasTypeInfo(file.FileName(), opts.TypeInfoFiles)
+	if plan.hasTypeInfo[fileIndex] {
+		plan.rules[fileIndex] = rules
+	} else {
+		plan.rules[fileIndex] = FilterNonTypeAwareRules(rules)
+	}
 }
 
 // Targets returns the plan's plugin-facing projection in stable Program/file
@@ -211,15 +168,6 @@ func (p *LintPlan) Targets() []LintTarget {
 	for _, programPlan := range p.programs {
 		for fileIndex, file := range programPlan.files {
 			rules := programPlan.rules[fileIndex]
-			if len(rules) == 0 {
-				continue
-			}
-			targets = append(targets, LintTarget{File: file, Rules: rules})
-		}
-	}
-	for _, sourceSetPlan := range p.standalone {
-		for fileIndex, file := range sourceSetPlan.files {
-			rules := sourceSetPlan.rules[fileIndex]
 			if len(rules) == 0 {
 				continue
 			}
@@ -262,22 +210,4 @@ func runProgramOptionsFor(opts RunLinterOptions, programIndex int, prepared *pro
 		)
 	}
 	return programOpts
-}
-
-func runStandaloneOptionsFor(opts RunLinterOptions, sourceSetIndex int, prepared *programLintPlan) runProgramOptions {
-	sourceSet := opts.Standalone[sourceSetIndex]
-	return runProgramOptions{
-		Standalone:           true,
-		SourceFiles:          sourceSet.Files,
-		Runtime:              sourceSet.Runtime,
-		Cwd:                  opts.Cwd,
-		ExcludePaths:         opts.ExcludePaths,
-		GetRulesForFile:      opts.GetRulesForFile,
-		CollectExecutedRules: true,
-		SyntaxErrorFiles:     opts.SyntaxErrorFiles,
-		SingleThreaded:       opts.SingleThreaded,
-		TypeInfoFiles:        opts.TypeInfoFiles,
-		Timing:               opts.Timing,
-		PreparedPlan:         prepared,
-	}
 }

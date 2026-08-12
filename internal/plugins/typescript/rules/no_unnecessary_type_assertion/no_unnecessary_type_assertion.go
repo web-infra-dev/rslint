@@ -90,7 +90,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			return fixScanner.TokenRange()
 		}
 
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ctx.TypeScriptProgram().Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,

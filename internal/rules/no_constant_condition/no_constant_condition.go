@@ -499,7 +499,7 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 					// First check if this identifier is the global built-in (not shadowed)
 					// If we can't determine (no TypeChecker), conservatively assume it's NOT the global builtin
 					// to avoid false positives from shadowing
-					if ctx == nil || ctx.TypeChecker == nil || ctx.Program == nil || ctx.SourceFile == nil {
+					if ctx == nil || ctx.TypeChecker == nil || ctx.TypeScriptProgram() == nil || ctx.SourceFile == nil {
 						// Can't check for shadowing - conservatively assume it's shadowed
 						return false
 					}
@@ -522,7 +522,7 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 					}
 
 					// Check if the symbol is from the default library (not shadowed)
-					isGlobalBuiltin := utils.IsSymbolFromDefaultLibrary(ctx.Program, symbol)
+					isGlobalBuiltin := utils.IsSymbolFromDefaultLibrary(ctx.TypeScriptProgram(), symbol)
 
 					// If it's not the global builtin, it's not constant
 					if !isGlobalBuiltin {

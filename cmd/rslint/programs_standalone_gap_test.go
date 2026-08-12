@@ -53,7 +53,7 @@ func compareStandaloneSyntaxDiagnostics(t *testing.T, legacy, direct []rule.Rule
 	}
 }
 
-func TestStandaloneGapSourceSetsMatchFallbackProgram(t *testing.T) {
+func TestStandaloneGapProgramsMatchFallbackProgram(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
 		"package.json":  "{\"type\":\"module\"}",
@@ -83,27 +83,24 @@ func TestStandaloneGapSourceSetsMatchFallbackProgram(t *testing.T) {
 	)
 
 	directContext := standaloneGapTestBuildContext()
-	sourceSets, directDiagnostics, _, err := buildStandaloneGapSourceSets(
+	programs, directDiagnostics, _, err := buildStandaloneGapPrograms(
 		[][]resolvedLintTarget{plan.Targets},
 		dir,
 		directContext,
 		false, // Exercise the production parallel parse/bind path.
 	)
 	if err != nil {
-		t.Fatalf("buildStandaloneGapSourceSets: %v", err)
+		t.Fatalf("buildStandaloneGapPrograms: %v", err)
 	}
 	compareStandaloneSyntaxDiagnostics(t, legacyDiagnostics, directDiagnostics)
-	if len(sourceSets) != 1 || len(sourceSets[0].Files) != len(plan.Targets) {
-		t.Fatalf("standalone source count differs: sets=%d files=%d", len(sourceSets), len(sourceSets[0].Files))
+	if len(programs) != 1 || len(programs[0].SourceFiles()) != len(plan.Targets) {
+		t.Fatalf("standalone source count differs: programs=%d files=%d", len(programs), len(programs[0].SourceFiles()))
 	}
-	runtime, ok := sourceSets[0].Runtime.(*standaloneGapRuntime)
-	if !ok {
-		t.Fatalf("standalone runtime = %T", sourceSets[0].Runtime)
-	}
+	standalone := programs[0]
 
 	for i, target := range plan.Targets {
 		programFile := exactProgramSourceFile(fallback, target.Path)
-		directFile := sourceSets[0].Files[i]
+		directFile := standalone.SourceFiles()[i]
 		if programFile == nil || directFile == nil {
 			t.Fatalf("missing source for %q: Program=%v direct=%v", target.Path, programFile != nil, directFile != nil)
 		}
@@ -113,8 +110,8 @@ func TestStandaloneGapSourceSetsMatchFallbackProgram(t *testing.T) {
 		if (programFile.ExternalModuleIndicator == nil) != (directFile.ExternalModuleIndicator == nil) {
 			t.Fatalf("external-module detection differs for %q", target.Path)
 		}
-		if legacyMetadata := fallback.GetSourceFileMetaData(programFile.Path()); legacyMetadata != runtime.metadataByPath[directFile.Path()] {
-			t.Fatalf("source metadata differs for %q: legacy=%+v direct=%+v", target.Path, legacyMetadata, runtime.metadataByPath[directFile.Path()])
+		if legacyMetadata := fallback.GetSourceFileMetaData(programFile.Path()); legacyMetadata != standalone.SourceFileMetadata(directFile) {
+			t.Fatalf("source metadata differs for %q: legacy=%+v direct=%+v", target.Path, legacyMetadata, standalone.SourceFileMetadata(directFile))
 		}
 
 		programAST, programErr := api.EncodeAST(programFile, target.Path)
@@ -129,7 +126,7 @@ func TestStandaloneGapSourceSetsMatchFallbackProgram(t *testing.T) {
 		for _, specifier := range programFile.Imports() {
 			mode := fallback.GetModeForUsageLocation(programFile, specifier)
 			legacyResolution := fallback.GetResolvedModule(programFile, specifier.Text(), mode)
-			directResolution := runtime.GetResolvedModule(directFile, specifier.Text(), mode)
+			directResolution := standalone.GetResolvedModule(directFile, specifier.Text(), mode)
 			if legacyResolution == nil || directResolution == nil ||
 				legacyResolution.ResolvedFileName != directResolution.ResolvedFileName ||
 				legacyResolution.IsResolved() != directResolution.IsResolved() {
@@ -137,7 +134,7 @@ func TestStandaloneGapSourceSetsMatchFallbackProgram(t *testing.T) {
 			}
 			if legacyResolution.IsResolved() {
 				legacySource := fallback.GetSourceFileForResolvedModule(legacyResolution.ResolvedFileName)
-				directSource := runtime.GetSourceFileForResolvedModule(directResolution.ResolvedFileName)
+				directSource := standalone.GetSourceFileForResolvedModule(directResolution.ResolvedFileName)
 				if (legacySource == nil) != (directSource == nil) ||
 					legacySource != nil && legacySource.FileName() != directSource.FileName() {
 					t.Fatalf("resolved source lookup differs for %q", specifier.Text())
@@ -146,15 +143,15 @@ func TestStandaloneGapSourceSetsMatchFallbackProgram(t *testing.T) {
 		}
 	}
 	unselected := tspath.ResolvePath(dir, "unselected.js")
-	if fallback.GetSourceFile(unselected) != nil || runtime.GetSourceFile(unselected) != nil {
-		t.Fatal("NoResolve source runtimes materialized an unselected dependency")
+	if fallback.GetSourceFile(unselected) != nil || standalone.GetSourceFile(unselected) != nil {
+		t.Fatal("NoResolve Programs materialized an unselected dependency")
 	}
 }
 
-func TestStandaloneGapSourceSetsReportUnreadableTarget(t *testing.T) {
+func TestStandaloneGapProgramsReportUnreadableTarget(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	target := tspath.ResolvePath(dir, "missing.ts")
-	_, _, _, err := buildStandaloneGapSourceSets(
+	_, _, _, err := buildStandaloneGapPrograms(
 		[][]resolvedLintTarget{{{
 			Path:           target,
 			CanonicalPath:  target,
@@ -164,27 +161,27 @@ func TestStandaloneGapSourceSetsReportUnreadableTarget(t *testing.T) {
 		standaloneGapTestBuildContext(),
 		true,
 	)
-	want := fmt.Sprintf("standalone runtime could not read lint target %q", target)
+	want := fmt.Sprintf("program: standalone Program could not read root %q", target)
 	if err == nil || err.Error() != want {
 		t.Fatalf("unreadable standalone target error = %v, want %q", err, want)
 	}
 }
 
-func TestStandaloneGapRuntimeSupportsCrossFileImportRules(t *testing.T) {
+func TestStandaloneGapProgramSupportsCrossFileImportRules(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
 		"a.ts": "import value from './b';\nexport const a = value;\n",
 		"b.ts": "import './a';\nexport const b = 1;\n",
 	})
 	plan := standaloneGapTestPlan(dir, "a.ts", "b.ts")
-	sourceSets, diagnostics, syntaxErrorFiles, err := buildStandaloneGapSourceSets(
+	programs, diagnostics, syntaxErrorFiles, err := buildStandaloneGapPrograms(
 		[][]resolvedLintTarget{plan.Targets},
 		dir,
 		standaloneGapTestBuildContext(),
 		true,
 	)
 	if err != nil {
-		t.Fatalf("buildStandaloneGapSourceSets: %v", err)
+		t.Fatalf("buildStandaloneGapPrograms: %v", err)
 	}
 	if len(diagnostics) != 0 {
 		t.Fatalf("unexpected standalone syntax diagnostics: %+v", diagnostics)
@@ -192,7 +189,7 @@ func TestStandaloneGapRuntimeSupportsCrossFileImportRules(t *testing.T) {
 
 	var cycleReports, defaultReports int
 	opts := linter.RunLinterOptions{
-		Standalone:       sourceSets,
+		Programs:         programs,
 		SingleThreaded:   true,
 		TypeInfoFiles:    map[string]struct{}{},
 		SyntaxErrorFiles: syntaxErrorFiles,
@@ -202,8 +199,8 @@ func TestStandaloneGapRuntimeSupportsCrossFileImportRules(t *testing.T) {
 					Name:     no_cycle.NoCycleRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						if ctx.Program != nil || !ctx.HasSourceRuntime() || ctx.Modules == nil {
-							t.Fatal("standalone import rule lost its source runtime")
+						if ctx.Program == nil || ctx.TypeScriptProgram() != nil || !ctx.HasProgram() || ctx.Modules == nil {
+							t.Fatal("standalone import rule lost its Program")
 						}
 						return no_cycle.NoCycleRule.Run(ctx, nil)
 					},
@@ -327,14 +324,14 @@ func TestBindCLILintTargetPlanMatchesFallbackRootAdmission(t *testing.T) {
 				false,
 				false,
 			)
-			_, directDiagnostics, _, err := buildStandaloneGapSourceSets(
+			_, directDiagnostics, _, err := buildStandaloneGapPrograms(
 				direct.binding.StandaloneGapGroups,
 				configDir,
 				directContext,
 				true,
 			)
 			if err != nil {
-				t.Fatalf("buildStandaloneGapSourceSets: %v", err)
+				t.Fatalf("buildStandaloneGapPrograms: %v", err)
 			}
 			compareStandaloneSyntaxDiagnostics(t, legacyDiagnostics, directDiagnostics)
 		})
@@ -353,7 +350,7 @@ func (fsys *standaloneGapExactCaseFS) DirectoryExists(path string) bool {
 	return fsys.exactCaseProgramFS.DirectoryExists(path)
 }
 
-func TestStandaloneGapSourceSetsIsolateCaseFoldedPackageScopes(t *testing.T) {
+func TestStandaloneGapProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 	const configDir = "/repo"
 	const upper = "/repo/node_modules/Pkg/index.js"
 	const lower = "/repo/node_modules/pkg/index.js"
@@ -389,16 +386,16 @@ func TestStandaloneGapSourceSetsIsolateCaseFoldedPackageScopes(t *testing.T) {
 		t.Fatalf("bindCLILintTargetPlan: %v", err)
 	}
 	if len(direct.StandaloneGapGroups) != 2 {
-		t.Fatalf("case-folded targets share a runtime: groups=%d", len(direct.StandaloneGapGroups))
+		t.Fatalf("case-folded targets share a Program: groups=%d", len(direct.StandaloneGapGroups))
 	}
-	sourceSets, directDiagnostics, _, err := buildStandaloneGapSourceSets(
+	programs, directDiagnostics, _, err := buildStandaloneGapPrograms(
 		direct.StandaloneGapGroups,
 		configDir,
 		directContext,
 		true,
 	)
 	if err != nil {
-		t.Fatalf("buildStandaloneGapSourceSets: %v", err)
+		t.Fatalf("buildStandaloneGapPrograms: %v", err)
 	}
 	legacyDiagnostics, _ := collectTargetSyntacticDiagnostics(
 		legacy.Programs,
@@ -410,8 +407,8 @@ func TestStandaloneGapSourceSetsIsolateCaseFoldedPackageScopes(t *testing.T) {
 	compareStandaloneSyntaxDiagnostics(t, legacyDiagnostics, directDiagnostics)
 
 	directExternal := make(map[string]bool, 2)
-	for _, sourceSet := range sourceSets {
-		for _, file := range sourceSet.Files {
+	for _, standalone := range programs {
+		for _, file := range standalone.SourceFiles() {
 			directExternal[file.FileName()] = file.ExternalModuleIndicator != nil
 		}
 	}
@@ -456,14 +453,14 @@ func TestStandaloneGapSyntaxDeduplicatesAgainstNonGoverningTypeCheckProgram(t *t
 		t.Fatalf("fixture did not create a non-governing Program plus standalone gap: programs=%d groups=%d", len(binding.Programs), len(binding.StandaloneGapGroups))
 	}
 
-	_, diagnostics, _, err := buildStandaloneGapSourceSets(
+	_, diagnostics, _, err := buildStandaloneGapPrograms(
 		binding.StandaloneGapGroups,
 		rootDir,
 		buildContext,
 		true,
 	)
 	if err != nil {
-		t.Fatalf("buildStandaloneGapSourceSets: %v", err)
+		t.Fatalf("buildStandaloneGapPrograms: %v", err)
 	}
 	diagnostics = append(
 		diagnostics,

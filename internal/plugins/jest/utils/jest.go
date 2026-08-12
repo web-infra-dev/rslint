@@ -337,12 +337,12 @@ func jestVersionFromPackageJSONText(data string) string {
 }
 
 // readJestVersionFromPackageJson resolves the jest version from the nearest package.json (same package
-// as the current source file) using the effective source runtime's filesystem.
+// as the current source file) using the effective Program's filesystem.
 func readJestVersionFromPackageJson(ctx rule.RuleContext) string {
 	if ctx.SourceFile == nil {
 		return ""
 	}
-	if !ctx.HasSourceRuntime() {
+	if !ctx.HasProgram() {
 		return ""
 	}
 	dir := tspath.GetDirectoryPath(ctx.SourceFile.FileName())

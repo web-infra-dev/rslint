@@ -20,7 +20,7 @@ import (
 // name, and an append-mostly parsed SourceFile cache keyed by every parse input.
 // Multiple tsconfigs can therefore reuse both layers; transient standalone
 // hosts share only immutable source bytes/hashes and parse inputs, then bind
-// their selected ASTs within their own source runtime.
+// their selected ASTs within their own rslint Program generation.
 //
 // The AST key reuses the upstream project.ParseCacheKey — SourceFileParseOptions
 // (FileName + Path + ExternalModuleIndicatorOptions) + ScriptKind + an xxh3

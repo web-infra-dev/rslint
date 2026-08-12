@@ -24,6 +24,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -609,13 +610,14 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// Build one run descriptor and prepared plan shared by native lint and
 	// plugin dispatch, keeping both paths on the exact same file/rule selection.
 	runOpts := linter.RunLinterOptions{
-		Programs:       programs,
+		Programs:       lintprogram.WrapTypeScriptPrograms(programs),
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
 		Cwd:            currentDirectory,
 		Scope:          linter.FileScope{Files: allowedFiles},
 		TargetFiles:    targetsByProgram,
-		// RunLinter repeats the RequiresTypeInfo eligibility check for files
-		// outside this set and withholds the project TypeChecker from them.
+		// PrepareLintPlan freezes the RequiresTypeInfo eligibility decision for
+		// files outside this set; RunLinter then consumes the same decision when
+		// deciding whether to provide a project TypeChecker.
 		TypeInfoFiles:    typeInfoFiles,
 		SyntaxErrorFiles: syntaxErrorFiles,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
@@ -628,7 +630,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			// GetActiveRulesForFile applies the type-aware gate: when
 			// typeInfoFiles is non-nil and this file is not in it (a gap /
 			// fallback file with no type information), type-aware rules are
-			// filtered out. RunLinter repeats this check at the execution boundary.
+			// filtered out. PrepareLintPlan repeats the gate at the native-plan
+			// boundary so plugin and native execution consume one immutable result.
 			// typeInfoFiles==nil ⇒ no fallback ⇒ every linted file has type
 			// info ⇒ nothing to filter. Rules come solely from the resolved
 			// config object (config.rules); --api has no separate rule-options

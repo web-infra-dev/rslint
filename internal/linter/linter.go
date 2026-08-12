@@ -3,22 +3,45 @@ package linter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
-	"reflect"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 )
+
+var (
+	errNilProgram               = errors.New("linter: Program must not be nil")
+	errInvalidProgram           = errors.New("linter: Program must be created by internal/program")
+	errInvalidTypeCheckSkipMask = errors.New("linter: SkipTypeCheckPrograms must be parallel to Programs")
+)
+
+func validateProgram(sourceProgram *program.Program) error {
+	if sourceProgram == nil {
+		return errNilProgram
+	}
+	if !sourceProgram.IsValid() {
+		return errInvalidProgram
+	}
+	return nil
+}
+
+func validatePrograms(sourcePrograms []*program.Program) error {
+	for _, sourceProgram := range sourcePrograms {
+		if err := validateProgram(sourceProgram); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // isFileAllowed checks if fileName matches any path in allowFiles.
 // It first tries fast string equality, then falls back to os.SameFile
@@ -68,21 +91,15 @@ func isDirAllowed(fileName string, allowDirs []string) bool {
 
 // runProgramOptions is the internal per-program input to runLintRulesInProgram.
 type runProgramOptions struct {
-	Program     *compiler.Program
-	Standalone  bool
-	SourceFiles []*ast.SourceFile
-	// SourceFilesValidated means SourceFiles is already the immutable,
-	// normalized result of validateStandaloneSourceSet for Runtime.
-	SourceFilesValidated bool
-	Runtime              rule.SourceRuntime
-	Cwd                  string
-	Scope                FileScope
-	ExcludePaths         []string
-	FileFilter           FileFilter
-	TargetFiles          []string
-	HasTargetFiles       bool
-	SyntaxErrorFiles     map[string]struct{}
-	GetRulesForFile      RuleHandler
+	Program          *program.Program
+	Cwd              string
+	Scope            FileScope
+	ExcludePaths     []string
+	FileFilter       FileFilter
+	TargetFiles      []string
+	HasTargetFiles   bool
+	SyntaxErrorFiles map[string]struct{}
+	GetRulesForFile  RuleHandler
 	// CollectExecutedRules controls whether runLintRulesInProgram builds the
 	// per-program rule-name set returned in programLintResult. LintSingleFile
 	// leaves this disabled because it does not consume that result.
@@ -188,6 +205,9 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		preparedPlan = &plan
 	}
 	filesToLint := preparedPlan.files
+	sourceProgram := opts.Program
+	typeScriptProgram := sourceProgram.TypeScriptProgram()
+	standalone := sourceProgram.IsStandalone()
 
 	result := programLintResult{lintedFileCount: int32(len(filesToLint))}
 
@@ -199,18 +219,12 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 	}
 
 	// One module graph shared by every rule on every file of this Program or
-	// standalone source set. Syntax collection and resolution are cached
+	// standalone Program. Syntax collection and resolution are cached
 	// separately: an opted-in caller may reuse the syntax half with the exact
-	// same SourceFile, while resolution remains local to this source runtime.
-	var moduleGraph *rule.ModuleGraph
-	if opts.Program != nil {
-		if opts.CacheModuleSpecifiers {
-			moduleGraph = rule.NewCachedModuleGraph(opts.Program)
-		} else {
-			moduleGraph = rule.NewModuleGraph(opts.Program)
-		}
-	} else if opts.Standalone && opts.Runtime != nil {
-		moduleGraph = rule.NewOwnedStandaloneModuleGraph(preparedPlan.sourceFiles, opts.Runtime)
+	// same SourceFile, while resolution remains local to this Program.
+	moduleGraph := rule.NewModuleGraph(sourceProgram)
+	if opts.CacheModuleSpecifiers {
+		moduleGraph = rule.NewCachedModuleGraph(sourceProgram)
 	}
 
 	// lintFile lints one file with its already-resolved rules and checker. Its
@@ -246,33 +260,18 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		globalsInit, refsInit := rule.ResolveLanguageDefaults(file.FileName())
 
 		fileChecker := chk
-		if opts.TypeInfoFiles != nil {
-			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
-				fileChecker = nil
-			}
-		}
 
 		// One lazy reference index shared by every rule in this file; most
 		// files never materialize it. fileChecker is passed as a fallback for
 		// identifiers the binder scope walk can't resolve (declared outside
 		// this file); nil there just disables the fallback.
-		var refs *rule.RefStore
-		if opts.Program != nil {
-			refs = rule.NewRefStore(file, opts.Program.Options(), fileChecker, refsInit)
-		} else if opts.Runtime != nil {
-			refs = rule.NewRefStore(file, opts.Runtime.Options(), fileChecker, refsInit)
-		}
+		refs := rule.NewRefStore(file, sourceProgram.Options(), fileChecker, refsInit)
 
 		// One lazy byte-order-mark answer shared by every rule in this file.
 		// The mark is gone from the text by the time the file is parsed, so
 		// answering means going back to whatever produced that text; a file no
 		// rule asks about never does.
-		var sourceBOM *rule.SourceBOM
-		if opts.Program != nil {
-			sourceBOM = rule.NewSourceBOM(opts.Program.Host().FS(), file.FileName())
-		} else if opts.Runtime != nil {
-			sourceBOM = rule.NewSourceBOM(opts.Runtime.FS(), file.FileName())
-		}
+		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
 		fileCache := rule.NewFileCache()
 
 		for ruleIndex, r := range rules {
@@ -439,17 +438,15 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			continue
 		}
 		rulesByFile[file] = rules
-		if opts.Standalone {
+		if standalone {
 			checkerGroups[nil] = append(checkerGroups[nil], file)
 			continue
 		}
-		if opts.TypeInfoFiles != nil {
-			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
-				checkerGroups[nil] = append(checkerGroups[nil], file)
-				continue
-			}
+		if !preparedPlan.hasTypeInfo[fileIndex] {
+			checkerGroups[nil] = append(checkerGroups[nil], file)
+			continue
 		}
-		chk, release := opts.Program.GetTypeCheckerForFile(ctx, file)
+		chk, release := typeScriptProgram.GetTypeCheckerForFile(ctx, file)
 		release()
 		checkerGroups[chk] = append(checkerGroups[chk], file)
 	}
@@ -460,7 +457,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 			registeredListeners := newListenerRegistry()
 			if chk != nil {
 				var done func()
-				chk, done = opts.Program.GetTypeCheckerForFileExclusive(ctx, files[0])
+				chk, done = typeScriptProgram.GetTypeCheckerForFileExclusive(ctx, files[0])
 				defer done()
 			}
 			for _, file := range files {
@@ -469,11 +466,11 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		})
 	}
 	for chk, files := range checkerGroups {
-		// Standalone source sets have no checker to define stable shards. Their
-		// ASTs, runtimes, rule plans, and per-file listener state are independent,
+		// Standalone Programs have no checker to define stable shards. Their
+		// ASTs, source services, rule plans, and per-file listener state are independent,
 		// so split the nil-checker group into a bounded number of file chunks.
 		// Program-backed nil-checker files keep their existing single shard.
-		if chk == nil && opts.Standalone && !opts.SingleThreaded && len(files) > 1 {
+		if chk == nil && standalone && !opts.SingleThreaded && len(files) > 1 {
 			workerCount := standaloneLintWorkerCount(len(files), runtime.GOMAXPROCS(0))
 			if workerCount < 2 {
 				queueFiles(nil, files)
@@ -521,14 +518,12 @@ func filterNativeRules(rules []ConfiguredRule) []ConfiguredRule {
 	return nativeRules
 }
 
-func filterRulesForTypeInfo(rules []ConfiguredRule, fileName string, typeInfoFiles map[string]struct{}) []ConfiguredRule {
+func fileHasTypeInfo(fileName string, typeInfoFiles map[string]struct{}) bool {
 	if typeInfoFiles == nil {
-		return rules
+		return true
 	}
-	if _, hasTypeInfo := typeInfoFiles[fileName]; hasTypeInfo {
-		return rules
-	}
-	return FilterNonTypeAwareRules(rules)
+	_, hasTypeInfo := typeInfoFiles[fileName]
+	return hasTypeInfo
 }
 
 func shouldSkipRulesForSyntax(opts runProgramOptions, file *ast.SourceFile, ctx context.Context) bool {
@@ -536,16 +531,7 @@ func shouldSkipRulesForSyntax(opts runProgramOptions, file *ast.SourceFile, ctx 
 		_, invalid := opts.SyntaxErrorFiles[file.FileName()]
 		return invalid
 	}
-	if opts.Standalone {
-		if len(file.Diagnostics()) > 0 || len(file.JSDiagnostics()) > 0 {
-			return true
-		}
-		return opts.Runtime != nil &&
-			ast.IsSourceFileJS(file) &&
-			!ast.IsCheckJSEnabledForFile(file, opts.Runtime.Options()) &&
-			len(compiler.GetAdditionalJSSyntacticDiagnostics(file, opts.Runtime.Options())) > 0
-	}
-	return len(opts.Program.GetSyntacticDiagnostics(ctx, file)) > 0
+	return len(opts.Program.SyntacticDiagnostics(ctx, file)) > 0
 }
 
 // RunLinter runs all configured lint rules across the given programs in
@@ -586,6 +572,17 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		return nil, errors.New("linter: invalid native edit demand")
 	}
 	consumer := normalizeDiagnosticConsumer(opts.Consumer)
+	// Reject an invalid source generation before either phase can report
+	// diagnostics. In particular, type-check-only runs skip Phase 1 entirely,
+	// so validation cannot live inside the lint-rule branch.
+	if opts.GetRulesForFile != nil || opts.TypeCheck {
+		if err := validatePrograms(opts.Programs); err != nil {
+			return nil, err
+		}
+	}
+	if opts.TypeCheck && opts.SkipTypeCheckPrograms != nil && len(opts.SkipTypeCheckPrograms) != len(opts.Programs) {
+		return nil, errInvalidTypeCheckSkipMask
+	}
 
 	executedRules := make(map[string]struct{})
 	var lintedFileCount int32
@@ -594,8 +591,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	// handler was supplied — see doc above.
 	if opts.GetRulesForFile != nil {
 		if opts.PreparedPlan != nil {
-			if len(opts.PreparedPlan.programs) != len(opts.Programs) ||
-				len(opts.PreparedPlan.standalone) != len(opts.Standalone) {
+			if len(opts.PreparedPlan.programs) != len(opts.Programs) {
 				return nil, errors.New("linter: prepared lint plan does not match Programs")
 			}
 			for programIndex, programPlan := range opts.PreparedPlan.programs {
@@ -604,40 +600,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 				}
 			}
 		}
-		var normalizedStandalone [][]*ast.SourceFile
-		if opts.PreparedPlan == nil {
-			normalizedStandalone = make([][]*ast.SourceFile, len(opts.Standalone))
-		}
-		for sourceSetIndex, sourceSet := range opts.Standalone {
-			if opts.PreparedPlan != nil {
-				sourceSetPlan := opts.PreparedPlan.standalone[sourceSetIndex]
-				// The common CLI/API path reuses the exact normalized AST sequence
-				// and source runtime that PrepareLintPlan already validated. Preserve
-				// fail-before-side-effects for changed inputs below without allocating
-				// and rescanning every prepared source set a second time.
-				if sameSourceFiles(sourceSet.Files, sourceSetPlan.sourceFiles) &&
-					sameSourceRuntime(sourceSet.Runtime, sourceSetPlan.runtime) {
-					continue
-				}
-			}
-			files, err := validateStandaloneSourceSet(sourceSet.Files, sourceSet.Runtime)
-			if err != nil {
-				return nil, err
-			}
-			if opts.PreparedPlan == nil {
-				normalizedStandalone[sourceSetIndex] = files
-				continue
-			}
-			sourceSetPlan := opts.PreparedPlan.standalone[sourceSetIndex]
-			if !sameSourceFiles(sourceSetPlan.sourceFiles, files) {
-				return nil, errors.New("linter: prepared lint plan does not match standalone files")
-			}
-			if !sameSourceRuntime(sourceSetPlan.runtime, sourceSet.Runtime) {
-				return nil, errors.New("linter: prepared lint plan does not match standalone runtime")
-			}
-		}
 		programResults := make([]programLintResult, len(opts.Programs))
-		standaloneResults := make([]programLintResult, len(opts.Standalone))
 		wg := core.NewWorkGroup(opts.SingleThreaded)
 		for i := range opts.Programs {
 			var prepared *programLintPlan
@@ -651,22 +614,6 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 				programResults[programIndex] = runLintRulesInProgram(programOptions, consumer)
 			})
 		}
-		for i := range opts.Standalone {
-			var prepared *programLintPlan
-			if opts.PreparedPlan != nil {
-				prepared = &opts.PreparedPlan.standalone[i]
-			}
-			sourceSetOpts := runStandaloneOptionsFor(opts, i, prepared)
-			if opts.PreparedPlan == nil {
-				sourceSetOpts.SourceFiles = normalizedStandalone[i]
-				sourceSetOpts.SourceFilesValidated = true
-			}
-			sourceSetIndex := i
-			sourceSetOptions := sourceSetOpts
-			wg.Queue(func() {
-				standaloneResults[sourceSetIndex] = runLintRulesInProgram(sourceSetOptions, consumer)
-			})
-		}
 		wg.RunAndWait()
 		mergeResult := func(programResult programLintResult) {
 			lintedFileCount += programResult.lintedFileCount
@@ -676,9 +623,6 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		}
 		for _, programResult := range programResults {
 			mergeResult(programResult)
-		}
-		for _, standaloneResult := range standaloneResults {
-			mergeResult(standaloneResult)
 		}
 	}
 
@@ -705,13 +649,16 @@ func collectFilesToLint(opts runProgramOptions) []*ast.SourceFile {
 	if opts.HasTargetFiles {
 		return collectExactFilesToLint(opts)
 	}
+	if opts.Program.IsStandalone() {
+		return collectStandaloneFilesToLint(opts.Program.SourceFiles(), opts.ExcludePaths)
+	}
 
 	var allowFileInfos []os.FileInfo
 	if opts.Scope.Files != nil {
 		allowFileInfos = precomputeAllowFileInfos(opts.Scope.Files)
 	}
 	var filesToLint []*ast.SourceFile
-	for _, file := range opts.Program.GetSourceFiles() {
+	for _, file := range opts.Program.SourceFiles() {
 		p := string(file.Path())
 		// skip lint node_modules and bundled files
 		skipFile := false
@@ -773,102 +720,6 @@ func isStandaloneFileExcluded(file *ast.SourceFile, excludePaths []string) bool 
 	return false
 }
 
-// normalizeStandaloneSourceFiles fixes the complete source universe used by
-// planning and cross-file rule structures. A SourceRuntime identifies files
-// by ts-go Path, so two AST objects with the same non-empty Path cannot be
-// distinct nodes in one source set. Exact pointer duplicates are collapsed in
-// stable input order, while different ASTs for one Path are rejected;
-// pathless synthetic sources fall back to pointer identity.
-func normalizeStandaloneSourceFiles(files []*ast.SourceFile) ([]*ast.SourceFile, error) {
-	normalized := make([]*ast.SourceFile, 0, len(files))
-	seenPaths := make(map[tspath.Path]*ast.SourceFile, len(files))
-	seenPathless := make(map[*ast.SourceFile]struct{})
-	for _, file := range files {
-		if file == nil {
-			continue
-		}
-		path := file.Path()
-		if path != "" {
-			if previous, seen := seenPaths[path]; seen {
-				if previous != file {
-					return nil, fmt.Errorf(
-						"linter: standalone source set contains different ASTs for path %q",
-						path,
-					)
-				}
-				continue
-			}
-			seenPaths[path] = file
-		} else {
-			if _, seen := seenPathless[file]; seen {
-				continue
-			}
-			seenPathless[file] = struct{}{}
-		}
-		normalized = append(normalized, file)
-	}
-	return normalized, nil
-}
-
-func validateStandaloneSourceSet(
-	files []*ast.SourceFile,
-	runtime rule.SourceRuntime,
-) ([]*ast.SourceFile, error) {
-	normalized, err := normalizeStandaloneSourceFiles(files)
-	if err != nil {
-		return nil, err
-	}
-	if len(normalized) == 0 {
-		return normalized, nil
-	}
-	if isNilSourceRuntime(runtime) {
-		return nil, errors.New("linter: non-empty standalone source set requires a runtime")
-	}
-	for _, file := range normalized {
-		if !file.IsBound() {
-			return nil, fmt.Errorf("linter: standalone source %q is not bound", file.FileName())
-		}
-		if !runtime.OwnsSourceFile(file) {
-			return nil, fmt.Errorf("linter: standalone runtime does not own source %q", file.FileName())
-		}
-	}
-	return normalized, nil
-}
-
-func sameSourceFiles(left, right []*ast.SourceFile) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for i, file := range left {
-		if file != right[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func sameSourceRuntime(left, right rule.SourceRuntime) bool {
-	leftNil := isNilSourceRuntime(left)
-	rightNil := isNilSourceRuntime(right)
-	if leftNil || rightNil {
-		return leftNil && rightNil
-	}
-	return left.SameSourceRuntime(right) && right.SameSourceRuntime(left)
-}
-
-func isNilSourceRuntime(runtime rule.SourceRuntime) bool {
-	if runtime == nil {
-		return true
-	}
-	value := reflect.ValueOf(runtime)
-	switch value.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
-		return value.IsNil()
-	default:
-		return false
-	}
-}
-
 func collectExactFilesToLint(opts runProgramOptions) []*ast.SourceFile {
 	var filesToLint []*ast.SourceFile
 	seen := make(map[string]struct{}, len(opts.TargetFiles))
@@ -919,7 +770,7 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		}
 	}
 	runLintRulesInProgram(runProgramOptions{
-		Program:               opts.Program,
+		Program:               program.NewTypeScript(opts.Program),
 		Cwd:                   opts.Cwd,
 		ExcludePaths:          opts.ExcludePaths,
 		TargetFiles:           []string{opts.File},
@@ -967,8 +818,12 @@ func composeOwnedFilter(extra FileFilter, owned map[string]struct{}) FileFilter 
 // Files in GetSourceFiles() but NOT in this set were pulled in through import
 // resolution or project references — they belong to other programs.
 // Returns nil for programs with no root files (should not happen in practice).
-func buildOwnedFileSet(program *compiler.Program) map[string]struct{} {
-	fileNames := program.CommandLine().FileNames()
+func buildOwnedFileSet(sourceProgram *program.Program) map[string]struct{} {
+	typeScriptProgram := sourceProgram.TypeScriptProgram()
+	if typeScriptProgram == nil {
+		return nil
+	}
+	fileNames := typeScriptProgram.CommandLine().FileNames()
 	if len(fileNames) == 0 {
 		return nil
 	}

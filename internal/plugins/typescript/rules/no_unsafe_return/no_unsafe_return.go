@@ -78,7 +78,7 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ctx.TypeScriptProgram().Options()
 		// When noImplicitThis is not enabled (considering strict mode), object literal methods
 		// can have implicit any this. We need to use IsStrictCompilerOptionEnabled to properly
 		// handle the case where noImplicitThis is inherited from strict mode.
@@ -97,7 +97,7 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			anyType := discriminateReturnType(
 				returnNodeType,
 				ctx.TypeChecker,
-				ctx.Program,
+				ctx.TypeScriptProgram(),
 				returnNode,
 			)
 			if anyType == utils.DiscriminatedAnyTypeSafe &&

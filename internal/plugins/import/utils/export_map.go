@@ -97,10 +97,10 @@ func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 // The map is read-only and may be shared with every other file of the run that
 // imports the same module; so may any ExportMeta.Namespace reached through it.
 func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, bool) {
-	if !ctx.HasSourceRuntime() || ctx.SourceFile == nil {
+	if !ctx.HasProgram() || ctx.SourceFile == nil {
 		return nil, false
 	}
-	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.ModuleResolutionRuntime()))
+	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.Program))
 }
 
 // exportBuilder carries one query's traversal state over the per-file export
@@ -145,7 +145,7 @@ func newExportBuilder(index *ModuleIndex, runtime rslint_utils.ModuleResolutionR
 	}
 }
 
-func (builder *exportBuilder) sourceRuntime() rslint_utils.ModuleResolutionRuntime {
+func (builder *exportBuilder) moduleRuntime() rslint_utils.ModuleResolutionRuntime {
 	if builder == nil {
 		return nil
 	}
@@ -153,7 +153,7 @@ func (builder *exportBuilder) sourceRuntime() rslint_utils.ModuleResolutionRunti
 }
 
 func getExportMap(origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *exportBuilder) (*ExportMap, bool) {
-	runtime := builder.sourceRuntime()
+	runtime := builder.moduleRuntime()
 	if runtime == nil || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return nil, false
 	}
@@ -194,7 +194,7 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	enclosing := builder.sawCycle
 	builder.sawCycle = false
 
-	local := builder.index.localExportsOf(builder.sourceRuntime(), sourceFile)
+	local := builder.index.localExportsOf(builder.moduleRuntime(), sourceFile)
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}

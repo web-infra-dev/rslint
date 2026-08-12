@@ -19,8 +19,8 @@ import (
 //
 // For real projects the index lives in the Program cache, so it must not hold
 // the Program it was built for: an entry that did would keep its Program
-// reachable forever. The effective runtime is therefore passed in by whoever
-// is asking. Standalone source sets keep the same index only for their run.
+// reachable forever. The effective module services are therefore passed in by
+// whoever is asking. Standalone Programs keep the same index only for their run.
 type ModuleIndex struct {
 	settings *ModuleSettings
 
@@ -43,7 +43,7 @@ type indexKey struct {
 // on the first rule of the run that asks for it.
 func IndexFor(ctx rule.RuleContext) *ModuleIndex {
 	settings := SettingsFor(ctx)
-	return rule.CachedBySourceRuntime(ctx, indexKey{settings: settings.Key()}, func() *ModuleIndex {
+	return rule.CachedByProgram(ctx, indexKey{settings: settings.Key()}, func() *ModuleIndex {
 		return newModuleIndex(settings)
 	})
 }

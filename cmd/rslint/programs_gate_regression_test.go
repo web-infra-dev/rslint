@@ -46,8 +46,9 @@ func TestGate_LinterFiltersTypeAwareRuleOnGapFile(t *testing.T) {
 	if len(rules) != 1 || rules[0].Name != "@typescript-eslint/no-unsafe-member-access" || !rules[0].RequiresTypeInfo {
 		t.Fatalf("fixture did not resolve the expected type-aware rule: %+v", rules)
 	}
+	lintPrograms, _, _ := combineLintPrograms([]*compiler.Program{fallback}, nil, nil, nil)
 	result, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:      []*compiler.Program{fallback},
+		Programs:      lintPrograms,
 		Scope:         linter.FileScope{Files: []string{gapFile}},
 		TypeInfoFiles: map[string]struct{}{},
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

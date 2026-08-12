@@ -2,6 +2,7 @@ package linter
 
 import (
 	"github.com/microsoft/typescript-go/shim/compiler"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -30,7 +31,7 @@ func runLinterPositional(
 		}
 	}
 	return RunLinter(RunLinterOptions{
-		Programs:         programs,
+		Programs:         lintprogram.WrapTypeScriptPrograms(programs),
 		SingleThreaded:   singleThreaded,
 		Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
 		ExcludePaths:     excludedPaths,
@@ -83,7 +84,7 @@ func RunLinterInProgram(
 		// runs. The returned LintResult.LintedFileCount equals what
 		// runLintRulesInProgram would have returned for this single program.
 		res, _ := RunLinter(RunLinterOptions{
-			Programs:         []*compiler.Program{program},
+			Programs:         []*lintprogram.Program{lintprogram.NewTypeScript(program)},
 			SingleThreaded:   true,
 			Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
 			ExcludePaths:     excludes,
@@ -108,7 +109,7 @@ func RunLinterInProgram(
 		return res.LintedFileCount
 	}
 	return runLintRulesInProgram(runProgramOptions{
-		Program:          program,
+		Program:          lintprogram.NewTypeScript(program),
 		Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
 		ExcludePaths:     excludes,
 		FileFilter:       ff,

@@ -5,19 +5,16 @@ import (
 	"fmt"
 	"runtime"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/binder"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/module"
 	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
-	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -972,180 +969,6 @@ func bindCLILintTargetPlan(
 	return binding, nil
 }
 
-type standaloneGapRuntime struct {
-	host            compiler.CompilerHost
-	options         *core.CompilerOptions
-	resolver        *module.Resolver
-	metadataByPath  map[tspath.Path]ast.SourceFileMetaData
-	sourcesByPath   map[tspath.Path]*ast.SourceFile
-	resolvedModules map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule]
-}
-
-func (r *standaloneGapRuntime) SameSourceRuntime(other rule.SourceRuntime) bool {
-	otherRuntime, ok := other.(*standaloneGapRuntime)
-	return ok && r == otherRuntime
-}
-
-func (r *standaloneGapRuntime) OwnsSourceFile(file *ast.SourceFile) bool {
-	return file != nil && r.sourcesByPath[file.Path()] == file
-}
-
-func newStandaloneGapRuntime(currentDirectory string, buildContext *utils.ProgramBuildContext) *standaloneGapRuntime {
-	options := fallbackCompilerOptions()
-	host := buildContext.NewTransientCompilerHost(currentDirectory)
-	return &standaloneGapRuntime{
-		host:            host,
-		options:         options,
-		resolver:        module.NewResolver(host, options, "", ""),
-		metadataByPath:  make(map[tspath.Path]ast.SourceFileMetaData),
-		sourcesByPath:   make(map[tspath.Path]*ast.SourceFile),
-		resolvedModules: make(map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule]),
-	}
-}
-
-func (r *standaloneGapRuntime) Options() *core.CompilerOptions { return r.options }
-func (r *standaloneGapRuntime) FS() vfs.FS                     { return r.host.FS() }
-func (r *standaloneGapRuntime) CurrentDirectory() string       { return r.host.GetCurrentDirectory() }
-func (r *standaloneGapRuntime) FileExists(path string) bool    { return r.host.FS().FileExists(path) }
-
-func (r *standaloneGapRuntime) NearestPackageJSONDirectory(directory string) string {
-	scope := r.resolver.GetPackageScopeForPath(directory)
-	if scope.Exists() {
-		return scope.PackageDirectory
-	}
-	return ""
-}
-
-func (r *standaloneGapRuntime) sourceFileMetaData(fileName string) ast.SourceFileMetaData {
-	packageJSONScope := r.resolver.GetPackageScopeForPath(tspath.GetDirectoryPath(fileName))
-	moduleResolutionKind := r.options.GetModuleResolutionKind()
-
-	var packageJSONType, packageJSONDirectory string
-	if packageJSONScope.Exists() {
-		packageJSONDirectory = packageJSONScope.PackageDirectory
-		if value, ok := packageJSONScope.Contents.Type.GetValue(); ok {
-			hasExplicitFormat := tspath.FileExtensionIsOneOf(fileName, []string{
-				tspath.ExtensionMts,
-				tspath.ExtensionCts,
-				tspath.ExtensionMjs,
-				tspath.ExtensionCjs,
-			})
-			usesNodeFormat := core.ModuleResolutionKindNode16 <= moduleResolutionKind &&
-				moduleResolutionKind <= core.ModuleResolutionKindNodeNext
-			if (!hasExplicitFormat && usesNodeFormat) || strings.Contains(fileName, "/node_modules/") {
-				packageJSONType = value
-			}
-		}
-	}
-
-	return ast.SourceFileMetaData{
-		PackageJsonType:      packageJSONType,
-		PackageJsonDirectory: packageJSONDirectory,
-		ImpliedNodeFormat:    ast.GetImpliedNodeFormatForFile(fileName, packageJSONType),
-	}
-}
-
-func (r *standaloneGapRuntime) parse(target resolvedLintTarget) (*ast.SourceFile, ast.SourceFileMetaData) {
-	fileName := tspath.GetNormalizedAbsolutePath(target.Path, r.host.GetCurrentDirectory())
-	metadata := r.sourceFileMetaData(fileName)
-	file := r.host.GetSourceFile(ast.SourceFileParseOptions{
-		FileName: fileName,
-		Path: tspath.ToPath(
-			fileName,
-			r.host.GetCurrentDirectory(),
-			r.host.FS().UseCaseSensitiveFileNames(),
-		),
-		ExternalModuleIndicatorOptions: ast.GetExternalModuleIndicatorOptions(fileName, r.options, metadata),
-	})
-	return file, metadata
-}
-
-func (r *standaloneGapRuntime) resolveImports(
-	file *ast.SourceFile,
-	metadata ast.SourceFileMetaData,
-) module.ModeAwareCache[*module.ResolvedModule] {
-	moduleNames := append([]*ast.Node(nil), file.Imports()...)
-	for _, augmentation := range file.ModuleAugmentations {
-		if augmentation.Kind == ast.KindStringLiteral {
-			moduleNames = append(moduleNames, augmentation)
-		}
-	}
-	if len(moduleNames) == 0 {
-		return nil
-	}
-
-	resolutions := make(module.ModeAwareCache[*module.ResolvedModule], len(moduleNames))
-	for _, moduleName := range moduleNames {
-		name := moduleName.Text()
-		if name == "" {
-			continue
-		}
-		mode := compiler.GetModeForUsageLocation(file.FileName(), metadata, moduleName, r.options)
-		resolved, _ := r.resolver.ResolveModuleName(name, file.FileName(), mode, nil)
-		resolutions[module.ModeAwareCacheKey{Name: name, Mode: mode}] = resolved
-	}
-	return resolutions
-}
-
-func (r *standaloneGapRuntime) install(
-	file *ast.SourceFile,
-	metadata ast.SourceFileMetaData,
-	resolvedModules module.ModeAwareCache[*module.ResolvedModule],
-) {
-	if file == nil {
-		return
-	}
-	r.metadataByPath[file.Path()] = metadata
-	r.sourcesByPath[file.Path()] = file
-	if resolvedModules != nil {
-		r.resolvedModules[file.Path()] = resolvedModules
-	}
-}
-
-func (r *standaloneGapRuntime) syntacticDiagnostics(file *ast.SourceFile) []*ast.Diagnostic {
-	diagnostics := append([]*ast.Diagnostic(nil), file.Diagnostics()...)
-	diagnostics = append(diagnostics, file.JSDiagnostics()...)
-	if ast.IsSourceFileJS(file) && !ast.IsCheckJSEnabledForFile(file, r.options) {
-		diagnostics = append(diagnostics, compiler.GetAdditionalJSSyntacticDiagnostics(file, r.options)...)
-	}
-	return compiler.SortAndDeduplicateDiagnostics(diagnostics)
-}
-
-func (r *standaloneGapRuntime) GetModeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode {
-	return compiler.GetModeForUsageLocation(sourceFile.FileName(), r.metadataByPath[sourceFile.Path()], location, r.options)
-}
-
-func (r *standaloneGapRuntime) GetResolvedModule(sourceFile ast.HasFileName, moduleName string, mode core.ResolutionMode) *module.ResolvedModule {
-	return r.resolvedModules[sourceFile.Path()][module.ModeAwareCacheKey{Name: moduleName, Mode: mode}]
-}
-
-func (r *standaloneGapRuntime) ResolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
-	resolved, _ := r.resolver.ResolveModuleName(moduleName, containingFile, mode, nil)
-	return resolved
-}
-
-func (r *standaloneGapRuntime) GetSourceFileForResolvedModule(fileName string) *ast.SourceFile {
-	return r.GetSourceFile(fileName)
-}
-
-func (r *standaloneGapRuntime) GetSourceFile(fileName string) *ast.SourceFile {
-	path := tspath.ToPath(fileName, r.host.GetCurrentDirectory(), r.host.FS().UseCaseSensitiveFileNames())
-	return r.sourcesByPath[path]
-}
-
-type standaloneGapParseResult struct {
-	file            *ast.SourceFile
-	metadata        ast.SourceFileMetaData
-	resolvedModules module.ModeAwareCache[*module.ResolvedModule]
-	diagnostics     []*ast.Diagnostic
-	err             error
-}
-
-type standaloneGapRef struct {
-	groupIndex  int
-	targetIndex int
-}
-
 func typeScriptRuleDiagnostic(file *ast.SourceFile, diagnostic *ast.Diagnostic) rule.RuleDiagnostic {
 	return rule.RuleDiagnostic{
 		RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
@@ -1159,92 +982,79 @@ func typeScriptRuleDiagnostic(file *ast.SourceFile, diagnostic *ast.Diagnostic) 
 	}
 }
 
-func buildStandaloneGapSourceSets(
+func buildStandaloneGapPrograms(
 	groups [][]resolvedLintTarget,
 	currentDirectory string,
 	buildContext *utils.ProgramBuildContext,
 	singleThreaded bool,
-) ([]linter.StandaloneLintSourceSet, []rule.RuleDiagnostic, map[string]struct{}, error) {
+) ([]*lintprogram.Program, []rule.RuleDiagnostic, map[string]struct{}, error) {
 	if len(groups) == 0 {
 		return nil, nil, nil, nil
 	}
 
-	runtimes := make([]*standaloneGapRuntime, len(groups))
-	results := make([][]standaloneGapParseResult, len(groups))
-	var refs []standaloneGapRef
-	for groupIndex, group := range groups {
-		runtimes[groupIndex] = newStandaloneGapRuntime(currentDirectory, buildContext)
-		results[groupIndex] = make([]standaloneGapParseResult, len(group))
-		for targetIndex := range group {
-			refs = append(refs, standaloneGapRef{groupIndex: groupIndex, targetIndex: targetIndex})
-		}
-	}
-
-	parse := func(ref standaloneGapRef) {
-		target := groups[ref.groupIndex][ref.targetIndex]
-		runtime := runtimes[ref.groupIndex]
-		file, metadata := runtime.parse(target)
-		if file == nil {
-			results[ref.groupIndex][ref.targetIndex].err = fmt.Errorf("standalone runtime could not read lint target %q", target.Path)
-			return
-		}
-		diagnostics := runtime.syntacticDiagnostics(file)
-		resolvedModules := runtime.resolveImports(file, metadata)
-		binder.BindSourceFile(file)
-		results[ref.groupIndex][ref.targetIndex] = standaloneGapParseResult{
-			file:            file,
-			metadata:        metadata,
-			resolvedModules: resolvedModules,
-			diagnostics:     diagnostics,
-		}
-	}
-
-	workerCount := min(runtime.GOMAXPROCS(0), len(refs))
-	if singleThreaded || workerCount < 2 {
-		for _, ref := range refs {
-			parse(ref)
-		}
-	} else {
-		chunkSize := (len(refs) + workerCount - 1) / workerCount
-		work := core.NewWorkGroup(false)
-		for worker := range workerCount {
-			start := worker * chunkSize
-			end := min(start+chunkSize, len(refs))
-			if start >= end {
-				continue
-			}
-			chunk := refs[start:end]
-			work.Queue(func() {
-				for _, ref := range chunk {
-					parse(ref)
-				}
-			})
-		}
-		work.RunAndWait()
-	}
-
-	sourceSets := make([]linter.StandaloneLintSourceSet, len(groups))
+	programs := make([]*lintprogram.Program, len(groups))
 	syntaxErrorFiles := make(map[string]struct{})
 	var diagnostics []rule.RuleDiagnostic
-	for groupIndex, groupResults := range results {
-		runtime := runtimes[groupIndex]
-		files := make([]*ast.SourceFile, 0, len(groupResults))
-		for _, result := range groupResults {
-			if result.err != nil {
-				return nil, nil, nil, result.err
+	for groupIndex, group := range groups {
+		rootFileNames := make([]string, len(group))
+		for targetIndex, target := range group {
+			rootFileNames[targetIndex] = target.Path
+		}
+		standalone, err := lintprogram.NewStandalone(lintprogram.StandaloneOptions{
+			RootFileNames:   rootFileNames,
+			Host:            buildContext.NewTransientCompilerHost(currentDirectory),
+			CompilerOptions: fallbackCompilerOptions(),
+			SingleThreaded:  singleThreaded,
+		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		programs[groupIndex] = standalone
+		for _, file := range standalone.SourceFiles() {
+			fileDiagnostics := standalone.SyntacticDiagnostics(context.Background(), file)
+			if len(fileDiagnostics) > 0 {
+				syntaxErrorFiles[file.FileName()] = struct{}{}
 			}
-			runtime.install(result.file, result.metadata, result.resolvedModules)
-			files = append(files, result.file)
-			if len(result.diagnostics) > 0 {
-				syntaxErrorFiles[result.file.FileName()] = struct{}{}
-			}
-			for _, diagnostic := range result.diagnostics {
-				diagnostics = append(diagnostics, typeScriptRuleDiagnostic(result.file, diagnostic))
+			for _, diagnostic := range fileDiagnostics {
+				diagnostics = append(diagnostics, typeScriptRuleDiagnostic(file, diagnostic))
 			}
 		}
-		sourceSets[groupIndex] = linter.StandaloneLintSourceSet{Files: files, Runtime: runtime}
 	}
-	return sourceSets, diagnostics, syntaxErrorFiles, nil
+	return programs, diagnostics, syntaxErrorFiles, nil
+}
+
+// combineLintPrograms preserves the CLI binding order while turning ts-go and
+// standalone backends into one rslint Program sequence. Target/type-check
+// policy remains parallel run metadata rather than becoming Program state.
+func combineLintPrograms(
+	typeScriptPrograms []*compiler.Program,
+	standalonePrograms []*lintprogram.Program,
+	targetFiles [][]string,
+	skipTypeCheck []bool,
+) ([]*lintprogram.Program, [][]string, []bool) {
+	programs := lintprogram.WrapTypeScriptPrograms(typeScriptPrograms)
+	programs = append(programs, standalonePrograms...)
+	if len(standalonePrograms) == 0 {
+		return programs, targetFiles, skipTypeCheck
+	}
+
+	combinedTargets := make([][]string, len(typeScriptPrograms), len(programs))
+	copy(combinedTargets, targetFiles)
+	for _, standalone := range standalonePrograms {
+		files := standalone.SourceFiles()
+		targets := make([]string, len(files))
+		for fileIndex, file := range files {
+			targets[fileIndex] = file.FileName()
+		}
+		combinedTargets = append(combinedTargets, targets)
+	}
+
+	combinedSkip := make([]bool, len(programs))
+	copy(combinedSkip, skipTypeCheck)
+	for programIndex := len(typeScriptPrograms); programIndex < len(programs); programIndex++ {
+		combinedSkip[programIndex] = true
+	}
+	return programs, combinedTargets, combinedSkip
 }
 
 func discoverLintFilesMultiConfig(

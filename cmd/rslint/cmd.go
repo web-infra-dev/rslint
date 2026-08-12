@@ -148,8 +148,8 @@ type typeScriptDiagnosticDedupeKey struct {
 
 // deduplicateTypeScriptDiagnostics joins the lint-target syntax path and the
 // program-wide type-check path. A file governed by a config without a tsconfig
-// can be parsed as a standalone source while also belonging to another config's
-// real Program; --type-check legitimately visits both, but the same TypeScript
+// can be parsed into a standalone rslint Program while also belonging to another
+// config's ts-go Program; --type-check legitimately visits both, but the same TypeScript
 // diagnostic must be reported once.
 func deduplicateTypeScriptDiagnostics(
 	diags []rule.RuleDiagnostic,
@@ -884,7 +884,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Real Program construction and target binding are complete. Evict parsed
 	// AST entries that ended up in no Program before parsing standalone gaps.
 	buildContext.RetainOnlySourceFiles(programs)
-	standaloneSources, standaloneSyntaxDiagnostics, standaloneSyntaxErrorFiles, err := buildStandaloneGapSourceSets(
+	standalonePrograms, standaloneSyntaxDiagnostics, standaloneSyntaxErrorFiles, err := buildStandaloneGapPrograms(
 		standaloneGapGroups,
 		currentDirectory,
 		buildContext,
@@ -895,9 +895,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return 1
 	}
 
-	// Rebuild real Programs and bind the original stable target plan again on
-	// every fix pass. A target can move between a tsconfig Program and a
-	// standalone gap source set when fixes change the import graph.
+	// Rebuild ts-go Programs and bind the original stable target plan again on
+	// every fix pass. A target can move between compiler-backed and standalone
+	// rslint Programs when fixes change the import graph.
 	createPrograms := func() (lintTargetBinding, error) {
 		var rebuilt lintProgramSet
 		var err error
@@ -954,6 +954,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// standalone and therefore absent from this Program mask; the legacy
 	// fallback remains only for roots that ts-go would reject as Program roots.
 	skipTypeCheck := buildTypeCheckSkipMask(programs)
+	lintPrograms, targetsByProgram, skipTypeCheck := combineLintPrograms(
+		programs,
+		standalonePrograms,
+		targetsByProgram,
+		skipTypeCheck,
+	)
 	syntaxDiagnostics, syntaxErrorFiles := collectTargetSyntacticDiagnostics(
 		programs,
 		targetsByProgram,
@@ -982,8 +988,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		nativeEditDemand = rule.EditDemandAutofix
 	}
 	runOpts := linter.RunLinterOptions{
-		Programs:              programs,
-		Standalone:            standaloneSources,
+		Programs:              lintPrograms,
 		SingleThreaded:        singleThreaded,
 		Cwd:                   cwd,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -1098,7 +1103,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// end of this function, so its objects are alive regardless and
 			// keeping their entries costs nothing because RetainOnly only deletes.
 			buildContext.RetainOnlySourceFiles(append(slices.Clone(newPrograms), programs...))
-			fixStandaloneSources, fixStandaloneSyntaxDiagnostics, fixStandaloneSyntaxErrorFiles, err := buildStandaloneGapSourceSets(
+			fixStandalonePrograms, fixStandaloneSyntaxDiagnostics, fixStandaloneSyntaxErrorFiles, err := buildStandaloneGapPrograms(
 				newBinding.StandaloneGapGroups,
 				currentDirectory,
 				buildContext,
@@ -1113,6 +1118,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fixTargetsByProgram := newBinding.TargetsByProgram
 			fixTargetPathBySourcePath := newBinding.TargetPathBySourcePath
 			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
+			fixLintPrograms, fixTargetsByProgram, fixSkipMask := combineLintPrograms(
+				newPrograms,
+				fixStandalonePrograms,
+				fixTargetsByProgram,
+				fixSkipMask,
+			)
 			fixTypeInfoFiles := newBinding.TypeInfoFiles
 			fixConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
 				ConfigMap:                  configMap,
@@ -1152,8 +1163,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)
 			fixRunOpts := linter.RunLinterOptions{
-				Programs:              newPrograms,
-				Standalone:            fixStandaloneSources,
+				Programs:              fixLintPrograms,
 				SingleThreaded:        singleThreaded,
 				Cwd:                   cwd,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},

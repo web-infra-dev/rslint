@@ -518,7 +518,7 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 			objectType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, callee.Expression())
-			return utils.IsPromiseLike(ctx.Program, ctx.TypeChecker, objectType)
+			return utils.IsPromiseLike(ctx.TypeScriptProgram(), ctx.TypeChecker, objectType)
 		}
 
 		checkArguments := func(

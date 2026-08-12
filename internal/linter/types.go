@@ -3,6 +3,7 @@ package linter
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -47,21 +48,6 @@ func FilterNonTypeAwareRules(rules []ConfiguredRule) []ConfiguredRule {
 type RuleHandler = func(sourceFile *ast.SourceFile) []ConfiguredRule
 type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 
-// StandaloneLintSourceSet is one parser/binder-backed source universe with no
-// TypeScript Program or TypeChecker. Files may include sources excluded from
-// rule execution because cross-file rules still need the complete universe;
-// nil entries and exact pointer duplicates are normalized away in stable
-// order; different ASTs with the same non-empty SourceFile Path are rejected.
-// A nil or empty Files slice is an empty source set. Runtime must own every
-// bound AST exactly and keep its source services stable for the prepared
-// plan's full lifetime and every reuse; a prepared plan may only be reused with
-// the same Runtime identity. Its source lookup methods must not return ASTs
-// outside Files for this source universe.
-type StandaloneLintSourceSet struct {
-	Files   []*ast.SourceFile
-	Runtime rule.SourceRuntime
-}
-
 // FileScope describes user-supplied "lint targets" (CLI args).
 //
 // Both fields are independently nullable:
@@ -95,6 +81,8 @@ type LintResult struct {
 //
 // Zero-value semantics:
 //   - SingleThreaded=false                → use the default parallel work group
+//   - Programs entries                    → must be non-nil Programs created by
+//     internal/program whenever either lint or type-check consumes them
 //   - Scope.{Files,Dirs}=nil              → process all program files
 //   - ExcludePaths=nil                    → fall back to the linter default
 //     (substring match against utils.ExcludePaths). Pass an explicit empty
@@ -116,8 +104,9 @@ type LintResult struct {
 //     never have type information regardless of this field. It never restricts
 //     program-wide type-check.
 //   - TypeCheck=false                     → skip the type-check phase
-//   - SkipTypeCheckPrograms=nil           → every program participates in
-//     type-check. When non-nil, must be parallel to Programs; entries set
+//   - SkipTypeCheckPrograms=nil           → every compiler-backed program participates in
+//     type-check. When TypeCheck is true and this is non-nil, it must be
+//     parallel to Programs; entries set
 //     to true mark the corresponding program to be skipped (typically the
 //     non-project fallback Program with synthesized CompilerOptions).
 //   - Consumer=zero                        → diagnostics are dropped and no
@@ -134,8 +123,10 @@ type LintResult struct {
 // out per program. Callers MUST make their handler safe for concurrent
 // calls (channel send, mutex-guarded slice append, sync.Map, etc.).
 type RunLinterOptions struct {
-	Programs       []*compiler.Program
-	Standalone     []StandaloneLintSourceSet
+	// Programs contains rslint source universes. Each entry is either backed by
+	// a ts-go Program or by bound standalone sources, but Phase 1 consumes both
+	// through the same immutable Program contract.
+	Programs       []*program.Program
 	SingleThreaded bool
 	// Cwd is the working directory of the linting run, forwarded verbatim to
 	// every RuleContext. See RuleContext.Cwd for what rules may assume of it.
@@ -174,6 +165,8 @@ type RunLinterOptions struct {
 // LintSingleFileOptions configures a single-file, single-program rule pass.
 // The caller must handle syntactic diagnostics before invoking it.
 type LintSingleFileOptions struct {
+	// Program is the ts-go project backing this LSP/single-file adapter. The
+	// linter wraps it in the same rslint Program model used by RunLinter.
 	Program *compiler.Program
 	// File is the exact source-file name exposed by Program.
 	File string

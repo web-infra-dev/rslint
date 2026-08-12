@@ -173,7 +173,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 				t,
 				opts.AllowForKnownSafePromises,
 				nil,
-				ctx.Program,
+				ctx.TypeScriptProgram(),
 			) {
 				return false
 			}
@@ -181,7 +181,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			// Otherwise, we always consider the built-in Promise to be Promise-like...
 			typeParts := utils.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t))
 			if utils.Some(typeParts, func(typePart *checker.Type) bool {
-				return utils.IsPromiseLike(ctx.Program, ctx.TypeChecker, typePart)
+				return utils.IsPromiseLike(ctx.TypeScriptProgram(), ctx.TypeChecker, typePart)
 			}) {
 				return true
 			}
@@ -258,7 +258,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 				t,
 				opts.AllowForKnownSafeCalls,
 				nil,
-				ctx.Program,
+				ctx.TypeScriptProgram(),
 				calleeNames,
 			)
 		}

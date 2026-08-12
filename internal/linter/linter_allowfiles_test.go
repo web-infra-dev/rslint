@@ -229,7 +229,7 @@ func TestRunLinter_TargetFilesEmptyDoesNotScanProgram(t *testing.T) {
 
 	called := false
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{nil},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -248,7 +248,7 @@ func TestRunLinter_TargetFilesEmptyDoesNotScanProgram(t *testing.T) {
 	}
 
 	targets := mustPrepareLintPlan(t, RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{nil},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -266,7 +266,7 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 
 	var linted []string
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{target}},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -285,7 +285,7 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 	}
 
 	targets := mustPrepareLintPlan(t, RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{target}},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {

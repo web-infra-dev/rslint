@@ -112,7 +112,7 @@ func normalizeDepth(depth int) (int, bool) {
 }
 
 func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
-	if ctx.SourceFile == nil || !ctx.HasSourceRuntime() {
+	if ctx.SourceFile == nil || !ctx.HasProgram() {
 		return
 	}
 

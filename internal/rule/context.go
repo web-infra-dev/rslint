@@ -7,33 +7,9 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/module"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
-
-// SourceRuntime is the non-type-aware source environment used when a native
-// rule has no TypeScript Program. Standalone gap files provide a lightweight
-// parser/binder-backed implementation. Type-aware rules continue to use
-// Program and TypeChecker directly.
-type SourceRuntime interface {
-	// SameSourceRuntime reports whether other exposes the same source
-	// environment. Prepared lint plans use this identity boundary to avoid
-	// resolving rule eligibility against one runtime and executing against
-	// another. Implementations must make this a stable equivalence relation.
-	SameSourceRuntime(other SourceRuntime) bool
-	// OwnsSourceFile reports whether file is the exact bound AST generation
-	// exposed by this runtime.
-	OwnsSourceFile(file *ast.SourceFile) bool
-	Options() *core.CompilerOptions
-	FS() vfs.FS
-	CurrentDirectory() string
-	NearestPackageJSONDirectory(directory string) string
-	FileExists(path string) bool
-	GetModeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode
-	GetResolvedModule(sourceFile ast.HasFileName, moduleReference string, mode core.ResolutionMode) *module.ResolvedModule
-	ResolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule
-	GetSourceFileForResolvedModule(fileName string) *ast.SourceFile
-	GetSourceFile(fileName string) *ast.SourceFile
-}
 
 // EditDemand is a native diagnostic consumer's demand for optional edit
 // artifacts. It controls materialization only: diagnostic detection, message,
@@ -88,145 +64,105 @@ type RuleContext struct {
 	// that need "all references to this declared symbol" should query this
 	// instead of walking the AST and calling TypeChecker.GetSymbolAtLocation
 	// per identifier. Keys are binder symbols (node.Symbol()); see RefStore.
-	// Nil when no Program or standalone source runtime is available.
+	// Nil when no Program is available.
 	Refs *RefStore
 	// BOM lazily answers whether this file's source text began with a byte
 	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
-	// false, which is what a context with no Program or source runtime can say.
+	// false, which is what a context with no Program can say.
 	BOM *SourceBOM
 	// Modules answers which modules each file of the effective source set references and
 	// what they resolve to, derived once per lint run rather than once per
-	// rule and file. Nil when no Program or standalone source runtime is available.
+	// rule and file. Nil when no Program is available.
 	Modules        *ModuleGraph
-	Program        *compiler.Program
+	Program        *program.Program
 	TypeChecker    *checker.Checker
 	DisableManager *DisableManager
 	reporter       ruleContextReporter
 }
 
-// HasSourceRuntime reports whether non-type-aware source services are
-// available through either a real Program or a standalone runtime.
-func (ctx RuleContext) HasSourceRuntime() bool {
-	return ctx.Program != nil || ctx.sourceRuntime() != nil
+// HasProgram reports whether source, filesystem, and module-resolution
+// services are available for this rule context.
+func (ctx *RuleContext) HasProgram() bool {
+	return ctx != nil && ctx.Program.IsValid()
 }
 
-func (ctx *RuleContext) sourceRuntime() SourceRuntime {
-	if ctx.Modules == nil {
+// TypeScriptProgram returns the optional ts-go backing Program. Its presence
+// does not by itself imply that this file is eligible for type-aware rules;
+// TypeChecker is the per-file capability boundary.
+func (ctx *RuleContext) TypeScriptProgram() *compiler.Program {
+	if ctx == nil || ctx.Program == nil {
 		return nil
 	}
-	return ctx.Modules.sourceRuntime()
+	return ctx.Program.TypeScriptProgram()
 }
 
-// ModuleResolutionRuntime returns the effective non-type-aware module
-// resolver. Real projects stay on the Program directly; standalone gap files
-// use their parser/binder-backed runtime.
-func (ctx RuleContext) ModuleResolutionRuntime() utils.ModuleResolutionRuntime {
-	if ctx.Program != nil {
-		return ctx.Program
+// CompilerOptions returns the effective source Program's options.
+func (ctx *RuleContext) CompilerOptions() *core.CompilerOptions {
+	if ctx == nil || ctx.Program == nil {
+		return nil
 	}
-	return ctx.sourceRuntime()
-}
-
-// CompilerOptions returns the effective source environment's options. The
-// Program branch keeps the existing real-project path direct; only standalone
-// sources pay interface dispatch.
-func (ctx RuleContext) CompilerOptions() *core.CompilerOptions {
-	if ctx.Program != nil {
-		return ctx.Program.Options()
-	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.Options()
-	}
-	return nil
+	return ctx.Program.Options()
 }
 
 // FileSystem returns the effective source environment's VFS.
-func (ctx RuleContext) FileSystem() vfs.FS {
-	if ctx.Program != nil {
-		return ctx.Program.Host().FS()
+func (ctx *RuleContext) FileSystem() vfs.FS {
+	if ctx == nil || ctx.Program == nil {
+		return nil
 	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.FS()
-	}
-	return nil
+	return ctx.Program.FS()
 }
 
-func (ctx RuleContext) CurrentDirectory() string {
-	if ctx.Program != nil {
-		return ctx.Program.Host().GetCurrentDirectory()
+func (ctx *RuleContext) CurrentDirectory() string {
+	if ctx == nil || ctx.Program == nil {
+		return ""
 	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.CurrentDirectory()
-	}
-	return ""
+	return ctx.Program.CurrentDirectory()
 }
 
-func (ctx RuleContext) NearestPackageJSONDirectory(directory string) string {
-	if ctx.Program != nil {
-		return ctx.Program.GetNearestAncestorDirectoryWithPackageJson(directory)
+func (ctx *RuleContext) NearestPackageJSONDirectory(directory string) string {
+	if ctx == nil || ctx.Program == nil {
+		return ""
 	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.NearestPackageJSONDirectory(directory)
-	}
-	return ""
+	return ctx.Program.NearestPackageJSONDirectory(directory)
 }
 
-func (ctx RuleContext) FileExists(path string) bool {
-	if ctx.Program != nil {
-		return ctx.Program.FileExists(path)
-	}
-	runtime := ctx.sourceRuntime()
-	return runtime != nil && runtime.FileExists(path)
+func (ctx *RuleContext) FileExists(path string) bool {
+	return ctx != nil && ctx.Program != nil && ctx.Program.FileExists(path)
 }
 
-func (ctx RuleContext) GetModeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode {
-	if ctx.Program != nil {
-		return ctx.Program.GetModeForUsageLocation(sourceFile, location)
+func (ctx *RuleContext) GetModeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode {
+	if ctx == nil || ctx.Program == nil {
+		return core.ResolutionModeNone
 	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.GetModeForUsageLocation(sourceFile, location)
-	}
-	return core.ResolutionModeNone
+	return ctx.Program.GetModeForUsageLocation(sourceFile, location)
 }
 
-func (ctx RuleContext) GetResolvedModule(sourceFile ast.HasFileName, moduleReference string, mode core.ResolutionMode) *module.ResolvedModule {
-	if ctx.Program != nil {
-		return ctx.Program.GetResolvedModule(sourceFile, moduleReference, mode)
+func (ctx *RuleContext) GetResolvedModule(sourceFile ast.HasFileName, moduleReference string, mode core.ResolutionMode) *module.ResolvedModule {
+	if ctx == nil || ctx.Program == nil {
+		return nil
 	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.GetResolvedModule(sourceFile, moduleReference, mode)
-	}
-	return nil
+	return ctx.Program.GetResolvedModule(sourceFile, moduleReference, mode)
 }
 
-func (ctx RuleContext) ResolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
-	if ctx.Program != nil {
-		return ctx.Program.ResolveModuleName(moduleName, containingFile, mode)
+func (ctx *RuleContext) ResolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
+	if ctx == nil || ctx.Program == nil {
+		return nil
 	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.ResolveModuleName(moduleName, containingFile, mode)
-	}
-	return nil
+	return ctx.Program.ResolveModuleName(moduleName, containingFile, mode)
 }
 
-func (ctx RuleContext) GetSourceFileForResolvedModule(fileName string) *ast.SourceFile {
-	if ctx.Program != nil {
-		return ctx.Program.GetSourceFileForResolvedModule(fileName)
+func (ctx *RuleContext) GetSourceFileForResolvedModule(fileName string) *ast.SourceFile {
+	if ctx == nil || ctx.Program == nil {
+		return nil
 	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.GetSourceFileForResolvedModule(fileName)
-	}
-	return nil
+	return ctx.Program.GetSourceFileForResolvedModule(fileName)
 }
 
-func (ctx RuleContext) GetSourceFile(fileName string) *ast.SourceFile {
-	if ctx.Program != nil {
-		return ctx.Program.GetSourceFile(fileName)
+func (ctx *RuleContext) GetSourceFile(fileName string) *ast.SourceFile {
+	if ctx == nil || ctx.Program == nil {
+		return nil
 	}
-	if runtime := ctx.sourceRuntime(); runtime != nil {
-		return runtime.GetSourceFile(fileName)
-	}
-	return nil
+	return ctx.Program.GetSourceFile(fileName)
 }
 
 // ruleContextReporter is immutable after Rule.Run starts. Keeping only the

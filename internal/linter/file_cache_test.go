@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -35,7 +34,7 @@ func TestRunLinterCachesOncePerFileAcrossRules(t *testing.T) {
 	}
 
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles: [][]string{{
 			paths["first.test.ts"],

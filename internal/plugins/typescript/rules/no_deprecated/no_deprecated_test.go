@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -246,7 +246,7 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	diagnostics := []rule.RuleDiagnostic{}
 	var diagnosticsMu sync.Mutex
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       []*lintprogram.Program{lintprogram.NewTypeScript(program)},
 		SingleThreaded: true,
 		Scope: linter.FileScope{
 			Files: []string{sourceFile.FileName()},

@@ -116,7 +116,7 @@ func TestRunLinter_DoesNotExecutePluginPlaceholderInNativePass(t *testing.T) {
 	pluginRunCalled := false
 
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["a.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
@@ -280,7 +280,7 @@ func TestRunLinter_ExecutedRulesAcrossPrograms(t *testing.T) {
 		}
 	}
 	result, err := RunLinter(RunLinterOptions{
-		Programs:    []*compiler.Program{programA, programB},
+		Programs:    wrapTestPrograms(programA, programB),
 		TargetFiles: [][]string{{pathsA["a.ts"]}, {pathsB["b.ts"]}},
 		GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
 			if file.FileName() == pathsA["a.ts"] {
@@ -389,7 +389,7 @@ func TestListenerRegistryIsolationAndRuleOrderAcrossFiles(t *testing.T) {
 
 	var diagnostics []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["a.ts"], paths["b.ts"]}},
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []ConfiguredRule {
@@ -467,7 +467,7 @@ func TestRuleContextReporterPreservesDiagnosticSemantics(t *testing.T) {
 
 	var diagnostics []rule.RuleDiagnostic
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["reporter.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {

@@ -1244,8 +1244,9 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 
 	rslintconfig.RegisterAllRules()
 	var diagnostics []rule.RuleDiagnostic
+	lintPrograms, targetsByProgram, _ := combineLintPrograms(programs, nil, targetsByProgram, nil)
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       programs,
+		Programs:       lintPrograms,
 		SingleThreaded: true,
 		TargetFiles:    targetsByProgram,
 		TypeInfoFiles:  typeInfoFiles,

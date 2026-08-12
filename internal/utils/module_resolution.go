@@ -8,8 +8,8 @@ import (
 )
 
 // ModuleResolutionRuntime is the non-type-aware subset of a TypeScript
-// Program needed to resolve module references. Both real Programs and the
-// standalone CLI gap runtime implement it.
+// Program needed to resolve module references. The unified rslint Program
+// implements it for both compiler-backed and standalone source universes.
 type ModuleResolutionRuntime interface {
 	Options() *core.CompilerOptions
 	GetModeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode

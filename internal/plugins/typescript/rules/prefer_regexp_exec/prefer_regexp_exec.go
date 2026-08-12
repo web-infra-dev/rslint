@@ -158,7 +158,7 @@ func isUndefinedLiteral(ctx rule.RuleContext, node *ast.Node) bool {
 	if id == nil || id.Text != "undefined" {
 		return false
 	}
-	if ctx.TypeChecker == nil || ctx.Program == nil {
+	if ctx.TypeChecker == nil || ctx.TypeScriptProgram() == nil {
 		return true
 	}
 	sym := ctx.TypeChecker.GetSymbolAtLocation(node)

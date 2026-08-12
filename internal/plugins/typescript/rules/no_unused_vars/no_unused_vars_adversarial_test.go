@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -183,7 +184,7 @@ console.log(mutateParameter);
 	defer done()
 	ctx := rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     program,
+		Program:     lintprogram.NewTypeScript(program),
 		TypeChecker: typeChecker,
 		Refs:        rule.NewRefStore(sourceFile, program.Options(), typeChecker, rule.RefStoreInit{}),
 	}

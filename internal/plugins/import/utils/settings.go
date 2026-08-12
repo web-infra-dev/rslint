@@ -31,7 +31,7 @@ type settingsKey struct {
 func SettingsFor(ctx rule.RuleContext) *ModuleSettings {
 	key := moduleSettingsKey(ctx.Settings)
 	settings := ctx.Settings
-	return rule.CachedBySourceRuntime(ctx, settingsKey{settings: key}, func() *ModuleSettings {
+	return rule.CachedByProgram(ctx, settingsKey{settings: key}, func() *ModuleSettings {
 		return compileModuleSettings(settings)
 	})
 }

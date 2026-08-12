@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -153,17 +154,23 @@ func TestHasExport(t *testing.T) {
 	}
 }
 
-func TestExportQueriesSupportStandaloneSourceRuntime(t *testing.T) {
+func TestExportQueriesSupportStandaloneProgram(t *testing.T) {
 	programContext, specifier := contextForImport(t, "./re-export")
 	program := programContext.Program
 	if program == nil {
 		t.Fatal("fixture did not create a Program")
 	}
 
+	standalone, err := lintprogram.NewStandaloneFromTypeScriptSources(
+		program.TypeScriptProgram(),
+		program.SourceFiles(),
+	)
+	if err != nil {
+		t.Fatalf("NewStandaloneFromTypeScriptSources: %v", err)
+	}
 	standaloneContext := programContext
-	standaloneContext.Program = nil
-	standaloneRuntime := rule.SourceRuntimeForProgram(program)
-	standaloneContext.Modules = rule.NewStandaloneModuleGraph(program.SourceFiles(), standaloneRuntime)
+	standaloneContext.Program = standalone
+	standaloneContext.Modules = rule.NewModuleGraph(standalone)
 
 	if found, ok := import_utils.HasExport(standaloneContext, specifier, "baz"); !ok || !found {
 		t.Fatalf("standalone HasExport = (%v, %v), want (true, true)", found, ok)
@@ -519,7 +526,7 @@ func TestHasDefaultExportFollowsHostCaseSensitivity(t *testing.T) {
 			t.Parallel()
 
 			ctx, specifier := contextForImportWithFS(t, tc.fs, consumerPath)
-			resolved := ctx.Program.GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, specifier)
+			resolved := ctx.TypeScriptProgram().GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, specifier)
 			if (resolved != nil && resolved.ResolvedFileName != "") != tc.wantResolve {
 				t.Fatalf("resolved = %#v, want resolved %v", resolved, tc.wantResolve)
 			}
@@ -611,7 +618,7 @@ func contextForImport(t *testing.T, source string) (rule.RuleContext, *ast.Node)
 	}
 
 	return rule.RuleContext{
-		Program:    program,
+		Program:    lintprogram.NewTypeScript(program),
 		SourceFile: sourceFile,
 	}, importDecl.ModuleSpecifier
 }
@@ -640,7 +647,7 @@ func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.Rule
 	}
 
 	return rule.RuleContext{
-		Program:    program,
+		Program:    lintprogram.NewTypeScript(program),
 		SourceFile: sourceFile,
 	}, importDecl.ModuleSpecifier
 }
@@ -671,7 +678,7 @@ func contextForImportWithCompilerOptions(t *testing.T, source string, options *c
 	}
 
 	return rule.RuleContext{
-		Program:    program,
+		Program:    lintprogram.NewTypeScript(program),
 		SourceFile: sourceFile,
 	}, importDecl.ModuleSpecifier
 }

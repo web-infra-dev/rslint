@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -44,6 +45,7 @@ func contextsForFiles(t *testing.T, files map[string]string, entries ...string) 
 		t.Fatalf("CreateProgram: %v", err)
 	}
 
+	sourceProgram := lintprogram.NewTypeScript(program)
 	contexts := make([]rule.RuleContext, 0, len(entries))
 	for _, entry := range entries {
 		sourceFile := program.GetSourceFile(entry)
@@ -51,9 +53,9 @@ func contextsForFiles(t *testing.T, files map[string]string, entries ...string) 
 			t.Fatalf("entry %q was not parsed", entry)
 		}
 		contexts = append(contexts, rule.RuleContext{
-			Program:    program,
+			Program:    sourceProgram,
 			SourceFile: sourceFile,
-			Modules:    rule.NewModuleGraph(program),
+			Modules:    rule.NewModuleGraph(sourceProgram),
 		})
 	}
 	return contexts
@@ -219,7 +221,7 @@ func TestIndexReleasesItsProgram(t *testing.T) {
 			"release-target.ts": `export const value = 1;`,
 		}, "release-entry.ts")
 
-		key = weak.Make(contexts[0].Program)
+		key = weak.Make(contexts[0].TypeScriptProgram())
 
 		// Reach the index the way import/namespace and import/default do, so
 		// the entry under test is a populated ModuleIndex rather than an

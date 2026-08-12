@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -78,7 +79,7 @@ function MyComponent({theme}) {
 
 	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     program,
+		Program:     lintprogram.NewTypeScript(program),
 		Settings:    settings,
 		TypeChecker: nil, // explicitly nil — this is the path under test
 	}).WithReporter("test/exhaustive-deps", rule.SeverityWarning, func(rule.RuleDiagnostic) {})

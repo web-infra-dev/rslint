@@ -177,7 +177,7 @@ var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 
 				t := ctx.TypeChecker.GetTypeAtLocation(expr)
 
-				if utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program) {
+				if utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.TypeScriptProgram()) {
 					return
 				}
 
@@ -194,7 +194,7 @@ var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				if utils.IsErrorLike(ctx.Program, ctx.TypeChecker, t) {
+				if utils.IsErrorLike(ctx.TypeScriptProgram(), ctx.TypeChecker, t) {
 					return
 				}
 

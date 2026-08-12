@@ -282,8 +282,8 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 		isBuiltInStringCall := func(node *ast.CallExpression) bool {
 			if ast.IsIdentifier(node.Expression) && node.Expression.AsIdentifier().Text == "String" && len(node.Arguments.Nodes) > 0 {
 				tt := ctx.TypeChecker.GetTypeAtLocation(node.Expression)
-				s := utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, tt, "String")
-				sc := utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, tt, "StringConstructor")
+				s := utils.IsBuiltinSymbolLike(ctx.TypeScriptProgram(), ctx.TypeChecker, tt, "String")
+				sc := utils.IsBuiltinSymbolLike(ctx.TypeScriptProgram(), ctx.TypeChecker, tt, "StringConstructor")
 				return s || sc
 				// TODO(port-scopemanager)
 				// const scope = context.sourceCode.getScope(node);
