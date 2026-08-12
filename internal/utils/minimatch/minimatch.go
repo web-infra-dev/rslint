@@ -40,6 +40,7 @@ import (
 	"unicode"
 
 	"github.com/dlclark/regexp2"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // Options mirrors the minimatch options a caller can pass. The zero value is
@@ -528,11 +529,10 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			// the contents so any character that was passed through as-is gets
 			// translated.
 			//
-			// What decides that is whether the class compiles, so ask about the
-			// translated source rather than the pattern text it came from: a
-			// character such as `[` or `\` that a glob passes straight through
-			// carries a meaning of its own in a regexp character class.
-			if _, err := regexp2.Compile(re[reClassStart:]+"]", regexp2.None); err != nil {
+			// What decides that is whether the original class compiles as an
+			// ECMAScript regexp. regexp2 follows .NET character-class syntax,
+			// which accepts and rejects a different set of classes.
+			if !isValidJSClass(pattern[classStart : i+1]) {
 				class := pattern[classStart+1 : i]
 				source, sourceMagic, _ := m.parseSource(class, true)
 				re = re[:reClassStart] + `\[` + source + `\]`
@@ -653,6 +653,55 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 	}
 
 	return re, hasMagic, true
+}
+
+// isValidJSClass asks the ECMAScript scanner whether class is a complete
+// character class. minimatch uses the RegExp constructor for this check; the
+// scanner accepts a literal instead, so delimiters and raw line terminators
+// are escaped without changing the pattern the regexp parser sees.
+func isValidJSClass(class string) bool {
+	var literal strings.Builder
+	literal.Grow(len(class) + 2)
+	literal.WriteByte('/')
+	backslashes := 0
+	for _, r := range class {
+		switch r {
+		case '\\':
+			literal.WriteRune(r)
+			backslashes++
+			continue
+		case '/':
+			if backslashes%2 == 0 {
+				literal.WriteByte('\\')
+			}
+			literal.WriteRune(r)
+		case '\n':
+			if backslashes%2 == 0 {
+				literal.WriteByte('\\')
+			}
+			literal.WriteByte('n')
+		case '\r':
+			if backslashes%2 == 0 {
+				literal.WriteByte('\\')
+			}
+			literal.WriteByte('r')
+		case '\u2028':
+			if backslashes%2 == 0 {
+				literal.WriteByte('\\')
+			}
+			literal.WriteString("u2028")
+		case '\u2029':
+			if backslashes%2 == 0 {
+				literal.WriteByte('\\')
+			}
+			literal.WriteString("u2029")
+		default:
+			literal.WriteRune(r)
+		}
+		backslashes = 0
+	}
+	literal.WriteByte('/')
+	return ecmascript.IsValidRegexLiteral(literal.String())
 }
 
 // Match reports whether path matches the compiled pattern.

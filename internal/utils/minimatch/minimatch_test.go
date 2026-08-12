@@ -114,6 +114,10 @@ func TestMatch(t *testing.T) {
 		// An invalid or unterminated class matches itself.
 		{"/src/[z-a]/x", "/src/[z-a]/x", true},
 		{"/src/[z-a]/x", "/src/a/x", false},
+		{"[!-\n]", "[!-\n]", true},
+		{"[!-\n]", "a", false},
+		{"[]^?]", "[]^?]", true},
+		{"[]^?]", "]", false},
 		{"/src/[abc/x", "/src/[abc/x", true},
 		{"/src/[abc/x", "/src/a/x", false},
 
@@ -308,11 +312,12 @@ func TestMatchOptions(t *testing.T) {
 // and U+03C2 ς are one character to it, while U+212A K and `k` are two, and
 // neither answer is the one Unicode case folding gives.
 func TestMatchNoCase(t *testing.T) {
-	tests := []struct {
+	type testCase struct {
 		pattern string
 		path    string
 		want    bool
-	}{
+	}
+	tests := []testCase{
 		{"/src/Server/*.ts", "/src/server/a.ts", true},
 		{"caf\u00e9", "CAF\u00c9", true},
 		{"@(a|b)", "B", true},
@@ -335,6 +340,10 @@ func TestMatchNoCase(t *testing.T) {
 		// a capital eszett does not uppercase onto the small one
 		{"\u00df", "\u1e9e", false},
 
+		// a regexp without `u` does not fold a supplementary-plane letter
+		{"\U00010428", "\U00010400", false},
+		{"\U00010400", "\U00010428", false},
+
 		// a negated class turns down whatever the widened class covers
 		{"[!a]", "A", false},
 		{"[!a-z]", "K", false},
@@ -343,6 +352,44 @@ func TestMatchNoCase(t *testing.T) {
 		{"[a-]", "a", true},
 		{"[a-]", "A", true},
 		{"[a-]", "-", true},
+	}
+
+	// These mappings were added in Unicode 16 and 17 after the Unicode 15
+	// tables in Go 1.26. Node 26 uses Unicode 17 for regexp canonicalization.
+	unicode17Pairs := [][2]rune{
+		{0x019B, 0xA7DC},
+		{0x0264, 0xA7CB},
+		{0x1C8A, 0x1C89},
+		{0xA7CD, 0xA7CC},
+		{0xA7CF, 0xA7CE},
+		{0xA7D3, 0xA7D2},
+		{0xA7D5, 0xA7D4},
+		{0xA7DB, 0xA7DA},
+	}
+	for _, pair := range unicode17Pairs {
+		tests = append(tests,
+			testCase{pattern: string(pair[0]), path: string(pair[1]), want: true},
+			testCase{pattern: string(pair[1]), path: string(pair[0]), want: true},
+			testCase{pattern: "[" + string(pair[0]) + "]", path: string(pair[1]), want: true},
+			testCase{pattern: "[" + string(pair[1]) + "]", path: string(pair[0]), want: true},
+		)
+	}
+
+	// Full uppercase expands each of these into multiple UTF-16 code units,
+	// so ECMAScript keeps it distinct from Go's simple uppercase character.
+	multiUnitUppercase := [][2]rune{{0x1FB3, 0x1FBC}, {0x1FC3, 0x1FCC}, {0x1FF3, 0x1FFC}}
+	for _, bounds := range [][2]rune{{0x1F80, 0x1F87}, {0x1F90, 0x1F97}, {0x1FA0, 0x1FA7}} {
+		for r := bounds[0]; r <= bounds[1]; r++ {
+			multiUnitUppercase = append(multiUnitUppercase, [2]rune{r, r + 8})
+		}
+	}
+	for _, pair := range multiUnitUppercase {
+		tests = append(tests,
+			testCase{pattern: string(pair[0]), path: string(pair[1]), want: false},
+			testCase{pattern: string(pair[1]), path: string(pair[0]), want: false},
+			testCase{pattern: "[" + string(pair[0]) + "]", path: string(pair[1]), want: false},
+			testCase{pattern: "[" + string(pair[1]) + "]", path: string(pair[0]), want: false},
+		)
 	}
 
 	for _, test := range tests {
