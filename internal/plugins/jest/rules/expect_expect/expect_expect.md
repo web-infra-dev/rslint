@@ -6,6 +6,19 @@ Ensure every Jest test callback contains at least one assertion. The rule tracks
 
 Skipped [`test.todo` / `it.todo`](https://jestjs.io/docs/api#testtodotitle) bodies are ignored.
 
+### Divergence from `eslint-plugin-jest`
+
+For a named callback whose declaration is asserting, this rule intentionally treats the registration as covered **independent of source order**, whereas upstream `eslint-plugin-jest` only clears a registration if it was already seen when the assertion was walked. Concretely:
+
+```js
+function myTest() {
+  expect(true).toBeDefined();
+}
+it('should pass', myTest);
+```
+
+Upstream reports `Test has no assertions` here (the assertion is walked before the `it(...)` registration is queued), while this rule does not. Because the function declaration is hoisted, this snippet is runtime-equivalent to the call-first form `it('should pass', myTest); function myTest() { ... }`, which both implementations already accept — so treating the two forms identically is the correct behavior and removes an order-dependent false positive.
+
 Examples of **incorrect** code for this rule:
 
 ```js
