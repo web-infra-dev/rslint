@@ -28,12 +28,9 @@ func TestNoLabelVarRule(t *testing.T) {
 			{Code: `for (const k in obj) { q: for(;;) { break q; } }`},
 			{Code: `for (const v of arr) { q: for(;;) { break q; } }`},
 
-			// ---- TS type-only declarations should NOT clash (only values count) ----
-			{Code: `interface X {} X: for(;;) { break X; }`},
-			{Code: `type X = number; X: for(;;) { break X; }`},
-			// NOTE: `import type` is intentionally NOT in the valid list — utils.IsShadowed
-			// does not distinguish type-only imports from value imports, so it triggers.
-			// See the matching invalid case below.
+			// ---- Type-only names in sibling scopes are not visible ----
+			{Code: `function f<T>() {} T: for(;;) { break T; }`},
+			{Code: `function f() { type X = number; } X: for(;;) { break X; }`},
 
 			// ---- Nested label inside iteration; outer var has different name ----
 			{Code: `var x = 1; function f() { y: for(;;) { break y; } }`},
@@ -49,9 +46,14 @@ func TestNoLabelVarRule(t *testing.T) {
 			// ---- Declared global that does not clash with the label name ----
 			{Code: `q: for(;;) { break q; }`, Globals: map[string]any{"myConfiguredGlobal": "readonly"}},
 
-			// TypeScript libraries do not implicitly populate ESLint's global scope.
+			// Host libraries are not part of scope-manager's default esnext scope.
 			{Code: `window: for (;;) { break window; }`},
 			{Code: `console: for (;;) { break console; }`},
+			{Code: `NodeListOf: for (;;) { break NodeListOf; }`},
+			{Code: `AbortController: for (;;) { break AbortController; }`},
+
+			// Global augmentations are not visible as module-local variables.
+			{Code: `export {}; declare global { interface X {} } X: for(;;) { break X; }`},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -72,6 +74,81 @@ func TestNoLabelVarRule(t *testing.T) {
 				Code: `function bar(x) { x: for(;;) { break x; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 19},
+				},
+			},
+
+			// ---- TypeScript type-space bindings ----
+			{
+				Code: `interface X {} X: for(;;) { break X; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 16},
+				},
+			},
+			{
+				Code: `type X = number; X: for(;;) { break X; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 18},
+				},
+			},
+			{
+				Code: `{ type X = number; X: for(;;) { break X; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 20},
+				},
+			},
+			{
+				Code: `function f<T>() { T: for(;;) { break T; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 19},
+				},
+			},
+			{
+				Code: `class C<T> { m() { T: for(;;) { break T; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 20},
+				},
+			},
+			{
+				Code: `class C<T> { static m() { T: for(;;) { break T; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 27},
+				},
+			},
+			{
+				Code: `class C<T> { static { T: for(;;) { break T; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 23},
+				},
+			},
+			{
+				Code: `function outer<T>() { function inner() { T: for(;;) { break T; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 42},
+				},
+			},
+			{
+				Code: `Record: for(;;) { break Record; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `ImportMeta: for(;;) { break ImportMeta; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `export {}; Record: for(;;) { break Record; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 12},
+				},
+			},
+			{
+				Code:    `Record: for(;;) { break Record; }`,
+				Globals: map[string]any{"Record": "off"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
 				},
 			},
 
@@ -194,8 +271,7 @@ func TestNoLabelVarRule(t *testing.T) {
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 31},
 				},
 			},
-			// Type-only import: utils.IsShadowed does not differentiate type-only
-			// from value imports, so this is reported. Lock current behavior.
+			// Type-only imports are scope variables too.
 			{
 				Code: `import type { X } from 'mod'; X: for(;;) { break X; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -274,18 +350,27 @@ func TestNoLabelVarRule(t *testing.T) {
 func TestNoLabelVarECMAVersion(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
-		"tsconfig.json",
+		"tsconfig.allow-js.json",
 		t,
 		&NoLabelVarRule,
 		[]rule_tester.ValidTestCase{
 			{
 				Code:            `Promise: for (;;) { break Promise; }`,
+				FileName:        "promise.js",
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
 				Code:            `Promise: for (;;) { break Promise; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code:            `Promise: for (;;) { break Promise; }`,
+				FileName:        "promise.js",
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
@@ -304,6 +389,8 @@ func TestNoLabelVarLanguageDefaults(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `arguments: while (false) { break arguments; }`, FileName: "plain-label.js"},
 			{Code: `require: while (false) { break require; }`, FileName: "plain-require.js"},
+			// TypeScript scope-manager globals are not part of ordinary JS scope.
+			{Code: `Record: for (;;) { break Record; }`, FileName: "record.js"},
 			{
 				Code:     `require: while (false) { break require; }`,
 				FileName: "require-off.cjs",
