@@ -2,7 +2,7 @@
 
 ## Rule Details
 
-Ensure every Jest test callback contains at least one assertion. The rule tracks test APIs such as `test`, `it`, `fit`, `xit`, and `xtest` (including chained forms like `it.each` that the Jest integration recognizes) and reports when none of the configured assertion callee patterns appear in the body. Assertions inside a named function declaration that is passed as the test callback are attributed to outer tests that reference that name. This guards against tests that run side effects but never verify outcomes.
+Ensure every Jest test callback contains at least one assertion. The rule tracks test APIs such as `test`, `it`, `fit`, `xit`, and `xtest` (including chained forms like `it.each` that the Jest integration recognizes) and reports when none of the configured assertion callee patterns appear in the body. Assertions inside a named function declaration or variable function passed as the test callback are attributed to every test that references it, regardless of whether the callback is declared before or after the registration. This guards against tests that run side effects but never verify outcomes.
 
 Skipped [`test.todo` / `it.todo`](https://jestjs.io/docs/api#testtodotitle) bodies are ignored.
 
