@@ -82,4 +82,5 @@ const Foo = createReactClass({
 
 ## Original Documentation
 
-- [eslint-plugin-react `no-this-in-sfc`](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-this-in-sfc.md)
+- [eslint-plugin-react: no-this-in-sfc](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-this-in-sfc.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-this-in-sfc.js)

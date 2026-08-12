@@ -73,4 +73,5 @@ class Foo extends React.PureComponent {
 
 ## Original Documentation
 
-- [react/prefer-stateless-function](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/prefer-stateless-function.md)
+- [eslint-plugin-react: prefer-stateless-function](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/prefer-stateless-function.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/prefer-stateless-function.js)

@@ -23,7 +23,8 @@ func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind,
 		Path:     tspath.Path(fileName),
 	}, source, scriptKind)
 	binder.BindSourceFile(sourceFile)
-	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil)
+	_, refsInit := ResolveLanguageDefaults(fileName)
+	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit)
 }
 
 // newCheckedRefStore builds a real Program (via the shared fixtures
@@ -48,7 +49,8 @@ func newCheckedRefStore(t *testing.T, source string) (*ast.SourceFile, *RefStore
 		t.Fatalf("GetSourceFile(%q) = nil", filePath)
 	}
 	tc, done := program.GetTypeChecker(t.Context())
-	return sourceFile, NewRefStore(sourceFile, program.Options(), tc), done
+	_, refsInit := ResolveLanguageDefaults(sourceFile.FileName())
+	return sourceFile, NewRefStore(sourceFile, program.Options(), tc, refsInit), done
 }
 
 // identifiers returns every Identifier node under root with the given text,
@@ -898,6 +900,52 @@ func TestRefStoreResolveInFileNeverUsesCheckerFallback(t *testing.T) {
 	}
 	if got := refs.Resolve(window); got == nil {
 		t.Fatal("Resolve(window) = nil, want proof that the checker fallback is available")
+	}
+}
+
+func TestRefStoreImplicitFileArguments(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		fileName string
+		source   string
+		want     []bool
+	}{
+		{
+			name:     "commonjs top level arrow and function",
+			fileName: "/file.cjs",
+			source:   "arguments; (() => arguments)(); function f() { return arguments; }",
+			want:     []bool{true, true, true},
+		},
+		{
+			name:     "module top level arrow and function",
+			fileName: "/file.js",
+			source:   "arguments; (() => arguments)(); function f() { return arguments; }",
+			want:     []bool{false, false, true},
+		},
+		{
+			name:     "local declaration wins",
+			fileName: "/file.cjs",
+			source:   "let arguments = 1; arguments;",
+			want:     []bool{false, true},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			sourceFile, refs := newBoundRefStore(t, test.fileName, core.ScriptKindJS, test.source)
+			occurrences := identifiers(sourceFile.AsNode(), "arguments")
+			if len(occurrences) != len(test.want) {
+				t.Fatalf("found %d arguments identifiers, want %d", len(occurrences), len(test.want))
+			}
+			for i, node := range occurrences {
+				if got := refs.IsDefinedInFile(node); got != test.want[i] {
+					t.Errorf("IsDefinedInFile(arguments occurrence %d) = %v, want %v", i, got, test.want[i])
+				}
+			}
+		})
 	}
 }
 

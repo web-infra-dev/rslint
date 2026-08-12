@@ -53,4 +53,5 @@ upstream's default branch.
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-render-return-value](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-render-return-value.md)
+- [eslint-plugin-react: no-render-return-value](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-render-return-value.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-render-return-value.js)

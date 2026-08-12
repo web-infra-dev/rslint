@@ -129,4 +129,5 @@ If your project does not need to enforce wrapping JSX text in expressions or has
 
 ## Original Documentation
 
-- [react/jsx-no-literals](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-literals.md)
+- [eslint-plugin-react: jsx-no-literals](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-no-literals.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-no-literals.js)

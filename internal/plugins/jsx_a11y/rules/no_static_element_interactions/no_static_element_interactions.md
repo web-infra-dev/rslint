@@ -120,4 +120,5 @@ Examples of **incorrect** code with `{ "allowExpressionValues": false }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-static-element-interactions](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-static-element-interactions.md)
+- [eslint-plugin-jsx-a11y: no-static-element-interactions](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-static-element-interactions.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-static-element-interactions.js)

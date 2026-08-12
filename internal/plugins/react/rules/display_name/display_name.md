@@ -157,5 +157,5 @@ If you are not interested in giving every component a `displayName` and rely on 
 
 ## Original Documentation
 
-- [eslint-plugin-react / display-name](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/display-name.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/display-name.js)
+- [eslint-plugin-react: display-name](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/display-name.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/display-name.js)

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -1687,4 +1688,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	if !lintResult.HasSyntaxErrors {
 		s.dispatchPluginLintWithConfig(uri, generation, rslintConfig, configCwd, isJSConfig)
 	}
+
+	// The pacer cannot see that the lint just dropped what it derived.
+	go runtime.GC()
 }

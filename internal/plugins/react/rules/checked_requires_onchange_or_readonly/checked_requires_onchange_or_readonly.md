@@ -72,4 +72,5 @@ Examples of **correct** code for this rule with `{ "ignoreExclusiveCheckedAttrib
 
 ## Original Documentation
 
-- [react/checked-requires-onchange-or-readonly](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/checked-requires-onchange-or-readonly.md)
+- [eslint-plugin-react: checked-requires-onchange-or-readonly](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/checked-requires-onchange-or-readonly.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/checked-requires-onchange-or-readonly.js)

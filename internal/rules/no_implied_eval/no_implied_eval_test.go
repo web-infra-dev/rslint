@@ -1203,6 +1203,7 @@ func TestNoImpliedEvalGlobalAvailability(t *testing.T) {
 			{Code: `window.setTimeout('code')`},
 			{Code: `self.setTimeout('code')`},
 			{Code: `global.setTimeout('code')`},
+			{Code: `global.setTimeout('code')`, FileName: "commonjs-off.cjs", TSConfig: "tsconfig.allow-js.json", Globals: map[string]any{"global": "off"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `setTimeout('code')`, Globals: map[string]any{"setTimeout": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
@@ -1211,6 +1212,7 @@ func TestNoImpliedEvalGlobalAvailability(t *testing.T) {
 			{Code: `window.setTimeout('code')`, Globals: map[string]any{"window": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
 			{Code: `self.setTimeout('code')`, Globals: map[string]any{"self": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
 			{Code: `global.setTimeout('code')`, Globals: map[string]any{"global": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
+			{Code: `global.setTimeout('code')`, FileName: "commonjs-global.cjs", TSConfig: "tsconfig.allow-js.json", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
 			{Code: `/* global window */ window.setTimeout('code')`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "impliedEval"}}},
 		},
 	)

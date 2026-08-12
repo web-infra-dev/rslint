@@ -2,7 +2,6 @@ package no_meaningless_void_operator
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -28,20 +27,17 @@ func buildRemoveVoidMessage() rule.RuleMessage {
 }
 
 type NoMeaninglessVoidOperatorOptions struct {
-	CheckNever *bool `json:"checkNever"`
+	CheckNever bool
 }
 
 func parseOptions(options []any) NoMeaninglessVoidOperatorOptions {
 	opts := NoMeaninglessVoidOperatorOptions{}
-	if len(options) > 0 {
-		if optsMap, ok := options[0].(map[string]interface{}); ok {
-			if optsJSON, err := json.Marshal(optsMap); err == nil {
-				_ = json.Unmarshal(optsJSON, &opts)
-			}
-		}
+	if len(options) == 0 {
+		return opts
 	}
-	if opts.CheckNever == nil {
-		opts.CheckNever = utils.Ref(false)
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["checkNever"].(bool); ok {
+		opts.CheckNever = value
 	}
 	return opts
 }
@@ -70,7 +66,7 @@ var NoMeaninglessVoidOperatorRule = rule.CreateRule(rule.Rule{
 
 				if mask&checker.TypeFlagsVoidLike != 0 {
 					ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType)), fixRemoveVoidKeyword())
-				} else if *opts.CheckNever && mask&checker.TypeFlagsNever != 0 {
+				} else if opts.CheckNever && mask&checker.TypeFlagsNever != 0 {
 					ctx.ReportNodeWithSuggestions(node, buildMeaninglessVoidOperatorMessage(ctx.TypeChecker.TypeToString(argType)), rule.RuleSuggestion{
 						Message:  buildRemoveVoidMessage(),
 						FixesArr: []rule.RuleFix{fixRemoveVoidKeyword()},

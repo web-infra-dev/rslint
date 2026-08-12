@@ -208,4 +208,5 @@ These mirror the upstream `eslint-plugin-jsx-a11y` settings exactly.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/label-has-associated-control](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/label-has-associated-control.md)
+- [eslint-plugin-jsx-a11y: label-has-associated-control](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/label-has-associated-control.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/label-has-associated-control.js)

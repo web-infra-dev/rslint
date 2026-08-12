@@ -7,18 +7,21 @@ import (
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_identical_title"
 )
 
-func parseRstestCall(node *ast.Node, ctx rule.RuleContext) *shared.ParsedCall {
-	parsed := rstestUtils.ParseRstestFnCall(node, ctx)
-	if parsed == nil {
-		return nil
-	}
-	return &shared.ParsedCall{
-		Call:          &parsed.ParsedCall,
-		Parameterized: parsed.IsParameterized(),
-	}
-}
-
 var NoIdenticalTitleRule = shared.NewRule(shared.Config{
-	Name:  "rstest/no-identical-title",
-	Parse: parseRstestCall,
+	Name: "rstest/no-identical-title",
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := rstestUtils.NewRstestCallAnalysis(ctx)
+		return shared.Runtime{
+			Parse: func(node *ast.Node) *shared.ParsedCall {
+				parsed := analysis.ParseFnCall(node)
+				if parsed == nil {
+					return nil
+				}
+				return &shared.ParsedCall{
+					Call:          &parsed.ParsedCall,
+					Parameterized: parsed.IsParameterized(),
+				}
+			},
+		}
+	},
 })

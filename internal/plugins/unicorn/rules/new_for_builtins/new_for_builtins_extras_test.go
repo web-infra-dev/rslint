@@ -406,6 +406,10 @@ func TestNewForBuiltinsECMAVersion(t *testing.T) {
 }
 
 func TestNewForBuiltinsGlobalAvailability(t *testing.T) {
+	commonJSGlobal := enforceInvalid(`global.Array()`, `global.Array()`, "Array")
+	commonJSGlobal.FileName = "commonjs-global.cjs"
+	commonJSGlobal.Globals = nil
+
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
@@ -415,9 +419,11 @@ func TestNewForBuiltinsGlobalAvailability(t *testing.T) {
 			{Code: `window.Array()`, FileName: "file.js"},
 			{Code: `self.Array()`, FileName: "file.js"},
 			{Code: `global.Array()`, FileName: "file.js"},
+			{Code: `global.Array()`, FileName: "commonjs-off.cjs", Globals: map[string]any{"global": "off"}},
 			{Code: `WebAssembly.Module(buffer)`, FileName: "file.js"},
 		},
 		[]rule_tester.InvalidTestCase{
+			commonJSGlobal,
 			invalidWithExactGlobals(
 				enforceInvalid(`window.Array()`, `window.Array()`, "Array"),
 				map[string]any{"window": "readonly"},

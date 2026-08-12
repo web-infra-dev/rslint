@@ -111,4 +111,5 @@ If you are not using JSX, you can disable this rule. If you use a code formatter
 
 ## Original Documentation
 
-- [react/jsx-indent](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-indent.md)
+- [eslint-plugin-react: jsx-indent](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-indent.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-indent.js)

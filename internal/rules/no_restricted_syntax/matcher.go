@@ -1,8 +1,11 @@
 package no_restricted_syntax
 
 import (
+	"math"
 	"strconv"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -30,6 +33,9 @@ func newKindSet() *kindSet {
 }
 
 func (s *kindSet) addAll(ks []ast.Kind) {
+	if s.universe {
+		return
+	}
 	for _, k := range ks {
 		s.kinds[k] = struct{}{}
 	}
@@ -73,6 +79,8 @@ func collectKinds(sel selector, s *kindSet) {
 		// The right-hand side is the node being matched; the left side
 		// is an ancestor / sibling constraint we evaluate at match time.
 		collectKinds(v.Right, s)
+	case relativeSelector:
+		collectKinds(v.Inner, s)
 	case pseudoSelector:
 		switch v.Name {
 		case "is", "matches":
@@ -87,6 +95,8 @@ func collectKinds(sel selector, s *kindSet) {
 			s.markUniverse()
 		case "nth-child", "nth-last-child":
 			s.markUniverse()
+		case "statement", "expression", "declaration", "function", "pattern":
+			s.markUniverse()
 		}
 	case combinedPseudo:
 		collectKinds(v.Inner, s)
@@ -99,34 +109,42 @@ func collectKinds(sel selector, s *kindSet) {
 
 // matches reports whether sel matches the supplied tsgo AST node.
 func matches(sel selector, node *ast.Node, mc *matchContext) bool {
+	return matchesInScope(sel, node, mc, nil)
+}
+
+func matchesInScope(sel selector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node) bool {
 	switch v := sel.(type) {
 	case identifierSelector:
 		return matchesIdentifier(v, node)
 	case classSelector:
-		if !matches(v.Inner, node, mc) {
+		if !matchesInScope(v.Inner, node, mc, scopeRoot) {
 			return false
 		}
-		return matchesClass(node, v.Class)
+		return matchesClass(node, v.Path, scopeRoot)
 	case attrSelector:
-		if !matches(v.Inner, node, mc) {
+		if !matchesInScope(v.Inner, node, mc, scopeRoot) {
 			return false
 		}
 		return matchesAttr(node, v.Path, v.Op, v.Value, mc)
 	case combinatorSelector:
-		if !matches(v.Right, node, mc) {
+		if !matchesInScope(v.Right, node, mc, scopeRoot) {
 			return false
 		}
-		return matchesCombinator(v, node, mc)
+		return matchesCombinator(v, node, mc, scopeRoot)
+	case relativeSelector:
+		// Relative selectors are meaningful only as arguments to :has(),
+		// where the node on the left is the :has() subject.
+		return false
 	case pseudoSelector:
-		return matchesPseudo(v, node, mc)
+		return matchesPseudo(v, node, mc, scopeRoot)
 	case combinedPseudo:
-		if !matches(v.Inner, node, mc) {
+		if !matchesInScope(v.Inner, node, mc, scopeRoot) {
 			return false
 		}
-		return matchesPseudo(v.Pseudo, node, mc)
+		return matchesPseudo(v.Pseudo, node, mc, scopeRoot)
 	case unionSelector:
 		for _, a := range v.Selectors {
-			if matches(a, node, mc) {
+			if matchesInScope(a, node, mc, scopeRoot) {
 				return true
 			}
 		}
@@ -165,6 +183,17 @@ func matchesIdentifier(sel identifierSelector, node *ast.Node) bool {
 // / SequenceExpression — the operator decides which ESTree form it really is.
 func refineEstreeMatch(name string, node *ast.Node) bool {
 	switch name {
+	case "VariableDeclaration":
+		return node.Kind == ast.KindVariableStatement ||
+			node.Kind == ast.KindVariableDeclarationList && (node.Parent == nil || node.Parent.Kind != ast.KindVariableStatement)
+	case "CallExpression":
+		return node.Kind == ast.KindCallExpression &&
+			node.AsCallExpression().Expression != nil &&
+			node.AsCallExpression().Expression.Kind != ast.KindImportKeyword
+	case "ImportExpression":
+		return node.Kind == ast.KindCallExpression &&
+			node.AsCallExpression().Expression != nil &&
+			node.AsCallExpression().Expression.Kind == ast.KindImportKeyword
 	case "BinaryExpression":
 		return node.Kind == ast.KindBinaryExpression && isPlainBinaryOperator(node)
 	case "LogicalExpression":
@@ -324,12 +353,20 @@ func isAssignmentOperatorKind(k ast.Kind) bool {
 // matchesClass evaluates `Foo.bar` — Foo already matched by the inner
 // selector, here we check that the node sits at the named field of its
 // parent.
-func matchesClass(node *ast.Node, class string) bool {
-	parent := node.Parent
-	if parent == nil {
+func matchesClass(node *ast.Node, path []string, scopeRoot *ast.Node) bool {
+	if len(path) == 0 {
 		return false
 	}
-	return nodeIsAtField(node, parent, class)
+	// esquery selects exactly the Nth ESTree ancestor for an N-segment field
+	// path. Walk logical parents so tsgo-only wrappers do not shift that index.
+	ancestor := node
+	for range path {
+		ancestor = matchingParent(ancestor, scopeRoot)
+		if ancestor == nil {
+			return false
+		}
+	}
+	return nodeIsAtFieldPath(node, ancestor, path)
 }
 
 // matchesAttr resolves the attribute path against the node and compares
@@ -339,28 +376,35 @@ func matchesAttr(node *ast.Node, path []string, op attrOp, value attrValue, mc *
 		(value.Kind == attrValueString || value.Kind == attrValueIdent || value.Kind == attrValueRegex) {
 		if text, ok, handled := lookupStringAttrPath(node, path, mc); handled {
 			if !ok {
-				return false
+				return compareAttr(undefinedAttr{}, op, value)
 			}
-			equal := attrStringEquals(text, value)
-			if op == attrNotEqual {
-				return !equal
-			}
-			return equal
+			return compareStringAttr(text, op, value)
 		}
 	}
 
 	val, ok := lookupAttrPath(node, path, mc)
 	if op == attrPresent {
-		// Presence: any non-zero, non-nil value passes.
-		if !ok {
-			return false
-		}
-		return attrTruthy(val)
+		// esquery defines presence as a reachable, non-null property. Values
+		// such as false, 0, "", and empty arrays still count as present.
+		return ok && attrIsPresent(val)
 	}
 	if !ok {
-		return false
+		val = undefinedAttr{}
 	}
 	return compareAttr(val, op, value)
+}
+
+func attrIsPresent(value interface{}) bool {
+	if value == nil {
+		return false
+	}
+	// A typed nil pointer stored in an interface is not equal to nil. AST
+	// optional fields commonly take that shape, but ESTree/esquery still sees
+	// them as null and therefore absent.
+	if node, ok := value.(*ast.Node); ok {
+		return node != nil
+	}
+	return true
 }
 
 // lookupStringAttrPath avoids boxing the overwhelmingly common string-valued
@@ -386,15 +430,22 @@ func lookupStringAttrPath(node *ast.Node, path []string, mc *matchContext) (text
 		switch value := current.(type) {
 		case *ast.Node:
 			if value == nil {
-				return "", false, true
+				// A present ESTree property whose value is null remains null when
+				// a deeper path is requested; use the generic resolver to retain
+				// that distinction from a missing (undefined) property.
+				return "", false, false
 			}
 			switch segment {
 			case "name":
-				name, found := readNameAttr(value)
-				if !found {
-					return "", false, true
+				switch value.Kind {
+				case ast.KindIdentifier:
+					return value.AsIdentifier().Text, true, true
+				case ast.KindPrivateIdentifier:
+					return value.AsPrivateIdentifier().Text, true, true
 				}
-				return attrAsString(name), true, true
+				// JSX name attributes resolve to nodes rather than strings, so
+				// let the generic resolver preserve that facade's semantics.
+				return "", false, false
 			case "operator":
 				text, found := readOperatorAttrString(value)
 				return text, found, true
@@ -414,9 +465,13 @@ func lookupStringAttrPath(node *ast.Node, path []string, mc *matchContext) (text
 // matchesCombinator handles `>` (parent), descendant, `+` (prev sibling),
 // `~` (any prior sibling). The right-hand side has already been verified
 // against the current node before this function is called.
-func matchesCombinator(c combinatorSelector, node *ast.Node, mc *matchContext) bool {
+func matchesCombinator(c combinatorSelector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node) bool {
 	switch c.Kind {
 	case combChild:
+		parent := matchingParent(node, scopeRoot)
+		if parent == nil {
+			return false
+		}
 		// ESTree wraps `export default <decl>` in an
 		// ExportDefaultDeclaration node. tsgo flattens this — a default-
 		// exported FunctionDeclaration / ClassDeclaration sits directly
@@ -429,25 +484,24 @@ func matchesCombinator(c combinatorSelector, node *ast.Node, mc *matchContext) b
 				return true
 			}
 		}
-		parent := node.Parent
-		if parent == nil {
+		return matchesInScope(c.Left, parent, mc, scopeRoot)
+	case combDescendant:
+		current := matchingParent(node, scopeRoot)
+		if current == nil {
 			return false
 		}
-		return matches(c.Left, parent, mc)
-	case combDescendant:
 		if isDefaultExportedDeclaration(node) && selectorMatchesVirtualExportDefault(c.Left) {
 			return true
 		}
-		current := node.Parent
 		for current != nil {
-			if matches(c.Left, current, mc) {
+			if matchesInScope(c.Left, current, mc, scopeRoot) {
 				return true
 			}
-			current = current.Parent
+			current = matchingParent(current, scopeRoot)
 		}
 		return false
 	case combAdjacent, combSibling:
-		parent := node.Parent
+		parent := matchingParent(node, scopeRoot)
 		if parent == nil {
 			return false
 		}
@@ -458,7 +512,7 @@ func matchesCombinator(c combinatorSelector, node *ast.Node, mc *matchContext) b
 		var siblings []*ast.Node
 		for _, list := range listChildrenOf(parent) {
 			for _, child := range list {
-				if child == node {
+				if unwrapEstreeNode(child) == node {
 					siblings = list
 					break
 				}
@@ -472,7 +526,7 @@ func matchesCombinator(c combinatorSelector, node *ast.Node, mc *matchContext) b
 		}
 		idx := -1
 		for i, sib := range siblings {
-			if sib == node {
+			if unwrapEstreeNode(sib) == node {
 				idx = i
 				break
 			}
@@ -481,10 +535,10 @@ func matchesCombinator(c combinatorSelector, node *ast.Node, mc *matchContext) b
 			return false
 		}
 		if c.Kind == combAdjacent {
-			return matches(c.Left, siblings[idx-1], mc)
+			return matchesInScope(c.Left, unwrapEstreeNode(siblings[idx-1]), mc, scopeRoot)
 		}
 		for i := idx - 1; i >= 0; i-- {
-			if matches(c.Left, siblings[i], mc) {
+			if matchesInScope(c.Left, unwrapEstreeNode(siblings[i]), mc, scopeRoot) {
 				return true
 			}
 		}
@@ -493,43 +547,95 @@ func matchesCombinator(c combinatorSelector, node *ast.Node, mc *matchContext) b
 	return false
 }
 
-func matchesPseudo(p pseudoSelector, node *ast.Node, mc *matchContext) bool {
+func matchesPseudo(p pseudoSelector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node) bool {
 	switch p.Name {
 	case "is", "matches":
 		for _, a := range p.Args {
-			if matches(a, node, mc) {
+			if matchesInScope(a, node, mc, scopeRoot) {
 				return true
 			}
 		}
 		return false
 	case "not":
 		for _, a := range p.Args {
-			if matches(a, node, mc) {
+			if matchesInScope(a, node, mc, scopeRoot) {
 				return false
 			}
 		}
 		return true
 	case "has":
 		for _, a := range p.Args {
-			if hasDescendantMatching(node, a, mc) {
+			if hasMatching(node, a, mc) {
 				return true
 			}
 		}
 		return false
 	case "nth-child":
-		idx, _ := nodeIndexInListField(node)
+		idx, _ := nodeIndexInListField(node, scopeRoot)
 		return idx >= 0 && idx == p.N-1
 	case "nth-last-child":
-		idx, total := nodeIndexInListField(node)
+		idx, total := nodeIndexInListField(node, scopeRoot)
 		if idx < 0 {
 			return false
 		}
 		return total-idx == p.N
+	case "statement", "expression", "declaration", "function", "pattern":
+		return matchesNodeClass(node, p.Name, scopeRoot)
 	}
 	return false
 }
 
+func matchesNodeClass(node *ast.Node, class string, scopeRoot *ast.Node) bool {
+	nodeType := estreeNameForKind(node)
+	switch class {
+	case "statement":
+		return strings.HasSuffix(nodeType, "Statement") || strings.HasSuffix(nodeType, "Declaration")
+	case "declaration":
+		return strings.HasSuffix(nodeType, "Declaration")
+	case "function":
+		return nodeType == "FunctionDeclaration" || nodeType == "FunctionExpression" || nodeType == "ArrowFunctionExpression"
+	case "expression", "pattern":
+		parent := matchingParent(node, scopeRoot)
+		isExpression := strings.HasSuffix(nodeType, "Expression") ||
+			strings.HasSuffix(nodeType, "Literal") ||
+			nodeType == "MetaProperty" ||
+			(nodeType == "Identifier" && (parent == nil || parent.Kind != ast.KindMetaProperty))
+		if class == "expression" {
+			return isExpression
+		}
+		return strings.HasSuffix(nodeType, "Pattern") || isExpression
+	}
+	return false
+}
+
+func hasMatching(node *ast.Node, sel selector, mc *matchContext) bool {
+	if relative, ok := sel.(relativeSelector); ok {
+		if relative.Kind != combChild {
+			return false
+		}
+		matched := false
+		var visitDirect func(child *ast.Node) bool
+		visitDirect = func(child *ast.Node) bool {
+			if isTransparentEstreeContainer(child) {
+				child.ForEachChild(visitDirect)
+				return matched
+			}
+			if matchesInScope(relative.Inner, child, mc, node) {
+				matched = true
+				return true
+			}
+			return false
+		}
+		node.ForEachChild(visitDirect)
+		return matched
+	}
+	return hasDescendantMatching(node, sel, mc)
+}
+
 func hasDescendantMatching(node *ast.Node, sel selector, mc *matchContext) bool {
+	if matchesInScope(sel, node, mc, node) {
+		return true
+	}
 	found := false
 	var visit func(n *ast.Node) bool
 	visit = func(n *ast.Node) bool {
@@ -537,7 +643,10 @@ func hasDescendantMatching(node *ast.Node, sel selector, mc *matchContext) bool 
 			return true
 		}
 		n.ForEachChild(func(child *ast.Node) bool {
-			if matches(sel, child, mc) {
+			if isTransparentEstreeContainer(child) {
+				return visit(child)
+			}
+			if matchesInScope(sel, child, mc, node) {
 				found = true
 				return true
 			}
@@ -549,13 +658,13 @@ func hasDescendantMatching(node *ast.Node, sel selector, mc *matchContext) bool 
 	return found
 }
 
-// nodeIsAtField returns whether `node` is positioned at the named ESTree
-// field on `parent`. Resolution uses the field-mapping helpers (see
-// fields.go).
-func nodeIsAtField(node, parent *ast.Node, field string) bool {
-	candidates := nodesAtField(parent, field)
-	for _, c := range candidates {
-		if c == node {
+func nodeIsAtFieldPath(node, ancestor *ast.Node, path []string) bool {
+	ancestor = unwrapEstreeNode(ancestor)
+	if len(path) == 0 {
+		return unwrapEstreeNode(node) == ancestor
+	}
+	for _, child := range nodesAtField(ancestor, path[0]) {
+		if nodeIsAtFieldPath(node, unwrapEstreeNode(child), path[1:]) {
 			return true
 		}
 	}
@@ -578,7 +687,15 @@ func lookupAttrPath(node *ast.Node, path []string, mc *matchContext) (interface{
 }
 
 func stepAttrPath(current interface{}, segment string, mc *matchContext) (interface{}, bool) {
+	if current == nil {
+		// esquery's getPath short-circuits a null intermediate value and
+		// returns null, rather than converting it to undefined.
+		return nil, true
+	}
 	if n, ok := current.(*ast.Node); ok {
+		if n == nil {
+			return nil, true
+		}
 		return readNodeAttr(n, segment, mc)
 	}
 	if rf, ok := current.(regexFacade); ok {
@@ -610,77 +727,190 @@ func stepAttrPath(current interface{}, segment string, mc *matchContext) (interf
 			return float64(len(v)), true
 		}
 	}
+	if nodes, ok := current.([]*ast.Node); ok {
+		index, err := strconv.Atoi(segment)
+		if err != nil || index < 0 || index >= len(nodes) {
+			return nil, false
+		}
+		return nodes[index], true
+	}
 	return nil, false
 }
 
-// attrTruthy evaluates the truthiness of an attribute value the same way
-// JavaScript would, so that bare attribute presence (`[label]`) only
-// matches when the value is non-empty / non-zero / non-nil.
-func attrTruthy(v interface{}) bool {
-	if v == nil {
-		return false
+type undefinedAttr struct{}
+
+func compareStringAttr(left string, op attrOp, right attrValue) bool {
+	equal := attrStringEquals(left, right)
+	if op == attrNotEqual {
+		return !equal
 	}
-	switch x := v.(type) {
-	case bool:
-		return x
-	case string:
-		return x != ""
-	case float64:
-		return x != 0
-	case *ast.Node:
-		return x != nil
-	case []*ast.Node:
-		return len(x) > 0
-	}
-	return true
+	return equal
 }
 
 func compareAttr(left interface{}, op attrOp, right attrValue) bool {
 	switch op {
 	case attrEqual:
+		if right.Kind == attrValueRegex {
+			text, ok := left.(string)
+			return ok && attrStringEquals(text, right)
+		}
 		return attrEquals(left, right)
 	case attrNotEqual:
+		if right.Kind == attrValueRegex {
+			return !attrStringEquals(attrAsString(left), right)
+		}
 		return !attrEquals(left, right)
 	case attrLess, attrLessOrEqual, attrGreater, attrGreaterOrEqual:
-		l, ok := numericFromAttr(left)
+		comparison, ok := compareRelationalAttr(left, right)
 		if !ok {
-			return false
-		}
-		var r float64
-		switch right.Kind {
-		case attrValueNumber:
-			r = right.Num
-		default:
 			return false
 		}
 		switch op {
 		case attrLess:
-			return l < r
+			return comparison < 0
 		case attrLessOrEqual:
-			return l <= r
+			return comparison <= 0
 		case attrGreater:
-			return l > r
+			return comparison > 0
 		case attrGreaterOrEqual:
-			return l >= r
+			return comparison >= 0
 		}
 	}
 	return false
 }
 
-func numericFromAttr(v interface{}) (float64, bool) {
-	switch x := v.(type) {
-	case float64:
-		return x, true
-	case int:
-		return float64(x), true
-	case string:
-		n, err := strconv.ParseFloat(x, 64)
-		if err != nil {
-			return 0, false
-		}
-		return n, true
+func compareRelationalAttr(left interface{}, right attrValue) (int, bool) {
+	leftText, leftIsString, leftNumber, leftOK := leftRelationalPrimitive(left)
+	rightText, rightIsString, rightNumber, rightOK := rightRelationalPrimitive(right)
+	if !leftOK || !rightOK {
+		return 0, false
 	}
-	return 0, false
+	if leftIsString && rightIsString {
+		return compareJSStrings(leftText, rightText), true
+	}
+	if leftIsString {
+		leftNumber, leftOK = jsStringToNumber(leftText)
+	}
+	if rightIsString {
+		rightNumber, rightOK = jsStringToNumber(rightText)
+	}
+	if !leftOK || !rightOK || math.IsNaN(leftNumber) || math.IsNaN(rightNumber) {
+		return 0, false
+	}
+	switch {
+	case leftNumber < rightNumber:
+		return -1, true
+	case leftNumber > rightNumber:
+		return 1, true
+	default:
+		return 0, true
+	}
+}
+
+func leftRelationalPrimitive(value interface{}) (text string, isString bool, number float64, ok bool) {
+	switch typed := value.(type) {
+	case string:
+		return typed, true, 0, true
+	case float64:
+		return "", false, typed, true
+	case int:
+		return "", false, float64(typed), true
+	case bool:
+		if typed {
+			return "", false, 1, true
+		}
+		return "", false, 0, true
+	case nil:
+		return "", false, 0, true
+	case undefinedAttr:
+		return "", false, 0, false
+	case *ast.Node:
+		if typed == nil {
+			return "", false, 0, true
+		}
+		return attrAsString(typed), true, 0, true
+	case []*ast.Node, regexFacade, metaIdentifier:
+		return attrAsString(typed), true, 0, true
+	default:
+		return "", false, 0, false
+	}
+}
+
+func rightRelationalPrimitive(value attrValue) (text string, isString bool, number float64, ok bool) {
+	switch value.Kind {
+	case attrValueString:
+		return value.Str, true, 0, true
+	case attrValueIdent:
+		return value.Ident, true, 0, true
+	case attrValueNumber:
+		return "", false, value.Num, true
+	default:
+		return "", false, 0, false
+	}
+}
+
+func jsStringToNumber(value string) (float64, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, true
+	}
+	switch value {
+	case "Infinity", "+Infinity":
+		return math.Inf(1), true
+	case "-Infinity":
+		return math.Inf(-1), true
+	}
+	if len(value) > 2 && value[0] == '0' {
+		base := 0
+		switch value[1] {
+		case 'x', 'X':
+			base = 16
+		case 'b', 'B':
+			base = 2
+		case 'o', 'O':
+			base = 8
+		}
+		if base != 0 {
+			parsed, err := strconv.ParseUint(value[2:], base, 64)
+			return float64(parsed), err == nil
+		}
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	return parsed, err == nil && !math.IsNaN(parsed)
+}
+
+func compareJSStrings(left, right string) int {
+	if isASCII(left) && isASCII(right) {
+		return strings.Compare(left, right)
+	}
+	leftUnits := utf16.Encode([]rune(left))
+	rightUnits := utf16.Encode([]rune(right))
+	limit := min(len(leftUnits), len(rightUnits))
+	for index := range limit {
+		if leftUnits[index] < rightUnits[index] {
+			return -1
+		}
+		if leftUnits[index] > rightUnits[index] {
+			return 1
+		}
+	}
+	switch {
+	case len(leftUnits) < len(rightUnits):
+		return -1
+	case len(leftUnits) > len(rightUnits):
+		return 1
+	default:
+		return 0
+	}
+}
+
+func isASCII(value string) bool {
+	for index := range len(value) {
+		if value[index] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
 }
 
 func attrEquals(left interface{}, right attrValue) bool {
@@ -688,15 +918,11 @@ func attrEquals(left interface{}, right attrValue) bool {
 	case attrValueString:
 		return attrAsString(left) == right.Str
 	case attrValueNumber:
-		n, ok := numericFromAttr(left)
-		return ok && n == right.Num
-	case attrValueBool:
-		b, ok := left.(bool)
-		return ok && b == right.Bool
-	case attrValueNull:
-		return left == nil
+		return attrAsString(left) == attrAsString(right.Num)
 	case attrValueIdent:
 		return attrAsString(left) == right.Ident
+	case attrValueType:
+		return attrTypeOf(left) == right.Ident
 	case attrValueRegex:
 		return attrStringEquals(attrAsString(left), right)
 	}
@@ -728,7 +954,7 @@ func attrStringEquals(left string, right attrValue) bool {
 }
 
 func regexpFlags(flags string) regexp2.RegexOptions {
-	var opts regexp2.RegexOptions
+	opts := regexp2.RegexOptions(regexp2.ECMAScript)
 	for _, c := range flags {
 		switch c {
 		case 'i':
@@ -737,6 +963,8 @@ func regexpFlags(flags string) regexp2.RegexOptions {
 			opts |= regexp2.Singleline
 		case 'm':
 			opts |= regexp2.Multiline
+		case 'u':
+			opts |= regexp2.Unicode
 		}
 	}
 	return opts
@@ -757,10 +985,51 @@ func attrAsString(v interface{}) string {
 			return strconv.FormatInt(int64(x), 10)
 		}
 		return strconv.FormatFloat(x, 'g', -1, 64)
+	case int:
+		return strconv.Itoa(x)
 	case nil:
-		return ""
+		return "null"
+	case undefinedAttr:
+		return "undefined"
+	case *ast.Node:
+		if x == nil {
+			return "null"
+		}
+		return "[object Object]"
+	case []*ast.Node:
+		if len(x) == 0 {
+			return ""
+		}
+		var text strings.Builder
+		text.Grow(len(x) * len("[object Object],"))
+		for index, node := range x {
+			if index > 0 {
+				text.WriteByte(',')
+			}
+			if node != nil {
+				text.WriteString("[object Object]")
+			}
+		}
+		return text.String()
+	case regexFacade, metaIdentifier:
+		return "[object Object]"
 	}
 	return ""
+}
+
+func attrTypeOf(v interface{}) string {
+	switch v.(type) {
+	case undefinedAttr:
+		return "undefined"
+	case string:
+		return "string"
+	case bool:
+		return "boolean"
+	case float64, int:
+		return "number"
+	default:
+		return "object"
+	}
 }
 
 // nodeIndexInListField returns (idx, total) for a node that sits inside
@@ -769,14 +1038,14 @@ func attrAsString(v interface{}) string {
 // `CallExpression.arguments`) — a node sitting at a scalar field
 // (`ExpressionStatement.expression`, `MemberExpression.object`) is not
 // considered a positional child and never matches.
-func nodeIndexInListField(node *ast.Node) (int, int) {
-	parent := node.Parent
+func nodeIndexInListField(node *ast.Node, scopeRoot *ast.Node) (int, int) {
+	parent := matchingParent(node, scopeRoot)
 	if parent == nil {
 		return -1, 0
 	}
 	for _, list := range listChildrenOf(parent) {
 		for i, child := range list {
-			if child == node {
+			if unwrapEstreeNode(child) == node {
 				return i, len(list)
 			}
 		}
@@ -866,13 +1135,71 @@ func unwrapExpression(node *ast.Node) *ast.Node {
 	}
 }
 
+func unwrapEstreeNode(node *ast.Node) *ast.Node {
+	for node != nil && node.Kind == ast.KindParenthesizedExpression {
+		node = node.AsParenthesizedExpression().Expression
+	}
+	return node
+}
+
+func isTransparentEstreeContainer(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindParenthesizedExpression, ast.KindImportAttributes:
+		return true
+	case ast.KindVariableDeclarationList:
+		return node.Parent != nil && node.Parent.Kind == ast.KindVariableStatement
+	}
+	return false
+}
+
+func estreeParent(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	parent := node.Parent
+	for parent != nil {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression, ast.KindImportAttributes:
+			// These are tsgo parser nodes without corresponding ESTree nodes.
+			parent = parent.Parent
+		case ast.KindVariableDeclarationList:
+			// A list under VariableStatement is a tsgo-only container. In a
+			// for-loop initializer, the list itself is ESTree's
+			// VariableDeclaration and must remain in the ancestry.
+			if parent.Parent != nil && parent.Parent.Kind == ast.KindVariableStatement {
+				parent = parent.Parent
+				continue
+			}
+			return parent
+		default:
+			return parent
+		}
+	}
+	return parent
+}
+
+func matchingParent(node *ast.Node, scopeRoot *ast.Node) *ast.Node {
+	if node == nil || scopeRoot == node {
+		return nil
+	}
+	return estreeParent(node)
+}
+
 // readNodeAttr extracts the named ESTree-style attribute from a tsgo node.
 // Centralising the field map here makes it easy to widen support without
 // rewriting the matcher.
 func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, bool) {
+	if node == nil {
+		return nil, false
+	}
 	switch name {
 	case "type":
 		return estreeNameForKind(node), true
+	case "parent":
+		return estreeParent(node), true
 	case "name":
 		return readNameAttr(node)
 	case "value":
@@ -884,11 +1211,7 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 	case "kind":
 		return readKindAttr(node)
 	case "optional":
-		// ESTree's `optional` is true only on the link that carries the
-		// literal `?.` token (e.g. `foo?.bar`, not the trailing `.baz`
-		// in `foo?.bar.baz`). tsgo's IsOptionalChainRoot encodes the
-		// same condition.
-		return ast.IsOptionalChainRoot(node), true
+		return readOptionalAttr(node)
 	case "computed":
 		return readComputedAttr(node)
 	case "static":
@@ -1011,8 +1334,19 @@ func readAttributesAttr(node *ast.Node) (interface{}, bool) {
 		return node.AsJsxOpeningElement().Attributes, true
 	case ast.KindJsxSelfClosingElement:
 		return node.AsJsxSelfClosingElement().Attributes, true
+	case ast.KindImportDeclaration:
+		return importAttributes(node.AsImportDeclaration().Attributes), true
+	case ast.KindExportDeclaration:
+		return importAttributes(node.AsExportDeclaration().Attributes), true
 	}
 	return nil, false
+}
+
+func importAttributes(node *ast.Node) []*ast.Node {
+	if node == nil || node.AsImportAttributes().Attributes == nil {
+		return []*ast.Node{}
+	}
+	return node.AsImportAttributes().Attributes.Nodes
 }
 
 func readChildrenAttr(node *ast.Node) (interface{}, bool) {
@@ -1021,7 +1355,7 @@ func readChildrenAttr(node *ast.Node) (interface{}, bool) {
 		if c == nil {
 			return []*ast.Node{}, true
 		}
-		return append([]*ast.Node{}, c.Nodes...), true
+		return c.Nodes, true
 	}
 	return nil, false
 }
@@ -1173,6 +1507,10 @@ func estreeNameForKind(node *ast.Node) string {
 	case ast.KindCatchClause:
 		return "CatchClause"
 	case ast.KindCallExpression:
+		call := node.AsCallExpression()
+		if call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword {
+			return "ImportExpression"
+		}
 		return "CallExpression"
 	case ast.KindNewExpression:
 		return "NewExpression"
@@ -1296,6 +1634,8 @@ func estreeNameForKind(node *ast.Node) string {
 		return "ArrayPattern"
 	case ast.KindObjectBindingPattern:
 		return "ObjectPattern"
+	case ast.KindImportAttribute:
+		return "ImportAttribute"
 	}
 	return ""
 }
@@ -1351,15 +1691,45 @@ func readValueAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 	// when uninitialised. tsgo's PropertyDeclaration uses Initializer.
 	case ast.KindPropertyDeclaration:
 		return unwrapExpression(node.AsPropertyDeclaration().Initializer), true
+	case ast.KindImportAttribute:
+		return unwrapExpression(node.AsImportAttribute().Value), true
 	}
 	return nil, false
 }
 
 func readRawAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
-	if mc == nil || mc.sf == nil {
+	if mc == nil || mc.sf == nil || !isEstreeLiteralKind(node.Kind) {
 		return nil, false
 	}
 	return scanner.GetSourceTextOfNodeFromSourceFile(mc.sf, node, false), true
+}
+
+func isEstreeLiteralKind(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindStringLiteral,
+		ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword:
+		return true
+	}
+	return false
+}
+
+func readOptionalAttr(node *ast.Node) (interface{}, bool) {
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return ast.IsOptionalChainRoot(node), true
+	case ast.KindCallExpression:
+		call := node.AsCallExpression()
+		if call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword {
+			return nil, false
+		}
+		return ast.IsOptionalChainRoot(node), true
+	}
+	return nil, false
 }
 
 func readOperatorAttr(node *ast.Node) (interface{}, bool) {
@@ -1846,9 +2216,10 @@ func readParamsAttr(node *ast.Node) (interface{}, bool) {
 	// Treat nil and empty as the same — `[params.length=0]` should
 	// match a function-like with no parameters regardless of whether
 	// the underlying NodeList was allocated.
-	out := make([]*ast.Node, 0, len(params))
-	out = append(out, params...)
-	return out, true
+	if params == nil {
+		return []*ast.Node{}, true
+	}
+	return params, true
 }
 
 func readSourceAttr(node *ast.Node) (interface{}, bool) {
@@ -1857,6 +2228,11 @@ func readSourceAttr(node *ast.Node) (interface{}, bool) {
 		return unwrapExpression(node.AsImportDeclaration().ModuleSpecifier), true
 	case ast.KindExportDeclaration:
 		return unwrapExpression(node.AsExportDeclaration().ModuleSpecifier), true
+	case ast.KindCallExpression:
+		call := node.AsCallExpression()
+		if call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
+			return unwrapExpression(call.Arguments.Nodes[0]), true
+		}
 	}
 	return nil, false
 }
@@ -1864,7 +2240,11 @@ func readSourceAttr(node *ast.Node) (interface{}, bool) {
 func readCalleeAttr(node *ast.Node) (interface{}, bool) {
 	switch node.Kind {
 	case ast.KindCallExpression:
-		return unwrapExpression(node.AsCallExpression().Expression), true
+		expression := node.AsCallExpression().Expression
+		if expression != nil && expression.Kind == ast.KindImportKeyword {
+			return nil, false
+		}
+		return unwrapExpression(expression), true
 	case ast.KindNewExpression:
 		return unwrapExpression(node.AsNewExpression().Expression), true
 	case ast.KindTaggedTemplateExpression:
@@ -1876,17 +2256,21 @@ func readCalleeAttr(node *ast.Node) (interface{}, bool) {
 func readArgumentsAttr(node *ast.Node) (interface{}, bool) {
 	switch node.Kind {
 	case ast.KindCallExpression:
-		args := node.AsCallExpression().Arguments
+		call := node.AsCallExpression()
+		if call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword {
+			return nil, false
+		}
+		args := call.Arguments
 		if args == nil {
 			return []*ast.Node{}, true
 		}
-		return append([]*ast.Node{}, args.Nodes...), true
+		return args.Nodes, true
 	case ast.KindNewExpression:
 		args := node.AsNewExpression().Arguments
 		if args == nil {
 			return []*ast.Node{}, true
 		}
-		return append([]*ast.Node{}, args.Nodes...), true
+		return args.Nodes, true
 	}
 	return nil, false
 }
@@ -1945,6 +2329,8 @@ func readKeyAttr(node *ast.Node) (interface{}, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindPropertyDeclaration:
 		return node.Name(), true
+	case ast.KindImportAttribute:
+		return node.AsImportAttribute().Name(), true
 	}
 	return nil, false
 }
@@ -2030,7 +2416,7 @@ func readConsequentAttr(node *ast.Node) (interface{}, bool) {
 		if stmts == nil {
 			return []*ast.Node{}, true
 		}
-		return append([]*ast.Node{}, stmts.Nodes...), true
+		return stmts.Nodes, true
 	}
 	return nil, false
 }
@@ -2068,25 +2454,25 @@ func readBodyAttr(node *ast.Node) (interface{}, bool) {
 		if stmts == nil {
 			return []*ast.Node{}, true
 		}
-		return append([]*ast.Node{}, stmts.Nodes...), true
+		return stmts.Nodes, true
 	case ast.KindSourceFile:
 		stmts := node.AsSourceFile().Statements
 		if stmts == nil {
 			return []*ast.Node{}, true
 		}
-		return append([]*ast.Node{}, stmts.Nodes...), true
+		return stmts.Nodes, true
 	case ast.KindClassDeclaration:
 		members := node.AsClassDeclaration().Members
 		if members == nil {
 			return []*ast.Node{}, true
 		}
-		return append([]*ast.Node{}, members.Nodes...), true
+		return members.Nodes, true
 	case ast.KindClassExpression:
 		members := node.AsClassExpression().Members
 		if members == nil {
 			return []*ast.Node{}, true
 		}
-		return append([]*ast.Node{}, members.Nodes...), true
+		return members.Nodes, true
 	}
 	return nil, false
 }
@@ -2131,7 +2517,7 @@ func readPrefixAttr(node *ast.Node) (interface{}, bool) {
 
 func readAsyncAttr(node *ast.Node) (interface{}, bool) {
 	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration:
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
 		return ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync), true
 	}
 	return nil, false
@@ -2143,8 +2529,8 @@ func readGeneratorAttr(node *ast.Node) (interface{}, bool) {
 		return node.AsFunctionDeclaration().AsteriskToken != nil, true
 	case ast.KindFunctionExpression:
 		return node.AsFunctionExpression().AsteriskToken != nil, true
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().AsteriskToken != nil, true
+	case ast.KindArrowFunction:
+		return false, true
 	}
 	return nil, false
 }

@@ -69,4 +69,5 @@ class Qux extends React.PureComponent {
 
 ## Original Documentation
 
-- [eslint-plugin-react: no-redundant-should-component-update](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-redundant-should-component-update.md)
+- [eslint-plugin-react: no-redundant-should-component-update](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-redundant-should-component-update.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-redundant-should-component-update.js)

@@ -1,6 +1,8 @@
 package no_restricted_syntax
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 )
 
@@ -47,7 +49,7 @@ var estreeKindMap = map[string][]ast.Kind{
 	// ESTree's VariableDeclaration is the statement-level node (`var a = 1;`).
 	// tsgo represents that with VariableStatement; the inner declarators
 	// become VariableDeclaration nodes (mapped as VariableDeclarator below).
-	"VariableDeclaration":     {ast.KindVariableStatement},
+	"VariableDeclaration":     {ast.KindVariableStatement, ast.KindVariableDeclarationList},
 	"VariableDeclarator":      {ast.KindVariableDeclaration},
 	"FunctionDeclaration":     {ast.KindFunctionDeclaration},
 	"FunctionExpression":      {ast.KindFunctionExpression},
@@ -69,6 +71,7 @@ var estreeKindMap = map[string][]ast.Kind{
 	"CallExpression":           {ast.KindCallExpression},
 	"ChainExpression":          {ast.KindPropertyAccessExpression, ast.KindElementAccessExpression, ast.KindCallExpression, ast.KindNonNullExpression},
 	"ConditionalExpression":    {ast.KindConditionalExpression},
+	"ImportExpression":         {ast.KindCallExpression},   // matcher checks the import callee
 	"LogicalExpression":        {ast.KindBinaryExpression}, // matcher checks operator
 	"MemberExpression":         {ast.KindPropertyAccessExpression, ast.KindElementAccessExpression},
 	"MetaProperty":             {ast.KindMetaProperty},
@@ -121,6 +124,7 @@ var estreeKindMap = map[string][]ast.Kind{
 
 	// Modules
 	"ImportDeclaration":        {ast.KindImportDeclaration},
+	"ImportAttribute":          {ast.KindImportAttribute},
 	"ImportSpecifier":          {ast.KindImportSpecifier},
 	"ImportDefaultSpecifier":   {ast.KindImportClause},
 	"ImportNamespaceSpecifier": {ast.KindNamespaceImport},
@@ -154,6 +158,19 @@ func kindsForEstreeName(name string) []ast.Kind {
 	return nil
 }
 
+var canonicalEstreeNames = func() map[string]string {
+	names := make(map[string]string, len(estreeKindMap))
+	for name := range estreeKindMap {
+		names[strings.ToLower(name)] = name
+	}
+	return names
+}()
+
+func canonicalEstreeName(name string) (string, bool) {
+	canonical, ok := canonicalEstreeNames[strings.ToLower(name)]
+	return canonical, ok
+}
+
 // allInterestingKinds is the universe of tsgo kinds the wildcard `*`
 // should listen on. We exclude pure trivia / token-only kinds the
 // framework's visitor never hands to listeners (e.g. punctuation) and
@@ -172,7 +189,6 @@ var allInterestingKinds = func() []ast.Kind {
 	// TypeScript-specific kinds that are common in real programs and
 	// that users might select with `*` ~ `*`-style wildcards.
 	extra := []ast.Kind{
-		ast.KindParenthesizedExpression,
 		ast.KindAsExpression,
 		ast.KindSatisfiesExpression,
 		ast.KindNonNullExpression,

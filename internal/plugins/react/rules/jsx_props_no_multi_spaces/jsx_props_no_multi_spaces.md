@@ -24,4 +24,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [react/jsx-props-no-multi-spaces](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-props-no-multi-spaces.md)
+- [eslint-plugin-react: jsx-props-no-multi-spaces](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-props-no-multi-spaces.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-props-no-multi-spaces.js)

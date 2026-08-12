@@ -44,8 +44,38 @@ func TestNoDisabledTestsRule(t *testing.T) {
 			{Code: `declare const pending: any; pending();`},
 			{Code: `import { customTest } from "./test-utils"; customTest.skip("case", () => {});`},
 			{Code: `test.for([1]).skip("case", () => {}); describe.each([1]).skip("suite", () => {});`},
+			{Code: `import.meta.rstest.test.todo("case"); import.meta.rstest.test("case", () => {});`},
+			{Code: `import { test } from "@rstest/playwright"; test("case", () => {});`},
+			// @rstest/playwright does not export `it` as a registration API.
+			{Code: `import { it } from "@rstest/playwright"; it.skip("case", () => {});`},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import.meta.rstest.test.skip("case", () => {});
+import.meta.rstest.describe.skip("suite", () => {});
+const api = import.meta.rstest;
+api.test.skip("alias", () => {});
+import.meta.rstest.test("missing");
+import.meta.rstest.test("options", { timeout: 1 });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "skippedTest", Line: 1, Column: 1},
+					{MessageId: "skippedTest", Line: 2, Column: 1},
+					{MessageId: "skippedTest", Line: 4, Column: 1},
+					{MessageId: "missingFunction", Line: 5, Column: 1},
+					{MessageId: "missingFunction", Line: 6, Column: 1},
+				},
+			},
+			{
+				Code: `import { test, describe } from "@rstest/playwright";
+test.skip("case", () => {});
+describe.skip("suite", () => {});
+test("missing");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "skippedTest", Line: 2, Column: 1},
+					{MessageId: "skippedTest", Line: 3, Column: 1},
+					{MessageId: "missingFunction", Line: 4, Column: 1},
+				},
+			},
 			{
 				Code: `test.skip("case", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{

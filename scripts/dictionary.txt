@@ -530,6 +530,7 @@ tablist
 Taml
 tanstack
 tarask
+tarjan
 tascript
 tekuri
 Telu
@@ -562,6 +563,7 @@ tsgo
 tsgolint
 TSJSDoc
 tsoptions
+tsparser
 tspath
 tsutils
 typeparam

@@ -43,4 +43,5 @@ React.createElement("div", {}, "Children");
 
 ## Original Documentation
 
-- https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-danger-with-children.md
+- [eslint-plugin-react: no-danger-with-children](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-danger-with-children.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-danger-with-children.js)

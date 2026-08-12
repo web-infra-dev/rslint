@@ -388,13 +388,11 @@ func filterByKind(decls []declInfo, kind ast.Kind) []declInfo {
 }
 
 type programGlobalDeclarations struct {
-	ctx                             rule.RuleContext
-	builtinMode                     builtinGlobalsMode
-	builtinGlobals                  bool
-	defaultLibraryTypeGlobals       map[string]bool
-	defaultLibraryTypeGlobalsLoaded bool
-	inlineByName                    map[string]rule.InlineGlobal
-	inlineOrder                     []string
+	ctx            rule.RuleContext
+	builtinMode    builtinGlobalsMode
+	builtinGlobals bool
+	inlineByName   map[string]rule.InlineGlobal
+	inlineOrder    []string
 }
 
 func newProgramGlobalDeclarations(ctx rule.RuleContext, o options, mode builtinGlobalsMode) *programGlobalDeclarations {
@@ -428,14 +426,7 @@ func (declarations *programGlobalDeclarations) isImplicitBuiltin(name string) bo
 	}
 
 	if declarations.builtinMode == builtinGlobalsTypeScriptLibs {
-		if declarations.ctx.Program != nil && declarations.ctx.TypeChecker != nil {
-			if !declarations.defaultLibraryTypeGlobalsLoaded {
-				declarations.defaultLibraryTypeGlobals = make(map[string]bool)
-				utils.AddDefaultLibraryTypeGlobalNames(declarations.defaultLibraryTypeGlobals, declarations.ctx.Program, declarations.ctx.TypeChecker)
-				declarations.defaultLibraryTypeGlobalsLoaded = true
-			}
-		}
-		isTypeScriptTypeGlobal := declarations.defaultLibraryTypeGlobals[name]
+		isTypeScriptTypeGlobal := rule.IsDefaultTypeScriptTypeGlobal(name)
 		if declarations.ctx.Globals.LanguageAccess(name).IsDeclared() || isTypeScriptTypeGlobal {
 			if declarations.ctx.Globals.ConfigOverride(name) == utils.GlobalAccessOff {
 				if _, hasActiveDirective := declarations.inlineByName[name]; hasActiveDirective {
@@ -473,7 +464,8 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 	}
 
 	globals := newProgramGlobalDeclarations(ctx, o, variant.builtinMode)
-	isModule := ast.IsExternalModule(ctx.SourceFile)
+	hasNonGlobalTopLevelScope := ast.IsExternalModule(ctx.SourceFile) ||
+		(ctx.Refs != nil && ctx.Refs.HasNonGlobalTopLevelScope())
 	var handled map[string]bool
 	if len(globals.inlineOrder) > 0 {
 		handled = make(map[string]bool, len(s.order))
@@ -483,7 +475,7 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 	for _, name := range s.order {
 		decls := filterMergeDeclarations(s.decls[name], o.ignoreDeclarationMerge)
 		inline := globals.inlineByName[name]
-		reportProgramDeclarations(ctx, &reports, globals, name, decls, inline.NameRanges, isModule, variant.commentsBeforeSyntax)
+		reportProgramDeclarations(ctx, &reports, globals, name, decls, inline.NameRanges, hasNonGlobalTopLevelScope, variant.commentsBeforeSyntax)
 		if handled != nil {
 			handled[name] = true
 		}
@@ -495,7 +487,7 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 			continue
 		}
 		inline := globals.inlineByName[name]
-		reportProgramDeclarations(ctx, &reports, globals, name, nil, inline.NameRanges, isModule, variant.commentsBeforeSyntax)
+		reportProgramDeclarations(ctx, &reports, globals, name, nil, inline.NameRanges, hasNonGlobalTopLevelScope, variant.commentsBeforeSyntax)
 	}
 
 	sort.SliceStable(reports, func(i, j int) bool {
@@ -523,12 +515,12 @@ func reportProgramDeclarations(
 	name string,
 	syntax []declInfo,
 	comments []core.TextRange,
-	isModule bool,
+	hasNonGlobalTopLevelScope bool,
 	commentsBeforeSyntax bool,
 ) {
-	// A module's syntax declarations live in its module scope, while config and
-	// inline globals remain in the outer global scope.
-	if isModule {
+	// Module and implicit-wrapper syntax declarations live in a non-global file
+	// scope, while config and inline globals remain in the outer global scope.
+	if hasNonGlobalTopLevelScope {
 		reportDeclarationSequence(ctx, reports, name, syntax, nil, false, commentsBeforeSyntax)
 		if len(comments) > 0 {
 			reportDeclarationSequence(ctx, reports, name, nil, comments, globals.isImplicitBuiltin(name), commentsBeforeSyntax)

@@ -28,7 +28,7 @@ func (identifierSelector) isSelector() {}
 // `Literal.key` requires the Literal to be the key of a Property).
 type classSelector struct {
 	Inner selector
-	Class string
+	Path  []string
 }
 
 func (classSelector) isSelector() {}
@@ -53,17 +53,15 @@ const (
 	attrValueNone   attrValueKind = iota // presence
 	attrValueString                      // "x" or 'x'
 	attrValueNumber                      // 42
-	attrValueBool                        // true / false
 	attrValueRegex                       // /pattern/flags
-	attrValueIdent                       // bareword (e.g. type(undefined))
-	attrValueNull                        // null literal
+	attrValueIdent                       // bareword literal (e.g. undefined)
+	attrValueType                        // type(string), type(number), ...
 )
 
 type attrValue struct {
 	Kind          attrValueKind
 	Str           string
 	Num           float64
-	Bool          bool
 	Regex         string
 	Flags         string
 	Ident         string
@@ -73,7 +71,7 @@ type attrValue struct {
 
 // attrSelector matches a node whose attribute (a dotted path inside the
 // node's logical fields) satisfies a comparison. With Op == attrPresent the
-// rule only checks that the value resolves to truthy / non-nil.
+// rule only checks that the path resolves to a non-null value.
 type attrSelector struct {
 	Inner selector
 	Path  []string
@@ -103,6 +101,16 @@ type combinatorSelector struct {
 }
 
 func (combinatorSelector) isSelector() {}
+
+// relativeSelector is the leading-combinator form accepted inside :has(),
+// for example `:has(> Identifier)`. esquery models its left side as the exact
+// node on which :has() is being evaluated.
+type relativeSelector struct {
+	Kind  combinatorKind
+	Inner selector
+}
+
+func (relativeSelector) isSelector() {}
 
 // pseudoSelector covers the `:is(...)`, `:matches(...)`, `:not(...)`,
 // `:has(...)`, `:nth-child(N)`, `:nth-last-child(N)`, `:first-child`,

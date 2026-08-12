@@ -26,4 +26,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [react/self-closing-comp](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/self-closing-comp.md)
+- [eslint-plugin-react: self-closing-comp](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/self-closing-comp.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/self-closing-comp.js)

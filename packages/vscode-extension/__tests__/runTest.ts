@@ -257,6 +257,11 @@ async function main(): Promise<void> {
       workspace: path.resolve(testsSourceDir, 'fixtures-rule-option-types'),
       tests: path.resolve(__dirname, './suite-rule-option-types'),
     },
+    {
+      name: 'import/no-cycle tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-import-cycle'),
+      tests: path.resolve(__dirname, './suite-import-cycle'),
+    },
   ];
 
   const failures: unknown[] = [];

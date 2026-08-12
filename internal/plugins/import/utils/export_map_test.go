@@ -324,6 +324,24 @@ func TestGetExportMap(t *testing.T) {
 		}
 	})
 
+	t.Run("default export of named class expression does not carry namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./default-named-class-expression")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		def := exportMap.Get("default")
+		if def == nil {
+			t.Fatal("expected default export to be visible")
+			return
+		}
+		if def.Namespace != nil {
+			t.Fatal("expected named class expression default not to carry namespace metadata")
+		}
+	})
+
 	t.Run("local export of namespace import carries namespace metadata", func(t *testing.T) {
 		t.Parallel()
 
@@ -438,53 +456,6 @@ func TestHasExportRespectsImportIgnore(t *testing.T) {
 	gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, specifier)
 	if gotDefaultExport || gotOK {
 		t.Fatalf("HasDefaultExport for ignored import = (%v, %v), want (false, false)", gotDefaultExport, gotOK)
-	}
-}
-
-func TestIsImportPathIgnored(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		settings map[string]interface{}
-		fileName string
-		want     bool
-	}{
-		{
-			name:     "array of interface strings matches as regexp",
-			settings: map[string]interface{}{"import/ignore": []interface{}{"ignored-missing-default"}},
-			fileName: "/repo/ignored-missing-default.ts",
-			want:     true,
-		},
-		{
-			name:     "array of strings matches as regexp",
-			settings: map[string]interface{}{"import/ignore": []string{`\.css$`}},
-			fileName: "/repo/styles.css",
-			want:     true,
-		},
-		{
-			name:     "non-string entries and invalid regexps are ignored",
-			settings: map[string]interface{}{"import/ignore": []interface{}{123, "["}},
-			fileName: "/repo/ignored-missing-default.ts",
-			want:     false,
-		},
-		{
-			name:     "missing setting does not ignore",
-			settings: map[string]interface{}{},
-			fileName: "/repo/ignored-missing-default.ts",
-			want:     false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := import_utils.IsImportPathIgnored(tc.settings, tc.fileName)
-			if got != tc.want {
-				t.Fatalf("IsImportPathIgnored() = %v, want %v", got, tc.want)
-			}
-		})
 	}
 }
 

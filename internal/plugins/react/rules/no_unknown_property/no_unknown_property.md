@@ -102,4 +102,5 @@ When the version is not set, the rule assumes the latest React.
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-unknown-property](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-unknown-property.md)
+- [eslint-plugin-react: no-unknown-property](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-unknown-property.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-unknown-property.js)
