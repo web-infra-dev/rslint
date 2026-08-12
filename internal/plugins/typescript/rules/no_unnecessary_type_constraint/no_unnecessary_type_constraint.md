@@ -38,4 +38,5 @@ const Quux = <T>() => {};
 
 ## Original Documentation
 
-- [typescript-eslint rule: no-unnecessary-type-constraint](https://typescript-eslint.io/rules/no-unnecessary-type-constraint)
+- [typescript-eslint: no-unnecessary-type-constraint](https://typescript-eslint.io/rules/no-unnecessary-type-constraint)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unnecessary-type-constraint.ts)

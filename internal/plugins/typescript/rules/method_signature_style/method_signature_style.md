@@ -54,4 +54,5 @@ interface T1 {
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/method-signature-style
+- [typescript-eslint: method-signature-style](https://typescript-eslint.io/rules/method-signature-style)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.58.2/packages/eslint-plugin/src/rules/method-signature-style.ts)

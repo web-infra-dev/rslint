@@ -35,4 +35,5 @@ class MyClass {
 
 ## Original Documentation
 
-- [typescript-eslint no-empty-function](https://typescript-eslint.io/rules/no-empty-function)
+- [typescript-eslint: no-empty-function](https://typescript-eslint.io/rules/no-empty-function)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-empty-function.ts)

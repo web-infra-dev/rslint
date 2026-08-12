@@ -33,4 +33,5 @@ function fn(x: string | number) {
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-type-assertion](https://typescript-eslint.io/rules/no-unsafe-type-assertion)
+- [typescript-eslint: no-unsafe-type-assertion](https://typescript-eslint.io/rules/no-unsafe-type-assertion)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.29.0/packages/eslint-plugin/src/rules/no-unsafe-type-assertion.ts)

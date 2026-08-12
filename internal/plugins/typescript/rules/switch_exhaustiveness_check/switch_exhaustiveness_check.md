@@ -41,4 +41,5 @@ function move(dir: Direction) {
 
 ## Original Documentation
 
-- [typescript-eslint switch-exhaustiveness-check](https://typescript-eslint.io/rules/switch-exhaustiveness-check)
+- [typescript-eslint: switch-exhaustiveness-check](https://typescript-eslint.io/rules/switch-exhaustiveness-check)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/switch-exhaustiveness-check.ts)

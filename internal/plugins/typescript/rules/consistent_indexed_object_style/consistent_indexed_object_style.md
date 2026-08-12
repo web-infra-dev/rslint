@@ -32,4 +32,5 @@ interface Baz {
 
 ## Original Documentation
 
-- [typescript-eslint consistent-indexed-object-style](https://typescript-eslint.io/rules/consistent-indexed-object-style)
+- [typescript-eslint: consistent-indexed-object-style](https://typescript-eslint.io/rules/consistent-indexed-object-style)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/consistent-indexed-object-style.ts)

@@ -31,4 +31,5 @@ import 'mod';
 
 ## Original Documentation
 
-- [typescript-eslint no-import-type-side-effects](https://typescript-eslint.io/rules/no-import-type-side-effects)
+- [typescript-eslint: no-import-type-side-effects](https://typescript-eslint.io/rules/no-import-type-side-effects)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-import-type-side-effects.ts)

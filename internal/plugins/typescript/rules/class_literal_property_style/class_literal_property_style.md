@@ -36,4 +36,5 @@ class Bar {
 
 ## Original Documentation
 
-- [typescript-eslint class-literal-property-style](https://typescript-eslint.io/rules/class-literal-property-style)
+- [typescript-eslint: class-literal-property-style](https://typescript-eslint.io/rules/class-literal-property-style)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.39.0/packages/eslint-plugin/src/rules/class-literal-property-style.ts)

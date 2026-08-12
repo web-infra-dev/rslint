@@ -31,4 +31,5 @@ const x: number = 'hello';
 
 ## Original Documentation
 
-- [typescript-eslint ban-ts-comment](https://typescript-eslint.io/rules/ban-ts-comment)
+- [typescript-eslint: ban-ts-comment](https://typescript-eslint.io/rules/ban-ts-comment)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.46.3/packages/eslint-plugin/src/rules/ban-ts-comment.ts)

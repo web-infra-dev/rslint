@@ -42,4 +42,5 @@ function foo(arg: string) {
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/no-unnecessary-condition
+- [typescript-eslint: no-unnecessary-condition](https://typescript-eslint.io/rules/no-unnecessary-condition)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.58.1/packages/eslint-plugin/src/rules/no-unnecessary-condition.ts)

@@ -23,4 +23,5 @@ delete container[7];
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/no-dynamic-delete
+- [typescript-eslint: no-dynamic-delete](https://typescript-eslint.io/rules/no-dynamic-delete)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-dynamic-delete.ts)

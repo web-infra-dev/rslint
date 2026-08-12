@@ -66,4 +66,5 @@ To require every interpolated value to be a `string`, empty the `allow` list and
 
 ## Original Documentation
 
-- [typescript-eslint restrict-template-expressions](https://typescript-eslint.io/rules/restrict-template-expressions)
+- [typescript-eslint: restrict-template-expressions](https://typescript-eslint.io/rules/restrict-template-expressions)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/restrict-template-expressions.ts)

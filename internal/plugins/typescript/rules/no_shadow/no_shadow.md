@@ -77,4 +77,5 @@ Same semantics and defaults as the ESLint core rule.
 
 ## Original Documentation
 
-[https://typescript-eslint.io/rules/no-shadow](https://typescript-eslint.io/rules/no-shadow)
+- [typescript-eslint: no-shadow](https://typescript-eslint.io/rules/no-shadow)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.59.1/packages/eslint-plugin/src/rules/no-shadow.ts)

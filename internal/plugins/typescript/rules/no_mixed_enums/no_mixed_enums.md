@@ -43,4 +43,5 @@ enum Direction {
 
 ## Original Documentation
 
-- [typescript-eslint no-mixed-enums](https://typescript-eslint.io/rules/no-mixed-enums)
+- [typescript-eslint: no-mixed-enums](https://typescript-eslint.io/rules/no-mixed-enums)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-mixed-enums.ts)

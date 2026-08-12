@@ -26,4 +26,5 @@ import { foo } from 'foo';
 
 ## Original Documentation
 
-- [typescript-eslint no-var-requires](https://typescript-eslint.io/rules/no-var-requires)
+- [typescript-eslint: no-var-requires](https://typescript-eslint.io/rules/no-var-requires)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-var-requires.ts)

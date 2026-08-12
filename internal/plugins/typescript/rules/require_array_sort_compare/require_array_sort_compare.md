@@ -28,4 +28,5 @@ strings.sort(); // OK, string arrays are ignored by default
 
 ## Original Documentation
 
-- [typescript-eslint require-array-sort-compare](https://typescript-eslint.io/rules/require-array-sort-compare)
+- [typescript-eslint: require-array-sort-compare](https://typescript-eslint.io/rules/require-array-sort-compare)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/require-array-sort-compare.ts)

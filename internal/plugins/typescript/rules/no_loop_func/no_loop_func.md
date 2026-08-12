@@ -57,5 +57,5 @@ If you do not want to be notified about functions defined inside loops, you can 
 
 ## Original Documentation
 
-- [typescript-eslint/no-loop-func](https://typescript-eslint.io/rules/no-loop-func/)
-- [ESLint no-loop-func](https://eslint.org/docs/latest/rules/no-loop-func)
+- [typescript-eslint: no-loop-func](https://typescript-eslint.io/rules/no-loop-func)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.59.1/packages/eslint-plugin/src/rules/no-loop-func.ts)

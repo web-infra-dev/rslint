@@ -34,4 +34,5 @@ class MyClass {
 
 ## Original Documentation
 
-- [typescript-eslint adjacent-overload-signatures](https://typescript-eslint.io/rules/adjacent-overload-signatures)
+- [typescript-eslint: adjacent-overload-signatures](https://typescript-eslint.io/rules/adjacent-overload-signatures)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/adjacent-overload-signatures.ts)

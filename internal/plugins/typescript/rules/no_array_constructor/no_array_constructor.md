@@ -33,5 +33,5 @@ new Array<Foo>(1, 2, 3);
 
 ## Original Documentation
 
-- [typescript-eslint no-array-constructor](https://typescript-eslint.io/rules/no-array-constructor)
-- [ESLint no-array-constructor](https://eslint.org/docs/rules/no-array-constructor)
+- [typescript-eslint: no-array-constructor](https://typescript-eslint.io/rules/no-array-constructor)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-array-constructor.ts)

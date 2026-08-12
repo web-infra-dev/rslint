@@ -37,4 +37,5 @@ typeof instance.method;
 
 ## Original Documentation
 
-- [typescript-eslint unbound-method](https://typescript-eslint.io/rules/unbound-method)
+- [typescript-eslint: unbound-method](https://typescript-eslint.io/rules/unbound-method)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/unbound-method.ts)

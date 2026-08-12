@@ -39,4 +39,5 @@ let value: <T>(t: T) => T;
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-function-type](https://typescript-eslint.io/rules/no-unsafe-function-type)
+- [typescript-eslint: no-unsafe-function-type](https://typescript-eslint.io/rules/no-unsafe-function-type)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unsafe-function-type.ts)

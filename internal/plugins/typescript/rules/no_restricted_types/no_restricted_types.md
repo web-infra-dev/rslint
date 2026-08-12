@@ -63,4 +63,5 @@ let value: [];
 
 ## Original Documentation
 
-- [typescript-eslint no-restricted-types](https://typescript-eslint.io/rules/no-restricted-types)
+- [typescript-eslint: no-restricted-types](https://typescript-eslint.io/rules/no-restricted-types)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-restricted-types.ts)

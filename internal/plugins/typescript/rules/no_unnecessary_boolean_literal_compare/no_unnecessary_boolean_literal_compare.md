@@ -56,4 +56,5 @@ if (nullableFlag === true) {
 
 ## Original Documentation
 
-- [typescript-eslint no-unnecessary-boolean-literal-compare](https://typescript-eslint.io/rules/no-unnecessary-boolean-literal-compare)
+- [typescript-eslint: no-unnecessary-boolean-literal-compare](https://typescript-eslint.io/rules/no-unnecessary-boolean-literal-compare)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.29.0/packages/eslint-plugin/src/rules/no-unnecessary-boolean-literal-compare.ts)

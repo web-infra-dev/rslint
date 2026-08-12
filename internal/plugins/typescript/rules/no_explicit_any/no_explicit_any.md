@@ -32,4 +32,5 @@ const key: PropertyKey = 'name';
 
 ## Original Documentation
 
-- [typescript-eslint no-explicit-any](https://typescript-eslint.io/rules/no-explicit-any)
+- [typescript-eslint: no-explicit-any](https://typescript-eslint.io/rules/no-explicit-any)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-explicit-any.ts)
