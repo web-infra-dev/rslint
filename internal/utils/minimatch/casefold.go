@@ -19,16 +19,50 @@ import (
 // Rather than ask regexp2 to ignore case, a pattern is widened to name every
 // character it should compare equal to and then matched exactly.
 
+// unicode17CasePairs are the simple uppercase mappings Node 26 has from
+// Unicode 16 and 17 that Go 1.26's Unicode 15 tables do not. Keeping this small
+// delta here makes the compatibility target explicit without depending on a
+// Node installation or a generated Unicode table.
+var unicode17CasePairs = [...][2]rune{
+	{0x019B, 0xA7DC},
+	{0x0264, 0xA7CB},
+	{0x1C8A, 0x1C89},
+	{0xA7CD, 0xA7CC},
+	{0xA7CF, 0xA7CE},
+	{0xA7D3, 0xA7D2},
+	{0xA7D5, 0xA7D4},
+	{0xA7DB, 0xA7DA},
+}
+
 // canonicalize maps a character to the one JavaScript compares it as. Go's
-// simple uppercase stands in for String.prototype.toUpperCase, which they only
-// differ over where the uppercase spans more than one character — `ß` is the
-// familiar one — and JavaScript keeps the original character there too.
+// simple uppercase stands in for String.prototype.toUpperCase after accounting
+// for the characters where the full uppercase spans multiple UTF-16 code units.
 func canonicalize(r rune) rune {
+	// A regexp without the `u` flag canonicalizes one UTF-16 code unit at a
+	// time, so it cannot case-fold a supplementary-plane character.
+	if r > 0xFFFF || expandsOnUppercase(r) {
+		return r
+	}
+	for _, pair := range unicode17CasePairs {
+		if r == pair[0] {
+			return pair[1]
+		}
+	}
 	upper := unicode.ToUpper(r)
 	if r >= utf8.RuneSelf && upper < utf8.RuneSelf {
 		return r
 	}
 	return upper
+}
+
+// expandsOnUppercase reports the characters for which Go's simple uppercase
+// is one character but Node 26's Unicode 17 full uppercase is multiple
+// characters. ECMAScript keeps the original character in that case.
+func expandsOnUppercase(r rune) bool {
+	return r >= 0x1F80 && r <= 0x1F87 ||
+		r >= 0x1F90 && r <= 0x1F97 ||
+		r >= 0x1FA0 && r <= 0x1FA7 ||
+		r == 0x1FB3 || r == 0x1FC3 || r == 0x1FF3
 }
 
 // caseTables groups the characters that canonicalize alike. A group of one has
@@ -49,6 +83,10 @@ var caseTables = sync.OnceValues(func() (map[rune][]rune, [][]rune) {
 			record(r)
 			record(canonicalize(r))
 		}
+	}
+	for _, pair := range unicode17CasePairs {
+		record(pair[0])
+		record(pair[1])
 	}
 
 	byMember := map[rune][]rune{}
