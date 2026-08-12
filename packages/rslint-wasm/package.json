@@ -13,8 +13,7 @@
   "files": [
     "dist/index.mjs",
     "dist/**.d.ts",
-    "rslint.wasm",
-    "rslint.wasm.gz"
+    "rslint.wasm"
   ],
   "keywords": [],
   "author": "",
