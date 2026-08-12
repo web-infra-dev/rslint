@@ -22,4 +22,5 @@ var bool = Boolean(someValue);
 
 ## Original Documentation
 
-- [ESLint no-new-wrappers](https://eslint.org/docs/latest/rules/no-new-wrappers)
+- [ESLint: no-new-wrappers](https://eslint.org/docs/latest/rules/no-new-wrappers)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-new-wrappers.js)

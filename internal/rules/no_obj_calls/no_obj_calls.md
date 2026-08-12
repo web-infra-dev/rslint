@@ -26,4 +26,5 @@ var b = Math.PI;
 
 ## Original Documentation
 
-- [ESLint no-obj-calls](https://eslint.org/docs/latest/rules/no-obj-calls)
+- [ESLint: no-obj-calls](https://eslint.org/docs/latest/rules/no-obj-calls)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-obj-calls.js)

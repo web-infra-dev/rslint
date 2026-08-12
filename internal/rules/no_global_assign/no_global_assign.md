@@ -55,4 +55,5 @@ This rule accepts an optional object with an `exceptions` property, which is an 
 
 ## Original Documentation
 
-- [ESLint no-global-assign](https://eslint.org/docs/latest/rules/no-global-assign)
+- [ESLint: no-global-assign](https://eslint.org/docs/latest/rules/no-global-assign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-global-assign.js)

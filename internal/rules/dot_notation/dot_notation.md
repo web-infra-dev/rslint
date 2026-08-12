@@ -59,4 +59,5 @@ const x = foo["snake_case"];
 
 ## Original Documentation
 
-- [ESLint dot-notation](https://eslint.org/docs/latest/rules/dot-notation)
+- [ESLint: dot-notation](https://eslint.org/docs/latest/rules/dot-notation)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/dot-notation.js)

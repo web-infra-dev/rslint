@@ -50,4 +50,5 @@ switch (foo) {
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/default-case-last
+- [ESLint: default-case-last](https://eslint.org/docs/latest/rules/default-case-last)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/default-case-last.js)

@@ -94,4 +94,5 @@ var b = a | 0;
 
 ## Original Documentation
 
-- [ESLint rule: no-bitwise](https://eslint.org/docs/latest/rules/no-bitwise)
+- [ESLint: no-bitwise](https://eslint.org/docs/latest/rules/no-bitwise)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-bitwise.js)

@@ -54,4 +54,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [ESLint rule: no-unassigned-vars](https://eslint.org/docs/latest/rules/no-unassigned-vars)
+- [ESLint: no-unassigned-vars](https://eslint.org/docs/latest/rules/no-unassigned-vars)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unassigned-vars.js)

@@ -144,4 +144,5 @@ else baz();
 
 ## Original Documentation
 
-- [ESLint curly](https://eslint.org/docs/latest/rules/curly)
+- [ESLint: curly](https://eslint.org/docs/latest/rules/curly)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/curly.js)

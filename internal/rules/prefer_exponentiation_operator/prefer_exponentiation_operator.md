@@ -30,4 +30,5 @@ exponentiation operator (`**`).
 
 ## Original Documentation
 
-- [ESLint prefer-exponentiation-operator](https://eslint.org/docs/latest/rules/prefer-exponentiation-operator)
+- [ESLint: prefer-exponentiation-operator](https://eslint.org/docs/latest/rules/prefer-exponentiation-operator)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-exponentiation-operator.js)

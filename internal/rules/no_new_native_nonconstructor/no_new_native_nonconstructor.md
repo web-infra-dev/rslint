@@ -27,4 +27,5 @@ new SymbolCtor();
 
 ## Original Documentation
 
-- [ESLint no-new-native-nonconstructor](https://eslint.org/docs/latest/rules/no-new-native-nonconstructor)
+- [ESLint: no-new-native-nonconstructor](https://eslint.org/docs/latest/rules/no-new-native-nonconstructor)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-new-native-nonconstructor.js)

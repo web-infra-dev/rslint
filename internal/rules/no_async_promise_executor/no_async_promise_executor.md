@@ -33,4 +33,5 @@ const result = new Promise(function (resolve, reject) {
 
 ## Original Documentation
 
-- [ESLint no-async-promise-executor](https://eslint.org/docs/latest/rules/no-async-promise-executor)
+- [ESLint: no-async-promise-executor](https://eslint.org/docs/latest/rules/no-async-promise-executor)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-async-promise-executor.js)

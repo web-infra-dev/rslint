@@ -529,7 +529,7 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 **Pin the upstream version** — this is how rslint records which upstream release a rule's _behavior_ was ported/verified against, since nothing else in the repo does.
 
 - **Source code link**: always required, always a `github.com/.../blob/<tag>/...` link pinned to the exact released tag you read while porting — never `main`/`master`/`HEAD`.
-- **Doc link**: if the docs are plain markdown files in the project's GitHub repo (`eslint-plugin-unicorn`, `-react`, `-jsx-a11y`, `-jest`, `-promise`, `-import`, ...), pin it to the same tag as the source link. If the docs live on a custom website (`eslint.org`, `typescript-eslint.io`, `react.dev`, ...), match the link style already used by other rules in that family instead — most such sites can't be pinned to an exact release anyway.
+- **Doc link**: text is always `<Family/Plugin name>: <rule-name>` (e.g. `eslint-plugin-unicorn: no-thenable`, `ESLint: no-console`, `typescript-eslint: await-thenable`) — colon included, regardless of family. If the docs are plain markdown files in the project's GitHub repo (`eslint-plugin-unicorn`, `-react`, `-jsx-a11y`, `-jest`, `-promise`, `-import`, ...), pin the URL to the same tag as the source link. If the docs live on a custom website (`eslint.org`, `typescript-eslint.io`, `react.dev`, ...), the URL itself can't be pinned to a release — leave it as the plain rule-page URL.
 
 ```markdown
 ## Original Documentation
@@ -541,11 +541,9 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 ```markdown
 ## Original Documentation
 
-- [ESLint no-console](https://eslint.org/docs/latest/rules/no-console)
+- [ESLint: no-console](https://eslint.org/docs/latest/rules/no-console)
 - [Source code](https://github.com/eslint/eslint/blob/v10.8.0/lib/rules/no-console.js)
 ```
-
-(Most existing ESLint core and `@typescript-eslint` rule docs predate this and don't have a "Source code" line yet — backfilling those is tracked separately; add it for any rule you touch going forward.)
 
 If a later change re-verifies a rule against a newer upstream release, bumping the pinned tag(s) is the entire re-alignment record — do it once the rule's behavior has actually been checked against the newer release, not preemptively.
 

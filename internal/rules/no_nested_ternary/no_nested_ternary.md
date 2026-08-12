@@ -29,4 +29,5 @@ if (foo) {
 
 ## Original Documentation
 
-- [ESLint no-nested-ternary](https://eslint.org/docs/latest/rules/no-nested-ternary)
+- [ESLint: no-nested-ternary](https://eslint.org/docs/latest/rules/no-nested-ternary)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-nested-ternary.js)

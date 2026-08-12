@@ -62,3 +62,4 @@ new Promise(function (resolve, reject) {
 ## Original Documentation
 
 - [ESLint: prefer-promise-reject-errors](https://eslint.org/docs/latest/rules/prefer-promise-reject-errors)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-promise-reject-errors.js)

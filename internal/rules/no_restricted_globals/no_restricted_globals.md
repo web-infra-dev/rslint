@@ -72,3 +72,4 @@ myGlobal.Promise;
 ## Original Documentation
 
 - [ESLint: no-restricted-globals](https://eslint.org/docs/latest/rules/no-restricted-globals)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-restricted-globals.js)

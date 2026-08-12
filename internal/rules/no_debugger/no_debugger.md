@@ -23,4 +23,5 @@ function check(value) {
 
 ## Original Documentation
 
-- [ESLint no-debugger](https://eslint.org/docs/latest/rules/no-debugger)
+- [ESLint: no-debugger](https://eslint.org/docs/latest/rules/no-debugger)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-debugger.js)

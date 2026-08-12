@@ -53,4 +53,5 @@ Flag validation (invalid flags, duplicate flags, `u`/`v` conflict) and `allowCon
 
 ## Original Documentation
 
-- [ESLint no-invalid-regexp](https://eslint.org/docs/latest/rules/no-invalid-regexp)
+- [ESLint: no-invalid-regexp](https://eslint.org/docs/latest/rules/no-invalid-regexp)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.0/lib/rules/no-invalid-regexp.js)

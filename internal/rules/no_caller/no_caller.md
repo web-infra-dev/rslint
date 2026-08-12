@@ -36,4 +36,5 @@ function foo(n) {
 
 ## Original Documentation
 
-- [ESLint no-caller](https://eslint.org/docs/latest/rules/no-caller)
+- [ESLint: no-caller](https://eslint.org/docs/latest/rules/no-caller)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-caller.js)

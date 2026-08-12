@@ -64,4 +64,5 @@ If you do not care about the presence of a byte order mark in your files, you ca
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/unicode-bom
+- [ESLint: unicode-bom](https://eslint.org/docs/latest/rules/unicode-bom)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/unicode-bom.js)

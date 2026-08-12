@@ -102,4 +102,5 @@ function hasThis(this: void, first: string, second: string) {
 
 ## Original Documentation
 
-- [https://eslint.org/docs/latest/rules/max-params](https://eslint.org/docs/latest/rules/max-params)
+- [ESLint: max-params](https://eslint.org/docs/latest/rules/max-params)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/max-params.js)

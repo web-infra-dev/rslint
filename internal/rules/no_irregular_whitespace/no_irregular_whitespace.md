@@ -75,4 +75,5 @@ var foo = ` `;
 
 ## Original Documentation
 
-[ESLint - no-irregular-whitespace](https://eslint.org/docs/latest/rules/no-irregular-whitespace)
+- [ESLint: no-irregular-whitespace](https://eslint.org/docs/latest/rules/no-irregular-whitespace)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-irregular-whitespace.js)

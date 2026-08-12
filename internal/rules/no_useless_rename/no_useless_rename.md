@@ -97,5 +97,5 @@ export { foo as foo } from "bar";
 
 ## Original Documentation
 
-- [ESLint rule](https://eslint.org/docs/latest/rules/no-useless-rename)
-- [Source code](https://github.com/eslint/eslint/blob/main/lib/rules/no-useless-rename.js)
+- [ESLint: no-useless-rename](https://eslint.org/docs/latest/rules/no-useless-rename)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-useless-rename.js)

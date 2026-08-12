@@ -98,6 +98,7 @@ configurations and in the upstream `no-restricted-syntax` test suite:
 
 ## Original Documentation
 
-- [ESLint no-restricted-syntax](https://eslint.org/docs/latest/rules/no-restricted-syntax)
+- [ESLint: no-restricted-syntax](https://eslint.org/docs/latest/rules/no-restricted-syntax)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-restricted-syntax.js)
 
 [esquery]: https://github.com/estools/esquery

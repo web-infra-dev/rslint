@@ -33,4 +33,5 @@ if (x === null) {
 
 ## Original Documentation
 
-- [ESLint no-constant-binary-expression](https://eslint.org/docs/latest/rules/no-constant-binary-expression)
+- [ESLint: no-constant-binary-expression](https://eslint.org/docs/latest/rules/no-constant-binary-expression)
+- [Source code](https://github.com/eslint/eslint/blob/v9.39.1/lib/rules/no-constant-binary-expression.js)

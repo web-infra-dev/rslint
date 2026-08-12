@@ -38,4 +38,5 @@ var x = f.bind(bar);
 
 ## Original Documentation
 
-- [ESLint no-extra-bind](https://eslint.org/docs/latest/rules/no-extra-bind)
+- [ESLint: no-extra-bind](https://eslint.org/docs/latest/rules/no-extra-bind)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-extra-bind.js)

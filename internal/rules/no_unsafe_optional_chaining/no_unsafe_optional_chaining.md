@@ -46,4 +46,5 @@ obj?.foo * bar; // may be NaN
 
 ## Original Documentation
 
-- [ESLint no-unsafe-optional-chaining](https://eslint.org/docs/latest/rules/no-unsafe-optional-chaining)
+- [ESLint: no-unsafe-optional-chaining](https://eslint.org/docs/latest/rules/no-unsafe-optional-chaining)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unsafe-optional-chaining.js)
