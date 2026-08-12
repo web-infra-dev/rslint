@@ -366,24 +366,35 @@ func shouldBeAwaited(parsed *rstestUtils.ParsedRstestExpectCall, asyncMatchers [
 	return rstestUtils.ShouldRstestExpectBeAwaited(parsed, asyncMatchers)
 }
 
-// resolveAsyncAssertionReportNode mirrors the jest rule: from the matcher
-// member it walks out through chained .then/.catch, notes whether the assertion
-// sits inside a Promise.all([...]) array, and decides whether the resulting node
-// must be awaited or returned.
+// resolveAsyncAssertionReportNode mirrors the jest rule: from the complete
+// matcher expression it walks out through chained .then/.catch, notes whether
+// the assertion sits inside a Promise.all([...]) array, and decides whether the
+// resulting node must be awaited or returned. A call-style matcher's complete
+// expression is its parent CallExpression, while a Chai property matcher is
+// already complete at the member-access expression.
 func resolveAsyncAssertionReportNode(
-	matcherEntry *rstestUtils.ParsedRstestFnMemberEntry,
+	matcher rstestUtils.ParsedRstestExpectMatcher,
 	alwaysAwait bool,
 ) (reportNode *ast.Node, promiseWrapped bool, insideAssertionArray bool, shouldReport bool) {
-	if matcherEntry == nil || matcherEntry.Node == nil || matcherEntry.Node.Parent == nil {
+	if matcher.Entry.Node == nil || matcher.Entry.Node.Parent == nil {
 		return nil, false, false, false
 	}
 
-	matcherMemberNode := matcherEntry.Node.Parent
-	if matcherMemberNode.Parent == nil {
+	matcherMemberNode := matcher.Entry.Node.Parent
+	assertionNode := matcherMemberNode
+	switch matcher.Kind {
+	case rstestUtils.RstestExpectMatcherCall:
+		if matcherMemberNode.Parent == nil {
+			return nil, false, false, false
+		}
+		assertionNode = matcherMemberNode.Parent
+	case rstestUtils.RstestExpectMatcherProperty:
+		// The member access itself executes a Chai property matcher.
+	default:
 		return nil, false, false, false
 	}
 
-	promiseChainedAssertionNode := getParentIfPromiseChained(matcherMemberNode.Parent)
+	promiseChainedAssertionNode := getParentIfPromiseChained(assertionNode)
 	insideAssertionArray = promiseChainedAssertionNode.Parent != nil && promiseChainedAssertionNode.Parent.Kind == ast.KindArrayLiteralExpression
 	reportNode = promiseChainedAssertionNode
 	if promiseCallNode := findPromiseCallExpressionNode(promiseChainedAssertionNode); promiseCallNode != nil {
@@ -468,12 +479,12 @@ var ValidExpectRule = rule.Rule{
 					}
 				}
 
-				if parsed.MatcherEntry == nil || !shouldBeAwaited(parsed, opts.AsyncMatchers) {
+				if len(parsed.Matchers) == 0 || !shouldBeAwaited(parsed, opts.AsyncMatchers) {
 					return
 				}
 
 				reportNode, promiseWrapped, insideAssertionArray, shouldReport := resolveAsyncAssertionReportNode(
-					parsed.MatcherEntry,
+					parsed.Matchers[0],
 					opts.AlwaysAwait,
 				)
 				if reportNode == nil {

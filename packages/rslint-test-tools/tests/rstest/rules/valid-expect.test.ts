@@ -24,6 +24,28 @@ ruleTester.run('valid-expect', {} as never, {
         });
       `,
     },
+    {
+      code: `
+        import { expect, test } from '@rstest/core';
+        test('t', async () => {
+          await expect(promise).resolves.to.be.true;
+        });
+      `,
+    },
+    {
+      code: `
+        import { expect, test } from '@rstest/core';
+        test('t', () => {
+          return expect(promise).resolves.to.be.true;
+        });
+      `,
+    },
+    {
+      code: `
+        import { expect, test } from '@rstest/core';
+        test('t', () => expect(promise).resolves.to.be.true);
+      `,
+    },
   ],
   invalid: [
     {
@@ -41,6 +63,21 @@ ruleTester.run('valid-expect', {} as never, {
         });
       `,
       errors: [{ messageId: 'asyncMustBeAwaited' }],
+    },
+    {
+      code: `
+        import { expect, test } from '@rstest/core';
+        test('t', async () => {
+          expect(promise).resolves.to.be.true;
+        });
+      `,
+      errors: [{ messageId: 'asyncMustBeAwaited' }],
+      output: `
+        import { expect, test } from '@rstest/core';
+        test('t', async () => {
+          await expect(promise).resolves.to.be.true;
+        });
+      `,
     },
   ],
 });

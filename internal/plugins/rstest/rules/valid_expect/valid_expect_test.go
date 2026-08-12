@@ -41,6 +41,9 @@ func TestValidExpectRule(t *testing.T) {
 			// Async assertions awaited or returned.
 			{Code: `test("t", async () => { await expect(p).resolves.toBe(1); });`},
 			{Code: `test("t", () => { return expect(p).rejects.toThrow(); });`},
+			{Code: `test("t", async () => { await expect(p).resolves.to.be.true; });`},
+			{Code: `test("t", () => { return expect(p).resolves.to.be.true; });`},
+			{Code: `test("t", () => expect(p).resolves.to.be.true);`},
 			{Code: `expect(value).not.toBe(1);`},
 			{Code: `test("t", async () => { await expect.poll(() => value).toBe(1); });`},
 			// poll/element are not treated as async by valid-expect (matching
@@ -116,6 +119,13 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited"},
 				},
 				Output: []string{`test("t", async () => { await expect(p).rejects.toThrow(); });`},
+			},
+			{
+				Code: `test("t", async () => { expect(p).resolves.to.be.true; });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await expect(p).resolves.to.be.true; });`},
 			},
 			{
 				Code: `test("t", async () => { const all = Promise.all([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]); });`,
