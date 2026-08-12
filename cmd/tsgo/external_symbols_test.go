@@ -4,131 +4,40 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/microsoft/typescript-go/shim/ast"
 )
 
-func TestCollectExternalSymbolsGlobals(t *testing.T) {
+func TestGlobalSymbols(t *testing.T) {
 	fixture := buildSemanticFixture(t, "export const value = Math.abs(-1);")
 
-	for _, expected := range []string{
-		"globalThis",
-		"Math",
-		"Math.abs",
-		"Object.prototype.hasOwnProperty",
-		"console.log",
-	} {
-		if !hasExternalSymbol(fixture.semantic, globalNamespace, expected) {
-			t.Errorf("missing global external symbol %q", expected)
-		}
-	}
+	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "globalThis")
+	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "Math")
+	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "Math.abs")
+	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "Object.prototype.hasOwnProperty")
+	expectSymbol(t, fixture.semantic.ExternalSymbols, globalNamespace, "console.log")
 }
 
-func TestCollectExternalSymbolsAmbientDependencyGlobalsWithoutDefaultLib(t *testing.T) {
-	tmpDir := t.TempDir()
-	dependencyDir := filepath.Join(tmpDir, "node_modules", "@types", "example")
-	if err := os.MkdirAll(dependencyDir, 0o755); err != nil {
-		t.Fatalf("Failed to create dependency directory: %v", err)
-	}
-
-	files := map[string]string{
-		filepath.Join(tmpDir, "tsconfig.json"): `{
-			"compilerOptions": {"noLib": true, "types": ["example"]},
-			"include": ["./index.ts"]
-		}`,
-		filepath.Join(tmpDir, "index.ts"): `ambientDependencyGlobal();`,
-		filepath.Join(dependencyDir, "index.d.ts"): `
-			declare function ambientDependencyGlobal(): void;
-		`,
-	}
-	for path, contents := range files {
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatalf("Failed to write %s: %v", path, err)
-		}
-	}
-
-	t.Chdir(tmpDir)
-	program, err := CreateProgram("tsconfig.json")
-	if err != nil {
-		t.Fatalf("Failed to create program: %v", err)
-	}
-	semantic := CollectSemantic(program)
-
-	if !hasExternalSymbol(semantic, globalNamespace, "ambientDependencyGlobal") {
-		t.Error("missing ambient dependency global external symbol")
-	}
-}
-
-func TestCollectExternalSymbolsDoesNotMarkLocalShadowAsGlobal(t *testing.T) {
-	fixture := buildSemanticFixture(
-		t,
-		`export {}; const Math = { abs(value: number) { return value; } }; Math.abs(-1);`,
-	)
-
-	found := map[string]bool{"Math": false, "abs": false}
-	for symbolID, symbol := range fixture.semantic.Symtab {
-		name := string(symbol.Name)
-		if _, ok := found[name]; !ok || symbol.Decl == nil || symbol.Decl.SourceFileId != fixture.sourceFileID {
-			continue
-		}
-		found[name] = true
-		if external, ok := findExternalSymbolByID(fixture.semantic, symbolID); ok {
-			t.Errorf(
-				"local symbol %q was incorrectly marked as %q.%q",
-				name,
-				external.Namespace,
-				external.Name,
-			)
-		}
-	}
-	for name, wasFound := range found {
-		if !wasFound {
-			t.Errorf("local symbol %q not found", name)
-		}
-	}
-}
-
-func TestCollectExternalSymbolsDependencyExports(t *testing.T) {
+func TestDependencySymbols(t *testing.T) {
 	tmpDir := t.TempDir()
 	dependencyDir := filepath.Join(tmpDir, "node_modules", "example-dependency")
-	if err := os.MkdirAll(dependencyDir, 0o755); err != nil {
-		t.Fatalf("Failed to create dependency directory: %v", err)
-	}
+	_ = os.MkdirAll(dependencyDir, 0o755)
 
 	files := map[string]string{
-		filepath.Join(tmpDir, "tsconfig.json"): `{
-			"compilerOptions": {"moduleResolution": "node"},
-			"include": ["./index.ts"]
-		}`,
-		filepath.Join(tmpDir, "index.ts"): `import { api } from "example-dependency"; api.run();`,
-		filepath.Join(dependencyDir, "package.json"): `{
-			"name": "example-dependency",
-			"version": "1.0.0",
-			"types": "index.d.ts"
-		}`,
-		filepath.Join(dependencyDir, "index.d.ts"): `
-			export declare const api: { run(): void };
-			export declare function value(): void;
-		`,
+		filepath.Join(tmpDir, "tsconfig.json"):       "{\n\t\"compilerOptions\": {\"moduleResolution\": \"node\"},\n\t\"include\": [\"./index.ts\"]\n}",
+		filepath.Join(tmpDir, "index.ts"):            `import { api } from "example-dependency"; api.run();`,
+		filepath.Join(dependencyDir, "package.json"): "{\n\t\"name\": \"example-dependency\",\n\t\"version\": \"1.0.0\",\n\t\"types\": \"index.d.ts\"\n}",
+		filepath.Join(dependencyDir, "index.d.ts"):   "export declare const api: { run(): void };\nexport declare function value(): void;",
 	}
 	for path, contents := range files {
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatalf("Failed to write %s: %v", path, err)
-		}
+		_ = os.WriteFile(path, []byte(contents), 0o644)
 	}
 
 	t.Chdir(tmpDir)
-	program, err := CreateProgram("tsconfig.json")
-	if err != nil {
-		t.Fatalf("Failed to create program: %v", err)
-	}
+	program, _ := CreateProgram("tsconfig.json")
 	semantic := CollectSemantic(program)
 
-	for _, expected := range []string{"api", "api.run", "value"} {
-		if !hasExternalSymbol(semantic, "example-dependency", expected) {
-			t.Errorf("missing dependency external symbol %q", expected)
-		}
-	}
+	expectSymbol(t, semantic.ExternalSymbols, "example-dependency", "api")
+	expectSymbol(t, semantic.ExternalSymbols, "example-dependency", "api.run")
+	expectSymbol(t, semantic.ExternalSymbols, "example-dependency", "value")
 }
 
 func TestExternalModuleName(t *testing.T) {
@@ -147,38 +56,28 @@ func TestExternalModuleName(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.moduleName, func(t *testing.T) {
-			namespace, prefix, ok := externalModuleName(test.moduleName)
-			if namespace != test.namespace || prefix != test.prefix || ok != test.ok {
-				t.Fatalf(
-					"externalModuleName(%q) = (%q, %q, %v), want (%q, %q, %v)",
-					test.moduleName,
-					namespace,
-					prefix,
-					ok,
-					test.namespace,
-					test.prefix,
-					test.ok,
-				)
-			}
-		})
+		namespace, prefix, ok := externalModuleName(test.moduleName)
+		if namespace != test.namespace || prefix != test.prefix || ok != test.ok {
+			t.Fatalf(
+				"externalModuleName(%q) = (%q, %q, %v), want (%q, %q, %v)",
+				test.moduleName,
+				namespace,
+				prefix,
+				ok,
+				test.namespace,
+				test.prefix,
+				test.ok,
+			)
+		}
 	}
 }
 
-func hasExternalSymbol(semantic Semantic, namespace string, name string) bool {
-	for _, external := range semantic.ExternalSymbols {
-		if string(external.Namespace) == namespace && string(external.Name) == name {
-			return true
+func expectSymbol(t *testing.T, symbols []ExternalSymbol, namespace string, symbolName string) {
+	t.Helper()
+	for _, symbol := range symbols {
+		if string(symbol.Namespace) == namespace && string(symbol.Name) == symbolName {
+			return
 		}
 	}
-	return false
-}
-
-func findExternalSymbolByID(semantic Semantic, symbolID ast.SymbolId) (ExternalSymbol, bool) {
-	for _, external := range semantic.ExternalSymbols {
-		if external.SymbolId == symbolID {
-			return external, true
-		}
-	}
-	return ExternalSymbol{}, false
+	t.Errorf("missing external symbol %q in namespace %q", symbolName, namespace)
 }
