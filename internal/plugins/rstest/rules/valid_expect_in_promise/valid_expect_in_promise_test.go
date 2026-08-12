@@ -17,6 +17,8 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `test("case", async (context) => { await promise.then(value => context.expect(value).toBe(1)); });`},
 			{Code: `test("case", (context) => promise.then(value => context.expect(value).toBe(1)));`},
+			{Code: `test("case", () => { try { return promise.then(value => expect(value).toBe(1)); } catch (error) {} });`},
+			{Code: `test("case", async () => { try { return promise.then(value => expect(value).toBe(1)); } catch (error) {} });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); await pending; });`},
 			{Code: `test("case", () => { const pending = promise.then(value => assert.equal(value, 1)); expect(pending).resolves.toBeUndefined(); });`},
 			{Code: `test("case", () => expect(promise.then(value => assert.equal(value, 1))).resolves.toBeUndefined());`},
@@ -28,6 +30,9 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", () => { let pending; ({ pending } = { pending: promise.then(value => assert.equal(value, 1)) }); return pending; });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } catch (error) { throw error; } });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } finally { cleanup(); } });`},
+			{Code: `try { test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); await pending; }); } catch (error) {}`},
+			{Code: `try { test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.resolve(pending); }); } catch (error) {}`},
+			{Code: `try { test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.all([pending]); }); } catch (error) {}`},
 			{Code: `import assert from "node:assert"; test("case", () => { promise.then(value => assert.equal(value, 1)); });`},
 			{Code: `import { assert } from "chai"; test("case", () => { promise.then(value => assert.equal(value, 1)); });`},
 			{Code: `const assert = createAssertionLibrary(); test("case", () => { promise.then(value => assert.equal(value, 1)); });`},

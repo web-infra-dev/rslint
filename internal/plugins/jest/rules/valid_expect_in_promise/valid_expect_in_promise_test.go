@@ -17,6 +17,8 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `test("case", async () => { await promise.then(value => expect(value).toBe(1)); });`},
 			{Code: `test("case", () => promise.then(value => expect(value).toBe(1)));`},
+			{Code: `test("case", () => { try { return promise.then(value => expect(value).toBe(1)); } catch (error) {} });`},
+			{Code: `test("case", async () => { try { return promise.then(value => expect(value).toBe(1)); } catch (error) {} });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); other = 1; await pending; });`},
 			{Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.resolve(pending); });`},
 			{Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.all([pending]); });`},
@@ -31,6 +33,9 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); if (condition) await pending; else return pending; });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); try { await pending; } catch (error) { throw error; } });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); try { await pending; } finally { cleanup(); } });`},
+			{Code: `try { test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); await pending; }); } catch (error) {}`},
+			{Code: `try { test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.resolve(pending); }); } catch (error) {}`},
+			{Code: `try { test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.all([pending]); }); } catch (error) {}`},
 			{Code: `test("done", done => { promise.then(value => { expect(value).toBe(1); done(); }); });`},
 			{Code: `function callback() { const pending = promise.then(value => expect(value).toBe(1)); return pending; } test("case", callback);`},
 			{Code: `function handler(value) { expect(value).toBe(1); } test("one", () => promise.then(handler)); test("two", () => promise.then(handler));`},

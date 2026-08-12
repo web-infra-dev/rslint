@@ -15,6 +15,20 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       );`,
     },
     {
+      code: `test('case', () => {
+        try {
+          return load().then(value => expect(value).toBe(1));
+        } catch (error) {}
+      });`,
+    },
+    {
+      code: `test('case', async () => {
+        try {
+          return load().then(value => expect(value).toBe(1));
+        } catch (error) {}
+      });`,
+    },
+    {
       code: `test('case', async () => {
         const pending = load().then(value => assert.equal(value, 1));
         await pending;
@@ -25,6 +39,30 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
         const pending = load().then(value => expect(value).toBe(1));
         expect(pending).resolves.toBeUndefined();
       });`,
+    },
+    {
+      code: `try {
+        test('case', async () => {
+          const pending = load().then(value => expect(value).toBe(1));
+          await pending;
+        });
+      } catch (error) {}`,
+    },
+    {
+      code: `try {
+        test('case', () => {
+          const pending = load().then(value => expect(value).toBe(1));
+          return Promise.resolve(pending);
+        });
+      } catch (error) {}`,
+    },
+    {
+      code: `try {
+        test('case', () => {
+          const pending = load().then(value => expect(value).toBe(1));
+          return Promise.all([pending]);
+        });
+      } catch (error) {}`,
     },
     {
       code: `test('case', () => {

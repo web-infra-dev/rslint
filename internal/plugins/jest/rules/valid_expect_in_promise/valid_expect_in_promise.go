@@ -286,7 +286,7 @@ func (a *analyzer) resolveFunctionConsumption(
 			}
 		},
 		Read: func(builder *cfg.Builder[flowEvent], node *ast.Node) {
-			if !a.isSafeIdentifierUse(node) {
+			if !a.isSafeIdentifierUse(node, function) {
 				return
 			}
 			if symbol := a.symbolOf(node); symbol != nil {
@@ -423,13 +423,13 @@ func (a *analyzer) isDirectlyConsumed(root, function *ast.Node) bool {
 		case ast.KindArrowFunction:
 			return parent.AsArrowFunction().Body == current
 		case ast.KindArrayLiteralExpression:
-			if safePromiseAggregatorForExpression(parent, current) {
+			if safePromiseAggregatorForExpression(parent, current, function) {
 				return true
 			}
 			return false
 		case ast.KindCallExpression:
 			if a.isAsyncExpectSink(parent, root) ||
-				safePromiseWrapperForExpression(parent, current) {
+				safePromiseWrapperForExpression(parent, current, function) {
 				return true
 			}
 			return false
@@ -456,7 +456,7 @@ func (a *analyzer) isDirectlyConsumed(root, function *ast.Node) bool {
 	return false
 }
 
-func (a *analyzer) isSafeIdentifierUse(identifier *ast.Node) bool {
+func (a *analyzer) isSafeIdentifierUse(identifier, function *ast.Node) bool {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -467,17 +467,17 @@ func (a *analyzer) isSafeIdentifierUse(identifier *ast.Node) bool {
 		case ast.KindParenthesizedExpression:
 			current = parent
 		case ast.KindAwaitExpression:
-			return testFramework.AbruptCompletionPropagatesFailure(parent, nil)
+			return testFramework.AbruptCompletionPropagatesFailure(parent, function)
 		case ast.KindReturnStatement:
-			return testFramework.AbruptCompletionPropagatesFailure(parent, nil)
+			return testFramework.AbruptCompletionPropagatesFailure(parent, function)
 		case ast.KindArrayLiteralExpression:
-			if safePromiseAggregatorForExpression(parent, current) {
+			if safePromiseAggregatorForExpression(parent, current, function) {
 				return true
 			}
 			return false
 		case ast.KindCallExpression:
 			if a.isAsyncExpectSink(parent, identifier) ||
-				safePromiseWrapperForExpression(parent, current) {
+				safePromiseWrapperForExpression(parent, current, function) {
 				return true
 			}
 			return false
@@ -522,7 +522,7 @@ func promiseValueFlowsThroughBinary(parent, current *ast.Node) bool {
 	}
 }
 
-func safePromiseWrapperForExpression(callNode, value *ast.Node) bool {
+func safePromiseWrapperForExpression(callNode, value, function *ast.Node) bool {
 	if callNode == nil || callNode.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -532,10 +532,10 @@ func safePromiseWrapperForExpression(callNode, value *ast.Node) bool {
 		testFramework.CalleeChainName(call.Expression) != "Promise.resolve" {
 		return false
 	}
-	return expressionIsAwaitedOrReturned(callNode)
+	return expressionIsAwaitedOrReturned(callNode, function)
 }
 
-func safePromiseAggregatorForExpression(arrayNode, value *ast.Node) bool {
+func safePromiseAggregatorForExpression(arrayNode, value, function *ast.Node) bool {
 	if arrayNode == nil || arrayNode.Kind != ast.KindArrayLiteralExpression ||
 		arrayNode.Parent == nil || arrayNode.Parent.Kind != ast.KindCallExpression {
 		return false
@@ -550,10 +550,10 @@ func safePromiseAggregatorForExpression(arrayNode, value *ast.Node) bool {
 	if name != "Promise.all" {
 		return false
 	}
-	return expressionIsAwaitedOrReturned(callNode)
+	return expressionIsAwaitedOrReturned(callNode, function)
 }
 
-func expressionIsAwaitedOrReturned(node *ast.Node) bool {
+func expressionIsAwaitedOrReturned(node, function *ast.Node) bool {
 	current := node
 	for current != nil && current.Parent != nil {
 		parent := current.Parent
@@ -562,9 +562,9 @@ func expressionIsAwaitedOrReturned(node *ast.Node) bool {
 			continue
 		}
 		return (parent.Kind == ast.KindAwaitExpression &&
-			testFramework.AbruptCompletionPropagatesFailure(parent, nil)) ||
+			testFramework.AbruptCompletionPropagatesFailure(parent, function)) ||
 			(parent.Kind == ast.KindReturnStatement &&
-				testFramework.AbruptCompletionPropagatesFailure(parent, nil)) ||
+				testFramework.AbruptCompletionPropagatesFailure(parent, function)) ||
 			(parent.Kind == ast.KindArrowFunction &&
 				parent.AsArrowFunction().Body == current)
 	}

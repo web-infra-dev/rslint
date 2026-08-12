@@ -15,6 +15,20 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       );`,
     },
     {
+      code: `test('case', () => {
+        try {
+          return load().then(value => expect(value).toBe(1));
+        } catch (error) {}
+      });`,
+    },
+    {
+      code: `test('case', async () => {
+        try {
+          return load().then(value => expect(value).toBe(1));
+        } catch (error) {}
+      });`,
+    },
+    {
       code: `test('case', async () => {
         const pending = load().then(value => expect(value).toBe(1));
         unrelated = 1;
@@ -63,6 +77,30 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
           throw error;
         }
       });`,
+    },
+    {
+      code: `try {
+        test('case', async () => {
+          const pending = load().then(value => expect(value).toBe(1));
+          await pending;
+        });
+      } catch (error) {}`,
+    },
+    {
+      code: `try {
+        test('case', () => {
+          const pending = load().then(value => expect(value).toBe(1));
+          return Promise.resolve(pending);
+        });
+      } catch (error) {}`,
+    },
+    {
+      code: `try {
+        test('case', () => {
+          const pending = load().then(value => expect(value).toBe(1));
+          return Promise.all([pending]);
+        });
+      } catch (error) {}`,
     },
     {
       code: `Promise.resolve().then(() => expect(1).toBe(2));`,

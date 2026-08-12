@@ -65,10 +65,12 @@ func promiseChainMethodName(callee *ast.Node) string {
 }
 
 // AbruptCompletionPropagatesFailure reports whether a rejection produced at
-// node can escape boundary. An enclosing catch suppresses it unless every path
-// through that catch throws again. A finally block that may return, break, or
-// continue also suppresses the pending rejection on that path.
+// node can escape boundary. An enclosing catch can suppress an awaited
+// rejection, but cannot intercept the later rejection of a returned promise. A
+// finally block that may return, break, or continue suppresses either form of
+// pending completion on that path.
 func AbruptCompletionPropagatesFailure(node, boundary *ast.Node) bool {
+	catchCanSuppress := node != nil && node.Kind == ast.KindAwaitExpression
 	current := node
 	for current != nil && current.Parent != nil && current.Parent != boundary {
 		parent := current.Parent
@@ -80,7 +82,8 @@ func AbruptCompletionPropagatesFailure(node, boundary *ast.Node) bool {
 					statementMaySuppressFailure(tryStatement.FinallyBlock) {
 					return false
 				}
-				if tryStatement.TryBlock == current && tryStatement.CatchClause != nil {
+				if catchCanSuppress &&
+					tryStatement.TryBlock == current && tryStatement.CatchClause != nil {
 					catchClause := tryStatement.CatchClause.AsCatchClause()
 					if catchClause == nil || !statementAlwaysThrows(catchClause.Block) {
 						return false
