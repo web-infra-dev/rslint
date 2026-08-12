@@ -135,9 +135,9 @@ ruleTester.run('no-focused-tests', {} as never, {
 focused('case', fn)`,
       errors: [
         {
-          line: 1,
-          column: 22,
-          endColumn: 26,
+          line: 2,
+          column: 1,
+          endColumn: 8,
           messageId: 'focusedTest',
           suggestions: [
             {
@@ -146,6 +146,33 @@ focused('case', fn)`,
 focused('case', fn)`,
             },
           ],
+        },
+      ],
+    },
+    {
+      code: `const focused = test.only;
+focused('first', fn);
+focused('second', fn)`,
+      errors: [
+        {
+          line: 2,
+          column: 1,
+          endColumn: 8,
+          messageId: 'focusedTest',
+          suggestions: [
+            {
+              messageId: 'suggestRemoveFocus',
+              output: `const focused = test;
+focused('first', fn);
+focused('second', fn)`,
+            },
+          ],
+        },
+        {
+          line: 3,
+          column: 1,
+          endColumn: 8,
+          messageId: 'focusedTest',
         },
       ],
     },

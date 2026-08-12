@@ -129,32 +129,58 @@ func TestNoFocusedTests(t *testing.T) {
 			focused(
 				"const focused = test.only;\nfocused('case', fn)",
 				"const focused = test;\nfocused('case', fn)",
-				1, 22, 26,
+				2, 1, 8,
 			),
 			focused(
 				"const focused = test?.only;\nfocused('case', fn)",
 				"const focused = test;\nfocused('case', fn)",
-				1, 23, 27,
+				2, 1, 8,
 			),
 			focused(
 				"const focusedEach = test.only.each(rows);\nfocusedEach('case', fn)",
 				"const focusedEach = test.each(rows);\nfocusedEach('case', fn)",
-				1, 26, 30,
+				2, 1, 12,
 			),
 			focused(
 				"const base = test.only;\nconst focused = base.only;\nfocused('case', fn)",
 				"const base = test;\nconst focused = base;\nfocused('case', fn)",
-				1, 19, 23,
+				3, 1, 8,
 			),
+			{
+				Code: "const focused = test.only;\nfocused('first', fn);\nfocused('second', fn)",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Line:      2,
+						Column:    1,
+						EndLine:   2,
+						EndColumn: 8,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output: "const focused = test;\nfocused('first', fn);\n" +
+									"focused('second', fn)",
+							},
+						},
+					},
+					{
+						MessageId: "focusedTest",
+						Line:      3,
+						Column:    1,
+						EndLine:   3,
+						EndColumn: 8,
+					},
+				},
+			},
 			{
 				Code: "const focused = test.only;\nfocused('first', fn);\nfocused.only('second', fn)",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "focusedTest",
-						Line:      1,
-						Column:    22,
-						EndLine:   1,
-						EndColumn: 26,
+						Line:      2,
+						Column:    1,
+						EndLine:   2,
+						EndColumn: 8,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
 								MessageId: "suggestRemoveFocus",

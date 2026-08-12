@@ -29,7 +29,7 @@ var NoFocusedTestsRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
-		reported := map[*ast.Node]bool{}
+		suggested := map[*ast.Node]bool{}
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				parsed := analysis.ParseFnCall(node)
@@ -44,26 +44,28 @@ var NoFocusedTestsRule = rule.Rule{
 					return
 				}
 
-				var reportNode *ast.Node
+				reportNode := focusedCallReportNode(node, parsed, focusEntries)
+				hasUnsuggestedEntry := false
 				for _, entry := range focusEntries {
-					if entry.Node != nil && !reported[entry.Node] {
-						reportNode = entry.Node
+					if entry.Node != nil && !suggested[entry.Node] {
+						hasUnsuggestedEntry = true
 						break
 					}
 				}
-				if reportNode == nil {
+				if !hasUnsuggestedEntry {
+					ctx.ReportNode(reportNode, buildErrorFocusedTestMessage())
 					return
-				}
-				for _, entry := range focusEntries {
-					if entry.Node != nil {
-						reported[entry.Node] = true
-					}
 				}
 
 				fixes, ok := removalFixes(focusEntries, ctx)
 				if !ok {
 					ctx.ReportNode(reportNode, buildErrorFocusedTestMessage())
 					return
+				}
+				for _, entry := range focusEntries {
+					if entry.Node != nil {
+						suggested[entry.Node] = true
+					}
 				}
 
 				ctx.ReportNodeWithSuggestions(
@@ -77,6 +79,31 @@ var NoFocusedTestsRule = rule.Rule{
 			},
 		}
 	},
+}
+
+func focusedCallReportNode(
+	node *ast.Node,
+	parsed *rstestUtils.ParsedRstestFnCall,
+	focusEntries []rstestUtils.ParsedRstestFnMemberEntry,
+) *ast.Node {
+	for _, focusEntry := range focusEntries {
+		for _, memberEntry := range parsed.MemberEntries {
+			if focusEntry.Node != nil && focusEntry.Node == memberEntry.Node {
+				return focusEntry.Node
+			}
+		}
+	}
+
+	if len(parsed.MemberEntries) > 0 {
+		lastEntry := parsed.MemberEntries[len(parsed.MemberEntries)-1]
+		if lastEntry.Node != nil {
+			return lastEntry.Node
+		}
+	}
+	if parsed.Head.Local.Node != nil {
+		return parsed.Head.Local.Node
+	}
+	return node
 }
 
 func removalFixes(
