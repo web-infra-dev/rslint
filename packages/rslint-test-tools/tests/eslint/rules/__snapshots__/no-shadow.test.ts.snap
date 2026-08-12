@@ -1057,6 +1057,448 @@ exports[`no-shadow > invalid 40`] = `
 
 exports[`no-shadow > invalid 41`] = `
 {
+  "code": "const a = wrap(function a() {});",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 42`] = `
+{
+  "code": "const a = foo || wrap(function a() {});",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 43`] = `
+{
+  "code": "const { a = wrap(function a() {}) } = obj;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 44`] = `
+{
+  "code": "const { a = foo || wrap(function a() {}) } = obj;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 45`] = `
+{
+  "code": "function foo(a = wrap(function a() {})) {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 46`] = `
+{
+  "code": "function foo(a = foo || wrap(function a() {})) {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 47`] = `
+{
+  "code": "const A = wrap(class A {});",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 48`] = `
+{
+  "code": "const A = foo || wrap(class A {});",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 49`] = `
+{
+  "code": "const { A = wrap(class A {}) } = obj;",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 50`] = `
+{
+  "code": "const { A = foo || wrap(class A {}) } = obj;",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 51`] = `
+{
+  "code": "function foo(A = wrap(class A {})) {}",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 52`] = `
+{
+  "code": "function foo(A = foo || wrap(class A {})) {}",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 53`] = `
+{
+  "code": "const { a = foo, b = function a() {} } = {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 54`] = `
+{
+  "code": "const { A = Foo, B = class A {} } = {}",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 55`] = `
+{
+  "code": "var a = function a() {} ? foo : bar",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 56`] = `
+{
+  "code": "var A = class A {} ? foo : bar",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 57`] = `
+{
+  "code": "let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 29.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 58`] = `
+{
   "code": "(function a() { function a(){ function a(){} } })()",
   "diagnostics": [
     {
@@ -1096,7 +1538,7 @@ exports[`no-shadow > invalid 41`] = `
 }
 `;
 
-exports[`no-shadow > invalid 42`] = `
+exports[`no-shadow > invalid 59`] = `
 {
   "code": "function foo() { var Object = 0; }",
   "diagnostics": [
@@ -1122,7 +1564,7 @@ exports[`no-shadow > invalid 42`] = `
 }
 `;
 
-exports[`no-shadow > invalid 43`] = `
+exports[`no-shadow > invalid 60`] = `
 {
   "code": "var Object = 0;",
   "diagnostics": [
@@ -1148,7 +1590,7 @@ exports[`no-shadow > invalid 43`] = `
 }
 `;
 
-exports[`no-shadow > invalid 44`] = `
+exports[`no-shadow > invalid 61`] = `
 {
   "code": "(function Array() {})",
   "diagnostics": [
@@ -1174,7 +1616,7 @@ exports[`no-shadow > invalid 44`] = `
 }
 `;
 
-exports[`no-shadow > invalid 45`] = `
+exports[`no-shadow > invalid 62`] = `
 {
   "code": "function foo(cb) { (function (cb) { cb(42); })(cb); }",
   "diagnostics": [
@@ -1200,7 +1642,7 @@ exports[`no-shadow > invalid 45`] = `
 }
 `;
 
-exports[`no-shadow > invalid 46`] = `
+exports[`no-shadow > invalid 63`] = `
 {
   "code": "class C { static { let a; { let a; } } }",
   "diagnostics": [
@@ -1226,7 +1668,7 @@ exports[`no-shadow > invalid 46`] = `
 }
 `;
 
-exports[`no-shadow > invalid 47`] = `
+exports[`no-shadow > invalid 64`] = `
 {
   "code": "class C { static { var C; } }",
   "diagnostics": [
@@ -1252,7 +1694,7 @@ exports[`no-shadow > invalid 47`] = `
 }
 `;
 
-exports[`no-shadow > invalid 48`] = `
+exports[`no-shadow > invalid 65`] = `
 {
   "code": "class C { static { let C; } }",
   "diagnostics": [
@@ -1278,7 +1720,7 @@ exports[`no-shadow > invalid 48`] = `
 }
 `;
 
-exports[`no-shadow > invalid 49`] = `
+exports[`no-shadow > invalid 66`] = `
 {
   "code": "var a; class C { static { var a; } }",
   "diagnostics": [
@@ -1304,7 +1746,7 @@ exports[`no-shadow > invalid 49`] = `
 }
 `;
 
-exports[`no-shadow > invalid 50`] = `
+exports[`no-shadow > invalid 67`] = `
 {
   "code": "class C { static { var a; } } var a;",
   "diagnostics": [
@@ -1330,7 +1772,7 @@ exports[`no-shadow > invalid 50`] = `
 }
 `;
 
-exports[`no-shadow > invalid 51`] = `
+exports[`no-shadow > invalid 68`] = `
 {
   "code": "class C { static { let a; } } let a;",
   "diagnostics": [
@@ -1356,7 +1798,7 @@ exports[`no-shadow > invalid 51`] = `
 }
 `;
 
-exports[`no-shadow > invalid 52`] = `
+exports[`no-shadow > invalid 69`] = `
 {
   "code": "class C { static { var a; } } let a;",
   "diagnostics": [
@@ -1382,7 +1824,7 @@ exports[`no-shadow > invalid 52`] = `
 }
 `;
 
-exports[`no-shadow > invalid 53`] = `
+exports[`no-shadow > invalid 70`] = `
 {
   "code": "class C { static { var a; class D { static { var a; } } } }",
   "diagnostics": [
@@ -1408,7 +1850,7 @@ exports[`no-shadow > invalid 53`] = `
 }
 `;
 
-exports[`no-shadow > invalid 54`] = `
+exports[`no-shadow > invalid 71`] = `
 {
   "code": "class C { static { let a; class D { static { let a; } } } }",
   "diagnostics": [
@@ -1434,7 +1876,7 @@ exports[`no-shadow > invalid 54`] = `
 }
 `;
 
-exports[`no-shadow > invalid 55`] = `
+exports[`no-shadow > invalid 72`] = `
 {
   "code": "let x = foo((x,y) => {});
 let y;",
@@ -1476,7 +1918,7 @@ let y;",
 }
 `;
 
-exports[`no-shadow > invalid 56`] = `
+exports[`no-shadow > invalid 73`] = `
 {
   "code": "let x = ((x,y) => {})();
 let y;",
@@ -1518,7 +1960,7 @@ let y;",
 }
 `;
 
-exports[`no-shadow > invalid 57`] = `
+exports[`no-shadow > invalid 74`] = `
 {
   "code": "const a = fn(()=>{ class C { fn () { const a = 42; return a } } return new C() })",
   "diagnostics": [
@@ -1544,7 +1986,7 @@ exports[`no-shadow > invalid 57`] = `
 }
 `;
 
-exports[`no-shadow > invalid 58`] = `
+exports[`no-shadow > invalid 75`] = `
 {
   "code": "function a() {}
 foo(a => {});",
@@ -1571,7 +2013,7 @@ foo(a => {});",
 }
 `;
 
-exports[`no-shadow > invalid 59`] = `
+exports[`no-shadow > invalid 76`] = `
 {
   "code": "const a = fn(()=>{ function C() { this.fn=function() { const a = 42; return a } } return new C() });",
   "diagnostics": [
@@ -1597,7 +2039,7 @@ exports[`no-shadow > invalid 59`] = `
 }
 `;
 
-exports[`no-shadow > invalid 60`] = `
+exports[`no-shadow > invalid 77`] = `
 {
   "code": "const x = foo(() => { const bar = () => { return x => {}; }; return bar; });",
   "diagnostics": [
@@ -1623,7 +2065,7 @@ exports[`no-shadow > invalid 60`] = `
 }
 `;
 
-exports[`no-shadow > invalid 61`] = `
+exports[`no-shadow > invalid 78`] = `
 {
   "code": "const x = foo(() => { return { bar(x) {} }; });",
   "diagnostics": [
@@ -1649,7 +2091,7 @@ exports[`no-shadow > invalid 61`] = `
 }
 `;
 
-exports[`no-shadow > invalid 62`] = `
+exports[`no-shadow > invalid 79`] = `
 {
   "code": "const x = () => { foo(x => x); }",
   "diagnostics": [
@@ -1675,7 +2117,7 @@ exports[`no-shadow > invalid 62`] = `
 }
 `;
 
-exports[`no-shadow > invalid 63`] = `
+exports[`no-shadow > invalid 80`] = `
 {
   "code": "const foo = () => { let x; bar(x => x); }",
   "diagnostics": [
@@ -1701,7 +2143,7 @@ exports[`no-shadow > invalid 63`] = `
 }
 `;
 
-exports[`no-shadow > invalid 64`] = `
+exports[`no-shadow > invalid 81`] = `
 {
   "code": "foo(() => { const x = x => x; });",
   "diagnostics": [
@@ -1727,7 +2169,7 @@ exports[`no-shadow > invalid 64`] = `
 }
 `;
 
-exports[`no-shadow > invalid 65`] = `
+exports[`no-shadow > invalid 82`] = `
 {
   "code": "const foo = (x) => { bar(x => {}) }",
   "diagnostics": [
@@ -1753,7 +2195,7 @@ exports[`no-shadow > invalid 65`] = `
 }
 `;
 
-exports[`no-shadow > invalid 66`] = `
+exports[`no-shadow > invalid 83`] = `
 {
   "code": "const a = (()=>{ class C { fn () { const a = 42; return a } } return new C() })()",
   "diagnostics": [
@@ -1779,7 +2221,7 @@ exports[`no-shadow > invalid 66`] = `
 }
 `;
 
-exports[`no-shadow > invalid 67`] = `
+exports[`no-shadow > invalid 84`] = `
 {
   "code": "const x = () => { (x => x)(); }",
   "diagnostics": [
@@ -1805,7 +2247,7 @@ exports[`no-shadow > invalid 67`] = `
 }
 `;
 
-exports[`no-shadow > invalid 68`] = `
+exports[`no-shadow > invalid 85`] = `
 {
   "code": "(function Array() {})",
   "diagnostics": [
@@ -1831,7 +2273,7 @@ exports[`no-shadow > invalid 68`] = `
 }
 `;
 
-exports[`no-shadow > invalid 69`] = `
+exports[`no-shadow > invalid 86`] = `
 {
   "code": "let a; { let b = (function a() {}) }",
   "diagnostics": [
@@ -1857,7 +2299,7 @@ exports[`no-shadow > invalid 69`] = `
 }
 `;
 
-exports[`no-shadow > invalid 70`] = `
+exports[`no-shadow > invalid 87`] = `
 {
   "code": "let a = foo; { let b = (function a() {}) }",
   "diagnostics": [
@@ -1883,7 +2325,7 @@ exports[`no-shadow > invalid 70`] = `
 }
 `;
 
-exports[`no-shadow > invalid 71`] = `
+exports[`no-shadow > invalid 88`] = `
 {
   "code": "
   type T = 1;
@@ -1914,7 +2356,7 @@ exports[`no-shadow > invalid 71`] = `
 }
 `;
 
-exports[`no-shadow > invalid 72`] = `
+exports[`no-shadow > invalid 89`] = `
 {
   "code": "
   type T = 1;
@@ -1943,7 +2385,7 @@ exports[`no-shadow > invalid 72`] = `
 }
 `;
 
-exports[`no-shadow > invalid 73`] = `
+exports[`no-shadow > invalid 90`] = `
 {
   "code": "
   function foo<T>() {
@@ -1973,7 +2415,7 @@ exports[`no-shadow > invalid 73`] = `
 }
 `;
 
-exports[`no-shadow > invalid 74`] = `
+exports[`no-shadow > invalid 91`] = `
 {
   "code": "
   type T = string;
@@ -2002,7 +2444,7 @@ exports[`no-shadow > invalid 74`] = `
 }
 `;
 
-exports[`no-shadow > invalid 75`] = `
+exports[`no-shadow > invalid 92`] = `
 {
   "code": "
   const x = 1;
@@ -2033,7 +2475,7 @@ exports[`no-shadow > invalid 75`] = `
 }
 `;
 
-exports[`no-shadow > invalid 76`] = `
+exports[`no-shadow > invalid 93`] = `
 {
   "code": "
   const test = 1;
@@ -2062,7 +2504,7 @@ exports[`no-shadow > invalid 76`] = `
 }
 `;
 
-exports[`no-shadow > invalid 77`] = `
+exports[`no-shadow > invalid 94`] = `
 {
   "code": "
   const arg = 0;
@@ -2093,7 +2535,7 @@ exports[`no-shadow > invalid 77`] = `
 }
 `;
 
-exports[`no-shadow > invalid 78`] = `
+exports[`no-shadow > invalid 95`] = `
 {
   "code": "
   const arg = 0;
@@ -2124,7 +2566,7 @@ exports[`no-shadow > invalid 78`] = `
 }
 `;
 
-exports[`no-shadow > invalid 79`] = `
+exports[`no-shadow > invalid 96`] = `
 {
   "code": "
   const arg = 0;
@@ -2153,7 +2595,7 @@ exports[`no-shadow > invalid 79`] = `
 }
 `;
 
-exports[`no-shadow > invalid 80`] = `
+exports[`no-shadow > invalid 97`] = `
 {
   "code": "
   const arg = 0;
@@ -2182,7 +2624,7 @@ exports[`no-shadow > invalid 80`] = `
 }
 `;
 
-exports[`no-shadow > invalid 81`] = `
+exports[`no-shadow > invalid 98`] = `
 {
   "code": "
   const arg = 0;
@@ -2213,7 +2655,7 @@ exports[`no-shadow > invalid 81`] = `
 }
 `;
 
-exports[`no-shadow > invalid 82`] = `
+exports[`no-shadow > invalid 99`] = `
 {
   "code": "
   const arg = 0;
@@ -2244,7 +2686,7 @@ exports[`no-shadow > invalid 82`] = `
 }
 `;
 
-exports[`no-shadow > invalid 83`] = `
+exports[`no-shadow > invalid 100`] = `
 {
   "code": "
   const arg = 0;
@@ -2273,7 +2715,7 @@ exports[`no-shadow > invalid 83`] = `
 }
 `;
 
-exports[`no-shadow > invalid 84`] = `
+exports[`no-shadow > invalid 101`] = `
 {
   "code": "
   const arg = 0;
@@ -2304,7 +2746,7 @@ exports[`no-shadow > invalid 84`] = `
 }
 `;
 
-exports[`no-shadow > invalid 85`] = `
+exports[`no-shadow > invalid 102`] = `
 {
   "code": "
 import type { foo } from './foo';
@@ -2333,7 +2775,7 @@ function doThing(foo: number) {}
 }
 `;
 
-exports[`no-shadow > invalid 86`] = `
+exports[`no-shadow > invalid 103`] = `
 {
   "code": "
 import { type foo } from './foo';
@@ -2362,7 +2804,7 @@ function doThing(foo: number) {}
 }
 `;
 
-exports[`no-shadow > invalid 87`] = `
+exports[`no-shadow > invalid 104`] = `
 {
   "code": "
 import { foo } from './foo';
@@ -2391,7 +2833,7 @@ function doThing(foo: number, bar: number) {}
 }
 `;
 
-exports[`no-shadow > invalid 88`] = `
+exports[`no-shadow > invalid 105`] = `
 {
   "code": "
 interface Foo {}
@@ -2420,7 +2862,7 @@ declare module 'bar' { export interface Foo { x: string } }
 }
 `;
 
-exports[`no-shadow > invalid 89`] = `
+exports[`no-shadow > invalid 106`] = `
 {
   "code": "
 import type { Foo } from 'bar';
@@ -2449,7 +2891,7 @@ declare module 'baz' { export interface Foo { x: string } }
 }
 `;
 
-exports[`no-shadow > invalid 90`] = `
+exports[`no-shadow > invalid 107`] = `
 {
   "code": "
 import { type Foo } from 'bar';
@@ -2478,7 +2920,7 @@ declare module 'baz' { export interface Foo { x: string } }
 }
 `;
 
-exports[`no-shadow > invalid 91`] = `
+exports[`no-shadow > invalid 108`] = `
 {
   "code": "
   let x = foo((x, y) => {});
@@ -2522,7 +2964,7 @@ exports[`no-shadow > invalid 91`] = `
 }
 `;
 
-exports[`no-shadow > invalid 92`] = `
+exports[`no-shadow > invalid 109`] = `
 {
   "code": "
   let x = foo((x, y) => {});
@@ -2551,7 +2993,7 @@ exports[`no-shadow > invalid 92`] = `
 }
 `;
 
-exports[`no-shadow > invalid 93`] = `
+exports[`no-shadow > invalid 110`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -2580,7 +3022,7 @@ exports[`no-shadow > invalid 93`] = `
 }
 `;
 
-exports[`no-shadow > invalid 94`] = `
+exports[`no-shadow > invalid 111`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -2609,7 +3051,7 @@ exports[`no-shadow > invalid 94`] = `
 }
 `;
 
-exports[`no-shadow > invalid 95`] = `
+exports[`no-shadow > invalid 112`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -2638,7 +3080,7 @@ exports[`no-shadow > invalid 95`] = `
 }
 `;
 
-exports[`no-shadow > invalid 96`] = `
+exports[`no-shadow > invalid 113`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -2667,7 +3109,7 @@ exports[`no-shadow > invalid 96`] = `
 }
 `;
 
-exports[`no-shadow > invalid 97`] = `
+exports[`no-shadow > invalid 114`] = `
 {
   "code": "
   {
@@ -2698,7 +3140,7 @@ exports[`no-shadow > invalid 97`] = `
 }
 `;
 
-exports[`no-shadow > invalid 98`] = `
+exports[`no-shadow > invalid 115`] = `
 {
   "code": "
   {
@@ -2729,7 +3171,7 @@ exports[`no-shadow > invalid 98`] = `
 }
 `;
 
-exports[`no-shadow > invalid 99`] = `
+exports[`no-shadow > invalid 116`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -2758,7 +3200,7 @@ exports[`no-shadow > invalid 99`] = `
 }
 `;
 
-exports[`no-shadow > invalid 100`] = `
+exports[`no-shadow > invalid 117`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -2787,7 +3229,7 @@ exports[`no-shadow > invalid 100`] = `
 }
 `;
 
-exports[`no-shadow > invalid 101`] = `
+exports[`no-shadow > invalid 118`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -2816,7 +3258,7 @@ exports[`no-shadow > invalid 101`] = `
 }
 `;
 
-exports[`no-shadow > invalid 102`] = `
+exports[`no-shadow > invalid 119`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -2845,7 +3287,7 @@ exports[`no-shadow > invalid 102`] = `
 }
 `;
 
-exports[`no-shadow > invalid 103`] = `
+exports[`no-shadow > invalid 120`] = `
 {
   "code": "
   {
@@ -2876,7 +3318,7 @@ exports[`no-shadow > invalid 103`] = `
 }
 `;
 
-exports[`no-shadow > invalid 104`] = `
+exports[`no-shadow > invalid 121`] = `
 {
   "code": "
   {
@@ -2907,7 +3349,7 @@ exports[`no-shadow > invalid 104`] = `
 }
 `;
 
-exports[`no-shadow > invalid 105`] = `
+exports[`no-shadow > invalid 122`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -2936,7 +3378,7 @@ exports[`no-shadow > invalid 105`] = `
 }
 `;
 
-exports[`no-shadow > invalid 106`] = `
+exports[`no-shadow > invalid 123`] = `
 {
   "code": "
 	if (true) {
@@ -2968,7 +3410,7 @@ exports[`no-shadow > invalid 106`] = `
 }
 `;
 
-exports[`no-shadow > invalid 107`] = `
+exports[`no-shadow > invalid 124`] = `
 {
   "code": "
 	// types
@@ -3020,7 +3462,7 @@ exports[`no-shadow > invalid 107`] = `
 }
 `;
 
-exports[`no-shadow > invalid 108`] = `
+exports[`no-shadow > invalid 125`] = `
 {
   "code": "
 	// types
@@ -3057,7 +3499,7 @@ exports[`no-shadow > invalid 108`] = `
 }
 `;
 
-exports[`no-shadow > invalid 109`] = `
+exports[`no-shadow > invalid 126`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -3086,7 +3528,7 @@ exports[`no-shadow > invalid 109`] = `
 }
 `;
 
-exports[`no-shadow > invalid 110`] = `
+exports[`no-shadow > invalid 127`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -3115,7 +3557,7 @@ exports[`no-shadow > invalid 110`] = `
 }
 `;
 
-exports[`no-shadow > invalid 111`] = `
+exports[`no-shadow > invalid 128`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -3144,7 +3586,7 @@ exports[`no-shadow > invalid 111`] = `
 }
 `;
 
-exports[`no-shadow > invalid 112`] = `
+exports[`no-shadow > invalid 129`] = `
 {
   "code": "
   {
@@ -3175,7 +3617,7 @@ exports[`no-shadow > invalid 112`] = `
 }
 `;
 
-exports[`no-shadow > invalid 113`] = `
+exports[`no-shadow > invalid 130`] = `
 {
   "code": "
   {
@@ -3206,7 +3648,7 @@ exports[`no-shadow > invalid 113`] = `
 }
 `;
 
-exports[`no-shadow > invalid 114`] = `
+exports[`no-shadow > invalid 131`] = `
 {
   "code": "
 		const A = 2;
@@ -3238,7 +3680,7 @@ exports[`no-shadow > invalid 114`] = `
 }
 `;
 
-exports[`no-shadow > invalid 115`] = `
+exports[`no-shadow > invalid 132`] = `
 {
   "code": "type X<T> = T extends (infer U) ? (U extends (infer U) ? U : never) : never;",
   "diagnostics": [
@@ -3264,7 +3706,7 @@ exports[`no-shadow > invalid 115`] = `
 }
 `;
 
-exports[`no-shadow > invalid 116`] = `
+exports[`no-shadow > invalid 133`] = `
 {
   "code": "const x = 1; const o = { foo(x: number) { return x; } };",
   "diagnostics": [
@@ -3290,7 +3732,7 @@ exports[`no-shadow > invalid 116`] = `
 }
 `;
 
-exports[`no-shadow > invalid 117`] = `
+exports[`no-shadow > invalid 134`] = `
 {
   "code": "const x = 1; const o = { get foo() { const x = 2; return x; } };",
   "diagnostics": [
@@ -3316,7 +3758,7 @@ exports[`no-shadow > invalid 117`] = `
 }
 `;
 
-exports[`no-shadow > invalid 118`] = `
+exports[`no-shadow > invalid 135`] = `
 {
   "code": "const x = 1; const o = { async foo(x: number) { return x; } };",
   "diagnostics": [
@@ -3342,7 +3784,7 @@ exports[`no-shadow > invalid 118`] = `
 }
 `;
 
-exports[`no-shadow > invalid 119`] = `
+exports[`no-shadow > invalid 136`] = `
 {
   "code": "const x = 1; const o = { *foo(x: number) { yield x; } };",
   "diagnostics": [
@@ -3368,7 +3810,7 @@ exports[`no-shadow > invalid 119`] = `
 }
 `;
 
-exports[`no-shadow > invalid 120`] = `
+exports[`no-shadow > invalid 137`] = `
 {
   "code": "using u = { [Symbol.dispose]() {} }; { using u = { [Symbol.dispose]() {} }; }",
   "diagnostics": [
@@ -3394,7 +3836,7 @@ exports[`no-shadow > invalid 120`] = `
 }
 `;
 
-exports[`no-shadow > invalid 121`] = `
+exports[`no-shadow > invalid 138`] = `
 {
   "code": "class C<T> { static s<T>(): T { return null as any; } i<T>(): T { return null as any; } }",
   "diagnostics": [
@@ -3420,7 +3862,7 @@ exports[`no-shadow > invalid 121`] = `
 }
 `;
 
-exports[`no-shadow > invalid 122`] = `
+exports[`no-shadow > invalid 139`] = `
 {
   "code": "const a = 1; function f({ x: a }: any) { return a; }",
   "diagnostics": [
@@ -3446,7 +3888,7 @@ exports[`no-shadow > invalid 122`] = `
 }
 `;
 
-exports[`no-shadow > invalid 123`] = `
+exports[`no-shadow > invalid 140`] = `
 {
   "code": "const fn = function f(f: number) { return f; };",
   "diagnostics": [
@@ -3472,7 +3914,7 @@ exports[`no-shadow > invalid 123`] = `
 }
 `;
 
-exports[`no-shadow > invalid 124`] = `
+exports[`no-shadow > invalid 141`] = `
 {
   "code": "function dec(x: any) { return x; }
 @dec class CD { method() { const dec = 1; return dec; } }",
@@ -3499,7 +3941,7 @@ exports[`no-shadow > invalid 124`] = `
 }
 `;
 
-exports[`no-shadow > invalid 125`] = `
+exports[`no-shadow > invalid 142`] = `
 {
   "code": "const k = 'x'; class C { foo() { const k = 1; return k; } }",
   "diagnostics": [
@@ -3525,7 +3967,7 @@ exports[`no-shadow > invalid 125`] = `
 }
 `;
 
-exports[`no-shadow > invalid 126`] = `
+exports[`no-shadow > invalid 143`] = `
 {
   "code": "const a = 1; function f({ a = a }: any) { return a; }",
   "diagnostics": [
@@ -3551,7 +3993,7 @@ exports[`no-shadow > invalid 126`] = `
 }
 `;
 
-exports[`no-shadow > invalid 127`] = `
+exports[`no-shadow > invalid 144`] = `
 {
   "code": "const e = 1; try {} catch ({ message: e }) { return e; }",
   "diagnostics": [
@@ -3577,7 +4019,7 @@ exports[`no-shadow > invalid 127`] = `
 }
 `;
 
-exports[`no-shadow > invalid 128`] = `
+exports[`no-shadow > invalid 145`] = `
 {
   "code": "async function* g() { const v = 1; for await (const v of [Promise.resolve(1)]) yield v; }",
   "diagnostics": [
@@ -3603,7 +4045,7 @@ exports[`no-shadow > invalid 128`] = `
 }
 `;
 
-exports[`no-shadow > invalid 129`] = `
+exports[`no-shadow > invalid 146`] = `
 {
   "code": "const a = 1, b = 2; function f() { const a = 3, b = 4; return a + b; }",
   "diagnostics": [
@@ -3644,7 +4086,7 @@ exports[`no-shadow > invalid 129`] = `
 }
 `;
 
-exports[`no-shadow > invalid 130`] = `
+exports[`no-shadow > invalid 147`] = `
 {
   "code": "function f() { const z = 1; switch (z) { case 1: { const z = 2; break; } case 2: { const z = 3; break; } } }",
   "diagnostics": [
@@ -3685,7 +4127,7 @@ exports[`no-shadow > invalid 130`] = `
 }
 `;
 
-exports[`no-shadow > invalid 131`] = `
+exports[`no-shadow > invalid 148`] = `
 {
   "code": "import * as Mods from 'fs'; function f(Mods: number) { return Mods; }",
   "diagnostics": [
@@ -3711,7 +4153,7 @@ exports[`no-shadow > invalid 131`] = `
 }
 `;
 
-exports[`no-shadow > invalid 132`] = `
+exports[`no-shadow > invalid 149`] = `
 {
   "code": "const Z = 1; const make = () => class Z {};",
   "diagnostics": [
@@ -3737,7 +4179,7 @@ exports[`no-shadow > invalid 132`] = `
 }
 `;
 
-exports[`no-shadow > invalid 133`] = `
+exports[`no-shadow > invalid 150`] = `
 {
   "code": "const t = 1; type T = typeof t; function f(t: number) { return t; }",
   "diagnostics": [
@@ -3763,7 +4205,7 @@ exports[`no-shadow > invalid 133`] = `
 }
 `;
 
-exports[`no-shadow > invalid 134`] = `
+exports[`no-shadow > invalid 151`] = `
 {
   "code": "const opts = { x: 1 }; function f(opts: typeof opts = opts) { return opts; }",
   "diagnostics": [
@@ -3789,7 +4231,7 @@ exports[`no-shadow > invalid 134`] = `
 }
 `;
 
-exports[`no-shadow > invalid 135`] = `
+exports[`no-shadow > invalid 152`] = `
 {
   "code": "const a = 1; const fn = function() { const a = 2; return a; };",
   "diagnostics": [
@@ -3815,7 +4257,7 @@ exports[`no-shadow > invalid 135`] = `
 }
 `;
 
-exports[`no-shadow > invalid 136`] = `
+exports[`no-shadow > invalid 153`] = `
 {
   "code": "const A = 1; class A_outer { x = class A {}; }",
   "diagnostics": [
@@ -3841,7 +4283,7 @@ exports[`no-shadow > invalid 136`] = `
 }
 `;
 
-exports[`no-shadow > invalid 137`] = `
+exports[`no-shadow > invalid 154`] = `
 {
   "code": "function f(...args: number[]) { function g({ args }: any) { return args; } }",
   "diagnostics": [
@@ -3867,7 +4309,7 @@ exports[`no-shadow > invalid 137`] = `
 }
 `;
 
-exports[`no-shadow > invalid 138`] = `
+exports[`no-shadow > invalid 155`] = `
 {
   "code": "function* g() { const v = 1; for (const v of [1,2,3]) { yield v; } }",
   "diagnostics": [
@@ -3893,7 +4335,7 @@ exports[`no-shadow > invalid 138`] = `
 }
 `;
 
-exports[`no-shadow > invalid 139`] = `
+exports[`no-shadow > invalid 156`] = `
 {
   "code": "function f<A>(fn: <A>(x: A) => A): A { return fn as any; }",
   "diagnostics": [
@@ -3919,7 +4361,7 @@ exports[`no-shadow > invalid 139`] = `
 }
 `;
 
-exports[`no-shadow > invalid 140`] = `
+exports[`no-shadow > invalid 157`] = `
 {
   "code": "function f<T>(): <T>(x: T) => T { return null as any; }",
   "diagnostics": [
@@ -3945,7 +4387,7 @@ exports[`no-shadow > invalid 140`] = `
 }
 `;
 
-exports[`no-shadow > invalid 141`] = `
+exports[`no-shadow > invalid 158`] = `
 {
   "code": "try {} catch (e) { try {} catch (e) {} }",
   "diagnostics": [
@@ -3971,7 +4413,7 @@ exports[`no-shadow > invalid 141`] = `
 }
 `;
 
-exports[`no-shadow > invalid 142`] = `
+exports[`no-shadow > invalid 159`] = `
 {
   "code": "class C<T> { m<T>(x: T): T { return x; } }",
   "diagnostics": [
@@ -3997,7 +4439,7 @@ exports[`no-shadow > invalid 142`] = `
 }
 `;
 
-exports[`no-shadow > invalid 143`] = `
+exports[`no-shadow > invalid 160`] = `
 {
   "code": "const x = 1; function f(x: number) { function g(x: number) { return x; } return g; }",
   "diagnostics": [
@@ -4038,7 +4480,7 @@ exports[`no-shadow > invalid 143`] = `
 }
 `;
 
-exports[`no-shadow > invalid 144`] = `
+exports[`no-shadow > invalid 161`] = `
 {
   "code": "const a = 1; function f([, a]: any[]) { return a; }",
   "diagnostics": [
@@ -4064,7 +4506,7 @@ exports[`no-shadow > invalid 144`] = `
 }
 `;
 
-exports[`no-shadow > invalid 145`] = `
+exports[`no-shadow > invalid 162`] = `
 {
   "code": "const a = 1; const fn = { call: (cb: any) => cb }; fn.call?.(a => a);",
   "diagnostics": [
@@ -4090,7 +4532,7 @@ exports[`no-shadow > invalid 145`] = `
 }
 `;
 
-exports[`no-shadow > invalid 146`] = `
+exports[`no-shadow > invalid 163`] = `
 {
   "code": "const x = 1; class C { constructor(public x: number) {} m() { const x = 1; return x; } }",
   "diagnostics": [
@@ -4131,7 +4573,7 @@ exports[`no-shadow > invalid 146`] = `
 }
 `;
 
-exports[`no-shadow > invalid 147`] = `
+exports[`no-shadow > invalid 164`] = `
 {
   "code": "const mod = 1; import('m').then((mod) => mod);",
   "diagnostics": [
@@ -4157,7 +4599,7 @@ exports[`no-shadow > invalid 147`] = `
 }
 `;
 
-exports[`no-shadow > invalid 148`] = `
+exports[`no-shadow > invalid 165`] = `
 {
   "code": "type X<T> = T extends Array<infer U> ? (U extends Array<infer U> ? U : never) : never;",
   "diagnostics": [
@@ -4183,7 +4625,7 @@ exports[`no-shadow > invalid 148`] = `
 }
 `;
 
-exports[`no-shadow > invalid 149`] = `
+exports[`no-shadow > invalid 166`] = `
 {
   "code": "const g = Array<number>; function f(Array: any) { return Array; }",
   "diagnostics": [
@@ -4209,7 +4651,7 @@ exports[`no-shadow > invalid 149`] = `
 }
 `;
 
-exports[`no-shadow > invalid 150`] = `
+exports[`no-shadow > invalid 167`] = `
 {
   "code": "const x = 1; class C { accessor x = 1; m() { const x = 2; return x; } }",
   "diagnostics": [
@@ -4235,7 +4677,7 @@ exports[`no-shadow > invalid 150`] = `
 }
 `;
 
-exports[`no-shadow > invalid 151`] = `
+exports[`no-shadow > invalid 168`] = `
 {
   "code": "async function f() { const x = 1; for await (const { v: x } of [Promise.resolve({ v: 1 })]) { return x; } }",
   "diagnostics": [
@@ -4261,7 +4703,7 @@ exports[`no-shadow > invalid 151`] = `
 }
 `;
 
-exports[`no-shadow > invalid 152`] = `
+exports[`no-shadow > invalid 169`] = `
 {
   "code": "async function f() { using u = { [Symbol.dispose]() {} }; for (const u of [] as any[]) { void u; } }",
   "diagnostics": [
@@ -4287,7 +4729,7 @@ exports[`no-shadow > invalid 152`] = `
 }
 `;
 
-exports[`no-shadow > invalid 153`] = `
+exports[`no-shadow > invalid 170`] = `
 {
   "code": "const k = 'a'; function f({ [k]: v }: any) { const k = 1; return [v, k]; }",
   "diagnostics": [
@@ -4313,7 +4755,7 @@ exports[`no-shadow > invalid 153`] = `
 }
 `;
 
-exports[`no-shadow > invalid 154`] = `
+exports[`no-shadow > invalid 171`] = `
 {
   "code": "function withTheme<P>(Component: any) { return function ThemedComponent(props: P) { const Component = 1; return Component; }; }",
   "diagnostics": [
@@ -4339,7 +4781,7 @@ exports[`no-shadow > invalid 154`] = `
 }
 `;
 
-exports[`no-shadow > invalid 155`] = `
+exports[`no-shadow > invalid 172`] = `
 {
   "code": "type A = { type: 'inc' } | { type: 'set'; value: number }; function reducer(state: number, action: A) { switch (action.type) { case 'inc': { const state = 1; return state + 1; } case 'set': return action.value; } }",
   "diagnostics": [
@@ -4365,7 +4807,7 @@ exports[`no-shadow > invalid 155`] = `
 }
 `;
 
-exports[`no-shadow > invalid 156`] = `
+exports[`no-shadow > invalid 173`] = `
 {
   "code": "function chain() { const item = { id: 1 }; [1, 2, 3].map(item => item + 1).filter(item => item > 1).forEach(item => void item); void item; }",
   "diagnostics": [
@@ -4421,7 +4863,7 @@ exports[`no-shadow > invalid 156`] = `
 }
 `;
 
-exports[`no-shadow > invalid 157`] = `
+exports[`no-shadow > invalid 174`] = `
 {
   "code": "const e = 1; try { try { throw new Error(); } catch (e) { try { throw e; } catch (e) {} } } catch (e) {} void e;",
   "diagnostics": [
@@ -4477,7 +4919,7 @@ exports[`no-shadow > invalid 157`] = `
 }
 `;
 
-exports[`no-shadow > invalid 158`] = `
+exports[`no-shadow > invalid 175`] = `
 {
   "code": "const methodName = 'foo'; const obj = { [methodName](methodName: string) { return methodName; } };",
   "diagnostics": [
@@ -4503,7 +4945,7 @@ exports[`no-shadow > invalid 158`] = `
 }
 `;
 
-exports[`no-shadow > invalid 159`] = `
+exports[`no-shadow > invalid 176`] = `
 {
   "code": "function f() { for (let i = 0; i < 1; i++) { for (let i = 0; i < 1; i++) {} } }",
   "diagnostics": [
@@ -4529,7 +4971,7 @@ exports[`no-shadow > invalid 159`] = `
 }
 `;
 
-exports[`no-shadow > invalid 160`] = `
+exports[`no-shadow > invalid 177`] = `
 {
   "code": "const a = 1; class C { m(x: string): void; m(x: number): void; m(a: any): void { void a; } }",
   "diagnostics": [
@@ -4555,7 +4997,7 @@ exports[`no-shadow > invalid 160`] = `
 }
 `;
 
-exports[`no-shadow > invalid 161`] = `
+exports[`no-shadow > invalid 178`] = `
 {
   "code": "function mk<T>(x: T) { return { get<T>(): T { return null as any; } }; }",
   "diagnostics": [
@@ -4581,7 +5023,7 @@ exports[`no-shadow > invalid 161`] = `
 }
 `;
 
-exports[`no-shadow > invalid 162`] = `
+exports[`no-shadow > invalid 179`] = `
 {
   "code": "const c = 1; { /* empty */ } { const c = 2; void c; }",
   "diagnostics": [
@@ -4607,7 +5049,7 @@ exports[`no-shadow > invalid 162`] = `
 }
 `;
 
-exports[`no-shadow > invalid 163`] = `
+exports[`no-shadow > invalid 180`] = `
 {
   "code": "const enum E { A, B } function f(E: number) { return E; }",
   "diagnostics": [
@@ -4633,7 +5075,7 @@ exports[`no-shadow > invalid 163`] = `
 }
 `;
 
-exports[`no-shadow > invalid 164`] = `
+exports[`no-shadow > invalid 181`] = `
 {
   "code": "abstract class C<T extends object> { abstract m<T>(): T; }",
   "diagnostics": [
@@ -4659,7 +5101,7 @@ exports[`no-shadow > invalid 164`] = `
 }
 `;
 
-exports[`no-shadow > invalid 165`] = `
+exports[`no-shadow > invalid 182`] = `
 {
   "code": "const iter = 1; class C { [Symbol.iterator](iter: number) { return iter; } }",
   "diagnostics": [
@@ -4685,7 +5127,7 @@ exports[`no-shadow > invalid 165`] = `
 }
 `;
 
-exports[`no-shadow > invalid 166`] = `
+exports[`no-shadow > invalid 183`] = `
 {
   "code": "const x = 1; class C { constructor(x?: number) { void x; } }",
   "diagnostics": [
@@ -4711,7 +5153,7 @@ exports[`no-shadow > invalid 166`] = `
 }
 `;
 
-exports[`no-shadow > invalid 167`] = `
+exports[`no-shadow > invalid 184`] = `
 {
   "code": "const val = { x: 1 }; function f(val: typeof val) { return val; }",
   "diagnostics": [
@@ -4737,7 +5179,7 @@ exports[`no-shadow > invalid 167`] = `
 }
 `;
 
-exports[`no-shadow > invalid 168`] = `
+exports[`no-shadow > invalid 185`] = `
 {
   "code": "const x = 1; class C { async m(x: number) { return x; } }",
   "diagnostics": [
@@ -4763,7 +5205,7 @@ exports[`no-shadow > invalid 168`] = `
 }
 `;
 
-exports[`no-shadow > invalid 169`] = `
+exports[`no-shadow > invalid 186`] = `
 {
   "code": "const x = 1; class C { *m(x: number) { yield x; } }",
   "diagnostics": [
@@ -4789,7 +5231,7 @@ exports[`no-shadow > invalid 169`] = `
 }
 `;
 
-exports[`no-shadow > invalid 170`] = `
+exports[`no-shadow > invalid 187`] = `
 {
   "code": "declare function foo(): void; function bar() { const foo = 1; return foo; }",
   "diagnostics": [
@@ -4815,7 +5257,7 @@ exports[`no-shadow > invalid 170`] = `
 }
 `;
 
-exports[`no-shadow > invalid 171`] = `
+exports[`no-shadow > invalid 188`] = `
 {
   "code": "const h = 1; class C extends (function() { const h = 2; return class {}; })() {}",
   "diagnostics": [
@@ -4841,7 +5283,7 @@ exports[`no-shadow > invalid 171`] = `
 }
 `;
 
-exports[`no-shadow > invalid 172`] = `
+exports[`no-shadow > invalid 189`] = `
 {
   "code": "const h = 1; class C extends ((h => h)(1), Object) {}",
   "diagnostics": [
@@ -4867,7 +5309,7 @@ exports[`no-shadow > invalid 172`] = `
 }
 `;
 
-exports[`no-shadow > invalid 173`] = `
+exports[`no-shadow > invalid 190`] = `
 {
   "code": "function dec(x: any) { return x; }
 @((target: any) => { const dec = 1; return dec && target; })
@@ -4895,7 +5337,7 @@ class D {}",
 }
 `;
 
-exports[`no-shadow > invalid 174`] = `
+exports[`no-shadow > invalid 191`] = `
 {
   "code": "const md = 1; class C { @((t: any, k: string) => { const md = 1; void md; }) method() {} }",
   "diagnostics": [
@@ -4921,7 +5363,7 @@ exports[`no-shadow > invalid 174`] = `
 }
 `;
 
-exports[`no-shadow > invalid 175`] = `
+exports[`no-shadow > invalid 192`] = `
 {
   "code": "const pd = 1; class C { method(@((t: any, k: any, i: number) => { const pd = 1; void pd; }) x: number) {} }",
   "diagnostics": [
@@ -4947,7 +5389,7 @@ exports[`no-shadow > invalid 175`] = `
 }
 `;
 
-exports[`no-shadow > invalid 176`] = `
+exports[`no-shadow > invalid 193`] = `
 {
   "code": "const k = 1; class C { [((k) => k)(2)]() {} }",
   "diagnostics": [
@@ -4973,7 +5415,7 @@ exports[`no-shadow > invalid 176`] = `
 }
 `;
 
-exports[`no-shadow > invalid 177`] = `
+exports[`no-shadow > invalid 194`] = `
 {
   "code": "const k = 1; class C { [((k) => k)(2)] = 1; }",
   "diagnostics": [
@@ -4999,7 +5441,7 @@ exports[`no-shadow > invalid 177`] = `
 }
 `;
 
-exports[`no-shadow > invalid 178`] = `
+exports[`no-shadow > invalid 195`] = `
 {
   "code": "const g = 1; class C { get [((g) => g)(1)]() { return 1; } }",
   "diagnostics": [
@@ -5025,7 +5467,7 @@ exports[`no-shadow > invalid 178`] = `
 }
 `;
 
-exports[`no-shadow > invalid 179`] = `
+exports[`no-shadow > invalid 196`] = `
 {
   "code": "const m = 1; class C { async *[((m) => m)(1)]() {} }",
   "diagnostics": [
@@ -5051,7 +5493,7 @@ exports[`no-shadow > invalid 179`] = `
 }
 `;
 
-exports[`no-shadow > invalid 180`] = `
+exports[`no-shadow > invalid 197`] = `
 {
   "code": "
   {
@@ -5082,7 +5524,7 @@ exports[`no-shadow > invalid 180`] = `
 }
 `;
 
-exports[`no-shadow > invalid 181`] = `
+exports[`no-shadow > invalid 198`] = `
 {
   "code": "
   {
@@ -5113,7 +5555,7 @@ exports[`no-shadow > invalid 181`] = `
 }
 `;
 
-exports[`no-shadow > invalid 182`] = `
+exports[`no-shadow > invalid 199`] = `
 {
   "code": "
 	if (true) {
@@ -5145,7 +5587,7 @@ exports[`no-shadow > invalid 182`] = `
 }
 `;
 
-exports[`no-shadow > invalid 183`] = `
+exports[`no-shadow > invalid 200`] = `
 {
   "code": "
 	// types
@@ -5197,7 +5639,7 @@ exports[`no-shadow > invalid 183`] = `
 }
 `;
 
-exports[`no-shadow > invalid 184`] = `
+exports[`no-shadow > invalid 201`] = `
 {
   "code": "
 	// types
@@ -5223,561 +5665,6 @@ exports[`no-shadow > invalid 184`] = `
         "start": {
           "column": 11,
           "line": 3,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 185`] = `
-{
-  "code": "
-  {
-	interface A {}
-  }
-  type A = 1;
-		",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 5 column 8.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 13,
-          "line": 3,
-        },
-        "start": {
-          "column": 12,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 186`] = `
-{
-  "code": "let x = foo((x,y) => {});
-let y;",
-  "diagnostics": [
-    {
-      "message": "'x' is already declared in the upper scope on line 1 column 5.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 15,
-          "line": 1,
-        },
-        "start": {
-          "column": 14,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-    {
-      "message": "'y' is already declared in the upper scope on line 2 column 5.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 1,
-        },
-        "start": {
-          "column": 16,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 187`] = `
-{
-  "code": "function a() {}
-foo(a => {});",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 10.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 6,
-          "line": 2,
-        },
-        "start": {
-          "column": 5,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 188`] = `
-{
-  "code": "let x = ((x,y) => {})();
-let y;",
-  "diagnostics": [
-    {
-      "message": "'x' is already declared in the upper scope on line 1 column 5.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 12,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-    {
-      "message": "'y' is already declared in the upper scope on line 2 column 5.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 14,
-          "line": 1,
-        },
-        "start": {
-          "column": 13,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 189`] = `
-{
-  "code": "
-  type T = 1;
-  {
-	type T = 2;
-  }
-		",
-  "diagnostics": [
-    {
-      "message": "'T' is already declared in the upper scope on line 2 column 8.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 8,
-          "line": 4,
-        },
-        "start": {
-          "column": 7,
-          "line": 4,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 190`] = `
-{
-  "code": "
-  type T = 1;
-  function foo<T>(arg: T) {}
-		",
-  "diagnostics": [
-    {
-      "message": "'T' is already declared in the upper scope on line 2 column 8.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 3,
-        },
-        "start": {
-          "column": 16,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 191`] = `
-{
-  "code": "
-  function foo<T>() {
-	return function <T>() {};
-  }
-		",
-  "diagnostics": [
-    {
-      "message": "'T' is already declared in the upper scope on line 2 column 16.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 20,
-          "line": 3,
-        },
-        "start": {
-          "column": 19,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 192`] = `
-{
-  "code": "
-  type T = string;
-  function foo<T extends (arg: any) => void>(arg: T) {}
-		",
-  "diagnostics": [
-    {
-      "message": "'T' is already declared in the upper scope on line 2 column 8.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 3,
-        },
-        "start": {
-          "column": 16,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 193`] = `
-{
-  "code": "
-  const arg = 0;
-  
-  declare const Test: {
-	new (arg: string): typeof arg;
-  };
-		",
-  "diagnostics": [
-    {
-      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 10,
-          "line": 5,
-        },
-        "start": {
-          "column": 7,
-          "line": 5,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 194`] = `
-{
-  "code": "
-  import type { foo } from './foo';
-  function doThing(foo: number) {}
-		",
-  "diagnostics": [
-    {
-      "message": "'foo' is already declared in the upper scope on line 2 column 17.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 23,
-          "line": 3,
-        },
-        "start": {
-          "column": 20,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 195`] = `
-{
-  "code": "
-  import { type foo } from './foo';
-  function doThing(foo: number) {}
-		",
-  "diagnostics": [
-    {
-      "message": "'foo' is already declared in the upper scope on line 2 column 17.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 23,
-          "line": 3,
-        },
-        "start": {
-          "column": 20,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 196`] = `
-{
-  "code": "
-  import { foo } from './foo';
-  function doThing(foo: number, bar: number) {}
-		",
-  "diagnostics": [
-    {
-      "message": "'foo' is already declared in the upper scope on line 2 column 12.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 23,
-          "line": 3,
-        },
-        "start": {
-          "column": 20,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 197`] = `
-{
-  "code": "
-  interface Foo {}
-  
-  declare module 'bar' {
-	export interface Foo {
-	  x: string;
-	}
-  }
-		",
-  "diagnostics": [
-    {
-      "message": "'Foo' is already declared in the upper scope on line 2 column 13.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 22,
-          "line": 5,
-        },
-        "start": {
-          "column": 19,
-          "line": 5,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 198`] = `
-{
-  "code": "
-  import type { Foo } from 'bar';
-  
-  declare module 'baz' {
-	export interface Foo {
-	  x: string;
-	}
-  }
-		",
-  "diagnostics": [
-    {
-      "message": "'Foo' is already declared in the upper scope on line 2 column 17.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 22,
-          "line": 5,
-        },
-        "start": {
-          "column": 19,
-          "line": 5,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 199`] = `
-{
-  "code": "
-  import { type Foo } from 'bar';
-  
-  declare module 'baz' {
-	export interface Foo {
-	  x: string;
-	}
-  }
-		",
-  "diagnostics": [
-    {
-      "message": "'Foo' is already declared in the upper scope on line 2 column 17.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 22,
-          "line": 5,
-        },
-        "start": {
-          "column": 19,
-          "line": 5,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 200`] = `
-{
-  "code": "
-  let x = foo((x, y) => {});
-  let y;
-		",
-  "diagnostics": [
-    {
-      "message": "'x' is already declared in the upper scope on line 2 column 7.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 2,
-        },
-        "start": {
-          "column": 16,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-    {
-      "message": "'y' is already declared in the upper scope on line 3 column 7.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 20,
-          "line": 2,
-        },
-        "start": {
-          "column": 19,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 201`] = `
-{
-  "code": "
-  let x = foo((x, y) => {});
-  let y;
-		",
-  "diagnostics": [
-    {
-      "message": "'x' is already declared in the upper scope on line 2 column 7.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 2,
-        },
-        "start": {
-          "column": 16,
-          "line": 2,
         },
       },
       "ruleName": "no-shadow",
@@ -5822,6 +5709,530 @@ exports[`no-shadow > invalid 202`] = `
 
 exports[`no-shadow > invalid 203`] = `
 {
+  "code": "let x = foo((x,y) => {});
+let y;",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 2 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 204`] = `
+{
+  "code": "function a() {}
+foo(a => {});",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 10.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 205`] = `
+{
+  "code": "let x = ((x,y) => {})();
+let y;",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 2 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 206`] = `
+{
+  "code": "
+  type T = 1;
+  {
+	type T = 2;
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 207`] = `
+{
+  "code": "
+  type T = 1;
+  function foo<T>(arg: T) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 208`] = `
+{
+  "code": "
+  function foo<T>() {
+	return function <T>() {};
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 16.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 209`] = `
+{
+  "code": "
+  type T = string;
+  function foo<T extends (arg: any) => void>(arg: T) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 210`] = `
+{
+  "code": "
+  const arg = 0;
+  
+  declare const Test: {
+	new (arg: string): typeof arg;
+  };
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 211`] = `
+{
+  "code": "
+  import type { foo } from './foo';
+  function doThing(foo: number) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 17.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 212`] = `
+{
+  "code": "
+  import { type foo } from './foo';
+  function doThing(foo: number) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 17.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 213`] = `
+{
+  "code": "
+  import { foo } from './foo';
+  function doThing(foo: number, bar: number) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 12.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 214`] = `
+{
+  "code": "
+  interface Foo {}
+  
+  declare module 'bar' {
+	export interface Foo {
+	  x: string;
+	}
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 215`] = `
+{
+  "code": "
+  import type { Foo } from 'bar';
+  
+  declare module 'baz' {
+	export interface Foo {
+	  x: string;
+	}
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 17.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 216`] = `
+{
+  "code": "
+  import { type Foo } from 'bar';
+  
+  declare module 'baz' {
+	export interface Foo {
+	  x: string;
+	}
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 17.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 217`] = `
+{
+  "code": "
+  let x = foo((x, y) => {});
+  let y;
+		",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 2 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 3 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 218`] = `
+{
+  "code": "
+  let x = foo((x, y) => {});
+  let y;
+		",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 2 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 219`] = `
+{
   "code": "
   {
 	interface A {}
@@ -5851,7 +6262,38 @@ exports[`no-shadow > invalid 203`] = `
 }
 `;
 
-exports[`no-shadow > invalid 204`] = `
+exports[`no-shadow > invalid 220`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 221`] = `
 {
   "code": "
 	if (true) {
@@ -5883,7 +6325,7 @@ exports[`no-shadow > invalid 204`] = `
 }
 `;
 
-exports[`no-shadow > invalid 205`] = `
+exports[`no-shadow > invalid 222`] = `
 {
   "code": "
 	// types
@@ -5935,7 +6377,7 @@ exports[`no-shadow > invalid 205`] = `
 }
 `;
 
-exports[`no-shadow > invalid 206`] = `
+exports[`no-shadow > invalid 223`] = `
 {
   "code": "
 	// types
@@ -5972,7 +6414,7 @@ exports[`no-shadow > invalid 206`] = `
 }
 `;
 
-exports[`no-shadow > invalid 207`] = `
+exports[`no-shadow > invalid 224`] = `
 {
   "code": "
   {
@@ -6003,7 +6445,7 @@ exports[`no-shadow > invalid 207`] = `
 }
 `;
 
-exports[`no-shadow > invalid 208`] = `
+exports[`no-shadow > invalid 225`] = `
 {
   "code": "
 			const A = 2;
