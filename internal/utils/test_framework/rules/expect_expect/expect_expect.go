@@ -168,6 +168,28 @@ func clearUncheckedCalls(unchecked *[]*ast.Node, calls []*ast.Node) {
 	}
 }
 
+// markAsserted records that the callback identified by declNode/fnName has been
+// seen to assert, then clears any registrations already queued against that
+// declaration or name from the ledger. Both the FunctionDeclaration and
+// VariableDeclaration branches of checkCallExpressionUsed share this sequence;
+// they differ only in which node stands in for the declaration.
+func markAsserted(
+	declNode *ast.Node,
+	fnName string,
+	unchecked *[]*ast.Node,
+	uncheckedByDecl map[*ast.Node][]*ast.Node,
+	uncheckedByName map[string][]*ast.Node,
+	assertedByDecl map[*ast.Node]bool,
+	assertedByName map[string]bool,
+) {
+	assertedByDecl[declNode] = true
+	assertedByName[fnName] = true
+	clearUncheckedCalls(unchecked, uncheckedByDecl[declNode])
+	delete(uncheckedByDecl, declNode)
+	clearUncheckedCalls(unchecked, uncheckedByName[fnName])
+	delete(uncheckedByName, fnName)
+}
+
 func checkCallExpressionUsed(
 	assertNode *ast.Node,
 	unchecked *[]*ast.Node,
@@ -187,16 +209,8 @@ func checkCallExpressionUsed(
 		case ast.KindFunctionDeclaration:
 			decl := n.AsFunctionDeclaration()
 			if decl != nil && decl.Name() != nil {
-				declNode := decl.AsNode()
-				fnName := decl.Name().Text()
-
-				assertedByDecl[declNode] = true
-				assertedByName[fnName] = true
-				clearUncheckedCalls(unchecked, uncheckedByDecl[declNode])
-				delete(uncheckedByDecl, declNode)
-
-				clearUncheckedCalls(unchecked, uncheckedByName[fnName])
-				delete(uncheckedByName, fnName)
+				markAsserted(decl.AsNode(), decl.Name().Text(),
+					unchecked, uncheckedByDecl, uncheckedByName, assertedByDecl, assertedByName)
 			}
 		case ast.KindVariableDeclaration:
 			declaration := n.AsVariableDeclaration()
@@ -205,13 +219,8 @@ func checkCallExpressionUsed(
 				declaration.Initializer != nil {
 				initializer := ast.SkipParentheses(declaration.Initializer)
 				if ast.IsFunctionExpressionOrArrowFunction(initializer) {
-					fnName := declaration.Name().Text()
-					assertedByDecl[initializer] = true
-					assertedByName[fnName] = true
-					clearUncheckedCalls(unchecked, uncheckedByDecl[initializer])
-					delete(uncheckedByDecl, initializer)
-					clearUncheckedCalls(unchecked, uncheckedByName[fnName])
-					delete(uncheckedByName, fnName)
+					markAsserted(initializer, declaration.Name().Text(),
+						unchecked, uncheckedByDecl, uncheckedByName, assertedByDecl, assertedByName)
 				}
 			}
 		}
