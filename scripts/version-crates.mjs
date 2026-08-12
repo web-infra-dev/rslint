@@ -1,36 +1,37 @@
 #!/usr/bin/env zx
 
-import { fs, path, chalk } from 'zx';
+import fs from 'node:fs/promises';
+import { argv, chalk } from 'zx';
+import {
+  TSGO_CRATE,
+  TSGO_NPM_PACKAGES,
+  readTsgoReleaseState,
+  replaceCargoLockVersion,
+  replaceCargoManifestVersion,
+  validateTsgoReleaseState,
+} from './tsgo-release-utils.mjs';
 
-// Version bump for publishable Rust crates, kept separate from
-// scripts/version.mjs: crates are versioned and published to crates.io
-// (via .github/workflows/release-crates.yml) on their own line, independent
-// of the unified npm package version.
-//
-// canary is intentionally unsupported here — a crates.io library gains nothing
-// from prerelease versions (default `^` ranges never resolve to them) and
-// published versions can never be deleted, only yanked.
+// Version the complete crate release line: tsgo-client and all related
+// @rslint/tsgo-server npm packages.
 
-// Crates bumped by this script. rslint-native is excluded (publish = false).
-const PUBLISHABLE_CRATES = ['crates/tsgo-client/Cargo.toml'];
-const CARGO_LOCK = 'Cargo.lock';
-
-const bumpType = process.argv[3];
+const bumpType = argv._[0];
 
 if (!bumpType || !['major', 'minor', 'patch'].includes(bumpType)) {
-  console.error(
-    chalk.red('❌ Usage: zx scripts/version-crates.mjs <major|minor|patch>'),
-  );
+  console.error(chalk.red('❌ Usage: pnpm version:crates <major|minor|patch>'));
   console.error(
     chalk.gray(
-      '   canary is not supported for crates (independent crates.io versioning).',
+      '   Canary versions are unsupported because crates.io releases cannot be deleted.',
     ),
   );
   process.exit(1);
 }
 
 function bumpVersion(version, type) {
-  const [major, minor, patch] = version.split('.').map(Number);
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) {
+    throw new Error(`unsupported current tsgo version: ${version}`);
+  }
+  const [, major, minor, patch] = match.map(Number);
   switch (type) {
     case 'major':
       return `${major + 1}.0.0`;
@@ -39,118 +40,53 @@ function bumpVersion(version, type) {
     case 'patch':
       return `${major}.${minor}.${patch + 1}`;
     default:
-      throw new Error(`Invalid bump type: ${type}`);
+      throw new Error(`invalid bump type: ${type}`);
   }
-}
-
-// Replace `version = "..."` in the [package] section only, leaving version
-// fields under [dependencies] etc. untouched.
-function bumpManifest(content, type) {
-  const lines = content.split('\n');
-  let inPackage = false;
-  let name = null;
-  let oldVersion = null;
-  let newVersion = null;
-
-  for (let i = 0; i < lines.length; i++) {
-    if (/^\s*\[/.test(lines[i])) {
-      inPackage = lines[i].trim() === '[package]';
-      continue;
-    }
-    if (!inPackage) continue;
-
-    const nameMatch = lines[i].match(/^\s*name\s*=\s*"([^"]+)"/);
-    if (nameMatch) name = nameMatch[1];
-
-    if (newVersion === null) {
-      const m = lines[i].match(/^(\s*version\s*=\s*")([^"]+)(".*)$/);
-      if (m) {
-        oldVersion = m[2];
-        newVersion = bumpVersion(m[2], type);
-        lines[i] = `${m[1]}${newVersion}${m[3]}`;
-      }
-    }
-  }
-
-  if (newVersion === null) {
-    throw new Error('no [package] version field found');
-  }
-  return { content: lines.join('\n'), name, oldVersion, newVersion };
-}
-
-// Sync a local workspace member's version in Cargo.lock so
-// `cargo publish --locked` stays happy. Local members carry no checksum, so
-// only the version line under their `name = "..."` entry needs touching.
-function bumpLock(content, crateName, newVersion) {
-  const lines = content.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() !== `name = "${crateName}"`) continue;
-    for (let j = i + 1; j < lines.length; j++) {
-      if (/^\s*\[\[package\]\]/.test(lines[j])) break;
-      const m = lines[j].match(/^(\s*version\s*=\s*")([^"]+)(".*)$/);
-      if (m) {
-        lines[j] = `${m[1]}${newVersion}${m[3]}`;
-        return { content: lines.join('\n'), updated: true };
-      }
-    }
-  }
-  return { content, updated: false };
 }
 
 async function main() {
-  const lockPath = path.join(process.cwd(), CARGO_LOCK);
-  const hasLock = await fs.pathExists(lockPath);
-  let lockContent = hasLock ? await fs.readFile(lockPath, 'utf8') : '';
-  let lockDirty = false;
+  // Validate every manifest and Cargo.lock before writing anything. This keeps
+  // an accidental pre-existing mismatch from being silently normalized.
+  const state = await readTsgoReleaseState();
+  const oldVersion = validateTsgoReleaseState(state);
+  const newVersion = bumpVersion(oldVersion, bumpType);
 
-  for (const rel of PUBLISHABLE_CRATES) {
-    const manifestPath = path.join(process.cwd(), rel);
-    const raw = await fs.readFile(manifestPath, 'utf8');
-    const { content, name, oldVersion, newVersion } = bumpManifest(
-      raw,
-      bumpType,
-    );
-
-    await fs.writeFile(manifestPath, content);
-    console.log(chalk.green(`✅ ${name}: ${oldVersion} → ${newVersion}`));
-    console.log(chalk.gray(`   ${rel}`));
-
-    if (hasLock) {
-      const { content: nextLock, updated } = bumpLock(
-        lockContent,
-        name,
-        newVersion,
-      );
-      if (updated) {
-        lockContent = nextLock;
-        lockDirty = true;
-      } else {
-        console.log(
-          chalk.yellow(
-            `⚠️  ${name} not found in Cargo.lock — run \`cargo update -p ${name}\` to sync`,
-          ),
-        );
-      }
-    }
-  }
-
-  if (lockDirty) {
-    await fs.writeFile(lockPath, lockContent);
-    console.log(chalk.green('✅ Cargo.lock synced'));
-  }
-
-  console.log(chalk.blue('\n🔧 Next steps:'));
-  console.log(
-    chalk.gray('  1. Commit the version bump (Cargo.toml + Cargo.lock)'),
+  const crateManifest = replaceCargoManifestVersion(
+    state.crateManifestRaw,
+    newVersion,
   );
+  const cargoLock = replaceCargoLockVersion(state.cargoLockRaw, newVersion);
+  const npmManifests = state.npmPackages.map(({ expected, manifest }) => ({
+    manifestPath: expected.manifestPath,
+    content: `${JSON.stringify({ ...manifest, version: newVersion }, null, 2)}\n`,
+    name: manifest.name,
+  }));
+
+  await Promise.all([
+    fs.writeFile(TSGO_CRATE.manifestPath, crateManifest),
+    fs.writeFile(TSGO_CRATE.lockPath, cargoLock),
+    ...npmManifests.map(({ manifestPath, content }) =>
+      fs.writeFile(manifestPath, content),
+    ),
+  ]);
+
+  console.log(
+    chalk.green(`✅ ${TSGO_CRATE.name}: ${oldVersion} → ${newVersion}`),
+  );
+  for (const { name } of npmManifests) {
+    console.log(chalk.green(`✅ ${name}: ${oldVersion} → ${newVersion}`));
+  }
+
+  console.log(chalk.blue('\nNext steps:'));
+  console.log(chalk.gray('  1. Commit the shared tsgo version bump'));
   console.log(
     chalk.gray(
-      '  2. Publish via the "📦 Release crates" workflow (Actions → workflow_dispatch)',
+      '  2. Run the "📦 Release tsgo" workflow for npm and crates.io together',
     ),
   );
 }
 
-main().catch((err) => {
-  console.error(chalk.red('❌ Error during crate version bump:'), err.message);
+main().catch((error) => {
+  console.error(chalk.red('❌ Failed to version tsgo:'), error.message);
   process.exit(1);
 });

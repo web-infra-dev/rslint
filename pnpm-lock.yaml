@@ -538,22 +538,22 @@ importers:
 
   packages/tsgo:
     optionalDependencies:
-      '@rslint/tsgo-darwin-arm64':
+      '@rslint/tsgo-server-darwin-arm64':
         specifier: workspace:*
         version: link:../../npm/tsgo/darwin-arm64
-      '@rslint/tsgo-darwin-x64':
+      '@rslint/tsgo-server-darwin-x64':
         specifier: workspace:*
         version: link:../../npm/tsgo/darwin-x64
-      '@rslint/tsgo-linux-arm64':
+      '@rslint/tsgo-server-linux-arm64':
         specifier: workspace:*
         version: link:../../npm/tsgo/linux-arm64
-      '@rslint/tsgo-linux-x64':
+      '@rslint/tsgo-server-linux-x64':
         specifier: workspace:*
         version: link:../../npm/tsgo/linux-x64
-      '@rslint/tsgo-win32-arm64':
+      '@rslint/tsgo-server-win32-arm64':
         specifier: workspace:*
         version: link:../../npm/tsgo/win32-arm64
-      '@rslint/tsgo-win32-x64':
+      '@rslint/tsgo-server-win32-x64':
         specifier: workspace:*
         version: link:../../npm/tsgo/win32-x64
 

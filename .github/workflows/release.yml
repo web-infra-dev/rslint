@@ -105,7 +105,7 @@ jobs:
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |
-          pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
+          pnpm --filter='!@rslint/tsgo-server' --filter='!@rslint/tsgo-server-*' -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions"
           version=$(jq -r .version package.json)
@@ -251,10 +251,6 @@ jobs:
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
 
-      - name: Go Build tsgo
-        run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo ./cmd/tsgo
-
       # Rule options JSON Schema dump for the generate-rule-option-types
       # rslib plugin (see packages/rslint/rslib.config.ts), read by
       # publish-npm once move-artifacts places it. The dump is
@@ -277,26 +273,6 @@ jobs:
         with:
           name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
           path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
-
-      - name: Upload tsgo artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo
-          path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo
-
-      - name: Build typescript-go
-        run: |
-          cd typescript-go
-          npm ci
-          npm run build
-          # Remove tsgo binary from typescript-go build, we use our own ./cmd/tsgo build
-          rm -f built/local/tsgo built/local/tsgo.exe
-
-      - name: Upload typescript-go built artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo-built
-          path: typescript-go/built
 
   # napi `.node` parser binaries, one per target → the @rslint/native-{tuple}
   # subpackages. Separate matrix from the Go build job (which is ubuntu-only):
