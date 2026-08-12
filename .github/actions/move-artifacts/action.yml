@@ -1,5 +1,5 @@
-name: Move Artifacts
-description: move artifacts to npm directory
+name: Move rslint artifacts
+description: Assemble @rslint/native platform packages from release artifacts
 runs:
   using: composite
 

@@ -149,7 +149,7 @@ vite.config.ts.timestamp-*
 /bin/rslint
 npm/*/rslint
 npm/*/rslint.exe
-npm/tsgo/*/local
+npm/tsgo/*/lib
 
 # napi build artifacts, never committed: the platform loader + its types now
 # live in @rslint/core (src/eslint-plugin/native/), so build:js needs neither

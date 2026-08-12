@@ -1,8 +1,8 @@
 {
-  "name": "@rslint/tsgo-win32-arm64",
-  "version": "0.7.3",
+  "name": "@rslint/tsgo-server-win32-arm64",
+  "version": "0.0.7",
   "license": "MIT",
-  "description": "tsgo binary for windows arm64",
+  "description": "tsgo server binary for windows arm64",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
     "type": "git",
