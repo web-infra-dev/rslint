@@ -359,9 +359,15 @@ func TestMatchNoCase(t *testing.T) {
 // which it measures before it reads anything else about the pattern. Nothing
 // the pattern says is honored after that, a leading `!` included, so a pattern
 // this long matches nothing rather than everything.
+//
+// The length is the one String.prototype.length reports, in UTF-16 code units,
+// so a pattern written in characters that take three bytes to spell fits three
+// times what its size in memory would allow.
 func TestMatchOverLongPattern(t *testing.T) {
 	longest := strings.Repeat("a/", 32767) + "a"
 	tooLong := strings.Repeat("a/", 32768) + "a"
+	wideLongest := strings.Repeat("界", 65536)
+	wideTooLong := strings.Repeat("界", 65537)
 
 	tests := []struct {
 		name    string
@@ -371,8 +377,10 @@ func TestMatchOverLongPattern(t *testing.T) {
 	}{
 		{name: "the longest pattern still compiles", pattern: longest, path: longest, want: true},
 		{name: "negating the longest pattern still compiles", pattern: "!" + longest, path: "x", want: true},
-		{name: "one byte past matches nothing", pattern: tooLong, path: tooLong, want: false},
-		{name: "negating one byte past matches nothing either", pattern: "!" + tooLong, path: "x", want: false},
+		{name: "one code unit past matches nothing", pattern: tooLong, path: tooLong, want: false},
+		{name: "negating one code unit past matches nothing either", pattern: "!" + tooLong, path: "x", want: false},
+		{name: "the longest pattern of wide characters still compiles", pattern: wideLongest, path: wideLongest, want: true},
+		{name: "one wide character past matches nothing", pattern: wideTooLong, path: wideTooLong, want: false},
 	}
 
 	for _, test := range tests {

@@ -90,8 +90,8 @@ const (
 	nonTerminator = `[^\n\r\u2028\u2029]`
 	// reSpecials are the characters that need escaping in a regexp.
 	reSpecials = `().*{}+?[]^$\!`
-	// maxPatternLength bounds a pattern the way minimatch does, counting the
-	// bytes of a pattern where minimatch counts the UTF-16 units of one.
+	// maxPatternLength bounds a pattern the way minimatch does, in the UTF-16
+	// code units JavaScript measures a string in.
 	maxPatternLength = 1024 * 64
 )
 
@@ -146,7 +146,7 @@ func New(pattern string, options Options) *Matcher {
 	// else about it, and refuses to compile one this long. Nothing about the
 	// pattern is honored past that point, a leading `!` included, so a matcher
 	// that says no to every path stands in for the refusal.
-	if len(pattern) > maxPatternLength {
+	if overMaxPatternLength(pattern) {
 		m.invalid = true
 		return m
 	}
@@ -154,6 +154,29 @@ func New(pattern string, options Options) *Matcher {
 	m.pattern = trimECMA(pattern)
 	m.make()
 	return m
+}
+
+// overMaxPatternLength reports whether a pattern runs past the length
+// minimatch refuses to compile one at, measuring it in the UTF-16 code units
+// String.prototype.length counts rather than in bytes. A character below
+// U+10000 is one code unit and the rest are two, so the count never runs above
+// the length in bytes: a pattern that fits the limit in bytes fits it in code
+// units too, which is what keeps the scan off the ordinary pattern.
+func overMaxPatternLength(pattern string) bool {
+	if len(pattern) <= maxPatternLength {
+		return false
+	}
+	units := 0
+	for _, r := range pattern {
+		units++
+		if r > 0xFFFF {
+			units++
+		}
+		if units > maxPatternLength {
+			return true
+		}
+	}
+	return false
 }
 
 // trimECMA trims the pattern the way String.prototype.trim does. Go's
@@ -334,7 +357,7 @@ type patternListItem struct {
 // caller's source rather than compiled on its own. The third result is false
 // when the part cannot be translated at all, which drops the whole expansion.
 func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
-	if len(pattern) > maxPatternLength {
+	if overMaxPatternLength(pattern) {
 		return "", false, false
 	}
 	if pattern == "" {
