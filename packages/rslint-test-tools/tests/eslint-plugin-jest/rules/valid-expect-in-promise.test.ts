@@ -29,12 +29,6 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
     },
     {
       code: `test('case', () => {
-        const pending = load().then(value => expect(value).toBe(1));
-        return Promise.any([pending]);
-      });`,
-    },
-    {
-      code: `test('case', () => {
         const [pending] = [load().then(value => expect(value).toBe(1))];
         return pending;
       });`,
@@ -94,13 +88,6 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
         return Promise.allSettled([pending]);
       });`,
       errors: [{ messageId: 'expectInFloatingPromise', line: 2, column: 15 }],
-    },
-    {
-      code: `test('case', () => {
-        const pending = load().then(value => expect(value).toBe(1));
-        return Promise.race([pending, other]);
-      });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
     },
     {
       code: `test('case', async () => {

@@ -531,20 +531,10 @@ func safePromiseAggregatorForExpression(arrayNode, value *ast.Node) bool {
 		return false
 	}
 	name := testFramework.CalleeChainName(call.Expression)
-	switch name {
-	case "Promise.all":
-		return expressionIsAwaitedOrReturned(callNode)
-	case "Promise.any", "Promise.race":
-		array := arrayNode.AsArrayLiteralExpression()
-		if array.Elements == nil || len(array.Elements.Nodes) != 1 ||
-			ast.SkipParentheses(array.Elements.Nodes[0]) != ast.SkipParentheses(value) ||
-			array.Elements.Nodes[0].Kind == ast.KindSpreadElement {
-			return false
-		}
-		return expressionIsAwaitedOrReturned(callNode)
-	default:
+	if name != "Promise.all" {
 		return false
 	}
+	return expressionIsAwaitedOrReturned(callNode)
 }
 
 func expressionIsAwaitedOrReturned(node *ast.Node) bool {

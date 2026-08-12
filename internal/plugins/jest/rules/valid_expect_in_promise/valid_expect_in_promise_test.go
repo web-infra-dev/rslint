@@ -20,8 +20,6 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); other = 1; await pending; });`},
 			{Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.resolve(pending); });`},
 			{Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.all([pending]); });`},
-			{Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.any([pending]); });`},
-			{Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.race([pending]); });`},
 			{Code: `test("case", () => { const [pending] = [promise.then(value => expect(value).toBe(1))]; return pending; });`},
 			{Code: `test("case", () => { const { pending } = { pending: promise.then(value => expect(value).toBe(1)) }; return pending; });`},
 			{Code: `test("case", () => { let pending; [pending] = [promise.then(value => expect(value).toBe(1))]; return pending; });`},
@@ -94,18 +92,6 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 					MessageId: "expectInFloatingPromise",
 					Line:      1,
 					Column:    39,
-				}},
-			},
-			{
-				Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.any([pending, other]); });`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "expectInFloatingPromise",
-				}},
-			},
-			{
-				Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.race([pending, other]); });`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "expectInFloatingPromise",
 				}},
 			},
 			{

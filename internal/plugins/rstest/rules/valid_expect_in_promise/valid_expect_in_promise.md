@@ -33,6 +33,6 @@ The rule recognizes Rstest globals, `@rstest/core` imports and requires, namespa
 
 Rstest does not support Jest-style `done` callbacks. A regular test callback's first argument is `TestContext`; `test.for` receives context as its second callback argument, while `test.each` receives case values only. All of these callbacks are analyzed.
 
-The rule follows promises stored in local bindings, including statically mappable array and object destructuring, and requires every reachable path to consume them. `Promise.resolve`, `Promise.all`, and single-input `Promise.any` / `Promise.race` preserve assertion failure. `Promise.reject` and `Promise.allSettled` are not safe sinks.
+The rule follows promises stored in local bindings, including statically mappable array and object destructuring, and requires every reachable path to consume them. `Promise.resolve` and `Promise.all` preserve assertion failure. `Promise.reject` and `Promise.allSettled` are not safe sinks.
 
 This rule has no options and does not provide an autofix.

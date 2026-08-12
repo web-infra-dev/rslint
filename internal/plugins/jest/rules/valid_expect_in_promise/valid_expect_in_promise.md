@@ -20,7 +20,7 @@ test('loads a value', async () => {
 });
 ```
 
-The rule follows promises stored in local bindings, including statically mappable array and object destructuring, and requires every reachable path to consume them. `Promise.resolve`, `Promise.all`, and single-input `Promise.any` / `Promise.race` preserve assertion failure. `Promise.reject` does not adopt its argument, and `Promise.allSettled` converts assertion failure into a fulfilled result, so neither is a safe sink.
+The rule follows promises stored in local bindings, including statically mappable array and object destructuring, and requires every reachable path to consume them. `Promise.resolve` and `Promise.all` preserve assertion failure. `Promise.reject` does not adopt its argument, and `Promise.allSettled` converts assertion failure into a fulfilled result, so neither is a safe sink.
 
 Jest callbacks using `done` are not analyzed because the callback can coordinate promise completion explicitly. Named callbacks and promise-handler callbacks are analyzed when their relationship to a test is statically known.
 
