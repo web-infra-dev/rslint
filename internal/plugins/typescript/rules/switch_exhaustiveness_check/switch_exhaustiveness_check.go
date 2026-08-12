@@ -292,9 +292,26 @@ func typeToString(typeChecker *checker.Checker, t *checker.Type) string {
 
 // requiresQuoting reports whether name needs bracket-quoting
 // (`Enum['a-b']`) rather than dot access (`Enum.ab`) when read back as a
-// property name.
+// property name. Like upstream, the name is inspected one UTF-16 code unit at
+// a time, so a character outside the BMP is seen as a surrogate pair and
+// requires quoting even though the code point itself is a letter.
 func requiresQuoting(name string) bool {
-	return !scanner.IsValidIdentifier(name)
+	if name == "" {
+		return true
+	}
+	for i, ch := range name {
+		if ch > 0xFFFF {
+			return true
+		}
+		if i == 0 {
+			if !scanner.IsIdentifierStart(ch) {
+				return true
+			}
+		} else if !scanner.IsIdentifierPart(ch) {
+			return true
+		}
+	}
+	return false
 }
 
 func checkSwitchExhaustive(

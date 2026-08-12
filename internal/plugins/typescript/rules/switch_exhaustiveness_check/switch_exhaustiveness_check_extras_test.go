@@ -358,6 +358,49 @@ switch (value) {
 					{MessageId: "dangerousDefaultCase", Line: 8, Column: 3, EndLine: 8, EndColumn: 16},
 				},
 			},
+			// ---- requiresQuoting walks UTF-16 code units: an enum member named with a
+			// character outside the BMP is a surrogate pair there, and neither half is an
+			// identifier character, so the suggestion must bracket-quote it. Verified
+			// against ESLint: suggests `case Astral['𐐀']`. ----
+			{
+				Code: `
+enum Astral {
+  '𐐀' = 1,
+  b = 2,
+}
+
+declare const value: Astral;
+
+switch (value) {
+  case Astral.b:
+    break;
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "switchIsNotExhaustive",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "addMissingCases",
+								Output: `
+enum Astral {
+  '𐐀' = 1,
+  b = 2,
+}
+
+declare const value: Astral;
+
+switch (value) {
+  case Astral.b:
+    break;
+  case Astral['𐐀']: { throw new Error('Not implemented yet: Astral[\'𐐀\'] case') }
+}
+`,
+							},
+						},
+					},
+				},
+			},
 			// ---- Branch lock-in: getCommentDefaultCase matches a block comment, not just a
 			// line comment (the `/*...*/`-stripping branch in getCommentDefaultCase). ----
 			{
