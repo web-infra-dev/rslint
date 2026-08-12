@@ -52,8 +52,3 @@ expect.extend({});
 
 - First argument (optional): object with `additionalTestBlockFunctions`
   - `additionalTestBlockFunctions`: array of function names that should also be treated as test blocks (for example `each.test`).
-
-## Original Documentation
-
-- [eslint-plugin-jest: no-standalone-expect](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-standalone-expect.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-standalone-expect.ts)
