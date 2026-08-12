@@ -659,5 +659,18 @@
       "rstest:no-disabled-tests",
       "rstest:no-identical-title"
     ]
+  },
+  {
+    "version": "0.8.0",
+    "rules": [
+      "@typescript-eslint:no-unnecessary-type-parameters",
+      "eslint-plugin-import:no-restricted-paths",
+      "eslint:consistent-return",
+      "eslint:no-useless-return",
+      "eslint:unicode-bom",
+      "rstest:no-conditional-expect",
+      "rstest:no-interpolation-in-snapshots",
+      "rstest:valid-title"
+    ]
   }
 ]
