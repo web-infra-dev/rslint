@@ -15,5 +15,5 @@ func Resolve(moduleSpecifier *ast.StringLiteralLike, ctx rule.RuleContext) (stri
 	if !ctx.HasProgram() {
 		return "", false
 	}
-	return rslint_utils.ResolveModulePath(ctx.Program, ctx.SourceFile, moduleSpecifier)
+	return rslint_utils.ResolveModulePath(ctx.Program(), ctx.SourceFile, moduleSpecifier)
 }

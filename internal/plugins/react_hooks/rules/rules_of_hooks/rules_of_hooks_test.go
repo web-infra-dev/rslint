@@ -62,10 +62,9 @@ function MyComponent({ theme }: { theme: string }) {
 	diagnosticCount := 0
 	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     lintprogram.NewTypeScript(program),
 		Settings:    nil,
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
+	}).WithProgram(lintprogram.NewTypeScript(program)).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
 		diagnosticCount++
 	})
 

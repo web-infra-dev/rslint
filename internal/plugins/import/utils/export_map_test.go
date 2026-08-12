@@ -156,7 +156,7 @@ func TestHasExport(t *testing.T) {
 
 func TestExportQueriesSupportStandaloneProgram(t *testing.T) {
 	programContext, specifier := contextForImport(t, "./re-export")
-	program := programContext.Program
+	program := programContext.Program()
 	if program == nil {
 		t.Fatal("fixture did not create a Program")
 	}
@@ -168,8 +168,9 @@ func TestExportQueriesSupportStandaloneProgram(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStandaloneFromTypeScriptSources: %v", err)
 	}
-	standaloneContext := programContext
-	standaloneContext.Program = standalone
+	standaloneContext := (rule.RuleContext{
+		SourceFile: programContext.SourceFile,
+	}).WithProgram(standalone)
 	standaloneContext.Modules = rule.NewModuleGraph(standalone)
 
 	if found, ok := import_utils.HasExport(standaloneContext, specifier, "baz"); !ok || !found {
@@ -617,10 +618,9 @@ func contextForImport(t *testing.T, source string) (rule.RuleContext, *ast.Node)
 		return rule.RuleContext{}, nil
 	}
 
-	return rule.RuleContext{
-		Program:    lintprogram.NewTypeScript(program),
+	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}, importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewTypeScript(program)), importDecl.ModuleSpecifier
 }
 
 func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.RuleContext, *ast.Node) {
@@ -646,10 +646,9 @@ func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.Rule
 		return rule.RuleContext{}, nil
 	}
 
-	return rule.RuleContext{
-		Program:    lintprogram.NewTypeScript(program),
+	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}, importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewTypeScript(program)), importDecl.ModuleSpecifier
 }
 
 func contextForImportWithCompilerOptions(t *testing.T, source string, options *core.CompilerOptions) (rule.RuleContext, *ast.Node) {
@@ -677,8 +676,7 @@ func contextForImportWithCompilerOptions(t *testing.T, source string, options *c
 		return rule.RuleContext{}, nil
 	}
 
-	return rule.RuleContext{
-		Program:    lintprogram.NewTypeScript(program),
+	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}, importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewTypeScript(program)), importDecl.ModuleSpecifier
 }

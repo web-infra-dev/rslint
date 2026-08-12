@@ -77,7 +77,8 @@ func CachedByTypeScriptProgram[T any](program *compiler.Program, key any, build 
 // lifetime cache; standalone Programs use the cache owned by their run-scoped
 // module graph and cannot leak beyond that lint run.
 func CachedByProgram[T any](ctx RuleContext, key any, build func() T) T {
-	if typeScriptProgram := ctx.TypeScriptProgram(); typeScriptProgram != nil {
+	typeScriptProgram := ctx.TypeScriptProgram()
+	if typeScriptProgram != nil {
 		return CachedByTypeScriptProgram(typeScriptProgram, key, build)
 	}
 	if ctx.Modules == nil {

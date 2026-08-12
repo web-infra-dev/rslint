@@ -964,11 +964,10 @@ function shadowed(a: number) {
 				}
 				ctx := (rule.RuleContext{
 					SourceFile:     sourceFile,
-					Program:        lintprogram.NewTypeScript(program),
 					TypeChecker:    checker,
 					Comments:       comments,
 					DisableManager: rule.NewDisableManager(sourceFile, comments),
-				}).WithDiagnosticConsumer(NoParamReassignRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+				}).WithProgram(lintprogram.NewTypeScript(program)).WithDiagnosticConsumer(NoParamReassignRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
 					Demand: demand,
 					Report: func(diagnostic rule.RuleDiagnostic) {
 						diagnostics = append(diagnostics, diagnostic)

@@ -6,14 +6,52 @@ import (
 	"time"
 	"weak"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/binder"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type programCacheTestKey struct{}
+
+func TestRuleContextWithProgramBindsCapabilityOnce(t *testing.T) {
+	typeScript := programCacheTestProgram(t)
+	sourceFile := typeScript.GetSourceFile("/program-cache-fixture/file.ts")
+	if sourceFile == nil {
+		t.Fatal("fixture source file was not parsed")
+	}
+	if !sourceFile.IsBound() {
+		binder.BindSourceFile(sourceFile)
+	}
+	standalone, err := lintprogram.NewStandaloneFromTypeScriptSources(
+		typeScript,
+		[]*ast.SourceFile{sourceFile},
+	)
+	if err != nil {
+		t.Fatalf("NewStandaloneFromTypeScriptSources: %v", err)
+	}
+
+	compilerBacked := lintprogram.NewTypeScript(typeScript)
+	ctx := (RuleContext{}).WithProgram(compilerBacked)
+	if ctx.Program() != compilerBacked || ctx.TypeScriptProgram() != typeScript {
+		t.Fatal("compiler-backed context lost its source capability")
+	}
+	standaloneCtx := (RuleContext{}).WithProgram(standalone)
+	if standaloneCtx.Program() != standalone || standaloneCtx.TypeScriptProgram() != nil {
+		t.Fatal("standalone context gained a ts-go capability")
+	}
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("rebinding a context to another Program did not panic")
+		}
+	}()
+	_ = ctx.WithProgram(standalone)
+}
 
 // TestCachedByTypeScriptProgramReusesWithinOneProgram locks in the point of the cache:
 // two callers asking about the same Program under the same key get the value

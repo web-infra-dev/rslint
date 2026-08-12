@@ -89,7 +89,6 @@ undeclaredName123;
 			var reported []string
 			ctx := (rule.RuleContext{
 				SourceFile:  sourceFile,
-				Program:     lintprogram.NewTypeScript(program),
 				TypeChecker: tc,
 				Refs:        rule.NewRefStore(sourceFile, program.Options(), tc, rule.RefStoreInit{}),
 				Globals: rule.NewGlobals(rule.LanguageOptions{}, rule.GlobalsInit{}, map[string]utils.GlobalAccess{
@@ -97,7 +96,7 @@ undeclaredName123;
 					"myOffGlobal":        utils.GlobalAccessOff,
 					"myOffLocal":         utils.GlobalAccessOff,
 				}, nil, nil),
-			}).WithReporter("test/no-undef", rule.SeverityError, func(d rule.RuleDiagnostic) {
+			}).WithProgram(lintprogram.NewTypeScript(program)).WithReporter("test/no-undef", rule.SeverityError, func(d rule.RuleDiagnostic) {
 				reported = append(reported, d.Message.Description)
 			})
 

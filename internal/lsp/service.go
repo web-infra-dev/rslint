@@ -974,7 +974,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 // runLintWithProgramLoader resolves one document against two distinct
 // directories: configCwd is the config's own path space, which a nested JS
 // config moves to its own directory, while processCwd is the server's working
-// directory that rules see as RuleContext.Cwd.
+// directory that rules see through RuleContext.ProcessCurrentDirectory.
 func runLintWithProgramLoader(
 	uri lsproto.DocumentUri,
 	session *project.Session,

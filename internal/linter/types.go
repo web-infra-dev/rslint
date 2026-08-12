@@ -129,7 +129,8 @@ type RunLinterOptions struct {
 	Programs       []*program.Program
 	SingleThreaded bool
 	// Cwd is the working directory of the linting run, forwarded verbatim to
-	// every RuleContext. See RuleContext.Cwd for what rules may assume of it.
+	// every RuleContext. See RuleContext.ProcessCurrentDirectory for what rules
+	// may assume of it.
 	Cwd string
 
 	Scope            FileScope

@@ -199,7 +199,7 @@ func TestStandaloneGapProgramSupportsCrossFileImportRules(t *testing.T) {
 					Name:     no_cycle.NoCycleRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						if ctx.Program == nil || ctx.TypeScriptProgram() != nil || !ctx.HasProgram() || ctx.Modules == nil {
+						if ctx.Program() == nil || ctx.TypeScriptProgram() != nil || !ctx.HasProgram() || ctx.Modules == nil {
 							t.Fatal("standalone import rule lost its Program")
 						}
 						return no_cycle.NoCycleRule.Run(ctx, nil)

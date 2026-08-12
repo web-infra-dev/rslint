@@ -27,7 +27,7 @@ func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName strin
 	if !ctx.HasProgram() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return false, false
 	}
-	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.Program))
+	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.Program()))
 }
 
 // exportKey is one (file, name) lookup in flight, so a re-export chain that

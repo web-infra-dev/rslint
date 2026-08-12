@@ -4,13 +4,21 @@ package rule
 // file's lint pass. Rules on one file run serially, so the cache intentionally
 // does not synchronize access.
 type FileCache struct {
-	values map[any]any
+	values                  map[any]any
+	processCurrentDirectory string
 }
 
 // NewFileCache creates the cache that the linter shares with every rule on one
 // file. Rules should consume it through CachedByFile rather than retaining it.
 func NewFileCache() *FileCache {
 	return &FileCache{}
+}
+
+// NewFileCacheWithProcessCurrentDirectory creates the per-file shared state
+// used by the linter and records the process working directory once per file
+// instead of copying its string into every rule context.
+func NewFileCacheWithProcessCurrentDirectory(currentDirectory string) *FileCache {
+	return &FileCache{processCurrentDirectory: currentDirectory}
 }
 
 // WithFileCache returns a context attached to cache. This is a linter assembly

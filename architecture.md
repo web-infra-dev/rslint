@@ -284,11 +284,17 @@ type RuleContext struct {
     Globals        Globals
     Comments       *CommentStore
     Refs           *RefStore
-    Program        *program.Program
+    Modules        *ModuleGraph
     TypeChecker    *checker.Checker
     DisableManager *DisableManager
+
+    program           *program.Program
+    typeScriptProgram *compiler.Program
 }
 
+func (*RuleContext) Program() *program.Program
+func (*RuleContext) TypeScriptProgram() *compiler.Program
+func (RuleContext) WithProgram(*program.Program) RuleContext // one-time assembly hook
 func (*RuleContext) ReportRange(...)
 func (*RuleContext) ReportRangeWithFixes(...)
 func (*RuleContext) ReportRangeWithSuggestions(...)
@@ -309,11 +315,17 @@ func (*RuleContext) ReportRangeWithDeferredFixesAndSuggestions(
 )
 ```
 
-`Program` is always the single source authority for a linter-created context,
-including standalone files. `TypeScriptProgram()` explicitly unwraps the
-optional ts-go backing for rules that need compiler-only operations, while
-`TypeChecker` remains the per-file type capability; a non-nil backing alone
-never admits a `RequiresTypeInfo` rule.
+`Program()` is always the single source authority for a linter-created context,
+including standalone files. `TypeScriptProgram()` is a read-only capability
+projection populated once from that Program by `WithProgram()` during context assembly; it
+avoids repeatedly unwrapping the source authority in type-aware listeners but
+does not become a second writable source owner. Rebinding an assembled context
+to a different Program is rejected because its other source-derived state would
+belong to the old universe. `TypeChecker` remains the
+per-file type capability, and a non-nil ts-go backing alone never admits a
+`RequiresTypeInfo` rule. Process cwd is likewise stored once in the
+file-shared context state and exposed through `ProcessCurrentDirectory()`,
+rather than copied into every per-rule context.
 
 The linter creates one short-lived `CommentStore` per file. `Comments.All()`
 materializes the scanner-backed, source-ordered, deduplicated comment list only

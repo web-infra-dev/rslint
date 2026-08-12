@@ -182,12 +182,11 @@ console.log(mutateParameter);
 	program, sourceFile := createNoUnusedVarsProgram(t, "self-modification-invariant.ts", code)
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()
-	ctx := rule.RuleContext{
+	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     lintprogram.NewTypeScript(program),
 		TypeChecker: typeChecker,
 		Refs:        rule.NewRefStore(sourceFile, program.Options(), typeChecker, rule.RefStoreInit{}),
-	}
+	}).WithProgram(lintprogram.NewTypeScript(program))
 	globalSourceFile := ast.IsGlobalSourceFile(sourceFile.AsNode())
 	selfModifyingCount := 0
 

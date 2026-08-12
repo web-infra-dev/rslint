@@ -114,7 +114,7 @@ var NoRestrictedPathsRule = rule.Rule{
 // compared against absolute file names. Rule tests and any other caller
 // without a process directory fall back to the Program's own directory.
 func resolveBasePath(ctx rule.RuleContext, configured string) string {
-	cwd := ctx.Cwd
+	cwd := ctx.ProcessCurrentDirectory()
 	if cwd == "" {
 		cwd = ctx.CurrentDirectory()
 	}

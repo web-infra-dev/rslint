@@ -272,22 +272,22 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		// answering means going back to whatever produced that text; a file no
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
-		fileCache := rule.NewFileCache()
+		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
+		baseContext := (rule.RuleContext{
+			SourceFile:     file,
+			Comments:       comments,
+			Refs:           refs,
+			BOM:            sourceBOM,
+			Modules:        moduleGraph,
+			TypeChecker:    fileChecker,
+			DisableManager: disableManager,
+		}).WithProgram(sourceProgram).WithFileCache(fileCache)
 
 		for ruleIndex, r := range rules {
-			ctx := rule.RuleContext{
-				SourceFile:     file,
-				Cwd:            opts.Cwd,
-				Program:        opts.Program,
-				Settings:       r.Settings,
-				Globals:        rule.NewGlobals(r.LanguageOptions, globalsInit, r.Globals, inlineGlobals, inlineGlobalDeclarations),
-				Comments:       comments,
-				Refs:           refs,
-				BOM:            sourceBOM,
-				Modules:        moduleGraph,
-				TypeChecker:    fileChecker,
-				DisableManager: disableManager,
-			}.WithFileCache(fileCache).WithDiagnosticConsumer(
+			ctx := baseContext
+			ctx.Settings = r.Settings
+			ctx.Globals = rule.NewGlobals(r.LanguageOptions, globalsInit, r.Globals, inlineGlobals, inlineGlobalDeclarations)
+			ctx = ctx.WithDiagnosticConsumer(
 				r.Name,
 				r.Severity,
 				consumer,

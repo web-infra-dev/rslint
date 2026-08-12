@@ -100,7 +100,7 @@ func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, 
 	if !ctx.HasProgram() || ctx.SourceFile == nil {
 		return nil, false
 	}
-	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.Program))
+	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.Program()))
 }
 
 // exportBuilder carries one query's traversal state over the per-file export

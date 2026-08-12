@@ -52,11 +52,10 @@ func contextsForFiles(t *testing.T, files map[string]string, entries ...string) 
 		if sourceFile == nil {
 			t.Fatalf("entry %q was not parsed", entry)
 		}
-		contexts = append(contexts, rule.RuleContext{
-			Program:    sourceProgram,
+		contexts = append(contexts, (rule.RuleContext{
 			SourceFile: sourceFile,
 			Modules:    rule.NewModuleGraph(sourceProgram),
-		})
+		}).WithProgram(sourceProgram))
 	}
 	return contexts
 }

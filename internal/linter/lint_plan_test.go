@@ -150,7 +150,7 @@ func TestLintPlanRunsStandaloneSourceWithoutProgram(t *testing.T) {
 								Severity: rule.SeverityError,
 								Run: func(ctx rule.RuleContext) rule.RuleListeners {
 									nativeRuns++
-									if ctx.Program == nil || ctx.TypeScriptProgram() != nil || ctx.TypeChecker != nil {
+									if ctx.Program() == nil || ctx.TypeScriptProgram() != nil || ctx.TypeChecker != nil {
 										t.Fatal("standalone source received the wrong Program capabilities")
 									}
 									if !ctx.HasProgram() || ctx.Refs == nil || !ctx.SourceFile.IsBound() {
@@ -342,7 +342,7 @@ func TestStandaloneSourceSharesModuleGraphAndDerivedCache(t *testing.T) {
 				Name:     "standalone-modules",
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
-					if ctx.Program == nil || ctx.TypeScriptProgram() != nil || !ctx.HasProgram() || ctx.Modules == nil {
+					if ctx.Program() == nil || ctx.TypeScriptProgram() != nil || !ctx.HasProgram() || ctx.Modules == nil {
 						t.Fatal("standalone rule context lost its Program module graph")
 					}
 					if got := len(ctx.Modules.Files()); got != len(files) {
@@ -791,6 +791,9 @@ func TestPreparedLintPlanFreezesPerFileTypeInfoEligibility(t *testing.T) {
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							if ctx.TypeChecker == nil {
 								t.Fatal("prepared type-aware rule received nil checker")
+							}
+							if ctx.TypeScriptProgram() != raw {
+								t.Fatal("prepared type-aware rule lost its ts-go capability projection")
 							}
 							runs.Add(1)
 							return nil

@@ -43,13 +43,6 @@ type RuleContext struct {
 	SourceFile *ast.SourceFile
 	Settings   map[string]interface{}
 	fileCache  *FileCache
-	// Cwd is the normalized working directory of the linting process, the
-	// counterpart of ESLint's `process.cwd()`. Rules that resolve configured
-	// relative paths should use it instead of the Program's current directory,
-	// which is the owning tsconfig's directory and therefore differs between
-	// Programs in the same run. Empty when the caller has no process directory
-	// to speak of, such as rule tests reading an in-memory fixture root.
-	Cwd string
 	// Globals owns the file's complete global-variable view: the selected
 	// ECMAScript edition, languageOptions.globals, inline /* global */ comments,
 	// their effective access, and inline declaration metadata. Rules should use
@@ -73,96 +66,134 @@ type RuleContext struct {
 	// Modules answers which modules each file of the effective source set references and
 	// what they resolve to, derived once per lint run rather than once per
 	// rule and file. Nil when no Program is available.
-	Modules        *ModuleGraph
-	Program        *program.Program
-	TypeChecker    *checker.Checker
-	DisableManager *DisableManager
-	reporter       ruleContextReporter
+	Modules *ModuleGraph
+	// program is the authoritative rslint source universe. typeScriptProgram
+	// is its immutable optional capability projection. WithProgram binds both
+	// views once so they cannot diverge.
+	program           *program.Program
+	typeScriptProgram *compiler.Program
+	TypeChecker       *checker.Checker
+	DisableManager    *DisableManager
+	reporter          ruleContextReporter
 }
 
 // HasProgram reports whether source, filesystem, and module-resolution
 // services are available for this rule context.
 func (ctx *RuleContext) HasProgram() bool {
-	return ctx != nil && ctx.Program.IsValid()
+	return ctx != nil && ctx.program.IsValid()
 }
 
-// TypeScriptProgram returns the optional ts-go backing Program. Its presence
-// does not by itself imply that this file is eligible for type-aware rules;
-// TypeChecker is the per-file capability boundary.
-func (ctx *RuleContext) TypeScriptProgram() *compiler.Program {
-	if ctx == nil || ctx.Program == nil {
+// Program returns the authoritative rslint source universe.
+func (ctx *RuleContext) Program() *program.Program {
+	if ctx == nil {
 		return nil
 	}
-	return ctx.Program.TypeScriptProgram()
+	return ctx.program
+}
+
+// TypeScriptProgram returns the optional ts-go capability projected from
+// Program when the context is assembled. Its presence does not by itself
+// imply type-aware rule eligibility; TypeChecker is the per-file boundary.
+func (ctx *RuleContext) TypeScriptProgram() *compiler.Program {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.typeScriptProgram
+}
+
+// WithProgram binds the source authority and its optional ts-go capability
+// projection. It is a one-time assembly hook for linter and rule tests;
+// rebinding an assembled context to a different Program would leave its other
+// source-derived state incoherent and therefore panics.
+func (ctx RuleContext) WithProgram(sourceProgram *program.Program) RuleContext {
+	if ctx.program != nil && ctx.program != sourceProgram {
+		panic("rule: cannot rebind RuleContext to a different Program")
+	}
+	ctx.program = sourceProgram
+	ctx.typeScriptProgram = nil
+	if sourceProgram != nil {
+		ctx.typeScriptProgram = sourceProgram.TypeScriptProgram()
+	}
+	return ctx
 }
 
 // CompilerOptions returns the effective source Program's options.
 func (ctx *RuleContext) CompilerOptions() *core.CompilerOptions {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return nil
 	}
-	return ctx.Program.Options()
+	return ctx.program.Options()
+}
+
+// ProcessCurrentDirectory returns the normalized working directory of the
+// linting process, the counterpart of ESLint's process.cwd(). It differs from
+// Program.CurrentDirectory when a Program is owned by another tsconfig.
+func (ctx *RuleContext) ProcessCurrentDirectory() string {
+	if ctx == nil || ctx.fileCache == nil {
+		return ""
+	}
+	return ctx.fileCache.processCurrentDirectory
 }
 
 // FileSystem returns the effective source environment's VFS.
 func (ctx *RuleContext) FileSystem() vfs.FS {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return nil
 	}
-	return ctx.Program.FS()
+	return ctx.program.FS()
 }
 
 func (ctx *RuleContext) CurrentDirectory() string {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return ""
 	}
-	return ctx.Program.CurrentDirectory()
+	return ctx.program.CurrentDirectory()
 }
 
 func (ctx *RuleContext) NearestPackageJSONDirectory(directory string) string {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return ""
 	}
-	return ctx.Program.NearestPackageJSONDirectory(directory)
+	return ctx.program.NearestPackageJSONDirectory(directory)
 }
 
 func (ctx *RuleContext) FileExists(path string) bool {
-	return ctx != nil && ctx.Program != nil && ctx.Program.FileExists(path)
+	return ctx != nil && ctx.program != nil && ctx.program.FileExists(path)
 }
 
 func (ctx *RuleContext) GetModeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return core.ResolutionModeNone
 	}
-	return ctx.Program.GetModeForUsageLocation(sourceFile, location)
+	return ctx.program.GetModeForUsageLocation(sourceFile, location)
 }
 
 func (ctx *RuleContext) GetResolvedModule(sourceFile ast.HasFileName, moduleReference string, mode core.ResolutionMode) *module.ResolvedModule {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return nil
 	}
-	return ctx.Program.GetResolvedModule(sourceFile, moduleReference, mode)
+	return ctx.program.GetResolvedModule(sourceFile, moduleReference, mode)
 }
 
 func (ctx *RuleContext) ResolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return nil
 	}
-	return ctx.Program.ResolveModuleName(moduleName, containingFile, mode)
+	return ctx.program.ResolveModuleName(moduleName, containingFile, mode)
 }
 
 func (ctx *RuleContext) GetSourceFileForResolvedModule(fileName string) *ast.SourceFile {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return nil
 	}
-	return ctx.Program.GetSourceFileForResolvedModule(fileName)
+	return ctx.program.GetSourceFileForResolvedModule(fileName)
 }
 
 func (ctx *RuleContext) GetSourceFile(fileName string) *ast.SourceFile {
-	if ctx == nil || ctx.Program == nil {
+	if ctx == nil || ctx.program == nil {
 		return nil
 	}
-	return ctx.Program.GetSourceFile(fileName)
+	return ctx.program.GetSourceFile(fileName)
 }
 
 // ruleContextReporter is immutable after Rule.Run starts. Keeping only the
