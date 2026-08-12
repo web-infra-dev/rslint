@@ -95,11 +95,7 @@ type switchMetadata struct {
 	defaultCase               defaultCaseRef
 	missingLiteralBranchTypes []*checker.Type
 	symbolName                string
-	// discriminant is the switch expression with parentheses skipped. ESTree
-	// has no parenthesized-expression node, so upstream's `node.discriminant`
-	// is always the unwrapped expression — both for the type lookup and for
-	// the reported range.
-	discriminant *ast.Node
+	discriminant              *ast.Node
 }
 
 // missingCase is either a concrete missing union constituent (typ != nil) or
