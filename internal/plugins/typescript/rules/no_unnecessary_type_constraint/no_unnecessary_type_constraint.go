@@ -47,6 +47,15 @@ var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 				// In tsgo, `infer U`, mapped-type `[P in K]`, and JSDoc `@template` also
 				// surface as KindTypeParameter but have no TSTypeParameterDeclaration
 				// analog, so upstream doesn't report them.
+				//
+				// JSDoc type parameters can appear twice: once under the template tag and
+				// once as a reparsed clone attached to the host declaration. The clone no
+				// longer has a JSDoc parent, so its Reparsed flag is the distinguishing
+				// signal.
+				if node.Flags&ast.NodeFlagsReparsed != 0 {
+					return
+				}
+
 				parent := node.Parent
 				if parent == nil {
 					return
