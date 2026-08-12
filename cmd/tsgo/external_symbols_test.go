@@ -16,45 +16,34 @@ func TestGlobalSymbols(t *testing.T) {
 }
 
 func TestJSXIntrinsicElementSymbols(t *testing.T) {
-	tmpDir := t.TempDir()
-	dependencyDir := filepath.Join(tmpDir, "node_modules", "react")
-	_ = os.MkdirAll(dependencyDir, 0o755)
-
-	files := map[string]string{
-		filepath.Join(tmpDir, "tsconfig.json"):       "{\n\t\"compilerOptions\": {\"moduleResolution\": \"node\"},\n\t\"include\": [\"./index.ts\"]\n}",
-		filepath.Join(tmpDir, "index.ts"):            `import "react";`,
-		filepath.Join(dependencyDir, "package.json"): "{\n\t\"name\": \"react\",\n\t\"version\": \"1.0.0\",\n\t\"types\": \"index.d.ts\"\n}",
-		filepath.Join(dependencyDir, "index.d.ts"):   "export namespace JSX {\ninterface IntrinsicElements {\ndiv: unknown;\n}\n}",
-	}
-	for path, contents := range files {
-		_ = os.WriteFile(path, []byte(contents), 0o644)
-	}
-
-	t.Chdir(tmpDir)
-	program, _ := CreateProgram("tsconfig.json")
-	semantic := CollectSemantic(program)
+	semantic := semanticFromFiles(t, map[string]string{
+		"tsconfig.json":                   "{\n\t\"compilerOptions\": {\"moduleResolution\": \"node\"},\n\t\"include\": [\"./index.ts\"]\n}",
+		"index.ts":                        `import "react";`,
+		"node_modules/react/package.json": "{\n\t\"name\": \"react\",\n\t\"version\": \"1.0.0\",\n\t\"types\": \"index.d.ts\"\n}",
+		"node_modules/react/index.d.ts":   "export namespace JSX {\ninterface IntrinsicElements {\ndiv: unknown;\n}\n}",
+	})
 
 	expectSymbol(t, semantic.ExternalSymbols, "react", "JSX.IntrinsicElements.div")
 }
 
+func TestGlobalJSXIntrinsicElementSymbols(t *testing.T) {
+	semantic := semanticFromFiles(t, map[string]string{
+		"tsconfig.json":                          "{\n\t\"compilerOptions\": {\"jsx\": \"preserve\", \"moduleResolution\": \"node\", \"types\": [\"react\"]},\n\t\"include\": [\"./index.tsx\"]\n}",
+		"index.tsx":                              `const element = <div />;`,
+		"node_modules/@types/react/package.json": "{\n\t\"name\": \"@types/react\",\n\t\"version\": \"1.0.0\",\n\t\"types\": \"index.d.ts\"\n}",
+		"node_modules/@types/react/index.d.ts":   "export = React;\nexport as namespace React;\ndeclare namespace React {\nfunction createElement(): unknown;\nnamespace JSX {\ninterface IntrinsicElements {\ndiv: unknown;\n}\n}\n}\n",
+	})
+
+	expectSymbol(t, semantic.ExternalSymbols, globalNamespace, "React.JSX.IntrinsicElements.div")
+}
+
 func TestDependencySymbols(t *testing.T) {
-	tmpDir := t.TempDir()
-	dependencyDir := filepath.Join(tmpDir, "node_modules", "example-dependency")
-	_ = os.MkdirAll(dependencyDir, 0o755)
-
-	files := map[string]string{
-		filepath.Join(tmpDir, "tsconfig.json"):       "{\n\t\"compilerOptions\": {\"moduleResolution\": \"node\"},\n\t\"include\": [\"./index.ts\"]\n}",
-		filepath.Join(tmpDir, "index.ts"):            `import { api } from "example-dependency"; api.run();`,
-		filepath.Join(dependencyDir, "package.json"): "{\n\t\"name\": \"example-dependency\",\n\t\"version\": \"1.0.0\",\n\t\"types\": \"index.d.ts\"\n}",
-		filepath.Join(dependencyDir, "index.d.ts"):   "export declare const api: { run(): void };\nexport declare function value(): void;",
-	}
-	for path, contents := range files {
-		_ = os.WriteFile(path, []byte(contents), 0o644)
-	}
-
-	t.Chdir(tmpDir)
-	program, _ := CreateProgram("tsconfig.json")
-	semantic := CollectSemantic(program)
+	semantic := semanticFromFiles(t, map[string]string{
+		"tsconfig.json": "{\n\t\"compilerOptions\": {\"moduleResolution\": \"node\"},\n\t\"include\": [\"./index.ts\"]\n}",
+		"index.ts":      `import { api } from "example-dependency"; api.run();`,
+		"node_modules/example-dependency/package.json": "{\n\t\"name\": \"example-dependency\",\n\t\"version\": \"1.0.0\",\n\t\"types\": \"index.d.ts\"\n}",
+		"node_modules/example-dependency/index.d.ts":   "export declare const api: { run(): void };\nexport declare function value(): void;",
+	})
 
 	expectSymbol(t, semantic.ExternalSymbols, "example-dependency", "api")
 	expectSymbol(t, semantic.ExternalSymbols, "example-dependency", "api.run")
@@ -101,4 +90,25 @@ func expectSymbol(t *testing.T, symbols []ExternalSymbol, namespace string, symb
 		}
 	}
 	t.Errorf("missing external symbol %q in namespace %q", symbolName, namespace)
+}
+
+func semanticFromFiles(t *testing.T, files map[string]string) Semantic {
+	t.Helper()
+	tmpDir := t.TempDir()
+	for name, contents := range files {
+		path := filepath.Join(tmpDir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("failed to create fixture directory: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+			t.Fatalf("failed to write fixture file %q: %v", name, err)
+		}
+	}
+
+	t.Chdir(tmpDir)
+	program, err := CreateProgram("tsconfig.json")
+	if err != nil {
+		t.Fatalf("failed to create program: %v", err)
+	}
+	return CollectSemantic(program)
 }

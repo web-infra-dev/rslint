@@ -124,6 +124,22 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 }
 
 func (c *externalSymbolCollector) collect(namespace string, name string, symbol *ast.Symbol) {
+	isTypeOnlySymbolExemption := func(name string) bool {
+		for exemption := range typeOnlySymbolExemptions {
+			for prefix := exemption; ; {
+				if name == prefix || strings.HasSuffix(name, "."+prefix) {
+					return true
+				}
+				index := strings.LastIndexByte(prefix, '.')
+				if index == -1 {
+					break
+				}
+				prefix = prefix[:index]
+			}
+		}
+		return false
+	}
+
 	if symbol == nil || name == "" || strings.HasPrefix(name, ast.InternalSymbolNamePrefix) {
 		return
 	}
@@ -132,19 +148,8 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 			symbol = target
 		}
 	}
-	isTypeOnlyExempt := false
-	if symbol != nil && symbol.Flags&ast.SymbolFlagsValue == 0 {
-		if _, ok := typeOnlySymbolExemptions[name]; ok {
-			isTypeOnlyExempt = true
-		} else {
-			for exemption := range typeOnlySymbolExemptions {
-				if strings.HasPrefix(exemption, name+".") {
-					isTypeOnlyExempt = true
-					break
-				}
-			}
-		}
-	}
+	followsTypeOnlyExemption := isTypeOnlySymbolExemption(name)
+	isTypeOnlyExempt := symbol != nil && symbol.Flags&ast.SymbolFlagsValue == 0 && followsTypeOnlyExemption
 	if symbol == nil || symbol.Flags&ast.SymbolFlagsValue == 0 && !isTypeOnlyExempt {
 		return
 	}
@@ -158,15 +163,20 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 	}
 	c.expanded[expandedKey] = name
 
-	if isTypeOnlyExempt && symbol.Flags&ast.SymbolFlagsModule != 0 {
+	if symbol.Flags&ast.SymbolFlagsModule != 0 {
 		properties := c.tc.GetExportsAndPropertiesOfModule(symbol)
 		sort.Slice(properties, func(i int, j int) bool {
 			return properties[i].Name < properties[j].Name
 		})
 		for _, property := range properties {
-			c.collect(namespace, joinExternalName(name, property.Name), property)
+			propertyName := joinExternalName(name, property.Name)
+			if isTypeOnlySymbolExemption(propertyName) {
+				c.collect(namespace, propertyName, property)
+			}
 		}
-		return
+		if isTypeOnlyExempt {
+			return
+		}
 	}
 
 	var ty *checker.Type
@@ -186,6 +196,7 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 		c.collect(namespace, joinExternalName(name, property.Name), property)
 	}
 }
+
 func (c *externalSymbolCollector) record(namespace string, name string, symbol *ast.Symbol) {
 	symbolID := ast.GetSymbolId(symbol)
 	external := ExternalSymbol{
