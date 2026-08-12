@@ -1,9 +1,13 @@
 package test_framework
 
 import (
+	"cmp"
+	"slices"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // lastAccessor parses code, takes the first call expression's member chain and
@@ -183,6 +187,62 @@ func TestAccessorReplacement(t *testing.T) {
 			got := test.code[:replaceRange.Pos()] + text + test.code[replaceRange.End():]
 			if got != test.want {
 				t.Errorf("applied fix = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func applyRanges(code string, ranges []core.TextRange) string {
+	for index := len(ranges) - 1; index >= 0; index-- {
+		textRange := ranges[index]
+		code = code[:textRange.Pos()] + code[textRange.End():]
+	}
+	return code
+}
+
+func TestRemoveAccessorEntryRanges(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want string
+	}{
+		{name: "property", code: `test.only()`, want: `test()`},
+		{name: "element", code: `test[ "only" ]()`, want: `test()`},
+		{name: "optional property", code: `test?.only()`, want: `test()`},
+		{name: "optional element", code: `test?.["only"]()`, want: `test()`},
+		{name: "optional call", code: `test?.only?.()`, want: `test?.()`},
+		{name: "comment before property", code: `test /* keep */.only()`, want: `test /* keep */()`},
+		{name: "comment in element", code: `test[/* keep */ "only"]()`, want: `test/* keep */ ()`},
+		{name: "next property", code: `test?.only.concurrent()`, want: `test?.concurrent()`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, call := parseFirstCall(t, test.code)
+			entries := GetMemberEntries(call)
+			index := slices.IndexFunc(entries, func(entry MemberEntry) bool {
+				return entry.Name == "only"
+			})
+			if index < 0 {
+				t.Fatalf("no only entry in %q", test.code)
+			}
+			var comments []*ast.CommentRange
+			utils.ForEachComment(sourceFile.AsNode(), func(comment *ast.CommentRange) {
+				comments = append(comments, comment)
+			}, sourceFile)
+			slices.SortFunc(comments, func(a, b *ast.CommentRange) int {
+				return cmp.Compare(a.Pos(), b.Pos())
+			})
+
+			ranges, ok := RemoveAccessorEntryRanges(sourceFile, comments, &entries[index])
+			if !ok {
+				t.Fatalf("RemoveAccessorEntryRanges returned false for %q", test.code)
+			}
+			slices.SortFunc(ranges, func(a, b core.TextRange) int {
+				return cmp.Compare(a.Pos(), b.Pos())
+			})
+			if got := applyRanges(test.code, ranges); got != test.want {
+				t.Errorf("output = %q, want %q", got, test.want)
 			}
 		})
 	}
