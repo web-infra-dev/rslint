@@ -41,7 +41,6 @@ export default defineConfig([
         project: [
           './packages/*/tsconfig.build.json',
           './packages/*/tsconfig.spec.json',
-          './packages/rslint/fixtures/tsconfig.json',
         ],
       },
     },

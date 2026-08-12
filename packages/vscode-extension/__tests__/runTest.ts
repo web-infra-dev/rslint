@@ -253,6 +253,11 @@ async function main(): Promise<void> {
       tests: path.resolve(__dirname, './suite-unicode-bom'),
     },
     {
+      name: 'Generated rule-option-types tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-rule-option-types'),
+      tests: path.resolve(__dirname, './suite-rule-option-types'),
+    },
+    {
       name: 'import/no-cycle tests',
       workspace: path.resolve(testsSourceDir, 'fixtures-import-cycle'),
       tests: path.resolve(__dirname, './suite-import-cycle'),

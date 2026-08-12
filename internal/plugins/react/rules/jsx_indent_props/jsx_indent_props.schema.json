@@ -25,7 +25,8 @@
             "ignoreTernaryOperator": {
               "type": "boolean"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     }
