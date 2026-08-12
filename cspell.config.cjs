@@ -15,6 +15,7 @@ module.exports = {
     'packages/vscode-extension/out',
     'packages/rslint-test-tools/tests',
     'packages/rslint/pkg/mod',
+    'packages/rslint/rule-schemas.json',
     'cmd/tsgo',
     './agents',
     'crates/rslint-native/index.js',

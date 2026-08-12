@@ -119,13 +119,11 @@ test('foo', () => {});
 it('foo', () => {});
 ```
 
-<!-- cspell:ignore sdjifo -->
-
 ### Differences from `jest/valid-title`
 
 The rule is otherwise a port of `jest/valid-title`, with three differences that follow from how Rstest itself behaves.
 
-**The set of valid `printf` specifiers is Rstest's, not Jest's.** Rstest formats parameterized titles with Node's `util.format` semantics (`formatRegExp` is `/%[sdjifoOc%]/`), while Jest uses its own `pretty-format` placeholder set. So:
+**The set of valid `printf` specifiers is Rstest's, not Jest's.** Rstest formats parameterized titles with Node's `util.format` semantics, accepting `s`, `d`, `j`, `i`, `f`, `o`, `O`, `c`, and `%` after a `%`, while Jest uses its own `pretty-format` placeholder set. So:
 
 | Title | `jest/valid-title` | `rstest/valid-title` |
 | --- | :---: | :---: |
