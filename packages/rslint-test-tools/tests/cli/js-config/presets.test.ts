@@ -142,6 +142,7 @@ describe('defineConfig and config presets', () => {
       'rstest/no-identical-title': 'error',
       'rstest/no-interpolation-in-snapshots': 'error',
       'rstest/no-mocks-import': 'error',
+      'rstest/valid-expect': 'error',
       'rstest/valid-title': 'error',
     });
   });
