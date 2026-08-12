@@ -1,4 +1,4 @@
-name: 📦 Release crates
+name: 📦 Release tsgo
 
 on:
   workflow_dispatch:
@@ -16,26 +16,62 @@ on:
 permissions:
   contents: read
 
-jobs:
-  publish-crates:
-    name: ${{ inputs.dry_run == true && 'Dry Run - Crates' || 'Publish Crates' }}
-    runs-on: ubuntu-22.04
-    environment: crate
-    permissions:
-      contents: read
-      # For crates.io Trusted Publishing.
-      id-token: write
-    steps:
-      - name: Show dry-run status
-        run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "RUNNING IN DRY-RUN MODE - No crates will be published to crates.io"
-            echo "=================================================================="
-          else
-            echo "LIVE MODE - Crates will be published to crates.io"
-            echo "================================================="
-          fi
+concurrency:
+  group: release-tsgo
+  cancel-in-progress: false
 
+jobs:
+  validate-tsgo-release:
+    name: Validate tsgo release versions
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+
+      - name: Validate versions and package relationships
+        run: node scripts/check-tsgo-release.mjs
+
+  build-tsgo-server:
+    name: Build tsgo server (${{ matrix.node_os }}-${{ matrix.node_arch }})
+    needs: validate-tsgo-release
+    runs-on: rspack-ubuntu-22.04-large
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+            node_arch: x64
+            node_os: darwin
+          - goos: darwin
+            goarch: arm64
+            node_arch: arm64
+            node_os: darwin
+          - goos: linux
+            goarch: amd64
+            node_arch: x64
+            node_os: linux
+          - goos: linux
+            goarch: arm64
+            node_arch: arm64
+            node_os: linux
+          - goos: windows
+            goarch: amd64
+            node_arch: x64
+            node_os: win32
+          - goos: windows
+            goarch: arm64
+            node_arch: arm64
+            node_os: win32
+    steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -47,19 +83,131 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: 1.26.0
-          cache-name: release-crates
+          cache-name: tsgo-server-${{ matrix.node_os }}-${{ matrix.node_arch }}
+
+      - name: Build tsgo server
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo-server ./cmd/tsgo
+
+      - name: Upload tsgo server artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo-server
+          path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo-server
+          if-no-files-found: error
+
+  build-typescript-libs:
+    name: Build TypeScript standard libraries
+    needs: validate-tsgo-release
+    runs-on: rspack-ubuntu-22.04-large
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.26.0
+          cache-name: tsgo-server-libs
+
+      - name: Build TypeScript standard libraries
+        working-directory: typescript-go
+        run: |
+          npm ci
+          npm run build
+          rm -f built/local/tsgo built/local/tsgo.exe
+
+      - name: Upload TypeScript standard libraries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tsgo-server-libs
+          path: typescript-go/built/local
+          if-no-files-found: error
+
+  publish-tsgo:
+    name: ${{ inputs.dry_run == true && 'Dry Run - tsgo' || 'Publish tsgo' }}
+    needs: [build-tsgo-server, build-typescript-libs]
+    runs-on: ubuntu-22.04
+    environment: crate
+    permissions:
+      contents: read
+      # For npm and crates.io Trusted Publishing.
+      id-token: write
+    steps:
+      - name: Show dry-run status
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "RUNNING IN DRY-RUN MODE - Nothing will be published"
+          else
+            echo "LIVE MODE - Publishing @rslint/tsgo-server packages and tsgo-client"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+
+      - name: Update npm for trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - name: Install pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.26.0
+          cache-name: release-tsgo
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          cache-key: release-crates
+          cache-key: release-tsgo
+
+      - name: Validate release versions
+        run: pnpm check:tsgo-release
+
+      - name: Download artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: binaries
+
+      - name: Assemble npm platform packages
+        uses: ./.github/actions/move-tsgo-server-artifacts
 
       - name: Test tsgo-client
         run: cargo test -p tsgo-client --verbose
 
-      - name: Package tsgo-client
-        if: ${{ inputs.dry_run == true }}
+      - name: Validate npm packages
+        run: pnpm --filter='@rslint/tsgo-server...' -r publish --dry-run --no-git-checks
+
+      - name: Validate tsgo-client crate
         run: cargo publish --manifest-path crates/tsgo-client/Cargo.toml --locked --dry-run
+
+      - name: Publish npm packages
+        if: ${{ inputs.dry_run == false }}
+        run: pnpm --filter='@rslint/tsgo-server...' -r publish --no-git-checks --tag latest --publish-branch ${{ github.event.inputs.branch }}
 
       - name: Authenticate with crates.io
         if: ${{ inputs.dry_run == false }}

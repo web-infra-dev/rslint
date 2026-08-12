@@ -1,7 +1,7 @@
 {
-  "name": "@rslint/tsgo",
-  "version": "0.7.3",
-  "description": "custom tsgo binary",
+  "name": "@rslint/tsgo-server",
+  "version": "0.0.7",
+  "description": "TypeScript Go semantic server",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -28,11 +28,11 @@
     "access": "public"
   },
   "optionalDependencies": {
-    "@rslint/tsgo-darwin-arm64": "workspace:*",
-    "@rslint/tsgo-darwin-x64": "workspace:*",
-    "@rslint/tsgo-linux-arm64": "workspace:*",
-    "@rslint/tsgo-linux-x64": "workspace:*",
-    "@rslint/tsgo-win32-arm64": "workspace:*",
-    "@rslint/tsgo-win32-x64": "workspace:*"
+    "@rslint/tsgo-server-darwin-arm64": "workspace:*",
+    "@rslint/tsgo-server-darwin-x64": "workspace:*",
+    "@rslint/tsgo-server-linux-arm64": "workspace:*",
+    "@rslint/tsgo-server-linux-x64": "workspace:*",
+    "@rslint/tsgo-server-win32-arm64": "workspace:*",
+    "@rslint/tsgo-server-win32-x64": "workspace:*"
   }
 }
