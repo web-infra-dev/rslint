@@ -21,7 +21,7 @@ module.exports = {
     'crates/rslint-native/index.js',
     'crates/rslint-native/index.d.ts',
     'internal/linter/*_test.go',
-    'internal/utils/minimatch/*_test.go',
+    'internal/utils/ecmascript/minimatch/*_test.go',
     'internal/lsp/*_test.go',
     'internal/config/*_test.go',
     'internal/rules/valid_typeof/valid_typeof.md',

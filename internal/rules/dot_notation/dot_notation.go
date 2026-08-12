@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"regexp"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed dot_notation.schema.json
@@ -284,9 +284,11 @@ var DotNotationRule = rule.Rule{
 		// where the schema's `format: "regex"` on allowPattern rejects the
 		// config before linting starts - so the compile-error branch here is
 		// only defensive.
-		var allowRE *regexp2.Regexp
+		var allowRE *esregexp.RegExp
 		if opts.AllowPattern != "" {
-			allowRE, _ = utils.CompileRegexp2(opts.AllowPattern, utils.JSUnicodeRegexOptions)
+			if re, err := esregexp.Compile(opts.AllowPattern, "u"); err == nil {
+				allowRE = re
+			}
 		}
 
 		sourceFile := ctx.SourceFile
@@ -303,8 +305,12 @@ var DotNotationRule = rule.Rule{
 			if !opts.AllowKeywords && isKeyword(value) {
 				return
 			}
-			if utils.Regexp2MatchString(allowRE, value) {
-				return
+			if allowRE != nil {
+				if matched, err := allowRE.TestOrError(value); err != nil || matched {
+					// Fail open when the match runs into the bound: skip
+					// reporting rather than risk a false positive.
+					return
+				}
 			}
 
 			ctx.ReportNodeWithDeferredFixes(keyNode, buildUseDotMessage(formattedKey), func() []rule.RuleFix {

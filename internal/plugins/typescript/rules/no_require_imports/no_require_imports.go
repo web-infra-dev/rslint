@@ -3,10 +3,10 @@ package no_require_imports
 import (
 	_ "embed"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_require_imports.schema.json
@@ -47,14 +47,14 @@ var NoRequireImportsRule = rule.CreateRule(rule.Rule{
 			optsMap, _ = options[0].(map[string]interface{})
 		}
 		allowAsImport, _ := optsMap["allowAsImport"].(bool)
-		var allowPatterns []*regexp2.Regexp
+		var allowPatterns []*esregexp.RegExp
 		if allow, ok := optsMap["allow"].([]interface{}); ok {
 			for _, rawPattern := range allow {
 				pattern, ok := rawPattern.(string)
 				if !ok {
 					continue
 				}
-				if compiled, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+				if compiled, err := esregexp.Compile(pattern, "u"); err == nil {
 					allowPatterns = append(allowPatterns, compiled)
 				}
 			}
@@ -62,7 +62,7 @@ var NoRequireImportsRule = rule.CreateRule(rule.Rule{
 
 		isImportPathAllowed := func(importPath string) bool {
 			for _, pattern := range allowPatterns {
-				if utils.Regexp2MatchString(pattern, importPath) {
+				if pattern.Test(importPath) {
 					return true
 				}
 			}

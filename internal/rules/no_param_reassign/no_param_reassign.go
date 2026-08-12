@@ -4,10 +4,10 @@ import (
 	_ "embed"
 	"slices"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_param_reassign.schema.json
@@ -16,7 +16,7 @@ var schemaJSON []byte
 type Options struct {
 	Props                               bool
 	IgnorePropertyModificationsFor      []string
-	IgnorePropertyModificationsForRegex []*regexp2.Regexp
+	IgnorePropertyModificationsForRegex []*esregexp.RegExp
 }
 
 func parseOptions(options []any) Options {
@@ -43,7 +43,7 @@ func parseOptions(options []any) Options {
 				// same as upstream (Go's RE2 supports none of those). An unparsable
 				// pattern is rejected up front by the schema's `format: "regex"`, so
 				// the compile-error branch here is only defensive.
-				if re, err := utils.CompileRegexp2(s, utils.JSUnicodeRegexOptions); err == nil {
+				if re, err := esregexp.Compile(s, "u"); err == nil {
 					opts.IgnorePropertyModificationsForRegex = append(opts.IgnorePropertyModificationsForRegex, re)
 				}
 			}
@@ -218,7 +218,7 @@ func isIgnoredPropertyAssignment(opts Options, name string) bool {
 		return true
 	}
 	for _, re := range opts.IgnorePropertyModificationsForRegex {
-		if utils.Regexp2MatchString(re, name) {
+		if re.Test(name) {
 			return true
 		}
 	}

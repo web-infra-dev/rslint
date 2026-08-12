@@ -40,6 +40,7 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // Options mirrors the minimatch options a caller can pass. The zero value is
@@ -513,7 +514,7 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			hasMagic = true
 			inClass = false
 			if m.options.NoCase {
-				re = re[:reClassStart+1] + caseCloseClass(re[reClassStart+1:])
+				re = re[:reClassStart+1] + esregexp.CaseCloseClass(re[reClassStart+1:], false)
 			}
 			re += string(c)
 
@@ -528,7 +529,7 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			// A character class is widened as a whole once it closes, so only
 			// a literal standing on its own is widened here.
 			if m.options.NoCase && !inClass {
-				if class, widened := caseClass(c); widened {
+				if class, widened := esregexp.CaseClass(c); widened {
 					re += class
 					continue
 				}

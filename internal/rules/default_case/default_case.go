@@ -4,11 +4,11 @@ import (
 	_ "embed"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed default_case.schema.json
@@ -71,7 +71,7 @@ var DefaultCaseRule = rule.Rule{
 						commentText = strings.TrimSpace(commentText[2 : len(commentText)-2])
 					}
 
-					if matched, err := opts.commentPattern.MatchString(commentText); err == nil && matched {
+					if opts.commentPattern.Test(commentText) {
 						return
 					}
 				}
@@ -86,13 +86,13 @@ var DefaultCaseRule = rule.Rule{
 }
 
 type options struct {
-	commentPattern *regexp2.Regexp
+	commentPattern *esregexp.RegExp
 }
 
 // defaultCommentPattern mirrors upstream's DEFAULT_COMMENT_PATTERN
 // (/^no default$/iu). A configured commentPattern is compiled without the
 // `i` flag, exactly like upstream's `new RegExp(commentPattern, "u")`.
-var defaultCommentPattern = regexp2.MustCompile(`^no default$`, utils.JSUnicodeRegexOptions|regexp2.IgnoreCase)
+var defaultCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 
 func parseOptions(opts []any) options {
 	result := options{commentPattern: defaultCommentPattern}
@@ -104,7 +104,7 @@ func parseOptions(opts []any) options {
 	if pattern, ok := m["commentPattern"].(string); ok && pattern != "" {
 		// An invalid pattern is rejected by the schema's `format: "regex"`
 		// before linting starts, so this compile error is only defensive.
-		if compiled, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+		if compiled, err := esregexp.Compile(pattern, "u"); err == nil {
 			result.commentPattern = compiled
 		}
 	}

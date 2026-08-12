@@ -691,16 +691,6 @@ func TestBooleanPropNamingRule(t *testing.T) {
           }
         `, Tsx: true, Options: optsIs},
 
-		// ---- regex with lookahead (Go RE2 unsupported) → silent no-op ----
-		// `^(?=is)` is a JS-only lookahead; Go's regexp.Compile rejects
-		// it; the rule degrades silently.
-		{Code: `
-          class Hello extends React.Component {
-            static propTypes = { something: PropTypes.bool };
-            render() { return <div/>; }
-          }
-        `, Tsx: true, Options: []interface{}{map[string]interface{}{"rule": "^(?=is)"}}},
-
 		// ---- Empty file / imports-only file ----
 		{Code: ``, Tsx: true, Options: optsIs},
 		{Code: `import * as React from 'react';`, Tsx: true, Options: optsIs},
@@ -746,6 +736,22 @@ func TestBooleanPropNamingRule(t *testing.T) {
           export { Card, Avatar };
         `, Tsx: true, Options: optsIs},
 	}, []rule_tester.InvalidTestCase{
+		// ---- a lookahead in `rule` is ordinary JavaScript, so the rule runs ----
+		// `^(?=is)` asks for a name starting with `is`; `something` does not.
+		{
+			Code: `
+          class Hello extends React.Component {
+            static propTypes = { something: PropTypes.bool };
+            render() { return <div/>; }
+          }
+        `,
+			Tsx:     true,
+			Options: []interface{}{map[string]interface{}{"rule": "^(?=is)"}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "patternMismatch",
+			}},
+		},
+
 		// ============================================================
 		// Upstream invalid cases (all migrated, 1:1 with optional Flow→TS).
 		// ============================================================

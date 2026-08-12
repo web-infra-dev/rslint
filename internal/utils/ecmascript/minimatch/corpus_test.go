@@ -11,7 +11,7 @@ package minimatch_test
 import (
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/utils/minimatch"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/minimatch"
 )
 
 type corpusCase struct {

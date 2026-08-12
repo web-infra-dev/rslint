@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_invalid_regexp.schema.json
@@ -155,30 +155,31 @@ func validateFlags(flags string, allowConstructorFlags map[byte]bool) string {
 	return ""
 }
 
-// validatePattern tries to compile the pattern using regexp2 with ECMAScript mode.
-// Returns an error message or empty string if valid.
-// Note: regexp2 is a .NET regex port and does not fully support ECMAScript semantics.
-// See no_invalid_regexp.md "Known Limitations" for details on misalignments with ESLint.
+// validatePattern reports whether the pattern compiles as a JavaScript
+// RegExp, returning an error message or the empty string when it does.
+// See no_invalid_regexp.md "Known Limitations" for the misalignments that
+// remain against ESLint.
 func validatePattern(pattern string, flags string) string {
-	var regexpFlags regexp2.RegexOptions = regexp2.ECMAScript
-	if strings.Contains(flags, "i") {
-		regexpFlags |= regexp2.IgnoreCase
+	// Flags are validated separately by validateFlags, which also honors
+	// allowConstructorFlags, so only the ones that change what the pattern
+	// means are passed on here. `v` extends `u` rather than replacing it, and
+	// the set syntax it adds is not supported, so it is read as the `u` it
+	// builds on.
+	compileFlags := ""
+	for _, flag := range "imsu" {
+		if strings.ContainsRune(flags, flag) {
+			compileFlags += string(flag)
+		}
 	}
-	if strings.Contains(flags, "m") {
-		regexpFlags |= regexp2.Multiline
-	}
-	if strings.Contains(flags, "s") {
-		regexpFlags |= regexp2.Singleline
-	}
-	if strings.Contains(flags, "u") || strings.Contains(flags, "v") {
-		regexpFlags |= regexp2.Unicode
+	if !strings.Contains(compileFlags, "u") && strings.Contains(flags, "v") {
+		compileFlags += "u"
 	}
 
-	_, err := regexp2.Compile(pattern, regexpFlags)
+	_, err := esregexp.Compile(pattern, compileFlags)
 	if err != nil {
 		// Extract a clean error message
 		errMsg := err.Error()
-		// regexp2 error messages often start with "error parsing regexp:"
+		// The message often starts with "error parsing regexp:"
 		if idx := strings.Index(errMsg, ": "); idx != -1 {
 			errMsg = errMsg[idx+2:]
 		}

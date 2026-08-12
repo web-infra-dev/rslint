@@ -7,12 +7,12 @@ import (
 	"sync"
 	"weak"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/module"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 type TypeOrValueSpecifierFrom uint8
@@ -332,16 +332,16 @@ func sourceFilePackageNames(program *compiler.Program) map[tspath.Path][]string 
 
 // packageMatchers caches the compiled matcher per `package` specifier, which
 // comes from the rule options and so takes only a handful of distinct values.
-var packageMatchers sync.Map // package name -> *regexp2.Regexp, nil when the pattern is invalid
+var packageMatchers sync.Map // package name -> *esregexp.RegExp, nil when the pattern is invalid
 
 // packageMatcher builds `new RegExp(`${packageName}|${typesPackageName}`)`. The
 // pattern carries no anchors, so "demo" matches "demo-pkg" as well.
-func packageMatcher(packageName string) *regexp2.Regexp {
+func packageMatcher(packageName string) *esregexp.RegExp {
 	if cached, ok := packageMatchers.Load(packageName); ok {
-		matcher, _ := cached.(*regexp2.Regexp)
+		matcher, _ := cached.(*esregexp.RegExp)
 		return matcher
 	}
-	matcher, err := CompileRegexp2(packageName+"|"+module.MangleScopedPackageName(packageName), JSRegexOptions)
+	matcher, err := esregexp.Compile(packageName+"|"+module.MangleScopedPackageName(packageName), "")
 	if err != nil {
 		matcher = nil
 	}
@@ -363,7 +363,7 @@ func typeDeclaredInDeclarationFile(
 			continue
 		}
 		for _, name := range sourceFilePackageNames(program)[file.Path()] {
-			if Regexp2MatchString(matcher, name) {
+			if matcher.Test(name) {
 				return true
 			}
 		}

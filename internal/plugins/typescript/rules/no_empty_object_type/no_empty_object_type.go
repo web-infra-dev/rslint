@@ -4,12 +4,12 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_empty_object_type.schema.json
@@ -174,9 +174,9 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
-		var allowWithNameTester *regexp2.Regexp
+		var allowWithNameTester *esregexp.RegExp
 		if opts.AllowWithName != "" {
-			allowWithNameTester, _ = utils.CompileRegexp2(opts.AllowWithName, utils.JSUnicodeRegexOptions)
+			allowWithNameTester, _ = esregexp.Compile(opts.AllowWithName, "u")
 		}
 
 		listeners := rule.RuleListeners{}
@@ -192,7 +192,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				if allowWithNameTester != nil {
-					if id := nameNode.AsIdentifier(); id != nil && utils.Regexp2MatchString(allowWithNameTester, id.Text) {
+					if id := nameNode.AsIdentifier(); id != nil && allowWithNameTester.Test(id.Text) {
 						return
 					}
 				}
@@ -272,7 +272,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					if typeAlias != nil {
 						aliasName := typeAlias.Name()
 						if aliasName != nil {
-							if id := aliasName.AsIdentifier(); id != nil && utils.Regexp2MatchString(allowWithNameTester, id.Text) {
+							if id := aliasName.AsIdentifier(); id != nil && allowWithNameTester.Test(id.Text) {
 								return
 							}
 						}

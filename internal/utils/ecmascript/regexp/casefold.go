@@ -1,4 +1,4 @@
-package minimatch
+package regexp
 
 import (
 	"slices"
@@ -8,15 +8,19 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-// The NoCase option compares the way a JavaScript regexp with the `i` flag and
-// without the `u` flag does, which ecmascript.Canonicalize spells out. Rather than ask
-// regexp2 to ignore case — its own rules are Unicode's, and disagree in both
-// directions — a pattern is widened to name every character it should compare
-// equal to, and then matched exactly.
+// A JavaScript regexp carrying the `i` flag compares two characters by
+// ecmascript.Canonicalize, which is neither Go's case folding nor the Unicode folding
+// regexp2 reaches for when told to ignore case — they disagree in both
+// directions, over U+03A3 Σ against U+03C2 ς and over U+212A K against `k`.
+//
+// So rather than ask regexp2 to ignore case, a pattern is widened: every
+// literal and every character class is rewritten to name each character it
+// should compare equal to, and the widened pattern is matched exactly.
 
-// caseClass widens one literal character to the class of characters NoCase
-// compares it equal to, reporting false when it stands alone.
-func caseClass(r rune) (string, bool) {
+// CaseClass widens one literal character to the class of characters a `/i`
+// comparison accepts for it, reporting false when the character stands alone
+// and needs no widening.
+func CaseClass(r rune) (string, bool) {
 	members := ecmascript.CaseEquivalents(r)
 	if len(members) == 0 {
 		return "", false
@@ -24,22 +28,23 @@ func caseClass(r rune) (string, bool) {
 	var class strings.Builder
 	class.WriteByte('[')
 	for _, member := range members {
-		class.WriteString(escapeClassRune(member))
+		class.WriteString(EscapeClassRune(member))
 	}
 	class.WriteByte(']')
 	return class.String(), true
 }
 
-// caseCloseClass widens a character class to cover every character NoCase
-// compares equal to one it already covers, taking the class body this package
-// wrote and returning the body to write instead.
+// CaseCloseClass widens a character class to cover every character a `/i`
+// comparison accepts for one it already covers. It takes the body of a class —
+// what sits between the brackets, leading `^` included — and returns the body
+// to write instead.
 //
 // What the class already names is left alone and the rest is appended, so a
 // negated class goes on negating whatever the widened class covers. That is
 // how JavaScript reads one too: `[^a]` asks whether any member compares equal
 // to the character at hand, and answers no to `A`.
-func caseCloseClass(body string) string {
-	singles, ranges := classMembers(body)
+func CaseCloseClass(body string, unicode bool) string {
+	singles, ranges := classMembers(body, unicode)
 	covers := func(r rune) bool {
 		return slices.Contains(singles, r) || slices.ContainsFunc(ranges, func(bounds [2]rune) bool {
 			return r >= bounds[0] && r <= bounds[1]
@@ -53,7 +58,7 @@ func caseCloseClass(body string) string {
 		}
 		for _, member := range members {
 			if !covers(member) {
-				extras.WriteString(escapeClassRune(member))
+				extras.WriteString(EscapeClassRune(member))
 			}
 		}
 	}
@@ -61,6 +66,15 @@ func caseCloseClass(body string) string {
 		return body
 	}
 	return escapeTrailingDash(body) + extras.String()
+}
+
+// EscapeClassRune escapes a character that would carry a meaning of its own
+// inside a character class.
+func EscapeClassRune(r rune) string {
+	if strings.ContainsRune(`\]^-[`, r) {
+		return `\` + string(r)
+	}
+	return string(r)
 }
 
 // escapeTrailingDash escapes the `-` that stands for itself at the end of a
@@ -80,10 +94,16 @@ func escapeTrailingDash(body string) string {
 	return body[:len(body)-1] + `\-`
 }
 
-// classMembers reads back the characters a character class covers. The body is
-// this package's own output, so it holds nothing but characters, backslash
-// escapes, `-` ranges and the `^` that negates the whole class.
-func classMembers(body string) ([]rune, [][2]rune) {
+// classMembers reads back the characters a character class covers, so that
+// widening it can tell what it already has. It understands the shapes a class
+// body takes: a leading `^`, backslash escapes, `-` ranges, and plain
+// characters.
+//
+// An escape is decoded to the character it names, so that `[\u0041-\u005A]`
+// is read as the range `A` to `Z` it is. One naming a set rather than a
+// character — `\d`, `\w`, `\s` — decodes to utf8.RuneError, which has no
+// case-equivalent and so widens nothing.
+func classMembers(body string, unicode bool) ([]rune, [][2]rune) {
 	body = strings.TrimPrefix(body, "^")
 
 	type member struct {
@@ -94,7 +114,10 @@ func classMembers(body string) ([]rune, [][2]rune) {
 	for i := 0; i < len(body); {
 		r, size := utf8.DecodeRuneInString(body[i:])
 		if r == '\\' && i+size < len(body) {
-			escaped, escapedSize := utf8.DecodeRuneInString(body[i+size:])
+			escaped, escapedSize, ok := decodeEscape(body, i+size, unicode)
+			if !ok {
+				break
+			}
 			members = append(members, member{r: escaped})
 			i += size + escapedSize
 			continue
@@ -116,13 +139,4 @@ func classMembers(body string) ([]rune, [][2]rune) {
 		singles = append(singles, members[i].r)
 	}
 	return singles, ranges
-}
-
-// escapeClassRune escapes a character that would carry a meaning of its own
-// inside a character class.
-func escapeClassRune(r rune) string {
-	if strings.ContainsRune(`\]^-[`, r) {
-		return `\` + string(r)
-	}
-	return string(r)
 }

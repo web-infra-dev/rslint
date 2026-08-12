@@ -5,21 +5,21 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_fallthrough.schema.json
 var schemaJSON []byte
 
 // defaultFallthroughPattern matches ESLint's default /falls?\s?through/iu
-var defaultFallthroughPattern = regexp2.MustCompile(`falls?\s?through`, utils.JSUnicodeRegexOptions|regexp2.IgnoreCase)
+var defaultFallthroughPattern = esregexp.MustCompile(`falls?\s?through`, "iu")
 
 type noFallthroughOptions struct {
-	commentPattern                 *regexp2.Regexp
+	commentPattern                 *esregexp.RegExp
 	allowEmptyCase                 bool
 	reportUnusedFallthroughComment bool
 }
@@ -42,7 +42,7 @@ func parseOptions(options []any) noFallthroughOptions {
 	// `format: "regex"` on commentPattern rejects the config before linting
 	// starts - so the compile-error branch here is only defensive.
 	if pattern, ok := m["commentPattern"].(string); ok && pattern != "" {
-		if compiled, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+		if compiled, err := esregexp.Compile(pattern, "u"); err == nil {
 			opts.commentPattern = compiled
 		}
 	}
@@ -328,9 +328,9 @@ func forEachDescendant(node *ast.Node, fn func(*ast.Node) bool) {
 
 // hasFallthroughComment checks if there is a fallthrough comment matching the
 // given pattern between start and end positions in the source text.
-func hasFallthroughComment(sourceText string, start, end int, pattern *regexp2.Regexp) bool {
+func hasFallthroughComment(sourceText string, start, end int, pattern *esregexp.RegExp) bool {
 	if start < 0 || end > len(sourceText) || start >= end {
 		return false
 	}
-	return utils.Regexp2MatchString(pattern, sourceText[start:end])
+	return pattern.Test(sourceText[start:end])
 }

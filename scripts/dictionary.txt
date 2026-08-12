@@ -152,6 +152,7 @@ escope
 ESLint
 esmodule
 espree
+esregexp
 estree
 eszett
 Ethi
@@ -246,6 +247,7 @@ interrobang
 iovfs
 IPC
 isatty
+isglob
 isnan
 Isnt
 jakebailey

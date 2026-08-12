@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/web-infra-dev/rslint/internal/utils/minimatch"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/minimatch"
 )
 
 // TestMatch pins this port against minimatch 3.1.5 itself: every expectation

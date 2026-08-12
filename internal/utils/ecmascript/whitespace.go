@@ -8,6 +8,21 @@
 // Everything here is a pure function of its arguments. Only
 // [IsValidRegexLiteral] reaches past the standard library, for the scanner that
 // reads a regexp literal, and a rule carries that dependency already.
+//
+// The larger pieces of JavaScript a rule has to reproduce live alongside, each
+// in its own package so that only what needs a dependency carries one:
+//
+//   - [ecmascript/regexp] compiles a JavaScript RegExp, closing the gaps
+//     between what ECMAScript specifies and what a Go engine does.
+//   - [ecmascript/minimatch] ports the glob matcher an ESLint plugin compares
+//     paths with, extended glob syntax included.
+//   - [ecmascript/isglob] answers whether a string was written as a glob at
+//     all.
+//
+// Config-level path matching is deliberately not here: ESLint matches a flat
+// config's own `files` and `ignores` with a later minimatch than the one
+// plugins use, so that layer stays on doublestar rather than borrowing a
+// fidelity it does not want.
 package ecmascript
 
 import (

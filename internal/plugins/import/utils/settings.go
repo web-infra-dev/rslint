@@ -1,12 +1,12 @@
 package utils
 
 import (
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // ModuleSettings is the `import/` settings block compiled once per Program and
@@ -14,7 +14,7 @@ import (
 // which means recompiling the import/ignore patterns and re-deriving the
 // external module folders each time.
 type ModuleSettings struct {
-	ignore          []*regexp.Regexp
+	ignore          []*esregexp.RegExp
 	externalFolders []string
 	key             string
 }
@@ -44,7 +44,7 @@ func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
 		key:             moduleSettingsKey(settings),
 	}
 	for _, pattern := range settingsStringList(settings, "import/ignore") {
-		if expression, err := regexp.Compile(pattern); err == nil {
+		if expression, err := esregexp.Compile(pattern, ""); err == nil {
 			compiled.ignore = append(compiled.ignore, expression)
 		}
 	}
@@ -83,7 +83,7 @@ func (compiled *ModuleSettings) IsIgnoredPath(fileName string) bool {
 		return false
 	}
 	for _, expression := range compiled.ignore {
-		if expression.MatchString(fileName) {
+		if expression.Test(fileName) {
 			return true
 		}
 	}
