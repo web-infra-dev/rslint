@@ -42,4 +42,5 @@ For more option examples and edge cases, see the upstream rule documentation lin
 
 ## Original Documentation
 
-- [jest/expect-expect](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/expect-expect.md)
+- [eslint-plugin-jest: expect-expect](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/expect-expect.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/expect-expect.ts)

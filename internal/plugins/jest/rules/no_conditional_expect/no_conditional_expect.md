@@ -132,4 +132,5 @@ it('includes the status code in the error', async () => {
 
 ## Original Documentation
 
-- [jest/no-conditional-expect](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-conditional-expect.md)
+- [eslint-plugin-jest: no-conditional-expect](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-conditional-expect.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-conditional-expect.ts)

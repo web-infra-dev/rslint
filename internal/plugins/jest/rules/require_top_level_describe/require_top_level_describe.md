@@ -44,4 +44,5 @@ describe('one', () => {
 
 ## Original Documentation
 
-- [jest/require-top-level-describe](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/require-top-level-describe.md)
+- [eslint-plugin-jest: require-top-level-describe](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/require-top-level-describe.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/require-top-level-describe.ts)

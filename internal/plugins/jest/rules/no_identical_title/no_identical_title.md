@@ -29,4 +29,5 @@ test("x" + n, () => {}); // not static — skipped
 
 ## Original Documentation
 
-- [jest/no-identical-title](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-identical-title.md)
+- [eslint-plugin-jest: no-identical-title](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-identical-title.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-identical-title.ts)
