@@ -202,8 +202,6 @@ func RemoveAccessorEntryRanges(
 			} else {
 				ranges = append(ranges, core.NewTextRange(accessor.End(), callQuestionDotRange.End()))
 			}
-		} else {
-			ranges = append(ranges, utils.TrimNodeTextRange(sourceFile, questionDot))
 		}
 	case ast.KindVariableDeclaration:
 		declaration := next.AsVariableDeclaration()

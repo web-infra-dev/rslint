@@ -208,8 +208,8 @@ func TestRemoveAccessorEntryRanges(t *testing.T) {
 	}{
 		{name: "property", code: `test.only()`, want: `test()`},
 		{name: "element", code: `test[ "only" ]()`, want: `test()`},
-		{name: "optional property", code: `test?.only()`, want: `test()`},
-		{name: "optional element", code: `test?.["only"]()`, want: `test()`},
+		{name: "optional property", code: `test?.only()`, want: `test?.()`},
+		{name: "optional element", code: `test?.["only"]()`, want: `test?.()`},
 		{name: "optional call", code: `test?.only?.()`, want: `test?.()`},
 		{name: "comment before property", code: `test /* keep */.only()`, want: `test /* keep */()`},
 		{name: "comment in element", code: `test[/* keep */ "only"]()`, want: `test/* keep */ ()`},

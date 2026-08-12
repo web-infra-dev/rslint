@@ -103,6 +103,34 @@ ruleTester.run('no-focused-tests', {} as never, {
       ],
     },
     {
+      code: 'test?.only()',
+      errors: [
+        {
+          line: 1,
+          column: 7,
+          endColumn: 11,
+          messageId: 'focusedTest',
+          suggestions: [
+            { messageId: 'suggestRemoveFocus', output: 'test?.()' },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'test?.["only"]()',
+      errors: [
+        {
+          line: 1,
+          column: 8,
+          endColumn: 14,
+          messageId: 'focusedTest',
+          suggestions: [
+            { messageId: 'suggestRemoveFocus', output: 'test?.()' },
+          ],
+        },
+      ],
+    },
+    {
       code: 'describe.only.each()()',
       errors: [
         {

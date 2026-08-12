@@ -259,8 +259,8 @@ func TestNoFocusedTests(t *testing.T) {
 			focused(`test[  "only"  ]()`, "test()", 1, 8, 14),
 			focused("test[\n  `only`\n]()", "test()", 2, 3, 9),
 			focused(`test[("only")]()`, "test()", 1, 7, 13),
-			focused("test?.only()", "test()", 1, 7, 11),
-			focused(`test?.["only"]()`, "test()", 1, 8, 14),
+			focused("test?.only()", "test?.()", 1, 7, 11),
+			focused(`test?.["only"]()`, "test?.()", 1, 8, 14),
 
 			// One suggestion removes every focus marker from a registration.
 			focused("test.only.only()", "test()", 1, 6, 10),
