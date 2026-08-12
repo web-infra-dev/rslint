@@ -27,22 +27,24 @@ type StandaloneOptions struct {
 }
 
 type standaloneProgram struct {
-	host             compiler.CompilerHost
-	fs               vfs.FS
-	currentDirectory string
-	options          *core.CompilerOptions
-	resolver         *module.Resolver
-	files            []*ast.SourceFile
-	metadataByPath   map[tspath.Path]ast.SourceFileMetaData
-	sourcesByPath    map[tspath.Path]*ast.SourceFile
-	resolvedModules  map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule]
+	host                       compiler.CompilerHost
+	fs                         vfs.FS
+	currentDirectory           string
+	options                    *core.CompilerOptions
+	resolver                   *module.Resolver
+	files                      []*ast.SourceFile
+	metadataByPath             map[tspath.Path]ast.SourceFileMetaData
+	sourcesByPath              map[tspath.Path]*ast.SourceFile
+	resolvedModules            map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule]
+	syntacticDiagnosticsByPath map[tspath.Path][]*ast.Diagnostic
 }
 
 type standaloneParseResult struct {
-	file            *ast.SourceFile
-	metadata        ast.SourceFileMetaData
-	resolvedModules module.ModeAwareCache[*module.ResolvedModule]
-	err             error
+	file                 *ast.SourceFile
+	metadata             ast.SourceFileMetaData
+	resolvedModules      module.ModeAwareCache[*module.ResolvedModule]
+	syntacticDiagnostics []*ast.Diagnostic
+	err                  error
 }
 
 // NewStandalone parses, resolves direct imports for, and binds one immutable
@@ -84,12 +86,14 @@ func NewStandalone(opts StandaloneOptions) (*Program, error) {
 			results[index].err = fmt.Errorf("program: standalone Program could not read root %q", rootFileName)
 			return
 		}
+		syntacticDiagnostics := standalone.computeSyntacticDiagnostics(file)
 		resolvedModules := standalone.resolveImports(file, metadata)
 		binder.BindSourceFile(file)
 		results[index] = standaloneParseResult{
-			file:            file,
-			metadata:        metadata,
-			resolvedModules: resolvedModules,
+			file:                 file,
+			metadata:             metadata,
+			resolvedModules:      resolvedModules,
+			syntacticDiagnostics: syntacticDiagnostics,
 		}
 	}
 
@@ -130,7 +134,7 @@ func NewStandalone(opts StandaloneOptions) (*Program, error) {
 			}
 			continue
 		}
-		standalone.install(result.file, result.metadata, result.resolvedModules)
+		standalone.install(result.file, result.metadata, result.resolvedModules, result.syntacticDiagnostics)
 		standalone.files = append(standalone.files, result.file)
 	}
 	return &Program{standalone: standalone}, nil
@@ -221,7 +225,12 @@ func NewStandaloneFromTypeScriptSources(
 			return nil, fmt.Errorf("program: source services do not own standalone source %q", file.FileName())
 		}
 		metadata := standalone.sourceFileMetaData(file.FileName())
-		standalone.install(file, metadata, standalone.resolveImports(file, metadata))
+		standalone.install(
+			file,
+			metadata,
+			standalone.resolveImports(file, metadata),
+			standalone.computeSyntacticDiagnostics(file),
+		)
 	}
 	standalone.files = normalized
 	return &Program{standalone: standalone}, nil
@@ -325,12 +334,28 @@ func (p *standaloneProgram) install(
 	file *ast.SourceFile,
 	metadata ast.SourceFileMetaData,
 	resolvedModules module.ModeAwareCache[*module.ResolvedModule],
+	syntacticDiagnostics []*ast.Diagnostic,
 ) {
 	p.metadataByPath[file.Path()] = metadata
 	p.sourcesByPath[file.Path()] = file
 	if resolvedModules != nil {
 		p.resolvedModules[file.Path()] = resolvedModules
 	}
+	if len(syntacticDiagnostics) > 0 {
+		if p.syntacticDiagnosticsByPath == nil {
+			p.syntacticDiagnosticsByPath = make(map[tspath.Path][]*ast.Diagnostic)
+		}
+		p.syntacticDiagnosticsByPath[file.Path()] = syntacticDiagnostics
+	}
+}
+
+func (p *standaloneProgram) computeSyntacticDiagnostics(file *ast.SourceFile) []*ast.Diagnostic {
+	diagnostics := append([]*ast.Diagnostic(nil), file.Diagnostics()...)
+	diagnostics = append(diagnostics, file.JSDiagnostics()...)
+	if ast.IsSourceFileJS(file) && !ast.IsCheckJSEnabledForFile(file, p.options) {
+		diagnostics = append(diagnostics, compiler.GetAdditionalJSSyntacticDiagnostics(file, p.options)...)
+	}
+	return compiler.SortAndDeduplicateDiagnostics(diagnostics)
 }
 
 func (p *standaloneProgram) sourceFile(fileName string) *ast.SourceFile {

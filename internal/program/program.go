@@ -259,10 +259,5 @@ func (p *Program) SyntacticDiagnostics(ctx context.Context, file *ast.SourceFile
 	if p.standalone == nil {
 		return nil
 	}
-	diagnostics := append([]*ast.Diagnostic(nil), file.Diagnostics()...)
-	diagnostics = append(diagnostics, file.JSDiagnostics()...)
-	if ast.IsSourceFileJS(file) && !ast.IsCheckJSEnabledForFile(file, p.standalone.options) {
-		diagnostics = append(diagnostics, compiler.GetAdditionalJSSyntacticDiagnostics(file, p.standalone.options)...)
-	}
-	return compiler.SortAndDeduplicateDiagnostics(diagnostics)
+	return p.standalone.syntacticDiagnosticsByPath[file.Path()]
 }

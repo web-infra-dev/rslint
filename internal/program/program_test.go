@@ -124,6 +124,31 @@ func TestStandaloneProgramRejectsCaseFoldedRootCollision(t *testing.T) {
 	}
 }
 
+func TestStandaloneProgramCachesSyntacticDiagnosticsDuringConstruction(t *testing.T) {
+	const root = "/program-standalone-syntax-test"
+	fileName := tspath.ResolvePath(root, "invalid.js")
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		fileName: "const value = ;",
+	})
+	standalone, err := NewStandalone(StandaloneOptions{
+		RootFileNames:   []string{fileName},
+		Host:            utils.CreateCompilerHost(root, fs),
+		CompilerOptions: &core.CompilerOptions{AllowJs: core.TSTrue},
+	})
+	if err != nil {
+		t.Fatalf("NewStandalone: %v", err)
+	}
+	file := standalone.SourceFiles()[0]
+	cached := standalone.standalone.syntacticDiagnosticsByPath[file.Path()]
+	if len(cached) == 0 {
+		t.Fatal("standalone construction did not cache parser diagnostics")
+	}
+	got := standalone.SyntacticDiagnostics(context.Background(), file)
+	if len(got) != len(cached) || &got[0] != &cached[0] {
+		t.Fatal("SyntacticDiagnostics did not reuse immutable construction output")
+	}
+}
+
 type typedNilCompilerHost struct {
 	compiler.CompilerHost
 }
