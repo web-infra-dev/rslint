@@ -50,32 +50,41 @@ func TestDependencySymbols(t *testing.T) {
 	expectSymbol(t, semantic.ExternalSymbols, "example-dependency", "value")
 }
 
+func TestDependencySubpathSymbols(t *testing.T) {
+	semantic := semanticFromFiles(t, map[string]string{
+		"tsconfig.json": "{\n\t\"compilerOptions\": {\"moduleResolution\": \"node\"},\n\t\"include\": [\"./index.ts\"]\n}",
+		"index.ts":      `import { api } from "example-dependency/index.js"; api.run();`,
+		"node_modules/example-dependency/package.json": "{\n\t\"name\": \"example-dependency\",\n\t\"version\": \"1.0.0\",\n\t\"types\": \"index.d.ts\"\n}",
+		"node_modules/example-dependency/index.d.ts":   "export declare const api: { run(): void };",
+	})
+
+	expectSymbol(t, semantic.ExternalSymbols, "example-dependency/index.js", "api")
+	expectSymbol(t, semantic.ExternalSymbols, "example-dependency/index.js", "api.run")
+}
+
 func TestExternalModuleName(t *testing.T) {
 	tests := []struct {
 		moduleName string
 		namespace  string
-		prefix     string
 		ok         bool
 	}{
 		{moduleName: "react", namespace: "react", ok: true},
-		{moduleName: "react/jsx-runtime", namespace: "react", prefix: "jsx-runtime", ok: true},
+		{moduleName: "react/jsx-runtime", namespace: "react/jsx-runtime", ok: true},
 		{moduleName: "@scope/pkg", namespace: "@scope/pkg", ok: true},
-		{moduleName: "@scope/pkg/subpath", namespace: "@scope/pkg", prefix: "subpath", ok: true},
+		{moduleName: "@scope/pkg/subpath", namespace: "@scope/pkg/subpath", ok: true},
 		{moduleName: "node:assert", namespace: "node:assert", ok: true},
 		{moduleName: "./local", ok: false},
 	}
 
 	for _, test := range tests {
-		namespace, prefix, ok := externalModuleName(test.moduleName)
-		if namespace != test.namespace || prefix != test.prefix || ok != test.ok {
+		namespace, ok := externalModuleName(test.moduleName)
+		if namespace != test.namespace || ok != test.ok {
 			t.Fatalf(
-				"externalModuleName(%q) = (%q, %q, %v), want (%q, %q, %v)",
+				"externalModuleName(%q) = (%q, %v), want (%q, %v)",
 				test.moduleName,
 				namespace,
-				prefix,
 				ok,
 				test.namespace,
-				test.prefix,
 				test.ok,
 			)
 		}

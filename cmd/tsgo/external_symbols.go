@@ -19,7 +19,6 @@ var acceptedTypeOnlySymbols = []string{
 
 type externalModuleRoot struct {
 	namespace string
-	prefix    string
 	fileName  string
 }
 
@@ -79,13 +78,12 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 			if resolution == nil || !resolution.IsResolved() || !resolution.IsExternalLibraryImport {
 				continue
 			}
-			namespace, prefix, ok := externalModuleName(key.Name)
+			namespace, ok := externalModuleName(key.Name)
 			if !ok {
 				continue
 			}
 			roots[externalModuleRoot{
 				namespace: namespace,
-				prefix:    prefix,
 				fileName:  resolution.ResolvedFileName,
 			}] = struct{}{}
 		}
@@ -101,9 +99,6 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 		if left.namespace != right.namespace {
 			return left.namespace < right.namespace
 		}
-		if left.prefix != right.prefix {
-			return left.prefix < right.prefix
-		}
 		return left.fileName < right.fileName
 	})
 
@@ -117,8 +112,7 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 			return exports[i].Name < exports[j].Name
 		})
 		for _, symbol := range exports {
-			name := joinExternalName(root.prefix, symbol.Name)
-			c.collect(root.namespace, name, symbol)
+			c.collect(root.namespace, symbol.Name, symbol)
 		}
 	}
 }
@@ -206,20 +200,19 @@ func (c *externalSymbolCollector) record(namespace string, name string, symbol *
 	}
 }
 
-func externalModuleName(moduleName string) (namespace string, prefix string, ok bool) {
+func externalModuleName(moduleName string) (namespace string, ok bool) {
 	if moduleName == "" || tspath.IsExternalModuleNameRelative(moduleName) || strings.HasPrefix(moduleName, "#") {
-		return "", "", false
+		return "", false
 	}
 	if strings.HasPrefix(moduleName, "node:") {
-		return moduleName, "", true
+		return moduleName, true
 	}
 
-	namespace, prefix = module.ParsePackageName(moduleName)
-	if namespace == "" {
-		return "", "", false
+	packageName, _ := module.ParsePackageName(moduleName)
+	if packageName == "" {
+		return "", false
 	}
-	prefix = strings.ReplaceAll(prefix, "/", ".")
-	return namespace, prefix, true
+	return moduleName, true
 }
 
 func joinExternalName(prefix string, name string) string {
