@@ -196,11 +196,10 @@ func (s *nonNullableTypeAssertionStyleState) checkAssertion(node *ast.Node) {
 
 func runNonNullableTypeAssertionStyle(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	compilerOptions := ctx.Program.Options()
-	if !utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.StrictNullChecks) {
-		// With the TypeScript versions supported by the upstream rule, null and
-		// undefined are erased when strictNullChecks is not enabled, so the rule
-		// cannot find an assertion that only removes those constituents. Keep that
-		// behavior even though newer typescript-go versions default strictness on.
+	if !compilerOptions.GetStrictOptionValue(compilerOptions.StrictNullChecks) {
+		// Use the compiler's effective value: TypeScript 6 enables strictness by
+		// default when neither strict nor strictNullChecks is specified, while an
+		// explicit false still erases null and undefined from the relevant types.
 		return nil
 	}
 

@@ -432,12 +432,24 @@ function first<T extends string | number>(array: ArrayLike<T>): T | null {
 }
 
 func TestNonNullableTypeAssertionStyleRule_withoutExplicitStrictNullChecks(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.no-explicit-strict.json", t, &NonNullableTypeAssertionStyleRule, []rule_tester.ValidTestCase{
-		{Code: `
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.no-explicit-strict.json", t, &NonNullableTypeAssertionStyleRule, nil, []rule_tester.InvalidTestCase{
+		{
+			Code: `
 declare function normalize(value?: string): string | undefined;
 const value = normalize() as string;
+      `,
+			Output: []string{`
+declare function normalize(value?: string): string | undefined;
+const value = normalize()!;
       `},
-		{Code: `
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "preferNonNullAssertion",
+				Line:      3,
+				Column:    15,
+			}},
+		},
+		{
+			Code: `
 declare const key: unique symbol;
 function read(adm: { [key]?: string[] }): string[] {
   if (key in adm) {
@@ -445,23 +457,73 @@ function read(adm: { [key]?: string[] }): string[] {
   }
   return [];
 }
+      `,
+			Output: []string{`
+declare const key: unique symbol;
+function read(adm: { [key]?: string[] }): string[] {
+  if (key in adm) {
+    return adm[key]!;
+  }
+  return [];
+}
       `},
-		{Code: `
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "preferNonNullAssertion",
+				Line:      5,
+				Column:    12,
+			}},
+		},
+		{
+			Code: `
 declare function getOptions(): { output: { hash?: string } };
 if (getOptions().output.hash) {
   const hash = getOptions().output.hash as string;
 }
+      `,
+			Output: []string{`
+declare function getOptions(): { output: { hash?: string } };
+if (getOptions().output.hash) {
+  const hash = getOptions().output.hash!;
+}
       `},
-		{Code: `
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "preferNonNullAssertion",
+				Line:      4,
+				Column:    16,
+			}},
+		},
+		{
+			Code: `
 declare const values: string[];
 if (values.length > 0) {
   const value = values.pop() as string;
 }
+      `,
+			Output: []string{`
+declare const values: string[];
+if (values.length > 0) {
+  const value = values.pop()!;
+}
       `},
-	}, nil)
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "preferNonNullAssertion",
+				Line:      4,
+				Column:    17,
+			}},
+		},
+	})
 }
 
 func TestNonNullableTypeAssertionStyleRule_strictNullChecksOverrides(t *testing.T) {
+	t.Run("disabled explicitly", func(t *testing.T) {
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.unstrict.json", t, &NonNullableTypeAssertionStyleRule, []rule_tester.ValidTestCase{
+			{Code: `
+declare const maybe: string | undefined;
+const value = maybe as string;
+        `},
+		}, nil)
+	})
+
 	t.Run("enabled without strict", func(t *testing.T) {
 		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.strict-null-checks-only.json", t, &NonNullableTypeAssertionStyleRule, nil, []rule_tester.InvalidTestCase{
 			{
