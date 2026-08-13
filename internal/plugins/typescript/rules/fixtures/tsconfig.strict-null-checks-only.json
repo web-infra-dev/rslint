@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "strict": false,
+    "strictNullChecks": true,
+    "target": "ES2020"
+  }
+}
