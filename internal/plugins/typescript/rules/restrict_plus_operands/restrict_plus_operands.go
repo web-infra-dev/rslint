@@ -2,7 +2,6 @@ package restrict_plus_operands
 
 import (
 	_ "embed"
-	"fmt"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -17,19 +16,19 @@ var schemaJSON []byte
 func buildBigintAndNumberMessage(left, right string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "bigintAndNumber",
-		Description: fmt.Sprintf("Numeric '+' operations must either be both bigints or both numbers. Got `%v` + `%v`.", left, right),
+		Description: "Numeric '+' operations must either be both bigints or both numbers. Got `" + left + "` + `" + right + "`.",
 	}
 }
 func buildInvalidMessage(stringLike, t string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "invalid",
-		Description: fmt.Sprintf("Invalid operand for a '+' operation. Operands must each be a number or %v. Got `%v`.", stringLike, t),
+		Description: "Invalid operand for a '+' operation. Operands must each be a number or " + stringLike + ". Got `" + t + "`.",
 	}
 }
 func buildMismatchedMessage(stringLike, left, right string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "mismatched",
-		Description: fmt.Sprintf("Operands of '+' operations must be a number or %v. Got `%v` + `%v`.", stringLike, left, right),
+		Description: "Operands of '+' operations must be a number or " + stringLike + ". Got `" + left + "` + `" + right + "`.",
 	}
 }
 
@@ -40,6 +39,44 @@ type RestrictPlusOperandsOptions struct {
 	AllowNumberAndString    bool
 	AllowRegExp             bool
 	SkipCompoundAssignments bool
+}
+
+func isDeeplyObjectType(t *checker.Type) bool {
+	if utils.IsIntersectionType(t) {
+		return utils.Every(t.Types(), utils.IsObjectType)
+	}
+	return utils.IsObjectType(t)
+}
+
+func invalidObjectOperandType(
+	typeChecker *checker.Checker,
+	part *checker.Type,
+	otherType *checker.Type,
+	allowAny bool,
+	allowRegExp bool,
+) (string, bool) {
+	isAny := utils.IsTypeAnyType(part)
+	isTypeParameter := utils.IsTypeParameter(part)
+	deeplyObject := isDeeplyObjectType(part)
+	if !isTypeParameter && !deeplyObject && (allowAny || !isAny) {
+		return "", false
+	}
+
+	typeName := utils.GetTypeName(typeChecker, part)
+	renderedType := typeName
+	if isTypeParameter {
+		renderedType = typeChecker.TypeToString(part)
+	}
+	if typeName == "RegExp" {
+		if allowRegExp && !utils.IsTypeFlagSet(otherType, checker.TypeFlagsNumberLike) {
+			return "", false
+		}
+		return renderedType, true
+	}
+	if (!allowAny && isAny) || deeplyObject {
+		return renderedType, true
+	}
+	return "", false
 }
 
 func parseOptions(options []any) RestrictPlusOperandsOptions {
@@ -82,37 +119,41 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
-		stringLikes := make([]string, 0, 5)
+		var stringLikes [5]string
+		stringLikeCount := 0
 		if opts.AllowAny {
-			stringLikes = append(stringLikes, "`any`")
+			stringLikes[stringLikeCount] = "`any`"
+			stringLikeCount++
 		}
 		if opts.AllowBoolean {
-			stringLikes = append(stringLikes, "`boolean`")
+			stringLikes[stringLikeCount] = "`boolean`"
+			stringLikeCount++
 		}
 		if opts.AllowNullish {
-			stringLikes = append(stringLikes, "`null`")
+			stringLikes[stringLikeCount] = "`null`"
+			stringLikeCount++
 		}
 		if opts.AllowRegExp {
-			stringLikes = append(stringLikes, "`RegExp`")
+			stringLikes[stringLikeCount] = "`RegExp`"
+			stringLikeCount++
 		}
 		if opts.AllowNullish {
-			stringLikes = append(stringLikes, "`undefined`")
+			stringLikes[stringLikeCount] = "`undefined`"
+			stringLikeCount++
 		}
 		var stringLike string
-		switch len(stringLikes) {
+		switch stringLikeCount {
 		case 0:
 			stringLike = "string"
 		case 1:
 			stringLike = "string, allowing a string + " + stringLikes[0]
 		default:
-			stringLike = "string, allowing a string + any of: " + strings.Join(stringLikes, ", ")
+			stringLike = "string, allowing a string + any of: " + strings.Join(stringLikes[:stringLikeCount], ", ")
 		}
 
 		getTypeConstrained := func(node *ast.Node) *checker.Type {
 			return checker.Checker_getBaseTypeOfLiteralType(ctx.TypeChecker, utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node))
 		}
-
-		globalRegexpType := checker.Checker_globalRegExpType(ctx.TypeChecker)
 
 		invalidFlags := checker.TypeFlagsESSymbolLike |
 			checker.TypeFlagsNever |
@@ -128,38 +169,48 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 		}
 
 		checkInvalidPlusOperand := func(baseNode *ast.Node, baseType, otherType *checker.Type) (checker.TypeFlags, bool) {
-			foundRegexp := false
-
-			var flags checker.TypeFlags
-
-			reported := false
-			for _, part := range utils.UnionTypeParts(baseType) {
-				flags |= checker.Type_flags(part)
-				if reported {
-					continue
-				}
-				if utils.IsTypeFlagSet(part, invalidFlags) {
+			if !utils.IsUnionType(baseType) {
+				flags := checker.Type_flags(baseType)
+				if flags&invalidFlags != 0 {
 					ctx.ReportNode(baseNode, buildInvalidMessage(stringLike, ctx.TypeChecker.TypeToString(baseType)))
-					reported = true
-					continue
+					return flags, true
 				}
-
-				// RegExps also contain checker.TypeFlagsAny & checker.TypeFlagsObject
-				if part == globalRegexpType {
-					if opts.AllowRegExp && !utils.IsTypeFlagSet(otherType, checker.TypeFlagsNumberLike) {
-						continue
-					}
-				} else if (opts.AllowAny || !utils.IsTypeAnyType(part)) && !utils.Every(utils.IntersectionTypeParts(part), utils.IsObjectType) {
-					continue
+				if typeName, invalid := invalidObjectOperandType(
+					ctx.TypeChecker,
+					baseType,
+					otherType,
+					opts.AllowAny,
+					opts.AllowRegExp,
+				); invalid {
+					ctx.ReportNode(baseNode, buildInvalidMessage(stringLike, typeName))
+					return flags, true
 				}
-				foundRegexp = true
+				return flags, false
 			}
 
-			if !reported && foundRegexp {
-				ctx.ReportNode(baseNode, buildInvalidMessage(stringLike, ctx.TypeChecker.TypeToString(globalRegexpType)))
+			parts := baseType.Types()
+			var flags checker.TypeFlags
+			for _, part := range parts {
+				flags |= checker.Type_flags(part)
+			}
+			if flags&invalidFlags != 0 {
+				ctx.ReportNode(baseNode, buildInvalidMessage(stringLike, ctx.TypeChecker.TypeToString(baseType)))
 				return flags, true
 			}
 
+			reported := false
+			for _, part := range parts {
+				if typeName, invalid := invalidObjectOperandType(
+					ctx.TypeChecker,
+					part,
+					otherType,
+					opts.AllowAny,
+					opts.AllowRegExp,
+				); invalid {
+					ctx.ReportNode(baseNode, buildInvalidMessage(stringLike, typeName))
+					reported = true
+				}
+			}
 			return flags, reported
 		}
 
@@ -179,32 +230,33 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			leftTypeFlags, leftInvalid := checkInvalidPlusOperand(node.Left, leftType, rightType)
-			rightTypeFlags, rightInvalid := checkInvalidPlusOperand(node.Right, rightType, leftType)
+			leftNode := node.Left
+			if leftNode.Kind == ast.KindParenthesizedExpression {
+				leftNode = ast.SkipParentheses(leftNode)
+			}
+			rightNode := node.Right
+			if rightNode.Kind == ast.KindParenthesizedExpression {
+				rightNode = ast.SkipParentheses(rightNode)
+			}
+			leftTypeFlags, leftInvalid := checkInvalidPlusOperand(leftNode, leftType, rightType)
+			rightTypeFlags, rightInvalid := checkInvalidPlusOperand(rightNode, rightType, leftType)
 			if leftInvalid || rightInvalid {
 				return
 			}
 
-			checkMismatchedPlusOperands := func(baseTypeFlags, otherTypeFlags checker.TypeFlags) bool {
-				if !opts.AllowNumberAndString &&
-					baseTypeFlags&checker.TypeFlagsStringLike != 0 &&
-					otherTypeFlags&(checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) != 0 {
-					ctx.ReportNode(&node.Node, buildMismatchedMessage(stringLike, ctx.TypeChecker.TypeToString(leftType), ctx.TypeChecker.TypeToString(rightType)))
-					return true
-				}
-
-				if baseTypeFlags&checker.TypeFlagsNumberLike != 0 && otherTypeFlags&checker.TypeFlagsBigIntLike != 0 {
-					ctx.ReportNode(&node.Node, buildBigintAndNumberMessage(ctx.TypeChecker.TypeToString(leftType), ctx.TypeChecker.TypeToString(rightType)))
-					return true
-				}
-
-				return false
-			}
-
-			if checkMismatchedPlusOperands(leftTypeFlags, rightTypeFlags) {
+			if !opts.AllowNumberAndString &&
+				(leftTypeFlags&checker.TypeFlagsStringLike != 0 &&
+					rightTypeFlags&(checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) != 0 ||
+					rightTypeFlags&checker.TypeFlagsStringLike != 0 &&
+						leftTypeFlags&(checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) != 0) {
+				ctx.ReportNode(&node.Node, buildMismatchedMessage(stringLike, ctx.TypeChecker.TypeToString(leftType), ctx.TypeChecker.TypeToString(rightType)))
 				return
 			}
-			checkMismatchedPlusOperands(rightTypeFlags, leftTypeFlags)
+
+			if leftTypeFlags&checker.TypeFlagsNumberLike != 0 && rightTypeFlags&checker.TypeFlagsBigIntLike != 0 ||
+				rightTypeFlags&checker.TypeFlagsNumberLike != 0 && leftTypeFlags&checker.TypeFlagsBigIntLike != 0 {
+				ctx.ReportNode(&node.Node, buildBigintAndNumberMessage(ctx.TypeChecker.TypeToString(leftType), ctx.TypeChecker.TypeToString(rightType)))
+			}
 		}
 
 		return rule.RuleListeners{
