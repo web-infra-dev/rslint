@@ -12,6 +12,7 @@ This document summarizes how to work on rslint effectively and consistently.
 - `internal/plugins/typescript/`: `@typescript-eslint` rules under `rules/<rule>/`.
 - `internal/plugins/import/`: `eslint-plugin-import` registration.
 - `internal/utils/`: JSONC, overlay VFS, TS program creation, helpers.
+- `internal/utils/ecmascript/`: JavaScript's own semantics (trim, blank, `/i` case comparison, number-to-string) plus `ecmascript/regexp` for a JavaScript RegExp. `internal/utils/minimatch3/` and `internal/utils/isglob/` port the glob packages ESLint plugins depend on.
 - `internal/lsp/`: Language Server integration. Also see `website/` and `packages/` for UI/tooling.
 
 ## Build, Test, and Development Commands
@@ -35,6 +36,7 @@ This document summarizes how to work on rslint effectively and consistently.
 - TS/JS/MD/CSS use Prettier via `pnpm run format`.
 - Rules: `internal/plugins/typescript/rules/<rule>/`; tests: `<rule>_test.go`.
 - Prefer table-driven tests and existing helpers in `internal/utils`.
+- A value that came from JavaScript — a string to trim, a number to print, a regexp or glob out of a rule option — is read through `internal/utils/ecmascript`, `ecmascript/regexp`, `minimatch3`, or `isglob`, never through `strings.TrimSpace`, the stdlib `regexp`, or `doublestar`. `depguard` enforces the last two under `internal/rules/**` and `internal/plugins/**`. **minimatch 10 is not ported**: if a rule being ported needs it, report that to the user instead of substituting `minimatch3` or `doublestar`.
 
 ## Testing Guidelines
 

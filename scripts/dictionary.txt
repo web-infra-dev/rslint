@@ -122,6 +122,7 @@ deboucne
 dedup
 dedupe
 dedups
+depguard
 deprec
 Deque
 describedby

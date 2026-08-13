@@ -268,6 +268,21 @@ Before starting, familiarize yourself with these key source locations:
    1. **Rule documentation** (or [AST_PATTERNS.md](AST_PATTERNS.md) if the quirk is general, not rule-specific): note the divergence under "Differences from ESLint" / the relevant AST-shape section.
    2. **Test cases**: Lock the current behavior in with a test — typically the ESLint-fails-but-we-pass case stays on the `valid` side with a comment pointing at the underlying quirk, so the behavior can't flip silently.
 
+7. **Identify How the Rule Reads Patterns**:
+
+   If the rule accepts a regexp or a glob — in a rule option, or read out of the source under lint — find the library upstream reads it with. Check the rule's own imports and the plugin's `package.json`, and note the **major version**. Go's standard library and general-purpose glob packages answer differently, so the port has a matching package for each:
+
+   | Upstream reads the pattern with        | Use in the port                                                  |
+   | -------------------------------------- | ---------------------------------------------------------------- |
+   | a regexp literal or `new RegExp(...)`  | `utils/ecmascript/regexp`, imported as `esregexp`                |
+   | `minimatch` at `^3.x`                  | `utils/minimatch3`                                               |
+   | `is-glob`                              | `utils/isglob`                                                   |
+   | `ignore` (gitignore syntax, not globs) | a gitignore matcher — see `internal/rules/no_restricted_imports` |
+
+   `depguard` denies `regexp2` and `doublestar` under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. Trimming, blankness, case comparison and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
+
+   **`minimatch@10` is not ported. If the rule depends on it, stop and report that to the user before writing the port** — do not substitute `minimatch3` or `doublestar` and carry on. ESLint itself moved to minimatch 10 for its own flat-config `files`/`ignores` and a plugin may follow, but only the 3.x reading is ported, because that is what the plugin ecosystem pins. `minimatch3` differs from 10 on POSIX character classes; `doublestar` differs on 13 of 37 sampled patterns, and not only on extended glob syntax — `src/**` matches `src` itself under doublestar but not under minimatch, and a leading `!` is a literal rather than a negation. Report which package and version the rule needs and which of its patterns would be misread; the user decides whether to port minimatch 10, accept a documented divergence, or skip the rule.
+
 ---
 
 ## Phase 2: Implementation (Go)

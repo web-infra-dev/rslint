@@ -265,6 +265,18 @@ The workflow is complete ONLY when all tasks created during Planning are marked 
 | Identifier → symbol (incl. globals/`.d.ts`) | `ctx.Refs.Resolve(node)`                               |
 | Every comment in the file                   | `ctx.Comments.All()`                                   |
 
+**Values that came from JavaScript** — Go's standard library answers a nearby but different question about each, so never reach for `strings.TrimSpace`, the stdlib `regexp`, or `doublestar` on one:
+
+| Need                                            | Use                                               |
+| ----------------------------------------------- | ------------------------------------------------- |
+| Trim, blank, whitespace, `String(n)`, `/i` case | `utils/ecmascript`                                |
+| A regexp option or a `new RegExp(...)`          | `utils/ecmascript/regexp`, imported as `esregexp` |
+| A glob option (upstream on `minimatch@3`)       | `utils/minimatch3`                                |
+| "Is this a glob or a plain path?"               | `utils/isglob`                                    |
+| Upstream reads globs with **`minimatch@10`**    | **Not ported — stop and report to the user**      |
+
+`minimatch@10` has no port and no safe substitute: `minimatch3` differs from it on POSIX classes, and `doublestar` differs on far more than extended glob syntax (`src/**` matches `src` under doublestar but not under minimatch). Report which package and version the rule needs and which patterns would be misread; do not quietly swap in either one. See [UTILS_REFERENCE.md § JavaScript Semantics](references/UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
+
 **Directory Structure**:
 
 - Core rules: `internal/rules/<rule_name_snake_case>/`
