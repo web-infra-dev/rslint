@@ -156,6 +156,12 @@ declare function Foo(props: { a: string }): never;
 		{Code: "const x: unknown = y as any;"},
 		{Code: "const x: unknown[] = y as any[];"},
 		{Code: "const x: Set<unknown> = y as Set<any>;"},
+		{Code: "const x: string[] = undefined as never;"},
+		{Code: `
+declare const values: Set<any>;
+const sameTarget: Set<any> = values;
+const differentTarget: ReadonlySet<string> = values;
+    `},
 		{Code: "const x: Map<string, string> = new Map();"},
 		{Code: `
 type Foo = { bar: unknown };
@@ -382,10 +388,47 @@ const [x] = [] as any[];
 			},
 		},
 		{
+			Code: `
+declare const unsafeValues: Set<any>;
+const first: Set<string> = unsafeValues;
+const second: Set<string> = unsafeValues;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeAssignment",
+					Message:   "Unsafe assignment of type `Set<any>` to a variable of type `Set<string>`.",
+					Line:      3,
+				},
+				{
+					MessageId: "unsafeAssignment",
+					Message:   "Unsafe assignment of type `Set<any>` to a variable of type `Set<string>`.",
+					Line:      4,
+				},
+			},
+		},
+		{
 			Code: "const x: Map<string, string> = new Map<string, any>();",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeAssignment",
+				},
+			},
+		},
+		{
+			Code: `
+const safeBefore: Map<string, string> = new Map();
+const unsafeFirst: Map<string, string> = new Map<any, any>();
+const safeAfter: Map<string, string> = new Map();
+const unsafeSecond: Map<string, string> = new Map<any, any>();
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeAssignment",
+					Line:      3,
+				},
+				{
+					MessageId: "unsafeAssignment",
+					Line:      5,
 				},
 			},
 		},

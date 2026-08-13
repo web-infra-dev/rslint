@@ -8,50 +8,77 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func formatSenderType(senderType *checker.Type) string {
-	if utils.IsIntrinsicErrorType(senderType) {
-		return "error typed"
+const (
+	anySenderMessageIndex = iota
+	errorSenderMessageIndex
+)
+
+func makeSenderMessages(id string, prefix string, suffix string) [2]rule.RuleMessage {
+	return [2]rule.RuleMessage{
+		{Id: id, Description: prefix + "`any`" + suffix},
+		{Id: id, Description: prefix + "error typed" + suffix},
 	}
-	return "`any`"
 }
 
-func buildAnyAssignmentMessage(sender *checker.Type) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "anyAssignment",
-		Description: "Unsafe assignment of an " + formatSenderType(sender) + " value.",
+func selectSenderMessage(senderType *checker.Type, messages *[2]rule.RuleMessage) rule.RuleMessage {
+	if utils.IsIntrinsicErrorType(senderType) {
+		return messages[errorSenderMessageIndex]
 	}
+	return messages[anySenderMessageIndex]
+}
+
+var (
+	anyAssignmentMessages = makeSenderMessages(
+		"anyAssignment",
+		"Unsafe assignment of an ",
+		" value.",
+	)
+	anyAssignmentThisMessages = makeSenderMessages(
+		"anyAssignmentThis",
+		"Unsafe assignment of an ",
+		" value. `this` is typed as `any`.\nYou can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.",
+	)
+	unsafeArrayPatternMessages = makeSenderMessages(
+		"unsafeArrayPattern",
+		"Unsafe array destructuring of an ",
+		" array value.",
+	)
+	unsafeArrayPatternFromTupleMessages = makeSenderMessages(
+		"unsafeArrayPatternFromTuple",
+		"Unsafe array destructuring of a tuple element with an ",
+		" value.",
+	)
+	unsafeObjectPatternMessages = makeSenderMessages(
+		"unsafeObjectPattern",
+		"Unsafe object destructuring of a property with an ",
+		" value.",
+	)
+	unsafeArraySpreadMessages = makeSenderMessages(
+		"unsafeArraySpread",
+		"Unsafe spread of an ",
+		" value in an array.",
+	)
+)
+
+func buildAnyAssignmentMessage(sender *checker.Type) rule.RuleMessage {
+	return selectSenderMessage(sender, &anyAssignmentMessages)
 }
 func buildAnyAssignmentThisMessage(sender *checker.Type) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id: "anyAssignmentThis",
-		Description: "Unsafe assignment of an " + formatSenderType(sender) + " value. `this` is typed as `any`.\n" +
-			"You can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.",
-	}
+	return selectSenderMessage(sender, &anyAssignmentThisMessages)
 }
 func buildUnsafeArrayPatternMessage(sender *checker.Type) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "unsafeArrayPattern",
-		Description: "Unsafe array destructuring of an " + formatSenderType(sender) + " array value.",
-	}
+	return selectSenderMessage(sender, &unsafeArrayPatternMessages)
 }
 func buildUnsafeArrayPatternFromTupleMessage(sender *checker.Type) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "unsafeArrayPatternFromTuple",
-		Description: "Unsafe array destructuring of a tuple element with an " + formatSenderType(sender) + " value.",
-	}
+	return selectSenderMessage(sender, &unsafeArrayPatternFromTupleMessages)
 }
 func buildUnsafeObjectPatternMessage(sender *checker.Type) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "unsafeObjectPattern",
-		Description: "Unsafe object destructuring of a property with an " + formatSenderType(sender) + " value.",
-	}
+	return selectSenderMessage(sender, &unsafeObjectPatternMessages)
 }
 func buildUnsafeArraySpreadMessage(sender *checker.Type) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "unsafeArraySpread",
-		Description: "Unsafe spread of an " + formatSenderType(sender) + " value in an array.",
-	}
+	return selectSenderMessage(sender, &unsafeArraySpreadMessages)
 }
+
 func buildUnsafeAssignmentMessage(typeChecker *checker.Checker, sender, receiver *checker.Type) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeAssignment",
@@ -175,6 +202,7 @@ func (r assignmentTypeResolver) recoverType(node *ast.Node, rawType *checker.Typ
 	}
 
 	var identifierInitializer *ast.Node
+	var identifierInitializerType *checker.Type
 	switch {
 	case ast.IsBinaryExpression(node):
 		if node.AsBinaryExpression().OperatorToken.Kind != ast.KindAmpersandAmpersandToken {
@@ -197,7 +225,8 @@ func (r assignmentTypeResolver) recoverType(node *ast.Node, rawType *checker.Typ
 		// resolver handles. A mutable variable can be initialized with a safe
 		// value and later widen to any; recovering the stale initializer in that
 		// case would hide a real unsafe assignment.
-		if !utils.IsTypeAnyType(r.typeChecker.GetTypeAtLocation(identifierInitializer)) {
+		identifierInitializerType = r.typeChecker.GetTypeAtLocation(identifierInitializer)
+		if !utils.IsTypeAnyType(identifierInitializerType) {
 			return rawType
 		}
 	case ast.IsPropertyAccessExpression(node), ast.IsConditionalExpression(node), ast.IsCallExpression(node):
@@ -233,7 +262,7 @@ func (r assignmentTypeResolver) recoverType(node *ast.Node, rawType *checker.Typ
 			return rightType
 		}
 	case ast.IsIdentifier(node):
-		initializerType := r.recoverTypeAtLocation(identifierInitializer, substitutions)
+		initializerType := r.recoverType(identifierInitializer, identifierInitializerType, substitutions)
 		if !utils.IsTypeAnyType(initializerType) {
 			return initializerType
 		}
@@ -485,7 +514,7 @@ func (r assignmentTypeResolver) objectLiteralAnyValuesAreRecoverable(node *ast.N
 			continue
 		}
 		foundAny = true
-		if utils.IsTypeAnyType(r.typeAtLocation(value)) {
+		if utils.IsTypeAnyType(r.recoverType(value, valueType, nil)) {
 			return false
 		}
 	}
@@ -610,13 +639,12 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 		// returns true if the assignment reported
 		checkObjectDestructureHelper := func(
 			receiverNode *ast.Node,
+			senderType *checker.Type,
 			senderNode *ast.Node,
 		) bool {
 			if !ast.IsObjectBindingPattern(receiverNode) && !ast.IsObjectLiteralExpression(receiverNode) {
 				return false
 			}
-
-			senderType := typeResolver.typeAtLocation(senderNode)
 
 			return checkObjectDestructure(receiverNode, senderType, senderNode)
 		}
@@ -712,13 +740,12 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 		// returns true if the assignment reported
 		checkArrayDestructureHelper := func(
 			receiverNode *ast.Node,
+			senderType *checker.Type,
 			senderNode *ast.Node,
 		) bool {
 			if !ast.IsArrayBindingPattern(receiverNode) && !ast.IsArrayLiteralExpression(receiverNode) {
 				return false
 			}
-
-			senderType := typeResolver.typeAtLocation(senderNode)
 
 			return checkArrayDestructure(receiverNode, senderType, senderNode)
 		}
@@ -729,9 +756,8 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			senderNode *ast.Node,
 			reportingNode *ast.Node,
 			compType comparisonType,
+			senderType *checker.Type,
 		) bool {
-			senderType := typeResolver.typeAtLocation(senderNode)
-
 			if utils.IsTypeAnyType(senderType) {
 				// handle cases when we assign any ==> unknown.
 				var receiverType *checker.Type
@@ -761,12 +787,23 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			if compType == comparisonTypeNone {
 				return false
 			}
+			// Beyond direct any (handled above), IsUnsafeAssignment can only
+			// report through matching generic type-reference arguments. Avoid
+			// resolving the receiver for the much more common scalar path.
+			if !utils.IsTypeReference(senderType) {
+				return false
+			}
 			var receiverType *checker.Type
 			if compType == comparisonTypeContextual {
 				receiverType = utils.GetContextualType(ctx.TypeChecker, receiverNode)
 			}
 			if receiverType == nil {
 				receiverType = ctx.TypeChecker.GetTypeAtLocation(receiverNode)
+			}
+			if senderType == receiverType ||
+				!utils.IsTypeReference(receiverType) ||
+				senderType.Target() != receiverType.Target() {
+				return false
 			}
 
 			receiver, sender, unsafe := utils.IsUnsafeAssignment(
@@ -801,19 +838,21 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			if id == nil || init == nil {
 				return
 			}
+			senderType := typeResolver.typeAtLocation(init)
 			didReport := checkAssignment(
 				id,
 				init,
 				node,
 				// the variable already has some form of a type to compare against
 				comparisonTypeBasic,
+				senderType,
 			)
 
 			if !didReport {
-				didReport = checkArrayDestructureHelper(id, init)
+				didReport = checkArrayDestructureHelper(id, senderType, init)
 			}
 			if !didReport {
-				checkObjectDestructureHelper(id, init)
+				checkObjectDestructureHelper(id, senderType, init)
 			}
 		}
 
@@ -831,7 +870,13 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				if initializer == nil {
 					return
 				}
-				checkAssignment(node.Name(), initializer, node, getComparisonType(node))
+				checkAssignment(
+					node.Name(),
+					initializer,
+					node,
+					getComparisonType(node),
+					typeResolver.typeAtLocation(initializer),
+				)
 			},
 
 			// ESTree AssignmentExpression, AssignmentPattern
@@ -868,18 +913,20 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				}
 
 				id := node.Name()
+				senderType := typeResolver.typeAtLocation(init)
 				didReport := checkAssignment(
 					id,
 					init,
 					node,
 					getComparisonType(node),
+					senderType,
 				)
 
 				if !didReport {
-					didReport = checkArrayDestructureHelper(id, init)
+					didReport = checkArrayDestructureHelper(id, senderType, init)
 				}
 				if !didReport {
-					checkObjectDestructureHelper(id, init)
+					checkObjectDestructureHelper(id, senderType, init)
 				}
 			},
 
@@ -912,7 +959,13 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 					}
 					init = ast.SkipParentheses(init)
 
-					checkAssignment(node.Name(), init, node, comparisonTypeContextual)
+					checkAssignment(
+						node.Name(),
+						init,
+						node,
+						comparisonTypeContextual,
+						typeResolver.typeAtLocation(init),
+					)
 				}
 			},
 
@@ -943,7 +996,13 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				checkAssignment(node.Name(), expr, expr, comparisonTypeContextual)
+				checkAssignment(
+					node.Name(),
+					expr,
+					expr,
+					comparisonTypeContextual,
+					typeResolver.typeAtLocation(expr),
+				)
 			},
 		}
 	},
