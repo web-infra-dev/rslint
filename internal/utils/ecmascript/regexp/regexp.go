@@ -70,10 +70,12 @@ type flagSet struct {
 	multiline  bool
 	dotAll     bool
 	unicode    bool
+	sticky     bool
 }
 
-// parseFlags reads a JavaScript flag string. `g`, `y` and `d` say how a match
-// is driven rather than what matches, so they are accepted and ignored.
+// parseFlags reads a JavaScript flag string. `g` and `d` say how a match is
+// driven rather than what matches, so they are accepted and ignored. `y` does
+// change what matches and is kept.
 func parseFlags(flags string) (flagSet, error) {
 	var set flagSet
 	seen := map[rune]bool{}
@@ -91,7 +93,9 @@ func parseFlags(flags string) (flagSet, error) {
 			set.dotAll = true
 		case 'u':
 			set.unicode = true
-		case 'g', 'y', 'd':
+		case 'y':
+			set.sticky = true
+		case 'g', 'd':
 		case 'v':
 			return set, fmt.Errorf("%w: %q", ErrUnsupportedFlag, flag)
 		default:
@@ -117,6 +121,13 @@ func Compile(source string, flags string) (*RegExp, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if set.sticky {
+		// A sticky regexp matches only at `lastIndex`, which is 0 for one just
+		// compiled and never moves here, since nothing this package exposes
+		// advances it. So it anchors at the start — around the whole pattern,
+		// or a top-level `|` would anchor only its first branch.
+		rewritten = inputStart + `(?:` + rewritten + `)`
 	}
 
 	// Multiline, Singleline and IgnoreCase are all handled by the rewrite, so

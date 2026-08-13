@@ -33,6 +33,60 @@ const (
 	lineEnd   = `(?:\z|(?=[` + lineTerminators + `]))`
 )
 
+// wordCharacters is the set ECMAScript builds `\w` and a word boundary out of.
+// It is ASCII whatever the flags say, where .NET — and so regexp2 — reaches
+// for a Unicode word set, which is why a boundary has to be spelled out.
+//
+// Under `u` and `i` together the set gains the two characters that fold into
+// it: U+017F LATIN SMALL LETTER LONG S onto `s`, U+212A KELVIN SIGN onto `k`.
+func wordCharacters(options rewriteOptions) string {
+	if options.ignoreCase && options.unicode {
+		return `[A-Za-z0-9_\u017f\u212a]`
+	}
+	return `[A-Za-z0-9_]`
+}
+
+// wordBoundary writes out `\b`, or `\B` when negated, as the pair of
+// lookarounds ECMAScript defines it as, so the boundary lands where JavaScript
+// puts it rather than where .NET's wider word set would.
+func wordBoundary(negated bool, options rewriteOptions) string {
+	word := wordCharacters(options)
+	if negated {
+		return `(?:(?<=` + word + `)(?=` + word + `)|(?<!` + word + `)(?!` + word + `))`
+	}
+	return `(?:(?<!` + word + `)(?=` + word + `)|(?<=` + word + `)(?!` + word + `))`
+}
+
+// hasControlLetter reports whether rest opens with the character a `\c` needs
+// to be a control escape. A character class takes a digit or an underscore as
+// well as a letter, which is the one place the two productions differ.
+func hasControlLetter(rest string, inClass bool) bool {
+	if rest == "" {
+		return false
+	}
+	c := rest[0]
+	if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' {
+		return true
+	}
+	return inClass && (c >= '0' && c <= '9' || c == '_')
+}
+
+// literalRune writes r so that regexp2 reads it as the character itself,
+// whatever meaning that character carries on its own. A letter or a digit is
+// written as it stands; everything else takes the `\uXXXX` form, which is what
+// regexp2 parses both inside a character class and out.
+func literalRune(r rune) string {
+	switch {
+	case r >= '0' && r <= '9', r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		return string(r)
+	case r > 0xFFFF:
+		// Past what `\uXXXX` names, and nothing up there carries a meaning of
+		// its own to escape.
+		return string(r)
+	}
+	return fmt.Sprintf(`\u%04x`, r)
+}
+
 // rewriteOptions says which of a JavaScript regexp's flags the rewrite has to
 // make up for, because regexp2 reads them differently or not at all.
 type rewriteOptions struct {
@@ -93,6 +147,32 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 					i = end
 					continue
 				}
+			}
+			// Annex B: a `\c` that no control letter follows is not an escape
+			// at all, and the backslash and the `c` each stand for themselves.
+			// .NET refuses the same text outright, which would drop whatever
+			// option carried it.
+			if nextSize == 1 && source[i+size] == 'c' && !hasControlLetter(source[end:], inClass) {
+				out.WriteString(literalRune('\\'))
+				out.WriteString("c")
+				i = end
+				continue
+			}
+			// `\b` and `\B` are boundaries, and only out here — inside a class
+			// a `\b` is a backspace, which regexp2 already reads that way.
+			if !inClass && nextSize == 1 && (source[i+size] == 'b' || source[i+size] == 'B') {
+				out.WriteString(wordBoundary(source[i+size] == 'B', options))
+				i = end
+				continue
+			}
+			// An escape that resolves to a character is written as that
+			// character. Passed through as written, one .NET reads differently
+			// — `\A`, `\a`, `\e` — would keep its .NET meaning, and one .NET
+			// does not know at all would refuse to compile.
+			if next != utf8.RuneError {
+				out.WriteString(literalRune(next))
+				i = end
+				continue
 			}
 			out.WriteString(source[i:end])
 			i = end
@@ -237,9 +317,16 @@ func decodeEscape(source string, i int, unicode bool) (rune, int, bool) {
 		return '\v', size, true
 	case '0':
 		return 0, size, true
-	case 'd', 'D', 'w', 'W', 's', 'S', 'b', 'B', 'p', 'P', 'k', 'c':
+	case 'd', 'D', 'w', 'W', 's', 'S', 'b', 'B', 'k', 'c':
 		// Names a set, a boundary or a group rather than a character.
 		return utf8.RuneError, size, true
+	case 'p', 'P':
+		// A property class, but only under `u`. Without it JavaScript reads
+		// `\p` as the letter, where .NET reads a property either way.
+		if unicode {
+			return utf8.RuneError, size, true
+		}
+		return r, size, true
 	}
 	if r >= '1' && r <= '9' {
 		// A backreference.

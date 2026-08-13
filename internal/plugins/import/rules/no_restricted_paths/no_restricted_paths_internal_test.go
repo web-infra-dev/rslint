@@ -183,6 +183,3 @@ func TestIsPathWithin(t *testing.T) {
 		})
 	}
 }
-
-// TestEscapeExtglob pins the rewrite that keeps the extended glob syntax
-// doublestar does not implement out of the base wildcard syntax.

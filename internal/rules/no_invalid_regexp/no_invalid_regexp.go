@@ -2,6 +2,7 @@ package no_invalid_regexp
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -178,11 +179,16 @@ func validatePattern(pattern string, flags string) string {
 
 	_, err := esregexp.Compile(pattern, compileFlags)
 	if err != nil {
-		// Extract a clean error message
 		errMsg := err.Error()
-		// The message often starts with "error parsing regexp:"
-		if idx := strings.Index(errMsg, ": "); idx != -1 {
-			errMsg = errMsg[idx+2:]
+		// A regexp2 message opens with "error parsing regexp: ", which says
+		// nothing the diagnostic has not already said. Trimming up to the
+		// first ": " drops it — but the package's own errors name what they
+		// refused after that same separator, so trimming there would keep the
+		// refused text and throw the explanation away.
+		if !errors.Is(err, esregexp.ErrUnsupportedSyntax) && !errors.Is(err, esregexp.ErrUnsupportedFlag) {
+			if idx := strings.Index(errMsg, ": "); idx != -1 {
+				errMsg = errMsg[idx+2:]
+			}
 		}
 		return fmt.Sprintf("Invalid regular expression: /%s/: %s", pattern, errMsg)
 	}

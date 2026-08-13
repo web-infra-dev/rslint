@@ -85,6 +85,32 @@ func TestTest(t *testing.T) {
 		{name: "iu negated class", source: "^[^a]$", flags: "iu", subject: "A"},
 		{name: "iu negated class kelvin", source: "^[^k]$", flags: "iu", subject: "\u212a"},
 
+		// ---- an escape that resolves to a character is written as that
+		// character; passed through, .NET would read its own meaning ----
+		{name: "identity A anchor", source: `\A`, flags: "", subject: "B"},
+		{name: "identity A anchor matches A", source: `\A`, flags: "", subject: "A", want: true},
+		{name: "identity alarm", source: `\a`, flags: "", subject: "a", want: true},
+		{name: "identity escape char", source: `\e`, flags: "", subject: "e", want: true},
+		{name: "identity in class", source: `[\a]`, flags: "", subject: "a", want: true},
+		{name: "property escape without u", source: `[\p]`, flags: "", subject: "p", want: true},
+		// Annex B: a `\c` no control letter follows is a backslash and a `c`.
+		{name: "bare control escape in class", source: `[\c]`, flags: "", subject: "c", want: true},
+		{name: "bare control escape in class takes backslash", source: `[\c]`, flags: "", subject: "\\", want: true},
+		{name: "control escape still works", source: `\cA`, flags: "", subject: "\x01", want: true},
+		// ---- a word boundary is ASCII, where .NET reads a Unicode word set ----
+		{name: "boundary between two greek letters", source: `\b`, flags: "", subject: "\u03a3\u03c3"},
+		{name: "boundary after a non-ascii letter", source: `\bfoo`, flags: "", subject: "\u00e9foo", want: true},
+		{name: "non-boundary between greek letters", source: `\B`, flags: "", subject: "\u03a3\u03c3", want: true},
+		{name: "boundary inside a word", source: `a\bb`, flags: "", subject: "ab"},
+		{name: "underscore is a word character", source: `^_\b`, flags: "", subject: "_", want: true},
+		// Under `u` and `i` the two characters that fold into ASCII join the set.
+		{name: "long s is a word character under iu", source: `\b`, flags: "iu", subject: "\u017f", want: true},
+		{name: "long s is not one otherwise", source: `\b`, flags: "", subject: "\u017f"},
+		// ---- a sticky pattern anchors at lastIndex, which is 0 here ----
+		{name: "sticky anchors at the start", source: `b`, flags: "y", subject: "ab"},
+		{name: "sticky matches at the start", source: `b`, flags: "y", subject: "ba", want: true},
+		{name: "sticky anchors every branch", source: `a|b`, flags: "y", subject: "ba", want: true},
+
 		// ---- classes only JavaScript spells ----
 		{name: "empty class never matches", source: "[]", subject: "a"},
 		{name: "negated empty class", source: "^[^]$", subject: "\n", want: true},
