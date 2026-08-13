@@ -372,7 +372,7 @@ legacy.old();
 	}
 	for index, diagnostic := range diagnostics {
 		if diagnostic.Message.Id != "deprecatedWithReason" ||
-			diagnostic.Message.Description != "`legacy.old` is deprecated. Use current instead." {
+			diagnostic.Message.Description != "`old` is deprecated. Use current instead." {
 			t.Fatalf("diagnostic %d message = %#v", index, diagnostic.Message)
 		}
 		if got := code[diagnostic.Range.Pos():diagnostic.Range.End()]; got != "old" {
@@ -382,6 +382,181 @@ legacy.old();
 			t.Fatalf("diagnostic %d unexpectedly included edits: %#v", index, diagnostic)
 		}
 	}
+}
+
+func TestNoDeprecatedMatchesUpstreamMessageFormatting(t *testing.T) {
+	t.Parallel()
+
+	t.Run("jsdoc-links", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+/**
+ * @deprecated This only works with the legacy {@link render} and {@link
+ * renderSync} APIs. Use {@link Options} with {@link compile}, {@link
+ * compileString}, {@link compileAsync}, and {@link compileStringAsync} instead.
+ */
+type LegacyOptions = string;
+const legacyValue: LegacyOptions = '';
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{"main.ts": code}, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+		}
+		want := "`LegacyOptions` is deprecated. This only works with the legacy {@link render } and {@link * renderSync} APIs. Use {@link Options } with {@link compile }, {@link * compileString}, {@link compileAsync }, and {@link compileStringAsync } instead."
+		if got := diagnostics[0].Message.Description; got != want {
+			t.Fatalf("message = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("import-alias-with-jsdoc-links", func(t *testing.T) {
+		t.Parallel()
+		files := map[string]string{
+			"deprecated.ts": `
+/**
+ * @deprecated This only works with the legacy {@link render} and {@link
+ * renderSync} APIs. Use {@link Options} instead.
+ */
+export type LegacyOptions = string;
+`,
+			"main.ts": `
+import type { LegacyOptions as LegacySassOptions } from './deprecated';
+declare const options: LegacySassOptions;
+`,
+		}
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, files, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+		}
+		want := "`LegacySassOptions` is deprecated. This only works with the legacy {@link render } and {@link * renderSync} APIs. Use {@link Options } instead."
+		if got := diagnostics[0].Message.Description; got != want {
+			t.Fatalf("message = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("multiline-reason", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+interface Cache {
+  /**
+   * @deprecated This option has no effect. Rspack keeps only one persistent
+   * cache per compiler path.
+   */
+  maxVersions?: number;
+}
+declare const cache: Cache;
+cache.maxVersions;
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{"main.ts": code}, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+		}
+		want := "`maxVersions` is deprecated. This option has no effect. Rspack keeps only one persistent\ncache per compiler path."
+		if got := diagnostics[0].Message.Description; got != want {
+			t.Fatalf("message = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("blank-line-in-reason", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+/**
+ * @deprecated First line.
+ *
+ * Third line.
+ */
+type BlankLine = string;
+const value: BlankLine = '';
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{"main.ts": code}, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+		}
+		want := "`BlankLine` is deprecated. First line.\n\nThird line."
+		if got := diagnostics[0].Message.Description; got != want {
+			t.Fatalf("message = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("crlf-reason", func(t *testing.T) {
+		t.Parallel()
+		code := strings.ReplaceAll(`/**
+ * @deprecated First line.
+ * Second line.
+ */
+type CRLF = string;
+const value: CRLF = '';
+`, "\n", "\r\n")
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{"main.ts": code}, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+		}
+		want := "`CRLF` is deprecated. First line.\r\nSecond line."
+		if got := diagnostics[0].Message.Description; got != want {
+			t.Fatalf("message = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("jsdoc-link-display-parts", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+class NewThing {}
+/** @deprecated Use {@link NewThing}. */ class OldResolved {}
+/** @deprecated Use {@link MissingThing}. */ class OldMissing {}
+/** @deprecated Use {@link NewThing | replacement}. */ class OldLabel {}
+/** @deprecated Use {@linkcode NewThing}. */ class OldCode {}
+/** @deprecated Use {@linkplain NewThing label}. */ class OldPlain {}
+/** @deprecated See {@link https://example.com | docs}. */ class OldURL {}
+/**
+ * @deprecated Use {@link
+ * NewThing}.
+ */
+class OldMultiline {}
+/** @deprecated A {@link NewThing<T>} B. */ class GenericResolved {}
+/** @deprecated A {@link Missing<T>} B. */ class GenericMissing {}
+/** @deprecated A {@link NewThing() | call label} B. */ class CallResolved {}
+/** @deprecated A {@link Missing() | call label} B. */ class CallMissing {}
+/**
+ * @deprecated A {@link NewThing |
+ * label} B.
+ */
+class WrappedLabel {}
+new OldResolved();
+new OldMissing();
+new OldLabel();
+new OldCode();
+new OldPlain();
+new OldURL();
+new OldMultiline();
+new GenericResolved();
+new GenericMissing();
+new CallResolved();
+new CallMissing();
+new WrappedLabel();
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{"main.ts": code}, "main.ts", nil)
+		if len(diagnostics) != 12 {
+			t.Fatalf("expected 12 diagnostics, got %#v", diagnostics)
+		}
+		want := []string{
+			"`OldResolved` is deprecated. Use {@link NewThing}.",
+			"`OldMissing` is deprecated. Use {@link MissingThing }.",
+			"`OldLabel` is deprecated. Use {@link NewThing" + "replacement}.",
+			"`OldCode` is deprecated. Use {@linkcode NewThing}.",
+			"`OldPlain` is deprecated. Use {@linkplain NewThing" + "label}.",
+			"`OldURL` is deprecated. See {@link https://example.com docs}.",
+			"`OldMultiline` is deprecated. Use {@link * NewThing}.",
+			"`GenericResolved` is deprecated. A {@link NewThing<T>} B.",
+			"`GenericMissing` is deprecated. A {@link Missing<T>} B.",
+			"`CallResolved` is deprecated. A {@link NewThing() | call label} B.",
+			"`CallMissing` is deprecated. A {@link Missing() | call label} B.",
+			"`WrappedLabel` is deprecated. A {@link NewThing} * label} B.",
+		}
+		for index, diagnostic := range diagnostics {
+			if got := diagnostic.Message.Description; got != want[index] {
+				t.Fatalf("diagnostic %d message = %q, want %q", index, got, want[index])
+			}
+		}
+	})
 }
 
 func TestNoDeprecatedRespectsScopedLineDisables(t *testing.T) {
