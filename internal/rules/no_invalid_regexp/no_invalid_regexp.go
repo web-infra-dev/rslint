@@ -165,12 +165,13 @@ func validatePattern(pattern string, flags string) string {
 	// means are passed on here. `v` extends `u` rather than replacing it, and
 	// the set syntax it adds is not supported, so it is read as the `u` it
 	// builds on.
-	compileFlags := ""
+	var builder strings.Builder
 	for _, flag := range "imsu" { // cspell:ignore imsu
 		if strings.ContainsRune(flags, flag) {
-			compileFlags += string(flag)
+			builder.WriteRune(flag)
 		}
 	}
+	compileFlags := builder.String()
 	if !strings.Contains(compileFlags, "u") && strings.Contains(flags, "v") {
 		compileFlags += "u"
 	}
