@@ -1473,3 +1473,275 @@ func TestRestrictPlusOperandsSerializedOptions(t *testing.T) {
 		},
 	)
 }
+
+// TestRestrictPlusOperandsExtras locks in object-operand diagnostics that are
+// not message-checked by the migrated suite in restrict_plus_operands_test.go.
+func TestRestrictPlusOperandsExtras(t *testing.T) {
+	const invalidMessagePrefix = "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `"
+	strictOptions := map[string]any{
+		"allowAny":             false,
+		"allowBoolean":         false,
+		"allowNullish":         false,
+		"allowNumberAndString": false,
+		"allowRegExp":          false,
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RestrictPlusOperandsRule, []rule_tester.ValidTestCase{
+		{
+			// Locks in upstream getTypeName() behavior for a shadowed RegExp.
+			Code: `function convert() {
+  class RegExp {}
+  const value = new RegExp();
+  return '' + value;
+}`,
+		},
+		{
+			// Locks in upstream getTypeName() behavior for a qualified RegExp.
+			Code: `namespace Custom {
+  export class RegExp {}
+}
+declare const value: Custom.RegExp;
+const result = '' + value;`,
+		},
+		{
+			// Type-parameter constraints participate in allowRegExp by type name.
+			Code: "function convert<T extends RegExp>(value: T) { return '' + value; }",
+		},
+		{
+			// Reporting through an unwrapped operand must still honor directives.
+			Code: "// eslint-disable-next-line test\nconst result = '' + ({});",
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			// Real-user regression: rspack's ModuleError.ts narrows err to Error.
+			Code: `function createMessage(err: Error): string {
+  let message = '';
+
+  if (err && typeof err === 'object' && err.message) {
+    message += err.message;
+  } else if (err) {
+    message += err;
+  }
+
+  return message;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   invalidMessagePrefix + "Error`.",
+				Line:      7,
+				Column:    16,
+				EndLine:   7,
+				EndColumn: 19,
+			}},
+		},
+		{
+			// Locks in upstream's per-union-constituent object reports.
+			Code: "declare const value: Date | Error;\nconst result = '' + value;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "invalid",
+					Message:   invalidMessagePrefix + "Date`.",
+					Line:      2,
+					Column:    21,
+					EndLine:   2,
+					EndColumn: 26,
+				},
+				{
+					MessageId: "invalid",
+					Message:   invalidMessagePrefix + "Error`.",
+					Line:      2,
+					Column:    21,
+					EndLine:   2,
+					EndColumn: 26,
+				},
+			},
+		},
+		{
+			// Parentheses and leading comments are not part of the ESTree operand.
+			Code: "declare const value: Error;\nconst result = '' + ((/* keep */ value));",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   invalidMessagePrefix + "Error`.",
+				Line:      2,
+				Column:    34,
+				EndLine:   2,
+				EndColumn: 39,
+			}},
+		},
+		{
+			// Parentheses around a TS assertion are omitted, but the assertion stays.
+			Code: "declare const value: Error;\nconst result = '' + (value as Error);",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   invalidMessagePrefix + "Error`.",
+				Line:      2,
+				Column:    22,
+				EndLine:   2,
+				EndColumn: 36,
+			}},
+		},
+		{
+			// Parentheses around a satisfies expression are omitted from its range.
+			Code: "declare const value: Error;\nconst result = '' + (value satisfies Error);",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   invalidMessagePrefix + "Error`.",
+				Line:      2,
+				Column:    22,
+				EndLine:   2,
+				EndColumn: 43,
+			}},
+		},
+		{
+			// The same unwrapping applies when the invalid operand is on the left.
+			Code: "declare const value: Error;\nconst result = ((value)) + '';",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   invalidMessagePrefix + "Error`.",
+				Line:      2,
+				Column:    18,
+				EndLine:   2,
+				EndColumn: 23,
+			}},
+		},
+		{
+			// A RegExp-named local type is rejected when paired with a number.
+			Code: `function convert() {
+  class RegExp {}
+  const value = new RegExp();
+  return 1 + value;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   invalidMessagePrefix + "RegExp`.",
+				Line:      4,
+				Column:    14,
+				EndLine:   4,
+				EndColumn: 19,
+			}},
+		},
+		{
+			// Disabling allowRegExp rejects shadowed types named RegExp too.
+			Code: `function convert() {
+  class RegExp {}
+  const value = new RegExp();
+  return '' + value;
+}`,
+			Options: strictOptions,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   "Invalid operand for a '+' operation. Operands must each be a number or string. Got `RegExp`.",
+				Line:      4,
+				Column:    15,
+				EndLine:   4,
+				EndColumn: 20,
+			}},
+		},
+		{
+			// Disabling allowRegExp also rejects a RegExp-constrained parameter.
+			Code:    "function convert<T extends RegExp>(value: T) { return '' + value; }",
+			Options: strictOptions,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   "Invalid operand for a '+' operation. Operands must each be a number or string. Got `RegExp`.",
+				Line:      1,
+				Column:    60,
+				EndLine:   1,
+				EndColumn: 65,
+			}},
+		},
+		{
+			// The zero-stringLikes branch retains the exact strict message.
+			Code:    "declare const value: { value: number };\nconst result = '' + value;",
+			Options: strictOptions,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   "Invalid operand for a '+' operation. Operands must each be a number or string. Got `{ value: number; }`.",
+				Line:      2,
+				Column:    21,
+				EndLine:   2,
+				EndColumn: 26,
+			}},
+		},
+		{
+			// The one-stringLike branch retains the exact message.
+			Code: "declare const value: Error;\nconst result = '' + value;",
+			Options: map[string]any{
+				"allowAny":     false,
+				"allowBoolean": false,
+				"allowNullish": false,
+				"allowRegExp":  true,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + `RegExp`. Got `Error`.",
+				Line:      2,
+				Column:    21,
+				EndLine:   2,
+				EndColumn: 26,
+			}},
+		},
+		{
+			// Locks in the exact mismatched diagnostic after message construction changes.
+			Code:    "const result = 1 + '';",
+			Options: strictOptions,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatched",
+				Message:   "Operands of '+' operations must be a number or string. Got `number` + `string`.",
+				Line:      1,
+				Column:    16,
+				EndLine:   1,
+				EndColumn: 22,
+			}},
+		},
+		{
+			// Locks in the exact bigint/number diagnostic after message construction changes.
+			Code: "const result = 1 + 1n;",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "bigintAndNumber",
+				Message:   "Numeric '+' operations must either be both bigints or both numbers. Got `number` + `bigint`.",
+				Line:      1,
+				Column:    16,
+				EndLine:   1,
+				EndColumn: 22,
+			}},
+		},
+		{
+			// An invalid primitive union is one base-type complaint, not object reports.
+			Code: "declare const value: symbol | Error;\nconst result = '' + value;",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Line:      2,
+				Column:    21,
+				EndLine:   2,
+				EndColumn: 26,
+			}},
+		},
+		{
+			// A valid string constituent does not mask an invalid object constituent.
+			Code: "declare const value: Error | string;\nconst result = '' + value;",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Message:   invalidMessagePrefix + "Error`.",
+				Line:      2,
+				Column:    21,
+				EndLine:   2,
+				EndColumn: 26,
+			}},
+		},
+		{
+			// Re-enabling the rule after a scoped directive reports normally.
+			Code: `/* eslint-disable test */
+const suppressed = '' + ({});
+/* eslint-enable test */
+const reported = '' + ({});`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "invalid",
+				Line:      4,
+				Column:    24,
+				EndLine:   4,
+				EndColumn: 26,
+			}},
+		},
+	})
+}
