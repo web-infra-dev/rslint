@@ -898,7 +898,7 @@ func isUnsafeAssignmentWorker(
 		visited[t] = NewSetFromItems(receiver)
 	}
 
-	if checker.IsNonDeferredTypeReference(t) && checker.IsNonDeferredTypeReference(receiver) {
+	if IsTypeReference(t) && IsTypeReference(receiver) {
 		// TODO - figure out how to handle cases like this,
 		// where the types are assignable, but not the same type
 		/*

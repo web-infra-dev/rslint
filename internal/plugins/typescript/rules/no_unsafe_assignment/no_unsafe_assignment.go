@@ -3,6 +3,7 @@ package no_unsafe_assignment
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -55,6 +56,53 @@ func buildUnsafeAssignmentMessage(typeChecker *checker.Checker, sender, receiver
 	return rule.RuleMessage{
 		Id:          "unsafeAssignment",
 		Description: "Unsafe assignment of type `" + typeChecker.TypeToString(sender) + "` to a variable of type `" + typeChecker.TypeToString(receiver) + "`.",
+	}
+}
+
+func destructureReportRange(sourceFile *ast.SourceFile, receiverNode *ast.Node, defaultValue *ast.Node) core.TextRange {
+	receiverRange := utils.TrimNodeTextRange(sourceFile, receiverNode)
+	if defaultValue == nil {
+		return receiverRange
+	}
+	return core.NewTextRange(receiverRange.Pos(), utils.TrimNodeTextRange(sourceFile, defaultValue).End())
+}
+
+func markAssignmentPatternLiterals(node *ast.Node, marked *map[*ast.Node]struct{}) {
+	if node == nil {
+		return
+	}
+	node = ast.SkipParentheses(node)
+	switch {
+	case ast.IsObjectLiteralExpression(node):
+		if *marked == nil {
+			*marked = make(map[*ast.Node]struct{})
+		}
+		(*marked)[node] = struct{}{}
+		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+			switch {
+			case ast.IsPropertyAssignment(property):
+				markAssignmentPatternLiterals(property.Initializer(), marked)
+			case ast.IsSpreadAssignment(property):
+				markAssignmentPatternLiterals(property.Expression(), marked)
+			}
+		}
+	case ast.IsArrayLiteralExpression(node):
+		if *marked == nil {
+			*marked = make(map[*ast.Node]struct{})
+		}
+		(*marked)[node] = struct{}{}
+		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+			if ast.IsSpreadElement(element) {
+				markAssignmentPatternLiterals(element.Expression(), marked)
+			} else {
+				markAssignmentPatternLiterals(element, marked)
+			}
+		}
+	case ast.IsBinaryExpression(node):
+		binary := node.AsBinaryExpression()
+		if binary.OperatorToken.Kind == ast.KindEqualsToken {
+			markAssignmentPatternLiterals(binary.Left, marked)
+		}
 	}
 }
 
@@ -119,6 +167,12 @@ func (r assignmentTypeResolver) recoverType(node *ast.Node, rawType *checker.Typ
 	if !utils.IsTypeAnyType(rawType) {
 		return rawType
 	}
+	cacheable := substitutions == nil
+	if cacheable && r.state.recoveredTypes != nil {
+		if recoveredType, ok := r.state.recoveredTypes[node]; ok {
+			return recoveredType
+		}
+	}
 
 	var identifierInitializer *ast.Node
 	switch {
@@ -139,18 +193,19 @@ func (r assignmentTypeResolver) recoverType(node *ast.Node, rawType *checker.Typ
 		if identifierInitializer == nil {
 			return rawType
 		}
+		// Only follow an initializer that itself exhibits the inference gap this
+		// resolver handles. A mutable variable can be initialized with a safe
+		// value and later widen to any; recovering the stale initializer in that
+		// case would hide a real unsafe assignment.
+		if !utils.IsTypeAnyType(r.typeChecker.GetTypeAtLocation(identifierInitializer)) {
+			return rawType
+		}
 	case ast.IsPropertyAccessExpression(node), ast.IsConditionalExpression(node), ast.IsCallExpression(node):
 		// These forms can expose a non-any type through their children.
 	default:
 		return rawType
 	}
 
-	cacheable := substitutions == nil
-	if cacheable && r.state.recoveredTypes != nil {
-		if recoveredType, ok := r.state.recoveredTypes[node]; ok {
-			return recoveredType
-		}
-	}
 	if r.state.recovering != nil && r.state.recovering[node] {
 		return rawType
 	}
@@ -454,7 +509,6 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				compilerOptions.StrictNullChecks,
 			),
 		)
-
 		var checkArrayDestructure func(
 			receiverNode *ast.Node,
 			senderType *checker.Type,
@@ -472,7 +526,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			senderType *checker.Type,
 			senderNode *ast.Node,
 		) bool {
-			checkObjectProperty := func(propertyKey *ast.Node, propertyValue *ast.Node) bool {
+			checkObjectProperty := func(propertyKey *ast.Node, propertyValue *ast.Node, defaultValue *ast.Node) bool {
 				var key string
 				if !ast.IsComputedPropertyName(propertyKey) {
 					key = propertyKey.Text()
@@ -491,9 +545,19 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 
 				// check for the any type first so we can handle {x: {y: z}} = {x: any}
 				if utils.IsTypeAnyType(senderType) {
-					ctx.ReportNode(propertyValue, buildUnsafeObjectPatternMessage(senderType))
+					ctx.ReportRange(
+						destructureReportRange(ctx.SourceFile, propertyValue, defaultValue),
+						buildUnsafeObjectPatternMessage(senderType),
+					)
 					return true
-				} else if ast.IsArrayBindingPattern(propertyValue) || ast.IsArrayLiteralExpression(propertyValue) {
+				}
+				// ESTree represents a binding with a default as one AssignmentPattern.
+				// Do not descend into the pattern on its left when the property itself
+				// is not any.
+				if defaultValue != nil {
+					return false
+				}
+				if ast.IsArrayBindingPattern(propertyValue) || ast.IsArrayLiteralExpression(propertyValue) {
 					return checkArrayDestructure(
 						propertyValue,
 						senderType,
@@ -517,7 +581,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 
-					if (ast.IsPropertyAssignment(receiverProperty) && checkObjectProperty(receiverProperty.Name(), receiverProperty.Initializer())) || (ast.IsShorthandPropertyAssignment(receiverProperty) && checkObjectProperty(receiverProperty.Name(), receiverProperty.Name())) {
+					if (ast.IsPropertyAssignment(receiverProperty) && checkObjectProperty(receiverProperty.Name(), receiverProperty.Initializer(), nil)) || (ast.IsShorthandPropertyAssignment(receiverProperty) && checkObjectProperty(receiverProperty.Name(), receiverProperty.Name(), receiverProperty.AsShorthandPropertyAssignment().ObjectAssignmentInitializer)) {
 						didReport = true
 					}
 				}
@@ -534,7 +598,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 						propertyKey = property.Name()
 					}
 
-					if checkObjectProperty(propertyKey, property.Name()) {
+					if checkObjectProperty(propertyKey, property.Name(), property.Initializer) {
 						didReport = true
 					}
 				}
@@ -576,7 +640,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 
 			tupleElements := checker.Checker_getTypeArguments(ctx.TypeChecker, senderType)
 
-			checkArrayElement := func(receiverElement *ast.Node, receiverIndex int) bool {
+			checkArrayElement := func(receiverElement *ast.Node, defaultValue *ast.Node, receiverIndex int) bool {
 				if receiverElement == nil {
 					return false
 				}
@@ -587,9 +651,16 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 
 				// check for the any type first so we can handle [[[x]]] = [any]
 				if utils.IsTypeAnyType(senderType) {
-					ctx.ReportNode(receiverElement, buildUnsafeArrayPatternFromTupleMessage(senderType))
+					ctx.ReportRange(
+						destructureReportRange(ctx.SourceFile, receiverElement, defaultValue),
+						buildUnsafeArrayPatternFromTupleMessage(senderType),
+					)
 					return true
-				} else if ast.IsArrayBindingPattern(receiverElement) || ast.IsArrayLiteralExpression(receiverElement) {
+				}
+				if defaultValue != nil {
+					return false
+				}
+				if ast.IsArrayBindingPattern(receiverElement) || ast.IsArrayLiteralExpression(receiverElement) {
 					return checkArrayDestructure(
 						receiverElement,
 						senderType,
@@ -616,7 +687,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 
-					if checkArrayElement(receiverElement, receiverIndex) {
+					if checkArrayElement(receiverElement, nil, receiverIndex) {
 						didReport = true
 					}
 				}
@@ -628,7 +699,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 
-					if checkArrayElement(receiverElement.Name(), receiverIndex) {
+					if checkArrayElement(receiverElement.Name(), elem.Initializer, receiverIndex) {
 						// TODO(port): in original rule didReport was reassigned every time. isn't it a bug?
 						didReport = true
 					}
@@ -746,6 +817,13 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			}
 		}
 
+		// The traversal normally keeps destructuring targets out of expression
+		// listeners. An AssignmentPattern inside an assignment target is the one
+		// exception: its left subtree is visited as ordinary syntax. Mark only
+		// those rare literal-pattern nodes up front so the hot object/array
+		// expression listeners avoid walking parent chains for every literal.
+		var assignmentPatternLiterals map[*ast.Node]struct{}
+
 		return rule.RuleListeners{
 			// ESTree PropertyDefinition, AccessorProperty
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
@@ -763,6 +841,9 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				}
 
 				expr := node.AsBinaryExpression()
+				if utils.IsDefaultValueInDestructuringAssignment(node) {
+					markAssignmentPatternLiterals(expr.Left, &assignmentPatternLiterals)
+				}
 				checkAssignmentFull(expr.Left, expr.Right, node)
 			},
 
@@ -804,6 +885,9 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 
 			// object pattern props are checked via assignments
 			rule.ListenerOnNotAllowPattern(ast.KindObjectLiteralExpression): func(node *ast.Node) {
+				if _, marked := assignmentPatternLiterals[node]; marked {
+					return
+				}
 				for _, node := range node.AsObjectLiteralExpression().Properties.Nodes {
 					var init *ast.Node
 					if ast.IsPropertyAssignment(node) {
@@ -815,6 +899,10 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 							continue
 						}
 						init = assignment.Name()
+					} else if node.Kind == ast.KindGetAccessor || node.Kind == ast.KindSetAccessor || node.Kind == ast.KindMethodDeclaration {
+						// ESTree represents object accessors and methods as Property nodes
+						// whose value is the function expression itself.
+						init = node
 					} else {
 						continue
 					}
@@ -829,6 +917,9 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			},
 
 			rule.ListenerOnNotAllowPattern(ast.KindArrayLiteralExpression): func(node *ast.Node) {
+				if _, marked := assignmentPatternLiterals[node]; marked {
+					return
+				}
 				for _, node := range node.AsArrayLiteralExpression().Elements.Nodes {
 					if !ast.IsSpreadElement(node) {
 						continue

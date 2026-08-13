@@ -99,6 +99,22 @@ class Foo {
 		{Code: "const [x, ...y] = [1, 2, 3, 4, 5];"},
 		{Code: "const [x, ...y] = [1];"},
 		{Code: "const [{ ...x }] = [{ x: 1 }] as [{ x: any }];"},
+		{Code: `
+declare const source: { outer: { value: any } };
+const { outer: { value } = { value: 'safe' } } = source;
+    `},
+		{Code: `
+declare const source: [{ value: any }];
+const [{ value } = { value: 'safe' }] = source;
+    `},
+		{Code: `
+declare const objectSource: { outer: { value: any } };
+let objectTarget: any;
+({ outer: { value: objectTarget } = { value: 'safe' } } = objectSource);
+declare const tupleSource: [{ value: any }];
+let tupleTarget: any;
+[{ value: tupleTarget } = { value: 'safe' }] = tupleSource;
+    `},
 		{Code: "function foo(x = 1) {}"},
 		{Code: "function foo([x] = [1]) {}"},
 		{Code: "function foo([x, ...y] = [1, 2, 3, 4, 5]) {}"},
@@ -447,6 +463,136 @@ const duplicateTarget: boolean = duplicate;
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "anyAssignment"},
 				{MessageId: "anyAssignment"},
+			},
+		},
+		{
+			Code: `
+declare const source: { value: any };
+const { value = 'safe' } = source;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeObjectPattern",
+					Line:      3,
+					Column:    9,
+					EndColumn: 23,
+				},
+			},
+		},
+		{
+			Code: `
+declare const source: [any];
+const [item = 'safe'] = source;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeArrayPatternFromTuple",
+					Line:      3,
+					Column:    8,
+					EndColumn: 21,
+				},
+			},
+		},
+		{
+			Code: `
+declare const source: { value: any };
+let assigned: unknown;
+({ value: assigned = 'safe' } = source);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeObjectPattern",
+					Line:      4,
+					Column:    11,
+					EndColumn: 28,
+				},
+			},
+		},
+		{
+			Code: `
+declare const source: { value: any };
+let value: unknown;
+({ value = 'safe' } = source);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeObjectPattern",
+					Line:      4,
+					Column:    4,
+					EndColumn: 18,
+				},
+			},
+		},
+		{
+			Code: `
+declare const directAny: any;
+const getterTarget: { value: string } = {
+  get value() {
+    return directAny;
+  },
+};
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "anyAssignment",
+					Line:      4,
+					Column:    3,
+					EndLine:   6,
+					EndColumn: 4,
+				},
+			},
+		},
+		{
+			Code: `
+const setterTarget: { value: string } = {
+  set value(next) {},
+};
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "anyAssignment",
+					Line:      3,
+					Column:    3,
+					EndColumn: 21,
+				},
+			},
+		},
+		{
+			Code: `
+type Plugin = { apply(): void } | false | null | undefined;
+type Plugins = Plugin[];
+declare const unsafePlugins: any[];
+const plugins: Plugins = unsafePlugins;
+
+type UnsafeMapAlias = Map<any, string>;
+declare const unsafeMapAlias: UnsafeMapAlias;
+const safeMap: Map<string, string> = unsafeMapAlias;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeAssignment",
+					Message:   "Unsafe assignment of type `any[]` to a variable of type `Plugins`.",
+				},
+				{
+					MessageId: "unsafeAssignment",
+					Message:   "Unsafe assignment of type `UnsafeMapAlias` to a variable of type `Map<string, string>`.",
+				},
+			},
+		},
+		{
+			Code: `
+let changedAfterInitialization = undefined;
+changedAfterInitialization = new Map<string, string>();
+const mapAfterMutation = changedAfterInitialization;
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "anyAssignment",
+					Line:      4,
+					Column:    7,
+					EndColumn: 52,
+				},
 			},
 		},
 		{
