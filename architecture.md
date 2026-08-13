@@ -498,10 +498,12 @@ Rslint supports two configuration formats following ESLint flat config semantics
 
 #### JS/TS Configuration (Recommended)
 
-Rslint automatically discovers `rslint.config.js`, `rslint.config.mjs`, `rslint.config.ts`, and `rslint.config.mts`. Explicit configuration paths also support `.cjs` and `.cts` files through CLI `--config` and API `overrideConfigFile`. JS/TS config files support preset composition via `defineConfig()`:
+Rslint automatically discovers `rslint.config.js`, `rslint.config.mjs`, `rslint.config.ts`, and `rslint.config.mts`. Explicit configuration paths also support `.cjs` and `.cts` files through CLI `--config` and API `overrideConfigFile`. JS/TS config files support preset composition via `defineConfig()`. The package root exports the complete catalog from its pinned build-time `globals` dependency, so consumers use the same flat-config composition shape without installing another package. During the library-surface Rspack compilation, an asset plugin mechanically splits every upstream top-level set into `dist/globals/<name>.json`. The root contains only the ordered upstream set-name table and synchronous accessors: importing it or calling `Object.keys(globals)` parses no environment data; the first `globals.browser` access loads and caches only `browser.json`. Rslint-specific sets that do not exist upstream are small ordinary objects registered directly in the runtime catalog; they neither pass through the asset plugin nor issue a runtime `require`. Operations that read every upstream value, such as `{ ...globals }`, intentionally load every upstream set. These assets share the existing worker distribution contract: direct package use works, while a redistributor must preserve the complete `dist` layout or leave `@rslint/core` external instead of treating one entry file as a self-contained bundle. The pinned package's exact readonly/literal declarations are shipped in the private `dist/globals/index.d.ts` module; the root declaration uses an `import()` type query, so upstream declaration names stay isolated and consumers have no dependency on `globals`.
+
+A selected map enters the existing `languageOptions.globals` path as an explicit declaration: config matching, flat merge, the Go rule runtime, and the ESLint-plugin worker all consume the same effective globals. This does not enable any runtime environment by default or change the parser edition. The data assets are emitted only with the root library surface, not duplicated into the service, internal, or worker outputs. The worker keeps a small edition-aware ECMAScript table aligned with the Go catalog; for TypeScript ASTs it reconciles scope-manager's value bindings to that table while retaining its type-only lib bindings.
 
 ```typescript
-import { defineConfig, js, ts } from '@rslint/core';
+import { defineConfig, globals, js, ts } from '@rslint/core';
 
 export default defineConfig([
   {
@@ -509,6 +511,10 @@ export default defineConfig([
   },
   js.configs.recommended,
   ts.configs.recommended,
+  {
+    files: ['**/*.js'],
+    languageOptions: { globals: globals.node },
+  },
   {
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',

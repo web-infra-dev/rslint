@@ -14,6 +14,7 @@ module.exports = {
     'shim',
     'packages/vscode-extension/out',
     'packages/rslint-test-tools/tests',
+    'packages/rslint/THIRD-PARTY-NOTICES.md',
     'packages/rslint/pkg/mod',
     'packages/rslint/rule-schemas.json',
     'cmd/tsgo',

@@ -2,6 +2,7 @@ import { describe, test, expect } from '@rstest/core';
 import { normalizeConfig } from '@rslint/core/config-loader';
 import {
   defineConfig,
+  globals,
   ts,
   js,
   reactPlugin,
@@ -16,6 +17,12 @@ describe('defineConfig and config presets', () => {
     ];
     const result = defineConfig(input);
     expect(result).toBe(input);
+  });
+
+  test('globals should be importable from the public root', () => {
+    expect(globals.node.process).toBe(false);
+    expect(globals.nodeBuiltin.process).toBe(false);
+    expect(Object.hasOwn(globals.nodeBuiltin, 'require')).toBe(false);
   });
 
   test('config presets should be importable', () => {
