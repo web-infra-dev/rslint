@@ -13,8 +13,9 @@ import (
 
 const globalNamespace = "global"
 
-var acceptedTypeOnlySymbols = []string{
+var acceptedTypeOnlySymbolPaths = []string{
 	"JSX.IntrinsicElements",
+	"React.JSX.IntrinsicElements",
 }
 
 type externalModuleRoot struct {
@@ -118,15 +119,6 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 }
 
 func (c *externalSymbolCollector) collect(namespace string, name string, symbol *ast.Symbol) {
-	isAcceptedTypeOnlySymbol := func(symbolName string) bool {
-		for _, accepted := range acceptedTypeOnlySymbols {
-			if strings.Contains(accepted, symbolName) {
-				return true
-			}
-		}
-		return false
-	}
-
 	if symbol == nil || name == "" || strings.HasPrefix(name, ast.InternalSymbolNamePrefix) {
 		return
 	}
@@ -138,7 +130,7 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 	if symbol == nil {
 		return
 	}
-	isAcceptedTypeOnly := isAcceptedTypeOnlySymbol(symbol.Name)
+	isAcceptedTypeOnly := isAcceptedTypeOnlySymbolPath(name)
 	isTypeOnly := symbol.Flags&ast.SymbolFlagsValue == 0
 	if isTypeOnly && !isAcceptedTypeOnly {
 		return
@@ -159,8 +151,9 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 			return properties[i].Name < properties[j].Name
 		})
 		for _, property := range properties {
-			if isAcceptedTypeOnlySymbol(property.Name) {
-				c.collect(namespace, joinExternalName(name, property.Name), property)
+			childName := joinExternalName(name, property.Name)
+			if isAcceptedTypeOnlySymbolPath(childName) {
+				c.collect(namespace, childName, property)
 			}
 		}
 		if isTypeOnly {
@@ -184,6 +177,17 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 	for _, property := range properties {
 		c.collect(namespace, joinExternalName(name, property.Name), property)
 	}
+}
+
+func isAcceptedTypeOnlySymbolPath(name string) bool {
+	for _, accepted := range acceptedTypeOnlySymbolPaths {
+		if name == accepted ||
+			strings.HasPrefix(accepted, name+".") ||
+			strings.HasPrefix(name, accepted+".") {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *externalSymbolCollector) record(namespace string, name string, symbol *ast.Symbol) {
