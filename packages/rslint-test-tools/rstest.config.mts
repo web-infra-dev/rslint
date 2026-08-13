@@ -363,7 +363,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-unnecessary-type-conversion.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-parameters.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-argument.test.ts',
-    // './tests/typescript-eslint/rules/no-unsafe-assignment.test.ts',
+    './tests/typescript-eslint/rules/no-unsafe-assignment.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-call.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-declaration-merging.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-enum-comparison.test.ts',

@@ -1,8 +1,6 @@
 package no_unsafe_assignment
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -13,44 +11,50 @@ func formatSenderType(senderType *checker.Type) string {
 	if utils.IsIntrinsicErrorType(senderType) {
 		return "error typed"
 	}
-	return "any"
+	return "`any`"
 }
 
 func buildAnyAssignmentMessage(sender *checker.Type) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "anyAssignment",
-		Description: fmt.Sprintf("Unsafe assignment of an %v value.", formatSenderType(sender)),
+		Description: "Unsafe assignment of an " + formatSenderType(sender) + " value.",
 	}
 }
 func buildAnyAssignmentThisMessage(sender *checker.Type) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id: "anyAssignmentThis",
-		Description: fmt.Sprintf("Unsafe assignment of an %v value. `this` is typed as `any`.\n", formatSenderType(sender)) +
+		Description: "Unsafe assignment of an " + formatSenderType(sender) + " value. `this` is typed as `any`.\n" +
 			"You can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.",
 	}
 }
 func buildUnsafeArrayPatternMessage(sender *checker.Type) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeArrayPattern",
-		Description: fmt.Sprintf("Unsafe array destructuring of an %v array value.", formatSenderType(sender)),
+		Description: "Unsafe array destructuring of an " + formatSenderType(sender) + " array value.",
 	}
 }
 func buildUnsafeArrayPatternFromTupleMessage(sender *checker.Type) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeArrayPatternFromTuple",
-		Description: fmt.Sprintf("Unsafe array destructuring of a tuple element with an %v value.", formatSenderType(sender)),
+		Description: "Unsafe array destructuring of a tuple element with an " + formatSenderType(sender) + " value.",
+	}
+}
+func buildUnsafeObjectPatternMessage(sender *checker.Type) rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "unsafeObjectPattern",
+		Description: "Unsafe object destructuring of a property with an " + formatSenderType(sender) + " value.",
 	}
 }
 func buildUnsafeArraySpreadMessage(sender *checker.Type) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeArraySpread",
-		Description: fmt.Sprintf("Unsafe spread of an %v value in an array.", formatSenderType(sender)),
+		Description: "Unsafe spread of an " + formatSenderType(sender) + " value in an array.",
 	}
 }
 func buildUnsafeAssignmentMessage(typeChecker *checker.Checker, sender, receiver *checker.Type) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeAssignment",
-		Description: fmt.Sprintf("Unsafe assignment of type %v to a variable of type %v.", typeChecker.TypeToString(sender), typeChecker.TypeToString(receiver)),
+		Description: "Unsafe assignment of type `" + typeChecker.TypeToString(sender) + "` to a variable of type `" + typeChecker.TypeToString(receiver) + "`.",
 	}
 }
 
@@ -65,6 +69,374 @@ const (
 	comparisonTypeContextual
 )
 
+// assignmentTypeResolver compensates for a typescript-go inference difference
+// that is observable only with strictNullChecks disabled. TypeScript derives a
+// non-any result from the right-hand side of `any && value`, whereas
+// typescript-go currently propagates `any` through the whole expression. Keep
+// the fallback deliberately syntax-bound so annotated `any` values still
+// produce the same diagnostics as the upstream rule.
+type assignmentTypeResolver struct {
+	typeChecker *checker.Checker
+	enabled     bool
+	state       *assignmentTypeResolverState
+}
+
+type assignmentTypeResolverState struct {
+	recoveredTypes      map[*ast.Node]*checker.Type
+	recovering          map[*ast.Node]bool
+	functionReturnTypes map[*ast.Node]*checker.Type
+	recoveringFunctions map[*ast.Node]bool
+}
+
+func newAssignmentTypeResolver(typeChecker *checker.Checker, enabled bool) assignmentTypeResolver {
+	resolver := assignmentTypeResolver{
+		typeChecker: typeChecker,
+		enabled:     enabled,
+	}
+	if enabled {
+		resolver.state = &assignmentTypeResolverState{}
+	}
+	return resolver
+}
+
+func (r assignmentTypeResolver) typeAtLocation(node *ast.Node) *checker.Type {
+	rawType := r.typeChecker.GetTypeAtLocation(node)
+	if !r.enabled || !utils.IsTypeAnyType(rawType) {
+		return rawType
+	}
+	return r.recoverType(node, rawType, nil)
+}
+
+func (r assignmentTypeResolver) recoverTypeAtLocation(node *ast.Node, substitutions map[*ast.Node]*checker.Type) *checker.Type {
+	return r.recoverType(node, r.typeChecker.GetTypeAtLocation(node), substitutions)
+}
+
+func (r assignmentTypeResolver) recoverType(node *ast.Node, rawType *checker.Type, substitutions map[*ast.Node]*checker.Type) (result *checker.Type) {
+	node = ast.SkipParentheses(node)
+	if substitutedType, ok := r.substitutedIdentifierType(node, substitutions); ok {
+		return substitutedType
+	}
+	if !utils.IsTypeAnyType(rawType) {
+		return rawType
+	}
+
+	var identifierInitializer *ast.Node
+	switch {
+	case ast.IsBinaryExpression(node):
+		if node.AsBinaryExpression().OperatorToken.Kind != ast.KindAmpersandAmpersandToken {
+			return rawType
+		}
+	case ast.IsIdentifier(node):
+		symbol := r.typeChecker.GetSymbolAtLocation(node)
+		if symbol == nil || len(symbol.Declarations) != 1 {
+			return rawType
+		}
+		declaration := symbol.Declarations[0]
+		if !ast.IsVariableDeclaration(declaration) || declaration.Type() != nil {
+			return rawType
+		}
+		identifierInitializer = declaration.Initializer()
+		if identifierInitializer == nil {
+			return rawType
+		}
+	case ast.IsPropertyAccessExpression(node), ast.IsConditionalExpression(node), ast.IsCallExpression(node):
+		// These forms can expose a non-any type through their children.
+	default:
+		return rawType
+	}
+
+	cacheable := substitutions == nil
+	if cacheable && r.state.recoveredTypes != nil {
+		if recoveredType, ok := r.state.recoveredTypes[node]; ok {
+			return recoveredType
+		}
+	}
+	if r.state.recovering != nil && r.state.recovering[node] {
+		return rawType
+	}
+	if r.state.recovering == nil {
+		r.state.recovering = make(map[*ast.Node]bool)
+	}
+	r.state.recovering[node] = true
+	defer delete(r.state.recovering, node)
+
+	result = rawType
+	if cacheable {
+		if r.state.recoveredTypes == nil {
+			r.state.recoveredTypes = make(map[*ast.Node]*checker.Type)
+		}
+		defer func() {
+			r.state.recoveredTypes[node] = result
+		}()
+	}
+
+	switch {
+	case ast.IsBinaryExpression(node):
+		binary := node.AsBinaryExpression()
+		rightType := r.recoverTypeAtLocation(binary.Right, substitutions)
+		if !utils.IsTypeAnyType(rightType) {
+			return rightType
+		}
+	case ast.IsIdentifier(node):
+		initializerType := r.recoverTypeAtLocation(identifierInitializer, substitutions)
+		if !utils.IsTypeAnyType(initializerType) {
+			return initializerType
+		}
+	case ast.IsPropertyAccessExpression(node):
+		objectType := r.recoverTypeAtLocation(node.Expression(), substitutions)
+		if utils.IsTypeAnyType(objectType) {
+			break
+		}
+		propertyName, ok := checker.Checker_getAccessedPropertyName(r.typeChecker, node)
+		if !ok {
+			break
+		}
+		property := checker.Checker_getPropertyOfType(r.typeChecker, objectType, propertyName)
+		if property == nil {
+			break
+		}
+		propertyType := r.typeChecker.GetTypeOfSymbolAtLocation(property, node)
+		if !utils.IsTypeAnyType(propertyType) {
+			return propertyType
+		}
+	case ast.IsConditionalExpression(node):
+		conditional := node.AsConditionalExpression()
+		return r.mergeRecoveredTypes(rawType, []*checker.Type{
+			r.recoverTypeAtLocation(conditional.WhenTrue, substitutions),
+			r.recoverTypeAtLocation(conditional.WhenFalse, substitutions),
+		})
+	case ast.IsCallExpression(node):
+		if returnType := r.recoverFunctionReturnType(node, rawType, substitutions); !utils.IsTypeAnyType(returnType) {
+			return returnType
+		}
+	}
+
+	return rawType
+}
+
+func (r assignmentTypeResolver) substitutedIdentifierType(node *ast.Node, substitutions map[*ast.Node]*checker.Type) (*checker.Type, bool) {
+	if substitutions == nil || !ast.IsIdentifier(node) {
+		return nil, false
+	}
+	symbol := r.typeChecker.GetSymbolAtLocation(node)
+	if symbol == nil {
+		return nil, false
+	}
+	for _, declaration := range symbol.Declarations {
+		if substitutedType, ok := substitutions[declaration]; ok {
+			return substitutedType, true
+		}
+	}
+	return nil, false
+}
+
+func (r assignmentTypeResolver) recoverFunctionReturnType(callNode *ast.Node, rawType *checker.Type, substitutions map[*ast.Node]*checker.Type) (result *checker.Type) {
+	callee := callNode.Expression()
+	callee = ast.SkipParentheses(callee)
+	var functionNode *ast.Node
+	if ast.IsArrowFunction(callee) || ast.IsFunctionExpression(callee) {
+		functionNode = callee
+	} else if ast.IsIdentifier(callee) {
+		symbol := r.typeChecker.GetSymbolAtLocation(callee)
+		if symbol == nil || len(symbol.Declarations) != 1 {
+			return rawType
+		}
+		declaration := symbol.Declarations[0]
+		if ast.IsFunctionDeclaration(declaration) {
+			functionNode = declaration
+		} else if ast.IsVariableDeclaration(declaration) {
+			initializer := declaration.Initializer()
+			if initializer != nil {
+				initializer = ast.SkipParentheses(initializer)
+				if ast.IsArrowFunction(initializer) || ast.IsFunctionExpression(initializer) {
+					functionNode = initializer
+				}
+			}
+		}
+	}
+	if functionNode == nil || functionNode.Type() != nil {
+		return rawType
+	}
+	if r.state.recoveringFunctions != nil && r.state.recoveringFunctions[functionNode] {
+		return rawType
+	}
+
+	callSubstitutions := substitutions
+	if functionNode.TypeParameters() != nil {
+		callSubstitutions = make(map[*ast.Node]*checker.Type, len(substitutions)+len(functionNode.Parameters()))
+		for declaration, substitutedType := range substitutions {
+			callSubstitutions[declaration] = substitutedType
+		}
+		resolvedSignature := checker.Checker_getResolvedSignature(r.typeChecker, callNode, nil, checker.CheckModeNormal)
+		if resolvedSignature != nil {
+			instantiatedParameters := checker.Signature_parameters(resolvedSignature)
+			parameterIndex := 0
+			for _, parameter := range functionNode.Parameters() {
+				parameterName := parameter.Name()
+				if ast.IsIdentifier(parameterName) && parameterName.Text() == "this" {
+					continue
+				}
+				if parameterIndex >= len(instantiatedParameters) {
+					break
+				}
+				parameterType := r.typeChecker.GetTypeAtLocation(parameterName)
+				if r.typeContainsTypeParameter(parameterType, 0) {
+					callSubstitutions[parameter] = r.typeChecker.GetTypeOfSymbolAtLocation(instantiatedParameters[parameterIndex], callNode)
+				}
+				parameterIndex++
+			}
+		}
+	}
+
+	cacheable := callSubstitutions == nil
+	if cacheable && r.state.functionReturnTypes != nil {
+		if returnType, ok := r.state.functionReturnTypes[functionNode]; ok {
+			return returnType
+		}
+	}
+	if r.state.recoveringFunctions == nil {
+		r.state.recoveringFunctions = make(map[*ast.Node]bool)
+	}
+	r.state.recoveringFunctions[functionNode] = true
+	defer delete(r.state.recoveringFunctions, functionNode)
+	result = rawType
+	if cacheable {
+		if r.state.functionReturnTypes == nil {
+			r.state.functionReturnTypes = make(map[*ast.Node]*checker.Type)
+		}
+		defer func() {
+			r.state.functionReturnTypes[functionNode] = result
+		}()
+	}
+
+	body := functionNode.Body()
+	if body == nil {
+		return rawType
+	}
+	if !ast.IsBlock(body) {
+		returnType := r.recoverTypeAtLocation(body, callSubstitutions)
+		if r.typeContainsTypeParameter(returnType, 0) {
+			return rawType
+		}
+		return returnType
+	}
+
+	var returnTypes []*checker.Type
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node != body && ast.IsFunctionLike(node) {
+			return false
+		}
+		if ast.IsReturnStatement(node) {
+			expression := node.AsReturnStatement().Expression
+			if expression != nil {
+				returnTypes = append(returnTypes, r.recoverTypeAtLocation(expression, callSubstitutions))
+			}
+			return false
+		}
+		return node.ForEachChild(visit)
+	}
+	body.ForEachChild(visit)
+	if len(returnTypes) == 0 {
+		return rawType
+	}
+	return r.mergeRecoveredTypes(rawType, returnTypes)
+}
+
+func (r assignmentTypeResolver) mergeRecoveredTypes(rawType *checker.Type, types []*checker.Type) *checker.Type {
+	var representative *checker.Type
+	for _, currentType := range types {
+		if utils.IsTypeAnyType(currentType) || r.typeContainsTypeParameter(currentType, 0) {
+			return rawType
+		}
+		if utils.IsTypeFlagSet(currentType, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
+			continue
+		}
+		if representative == nil {
+			representative = currentType
+			continue
+		}
+		if _, _, unsafe := utils.IsUnsafeAssignment(currentType, representative, r.typeChecker, nil); unsafe {
+			representative = currentType
+		}
+	}
+	if representative == nil {
+		return rawType
+	}
+	return representative
+}
+
+func (r assignmentTypeResolver) typeContainsTypeParameter(t *checker.Type, depth int) bool {
+	if t == nil {
+		return false
+	}
+	// Type arguments and union/intersection constituents are normally shallow.
+	// Treat a pathological recursive type as unresolved instead of risking an
+	// unsafe recovery or spending unbounded time walking it.
+	if depth >= 32 {
+		return true
+	}
+	if utils.IsTypeFlagSet(t, checker.TypeFlagsTypeParameter) {
+		return true
+	}
+	for _, part := range utils.UnionTypeParts(t) {
+		if part != t && r.typeContainsTypeParameter(part, depth+1) {
+			return true
+		}
+	}
+	for _, part := range utils.IntersectionTypeParts(t) {
+		if part != t && r.typeContainsTypeParameter(part, depth+1) {
+			return true
+		}
+	}
+	if checker.IsNonDeferredTypeReference(t) {
+		for _, typeArgument := range checker.Checker_getTypeArguments(r.typeChecker, t) {
+			if r.typeContainsTypeParameter(typeArgument, depth+1) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// objectLiteralAnyValuesAreRecoverable identifies object literals whose only
+// unsafe property values are direct expressions covered by recoverType. This
+// lets the generic-aware assignment comparison avoid reporting the stale any
+// embedded in the checker's object type without hiding an explicit any value.
+func (r assignmentTypeResolver) objectLiteralAnyValuesAreRecoverable(node *ast.Node) bool {
+	if !r.enabled {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	if !ast.IsObjectLiteralExpression(node) {
+		return false
+	}
+
+	foundAny := false
+	for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+		var value *ast.Node
+		switch {
+		case ast.IsPropertyAssignment(property):
+			value = property.Initializer()
+		case ast.IsShorthandPropertyAssignment(property):
+			value = property.Name()
+		case ast.IsSpreadAssignment(property):
+			value = property.Expression()
+		default:
+			continue
+		}
+		valueType := r.typeChecker.GetTypeAtLocation(value)
+		if !utils.IsTypeAnyType(valueType) {
+			continue
+		}
+		foundAny = true
+		if utils.IsTypeAnyType(r.typeAtLocation(value)) {
+			return false
+		}
+	}
+	return foundAny
+}
+
 var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-assignment",
 	Schema:           rule.EmptyArraySchema,
@@ -74,6 +446,13 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.NoImplicitThis,
+		)
+		typeResolver := newAssignmentTypeResolver(
+			ctx.TypeChecker,
+			!utils.IsStrictCompilerOptionEnabled(
+				compilerOptions,
+				compilerOptions.StrictNullChecks,
+			),
 		)
 
 		var checkArrayDestructure func(
@@ -93,15 +472,6 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			senderType *checker.Type,
 			senderNode *ast.Node,
 		) bool {
-			propertySymbols := checker.Checker_getPropertiesOfType(ctx.TypeChecker, senderType)
-			if propertySymbols == nil {
-				return false
-			}
-			properties := make(map[string]*checker.Type, len(propertySymbols))
-			for _, property := range propertySymbols {
-				properties[property.Name] = ctx.TypeChecker.GetTypeOfSymbolAtLocation(property, senderNode)
-			}
-
 			checkObjectProperty := func(propertyKey *ast.Node, propertyValue *ast.Node) bool {
 				var key string
 				if !ast.IsComputedPropertyName(propertyKey) {
@@ -113,15 +483,15 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 					return false
 				}
 
-				senderType, ok := properties[key]
-				if !ok {
+				property := checker.Checker_getPropertyOfType(ctx.TypeChecker, senderType, key)
+				if property == nil {
 					return false
 				}
+				senderType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(property, senderNode)
 
 				// check for the any type first so we can handle {x: {y: z}} = {x: any}
 				if utils.IsTypeAnyType(senderType) {
-					// TODO(port): why object reported with "array" message?
-					ctx.ReportNode(propertyValue, buildUnsafeArrayPatternFromTupleMessage(senderType))
+					ctx.ReportNode(propertyValue, buildUnsafeObjectPatternMessage(senderType))
 					return true
 				} else if ast.IsArrayBindingPattern(propertyValue) || ast.IsArrayLiteralExpression(propertyValue) {
 					return checkArrayDestructure(
@@ -182,7 +552,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			senderType := ctx.TypeChecker.GetTypeAtLocation(senderNode)
+			senderType := typeResolver.typeAtLocation(senderNode)
 
 			return checkObjectDestructure(receiverNode, senderType, senderNode)
 		}
@@ -277,7 +647,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			senderType := ctx.TypeChecker.GetTypeAtLocation(senderNode)
+			senderType := typeResolver.typeAtLocation(senderNode)
 
 			return checkArrayDestructure(receiverNode, senderType, senderNode)
 		}
@@ -289,17 +659,17 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			reportingNode *ast.Node,
 			compType comparisonType,
 		) bool {
-			var receiverType *checker.Type
-			if compType == comparisonTypeContextual {
-				receiverType = utils.GetContextualType(ctx.TypeChecker, receiverNode)
-			}
-			if receiverType == nil {
-				receiverType = ctx.TypeChecker.GetTypeAtLocation(receiverNode)
-			}
-			senderType := ctx.TypeChecker.GetTypeAtLocation(senderNode)
+			senderType := typeResolver.typeAtLocation(senderNode)
 
 			if utils.IsTypeAnyType(senderType) {
 				// handle cases when we assign any ==> unknown.
+				var receiverType *checker.Type
+				if compType == comparisonTypeContextual {
+					receiverType = utils.GetContextualType(ctx.TypeChecker, receiverNode)
+				}
+				if receiverType == nil {
+					receiverType = ctx.TypeChecker.GetTypeAtLocation(receiverNode)
+				}
 				if utils.IsTypeUnknownType(receiverType) {
 					return false
 				}
@@ -320,6 +690,13 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			if compType == comparisonTypeNone {
 				return false
 			}
+			var receiverType *checker.Type
+			if compType == comparisonTypeContextual {
+				receiverType = utils.GetContextualType(ctx.TypeChecker, receiverNode)
+			}
+			if receiverType == nil {
+				receiverType = ctx.TypeChecker.GetTypeAtLocation(receiverNode)
+			}
 
 			receiver, sender, unsafe := utils.IsUnsafeAssignment(
 				senderType,
@@ -328,6 +705,9 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				senderNode,
 			)
 			if !unsafe {
+				return false
+			}
+			if typeResolver.objectLiteralAnyValuesAreRecoverable(senderNode) {
 				return false
 			}
 
@@ -429,21 +809,20 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 					if ast.IsPropertyAssignment(node) {
 						init = node.Initializer()
 					} else if ast.IsShorthandPropertyAssignment(node) {
-						init = node.Name()
+						assignment := node.AsShorthandPropertyAssignment()
+						if assignment.ObjectAssignmentInitializer != nil {
+							// Assignment patterns are handled by the shorthand listener.
+							continue
+						}
+						init = assignment.Name()
 					} else {
 						continue
 					}
 
 					if init == nil {
-						return
+						continue
 					}
 					init = ast.SkipParentheses(init)
-
-					if ast.IsAssignmentExpression(init, false) {
-						// node.value.type === AST_NODE_TYPES.TSEmptyBodyFunctionExpression
-						// handled by other selector
-						return
-					}
 
 					checkAssignment(node.Name(), init, node, comparisonTypeContextual)
 				}
@@ -455,7 +834,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 
-					restType := ctx.TypeChecker.GetTypeAtLocation(node.Expression())
+					restType := typeResolver.typeAtLocation(node.Expression())
 					if utils.IsTypeAnyType(restType) || utils.IsTypeAnyArrayType(restType, ctx.TypeChecker) {
 						ctx.ReportNode(node, buildUnsafeArraySpreadMessage(restType))
 					}

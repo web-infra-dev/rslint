@@ -8,14 +8,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func assignmentTest(
-	tests []struct {
-		code               string
-		col                int
-		endCol             int
-		skipAssignmentExpr bool
-	},
-) []rule_tester.InvalidTestCase {
+type assignmentTestCase struct {
+	code               string
+	col                int
+	endCol             int
+	skipAssignmentExpr bool
+	messageID          string
+}
+
+func assignmentTest(tests []assignmentTestCase) []rule_tester.InvalidTestCase {
 	res := make([]rule_tester.InvalidTestCase, 0, 3*len(tests))
 	for _, test := range tests {
 		res = append(res,
@@ -27,7 +28,7 @@ func assignmentTest(
 						Column:    test.col + 6,
 						EndColumn: test.endCol + 6,
 						Line:      1,
-						MessageId: "unsafeArrayPatternFromTuple",
+						MessageId: test.messageID,
 					},
 				},
 			},
@@ -39,7 +40,7 @@ func assignmentTest(
 						Column:    test.col + 13,
 						EndColumn: test.endCol + 13,
 						Line:      1,
-						MessageId: "unsafeArrayPatternFromTuple",
+						MessageId: test.messageID,
 					},
 				},
 			},
@@ -53,7 +54,7 @@ func assignmentTest(
 						Column:    test.col + 1,
 						EndColumn: test.endCol + 1,
 						Line:      1,
-						MessageId: "unsafeArrayPatternFromTuple",
+						MessageId: test.messageID,
 					},
 				},
 			})
@@ -152,12 +153,83 @@ let a = 1;
 
 a+= foo;
 		`},
+		{
+			Code: `
+declare const dynamic: any;
+const booleanResult = dynamic && true;
+const options: { refresh: boolean } = { refresh: booleanResult };
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+		},
+		{
+			Code: `
+const isEnabled = (value: MissingType | undefined, flag: boolean) => {
+  if (typeof value === 'boolean' || value === undefined) {
+    return (value ?? true) && flag;
+  }
+  return value.enabled !== false && flag;
+};
+let options: boolean | { enabled?: boolean } | undefined;
+options = { enabled: isEnabled(spooky, true) };
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+		},
+		{
+			Code: `
+declare function parseResource(value: string): { path: string; query: string; fragment: string };
+declare const input: any;
+const parsed = input && parseResource(input);
+let path: string;
+let query: string;
+let fragment: string;
+path = parsed ? parsed.path : undefined;
+query = parsed ? parsed.query : undefined;
+fragment = parsed ? parsed.fragment : undefined;
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+		},
+		{
+			Code: `
+declare const dynamic: any;
+const values = [...(dynamic && [1])];
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+		},
+		{
+			Code: `
+declare const dynamic: any;
+const genericLogical = <T>(value: T) => dynamic && value;
+const genericString: string = genericLogical('safe');
+const explicitString: string = genericLogical<string>(dynamic);
+const genericUnrelated = <T, U>(value: T, unused: U) => dynamic && value;
+const unrelatedString: string = genericUnrelated('safe', dynamic);
+const genericArray = <T>(value: T[]) => dynamic && value;
+const stringArray: string[] = genericArray(['safe']);
+const annotatedParameter = (value: boolean) => dynamic && value;
+const annotatedBoolean: boolean = annotatedParameter(dynamic);
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+		},
+		{
+			Code: `
+declare const dynamic: any;
+function recursive(flag: boolean) {
+  if (flag) {
+    return dynamic && true;
+  }
+  return recursive(true);
+}
+const recursiveBoolean: boolean = recursive(false);
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+		},
 	}, slices.Concat([]rule_tester.InvalidTestCase{
 		{
 			Code: "const x = 1 as any;",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "anyAssignment",
+					Message:   "Unsafe assignment of an `any` value.",
 				},
 			},
 		},
@@ -244,7 +316,8 @@ const {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "unsafeArrayPatternFromTuple",
+					MessageId: "unsafeObjectPattern",
+					Message:   "Unsafe object destructuring of a property with an error typed value.",
 				},
 				{
 					MessageId: "anyAssignment",
@@ -288,6 +361,7 @@ const [x] = [] as any[];
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeAssignment",
+					Message:   "Unsafe assignment of type `Set<any>` to a variable of type `Set<string>`.",
 				},
 			},
 		},
@@ -308,6 +382,88 @@ const [x] = [] as any[];
 			},
 		},
 		{
+			Code: `
+declare const dynamic: any;
+const booleanResult = dynamic && true;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "anyAssignment"},
+			},
+		},
+		{
+			Code: `
+declare const dynamic: any;
+const result = dynamic;
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "anyAssignment"},
+			},
+		},
+		{
+			Code: `
+declare function getAny(): any;
+let options: { enabled?: boolean };
+options = { enabled: getAny() };
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "anyAssignment"},
+			},
+		},
+		{
+			Code: `
+declare const dynamic: any;
+const genericLogical = <T>(value: T) => dynamic && value;
+const genericAny: boolean = genericLogical(dynamic);
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "anyAssignment"},
+			},
+		},
+		{
+			Code: `
+declare const dynamic: any;
+const genericArray = <T>(value: T[]) => dynamic && value;
+const unsafeArray: string[] = genericArray(dynamic as any[]);
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unsafeAssignment",
+					Message:   "Unsafe assignment of type `any[]` to a variable of type `string[]`.",
+				},
+			},
+		},
+		{
+			Code: `
+declare const dynamic: any;
+var duplicate = dynamic;
+var duplicate = dynamic && true;
+const duplicateTarget: boolean = duplicate;
+      `,
+			TSConfig: "tsconfig.unstrict.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "anyAssignment"},
+				{MessageId: "anyAssignment"},
+			},
+		},
+		{
+			Code: `
+declare const dynamic: any;
+let sink: unknown;
+const assignmentProperty = {
+  first: (sink = dynamic),
+  second: dynamic,
+};
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "anyAssignment"},
+				{MessageId: "anyAssignment"},
+			},
+		},
+		{
 			Code: "const x: Set<Set<Set<string>>> = new Set<Set<Set<any>>>();",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -316,18 +472,13 @@ const [x] = [] as any[];
 			},
 		},
 	},
-		assignmentTest([]struct {
-			code               string
-			col                int
-			endCol             int
-			skipAssignmentExpr bool
-		}{
-			{"[x] = [1] as [any]", 2, 3, false},
-			{"[[[[x]]]] = [[[[1 as any]]]]", 5, 6, false},
-			{"[[[[x]]]] = [1 as any]", 2, 9, true},
-			{"[{x}] = [{x: 1}] as [{x: any}]", 3, 4, false},
-			{"[{['x']: x}] = [{['x']: 1}] as [{['x']: any}]", 10, 11, false},
-			{"[{[`x`]: x}] = [{[`x`]: 1}] as [{[`x`]: any}]", 10, 11, false},
+		assignmentTest([]assignmentTestCase{
+			{"[x] = [1] as [any]", 2, 3, false, "unsafeArrayPatternFromTuple"},
+			{"[[[[x]]]] = [[[[1 as any]]]]", 5, 6, false, "unsafeArrayPatternFromTuple"},
+			{"[[[[x]]]] = [1 as any]", 2, 9, true, "unsafeArrayPatternFromTuple"},
+			{"[{x}] = [{x: 1}] as [{x: any}]", 3, 4, false, "unsafeObjectPattern"},
+			{"[{['x']: x}] = [{['x']: 1}] as [{['x']: any}]", 10, 11, false, "unsafeObjectPattern"},
+			{"[{[`x`]: x}] = [{[`x`]: 1}] as [{[`x`]: any}]", 10, 11, false, "unsafeObjectPattern"},
 		}),
 
 		[]rule_tester.InvalidTestCase{
@@ -363,16 +514,11 @@ const x = [...([] as any[])];
 				},
 			},
 		},
-		assignmentTest([]struct {
-			code               string
-			col                int
-			endCol             int
-			skipAssignmentExpr bool
-		}{
-			{"{x} = {x: 1} as {x: any}", 2, 3, false},
-			{"{x: y} = {x: 1} as {x: any}", 5, 6, false},
-			{"{x: {y}} = {x: {y: 1}} as {x: {y: any}}", 6, 7, false},
-			{"{x: [y]} = {x: {y: 1}} as {x: [any]}", 6, 7, false},
+		assignmentTest([]assignmentTestCase{
+			{"{x} = {x: 1} as {x: any}", 2, 3, false, "unsafeObjectPattern"},
+			{"{x: y} = {x: 1} as {x: any}", 5, 6, false, "unsafeObjectPattern"},
+			{"{x: {y}} = {x: {y: 1}} as {x: {y: any}}", 6, 7, false, "unsafeObjectPattern"},
+			{"{x: [y]} = {x: {y: 1}} as {x: [any]}", 6, 7, false, "unsafeArrayPatternFromTuple"},
 		}),
 
 		[]rule_tester.InvalidTestCase{
