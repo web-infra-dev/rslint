@@ -159,6 +159,11 @@ type Server struct {
 
 	session      *project.Session
 	lintPrograms *lintProgramStore
+	// moduleSpecifiers survives the Program a document is linted against.
+	// Every keystroke produces a new one, and rules that walk the module graph
+	// span the whole Program, so the imports of every file in the project are
+	// re-read on every keystroke without it.
+	moduleSpecifiers *rule.ModuleSpecifierCache
 
 	// enables tests to share a cache of parsed source files
 	parseCache *project.ParseCache

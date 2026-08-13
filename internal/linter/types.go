@@ -168,4 +168,10 @@ type LintSingleFileOptions struct {
 	Cwd string
 	// Consumer has the same native-only semantics as RunLinterOptions.Consumer.
 	Consumer rule.DiagnosticConsumer
+	// ModuleSpecifiers, when non-nil, carries the module graph's syntactic half
+	// across the sequence of runs the caller owns. An editor lints one file
+	// against a new Program per keystroke, and the graph spans the Program, so
+	// without it every keystroke re-reads the imports of every file in the
+	// project. nil confines every answer to this run.
+	ModuleSpecifiers *rule.ModuleSpecifierCache
 }
