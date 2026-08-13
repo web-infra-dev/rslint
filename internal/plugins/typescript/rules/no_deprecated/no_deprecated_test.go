@@ -460,6 +460,295 @@ const x = <Comp foo={1} />;
 	})
 }
 
+func TestNoDeprecatedIgnoresNameOnlyFallbackForResolvedTargets(t *testing.T) {
+	t.Parallel()
+
+	t.Run("dynamic-import-binding-cross-symbol-collision", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"implementation.ts": `
+export function glob(patterns: string[]): Promise<string[]> {
+  return Promise.resolve(patterns);
+}
+export function globSync(patterns: string[]): string[] {
+  return patterns;
+}
+			`,
+			"current.ts": `
+export { glob, globSync } from './implementation';
+			`,
+			"main.ts": `
+interface LegacyFinder {
+  /** @deprecated Provide patterns as the first argument instead. */
+  glob(pattern: string): Promise<string[]>;
+  /** @deprecated Provide patterns as the first argument instead. */
+  globSync(pattern: string): string[];
+}
+
+async function run() {
+  const { glob, globSync } = await import('./current');
+  await glob(['*.ts']);
+  globSync(['*.ts']);
+}
+
+run();
+			`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 0 {
+			t.Fatalf("expected 0 diagnostics, got %#v", diagnostics)
+		}
+	})
+
+	t.Run("resolved-method-signature-cross-type-collision", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"current.ts": `
+export interface CurrentEmitter {
+  on(event: string, listener: () => void): CurrentEmitter;
+}
+			`,
+			"main.ts": `
+import type { CurrentEmitter } from './current';
+
+interface LegacyEmitter {
+  /** @deprecated Use addListener instead. */
+  on(event: string, listener: () => void): LegacyEmitter;
+}
+
+declare const current: CurrentEmitter;
+current.on('error', () => {});
+			`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 0 {
+			t.Fatalf("expected 0 diagnostics, got %#v", diagnostics)
+		}
+	})
+
+	t.Run("selected-non-deprecated-overload", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": `
+interface Emitter {
+  /** @deprecated Use destroy instead. */
+  on(event: 'abort', listener: () => void): Emitter;
+  on(event: 'error', listener: (error: Error) => void): Emitter;
+}
+
+declare const emitter: Emitter;
+emitter.on('error', () => {});
+			`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 0 {
+			t.Fatalf("expected 0 diagnostics, got %#v", diagnostics)
+		}
+	})
+}
+
+func TestNoDeprecatedMatchesUpstreamResolutionBoundaries(t *testing.T) {
+	t.Parallel()
+
+	t.Run("computed-key-literal-types", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+declare const Keys: { numeric: 1 };
+declare const keySource: { property: 'old' };
+declare const annotatedKey: 'old';
+
+const target = {
+  /** @deprecated Use currentNumeric instead. */
+  [1]: 'numeric',
+  /** @deprecated Use current instead. */
+  old: 'string',
+};
+const bigintTarget = {
+  /** @deprecated Mirrors upstream's String(PseudoBigInt) key. */
+  ['[object Object]']: 'bigint',
+};
+declare const bigintKey: 1n;
+
+target[Keys.numeric];
+target[keySource.property];
+target[annotatedKey];
+function read(key: 'old') {
+  return target[key];
+}
+target['anything' as 'old'];
+bigintTarget[bigintKey];
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": code,
+		}, "main.ts", nil)
+		if len(diagnostics) != 6 {
+			t.Fatalf("expected 6 diagnostics, got %#v", diagnostics)
+		}
+		gotRanges := map[string]int{}
+		for _, diagnostic := range diagnostics {
+			gotRanges[code[diagnostic.Range.Pos():diagnostic.Range.End()]]++
+		}
+		for _, want := range []string{"Keys.numeric", "keySource.property", "annotatedKey", "key", "'anything' as 'old'", "bigintKey"} {
+			if gotRanges[want] != 1 {
+				t.Fatalf("diagnostic ranges = %#v, want one %q", gotRanges, want)
+			}
+		}
+	})
+
+	t.Run("computed-key-widened-types", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": `
+const target = {
+  /** @deprecated Use current instead. */
+  old: 'string',
+};
+let mutableKey = 'old';
+const assertedKey = 'old' as string;
+target[mutableKey];
+target[assertedKey];
+`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 0 {
+			t.Fatalf("expected no diagnostics, got %#v", diagnostics)
+		}
+	})
+
+	t.Run("mixed-overload-reference-and-calls", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+interface Emitter {
+  /** @deprecated Use destroy instead. */
+  on(event: 'abort', listener: () => void): Emitter;
+  on(event: 'error', listener: (error: Error) => void): Emitter;
+}
+
+declare const emitter: Emitter;
+const methodReference = emitter.on;
+emitter.on('error', () => {});
+emitter.on('abort', () => {});
+
+interface Props {
+  /** @deprecated Use current instead. */
+  callback: () => void;
+}
+declare const props: Props;
+props.callback();
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": code,
+		}, "main.ts", nil)
+		if len(diagnostics) != 3 {
+			t.Fatalf("expected 3 diagnostics, got %#v", diagnostics)
+		}
+		gotRanges := map[string]int{}
+		for _, diagnostic := range diagnostics {
+			gotRanges[code[diagnostic.Range.Pos():diagnostic.Range.End()]]++
+		}
+		if gotRanges["on"] != 2 || gotRanges["callback"] != 1 {
+			t.Fatalf("diagnostic ranges = %#v, want two on and one callback", gotRanges)
+		}
+	})
+
+	t.Run("mixed-declarations-remain-deprecated-when-destructured", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+interface Emitter {
+  /** @deprecated Use destroy instead. */
+  on(event: 'abort', listener: () => void): Emitter;
+  on(event: 'error', listener: (error: Error) => void): Emitter;
+}
+declare const emitter: Emitter;
+const { on } = emitter;
+on('error', () => {});
+on('abort', () => {});
+
+interface Merged {
+  /** @deprecated Use current instead. */
+  item: string;
+}
+interface Merged {
+  item: string;
+}
+declare const merged: Merged;
+const { item } = merged;
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": code,
+		}, "main.ts", nil)
+		if len(diagnostics) != 3 {
+			t.Fatalf("expected 3 diagnostics, got %#v", diagnostics)
+		}
+		gotRanges := map[string]int{}
+		for _, diagnostic := range diagnostics {
+			gotRanges[code[diagnostic.Range.Pos():diagnostic.Range.End()]]++
+		}
+		if gotRanges["on"] != 2 || gotRanges["item"] != 1 {
+			t.Fatalf("diagnostic ranges = %#v, want two on and one item", gotRanges)
+		}
+	})
+
+	t.Run("directly-exported-mixed-overload-binding", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+async function run() {
+  const { glob } = await import('./dependency');
+  await glob(['*.ts']);
+}
+void run();
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"dependency.ts": `
+export function glob(patterns: string[]): Promise<string[]>;
+/** @deprecated Provide patterns as the first argument instead. */
+export function glob(options: { patterns: string[] }): Promise<string[]>;
+export function glob(input: string[] | { patterns: string[] }): Promise<string[]> {
+  return Promise.resolve(Array.isArray(input) ? input : input.patterns);
+}
+`,
+			"main.ts": code,
+		}, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected one diagnostic, got %#v", diagnostics)
+		}
+		if got := code[diagnostics[0].Range.Pos():diagnostics[0].Range.End()]; got != "glob" {
+			t.Fatalf("diagnostic range = %q, want glob", got)
+		}
+	})
+
+	t.Run("deprecated-reexport-binding", func(t *testing.T) {
+		t.Parallel()
+		const code = `
+import * as imported from './dependency';
+import { normalFunction } from './dependency';
+const { normalVariable } = imported;
+normalFunction();
+`
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"dependency.ts": `
+const normalVariable = 1;
+function normalFunction(): void {}
+export {
+  /** @deprecated */
+  normalVariable,
+  /** @deprecated */
+  normalFunction,
+};
+`,
+			"main.ts": code,
+		}, "main.ts", nil)
+		if len(diagnostics) != 2 {
+			t.Fatalf("expected two diagnostics, got %#v", diagnostics)
+		}
+		gotRanges := map[string]int{}
+		for _, diagnostic := range diagnostics {
+			gotRanges[code[diagnostic.Range.Pos():diagnostic.Range.End()]]++
+		}
+		for _, want := range []string{"normalVariable", "normalFunction"} {
+			if gotRanges[want] != 1 {
+				t.Fatalf("diagnostic ranges = %#v, want one %q", gotRanges, want)
+			}
+		}
+	})
+}
+
 func TestNoDeprecatedMultilineImportsAndMultiDeclarators(t *testing.T) {
 	t.Parallel()
 
