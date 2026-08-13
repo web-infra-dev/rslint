@@ -1,32 +1,76 @@
 package no_unsafe_return
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+const unsafeReturnThisHelp = "\nYou can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function."
+
 func buildUnsafeReturnMessage(t string) rule.RuleMessage {
+	var description string
+	switch t {
+	case "error":
+		description = "Unsafe return of a value of type error."
+	case "`any`":
+		description = "Unsafe return of a value of type `any`."
+	case "`Promise<any>`":
+		description = "Unsafe return of a value of type `Promise<any>`."
+	case "`any[]`":
+		description = "Unsafe return of a value of type `any[]`."
+	default:
+		description = "Unsafe return of a value of type " + t + "."
+	}
 	return rule.RuleMessage{
 		Id:          "unsafeReturn",
-		Description: fmt.Sprintf("Unsafe return of a value of type %v.", t),
+		Description: description,
 	}
 }
 func buildUnsafeReturnAssignmentMessage(sender, receiver string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeReturnAssignment",
-		Description: fmt.Sprintf("Unsafe return of type `%v` from function with return type `%v`.", sender, receiver),
+		Description: "Unsafe return of type `" + sender + "` from function with return type `" + receiver + "`.",
 	}
 }
 func buildUnsafeReturnThisMessage(t string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id: "unsafeReturnThis",
-		Description: fmt.Sprintf("Unsafe return of a value of type `%v`. `this` is typed as `any`.", t) +
-			"You can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.",
+	var description string
+	switch t {
+	case "error":
+		description = "Unsafe return of a value of type `error`. `this` is typed as `any`." + unsafeReturnThisHelp
+	case "`any`":
+		description = "Unsafe return of a value of type ``any``. `this` is typed as `any`." + unsafeReturnThisHelp
+	case "`Promise<any>`":
+		description = "Unsafe return of a value of type ``Promise<any>``. `this` is typed as `any`." + unsafeReturnThisHelp
+	case "`any[]`":
+		description = "Unsafe return of a value of type ``any[]``. `this` is typed as `any`." + unsafeReturnThisHelp
+	default:
+		description = "Unsafe return of a value of type `" + t + "`. `this` is typed as `any`." + unsafeReturnThisHelp
 	}
+	return rule.RuleMessage{
+		Id:          "unsafeReturnThis",
+		Description: description,
+	}
+}
+
+func discriminateReturnType(
+	t *checker.Type,
+	typeChecker *checker.Checker,
+	program *compiler.Program,
+	node *ast.Node,
+) utils.DiscriminatedAnyType {
+	if utils.IsTypeAnyType(t) {
+		return utils.DiscriminatedAnyTypeAny
+	}
+	if utils.IsTypeFlagSet(t, checker.TypeFlagsPrimitive|checker.TypeFlagsUnknown|checker.TypeFlagsNever) {
+		return utils.DiscriminatedAnyTypeSafe
+	}
+	if utils.IsTypeAnyArrayType(t, typeChecker) {
+		return utils.DiscriminatedAnyTypeAnyArray
+	}
+	return utils.DiscriminateAnyType(t, typeChecker, program, node)
 }
 
 var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
@@ -44,20 +88,22 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			returnNode *ast.Node,
 			reportingNode *ast.Node,
 		) {
-			returnNodeType := ctx.TypeChecker.GetTypeAtLocation(returnNode)
-
-			anyType := utils.DiscriminateAnyType(
-				returnNodeType,
-				ctx.TypeChecker,
-				ctx.Program,
-				returnNode,
-			)
 			functionNode := utils.GetParentFunctionNode(returnNode)
 			if functionNode == nil {
 				return
 			}
 
-			constrainedReturnNodeType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, returnNode)
+			returnNodeType := ctx.TypeChecker.GetTypeAtLocation(returnNode)
+			anyType := discriminateReturnType(
+				returnNodeType,
+				ctx.TypeChecker,
+				ctx.Program,
+				returnNode,
+			)
+			if anyType == utils.DiscriminatedAnyTypeSafe &&
+				utils.IsTypeFlagSet(returnNodeType, checker.TypeFlagsPrimitive|checker.TypeFlagsUnknown|checker.TypeFlagsNever) {
+				return
+			}
 
 			// function expressions will not have their return type modified based on receiver typing
 			// so we have to use the contextual typing in these cases, i.e.
@@ -70,10 +116,13 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			if functionType == nil {
 				functionType = ctx.TypeChecker.GetTypeAtLocation(functionNode)
 			}
-			callSignatures := utils.CollectAllCallSignatures(ctx.TypeChecker, functionType)
+			var callSignatures []*checker.Signature
+			callSignaturesLoaded := false
 			// If there is an explicit type annotation *and* that type matches the actual
 			// function return type, we shouldn't complain (it's intentional, even if unsafe)
 			if functionNode.Type() != nil {
+				callSignatures = utils.CollectAllCallSignatures(ctx.TypeChecker, functionType)
+				callSignaturesLoaded = true
 				for _, signature := range callSignatures {
 					signatureReturnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
 
@@ -96,6 +145,9 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			}
 
 			if anyType != utils.DiscriminatedAnyTypeSafe {
+				if !callSignaturesLoaded {
+					callSignatures = utils.CollectAllCallSignatures(ctx.TypeChecker, functionType)
+				}
 				// Allow cases when the declared return type of the function is either unknown or unknown[]
 				// and the function is returning any or any[].
 				for _, signature := range callSignatures {
@@ -107,11 +159,11 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 					if anyType == utils.DiscriminatedAnyTypeAnyArray && utils.IsTypeUnknownArrayType(functionReturnType, ctx.TypeChecker) {
 						return
 					}
-					awaitedType := checker.Checker_getAwaitedType(ctx.TypeChecker, functionReturnType)
-					if awaitedType != nil &&
-						anyType == utils.DiscriminatedAnyTypePromiseAny &&
-						utils.IsTypeUnknownType(awaitedType) {
-						return
+					if anyType == utils.DiscriminatedAnyTypePromiseAny {
+						awaitedType := checker.Checker_getAwaitedType(ctx.TypeChecker, functionReturnType)
+						if awaitedType != nil && utils.IsTypeUnknownType(awaitedType) {
+							return
+						}
 					}
 				}
 
@@ -120,7 +172,8 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 				}
 
 				var typeString string
-				if utils.IsIntrinsicErrorType(constrainedReturnNodeType) {
+				if anyType == utils.DiscriminatedAnyTypeAny &&
+					utils.IsIntrinsicErrorType(utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, returnNode)) {
 					typeString = "error"
 				} else if anyType == utils.DiscriminatedAnyTypeAny {
 					typeString = "`any`"
@@ -146,6 +199,9 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
+			if !callSignaturesLoaded || utils.IsUnionType(functionType) || utils.IsIntersectionType(functionType) {
+				callSignatures = utils.GetCallSignatures(ctx.TypeChecker, functionType)
+			}
 			if len(callSignatures) < 1 {
 				return
 			}
