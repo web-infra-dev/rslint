@@ -26,4 +26,5 @@ declare module 'foo' {}
 
 ## Original Documentation
 
-- [typescript-eslint prefer-namespace-keyword](https://typescript-eslint.io/rules/prefer-namespace-keyword)
+- [typescript-eslint: prefer-namespace-keyword](https://typescript-eslint.io/rules/prefer-namespace-keyword)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-namespace-keyword.ts)

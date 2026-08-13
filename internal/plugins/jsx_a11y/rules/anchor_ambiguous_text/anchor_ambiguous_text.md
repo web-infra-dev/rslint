@@ -106,4 +106,5 @@ with the more concise and accessible:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/anchor-ambiguous-text](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-ambiguous-text.md)
+- [eslint-plugin-jsx-a11y: anchor-ambiguous-text](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/anchor-ambiguous-text.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/anchor-ambiguous-text.js)

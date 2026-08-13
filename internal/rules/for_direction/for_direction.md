@@ -26,4 +26,5 @@ for (var i = 0; i < 10; i += 1) {}
 
 ## Original Documentation
 
-- [ESLint for-direction](https://eslint.org/docs/latest/rules/for-direction)
+- [ESLint: for-direction](https://eslint.org/docs/latest/rules/for-direction)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/for-direction.js)

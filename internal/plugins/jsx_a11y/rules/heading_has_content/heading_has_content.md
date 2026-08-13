@@ -67,4 +67,5 @@ Examples of **correct** code for this rule with `{ "components": ["Heading"] }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/heading-has-content](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/heading-has-content.md)
+- [eslint-plugin-jsx-a11y: heading-has-content](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/heading-has-content.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/heading-has-content.js)

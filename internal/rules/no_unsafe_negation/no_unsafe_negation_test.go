@@ -92,50 +92,50 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			// Empty options object still defaults to not enforcing ordering
 			{
 				Code:    `! a <= b`,
-				Options: map[string]interface{}{},
+				Options: []any{map[string]interface{}{}},
 			},
 			// Explicitly disabled enforceForOrderingRelations
 			{
 				Code:    `foo = ! a >= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": false},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": false}},
 			},
 
 			// ===== Parenthesized negation with ordering (option enabled) =====
 			{
 				Code:    `(!a) < b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 			},
 			{
 				Code:    `(!a) > b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 			},
 			{
 				Code:    `(!a) <= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 			},
 			{
 				Code:    `(!a) >= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 			},
 			{
 				Code:    `foo = (!a) >= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 			},
 
 			// Normal comparisons with option enabled (no negation)
 			{
 				Code:    `a <= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 			},
 			{
 				Code:    `foo = a > b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 			},
 
 			// Properly negated whole expression with option enabled
 			{
 				Code:    `!(a < b)`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 			},
 		},
 		// Invalid cases
@@ -472,7 +472,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			// ===== Whitespace preservation =====
 			{
 				Code:    `if (! a < b) {}`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 5,
@@ -485,7 +485,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			},
 			{
 				Code:    `while (! a > b) {}`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 8,
@@ -498,7 +498,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			},
 			{
 				Code:    `foo = ! a <= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 7,
@@ -511,7 +511,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			},
 			{
 				Code:    `foo = ! a >= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 7,
@@ -524,7 +524,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			},
 			{
 				Code:    `! a <= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 1,
@@ -539,7 +539,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			// ===== Ordering without space =====
 			{
 				Code:    `!a < b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 1,
@@ -552,7 +552,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			},
 			{
 				Code:    `!a > b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 1,
@@ -565,7 +565,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			},
 			{
 				Code:    `!a <= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 1,
@@ -578,7 +578,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			},
 			{
 				Code:    `!a >= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 1,
@@ -594,7 +594,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			// Ordering in ternary: x = !a < b ? c : d
 			{
 				Code:    `x = !a < b ? c : d`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 5,
@@ -608,7 +608,7 @@ func TestNoUnsafeNegationRule(t *testing.T) {
 			// Computed property with ordering: !a[0] >= b
 			{
 				Code:    `!a[0] >= b`,
-				Options: map[string]interface{}{"enforceForOrderingRelations": true},
+				Options: []any{map[string]interface{}{"enforceForOrderingRelations": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "unexpected", Line: 1, Column: 1,

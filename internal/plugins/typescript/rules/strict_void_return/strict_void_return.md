@@ -121,4 +121,5 @@ fn(() => {
 
 ## Original Documentation
 
-- [typescript-eslint strict-void-return](https://typescript-eslint.io/rules/strict-void-return)
+- [typescript-eslint: strict-void-return](https://typescript-eslint.io/rules/strict-void-return)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/strict-void-return.ts)

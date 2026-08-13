@@ -48,4 +48,5 @@ Syntactically-invalid patterns are independently flagged by the [`no-invalid-reg
 
 ## Original Documentation
 
-- [no-control-regex](https://eslint.org/docs/latest/rules/no-control-regex)
+- [ESLint: no-control-regex](https://eslint.org/docs/latest/rules/no-control-regex)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/no-control-regex.js)

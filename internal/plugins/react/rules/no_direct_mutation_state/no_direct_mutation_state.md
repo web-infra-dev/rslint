@@ -68,4 +68,5 @@ class Hello {
 
 ## Original Documentation
 
-- [eslint-plugin-react `no-direct-mutation-state`](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-direct-mutation-state.md)
+- [eslint-plugin-react: no-direct-mutation-state](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-direct-mutation-state.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-direct-mutation-state.js)

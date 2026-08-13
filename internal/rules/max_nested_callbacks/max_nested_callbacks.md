@@ -110,4 +110,5 @@ foo1(() => {
 
 ## Original Documentation
 
-- [https://eslint.org/docs/latest/rules/max-nested-callbacks](https://eslint.org/docs/latest/rules/max-nested-callbacks)
+- [ESLint: max-nested-callbacks](https://eslint.org/docs/latest/rules/max-nested-callbacks)
+- [Source code](https://github.com/eslint/eslint/blob/v10.3.0/lib/rules/max-nested-callbacks.js)

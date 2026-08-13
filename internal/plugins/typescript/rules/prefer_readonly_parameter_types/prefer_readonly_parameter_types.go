@@ -1,11 +1,16 @@
 package prefer_readonly_parameter_types
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_readonly_parameter_types.schema.json
+var schemaJSON []byte
 
 type PreferReadonlyParameterTypesOptions struct {
 	CheckParameterProperties bool     `json:"checkParameterProperties"`
@@ -21,57 +26,30 @@ func buildShouldBeReadonlyMessage() rule.RuleMessage {
 	}
 }
 
-func parseOptions(options any) PreferReadonlyParameterTypesOptions {
+func parseOptions(options []any) PreferReadonlyParameterTypesOptions {
 	opts := PreferReadonlyParameterTypesOptions{
 		CheckParameterProperties: true,
 		IgnoreInferredTypes:      false,
 		TreatMethodsAsReadonly:   false,
 	}
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	// Handle array format: [{ option: value }]
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) > 0 {
-			if m, ok := arr[0].(map[string]interface{}); ok {
-				if v, ok := m["checkParameterProperties"].(bool); ok {
-					opts.CheckParameterProperties = v
-				}
-				if v, ok := m["ignoreInferredTypes"].(bool); ok {
-					opts.IgnoreInferredTypes = v
-				}
-				if v, ok := m["treatMethodsAsReadonly"].(bool); ok {
-					opts.TreatMethodsAsReadonly = v
-				}
-				if v, ok := m["allow"].([]interface{}); ok {
-					opts.Allow = make([]string, 0, len(v))
-					for _, item := range v {
-						if s, ok := item.(string); ok {
-							opts.Allow = append(opts.Allow, s)
-						}
-					}
-				}
-			}
-		}
-		return opts
+	optsMap, _ := options[0].(map[string]interface{})
+	if v, ok := optsMap["checkParameterProperties"].(bool); ok {
+		opts.CheckParameterProperties = v
 	}
-	// Handle direct object format
-	if m, ok := options.(map[string]interface{}); ok {
-		if v, ok := m["checkParameterProperties"].(bool); ok {
-			opts.CheckParameterProperties = v
-		}
-		if v, ok := m["ignoreInferredTypes"].(bool); ok {
-			opts.IgnoreInferredTypes = v
-		}
-		if v, ok := m["treatMethodsAsReadonly"].(bool); ok {
-			opts.TreatMethodsAsReadonly = v
-		}
-		if v, ok := m["allow"].([]interface{}); ok {
-			opts.Allow = make([]string, 0, len(v))
-			for _, item := range v {
-				if s, ok := item.(string); ok {
-					opts.Allow = append(opts.Allow, s)
-				}
+	if v, ok := optsMap["ignoreInferredTypes"].(bool); ok {
+		opts.IgnoreInferredTypes = v
+	}
+	if v, ok := optsMap["treatMethodsAsReadonly"].(bool); ok {
+		opts.TreatMethodsAsReadonly = v
+	}
+	if v, ok := optsMap["allow"].([]interface{}); ok {
+		opts.Allow = make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				opts.Allow = append(opts.Allow, s)
 			}
 		}
 	}
@@ -154,9 +132,9 @@ func checkParameter(ctx rule.RuleContext, param *ast.Node, opts PreferReadonlyPa
 
 var PreferReadonlyParameterTypesRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-readonly-parameter-types",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		checkParameters := func(node *ast.Node) {

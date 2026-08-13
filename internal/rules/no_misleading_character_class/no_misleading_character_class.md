@@ -73,4 +73,5 @@ new RegExp("[\\uD83D\\uDC4D]");  // surrogate pair in string literal
 
 ## Original Documentation
 
-- [https://eslint.org/docs/latest/rules/no-misleading-character-class](https://eslint.org/docs/latest/rules/no-misleading-character-class)
+- [ESLint: no-misleading-character-class](https://eslint.org/docs/latest/rules/no-misleading-character-class)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-misleading-character-class.js)

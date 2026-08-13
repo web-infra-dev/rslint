@@ -10,7 +10,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-dupe-else-if
 var NoDupeElseIfRule = rule.Rule{
-	Name: "no-dupe-else-if",
+	Name:   "no-dupe-else-if",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sf := ctx.SourceFile
 		return rule.RuleListeners{

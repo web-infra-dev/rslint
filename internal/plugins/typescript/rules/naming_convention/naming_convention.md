@@ -188,4 +188,5 @@ When no options are provided, the rule uses the following defaults:
 
 ## Original Documentation
 
-- [typescript-eslint naming-convention](https://typescript-eslint.io/rules/naming-convention)
+- [typescript-eslint: naming-convention](https://typescript-eslint.io/rules/naming-convention)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/naming-convention.ts)

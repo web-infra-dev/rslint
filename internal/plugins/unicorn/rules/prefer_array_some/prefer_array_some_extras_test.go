@@ -97,6 +97,13 @@ func TestPreferArraySomeExtras(t *testing.T) {
 			Code:   `if ((foo).find(fn)) {}`,
 			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`if ((foo).some(fn)) {}`)},
 		},
+		// A `for…of` const binding has no VariableDeclaration initializer. Its
+		// inferred array type still makes the boolean `.find()` use reportable.
+		{
+			Code:   `declare const arrays: number[][]; declare const fn: (value: number) => boolean; for (const array of arrays) { if (array.find(fn)) {} }`,
+			Tsx:    false,
+			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`declare const arrays: number[][]; declare const fn: (value: number) => boolean; for (const array of arrays) { if (array.some(fn)) {} }`)},
+		},
 		// Double-parenthesized call in a control-flow test.
 		{
 			Code:   `if (((foo.find(fn)))) {}`,

@@ -42,3 +42,4 @@ try {
 ## Original Documentation
 
 - [ESLint: no-throw-literal](https://eslint.org/docs/latest/rules/no-throw-literal)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/no-throw-literal.js)

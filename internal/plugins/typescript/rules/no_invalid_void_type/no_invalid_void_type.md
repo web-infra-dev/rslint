@@ -80,4 +80,5 @@ class Test {
 
 ## Original Documentation
 
-- [typescript-eslint no-invalid-void-type](https://typescript-eslint.io/rules/no-invalid-void-type)
+- [typescript-eslint: no-invalid-void-type](https://typescript-eslint.io/rules/no-invalid-void-type)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-invalid-void-type.ts)

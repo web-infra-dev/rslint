@@ -13,6 +13,15 @@ The rule supports four options:
 
 When the file is an ES module (detected via top-level `import` / `export`), the rule always uses module semantics: every `"use strict"` directive is reported as unnecessary and removed by autofix.
 
+## Differences from ESLint
+
+This rule currently determines module status from top-level `import` / `export`
+syntax and does not yet consult `languageOptions.sourceType`. In particular,
+configuring `sourceType: 'module'` on a file without module syntax or
+`sourceType: 'commonjs'` does not change this rule's behavior. The
+`parserOptions.ecmaFeatures.impliedStrict` and `globalReturn` options are also
+not supported.
+
 ## Examples
 
 ### `"never"`
@@ -115,4 +124,5 @@ const foo2 = (function() {
 
 ## Original Documentation
 
-- https://eslint.org/docs/latest/rules/strict
+- [ESLint: strict](https://eslint.org/docs/latest/rules/strict)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/strict.js)

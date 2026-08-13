@@ -69,7 +69,7 @@ func TestPreferNumberPropertiesExtras(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			// ---- RefStore: parameter initializers run outside the function body's var environment ----
 			fixed(`function f(value = parseInt("10", 2)) { var parseInt = custom; return value; }`, `function f(value = Number.parseInt("10", 2)) { var parseInt = custom; return value; }`, "parseInt", "parseInt", 1, 20, 1, 28),
-			fixed(`function f(value = window.parseFloat("1")) { var window = custom; return value; }`, `function f(value = Number.parseFloat("1")) { var window = custom; return value; }`, "parseFloat", "parseFloat", 1, 20, 1, 37),
+			withGlobals(fixed(`function f(value = window.parseFloat("1")) { var window = custom; return value; }`, `function f(value = Number.parseFloat("1")) { var window = custom; return value; }`, "parseFloat", "parseFloat", 1, 20, 1, 37), "window"),
 
 			// ---- RefStore: type-only and augmented declarations do not shadow runtime globals ----
 			fixed("type parseInt = (value: string) => number;\nparseInt(\"10\", 2);", "type parseInt = (value: string) => number;\nNumber.parseInt(\"10\", 2);", "parseInt", "parseInt", 2, 1, 2, 9),
@@ -95,7 +95,7 @@ func TestPreferNumberPropertiesExtras(t *testing.T) {
 			fixed("globalThis[`NaN`];", `Number.NaN;`, "NaN", "NaN", 1, 1, 1, 18),
 			fixed(`globalThis[("NaN")];`, `Number.NaN;`, "NaN", "NaN", 1, 1, 1, 20),
 			fixed(`globalThis["NaN" as const];`, `Number.NaN;`, "NaN", "NaN", 1, 1, 1, 27),
-			fixed(`window["parseFloat"](foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 21),
+			withGlobals(fixed(`window["parseFloat"](foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 21), "window"),
 			fixed(`globalThis[("parseFloat")](value);`, `Number.parseFloat(value);`, "parseFloat", "parseFloat", 1, 1, 1, 27),
 			fixedWithOptions(`globalThis["Infinity"];`, `Number.POSITIVE_INFINITY;`, "Infinity", "POSITIVE_INFINITY", map[string]interface{}{"checkInfinity": true}, 1, 1, 1, 23),
 

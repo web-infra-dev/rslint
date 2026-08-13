@@ -73,4 +73,5 @@ foo(a, (b, c), d);
 
 ## Original Documentation
 
-- [ESLint rule: no-sequences](https://eslint.org/docs/latest/rules/no-sequences)
+- [ESLint: no-sequences](https://eslint.org/docs/latest/rules/no-sequences)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-sequences.js)

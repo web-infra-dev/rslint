@@ -133,11 +133,11 @@ type T = Record<string, A | B>;
 		},
 		{
 			Code:    "type T = A | A;",
-			Options: NoDuplicateTypeConstituentsOptions{IgnoreUnions: true},
+			Options: map[string]interface{}{"ignoreUnions": true},
 		},
 		{
 			Code:    "type T = A & A;",
-			Options: NoDuplicateTypeConstituentsOptions{IgnoreIntersections: true},
+			Options: map[string]interface{}{"ignoreIntersections": true},
 		},
 		{
 			Code: "type T = Class<string> | Class<string>;",

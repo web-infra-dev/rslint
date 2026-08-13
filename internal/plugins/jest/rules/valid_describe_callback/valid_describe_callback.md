@@ -40,4 +40,5 @@ describe.each([1, 2, 3])("value %s", (value) => {
 
 ## Original Documentation
 
-- [jest/valid-describe-callback](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/valid-describe-callback.md)
+- [eslint-plugin-jest: valid-describe-callback](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/valid-describe-callback.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/valid-describe-callback.ts)

@@ -90,4 +90,5 @@ Examples of **correct** code with `{ "words": ["Bild", "Foto"] }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/img-redundant-alt](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/main/docs/rules/img-redundant-alt.md)
+- [eslint-plugin-jsx-a11y: img-redundant-alt](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/img-redundant-alt.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/img-redundant-alt.js)

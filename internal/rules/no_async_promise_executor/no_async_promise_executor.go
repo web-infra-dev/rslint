@@ -169,12 +169,13 @@ func noAsyncPromiseExecutorListeners(ctx rule.RuleContext) rule.RuleListeners {
 
 // NoAsyncPromiseExecutorRule disallows using an async function as a Promise executor.
 var NoAsyncPromiseExecutorRule = rule.Rule{
-	Name: "no-async-promise-executor",
+	Name:   "no-async-promise-executor",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		if !sourceMayUsePromise(ctx.SourceFile) {
 			return nil
 		}
-		if ctx.Globals["Promise"] == utils.GlobalAccessOff {
+		if !ctx.Globals.Access("Promise").IsDeclared() {
 			return nil
 		}
 		return noAsyncPromiseExecutorListeners(ctx)

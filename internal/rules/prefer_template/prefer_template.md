@@ -32,4 +32,5 @@ sequence, because those cannot be represented in a template literal.
 
 ## Original Documentation
 
-- [ESLint rule: prefer-template](https://eslint.org/docs/latest/rules/prefer-template)
+- [ESLint: prefer-template](https://eslint.org/docs/latest/rules/prefer-template)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/prefer-template.js)

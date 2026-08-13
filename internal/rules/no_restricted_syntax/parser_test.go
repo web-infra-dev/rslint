@@ -8,6 +8,7 @@ import (
 func TestParseSelector_Wellformed(t *testing.T) {
 	cases := []string{
 		"Identifier",
+		"#identifier",
 		"*",
 		"FunctionExpression",
 		"BinaryExpression",
@@ -19,11 +20,15 @@ func TestParseSelector_Wellformed(t *testing.T) {
 		"FunctionDeclaration[params.length>=2]",
 		"FunctionDeclaration[params.length<=2]",
 		"FunctionDeclaration[params.length<2]",
+		"FunctionDeclaration[params.0.name=x]",
+		"Identifier[name=type(string)]",
+		"Literal[value=.5]",
 		"Literal[regex.flags=/./]",
 		"Literal[regex.flags=/i/]",
 		`ImportDeclaration[source.value=/^some\/path$/]`,
 		"ArrowFunctionExpression > BlockStatement",
 		"Property > Literal.key",
+		".body.declarations.init",
 		"FunctionDeclaration FunctionExpression",
 		"Literal + Literal",
 		"* ~ *",
@@ -31,6 +36,10 @@ func TestParseSelector_Wellformed(t *testing.T) {
 		":matches(Identifier, Literal)",
 		":not(VariableDeclaration)",
 		":has(Literal)",
+		":has(> Identifier)",
+		":has(+ Identifier)",
+		":has(~ Identifier)",
+		":Expression",
 		":nth-child(1)",
 		":nth-last-child(2)",
 		":first-child",
@@ -62,6 +71,11 @@ func TestParseSelector_Malformed(t *testing.T) {
 		"BinaryExpression[name=",             // missing value
 		"BinaryExpression[name=']",           // unterminated string
 		"BinaryExpression[name=/]",           // unterminated regex (no closing /)
+		"Identifier[name=//]",                // empty regex
+		"Identifier[name=/foo/g]",            // unsupported regex flag
+		"Identifier[name=/foo/ii]",           // duplicate regex flag
+		"Identifier[name=type()]",            // empty typeof operand
+		"Literal[value=-1]",                  // esquery numbers are unsigned
 		":nth-child",                         // missing arg
 		":nth-child(",                        // unterminated paren
 		":nth-child(abc)",                    // non-numeric arg
@@ -71,6 +85,7 @@ func TestParseSelector_Malformed(t *testing.T) {
 		"Identifier >",                       // dangling combinator
 		"Identifier >> Foo",                  // double combinator
 		":unknownPseudo",                     // unsupported pseudo
+		":HAS(Identifier)",                   // named pseudos are case-sensitive
 		"FunctionDeclaration[params.length>", // missing operand
 		"BinaryExpression[name=&&]",          // illegal operator value
 	}
@@ -94,22 +109,22 @@ func TestParseRuleOptions_Shapes(t *testing.T) {
 			t.Fatalf("empty array should yield 0 entries, got %d", len(got))
 		}
 	})
-	t.Run("single string (CLI / single-option config shape)", func(t *testing.T) {
-		got := parseRuleOptions("Identifier")
+	t.Run("single string", func(t *testing.T) {
+		got := parseRuleOptions([]interface{}{"Identifier"})
 		if len(got) != 1 || got[0].selector != "Identifier" {
 			t.Fatalf("unexpected entries: %#v", got)
 		}
 	})
-	t.Run("single map (CLI / single-option config shape)", func(t *testing.T) {
-		got := parseRuleOptions(map[string]interface{}{
+	t.Run("single map", func(t *testing.T) {
+		got := parseRuleOptions([]interface{}{map[string]interface{}{
 			"selector": "Identifier",
 			"message":  "no identifiers",
-		})
+		}})
 		if len(got) != 1 || got[0].selector != "Identifier" || got[0].message != "no identifiers" {
 			t.Fatalf("unexpected entries: %#v", got)
 		}
 	})
-	t.Run("multi-element array of mixed forms (rule_tester shape)", func(t *testing.T) {
+	t.Run("multi-element array of mixed forms", func(t *testing.T) {
 		got := parseRuleOptions([]interface{}{
 			"WithStatement",
 			map[string]interface{}{"selector": "VariableDeclaration", "message": "x"},
@@ -117,7 +132,7 @@ func TestParseRuleOptions_Shapes(t *testing.T) {
 		if len(got) != 2 {
 			t.Fatalf("expected 2, got %d", len(got))
 		}
-		if got[0].selector != "WithStatement" || got[0].message != "" {
+		if got[0].selector != "WithStatement" || got[0].message != "Using 'WithStatement' is not allowed." {
 			t.Fatalf("entry 0 mismatch: %#v", got[0])
 		}
 		if got[1].selector != "VariableDeclaration" || got[1].message != "x" {
@@ -160,7 +175,7 @@ func TestParseRuleOptions_Shapes(t *testing.T) {
 }
 
 func TestParseRuleOptions_DefaultMessage(t *testing.T) {
-	got := parseRuleOptions("Identifier")
+	got := parseRuleOptions([]interface{}{"Identifier"})
 	if len(got) != 1 {
 		t.Fatalf("expected 1 entry")
 	}
@@ -170,14 +185,52 @@ func TestParseRuleOptions_DefaultMessage(t *testing.T) {
 }
 
 func TestParseRuleOptions_CustomMessage(t *testing.T) {
-	got := parseRuleOptions(map[string]interface{}{
+	got := parseRuleOptions([]interface{}{map[string]interface{}{
 		"selector": "Identifier",
 		"message":  "no",
-	})
+	}})
 	if len(got) != 1 {
 		t.Fatalf("expected 1 entry")
 	}
 	if msg := got[0].formatMessage(); msg != "no" {
 		t.Fatalf("custom message mismatch: %q", msg)
+	}
+}
+
+func TestSelectorSpecificityMatchesESLint(t *testing.T) {
+	tests := []struct {
+		selector    string
+		attributes  int
+		identifiers int
+	}{
+		{selector: "Identifier", identifiers: 1},
+		{selector: `[name='foo']`, attributes: 1},
+		{selector: `Identifier[name='foo']`, attributes: 1, identifiers: 1},
+		{selector: `FunctionDeclaration > Identifier.id`, attributes: 1, identifiers: 2},
+		{selector: `:nth-child(2)`, attributes: 1},
+		// ESLint deliberately excludes selectors nested inside :has().
+		{selector: `CallExpression:has(Identifier MemberExpression)`, identifiers: 1},
+	}
+	for _, test := range tests {
+		t.Run(test.selector, func(t *testing.T) {
+			parsed, err := parseSelector(test.selector)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := analyzeSelectorSpecificity(parsed)
+			if got.attributes != test.attributes || got.identifiers != test.identifiers {
+				t.Fatalf("specificity = (%d, %d), want (%d, %d)", got.attributes, got.identifiers, test.attributes, test.identifiers)
+			}
+		})
+	}
+}
+
+func TestCandidateKindsUniverseAbsorbsTypedBranches(t *testing.T) {
+	parsed, err := parseSelector(`:matches(*, Identifier)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kinds := candidateKinds(parsed); !kinds.universe {
+		t.Fatalf("candidate kinds = %#v, want universe", kinds)
 	}
 }

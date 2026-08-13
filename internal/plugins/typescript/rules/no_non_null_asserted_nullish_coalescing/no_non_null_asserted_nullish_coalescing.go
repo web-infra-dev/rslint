@@ -78,7 +78,8 @@ func checkAssignmentsBefore(identName string, node *ast.Node, scope *ast.Node) b
 }
 
 var NoNonNullAssertedNullishCoalescingRule = rule.CreateRule(rule.Rule{
-	Name: "no-non-null-asserted-nullish-coalescing",
+	Name:   "no-non-null-asserted-nullish-coalescing",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "noNonNullAssertedNullishCoalescing",

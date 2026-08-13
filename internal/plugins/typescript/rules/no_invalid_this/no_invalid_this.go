@@ -1,16 +1,19 @@
 package no_invalid_this
 
 import (
+	_ "embed"
 	"regexp"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_invalid_this.schema.json
+var schemaJSON []byte
 
 // NoInvalidThisRule mirrors @typescript-eslint/no-invalid-this, which wraps
 // ESLint core's no-invalid-this with two TypeScript-specific recognitions:
@@ -29,8 +32,9 @@ import (
 //
 // https://typescript-eslint.io/rules/no-invalid-this
 var NoInvalidThisRule = rule.CreateRule(rule.Rule{
-	Name: "no-invalid-this",
-	Run:  run,
+	Name:   "no-invalid-this",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 type ruleOptions struct {
@@ -39,12 +43,12 @@ type ruleOptions struct {
 	capIsConstructor bool
 }
 
-func parseOptions(raw any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{capIsConstructor: true}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	m, _ := options[0].(map[string]interface{})
 	if v, ok := m["capIsConstructor"]; ok {
 		if b, ok := v.(bool); ok {
 			opts.capIsConstructor = b
@@ -53,18 +57,15 @@ func parseOptions(raw any) ruleOptions {
 	return opts
 }
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 	sf := ctx.SourceFile
 
-	// Top-level `this` validity. typescript-eslint's wrapper defaults to
-	// `parserOptions.sourceType: 'module'`, which makes top-level `this`
-	// always invalid. rslint does not expose `sourceType` /
-	// `parserOptions.ecmaFeatures.globalReturn`, so we adopt the same
-	// default and treat top-level `this` as invalid — a framework-layer
-	// consequence of rslint not surfacing parser options, applied
-	// uniformly across rules.
+	// Top-level `this` validity. typescript-eslint defaults to module source
+	// type, which makes top-level `this` invalid. This rule does not yet consume
+	// ctx.SourceType, and rslint does not expose
+	// parserOptions.ecmaFeatures.globalReturn, so it always adopts that module
+	// default and treats top-level `this` as invalid.
 	topLevelValid := false
 
 	// Stack of `this`-validity flags, one per non-arrow function-like /
@@ -221,7 +222,7 @@ func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, capIsConstructor b
 	if hasJSDocThisTag(node, sf) {
 		return true
 	}
-	if capIsConstructor && isES5Constructor(node) {
+	if capIsConstructor && utils.IsES5Constructor(node) {
 		return true
 	}
 	return !isDefaultThisBinding(node, capIsConstructor)
@@ -241,26 +242,6 @@ func hasThisParameter(node *ast.Node) bool {
 	return false
 }
 
-// isES5Constructor mirrors ESLint's `isES5Constructor`: a function with an
-// own name whose first character is an uppercase letter is treated as an
-// ES5 constructor under `capIsConstructor: true`. Anonymous functions
-// (no own name) fall through.
-func isES5Constructor(node *ast.Node) bool {
-	var name *ast.Node
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		name = node.AsFunctionDeclaration().Name()
-	case ast.KindFunctionExpression:
-		name = node.AsFunctionExpression().Name()
-	default:
-		return false
-	}
-	if name == nil || !ast.IsIdentifier(name) {
-		return false
-	}
-	return startsWithUpperCase(name.AsIdentifier().Text)
-}
-
 // hasOwnFunctionName reports whether the function has an `id`/name in
 // ESTree terms (used to gate ES5-constructor recognition for the uppercase-
 // variable / uppercase-assignment-target branches: a *named* function
@@ -272,18 +253,6 @@ func hasOwnFunctionName(node *ast.Node) bool {
 		return node.AsFunctionDeclaration().Name() != nil
 	case ast.KindFunctionExpression:
 		return node.AsFunctionExpression().Name() != nil
-	}
-	return false
-}
-
-// startsWithUpperCase mirrors ESLint's `s[0] !== s[0].toLocaleLowerCase()`:
-// the first rune is uppercase iff it has a different lowercase form. In
-// Unicode terms that's category Lu, plus the rare title-case category Lt
-// (e.g. `Ǆ`). Everything else — lower-case letters, non-cased letters,
-// digits, `_`, `$` — returns false in both halves.
-func startsWithUpperCase(s string) bool {
-	for _, r := range s {
-		return unicode.IsUpper(r) || unicode.IsTitle(r)
 	}
 	return false
 }
@@ -458,7 +427,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 					return false
 				}
 				if capIsConstructor && isAnonymous && ast.IsIdentifier(left) &&
-					startsWithUpperCase(left.AsIdentifier().Text) {
+					utils.StartsWithUpperCase(left.AsIdentifier().Text) {
 					// Foo = function(){} — assignment to an uppercase variable
 					// (anonymous function) is treated as an ES5 constructor.
 					return false
@@ -524,7 +493,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			}
 			name := spa.Name()
 			if capIsConstructor && isAnonymous && name != nil && ast.IsIdentifier(name) &&
-				startsWithUpperCase(name.AsIdentifier().Text) {
+				utils.StartsWithUpperCase(name.AsIdentifier().Text) {
 				return false
 			}
 			return true
@@ -555,7 +524,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			if capIsConstructor && isAnonymous {
 				name := vd.Name()
 				if name != nil && ast.IsIdentifier(name) &&
-					startsWithUpperCase(name.AsIdentifier().Text) {
+					utils.StartsWithUpperCase(name.AsIdentifier().Text) {
 					return false
 				}
 			}
@@ -569,7 +538,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			if capIsConstructor && isAnonymous {
 				name := pd.Name()
 				if name != nil && ast.IsIdentifier(name) &&
-					startsWithUpperCase(name.AsIdentifier().Text) {
+					utils.StartsWithUpperCase(name.AsIdentifier().Text) {
 					return false
 				}
 			}
@@ -583,7 +552,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			if capIsConstructor && isAnonymous {
 				name := be.Name()
 				if name != nil && ast.IsIdentifier(name) &&
-					startsWithUpperCase(name.AsIdentifier().Text) {
+					utils.StartsWithUpperCase(name.AsIdentifier().Text) {
 					return false
 				}
 			}

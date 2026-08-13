@@ -102,4 +102,5 @@ particular value on a particular DOM Node:
 
 ## Original Documentation
 
-- [eslint-plugin-react/forbid-dom-props](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/forbid-dom-props.md)
+- [eslint-plugin-react: forbid-dom-props](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/forbid-dom-props.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/forbid-dom-props.js)

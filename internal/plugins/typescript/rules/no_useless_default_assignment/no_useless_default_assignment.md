@@ -71,4 +71,5 @@ If you only want to match upstream's behavior exactly, ignore these additional r
 
 ## Original Documentation
 
-- [typescript-eslint no-useless-default-assignment](https://typescript-eslint.io/rules/no-useless-default-assignment)
+- [typescript-eslint: no-useless-default-assignment](https://typescript-eslint.io/rules/no-useless-default-assignment)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.59.4/packages/eslint-plugin/src/rules/no-useless-default-assignment.ts)

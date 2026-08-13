@@ -1,6 +1,7 @@
 package dot_notation
 
 import (
+	_ "embed"
 	"regexp"
 
 	"github.com/dlclark/regexp2"
@@ -12,6 +13,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed dot_notation.schema.json
+var schemaJSON []byte
+
 // Options mirrors @typescript-eslint/dot-notation options
 type Options struct {
 	AllowIndexSignaturePropertyAccess bool   `json:"allowIndexSignaturePropertyAccess"`
@@ -21,44 +25,31 @@ type Options struct {
 	AllowProtectedClassPropertyAccess bool   `json:"allowProtectedClassPropertyAccess"`
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{
 		AllowKeywords:                     true,
 		AllowIndexSignaturePropertyAccess: false,
 	}
 
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 
-	// Parse options with dual-format support (handles both array and object formats)
-	var optsMap map[string]interface{}
-	var ok bool
-
-	// Handle array format: [{ option: value }]
-	if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-		optsMap, ok = optArray[0].(map[string]interface{})
-	} else {
-		// Handle direct object format: { option: value }
-		optsMap, ok = options.(map[string]interface{})
+	if v, ok := optsMap["allowIndexSignaturePropertyAccess"].(bool); ok {
+		opts.AllowIndexSignaturePropertyAccess = v
 	}
-
-	if ok {
-		if v, ok := optsMap["allowIndexSignaturePropertyAccess"].(bool); ok {
-			opts.AllowIndexSignaturePropertyAccess = v
-		}
-		if v, ok := optsMap["allowKeywords"].(bool); ok {
-			opts.AllowKeywords = v
-		}
-		if v, ok := optsMap["allowPattern"].(string); ok {
-			opts.AllowPattern = v
-		}
-		if v, ok := optsMap["allowPrivateClassPropertyAccess"].(bool); ok {
-			opts.AllowPrivateClassPropertyAccess = v
-		}
-		if v, ok := optsMap["allowProtectedClassPropertyAccess"].(bool); ok {
-			opts.AllowProtectedClassPropertyAccess = v
-		}
+	if v, ok := optsMap["allowKeywords"].(bool); ok {
+		opts.AllowKeywords = v
+	}
+	if v, ok := optsMap["allowPattern"].(string); ok {
+		opts.AllowPattern = v
+	}
+	if v, ok := optsMap["allowPrivateClassPropertyAccess"].(bool); ok {
+		opts.AllowPrivateClassPropertyAccess = v
+	}
+	if v, ok := optsMap["allowProtectedClassPropertyAccess"].(bool); ok {
+		opts.AllowProtectedClassPropertyAccess = v
 	}
 	return opts
 }
@@ -251,9 +242,9 @@ func (f *dotNotationFixer) buildUseBracketsFix(
 // See: /packages/rule-tester/src/index.ts line 273 - the lint() call doesn't use per-test config.
 var DotNotationRule = rule.CreateRule(rule.Rule{
 	Name:             "dot-notation",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work

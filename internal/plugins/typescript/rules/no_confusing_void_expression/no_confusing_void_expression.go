@@ -1,13 +1,16 @@
 package no_confusing_void_expression
 
 import (
-	"encoding/json"
+	_ "embed"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_confusing_void_expression.schema.json
+var schemaJSON []byte
 
 func buildInvalidVoidExprMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -59,33 +62,35 @@ func buildVoidExprWrapVoidMessage() rule.RuleMessage {
 }
 
 type NoConfusingVoidExpressionOptions struct {
-	IgnoreArrowShorthand         bool `json:"ignoreArrowShorthand,omitempty"`
-	IgnoreVoidOperator           bool `json:"ignoreVoidOperator,omitempty"`
-	IgnoreVoidReturningFunctions bool `json:"ignoreVoidReturningFunctions,omitempty"`
+	IgnoreArrowShorthand         bool
+	IgnoreVoidOperator           bool
+	IgnoreVoidReturningFunctions bool
+}
+
+func parseOptions(options []any) NoConfusingVoidExpressionOptions {
+	opts := NoConfusingVoidExpressionOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["ignoreArrowShorthand"].(bool); ok {
+		opts.IgnoreArrowShorthand = value
+	}
+	if value, ok := optsMap["ignoreVoidOperator"].(bool); ok {
+		opts.IgnoreVoidOperator = value
+	}
+	if value, ok := optsMap["ignoreVoidReturningFunctions"].(bool); ok {
+		opts.IgnoreVoidReturningFunctions = value
+	}
+	return opts
 }
 
 var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-confusing-void-expression",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoConfusingVoidExpressionOptions)
-
-		if !ok {
-			// try convert options to JSON and back to struct
-			opts = NoConfusingVoidExpressionOptions{}
-			// get first element of options (re-wrapping config.rules' unwrapped
-			// single option into eslint-format []any)
-			options_array := rule.NormalizeOptions(options)
-			// if options_array has at least one element, try to unmarshal it
-			if len(options_array) > 0 {
-				optsJSON, err := json.Marshal(options_array[0])
-				if err == nil {
-					json.Unmarshal(optsJSON, &opts)
-				}
-
-			}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		canFix := func(node *ast.Node) bool {
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)

@@ -66,10 +66,10 @@ type options struct {
 
 func parseOptions(rawOptions []any) options {
 	opts := options{minimumItems: 0}
-	optsMap := utils.GetOptionsMap(rawOptions)
-	if optsMap == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOptions[0].(map[string]any)
 	if value, ok := optsMap["minimumItems"]; ok {
 		if number, ok := utils.CoerceIntegral(value); ok {
 			opts.minimumItems = number

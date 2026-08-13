@@ -39,4 +39,5 @@ var result = x ? a : b;
 
 ## Original Documentation
 
-- [ESLint no-constant-condition](https://eslint.org/docs/latest/rules/no-constant-condition)
+- [ESLint: no-constant-condition](https://eslint.org/docs/latest/rules/no-constant-condition)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-constant-condition.js)

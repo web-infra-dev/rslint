@@ -26,4 +26,5 @@ console.error('error');
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/no-console
+- [ESLint: no-console](https://eslint.org/docs/latest/rules/no-console)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-console.js)

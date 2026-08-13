@@ -1,0 +1,34 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "max": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipComments": {
+              "type": "boolean"
+            },
+            "skipBlankLines": {
+              "type": "boolean"
+            },
+            "IIFEs": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

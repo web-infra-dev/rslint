@@ -2124,3 +2124,55 @@ exports[`no-undef > invalid 80`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-undef > invalid 81`] = `
+{
+  "code": "Promise;",
+  "diagnostics": [
+    {
+      "message": "'Promise' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 82`] = `
+{
+  "code": "Temporal;",
+  "diagnostics": [
+    {
+      "message": "'Temporal' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

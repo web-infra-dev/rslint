@@ -19,8 +19,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// objectOption produces the array-wrapped option shape that exercises
-// utils.GetOptionsMap's JSON path. Passing a typed struct directly would
+// objectOption produces the array-wrapped option shape that exercises the
+// rule's own options-array parsing. Passing a typed struct directly would
 // short-circuit the JSON round-trip and leave the CLI-facing wiring untested.
 func objectOption(opts map[string]interface{}) []interface{} {
 	return []interface{}{opts}

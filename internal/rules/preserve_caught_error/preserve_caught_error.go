@@ -38,12 +38,12 @@ type Options struct {
 
 func parseOptions(options []any) Options {
 	opts := Options{ErrorClassNames: map[string]int{}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	opts.RequireCatchParameter, _ = optsMap["requireCatchParameter"].(bool)
-	items, _ := optsMap["errorClassNames"].([]interface{})
+	m, _ := options[0].(map[string]any)
+	opts.RequireCatchParameter, _ = m["requireCatchParameter"].(bool)
+	items, _ := m["errorClassNames"].([]interface{})
 	for _, item := range items {
 		switch entry := item.(type) {
 		case string:
@@ -141,7 +141,7 @@ func isBuiltInGlobalError(ctx rule.RuleContext, callee *ast.Node) bool {
 	if !builtInErrorTypes[name] || utils.IsShadowed(callee, name) {
 		return false
 	}
-	return ctx.Globals[name] != utils.GlobalAccessOff
+	return ctx.Globals.Access(name).IsDeclared()
 }
 
 // thrownError describes a `throw` of a newly constructed error the rule checks.

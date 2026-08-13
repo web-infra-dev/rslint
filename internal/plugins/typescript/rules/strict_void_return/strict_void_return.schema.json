@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowReturnAny": {
+          "type": "boolean",
+          "description": "Whether to allow functions returning `any` to be used in place expecting a `void` function."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

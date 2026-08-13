@@ -23,4 +23,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [react/jsx-props-no-spread-multi](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-props-no-spread-multi.md)
+- [eslint-plugin-react: jsx-props-no-spread-multi](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-props-no-spread-multi.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-props-no-spread-multi.js)

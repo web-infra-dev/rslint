@@ -1,10 +1,14 @@
 package no_labels
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_labels.schema.json
+var schemaJSON []byte
 
 // labelScope tracks nested labeled statements as a linked list (stack).
 // Each entry records the label name and the kind of its body ("loop", "switch", or "other"),
@@ -27,29 +31,39 @@ func getBodyKind(node *ast.Node) string {
 	}
 }
 
+type ruleOptions struct {
+	allowLoop   bool
+	allowSwitch bool
+}
+
+func parseOptions(options []any) ruleOptions {
+	opts := ruleOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["allowLoop"].(bool); ok {
+		opts.allowLoop = v
+	}
+	if v, ok := m["allowSwitch"].(bool); ok {
+		opts.allowSwitch = v
+	}
+	return opts
+}
+
 // https://eslint.org/docs/latest/rules/no-labels
 var NoLabelsRule = rule.Rule{
-	Name: "no-labels",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		allowLoop := false
-		allowSwitch := false
-		optsMap := utils.GetOptionsMap(options)
-		if optsMap != nil {
-			if v, ok := optsMap["allowLoop"].(bool); ok {
-				allowLoop = v
-			}
-			if v, ok := optsMap["allowSwitch"].(bool); ok {
-				allowSwitch = v
-			}
-		}
+	Name:   "no-labels",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		isAllowed := func(kind string) bool {
 			switch kind {
 			case "loop":
-				return allowLoop
+				return opts.allowLoop
 			case "switch":
-				return allowSwitch
+				return opts.allowSwitch
 			default:
 				return false
 			}

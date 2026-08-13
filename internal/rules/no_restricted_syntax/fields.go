@@ -14,6 +14,8 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 		switch parent.Kind {
 		case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindPropertyDeclaration:
 			return single(parent.Name())
+		case ast.KindImportAttribute:
+			return single(parent.AsImportAttribute().Name())
 		}
 	case "value":
 		switch parent.Kind {
@@ -21,6 +23,19 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 			return single(parent.AsPropertyAssignment().Initializer)
 		case ast.KindPropertyDeclaration:
 			return single(parent.AsPropertyDeclaration().Initializer)
+		case ast.KindImportAttribute:
+			return single(parent.AsImportAttribute().Value)
+		}
+	case "attributes":
+		var attributes *ast.Node
+		switch parent.Kind {
+		case ast.KindImportDeclaration:
+			attributes = parent.AsImportDeclaration().Attributes
+		case ast.KindExportDeclaration:
+			attributes = parent.AsExportDeclaration().Attributes
+		}
+		if attributes != nil && attributes.AsImportAttributes().Attributes != nil {
+			return attributes.AsImportAttributes().Attributes.Nodes
 		}
 	case "id":
 		switch parent.Kind {
@@ -226,11 +241,14 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 			return statements(parent.AsBindingPattern().Elements)
 		}
 	case "declarations":
-		if parent.Kind == ast.KindVariableStatement {
+		switch parent.Kind {
+		case ast.KindVariableStatement:
 			dl := parent.AsVariableStatement().DeclarationList
 			if dl != nil {
 				return statements(dl.AsVariableDeclarationList().Declarations)
 			}
+		case ast.KindVariableDeclarationList:
+			return statements(parent.AsVariableDeclarationList().Declarations)
 		}
 	case "specifiers":
 		switch parent.Kind {
@@ -282,6 +300,14 @@ func listChildrenOf(parent *ast.Node) [][]*ast.Node {
 		add(statements(parent.AsCaseBlock().Clauses))
 	case ast.KindVariableDeclarationList:
 		add(statements(parent.AsVariableDeclarationList().Declarations))
+	case ast.KindImportDeclaration:
+		if attributes := parent.AsImportDeclaration().Attributes; attributes != nil {
+			add(statements(attributes.AsImportAttributes().Attributes))
+		}
+	case ast.KindExportDeclaration:
+		if attributes := parent.AsExportDeclaration().Attributes; attributes != nil {
+			add(statements(attributes.AsImportAttributes().Attributes))
+		}
 	}
 	if isFunctionLikeForParams(parent) {
 		if params := parent.Parameters(); len(params) > 0 {
@@ -325,7 +351,5 @@ func statements(list *ast.NodeList) []*ast.Node {
 	if list == nil {
 		return nil
 	}
-	out := make([]*ast.Node, 0, len(list.Nodes))
-	out = append(out, list.Nodes...)
-	return out
+	return list.Nodes
 }

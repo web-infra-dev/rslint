@@ -1,6 +1,7 @@
 package complexity
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,14 +10,17 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed complexity.schema.json
+var schemaJSON []byte
+
 const defaultThreshold = 20
 
 // ComplexityRule enforces a maximum cyclomatic complexity allowed in a program.
 // https://eslint.org/docs/latest/rules/complexity
 var ComplexityRule = rule.Rule{
-	Name: "complexity",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "complexity",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		threshold, isModified := parseOptions(options)
 
 		// counters maps a "code path owner" node to its complexity counter.
@@ -246,48 +250,20 @@ func makeMessage(name string, complexity, threshold int) rule.RuleMessage {
 }
 
 // parseOptions extracts the threshold and modified-variant flag from the
-// rule's options. Mirrors ESLint's `option.maximum || option.max` coercion:
-// when both are present, `maximum` wins only if truthy. The bare-number form
-// (`["error", 2]` or just `2` from the CLI) sets the threshold directly.
-func parseOptions(options any) (int, bool) {
-	threshold := defaultThreshold
+// rule's options. The threshold accepts the bare-number form (`["error", 2]`)
+// or the object form
+// `{ max?: number, maximum?: number, variant?: "classic"|"modified" }`, which
+// shares ESLint's legacy `maximum || max` coercion with the max-* rules.
+func parseOptions(options []any) (int, bool) {
+	if len(options) == 0 {
+		return defaultThreshold, false
+	}
+	threshold := utils.ResolveLegacyMaxOption(options[0], defaultThreshold)
 	isModified := false
-
-	if options == nil {
-		return threshold, isModified
-	}
-	// Bare number / array-wrapped number forms.
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) == 0 {
-			return threshold, isModified
+	if m, ok := options[0].(map[string]interface{}); ok {
+		if v, ok := m["variant"].(string); ok && v == "modified" {
+			isModified = true
 		}
-		options = arr[0]
-	}
-	if n, ok := utils.CoerceInt(options); ok {
-		return n, isModified
-	}
-	// Object form: `{ max?: number, maximum?: number, variant?: "classic"|"modified" }`.
-	m := utils.GetOptionsMap(options)
-	if m == nil {
-		return threshold, isModified
-	}
-	_, hasMaximum := m["maximum"]
-	_, hasMax := m["max"]
-	if hasMaximum {
-		if v, ok := utils.CoerceInt(m["maximum"]); ok && v != 0 {
-			threshold = v
-		} else if hasMax {
-			if v, ok := utils.CoerceInt(m["max"]); ok {
-				threshold = v
-			}
-		}
-	} else if hasMax {
-		if v, ok := utils.CoerceInt(m["max"]); ok {
-			threshold = v
-		}
-	}
-	if v, ok := m["variant"].(string); ok && v == "modified" {
-		isModified = true
 	}
 	return threshold, isModified
 }

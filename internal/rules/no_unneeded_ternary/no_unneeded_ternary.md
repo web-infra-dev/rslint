@@ -46,4 +46,5 @@ f(x ? x : 1);
 
 ## Original Documentation
 
-[no-unneeded-ternary - ESLint](https://eslint.org/docs/latest/rules/no-unneeded-ternary)
+- [ESLint: no-unneeded-ternary](https://eslint.org/docs/latest/rules/no-unneeded-ternary)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unneeded-ternary.js)

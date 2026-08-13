@@ -69,4 +69,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [ESLint no-unused-private-class-members](https://eslint.org/docs/latest/rules/no-unused-private-class-members)
+- [ESLint: no-unused-private-class-members](https://eslint.org/docs/latest/rules/no-unused-private-class-members)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unused-private-class-members.js)

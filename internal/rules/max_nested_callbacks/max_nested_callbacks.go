@@ -1,6 +1,7 @@
 package max_nested_callbacks
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,12 +9,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed max_nested_callbacks.schema.json
+var schemaJSON []byte
+
 // MaxNestedCallbacksRule enforces a maximum depth of nested callbacks.
 // https://eslint.org/docs/latest/rules/max-nested-callbacks
 var MaxNestedCallbacksRule = rule.Rule{
-	Name: "max-nested-callbacks",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "max-nested-callbacks",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		threshold := parseThreshold(options)
 
 		// `callbackStack` mirrors ESLint's stack of FunctionExpression /
@@ -88,7 +92,10 @@ func buildExceedMessage(num, threshold int) rule.RuleMessage {
 
 // parseThreshold resolves the configured maximum nesting depth. This rule uses
 // the same legacy `maximum || max` option behavior as other max-* core rules.
-func parseThreshold(options any) int {
+func parseThreshold(options []any) int {
 	const defaultMax = 10
-	return utils.ResolveLegacyMaxOption(options, defaultMax)
+	if len(options) == 0 {
+		return defaultMax
+	}
+	return utils.ResolveLegacyMaxOption(options[0], defaultMax)
 }

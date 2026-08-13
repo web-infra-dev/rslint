@@ -1,0 +1,42 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enforceForClassFields": {
+          "type": "boolean",
+          "description": "Enforces that functions used as instance field initializers utilize `this`."
+        },
+        "exceptMethods": {
+          "type": "array",
+          "description": "Allows specified method names to be ignored with this rule.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignoreClassesThatImplementAnInterface": {
+          "description": "Whether to ignore class members that are defined within a class that `implements` a type.",
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "Ignore all classes that implement an interface"
+            },
+            {
+              "type": "string",
+              "description": "Ignore only the public fields of classes that implement an interface",
+              "enum": ["public-fields"]
+            }
+          ]
+        },
+        "ignoreOverrideMethods": {
+          "type": "boolean",
+          "description": "Whether to ignore members marked with the `override` modifier."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

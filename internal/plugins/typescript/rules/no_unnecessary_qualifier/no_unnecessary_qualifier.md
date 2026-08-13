@@ -49,4 +49,5 @@ namespace Y {
 
 ## Original Documentation
 
-- [typescript-eslint no-unnecessary-qualifier](https://typescript-eslint.io/rules/no-unnecessary-qualifier)
+- [typescript-eslint: no-unnecessary-qualifier](https://typescript-eslint.io/rules/no-unnecessary-qualifier)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unnecessary-qualifier.ts)

@@ -1,6 +1,7 @@
 package triple_slash_reference
 
 import (
+	_ "embed"
 	"regexp"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed triple_slash_reference.schema.json
+var schemaJSON []byte
 
 type TripleSlashReferenceOptions struct {
 	Lib   string `json:"lib"`   // "always" | "never"
@@ -46,8 +50,9 @@ var tripleSlashReferenceCommentFactory = ast.NewNodeFactory(ast.NodeFactoryHooks
 // TripleSlashReferenceRule implements the triple-slash-reference rule.
 // Disallow certain triple slash directives in favor of import declarations.
 var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
-	Name: "triple-slash-reference",
-	Run:  run,
+	Name:   "triple-slash-reference",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -145,16 +150,19 @@ func parseOptions(options []any) TripleSlashReferenceOptions {
 		Types: "prefer-import",
 	}
 
-	if optionsMap := utils.GetOptionsMap(options); optionsMap != nil {
-		if lib, ok := optionsMap["lib"].(string); ok {
-			opts.Lib = lib
-		}
-		if path, ok := optionsMap["path"].(string); ok {
-			opts.Path = path
-		}
-		if types, ok := optionsMap["types"].(string); ok {
-			opts.Types = types
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	optionsMap, _ := options[0].(map[string]interface{})
+
+	if lib, ok := optionsMap["lib"].(string); ok {
+		opts.Lib = lib
+	}
+	if path, ok := optionsMap["path"].(string); ok {
+		opts.Path = path
+	}
+	if types, ok := optionsMap["types"].(string); ok {
+		opts.Types = types
 	}
 
 	return opts

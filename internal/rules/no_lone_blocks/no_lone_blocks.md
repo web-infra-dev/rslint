@@ -75,4 +75,5 @@ class C {
 
 ## Original Documentation
 
-- [ESLint rule: no-lone-blocks](https://eslint.org/docs/latest/rules/no-lone-blocks)
+- [ESLint: no-lone-blocks](https://eslint.org/docs/latest/rules/no-lone-blocks)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-lone-blocks.js)

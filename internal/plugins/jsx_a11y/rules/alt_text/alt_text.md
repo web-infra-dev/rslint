@@ -130,4 +130,5 @@ These mirror the upstream `eslint-plugin-jsx-a11y` settings exactly.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/alt-text](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/main/docs/rules/alt-text.md)
+- [eslint-plugin-jsx-a11y: alt-text](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/alt-text.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/alt-text.js)

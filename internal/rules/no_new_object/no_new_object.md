@@ -24,4 +24,5 @@ var foo = new foo.Object();
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/no-new-object
+- [ESLint: no-new-object](https://eslint.org/docs/latest/rules/no-new-object)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-new-object.js)

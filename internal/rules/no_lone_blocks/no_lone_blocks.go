@@ -8,7 +8,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-lone-blocks
 var NoLoneBlocksRule = rule.Rule{
-	Name: "no-lone-blocks",
+	Name:   "no-lone-blocks",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var loneBlocks []*ast.Node
 

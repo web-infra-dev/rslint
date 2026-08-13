@@ -24,7 +24,8 @@ var msg = rule.RuleMessage{
 }
 
 var NoNewFuncRule = rule.Rule{
-	Name: "no-new-func",
+	Name:   "no-new-func",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// isGlobalFunction checks whether an identifier resolves to the
 		// built-in Function (from lib.d.ts), not a user-declared one.
@@ -43,13 +44,15 @@ var NoNewFuncRule = rule.Rule{
 			// entry un-declares the builtin, so `Function` no longer resolves
 			// to a known global — ESLint's `globalScope.set.get("Function")`
 			// would be undefined and the rule stays silent.
-			if ctx.Globals["Function"] == utils.GlobalAccessOff {
+			if !ctx.Globals.Access("Function").IsDeclared() {
 				return false
 			}
 			if ctx.TypeChecker != nil {
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(id)
 				if symbol == nil {
-					return false
+					// The effective ESLint globals remain authoritative when the
+					// TypeScript program omits its default libraries (`noLib`).
+					return true
 				}
 				return !utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)
 			}

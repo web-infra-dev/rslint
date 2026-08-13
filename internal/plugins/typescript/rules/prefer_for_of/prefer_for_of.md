@@ -39,4 +39,5 @@ for (let i = 0; i < array.length; i++) {
 
 ## Original Documentation
 
-[typescript-eslint: prefer-for-of](https://typescript-eslint.io/rules/prefer-for-of)
+- [typescript-eslint: prefer-for-of](https://typescript-eslint.io/rules/prefer-for-of)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-for-of.ts)

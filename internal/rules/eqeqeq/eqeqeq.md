@@ -42,4 +42,5 @@ null != a;
 
 ## Original Documentation
 
-- [ESLint eqeqeq](https://eslint.org/docs/latest/rules/eqeqeq)
+- [ESLint: eqeqeq](https://eslint.org/docs/latest/rules/eqeqeq)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.0/lib/rules/eqeqeq.js)

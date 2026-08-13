@@ -45,4 +45,5 @@ doThing().then(function () {
 
 ## Original Documentation
 
-https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-nesting.md
+- [eslint-plugin-promise: no-nesting](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/no-nesting.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/no-nesting.js)

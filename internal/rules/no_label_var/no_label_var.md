@@ -46,4 +46,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [ESLint rule: no-label-var](https://eslint.org/docs/latest/rules/no-label-var)
+- [ESLint: no-label-var](https://eslint.org/docs/latest/rules/no-label-var)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-label-var.js)

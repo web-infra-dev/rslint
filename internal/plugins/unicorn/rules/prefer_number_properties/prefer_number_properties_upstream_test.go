@@ -14,6 +14,14 @@ const (
 	suggestionID = "suggestion"
 )
 
+func withGlobals(test rule_tester.InvalidTestCase, names ...string) rule_tester.InvalidTestCase {
+	test.Globals = make(map[string]any, len(names))
+	for _, name := range names {
+		test.Globals[name] = "readonly"
+	}
+	return test
+}
+
 // TestPreferNumberPropertiesUpstream migrates the full valid/invalid suite from
 // upstream test/prefer-number-properties.js in eslint-plugin-unicorn v64.0.0
 // 1:1. Position assertions cover line/column for every invalid case.
@@ -230,13 +238,13 @@ const d = Number.isFinite(10);`, 4, 11, 4, 19),
 			fixed(`function foo([a = NaN]) {}`, `function foo([a = Number.NaN]) {}`, "NaN", "NaN", 1, 19, 1, 22),
 			fixedWithOptions(`function foo() {return-Infinity}`, `function foo() {return Number.NEGATIVE_INFINITY}`, "-Infinity", "NEGATIVE_INFINITY", map[string]interface{}{"checkInfinity": true}, 1, 23, 1, 32),
 			suggested(`globalThis.isNaN(foo);`, "isNaN", "isNaN", `Number.isNaN(foo);`, 1, 1, 1, 17),
-			suggested(`global.isNaN(foo);`, "isNaN", "isNaN", `Number.isNaN(foo);`, 1, 1, 1, 13),
-			suggested(`window.isNaN(foo);`, "isNaN", "isNaN", `Number.isNaN(foo);`, 1, 1, 1, 13),
-			suggested(`self.isNaN(foo);`, "isNaN", "isNaN", `Number.isNaN(foo);`, 1, 1, 1, 11),
+			withGlobals(suggested(`global.isNaN(foo);`, "isNaN", "isNaN", `Number.isNaN(foo);`, 1, 1, 1, 13), "global"),
+			withGlobals(suggested(`window.isNaN(foo);`, "isNaN", "isNaN", `Number.isNaN(foo);`, 1, 1, 1, 13), "window"),
+			withGlobals(suggested(`self.isNaN(foo);`, "isNaN", "isNaN", `Number.isNaN(foo);`, 1, 1, 1, 11), "self"),
 			fixed(`globalThis.parseFloat(foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 22),
-			fixed(`global.parseFloat(foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 18),
-			fixed(`window.parseFloat(foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 18),
-			fixed(`self.parseFloat(foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 16),
+			withGlobals(fixed(`global.parseFloat(foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 18), "global"),
+			withGlobals(fixed(`window.parseFloat(foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 18), "window"),
+			withGlobals(fixed(`self.parseFloat(foo);`, `Number.parseFloat(foo);`, "parseFloat", "parseFloat", 1, 1, 1, 16), "self"),
 			fixed(`globalThis.NaN`, `Number.NaN`, "NaN", "NaN", 1, 1, 1, 15),
 			fixedWithOptions(`-globalThis.Infinity`, `Number.NEGATIVE_INFINITY`, "-Infinity", "NEGATIVE_INFINITY", map[string]interface{}{"checkInfinity": true}, 1, 1, 1, 21),
 			{

@@ -1,9 +1,10 @@
 package no_empty_object_type
 
 import (
+	_ "embed"
 	"fmt"
-	"regexp"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -11,21 +12,24 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_empty_object_type.schema.json
+var schemaJSON []byte
+
 type NoEmptyObjectTypeOptions struct {
 	AllowInterfaces  string
 	AllowObjectTypes string
 	AllowWithName    string
 }
 
-func parseOptions(options any) NoEmptyObjectTypeOptions {
+func parseOptions(options []any) NoEmptyObjectTypeOptions {
 	opts := NoEmptyObjectTypeOptions{
 		AllowInterfaces:  "never",
 		AllowObjectTypes: "never",
 	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if v, ok := optsMap["allowInterfaces"].(string); ok {
 		opts.AllowInterfaces = v
 	}
@@ -165,14 +169,14 @@ func interfaceFixRange(ctx rule.RuleContext, interfaceDecl *ast.InterfaceDeclara
 }
 
 var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
-	Name: "no-empty-object-type",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-empty-object-type",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
-		var allowWithNameTester *regexp.Regexp
+		var allowWithNameTester *regexp2.Regexp
 		if opts.AllowWithName != "" {
-			allowWithNameTester, _ = regexp.Compile(opts.AllowWithName)
+			allowWithNameTester, _ = utils.CompileRegexp2(opts.AllowWithName, utils.JSUnicodeRegexOptions)
 		}
 
 		listeners := rule.RuleListeners{}
@@ -188,7 +192,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				if allowWithNameTester != nil {
-					if id := nameNode.AsIdentifier(); id != nil && allowWithNameTester.MatchString(id.Text) {
+					if id := nameNode.AsIdentifier(); id != nil && utils.Regexp2MatchString(allowWithNameTester, id.Text) {
 						return
 					}
 				}
@@ -268,7 +272,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					if typeAlias != nil {
 						aliasName := typeAlias.Name()
 						if aliasName != nil {
-							if id := aliasName.AsIdentifier(); id != nil && allowWithNameTester.MatchString(id.Text) {
+							if id := aliasName.AsIdentifier(); id != nil && utils.Regexp2MatchString(allowWithNameTester, id.Text) {
 								return
 							}
 						}

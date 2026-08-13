@@ -69,4 +69,5 @@ const s = String(foo);
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/no-implicit-coercion
+- [ESLint: no-implicit-coercion](https://eslint.org/docs/latest/rules/no-implicit-coercion)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/no-implicit-coercion.js)

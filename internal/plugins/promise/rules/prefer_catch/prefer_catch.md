@@ -30,4 +30,5 @@ Fixed an upstream autofix bug: `x.then(a, b, c)` now fixes to `x.catch(b).then(a
 
 ## Original Documentation
 
-- [eslint-plugin-promise: prefer-catch](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/prefer-catch.md)
+- [eslint-plugin-promise: prefer-catch](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/prefer-catch.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/prefer-catch.js)

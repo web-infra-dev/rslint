@@ -47,4 +47,5 @@ const listeners = {
 
 ## Original Documentation
 
-- [typescript-eslint no-misused-promises](https://typescript-eslint.io/rules/no-misused-promises)
+- [typescript-eslint: no-misused-promises](https://typescript-eslint.io/rules/no-misused-promises)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/no-misused-promises.ts)

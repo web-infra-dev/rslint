@@ -32,4 +32,5 @@ class Foo {
 
 ## Original Documentation
 
-- [typescript-eslint prefer-return-this-type](https://typescript-eslint.io/rules/prefer-return-this-type)
+- [typescript-eslint: prefer-return-this-type](https://typescript-eslint.io/rules/prefer-return-this-type)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.29.0/packages/eslint-plugin/src/rules/prefer-return-this-type.ts)

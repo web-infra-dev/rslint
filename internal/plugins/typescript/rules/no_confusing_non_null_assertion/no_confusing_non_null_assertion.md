@@ -26,4 +26,5 @@ foo.bar == 'hello';
 
 ## Original Documentation
 
-- [typescript-eslint no-confusing-non-null-assertion](https://typescript-eslint.io/rules/no-confusing-non-null-assertion)
+- [typescript-eslint: no-confusing-non-null-assertion](https://typescript-eslint.io/rules/no-confusing-non-null-assertion)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-confusing-non-null-assertion.ts)

@@ -198,7 +198,8 @@ func (s *runState) shouldSkipDeclarator(node *ast.Node) bool {
 }
 
 var NoUnassignedVarsRule = rule.Rule{
-	Name: "no-unassigned-vars",
+	Name:   "no-unassigned-vars",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		s := &runState{ctx: ctx}
 

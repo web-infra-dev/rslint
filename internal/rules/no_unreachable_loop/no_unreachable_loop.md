@@ -99,4 +99,5 @@ function firstKey(obj) {
 
 ## Original Documentation
 
-- [ESLint no-unreachable-loop](https://eslint.org/docs/latest/rules/no-unreachable-loop)
+- [ESLint: no-unreachable-loop](https://eslint.org/docs/latest/rules/no-unreachable-loop)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unreachable-loop.js)

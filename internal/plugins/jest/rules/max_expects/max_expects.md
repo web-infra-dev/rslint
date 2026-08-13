@@ -113,4 +113,5 @@ test('should not pass', () => {
 
 ## Original Documentation
 
-- [jest/max-expects](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/max-expects.md)
+- [eslint-plugin-jest: max-expects](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/max-expects.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/max-expects.ts)

@@ -1,0 +1,27 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disallowTypeAnnotations": {
+          "type": "boolean",
+          "description": "Whether to disallow type imports in type annotations (`import()`)."
+        },
+        "fixStyle": {
+          "type": "string",
+          "description": "The expected type modifier to be added when an import is detected as used only in the type position.",
+          "enum": ["separate-type-imports", "inline-type-imports"]
+        },
+        "prefer": {
+          "type": "string",
+          "description": "The expected import kind for type-only imports.",
+          "enum": ["type-imports", "no-type-imports"]
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

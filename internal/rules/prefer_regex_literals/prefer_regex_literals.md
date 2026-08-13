@@ -62,4 +62,5 @@ new RegExp(/abc/, flags);
 
 ## Original Documentation
 
-- [ESLint prefer-regex-literals](https://eslint.org/docs/latest/rules/prefer-regex-literals)
+- [ESLint: prefer-regex-literals](https://eslint.org/docs/latest/rules/prefer-regex-literals)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-regex-literals.js)

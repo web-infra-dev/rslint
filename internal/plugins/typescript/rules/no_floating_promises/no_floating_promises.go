@@ -1,7 +1,7 @@
 package no_floating_promises
 
 import (
-	"encoding/json"
+	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -10,14 +10,43 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_floating_promises.schema.json
+var schemaJSON []byte
+
 type NoFloatingPromisesOptions struct {
-	AllowForKnownSafeCalls          []utils.TypeOrValueSpecifier `json:"allowForKnownSafeCalls"`
-	AllowForKnownSafeCallsInline    []string                     `json:"allowForKnownSafeCallsInline"`
-	AllowForKnownSafePromises       []utils.TypeOrValueSpecifier `json:"allowForKnownSafePromises"`
-	AllowForKnownSafePromisesInline []string                     `json:"allowForKnownSafePromisesInline"`
-	CheckThenables                  *bool                        `json:"checkThenables"`
-	IgnoreIIFE                      *bool                        `json:"ignoreIIFE"`
-	IgnoreVoid                      *bool                        `json:"ignoreVoid"`
+	AllowForKnownSafeCalls    []utils.TypeOrValueSpecifier
+	AllowForKnownSafePromises []utils.TypeOrValueSpecifier
+	CheckThenables            bool
+	IgnoreIIFE                bool
+	IgnoreVoid                bool
+}
+
+func parseOptions(options []any) NoFloatingPromisesOptions {
+	opts := NoFloatingPromisesOptions{
+		AllowForKnownSafeCalls:    []utils.TypeOrValueSpecifier{},
+		AllowForKnownSafePromises: []utils.TypeOrValueSpecifier{},
+		IgnoreVoid:                true,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if specifiers := utils.ParseTypeOrValueSpecifiers(optsMap["allowForKnownSafeCalls"]); specifiers != nil {
+		opts.AllowForKnownSafeCalls = specifiers
+	}
+	if specifiers := utils.ParseTypeOrValueSpecifiers(optsMap["allowForKnownSafePromises"]); specifiers != nil {
+		opts.AllowForKnownSafePromises = specifiers
+	}
+	if value, ok := optsMap["checkThenables"].(bool); ok {
+		opts.CheckThenables = value
+	}
+	if value, ok := optsMap["ignoreIIFE"].(bool); ok {
+		opts.IgnoreIIFE = value
+	}
+	if value, ok := optsMap["ignoreVoid"].(bool); ok {
+		opts.IgnoreVoid = value
+	}
+	return opts
 }
 
 var messageBase = "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler."
@@ -79,35 +108,10 @@ func buildFloatingVoidMessage() rule.RuleMessage {
 
 var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 	Name:             "no-floating-promises",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoFloatingPromisesOptions)
-		if !ok {
-			opts = NoFloatingPromisesOptions{
-				AllowForKnownSafeCalls:          []utils.TypeOrValueSpecifier{},
-				AllowForKnownSafeCallsInline:    []string{},
-				AllowForKnownSafePromises:       []utils.TypeOrValueSpecifier{},
-				AllowForKnownSafePromisesInline: []string{},
-			}
-			// Options from JS configs may arrive as either an array
-			// (`[{ checkThenables: true }]`) or a bare object (`{ checkThenables: true }`).
-			// GetOptionsMap normalizes both shapes.
-			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-				if optsJSON, err := json.Marshal(optsMap); err == nil {
-					_ = json.Unmarshal(optsJSON, &opts)
-				}
-			}
-		}
-		if opts.CheckThenables == nil {
-			opts.CheckThenables = utils.Ref(false)
-		}
-		if opts.IgnoreIIFE == nil {
-			opts.IgnoreIIFE = utils.Ref(false)
-		}
-		if opts.IgnoreVoid == nil {
-			opts.IgnoreVoid = utils.Ref(true)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		isHigherPrecedenceThanUnary := func(node *ast.Node) bool {
 			operator := ast.KindUnknown
 			if ast.IsBinaryExpression(node) {
@@ -168,7 +172,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			if utils.TypeMatchesSomeSpecifier(
 				t,
 				opts.AllowForKnownSafePromises,
-				opts.AllowForKnownSafePromisesInline,
+				nil,
 				ctx.Program,
 			) {
 				return false
@@ -183,7 +187,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			}
 
 			// ...and only check all Thenables if explicitly told to
-			if !*opts.CheckThenables {
+			if !opts.CheckThenables {
 				return false
 			}
 
@@ -253,7 +257,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			return utils.TypeMatchesSomeSpecifierWithCalleeNames(
 				t,
 				opts.AllowForKnownSafeCalls,
-				opts.AllowForKnownSafeCallsInline,
+				nil,
 				ctx.Program,
 				calleeNames,
 			)
@@ -304,7 +308,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 				return isUnhandledPromise(expr.Right)
 			}
 
-			if !*opts.IgnoreVoid && ast.IsVoidExpression(node) {
+			if !opts.IgnoreVoid && ast.IsVoidExpression(node) {
 				// Similarly, a `void` expression always returns undefined, so we need to
 				// see what's inside it without checking the type of the overall expression.
 				return isUnhandledPromise(node.Expression())
@@ -393,7 +397,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			ast.KindExpressionStatement: func(node *ast.Node) {
 				exprStatement := node.AsExpressionStatement()
 
-				if *opts.IgnoreIIFE && isAsyncIife(exprStatement) {
+				if opts.IgnoreIIFE && isAsyncIife(exprStatement) {
 					return
 				}
 
@@ -410,13 +414,13 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 				}
 				if promiseArray {
 					var msg rule.RuleMessage
-					if *opts.IgnoreVoid {
+					if opts.IgnoreVoid {
 						msg = buildFloatingPromiseArrayVoidMessage()
 					} else {
 						msg = buildFloatingPromiseArrayMessage()
 					}
 					ctx.ReportNode(node, msg)
-				} else if *opts.IgnoreVoid {
+				} else if opts.IgnoreVoid {
 					var msg rule.RuleMessage
 					if nonFunctionHandler {
 						msg = buildFloatingUselessRejectionHandlerVoidMessage()

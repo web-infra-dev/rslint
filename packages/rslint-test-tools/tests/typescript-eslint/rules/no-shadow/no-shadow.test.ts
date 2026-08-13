@@ -8,6 +8,118 @@ const ruleTester = new RuleTester();
 ruleTester.run('no-shadow', {
   invalid: [
     {
+      code: 'const f = (function f() {} as unknown);',
+      errors: [
+        {
+          data: {
+            name: 'f',
+            shadowedColumn: 7,
+            shadowedLine: 1,
+          },
+          messageId: 'noShadow',
+        },
+      ],
+    },
+    {
+      code: 'enum A { A }',
+      errors: [
+        {
+          data: {
+            name: 'A',
+            shadowedColumn: 6,
+            shadowedLine: 1,
+          },
+          messageId: 'noEnumShadow',
+        },
+      ],
+    },
+    {
+      code: 'function fn(Record: number) {}',
+      errors: [
+        {
+          data: { name: 'Record' },
+          messageId: 'noShadowGlobal',
+        },
+      ],
+      options: [{ builtinGlobals: true }],
+    },
+    {
+      code: 'function fn() { type Record = string; }',
+      errors: [
+        {
+          data: { name: 'Record' },
+          messageId: 'noShadowGlobal',
+        },
+      ],
+      options: [
+        {
+          builtinGlobals: true,
+          ignoreTypeValueShadow: false,
+        },
+      ],
+    },
+    {
+      code: "import type { Record } from 'pkg';",
+      errors: [
+        {
+          data: { name: 'Record' },
+          messageId: 'noShadowGlobal',
+        },
+      ],
+      options: [{ builtinGlobals: true }],
+    },
+    {
+      code: 'type Fn = (Record: number) => void;',
+      errors: [
+        {
+          data: { name: 'Record' },
+          messageId: 'noShadowGlobal',
+        },
+      ],
+      options: [{ builtinGlobals: true }],
+    },
+    {
+      code: 'interface Record {} namespace Record { export const value = 1; }',
+      errors: [
+        {
+          data: { name: 'Record' },
+          messageId: 'noShadowGlobal',
+        },
+      ],
+      options: [{ builtinGlobals: true }],
+    },
+    {
+      code: 'class C { static method<Record>() {} }',
+      errors: [
+        {
+          data: { name: 'Record' },
+          messageId: 'noShadowGlobal',
+        },
+      ],
+      options: [
+        {
+          builtinGlobals: true,
+          ignoreTypeValueShadow: false,
+        },
+      ],
+    },
+    {
+      code: `
+import { request, type Server } from 'node:http';
+function use(request: unknown) {}
+      `,
+      errors: [
+        {
+          data: {
+            name: 'request',
+            shadowedColumn: 10,
+            shadowedLine: 2,
+          },
+          messageId: 'noShadow',
+        },
+      ],
+    },
+    {
       code: `
 type T = 1;
 {
@@ -901,6 +1013,18 @@ const fn = (has: string) => {};
     },
   ],
   valid: [
+    {
+      code: 'function fn() { type Record = string; }',
+      options: [{ builtinGlobals: true }],
+    },
+    {
+      code: 'function fn(Record: number) {}',
+      options: [{ builtinGlobals: false }],
+    },
+    {
+      code: 'function fn(NodeListOf: number, HTMLElement: number) {}',
+      options: [{ builtinGlobals: true }],
+    },
     'function foo<T = (arg: any) => any>(arg: T) {}',
     'function foo<T = ([arg]: [any]) => any>(arg: T) {}',
     'function foo<T = ({ args }: { args: any }) => any>(arg: T) {}',

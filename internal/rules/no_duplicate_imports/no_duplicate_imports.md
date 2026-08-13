@@ -131,4 +131,5 @@ import type { Find } from "lodash-es";
 
 ## Original Documentation
 
-- ESLint rule: [no-duplicate-imports](https://eslint.org/docs/latest/rules/no-duplicate-imports)
+- [ESLint: no-duplicate-imports](https://eslint.org/docs/latest/rules/no-duplicate-imports)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-duplicate-imports.js)

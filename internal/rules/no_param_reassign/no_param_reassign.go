@@ -1,26 +1,30 @@
 package no_param_reassign
 
 import (
-	"regexp"
+	_ "embed"
 	"slices"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_param_reassign.schema.json
+var schemaJSON []byte
+
 type Options struct {
 	Props                               bool
 	IgnorePropertyModificationsFor      []string
-	IgnorePropertyModificationsForRegex []*regexp.Regexp
+	IgnorePropertyModificationsForRegex []*regexp2.Regexp
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{Props: false}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if props, ok := optsMap["props"].(bool); ok {
 		opts.Props = props
 	}
@@ -34,8 +38,12 @@ func parseOptions(options any) Options {
 	if arr, ok := optsMap["ignorePropertyModificationsForRegex"].([]interface{}); ok {
 		for _, v := range arr {
 			if s, ok := v.(string); ok {
-				// ESLint uses the "u" flag; Go's regexp is UTF-8 by default.
-				if re, err := regexp.Compile(s); err == nil {
+				// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`,
+				// so patterns using lookaround, backreferences, or `\p{...}` behave the
+				// same as upstream (Go's RE2 supports none of those). An unparsable
+				// pattern is rejected up front by the schema's `format: "regex"`, so
+				// the compile-error branch here is only defensive.
+				if re, err := utils.CompileRegexp2(s, utils.JSUnicodeRegexOptions); err == nil {
 					opts.IgnorePropertyModificationsForRegex = append(opts.IgnorePropertyModificationsForRegex, re)
 				}
 			}
@@ -182,8 +190,16 @@ func isModifyingProp(ident *ast.Node) bool {
 // Without TypeChecker: falls back to a scope walk — the reference refers to
 // the parameter unless an intermediate scope introduces its own binding with
 // the same name.
-func isSameBinding(ident *ast.Node, name string, paramDecl *ast.Node, paramSymbol *ast.Symbol, fn *ast.Node, ctx rule.RuleContext) bool {
-	if ctx.TypeChecker != nil && paramSymbol != nil {
+func isSameBinding(ident *ast.Node, binding *paramBinding, fn *ast.Node, ctx rule.RuleContext) bool {
+	if ctx.TypeChecker != nil {
+		if !binding.symbolResolved {
+			binding.symbol = ctx.TypeChecker.GetSymbolAtLocation(binding.ident)
+			binding.symbolResolved = true
+		}
+		paramSymbol := binding.symbol
+		if paramSymbol == nil {
+			return !utils.IsNameShadowedBetween(ident, fn, binding.name)
+		}
 		refSym := utils.GetReferenceSymbol(ident, ctx.TypeChecker)
 		if refSym == nil {
 			return false
@@ -192,9 +208,9 @@ func isSameBinding(ident *ast.Node, name string, paramDecl *ast.Node, paramSymbo
 			return true
 		}
 		// Parameter properties: two symbols share a Parameter decl.
-		return paramDecl != nil && refSym.ValueDeclaration == paramDecl
+		return binding.decl != nil && refSym.ValueDeclaration == binding.decl
 	}
-	return !utils.IsNameShadowedBetween(ident, fn, name)
+	return !utils.IsNameShadowedBetween(ident, fn, binding.name)
 }
 
 func isIgnoredPropertyAssignment(opts Options, name string) bool {
@@ -202,7 +218,7 @@ func isIgnoredPropertyAssignment(opts Options, name string) bool {
 		return true
 	}
 	for _, re := range opts.IgnorePropertyModificationsForRegex {
-		if re.MatchString(name) {
+		if utils.Regexp2MatchString(re, name) {
 			return true
 		}
 	}
@@ -210,14 +226,16 @@ func isIgnoredPropertyAssignment(opts Options, name string) bool {
 }
 
 // paramBinding holds the bits needed to decide whether an identifier elsewhere
-// in the function refers to this parameter — both the symbol (when a
-// TypeChecker is available) and the declaration node (Parameter or
-// BindingElement) as a fallback discriminator.
+// in the function refers to this parameter. The symbol is resolved lazily on
+// the first possible write; most functions never need it. The declaration node
+// (Parameter or BindingElement) remains the fallback discriminator.
 type paramBinding struct {
-	ident  *ast.Node
-	name   string
-	decl   *ast.Node // `ident.Parent` — Parameter or BindingElement
-	symbol *ast.Symbol
+	ident                   *ast.Node
+	name                    string
+	decl                    *ast.Node // `ident.Parent` — Parameter or BindingElement
+	symbol                  *ast.Symbol
+	symbolResolved          bool
+	ignorePropertyMutations bool
 }
 
 // checkFunction walks every identifier inside `fn` and reports reassignments
@@ -231,11 +249,12 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 			continue
 		}
 		utils.CollectBindingNames(param.Name(), func(ident *ast.Node, n string) {
-			b := paramBinding{ident: ident, name: n, decl: ident.Parent}
-			if ctx.TypeChecker != nil {
-				b.symbol = ctx.TypeChecker.GetSymbolAtLocation(ident)
-			}
-			bindings = append(bindings, b)
+			bindings = append(bindings, paramBinding{
+				ident:                   ident,
+				name:                    n,
+				decl:                    ident.Parent,
+				ignorePropertyMutations: opts.Props && isIgnoredPropertyAssignment(opts, n),
+			})
 		})
 	}
 	if len(bindings) == 0 {
@@ -244,7 +263,7 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 
 	// Skip the declaration identifiers themselves when walking.
 	skipSet := make(map[*ast.Node]struct{}, len(bindings))
-	// Quick name lookup for the slices.Contains hot path.
+	// Avoid binding work for identifiers that cannot name a parameter.
 	byName := make(map[string]*paramBinding, len(bindings))
 	for i := range bindings {
 		skipSet[bindings[i].ident] = struct{}{}
@@ -260,15 +279,19 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 			return
 		}
 		if node.Kind == ast.KindIdentifier {
-			if _, skip := skipSet[node]; !skip {
-				name := node.AsIdentifier().Text
-				if b := byName[name]; b != nil && isSameBinding(node, name, b.decl, b.symbol, fn, ctx) {
-					if _, already := reported[node]; !already {
-						if utils.IsWriteReference(node) {
-							reported[node] = struct{}{}
+			name := node.AsIdentifier().Text
+			if b := byName[name]; b != nil {
+				_, skip := skipSet[node]
+				_, already := reported[node]
+				if !skip && !already {
+					isDirectWrite := utils.IsWriteReference(node)
+					isPropertyWrite := !isDirectWrite && opts.Props &&
+						!b.ignorePropertyMutations && isModifyingProp(node)
+					if (isDirectWrite || isPropertyWrite) && isSameBinding(node, b, fn, ctx) {
+						reported[node] = struct{}{}
+						if isDirectWrite {
 							ctx.ReportNode(node, buildAssignmentMessage(name))
-						} else if opts.Props && !isIgnoredPropertyAssignment(opts, name) && isModifyingProp(node) {
-							reported[node] = struct{}{}
+						} else {
 							ctx.ReportNode(node, buildPropAssignmentMessage(name))
 						}
 					}
@@ -285,9 +308,9 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 }
 
 var NoParamReassignRule = rule.Rule{
-	Name: "no-param-reassign",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-param-reassign",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		handler := func(node *ast.Node) {
 			checkFunction(node, opts, ctx)

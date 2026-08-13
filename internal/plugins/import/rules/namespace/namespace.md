@@ -56,4 +56,5 @@ Modules that cannot be resolved, are ignored, or are not ES modules are not repo
 
 ## Original Documentation
 
-- [eslint-plugin-import/namespace](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/namespace.md)
+- [eslint-plugin-import: namespace](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/namespace.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/namespace.js)

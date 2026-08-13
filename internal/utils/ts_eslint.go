@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -470,16 +472,64 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 	return strings.Join(tokens, " ")
 }
 
+// IsES5Constructor mirrors ESLint's `astUtils.isES5Constructor`: a function
+// with a name of its own whose first character differs from its own lowercase
+// form is treated as an ES5-style constructor. Only a function declaration or
+// function expression can carry such a name; every other function-like node
+// (arrow, method, accessor) reports false.
+func IsES5Constructor(node *ast.Node) bool {
+	var name *ast.Node
+	switch node.Kind {
+	case ast.KindFunctionDeclaration:
+		name = node.AsFunctionDeclaration().Name()
+	case ast.KindFunctionExpression:
+		name = node.AsFunctionExpression().Name()
+	default:
+		return false
+	}
+	if name == nil || !ast.IsIdentifier(name) {
+		return false
+	}
+	return StartsWithUpperCase(name.AsIdentifier().Text)
+}
+
+// StartsWithUpperCase mirrors ESLint's `s[0] !== s[0].toLocaleLowerCase()`,
+// which reads the first UTF-16 code unit. A character counts when it has a
+// distinct lowercase form, so `Á` and the Roman numeral `Ⅰ` qualify while
+// `_` and `$` do not. A character outside the BMP is read as a lone surrogate,
+// which is its own lowercase form, so `𐐀` does not qualify.
+func StartsWithUpperCase(s string) bool {
+	r, _ := utf8.DecodeRuneInString(s)
+	if r > 0xFFFF {
+		return false
+	}
+	return unicode.ToLower(r) != r
+}
+
 // GetFunctionNameWithKindCore mirrors ESLint core's astUtils.getFunctionNameWithKind.
 // It intentionally does not walk from a function expression or arrow function
 // to an enclosing variable declaration when resolving names. Core rules such
 // as complexity and max-params rely on that narrower behavior for message text.
 func GetFunctionNameWithKindCore(node *ast.Node) string {
 	if node.Kind == ast.KindConstructor {
-		return "constructor"
+		if !ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+			return "constructor"
+		}
+		// tsgo parses a `static` member named `constructor` as a
+		// ConstructorDeclaration too, which every JS parser reads as an
+		// ordinary static method keyed `constructor`. A constructor's
+		// modifiers are not what ast.GetFunctionFlags looks at, so `async` is
+		// read here; `*constructor` parses as a method and never lands here.
+		tokens := []string{"static"}
+		if ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync) {
+			tokens = append(tokens, "async")
+		}
+		return strings.Join(append(tokens, "method", "'constructor'"), " ")
 	}
 
-	parent := node.Parent
+	// ESTree does not expose parentheses as nodes, so a function value wrapped
+	// only in parentheses still has the surrounding property as its parent.
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
 	if parent == nil {
 		return "function"
 	}
@@ -487,7 +537,7 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 	tokens := []string{}
 
 	isClassMember := isCoreDirectClassMember(node)
-	isClassFieldValue := isCoreClassFieldInitializer(node)
+	isClassFieldValue := isCoreClassFieldInitializer(node, parent)
 	if isClassMember || isClassFieldValue {
 		owner := node
 		if isClassFieldValue {
@@ -547,7 +597,7 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 func appendCoreFunctionNameFromOwner(tokens *[]string, owner *ast.Node, node *ast.Node) {
 	if name := owner.Name(); name != nil {
 		if name.Kind == ast.KindPrivateIdentifier {
-			*tokens = append(*tokens, fmt.Sprintf("'%s'", name.AsPrivateIdentifier().Text))
+			*tokens = append(*tokens, name.AsPrivateIdentifier().Text)
 			return
 		}
 		if s, ok := GetStaticPropertyName(name); ok {
@@ -586,14 +636,16 @@ func isCoreDirectClassMember(node *ast.Node) bool {
 	return false
 }
 
-func isCoreClassFieldInitializer(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
+func isCoreClassFieldInitializer(node *ast.Node, parent *ast.Node) bool {
+	if parent == nil ||
+		parent.Kind != ast.KindPropertyDeclaration ||
+		ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
 		return false
 	}
 	switch node.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
-		return parent.AsPropertyDeclaration().Initializer == node
+		initializer := parent.AsPropertyDeclaration().Initializer
+		return initializer != nil && ast.SkipParentheses(initializer) == node
 	}
 	return false
 }

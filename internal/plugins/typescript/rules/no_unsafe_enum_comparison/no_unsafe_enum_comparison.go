@@ -76,6 +76,7 @@ func typeViolates(leftTypeParts []*checker.Type, rightType *checker.Type) bool {
 
 var NoUnsafeEnumComparisonRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-enum-comparison",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		isMismatchedComparison := func(

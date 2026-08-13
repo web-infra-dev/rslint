@@ -26,4 +26,5 @@ var literal = 'This is a dollar sign: ${}'; // intentional
 
 ## Original Documentation
 
-- [ESLint no-template-curly-in-string](https://eslint.org/docs/latest/rules/no-template-curly-in-string)
+- [ESLint: no-template-curly-in-string](https://eslint.org/docs/latest/rules/no-template-curly-in-string)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-template-curly-in-string.js)

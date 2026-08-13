@@ -198,18 +198,22 @@ func ParseIgnorePatterns(raw []string) []IgnorePattern {
 // re-includes), aligned with ESLint v10. Matches only the cwd-relative path —
 // never the absolute path — so `**/`-prefixed patterns can't hit system dirs.
 func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
-	if cwd == "" {
-		return isFileIgnoredSimple(filePath, patterns)
+	matchPath := newFileMatchPath(filePath, cwd)
+	return matchPath.isIgnored(patterns)
+}
+
+func (path *fileMatchPath) isIgnored(patterns []IgnorePattern) bool {
+	if len(patterns) == 0 {
+		return false
 	}
-	normalizedPath := normalizePath(filePath, cwd)
-	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
-	if pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
+	normalizedPath, unixPath := path.normalizedPaths()
+	if path.cwd != "" && pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
 		// On Windows and case-insensitive macOS volumes, callers may supply a
 		// canonical path whose drive/share or directory casing differs from
 		// cwd. A case-sensitive relative conversion then manufactures ../ even
 		// though both paths name the same tree. Re-resolve only on that uncommon
 		// fallback so the normal hot path pays no extra pattern scan.
-		normalizedPath = normalizePathWithCaseSensitivity(filePath, cwd, false)
+		normalizedPath = normalizePathWithCaseSensitivity(path.original, path.cwd, false)
 		unixPath = strings.ReplaceAll(normalizedPath, "\\", "/")
 	}
 	return isFileIgnoredNormalized(normalizedPath, unixPath, patterns)
@@ -515,23 +519,66 @@ func gitIgnoreNodeGlob(pattern IgnorePattern) string {
 // `!` and file-level patterns are excluded by Kind. Shared by GetConfigForFile
 // (lint) and canPruneDir (walk).
 func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
+	var candidates []string
+	firstPattern := true
 	for i := range patterns {
 		p := patterns[i]
 		if p.Negated || p.Kind != dirAbsoluteBlock {
 			continue
 		}
-		if ignorePatternMatches(p, dirPath) || ignorePatternMatches(p, dirPath+"/x") {
-			return true
+		// Preserve the allocation-free early-match path for the common single
+		// pattern case. Build reusable candidates only when another positive
+		// directory pattern would otherwise repeat every synthetic `/x` value.
+		if firstPattern {
+			firstPattern = false
+			if directoryPatternAbsolutelyBlocks(p, dirPath) {
+				return true
+			}
+			continue
 		}
-		segments := strings.Split(dirPath, "/")
-		for j := 1; j < len(segments); j++ {
-			partial := strings.Join(segments[:j], "/")
-			if ignorePatternMatches(p, partial) || ignorePatternMatches(p, partial+"/x") {
+		if candidates == nil {
+			candidates = directoryBlockCandidates(dirPath)
+		}
+		for _, candidate := range candidates {
+			if ignorePatternMatches(p, candidate) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func directoryPatternAbsolutelyBlocks(pattern IgnorePattern, dirPath string) bool {
+	if ignorePatternMatches(pattern, dirPath) || ignorePatternMatches(pattern, dirPath+"/x") {
+		return true
+	}
+	for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
+		partial := dirPath[:slash]
+		if ignorePatternMatches(pattern, partial) || ignorePatternMatches(pattern, partial+"/x") {
+			return true
+		}
+		next := strings.IndexByte(dirPath[slash+1:], '/')
+		if next < 0 {
+			break
+		}
+		slash += next + 1
+	}
+	return false
+}
+
+func directoryBlockCandidates(dirPath string) []string {
+	candidates := make([]string, 0, 2+2*strings.Count(dirPath, "/"))
+	candidates = append(candidates, dirPath, dirPath+"/x")
+	for slash := strings.IndexByte(dirPath, '/'); slash >= 0; {
+		partial := dirPath[:slash]
+		candidates = append(candidates, partial, partial+"/x")
+		next := strings.IndexByte(dirPath[slash+1:], '/')
+		if next < 0 {
+			break
+		}
+		slash += next + 1
+	}
+	return candidates
 }
 
 // canPruneDir reports whether a directory walk may skip dirPath entirely. It is

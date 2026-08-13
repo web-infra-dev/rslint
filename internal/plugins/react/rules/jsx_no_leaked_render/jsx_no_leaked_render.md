@@ -90,4 +90,5 @@ const Component = ({ enabled, checked }) => {
 
 ## Original Documentation
 
-- ESLint plugin: [`react/jsx-no-leaked-render`](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-leaked-render.md)
+- [eslint-plugin-react: jsx-no-leaked-render](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-no-leaked-render.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-no-leaked-render.js)

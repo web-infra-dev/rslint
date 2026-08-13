@@ -30,4 +30,5 @@ var c = { __proto__: a };
 
 ## Original Documentation
 
-- [ESLint no-proto](https://eslint.org/docs/latest/rules/no-proto)
+- [ESLint: no-proto](https://eslint.org/docs/latest/rules/no-proto)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-proto.js)

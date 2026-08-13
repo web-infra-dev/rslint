@@ -41,4 +41,5 @@ class B {
 
 ## Original Documentation
 
-- [ESLint no-constructor-return](https://eslint.org/docs/latest/rules/no-constructor-return)
+- [ESLint: no-constructor-return](https://eslint.org/docs/latest/rules/no-constructor-return)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-constructor-return.js)

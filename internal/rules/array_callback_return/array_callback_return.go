@@ -1,10 +1,15 @@
 package array_callback_return
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed array_callback_return.schema.json
+var schemaJSON []byte
 
 // Options for array-callback-return rule
 type Options struct {
@@ -13,39 +18,26 @@ type Options struct {
 	AllowVoid     bool `json:"allowVoid"`
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{
 		AllowImplicit: false,
 		CheckForEach:  false,
 		AllowVoid:     false,
 	}
 
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
 
-	// Parse options with dual-format support (handles both array and object formats)
-	var optsMap map[string]interface{}
-	var ok bool
-
-	// Handle array format: [{ option: value }]
-	if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-		optsMap, ok = optArray[0].(map[string]interface{})
-	} else {
-		// Handle direct object format: { option: value }
-		optsMap, ok = options.(map[string]interface{})
+	optsMap, _ := options[0].(map[string]any)
+	if v, ok := optsMap["allowImplicit"].(bool); ok {
+		opts.AllowImplicit = v
 	}
-
-	if ok {
-		if v, ok := optsMap["allowImplicit"].(bool); ok {
-			opts.AllowImplicit = v
-		}
-		if v, ok := optsMap["checkForEach"].(bool); ok {
-			opts.CheckForEach = v
-		}
-		if v, ok := optsMap["allowVoid"].(bool); ok {
-			opts.AllowVoid = v
-		}
+	if v, ok := optsMap["checkForEach"].(bool); ok {
+		opts.CheckForEach = v
+	}
+	if v, ok := optsMap["allowVoid"].(bool); ok {
+		opts.AllowVoid = v
 	}
 	return opts
 }
@@ -291,9 +283,9 @@ func checkCallbackReturn(ctx rule.RuleContext, funcNode *ast.Node, methodName st
 
 // ArrayCallbackReturnRule enforces return statements in callbacks of array methods
 var ArrayCallbackReturnRule = rule.Rule{
-	Name: "array-callback-return",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "array-callback-return",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

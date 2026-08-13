@@ -8,7 +8,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-proto
 var NoProtoRule = rule.Rule{
-	Name: "no-proto",
+	Name:   "no-proto",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "unexpectedProto",

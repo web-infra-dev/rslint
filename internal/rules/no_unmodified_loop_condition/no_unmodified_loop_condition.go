@@ -252,7 +252,8 @@ func checkLoopCondition(ctx rule.RuleContext, condition *ast.Node, body *ast.Nod
 
 // NoUnmodifiedLoopConditionRule disallows variables in loop conditions that are not modified in the loop
 var NoUnmodifiedLoopConditionRule = rule.Rule{
-	Name: "no-unmodified-loop-condition",
+	Name:   "no-unmodified-loop-condition",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindWhileStatement: func(node *ast.Node) {

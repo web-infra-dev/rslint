@@ -150,4 +150,5 @@ Examples of **correct** code for this rule with `{ "children": true }`:
 
 ## Original Documentation
 
-- [eslint-plugin-react/jsx-curly-spacing](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-curly-spacing.md)
+- [eslint-plugin-react: jsx-curly-spacing](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-curly-spacing.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-curly-spacing.js)

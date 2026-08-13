@@ -2,6 +2,7 @@ export { defineConfig, globalIgnores } from './config/define-config.js';
 export type {
   RslintConfig,
   RslintConfigEntry,
+  LanguageOptions,
   ESLintPlugin,
 } from './config/define-config.js';
 export {

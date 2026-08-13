@@ -43,4 +43,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [ESLint no-useless-backreference](https://eslint.org/docs/latest/rules/no-useless-backreference)
+- [ESLint: no-useless-backreference](https://eslint.org/docs/latest/rules/no-useless-backreference)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-useless-backreference.js)

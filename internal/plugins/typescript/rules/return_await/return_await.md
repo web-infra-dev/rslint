@@ -45,4 +45,5 @@ async function baz() {
 
 ## Original Documentation
 
-- [typescript-eslint return-await](https://typescript-eslint.io/rules/return-await)
+- [typescript-eslint: return-await](https://typescript-eslint.io/rules/return-await)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/return-await.ts)

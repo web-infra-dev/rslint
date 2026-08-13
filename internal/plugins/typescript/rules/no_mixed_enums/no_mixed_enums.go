@@ -24,6 +24,7 @@ const (
 
 var NoMixedEnumsRule = rule.CreateRule(rule.Rule{
 	Name:             "no-mixed-enums",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		getMemberType := func(node *ast.Node) allowedType {

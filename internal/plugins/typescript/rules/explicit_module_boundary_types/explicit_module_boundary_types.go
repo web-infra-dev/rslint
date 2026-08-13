@@ -1,6 +1,7 @@
 package explicit_module_boundary_types
 
 import (
+	_ "embed"
 	"sort"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed explicit_module_boundary_types.schema.json
+var schemaJSON []byte
 
 // options mirrors upstream's schema.
 type options struct {
@@ -21,7 +25,7 @@ type options struct {
 	allowTypedFunctionExpressions             bool
 }
 
-func parseOptions(rawOpts any) options {
+func parseOptions(rawOpts []any) options {
 	opts := options{
 		allowArgumentsExplicitlyTypedAsAny:        false,
 		allowDirectConstAssertionInArrowFunctions: true,
@@ -30,10 +34,10 @@ func parseOptions(rawOpts any) options {
 		allowOverloadFunctions:        false,
 		allowTypedFunctionExpressions: true,
 	}
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
 	if v, ok := optsMap["allowArgumentsExplicitlyTypedAsAny"].(bool); ok {
 		opts.allowArgumentsExplicitlyTypedAsAny = v
 	}
@@ -60,7 +64,8 @@ func parseOptions(rawOpts any) options {
 }
 
 var ExplicitModuleBoundaryTypesRule = rule.CreateRule(rule.Rule{
-	Name: "explicit-module-boundary-types",
+	Name:   "explicit-module-boundary-types",
+	Schema: rule.NewSchema(schemaJSON),
 	// Upstream rule isn't type-aware (uses ESLint's scope manager) but a
 	// TypeScript rule running on a TS project always has a TypeChecker
 	// available, and the symbol-based scope walk we use here is strictly
@@ -71,8 +76,7 @@ var ExplicitModuleBoundaryTypesRule = rule.CreateRule(rule.Rule{
 	Run:              run,
 })
 
-func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-	rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 	opts := parseOptions(rawOptions)
 
 	// Per-file state. rslint constructs a new RuleListeners for each file, so

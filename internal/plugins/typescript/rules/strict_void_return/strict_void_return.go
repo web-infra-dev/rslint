@@ -1,7 +1,7 @@
 package strict_void_return
 
 import (
-	"encoding/json"
+	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -9,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed strict_void_return.schema.json
+var schemaJSON []byte
 
 func buildAsyncFuncMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -32,29 +35,30 @@ func buildNonVoidReturnMessage() rule.RuleMessage {
 }
 
 type StrictVoidReturnOptions struct {
-	AllowReturnAny *bool `json:"allowReturnAny,omitempty"`
+	AllowReturnAny bool
+}
+
+func parseOptions(options []any) StrictVoidReturnOptions {
+	opts := StrictVoidReturnOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["allowReturnAny"].(bool); ok {
+		opts.AllowReturnAny = value
+	}
+	return opts
 }
 
 var StrictVoidReturnRule = rule.CreateRule(rule.Rule{
 	Name:             "strict-void-return",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(StrictVoidReturnOptions)
-		if !ok {
-			opts = StrictVoidReturnOptions{}
-			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-				if optsJSON, err := json.Marshal(optsMap); err == nil {
-					_ = json.Unmarshal(optsJSON, &opts)
-				}
-			}
-		}
-		if opts.AllowReturnAny == nil {
-			opts.AllowReturnAny = utils.Ref(false)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		allowedReturnTypeFlags := checker.TypeFlagsVoid | checker.TypeFlagsNever | checker.TypeFlagsUndefined
-		if *opts.AllowReturnAny {
+		if opts.AllowReturnAny {
 			allowedReturnTypeFlags |= checker.TypeFlagsAny
 		}
 

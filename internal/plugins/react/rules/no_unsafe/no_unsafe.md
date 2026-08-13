@@ -83,5 +83,5 @@ This rule is influenced by the shared React settings:
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-unsafe](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-unsafe.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/no-unsafe.js)
+- [eslint-plugin-react: no-unsafe](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-unsafe.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-unsafe.js)

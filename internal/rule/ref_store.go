@@ -45,6 +45,7 @@ type RefStore struct {
 	sourceFile *ast.SourceFile
 	resolver   binder.NameResolver
 	tc         *checker.Checker
+	init       RefStoreInit
 	walked     bool
 	// candidates maps identifier text to the reference-position identifiers
 	// still awaiting resolution; entries move into refs on first query.
@@ -61,8 +62,9 @@ type RefStore struct {
 // a fallback by Resolve for identifiers the binder scope walk can't place,
 // and by References when asked about a symbol that fallback produced; nil
 // disables both (Resolve then never falls back, and References behaves as if
-// every such symbol were never queried).
-func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker) *RefStore {
+// every such symbol were never queried). init supplies only declaration-less
+// wrapper bindings and top-level scope facts resolved by the linter.
+func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker, init RefStoreInit) *RefStore {
 	resolver := binder.NameResolver{CompilerOptions: options}
 	if ast.IsGlobalSourceFile(sourceFile.AsNode()) {
 		// A script file's own top-level locals are never consulted by the
@@ -76,6 +78,7 @@ func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *
 		sourceFile: sourceFile,
 		resolver:   resolver,
 		tc:         tc,
+		init:       init,
 	}
 }
 
@@ -200,6 +203,83 @@ func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 		return sym
 	}
 	return s.checkerReferenceSymbol(node, meaning)
+}
+
+// ResolveInFile returns the symbol a reference-position identifier resolves to
+// using only the binder's lexical scope walk. Unlike Resolve, it never asks the
+// TypeChecker to supply a declaration from lib files, ambient .d.ts files, or
+// another source file.
+//
+// Imported bindings and declarations authored in this source file are still
+// visible because their binder symbols live in the file's own scope graph.
+// This distinction is required by ESLint-compatible rules such as no-undef:
+// their answer must not change merely because rslint happened to construct a
+// TypeChecker for the file.
+func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return nil
+	}
+	return s.binderReferenceSymbol(node, referenceMeaning(node))
+}
+
+// ResolveInFileWithMeaning is ResolveInFile with an explicit declaration-space
+// meaning. It is for consumers whose reference model intentionally differs
+// from TypeScript's checker semantics, such as ESLint scope variables that can
+// independently be type-capable, value-capable, or both. Like ResolveInFile,
+// it never consults the TypeChecker or declarations outside this source file.
+func (s *RefStore) ResolveInFileWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return nil
+	}
+	return s.binderReferenceSymbol(node, meaning)
+}
+
+// HasImplicitWrapperBinding reports whether the resolved file wrapper supplies
+// a declaration-less, non-global binding with name.
+func (s *RefStore) HasImplicitWrapperBinding(name string) bool {
+	return s != nil && name != "" && s.init.hasImplicitWrapperBinding(name)
+}
+
+// IsDefinedInFile reports whether a reference-position identifier is defined
+// by the file's lexical scope graph or by a non-global binding supplied by its
+// resolved file wrapper. It never consults the TypeChecker and does not
+// manufacture an ast.Symbol for an implicit binding.
+func (s *RefStore) IsDefinedInFile(node *ast.Node) bool {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return false
+	}
+	if s.binderReferenceSymbol(node, referenceMeaning(node)) != nil {
+		return true
+	}
+	return s.HasImplicitWrapperBinding(node.Text())
+}
+
+// IsNameDefinedInFile reports whether name is visible in the value scope at
+// location through a declaration in this file or a binding supplied by the
+// resolved file wrapper. Unlike IsDefinedInFile, location need not itself be a
+// reference-position identifier. The TypeChecker is never consulted.
+func (s *RefStore) IsNameDefinedInFile(location *ast.Node, name string) bool {
+	return s.IsNameDefinedInFileWithMeaning(location, name, ast.SymbolFlagsValue)
+}
+
+// IsNameDefinedInFileWithMeaning is IsNameDefinedInFile for an explicit set of
+// declaration spaces. Implicit wrapper bindings participate only in value
+// lookups.
+func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name string, meaning ast.SymbolFlags) bool {
+	if s == nil || location == nil || name == "" {
+		return false
+	}
+	if s.resolver.Resolve(location, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/) != nil {
+		return true
+	}
+	return meaning&ast.SymbolFlagsValue != 0 && s.HasImplicitWrapperBinding(name)
+}
+
+// HasNonGlobalTopLevelScope reports whether the resolved language defaults
+// place source declarations in a scope outside the global scope.
+// This supplements parser module classification for scope-oriented rules.
+func (s *RefStore) HasNonGlobalTopLevelScope() bool {
+	return s != nil && s.init.nonGlobalTopLevelScope
 }
 
 // binderReferenceSymbol resolves one reference without checker work. A named
@@ -421,6 +501,14 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		entity.Parent.AsImportEqualsDeclaration().ModuleReference == entity {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
+	// Heritage clauses parse dotted names as PropertyAccessExpressions rather
+	// than QualifiedNames. In a type-only heritage position, the root of that
+	// property-access chain still names a namespace and must skip a same-named
+	// value binding. A class `extends` expression is not part of a type node, so
+	// it deliberately continues to the value-space branch below.
+	if isTypeOnlyPropertyAccessQualifier(n) {
+		return ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	}
 	if ast.IsExpressionNode(n) {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
 	}
@@ -433,4 +521,20 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		return ast.SymbolFlagsType | ast.SymbolFlagsAlias
 	}
 	return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
+}
+
+// isTypeOnlyPropertyAccessQualifier reports whether n is the lexical root of
+// an expression-shaped qualified name used as a type. TypeScript represents
+// `N.T` in `class C implements N.T` and `interface I extends N.T` with a
+// PropertyAccessExpression, even though N has namespace meaning there.
+func isTypeOnlyPropertyAccessQualifier(n *ast.Node) bool {
+	entity := n
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression {
+		access := entity.Parent.AsPropertyAccessExpression()
+		if access == nil || access.Expression != entity {
+			break
+		}
+		entity = entity.Parent
+	}
+	return entity != n && ast.IsPartOfTypeNode(entity)
 }

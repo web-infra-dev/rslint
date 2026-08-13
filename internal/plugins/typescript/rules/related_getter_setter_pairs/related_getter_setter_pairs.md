@@ -42,4 +42,5 @@ class Bar {
 
 ## Original Documentation
 
-- [typescript-eslint related-getter-setter-pairs](https://typescript-eslint.io/rules/related-getter-setter-pairs)
+- [typescript-eslint: related-getter-setter-pairs](https://typescript-eslint.io/rules/related-getter-setter-pairs)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/related-getter-setter-pairs.ts)

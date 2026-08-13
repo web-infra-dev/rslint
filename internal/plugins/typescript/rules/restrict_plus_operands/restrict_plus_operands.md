@@ -23,4 +23,5 @@ const explicit = String(1) + '2';
 
 ## Original Documentation
 
-- [typescript-eslint restrict-plus-operands](https://typescript-eslint.io/rules/restrict-plus-operands)
+- [typescript-eslint: restrict-plus-operands](https://typescript-eslint.io/rules/restrict-plus-operands)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/restrict-plus-operands.ts)

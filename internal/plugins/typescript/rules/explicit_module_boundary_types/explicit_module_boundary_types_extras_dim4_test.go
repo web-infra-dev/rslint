@@ -509,7 +509,7 @@ export class Test {
 		},
 
 		// ---- Locks in option-array form: single-element wrapper ----
-		// rslint's GetOptionsMap must handle `[{...}]` as well as `{...}`.
+		// Options in the canonical array form `[{...}]`.
 		// Already exercised in upstream cases — pin one explicitly.
 		{
 			Code: `
@@ -799,7 +799,6 @@ export const inc = (delta) => ({ type: 'inc', delta }) as const;
 				{MessageId: "missingArgType", Line: 2},
 			},
 		},
-
 
 		// ---- Locks in `export = expr` followReference path ----
 		{

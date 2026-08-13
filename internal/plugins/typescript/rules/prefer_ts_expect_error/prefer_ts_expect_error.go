@@ -106,7 +106,8 @@ func findTsIgnoreDirective(commentText string, kind ast.Kind) (int, int, bool) {
 }
 
 var PreferTsExpectErrorRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-ts-expect-error",
+	Name:   "prefer-ts-expect-error",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		fullText := ctx.SourceFile.Text()
 		if !strings.Contains(fullText, tsIgnoreDirective) {

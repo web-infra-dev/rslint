@@ -49,4 +49,5 @@ obj.foo.apply(obj, args);
 
 ## Original Documentation
 
-- https://eslint.org/docs/latest/rules/no-useless-call
+- [ESLint: no-useless-call](https://eslint.org/docs/latest/rules/no-useless-call)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-useless-call.js)

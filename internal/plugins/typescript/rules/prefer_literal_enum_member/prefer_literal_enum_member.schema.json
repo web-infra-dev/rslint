@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowBitwiseExpressions": {
+          "type": "boolean",
+          "description": "Whether to allow using bitwise expressions in enum initializers."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

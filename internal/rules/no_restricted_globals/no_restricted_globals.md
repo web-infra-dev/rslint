@@ -69,10 +69,7 @@ Examples of **incorrect** code for this rule with a custom `globalObjects` entry
 myGlobal.Promise;
 ```
 
-## Differences from ESLint
-
-- When `checkGlobalObject` is enabled, rslint always treats `globalThis`, `self`, `window`, and any configured `globalObjects` as accessible global objects — it doesn't require them to be declared through an ESLint environment or `languageOptions.globals`. As a result, code like `window.foo()` is flagged as soon as `foo` is restricted and `window` isn't shadowed locally, even in projects that never configure a browser environment.
-
 ## Original Documentation
 
 - [ESLint: no-restricted-globals](https://eslint.org/docs/latest/rules/no-restricted-globals)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-restricted-globals.js)

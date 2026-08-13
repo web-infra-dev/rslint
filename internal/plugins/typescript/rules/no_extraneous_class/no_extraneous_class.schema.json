@@ -1,0 +1,29 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowConstructorOnly": {
+          "type": "boolean",
+          "description": "Whether to allow extraneous classes that contain only a constructor."
+        },
+        "allowEmpty": {
+          "type": "boolean",
+          "description": "Whether to allow extraneous classes that have no body (i.e. are empty)."
+        },
+        "allowStaticOnly": {
+          "type": "boolean",
+          "description": "Whether to allow extraneous classes that only contain static members."
+        },
+        "allowWithDecorator": {
+          "type": "boolean",
+          "description": "Whether to allow extraneous classes that include a decorator."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

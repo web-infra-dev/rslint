@@ -1,6 +1,7 @@
 package member_ordering
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed member_ordering.schema.json
+var schemaJSON []byte
 
 // --- Message builders ---
 
@@ -62,7 +66,11 @@ const (
 
 // parsedConfig holds the parsed configuration for a single context
 type parsedConfig struct {
-	memberTypes      []interface{} // each element is either string or []string
+	memberTypes []interface{} // each element is either string or []string
+	// memberTypeRanks is shared by configurations that use the immutable default
+	// order. Custom orders retain linear lookup to avoid rebuilding an index for
+	// every file-level Rule.Run call.
+	memberTypeRanks  map[string]int
 	order            string
 	optionalityOrder string
 	neverCheck       bool
@@ -233,6 +241,33 @@ var defaultOrder = []interface{}{
 	"method",
 }
 
+func buildMemberTypeRanks(orderConfig []interface{}) map[string]int {
+	ranks := make(map[string]int, len(orderConfig))
+	for rank, configEntry := range orderConfig {
+		switch entry := configEntry.(type) {
+		case string:
+			if _, exists := ranks[entry]; !exists {
+				ranks[entry] = rank
+			}
+		case []string:
+			for _, memberType := range entry {
+				if _, exists := ranks[memberType]; !exists {
+					ranks[memberType] = rank
+				}
+			}
+		}
+	}
+	return ranks
+}
+
+var defaultMemberTypeRanks = buildMemberTypeRanks(defaultOrder)
+
+var defaultParsedConfig = parsedConfig{
+	memberTypes:     defaultOrder,
+	memberTypeRanks: defaultMemberTypeRanks,
+	order:           orderAsWritten,
+}
+
 // --- Options parsing ---
 
 type ruleOptions struct {
@@ -274,6 +309,7 @@ func parseConfig(val interface{}) *parsedConfig {
 		} else {
 			// If memberTypes not specified, use default
 			cfg.memberTypes = defaultOrder
+			cfg.memberTypeRanks = defaultMemberTypeRanks
 		}
 
 		if order, ok := v["order"].(string); ok {
@@ -307,16 +343,13 @@ func convertToMemberTypes(arr []interface{}) []interface{} {
 	return result
 }
 
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
-		opts.defaultConfig = &parsedConfig{
-			memberTypes: defaultOrder,
-			order:       orderAsWritten,
-		}
+	if len(options) == 0 {
+		opts.defaultConfig = &defaultParsedConfig
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 
 	if def, ok := optsMap["default"]; ok {
 		opts.defaultConfig = parseConfig(def)
@@ -337,10 +370,7 @@ func parseOptions(options any) ruleOptions {
 	// If no default config is set and no other config is set, use the default order
 	if opts.defaultConfig == nil && opts.classesConfig == nil && opts.classExpressionsConfig == nil &&
 		opts.interfacesConfig == nil && opts.typeLiteralsConfig == nil {
-		opts.defaultConfig = &parsedConfig{
-			memberTypes: defaultOrder,
-			order:       orderAsWritten,
-		}
+		opts.defaultConfig = &defaultParsedConfig
 	}
 
 	return opts
@@ -553,10 +583,19 @@ func isOverloadSignature(node *ast.Node) bool {
 
 // --- Ranking ---
 
-// getRankOrder finds the rank (index) of memberGroups in orderConfig
-func getRankOrder(memberGroups []string, orderConfig []interface{}) int {
+// getRankOrder finds the rank (index) of memberGroups in cfg.memberTypes.
+func getRankOrder(memberGroups []string, cfg *parsedConfig) int {
+	if cfg.memberTypeRanks != nil {
+		for _, group := range memberGroups {
+			if rank, exists := cfg.memberTypeRanks[group]; exists {
+				return rank
+			}
+		}
+		return -1
+	}
+
 	for _, group := range memberGroups {
-		for i, configEntry := range orderConfig {
+		for i, configEntry := range cfg.memberTypes {
 			switch entry := configEntry.(type) {
 			case string:
 				if entry == group {
@@ -581,10 +620,10 @@ func getRankOrder(memberGroups []string, orderConfig []interface{}) int {
 //	accessibility-scope-type → scope-type → accessibility-type → type
 //
 // Returns -1 for overload signatures (skipped), or orderConfig length - 1 for unknown types.
-func getRank(node *ast.Node, orderConfig []interface{}, supportsModifiers bool) int {
+func getRank(node *ast.Node, cfg *parsedConfig, supportsModifiers bool) int {
 	nodeType := getNodeType(node)
 	if nodeType == "" {
-		return len(orderConfig) - 1
+		return len(cfg.memberTypes) - 1
 	}
 
 	// Skip overload signatures
@@ -593,13 +632,14 @@ func getRank(node *ast.Node, orderConfig []interface{}, supportsModifiers bool) 
 	}
 
 	memberType := string(nodeType)
-	accessibility := getAccessibility(node)
-	scope := getScope(node)
-	decorated := ast.HasDecorators(node)
-
-	var memberGroups []string
+	var memberGroupBuffer [12]string
+	memberGroups := memberGroupBuffer[:0]
 
 	if supportsModifiers {
+		accessibility := getAccessibility(node)
+		scope := getScope(node)
+		decorated := ast.HasDecorators(node)
+
 		// Decorated variants
 		if decorated && canBeDecorated(nodeType) && accessibility != "#private" {
 			memberGroups = append(memberGroups, accessibility+"-decorated-"+memberType)
@@ -644,7 +684,7 @@ func getRank(node *ast.Node, orderConfig []interface{}, supportsModifiers bool) 
 		memberGroups = append(memberGroups, "signature")
 	}
 
-	return getRankOrder(memberGroups, orderConfig)
+	return getRankOrder(memberGroups, cfg)
 }
 
 // getLowestRank returns the human-readable name of the first group that should come
@@ -707,16 +747,44 @@ type memberInfo struct {
 	rank int
 }
 
+// checkGroupOrder validates as-written group order without collecting the
+// member names and groups only needed by alphabetical sorting.
+func checkGroupOrder(ctx rule.RuleContext, members []*ast.Node, cfg *parsedConfig, supportsModifiers bool) {
+	var previousRankBuffer [8]int
+	previousRanks := previousRankBuffer[:0]
+
+	for _, member := range members {
+		rank := getRank(member, cfg, supportsModifiers)
+		if rank == -1 {
+			continue
+		}
+
+		rankLastMember := -1
+		if len(previousRanks) > 0 {
+			rankLastMember = previousRanks[len(previousRanks)-1]
+		}
+
+		if rankLastMember >= 0 && rank < rankLastMember {
+			name := getMemberName(member)
+			rankName := getLowestRank(previousRanks, rank, cfg.memberTypes)
+			ctx.ReportNode(member, messageIncorrectGroupOrder(name, rankName))
+		} else if rank != rankLastMember {
+			previousRanks = append(previousRanks, rank)
+		}
+	}
+}
+
 // checkGroupSort validates that members appear in the correct group order.
 // previousRanks only accumulates strictly increasing ranks (like ESLint).
 // Returns groups of members (by rank) if valid, nil if errors were found.
-func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, orderConfig []interface{}, supportsModifiers bool) [][]memberInfo {
-	var previousRanks []int
+func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, cfg *parsedConfig, supportsModifiers bool) [][]memberInfo {
+	var previousRankBuffer [8]int
+	previousRanks := previousRankBuffer[:0]
 	var memberGroups [][]memberInfo
 	isCorrectlySorted := true
 
 	for _, member := range members {
-		rank := getRank(member, orderConfig, supportsModifiers)
+		rank := getRank(member, cfg, supportsModifiers)
 		if rank == -1 {
 			continue
 		}
@@ -731,7 +799,7 @@ func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, orderConfig []int
 
 		if rankLastMember >= 0 && rank < rankLastMember {
 			// Out of order — report error but do NOT push this rank
-			rankName := getLowestRank(previousRanks, rank, orderConfig)
+			rankName := getLowestRank(previousRanks, rank, cfg.memberTypes)
 			ctx.ReportNode(member, messageIncorrectGroupOrder(name, rankName))
 			isCorrectlySorted = false
 		} else if rank == rankLastMember {
@@ -751,12 +819,12 @@ func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, orderConfig []int
 }
 
 // groupMembersByType groups all members by their rank (not just consecutive)
-func groupMembersByType(members []*ast.Node, orderConfig []interface{}, supportsModifiers bool) [][]memberInfo {
+func groupMembersByType(members []*ast.Node, cfg *parsedConfig, supportsModifiers bool) [][]memberInfo {
 	rankMap := make(map[int][]memberInfo)
 	var rankOrder []int
 
 	for _, member := range members {
-		rank := getRank(member, orderConfig, supportsModifiers)
+		rank := getRank(member, cfg, supportsModifiers)
 		if rank == -1 {
 			continue
 		}
@@ -807,16 +875,19 @@ func checkOrder(ctx rule.RuleContext, memberSet []*ast.Node, allMembers []*ast.N
 	hasAlphaSort := cfg.order != "" && cfg.order != orderAsWritten
 
 	if cfg.memberTypes != nil {
-		groups := checkGroupSort(ctx, memberSet, cfg.memberTypes, supportsModifiers)
+		if !hasAlphaSort {
+			checkGroupOrder(ctx, memberSet, cfg, supportsModifiers)
+			return
+		}
+
+		groups := checkGroupSort(ctx, memberSet, cfg, supportsModifiers)
 		if groups == nil {
 			// Group sort failed — alpha sort on full members grouped by type (ESLint behavior)
-			if hasAlphaSort {
-				typeGroups := groupMembersByType(allMembers, cfg.memberTypes, supportsModifiers)
-				for _, group := range typeGroups {
-					checkAlphaSort(ctx, group, cfg.order)
-				}
+			typeGroups := groupMembersByType(allMembers, cfg, supportsModifiers)
+			for _, group := range typeGroups {
+				checkAlphaSort(ctx, group, cfg.order)
 			}
-		} else if hasAlphaSort {
+		} else {
 			// Group sort succeeded — alpha sort within each group
 			for _, group := range groups {
 				checkAlphaSort(ctx, group, cfg.order)
@@ -958,9 +1029,9 @@ func getClassMembers(node *ast.Node) []*ast.Node {
 // --- Rule definition ---
 
 var MemberOrderingRule = rule.CreateRule(rule.Rule{
-	Name: "member-ordering",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "member-ordering",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		getConfig := func(nodeKind ast.Kind) *parsedConfig {

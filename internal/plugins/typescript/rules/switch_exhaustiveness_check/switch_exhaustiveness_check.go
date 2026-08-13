@@ -1,9 +1,14 @@
 package switch_exhaustiveness_check
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed switch_exhaustiveness_check.schema.json
+var schemaJSON []byte
 
 type SwitchExhaustivenessCheckOptions struct {
 	AllowDefaultCaseForExhaustiveSwitch bool   `json:"allowDefaultCaseForExhaustiveSwitch"`
@@ -16,12 +21,12 @@ type SwitchExhaustivenessCheckOptions struct {
 // Require exhaustive switch statements
 var SwitchExhaustivenessCheckRule = rule.CreateRule(rule.Rule{
 	Name:             "switch-exhaustiveness-check",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run:              run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := SwitchExhaustivenessCheckOptions{
 		AllowDefaultCaseForExhaustiveSwitch: false,
 		RequireDefaultForNonUnion:           false,
@@ -30,31 +35,19 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 	}
 
 	// Parse options
-	if options != nil {
-		var optsMap map[string]interface{}
-		var ok bool
-
-		// Handle array format: [{ option: value }]
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			optsMap, ok = optArray[0].(map[string]interface{})
-		} else {
-			// Handle direct object format: { option: value }
-			optsMap, ok = options.(map[string]interface{})
+	if len(options) > 0 {
+		optsMap, _ := options[0].(map[string]interface{})
+		if allowDefault, ok := optsMap["allowDefaultCaseForExhaustiveSwitch"].(bool); ok {
+			opts.AllowDefaultCaseForExhaustiveSwitch = allowDefault
 		}
-
-		if ok {
-			if allowDefault, ok := optsMap["allowDefaultCaseForExhaustiveSwitch"].(bool); ok {
-				opts.AllowDefaultCaseForExhaustiveSwitch = allowDefault
-			}
-			if requireDefault, ok := optsMap["requireDefaultForNonUnion"].(bool); ok {
-				opts.RequireDefaultForNonUnion = requireDefault
-			}
-			if considerDefault, ok := optsMap["considerDefaultExhaustiveForUnions"].(bool); ok {
-				opts.ConsiderDefaultExhaustiveForUnions = considerDefault
-			}
-			if pattern, ok := optsMap["defaultCaseCommentPattern"].(string); ok {
-				opts.DefaultCaseCommentPattern = pattern
-			}
+		if requireDefault, ok := optsMap["requireDefaultForNonUnion"].(bool); ok {
+			opts.RequireDefaultForNonUnion = requireDefault
+		}
+		if considerDefault, ok := optsMap["considerDefaultExhaustiveForUnions"].(bool); ok {
+			opts.ConsiderDefaultExhaustiveForUnions = considerDefault
+		}
+		if pattern, ok := optsMap["defaultCaseCommentPattern"].(string); ok {
+			opts.DefaultCaseCommentPattern = pattern
 		}
 	}
 

@@ -103,7 +103,8 @@ func (state *classState) register(name string, static bool, kind memberKind) boo
 }
 
 var NoDupeClassMembersRule = rule.CreateRule(rule.Rule{
-	Name: "no-dupe-class-members",
+	Name:   "no-dupe-class-members",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkClass := func(node *ast.Node) {
 			members := node.Members()

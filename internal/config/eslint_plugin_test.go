@@ -52,7 +52,7 @@ func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 	// ecmaFeatures the Go core doesn't model) so Go can forward them to the
 	// plugin worker — not just the typed ParserOptions.
 	var lo LanguageOptions
-	if err := json.Unmarshal([]byte(`{"sourceType":"module","globals":{"foo":"readonly"},"parserOptions":{"project":["./tsconfig.json"]}}`), &lo); err != nil {
+	if err := json.Unmarshal([]byte(`{"sourceType":"module","ecmaVersion":2020,"globals":{"foo":"readonly"},"parserOptions":{"project":["./tsconfig.json"],"ecmaFeatures":{"globalReturn":true}}}`), &lo); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if lo.Raw["sourceType"] != "module" {
@@ -63,6 +63,39 @@ func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 	}
 	if lo.ParserOptions == nil || len(lo.ParserOptions.Project) != 1 {
 		t.Error("typed ParserOptions.Project should still parse")
+	}
+
+	encoded, err := json.Marshal(lo)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var roundTripped map[string]any
+	if err := json.Unmarshal(encoded, &roundTripped); err != nil {
+		t.Fatalf("decode marshaled language options: %v", err)
+	}
+	if roundTripped["sourceType"] != "module" {
+		t.Errorf("marshal lost sourceType: %s", encoded)
+	}
+	if _, ok := roundTripped["globals"]; !ok {
+		t.Errorf("marshal lost globals: %s", encoded)
+	}
+	if roundTripped["ecmaVersion"] != float64(2020) {
+		t.Errorf("marshal lost ecmaVersion: %s", encoded)
+	}
+	parserOptions, _ := roundTripped["parserOptions"].(map[string]any)
+	if project, _ := parserOptions["project"].([]any); len(project) != 1 || project[0] != "./tsconfig.json" {
+		t.Errorf("marshal lost typed parserOptions.project: %s", encoded)
+	}
+	if _, ok := parserOptions["ecmaFeatures"]; !ok {
+		t.Errorf("marshal lost unknown parserOptions keys: %s", encoded)
+	}
+
+	var ecmaVersion LanguageOptions
+	if err := json.Unmarshal([]byte(`{"ecmaVersion":"latest"}`), &ecmaVersion); err != nil {
+		t.Fatalf("unmarshal ecmaVersion: %v", err)
+	}
+	if ecmaVersion.Raw["ecmaVersion"] != "latest" {
+		t.Errorf("Raw should capture ecmaVersion, got %v", ecmaVersion.Raw["ecmaVersion"])
 	}
 
 	// mergeLanguageOptions: override wins per key; base-only keys retained;

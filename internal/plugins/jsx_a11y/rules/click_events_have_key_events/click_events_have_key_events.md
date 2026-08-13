@@ -57,4 +57,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/click-events-have-key-events](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/click-events-have-key-events.md)
+- [eslint-plugin-jsx-a11y: click-events-have-key-events](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/click-events-have-key-events.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/click-events-have-key-events.js)

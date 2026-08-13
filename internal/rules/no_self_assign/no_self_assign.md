@@ -49,4 +49,5 @@ this.x = this.x;
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/no-self-assign
+- [ESLint: no-self-assign](https://eslint.org/docs/latest/rules/no-self-assign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-self-assign.js)

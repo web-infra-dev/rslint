@@ -1,20 +1,23 @@
 package no_unsafe_negation
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unsafe_negation.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-unsafe-negation
 var NoUnsafeNegationRule = rule.Rule{
-	Name: "no-unsafe-negation",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-unsafe-negation",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -98,16 +101,17 @@ type noUnsafeNegationOptions struct {
 	enforceForOrderingRelations bool
 }
 
-func parseOptions(opts any) noUnsafeNegationOptions {
+func parseOptions(options []any) noUnsafeNegationOptions {
 	result := noUnsafeNegationOptions{
 		enforceForOrderingRelations: false,
 	}
+	if len(options) == 0 {
+		return result
+	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if enforce, ok := optsMap["enforceForOrderingRelations"].(bool); ok {
-			result.enforceForOrderingRelations = enforce
-		}
+	optsMap, _ := options[0].(map[string]any)
+	if enforce, ok := optsMap["enforceForOrderingRelations"].(bool); ok {
+		result.enforceForOrderingRelations = enforce
 	}
 
 	return result

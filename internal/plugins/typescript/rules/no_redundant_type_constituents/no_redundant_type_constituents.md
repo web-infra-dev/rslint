@@ -26,4 +26,5 @@ type ReturnType = string | never; // allowed in return type position
 
 ## Original Documentation
 
-- [typescript-eslint no-redundant-type-constituents](https://typescript-eslint.io/rules/no-redundant-type-constituents)
+- [typescript-eslint: no-redundant-type-constituents](https://typescript-eslint.io/rules/no-redundant-type-constituents)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-redundant-type-constituents.ts)

@@ -100,7 +100,8 @@ func reportMissingAwait(ctx rule.RuleContext, node *ast.Node) {
 
 // https://eslint.org/docs/latest/rules/require-await
 var RequireAwaitRule = rule.Rule{
-	Name: "require-await",
+	Name:   "require-await",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		stack := make([]scopeFrame, 0, 8)
 

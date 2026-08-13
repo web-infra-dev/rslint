@@ -88,14 +88,14 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			{Code: `var r = /[🇯[A--B]🇵]/v`},
 
 			// ---- allowEscape ----
-			{Code: `/[\ud83d\udc4d]/`, Options: map[string]interface{}{"allowEscape": true}},
-			{Code: `/[A\u0301]/`, Options: map[string]interface{}{"allowEscape": true}},
-			{Code: `/[👶\u{1f3fb}]/u`, Options: map[string]interface{}{"allowEscape": true}},
-			{Code: `/[\u{1F1EF}\u{1F1F5}]/u`, Options: map[string]interface{}{"allowEscape": true}},
-			{Code: `/[\u00B7\u0300-\u036F]/u`, Options: map[string]interface{}{"allowEscape": true}},
-			{Code: `/[\n\u0305]/`, Options: map[string]interface{}{"allowEscape": true}},
-			{Code: `RegExp("[\uD83D\uDC4D]")`, Options: map[string]interface{}{"allowEscape": true}},
-			{Code: `RegExp("[A\u0301]")`, Options: map[string]interface{}{"allowEscape": true}},
+			{Code: `/[\ud83d\udc4d]/`, Options: []any{map[string]interface{}{"allowEscape": true}}},
+			{Code: `/[A\u0301]/`, Options: []any{map[string]interface{}{"allowEscape": true}}},
+			{Code: `/[👶\u{1f3fb}]/u`, Options: []any{map[string]interface{}{"allowEscape": true}}},
+			{Code: `/[\u{1F1EF}\u{1F1F5}]/u`, Options: []any{map[string]interface{}{"allowEscape": true}}},
+			{Code: `/[\u00B7\u0300-\u036F]/u`, Options: []any{map[string]interface{}{"allowEscape": true}}},
+			{Code: `/[\n\u0305]/`, Options: []any{map[string]interface{}{"allowEscape": true}}},
+			{Code: `RegExp("[\uD83D\uDC4D]")`, Options: []any{map[string]interface{}{"allowEscape": true}}},
+			{Code: `RegExp("[A\u0301]")`, Options: []any{map[string]interface{}{"allowEscape": true}}},
 
 			// ---- Identifier resolved to a u-flagged regex literal — OK ----
 			{Code: `const regex = /[👍]/u; new RegExp(regex);`},
@@ -550,7 +550,7 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			// ---- allowEscape: still flags non-escaped combinations ----
 			{
 				Code:    "/[A\u0301]/",
-				Options: map[string]interface{}{"allowEscape": true},
+				Options: []any{map[string]interface{}{"allowEscape": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "combiningClass"},
 				},
@@ -820,7 +820,7 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 
 			{
 				Code:    `/[A\u0301]/`,
-				Options: map[string]interface{}{"allowEscape": false},
+				Options: []any{map[string]interface{}{"allowEscape": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "combiningClass"},
 				},
@@ -832,7 +832,7 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			// Pair is still detected.
 			{
 				Code:    `RegExp('[\👍]')`,
-				Options: map[string]interface{}{"allowEscape": true},
+				Options: []any{map[string]interface{}{"allowEscape": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "surrogatePairWithoutUFlag",
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
@@ -847,7 +847,7 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 				// (`\<non-syntax-char>` is invalid under u), so no
 				// suggestUnicodeFlag fix.
 				Code:    `/[\👍]/`,
-				Options: map[string]interface{}{"allowEscape": true},
+				Options: []any{map[string]interface{}{"allowEscape": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "surrogatePairWithoutUFlag"},
 				},
@@ -965,7 +965,8 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `{ const window = { RegExp() {} }; window.RegExp("[Á]", ""); } window.RegExp("[Á]", "");`,
+				Code:    `{ const window = { RegExp() {} }; window.RegExp("[Á]", ""); } window.RegExp("[Á]", "");`,
+				Globals: map[string]any{"window": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "combiningClass"},
 				},
@@ -1374,6 +1375,28 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 					{MessageId: "zwj"},
 				},
 			},
+		},
+	)
+}
+
+func TestNoMisleadingCharacterClassGlobalAvailability(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoMisleadingCharacterClassRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `window.RegExp("[Á]", "")`},
+			{Code: `self.RegExp("[Á]", "")`},
+			{Code: `global.RegExp("[Á]", "")`},
+			{Code: `globalThis.RegExp("[Á]", "")`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019}},
+			{Code: `window.RegExp("[Á]", "")`, Globals: map[string]any{"window": "off"}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `window.RegExp("[Á]", "")`, Globals: map[string]any{"window": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "combiningClass"}}},
+			{Code: `self.RegExp("[Á]", "")`, Globals: map[string]any{"self": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "combiningClass"}}},
+			{Code: `global.RegExp("[Á]", "")`, Globals: map[string]any{"global": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "combiningClass"}}},
+			{Code: `globalThis.RegExp("[Á]", "")`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "combiningClass"}}},
 		},
 	)
 }

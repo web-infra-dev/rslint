@@ -59,12 +59,8 @@ func TestNoElseReturnExtras(t *testing.T) {
 
 			// Locks in upstream checkIfWithElse arm: no alternate means no report
 			// even when allowElseIf is disabled.
-			{Code: `function f() { if (bar) return; }`, Options: map[string]interface{}{"allowElseIf": false}},
+			{Code: `function f() { if (bar) return; }`, Options: []any{map[string]interface{}{"allowElseIf": false}}},
 			// ---- Options contract: empty object keeps ESLint default allowElseIf=true ----
-			{
-				Code:    `function f() { if (error) { return "failed"; } else if (loading) { return "loading"; } }`,
-				Options: map[string]interface{}{},
-			},
 			{
 				Code:    `function f() { if (error) { return "failed"; } else if (loading) { return "loading"; } }`,
 				Options: []interface{}{map[string]interface{}{}},
@@ -147,7 +143,7 @@ func TestNoElseReturnExtras(t *testing.T) {
 			{
 				Code:    `function f() { if (a) { return 1; } else if (b) { return 2; } else { return 3; } }`,
 				Output:  []string{`function f() { if (a) { return 1; } else if (b) { return 2; }  return 3;  }`},
-				Options: map[string]interface{}{},
+				Options: []any{map[string]interface{}{}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt(`function f() { if (a) { return 1; } else if (b) { return 2; } else { return 3; } }`, `{ return 3; }`),
 				},
@@ -335,7 +331,7 @@ func TestNoElseReturnExtras(t *testing.T) {
 			{
 				Code:    `function load(config) { if (!config) { return defaults; } else if (config.extends) { return merge(config); } }`,
 				Output:  []string{`function load(config) { if (!config) { return defaults; } if (config.extends) { return merge(config); } }`},
-				Options: map[string]interface{}{"allowElseIf": false},
+				Options: []any{map[string]interface{}{"allowElseIf": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt(`function load(config) { if (!config) { return defaults; } else if (config.extends) { return merge(config); } }`, `if (config.extends) { return merge(config); }`),
 				},

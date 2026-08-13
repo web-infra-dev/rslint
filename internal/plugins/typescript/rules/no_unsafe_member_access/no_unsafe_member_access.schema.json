@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowOptionalChaining": {
+          "type": "boolean",
+          "description": "Whether to allow `?.` optional chains on `any` values."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

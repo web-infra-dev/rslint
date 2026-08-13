@@ -1,0 +1,89 @@
+{
+  "definitions": {
+    "nameList": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      ]
+    }
+  },
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "description": "Type specifiers that can be allowed.",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "name"],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "enum": ["file"]
+                  },
+                  "name": {
+                    "$ref": "#/definitions/nameList"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "name"],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "enum": ["lib"]
+                  },
+                  "name": {
+                    "$ref": "#/definitions/nameList"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "name", "package"],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "enum": ["package"]
+                  },
+                  "name": {
+                    "$ref": "#/definitions/nameList"
+                  },
+                  "package": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

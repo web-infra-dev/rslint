@@ -20,38 +20,40 @@ var schemaJSON []byte
 // pattern) we leave both zero — upstream's `param.type === 'Identifier'`
 // equality also misses those.
 //
-// `symbol` carries the TypeChecker-resolved Symbol for the parameter binding,
-// when a TypeChecker is available. handleSFCUsage uses it to verify that an
-// Identifier with a name-matching `obj.Text == propsName` actually refers to
-// THIS SFC's parameter — without it, an inner `let props = …` shadow would
-// be misreported as a missed destructure (upstream has this same false
-// positive; rslint resolves it when a TypeChecker is present).
+// `symbol` carries the binder Symbol for the parameter binding when available,
+// otherwise the TypeChecker-resolved Symbol. `binderSymbol` records which
+// resolver owns that identity. handleSFCUsage uses both to verify that an
+// Identifier with a matching name actually refers to THIS SFC's parameter —
+// without it, an inner `let props = …` shadow would be misreported as a missed
+// destructure (upstream has this same false positive).
 type sfcParam struct {
 	destructuring bool
 	name          string
 	symbol        *ast.Symbol
+	binderSymbol  bool
 }
 
-// sfcParamsStack mirrors upstream's `createSFCParams()` queue: an
-// unshift-on-enter / shift-on-exit stack of the current SFC chain's param
-// shapes. `propsName` / `contextName` walk inner-to-outer for the first
+// sfcParamsStack mirrors upstream's `createSFCParams()` queue while storing
+// entries in append order so entering an SFC does not copy the existing
+// stack. `propsName` / `contextName` walk inner-to-outer for the first
 // non-destructuring identifier-named param at position 0 / 1 respectively.
 type sfcParamsStack struct {
 	queue [][]sfcParam
 }
 
 func (s *sfcParamsStack) push(params []sfcParam) {
-	s.queue = append([][]sfcParam{params}, s.queue...)
+	s.queue = append(s.queue, params)
 }
 
 func (s *sfcParamsStack) pop() {
 	if len(s.queue) > 0 {
-		s.queue = s.queue[1:]
+		s.queue = s.queue[:len(s.queue)-1]
 	}
 }
 
 func (s *sfcParamsStack) propsName() string {
-	for _, p := range s.queue {
+	for i := len(s.queue) - 1; i >= 0; i-- {
+		p := s.queue[i]
 		if len(p) > 0 && !p[0].destructuring && p[0].name != "" {
 			return p[0].name
 		}
@@ -59,21 +61,23 @@ func (s *sfcParamsStack) propsName() string {
 	return ""
 }
 
-// propsSymbol returns the TypeChecker Symbol of the active props parameter,
-// matching the same stack entry that `propsName` selects. Returns nil when no
-// TypeChecker was available at push time, or when the entry's parameter shape
-// doesn't carry a Symbol.
-func (s *sfcParamsStack) propsSymbol() *ast.Symbol {
-	for _, p := range s.queue {
+// propsSymbol returns the resolved Symbol of the active props parameter and
+// whether it is a binder identity, matching the same entry `propsName` selects.
+// It returns nil when no resolver was available or the parameter shape carries
+// no Symbol.
+func (s *sfcParamsStack) propsSymbol() (*ast.Symbol, bool) {
+	for i := len(s.queue) - 1; i >= 0; i-- {
+		p := s.queue[i]
 		if len(p) > 0 && !p[0].destructuring && p[0].name != "" {
-			return p[0].symbol
+			return p[0].symbol, p[0].binderSymbol
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func (s *sfcParamsStack) contextName() string {
-	for _, p := range s.queue {
+	for i := len(s.queue) - 1; i >= 0; i-- {
+		p := s.queue[i]
 		if len(p) > 1 && !p[1].destructuring && p[1].name != "" {
 			return p[1].name
 		}
@@ -81,13 +85,14 @@ func (s *sfcParamsStack) contextName() string {
 	return ""
 }
 
-func (s *sfcParamsStack) contextSymbol() *ast.Symbol {
-	for _, p := range s.queue {
+func (s *sfcParamsStack) contextSymbol() (*ast.Symbol, bool) {
+	for i := len(s.queue) - 1; i >= 0; i-- {
+		p := s.queue[i]
 		if len(p) > 1 && !p[1].destructuring && p[1].name != "" {
-			return p[1].symbol
+			return p[1].symbol, p[1].binderSymbol
 		}
 	}
-	return nil
+	return nil, false
 }
 
 // evalParams maps a function's parameter list to upstream's
@@ -109,11 +114,12 @@ func (s *sfcParamsStack) contextSymbol() *ast.Symbol {
 // an array, and ESTree's `RestElement.type` likewise fails the strict
 // equality checks above.
 //
-// When `tc` is non-nil, each Identifier-named parameter additionally carries
-// its TypeChecker-resolved Symbol so handleSFCUsage can verify that a
-// name-matching reference actually resolves to *this* parameter and not an
-// inner shadow.
-func evalParams(params []*ast.Node, tc *checker.Checker) []sfcParam {
+// When a reference store or TypeChecker is available, each Identifier-named
+// parameter additionally carries its resolved Symbol so handleSFCUsage can
+// verify that a name-matching reference actually resolves to *this* parameter
+// and not an inner shadow. Prefer the parameter's binder Symbol because
+// RefStore can resolve local references without a checker query.
+func evalParams(params []*ast.Node, refs *rule.RefStore, tc *checker.Checker) []sfcParam {
 	out := make([]sfcParam, len(params))
 	for i, p := range params {
 		if p == nil || p.Kind != ast.KindParameter {
@@ -132,7 +138,11 @@ func evalParams(params []*ast.Node, tc *checker.Checker) []sfcParam {
 			out[i].destructuring = true
 		case ast.KindIdentifier:
 			out[i].name = name.AsIdentifier().Text
-			if tc != nil {
+			if refs != nil {
+				out[i].symbol = p.Symbol()
+				out[i].binderSymbol = out[i].symbol != nil
+			}
+			if out[i].symbol == nil && tc != nil {
 				out[i].symbol = tc.GetSymbolAtLocation(name)
 			}
 		}
@@ -247,37 +257,50 @@ func findEnclosingTypeQuery(node *ast.Node) bool {
 //
 // One up-front decision selects the counting strategy:
 //
-//   - **Symbol path** (TypeChecker + parameter Symbol both resolved):
+//   - **Symbol path** (RefStore or TypeChecker + parameter Symbol resolved):
 //     count Identifiers whose Symbol matches the SFC parameter. Inner
 //     `let props = …` shadows have a different Symbol and are excluded —
-//     scope-aware, matching ESLint's scopeManager exactly.
+//     scope-aware, matching ESLint's scopeManager exactly. Prefer RefStore's
+//     binder-only local resolution to avoid repeated checker queries.
 //
 //   - **Name path** (anything required for the Symbol path missing):
 //     count every `props` Identifier that isn't an obvious binding /
 //     property name. Over-counts on shadows → conservative no-report.
 //
 // The decision happens once below; the walker calls `shouldCount` directly
-// without re-testing the TypeChecker on each Identifier.
-func countPropsRefsExcludingDecl(fn *ast.Node, exclude *ast.Node, tc *checker.Checker, paramName *ast.Node) int {
+// without re-selecting a resolver on each Identifier.
+func countPropsRefsExcludingDecl(
+	fn *ast.Node,
+	exclude *ast.Node,
+	refs *rule.RefStore,
+	tc *checker.Checker,
+	paramName *ast.Node,
+) int {
 	body := reactutil.FunctionBody(fn)
 	if body == nil {
 		return 0
 	}
 
-	var paramSymbol *ast.Symbol
-	if tc != nil && paramName != nil && paramName.Kind == ast.KindIdentifier {
-		paramSymbol = tc.GetSymbolAtLocation(paramName)
-	}
-
 	var shouldCount func(n *ast.Node) bool
-	if paramSymbol != nil {
-		// Symbol path — `tc` is guaranteed non-nil because paramSymbol was
-		// only assigned when `tc != nil`.
-		shouldCount = func(n *ast.Node) bool {
-			sym := tc.GetSymbolAtLocation(n)
-			return sym != nil && sym == paramSymbol
+	if refs != nil && paramName != nil && paramName.Parent != nil {
+		if paramSymbol := paramName.Parent.Symbol(); paramSymbol != nil {
+			shouldCount = func(n *ast.Node) bool {
+				return refs.Resolve(n) == paramSymbol
+			}
 		}
-	} else {
+	}
+	if shouldCount == nil && tc != nil && paramName != nil && paramName.Kind == ast.KindIdentifier {
+		paramSymbol := tc.GetSymbolAtLocation(paramName)
+		if paramSymbol != nil {
+			// Symbol path — `tc` is guaranteed non-nil because paramSymbol was
+			// only assigned when `tc != nil`.
+			shouldCount = func(n *ast.Node) bool {
+				sym := tc.GetSymbolAtLocation(n)
+				return sym != nil && sym == paramSymbol
+			}
+		}
+	}
+	if shouldCount == nil {
 		shouldCount = isPropsReference
 	}
 
@@ -355,23 +378,44 @@ type ruleOptions struct {
 
 // buildSFCMatcher returns a `(receiver, paramSymbol) → bool` closure used by
 // handleSFCUsage. The closure is constructed ONCE per rule invocation based
-// on whether a TypeChecker is available:
+// on whether binder-backed references or a TypeChecker are available:
 //
-//   - `tc == nil` → returns a closure that always answers true. The
-//     caller's name comparison alone gates the report — equivalent to
-//     upstream's name-only behavior. The closure has no reference to `tc`,
-//     so a nil checker can never be dereferenced downstream.
+//   - `refs != nil && binderSymbol` → compares the binder Symbol carried by
+//     the parameter against RefStore.Resolve(receiver), avoiding repeated
+//     checker queries. A missing binder Symbol safely falls back to checker.
 //
-//   - `tc != nil` → returns a closure that compares Symbols. A
+//   - `refs == nil && tc != nil` → compares checker Symbols. A
 //     name-matching but scope-shadowed reference is correctly rejected.
 //     `paramSymbol == nil` (Symbol resolution failed at push time) falls
 //     back to "accept" so a transient resolver miss never suppresses a
 //     legitimate report.
-func buildSFCMatcher(tc *checker.Checker) func(obj *ast.Node, paramSymbol *ast.Symbol) bool {
-	if tc == nil {
-		return func(_ *ast.Node, _ *ast.Symbol) bool { return true }
+//
+//   - neither available → returns a closure that always answers true. The
+//     caller's name comparison alone gates the report, matching upstream's
+//     name-only behavior.
+func buildSFCMatcher(
+	refs *rule.RefStore,
+	tc *checker.Checker,
+) func(obj *ast.Node, paramSymbol *ast.Symbol, binderSymbol bool) bool {
+	if refs != nil {
+		return func(obj *ast.Node, paramSymbol *ast.Symbol, binderSymbol bool) bool {
+			if paramSymbol == nil {
+				return true
+			}
+			if binderSymbol {
+				return refs.Resolve(obj) == paramSymbol
+			}
+			if tc == nil {
+				return true
+			}
+			sym := tc.GetSymbolAtLocation(obj)
+			return sym != nil && sym == paramSymbol
+		}
 	}
-	return func(obj *ast.Node, paramSymbol *ast.Symbol) bool {
+	if tc == nil {
+		return func(_ *ast.Node, _ *ast.Symbol, _ bool) bool { return true }
+	}
+	return func(obj *ast.Node, paramSymbol *ast.Symbol, _ bool) bool {
 		if paramSymbol == nil {
 			return true
 		}
@@ -416,6 +460,7 @@ var DestructuringAssignmentRule = rule.Rule{
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
 		stack := &sfcParamsStack{}
+		enteredSFCs := make([]bool, 0, 8)
 
 		reportUseDestruct := func(node *ast.Node, t string) {
 			ctx.ReportNode(node, rule.RuleMessage{
@@ -438,10 +483,12 @@ var DestructuringAssignmentRule = rule.Rule{
 		// `props` / `context` names, then in `never` mode emit the
 		// destructured-arg diagnostic.
 		handleStatelessComponent := func(node *ast.Node) {
-			if !reactutil.IsStatelessReactComponentWithWrappers(node, pragma, nil, wrappers) {
+			isSFC := reactutil.IsStatelessReactComponentWithWrappers(node, pragma, nil, wrappers)
+			enteredSFCs = append(enteredSFCs, isSFC)
+			if !isSFC {
 				return
 			}
-			params := evalParams(reactutil.FunctionParameters(node), ctx.TypeChecker)
+			params := evalParams(reactutil.FunctionParameters(node), ctx.Refs, ctx.TypeChecker)
 			stack.push(params)
 			if opts.configuration != "never" {
 				return
@@ -459,29 +506,36 @@ var DestructuringAssignmentRule = rule.Rule{
 			}
 		}
 
-		handleStatelessComponentExit := func(node *ast.Node) {
-			if !reactutil.IsStatelessReactComponentWithWrappers(node, pragma, nil, wrappers) {
+		handleStatelessComponentExit := func(_ *ast.Node) {
+			if len(enteredSFCs) == 0 {
 				return
 			}
-			stack.pop()
+			last := len(enteredSFCs) - 1
+			wasSFC := enteredSFCs[last]
+			enteredSFCs = enteredSFCs[:last]
+			if wasSFC {
+				stack.pop()
+			}
 		}
 
 		// matchesSFCParam returns true when the receiver Identifier `obj`
 		// (name-matched by the caller) actually refers to the SFC parameter
 		// recorded with `paramSymbol`. The closure is built ONCE based on
-		// whether a TypeChecker is wired up:
+		// whether binder-backed references or a TypeChecker are wired up:
 		//
-		//   - **No TypeChecker**: closure always returns true. Only the
-		//     caller's name comparison gates the report — equivalent to
-		//     upstream's name-only behavior. The closure never touches
-		//     `ctx.TypeChecker`, so nil-deref is impossible.
+		//   - **RefStore present**: resolve local references through the
+		//     binder and compare the parameter's raw Symbol, with the checker
+		//     fallback retained if a binder Symbol is unavailable.
 		//
-		//   - **TypeChecker present**: closure compares Symbols. A
+		//   - **TypeChecker only**: closure compares checker Symbols. A
 		//     name-matching but scope-shadowed reference is correctly
 		//     rejected. `paramSymbol == nil` (Symbol resolution failed at
 		//     push time) still falls back to "accept" so the rule never
 		//     loses a legitimate report due to a transient resolver miss.
-		matchesSFCParam := buildSFCMatcher(ctx.TypeChecker)
+		//
+		//   - **Neither**: name comparison alone gates the report, matching
+		//     upstream's name-only behavior.
+		matchesSFCParam := buildSFCMatcher(ctx.Refs, ctx.TypeChecker)
 
 		// handleSFCUsage reports `props.X` / `context.X` accesses on `always`
 		// mode. The receiver must be a bare Identifier matching the active
@@ -492,6 +546,9 @@ var DestructuringAssignmentRule = rule.Rule{
 		handleSFCUsage := func(node *ast.Node) {
 			propsName := stack.propsName()
 			contextName := stack.contextName()
+			if propsName == "" && contextName == "" {
+				return
+			}
 			var objNode *ast.Node
 			switch node.Kind {
 			case ast.KindPropertyAccessExpression:
@@ -506,22 +563,19 @@ var DestructuringAssignmentRule = rule.Rule{
 				return
 			}
 			objName := obj.AsIdentifier().Text
+			if isAssignmentLHS(node) || isOptionalMember(node) {
+				return
+			}
 
 			matched := false
-			if propsName != "" && objName == propsName &&
-				matchesSFCParam(obj, stack.propsSymbol()) {
-				matched = true
-			} else if contextName != "" && objName == contextName &&
-				matchesSFCParam(obj, stack.contextSymbol()) {
-				matched = true
+			if propsName != "" && objName == propsName {
+				paramSymbol, binderSymbol := stack.propsSymbol()
+				matched = matchesSFCParam(obj, paramSymbol, binderSymbol)
+			} else if contextName != "" && objName == contextName {
+				paramSymbol, binderSymbol := stack.contextSymbol()
+				matched = matchesSFCParam(obj, paramSymbol, binderSymbol)
 			}
 			if !matched {
-				return
-			}
-			if isAssignmentLHS(node) {
-				return
-			}
-			if opts.configuration != "always" || isOptionalMember(node) {
 				return
 			}
 			reportUseDestruct(node, objName)
@@ -563,16 +617,20 @@ var DestructuringAssignmentRule = rule.Rule{
 			if opts.ignoreClassFields && isInClassProperty(node) {
 				return
 			}
+			if reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers) == nil {
+				return
+			}
 			reportUseDestruct(node, name)
 		}
 
 		memberExprListener := func(node *ast.Node) {
-			if reactutil.GetParentStatelessComponent(node, pragma, wrappers) != nil {
+			if opts.configuration != "always" {
+				return
+			}
+			if len(stack.queue) > 0 {
 				handleSFCUsage(node)
 			}
-			if reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers) != nil {
-				handleClassUsage(node)
-			}
+			handleClassUsage(node)
 		}
 
 		return rule.RuleListeners{
@@ -613,9 +671,6 @@ var DestructuringAssignmentRule = rule.Rule{
 				if !findEnclosingTypeQuery(node) {
 					return
 				}
-				if reactutil.GetParentStatelessComponent(node, pragma, wrappers) == nil {
-					return
-				}
 				reportUseDestruct(node, "props")
 			},
 
@@ -652,39 +707,38 @@ var DestructuringAssignmentRule = rule.Rule{
 					}
 				}
 
-				// Mirror upstream's `components.get(getScope(context, node).block)`:
-				// enclosing-only semantics. A `const {x} = props` inside an
-				// inner non-SFC helper of an outer SFC must NOT report —
-				// upstream's `scope.block` is the inner helper, `components.
-				// get(inner) === undefined`, and the rule stays silent.
-				// `GetParentStatelessComponent` (ancestor walk) would
-				// over-report here.
-				sfcComp := getEnclosingSFCComponent(node, pragma, wrappers)
-				// Mirror upstream's `utils.getParentComponent(node)` =
-				// `getParentES6Component || getParentES5Component
-				// || getParentStatelessComponent`. The OrStateless tail
-				// matters: when a SFC body contains `const {x} = this.props`
-				// (semantically nonsensical but legal syntax), upstream's
-				// `classComponent` falls back to the SFC and reports under
-				// `'never'`. Using only `GetEnclosingReactComponent` (class-
-				// only) would silently drop that report.
-				classComp := reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers)
-
 				if opts.configuration == "never" {
-					if sfcComp != nil && sfcType != "" {
-						reportNoDestruct(node, sfcType)
+					if sfcType != "" {
+						// Mirror upstream's `components.get(getScope(context,
+						// node).block)`: enclosing-only semantics. An inner
+						// non-SFC helper of an outer SFC must stay silent.
+						if getEnclosingSFCComponent(node, pragma, wrappers) != nil {
+							reportNoDestruct(node, sfcType)
+						}
 					}
-					if classComp != nil && classType != "" {
-						if !opts.ignoreClassFields || !isParentClassProperty(node) {
+					if classType != "" && (!opts.ignoreClassFields || !isParentClassProperty(node)) {
+						// Mirror upstream's scope-based class-or-SFC fallback.
+						// The stateless tail intentionally reports the legal but
+						// nonsensical `const {x} = this.props` inside an SFC.
+						if reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers) != nil {
 							reportNoDestruct(node, classType)
 						}
 					}
+					return
+				}
+				if opts.configuration != "always" {
+					return
 				}
 
-				if sfcComp != nil &&
-					sfcType == "props" &&
-					opts.configuration == "always" &&
-					opts.destructureInSignature == "always" {
+				if sfcType == "props" && opts.destructureInSignature == "always" {
+					// This is the only `always` branch that needs component
+					// detection for an object-binding declaration. Default
+					// `destructureInSignature: "ignore"` declarations skip
+					// this branch without repeating component classification.
+					sfcComp := getEnclosingSFCComponent(node, pragma, wrappers)
+					if sfcComp == nil {
+						return
+					}
 					params := reactutil.FunctionParameters(sfcComp)
 					if len(params) == 0 {
 						return
@@ -708,43 +762,37 @@ var DestructuringAssignmentRule = rule.Rule{
 						paramName.AsIdentifier().Text != "props" {
 						return
 					}
-					// Use TypeChecker Symbol comparison when available so
-					// inner `let props = …` shadows are correctly excluded;
-					// otherwise fall back to a name+parent-shape walk.
-					if countPropsRefsExcludingDecl(sfcComp, vd.Initializer, ctx.TypeChecker, paramName) > 0 {
+					// Prefer binder-backed Symbol comparison so inner
+					// `let props = …` shadows are correctly excluded without
+					// repeated checker queries; preserve the checker and
+					// name+parent-shape fallbacks.
+					if countPropsRefsExcludingDecl(sfcComp, vd.Initializer, ctx.Refs, ctx.TypeChecker, paramName) > 0 {
 						return
 					}
 
-					// Replace the parameter binding name span with the
-					// destructure pattern. The trimmed range is identical to
-					// upstream's `[param.range[0], param.typeAnnotation
-					// ? param.typeAnnotation.range[0] : param.range[1]]` —
-					// when a type annotation exists, ESTree's `param.range[1]`
-					// includes it, while tsgo's `paramName.End()` is the bare
-					// identifier end, so this branch falls out naturally.
-					replaceRange := utils.TrimNodeTextRange(ctx.SourceFile, paramName)
-					patternText := utils.TrimmedNodeText(ctx.SourceFile, name)
-
-					// Remove the surrounding VariableStatement so the body
-					// loses the `const {a} = props;` line. tsgo's
-					// VariableDeclaration parent chain is
-					// VariableDeclarationList → VariableStatement, while
-					// ESTree's VariableDeclarator parent is VariableDeclaration
-					// (which carries the trailing semicolon directly).
-					removeTarget := node
-					if node.Parent != nil && node.Parent.Kind == ast.KindVariableDeclarationList {
-						list := node.Parent
-						if list.Parent != nil && list.Parent.Kind == ast.KindVariableStatement {
-							removeTarget = list.Parent
-						}
-					}
-					ctx.ReportNodeWithFixes(node, rule.RuleMessage{
+					ctx.ReportNodeWithDeferredFixes(node, rule.RuleMessage{
 						Id:          "destructureInSignature",
 						Description: "Must destructure props in the function signature.",
-					},
-						rule.RuleFixReplaceRange(replaceRange, patternText),
-						rule.RuleFixRemove(ctx.SourceFile, removeTarget),
-					)
+					}, func() []rule.RuleFix {
+						// Replace the parameter binding name span with the
+						// destructure pattern while preserving its annotation.
+						replaceRange := utils.TrimNodeTextRange(ctx.SourceFile, paramName)
+						patternText := utils.TrimmedNodeText(ctx.SourceFile, name)
+
+						// Remove the surrounding VariableStatement so the body
+						// loses the `const {a} = props;` line.
+						removeTarget := node
+						if node.Parent != nil && node.Parent.Kind == ast.KindVariableDeclarationList {
+							list := node.Parent
+							if list.Parent != nil && list.Parent.Kind == ast.KindVariableStatement {
+								removeTarget = list.Parent
+							}
+						}
+						return []rule.RuleFix{
+							rule.RuleFixReplaceRange(replaceRange, patternText),
+							rule.RuleFixRemove(ctx.SourceFile, removeTarget),
+						}
+					})
 				}
 			},
 		}

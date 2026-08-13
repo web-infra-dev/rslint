@@ -203,6 +203,13 @@ func TestPreferComparisonMatcherRule(t *testing.T) {
 
 	invalidCases = append(invalidCases,
 		rule_tester.InvalidTestCase{
+			Code:   `expect(value > 1)[("toBe")](true);`,
+			Output: []string{`expect(value).toBeGreaterThan(1);`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useToBeComparison", Line: 1, Column: 20},
+			},
+		},
+		rule_tester.InvalidTestCase{
 			Code:   `expect(value > 1).toBe(true as const);`,
 			Output: []string{`expect(value).toBeGreaterThan(1);`},
 			Errors: []rule_tester.InvalidTestCaseError{

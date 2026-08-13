@@ -158,6 +158,7 @@ func discoverLintTargetsWithStopDirs(
 
 	filesPatterns := collectLintFilePatterns(config)
 	filesMatcher := buildFilesMatcher(filesPatterns)
+	directoryBlocks := newDirectoryBlockMatcher(globalIgnores, configMatchDir)
 
 	var allowFileSet map[string]string
 	if allowFiles != nil {
@@ -192,7 +193,7 @@ func discoverLintTargetsWithStopDirs(
 		})
 	}
 	isGloballyIgnored := func(matchPath string) bool {
-		return isDirBlockedByIgnores(matchPath, globalIgnores, configMatchDir) ||
+		return directoryBlocks.blocksFileDirectory(matchPath) ||
 			isFileIgnored(matchPath, globalIgnores, configMatchDir)
 	}
 

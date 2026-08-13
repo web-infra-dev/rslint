@@ -52,8 +52,8 @@ This rule has no options.
 - rslint follows aliases flow-sensitively and reports calls that ESLint's ReferenceTracker misses: aliases established by a plain assignment (`let o; o = Object; o.assign({}, x)`), nested destructuring (`const { Object: { assign } } = globalThis; assign({}, x)`), and alias chains of any length. Conversely, an alias that has been reassigned to something else by the time of the call (`let o = Object; o = foo; o.assign({}, x)`) is not reported.
 - When a source argument is an object literal with a prototype-setting `__proto__:` property, the autofix keeps that literal whole behind a spread (`Object.assign({}, { __proto__: p })` → `({ ...{ __proto__: p } })`) instead of merging its properties into the result literal, where `__proto__:` would change the result's prototype. ESLint's fixer merges it and changes behavior.
 - The autofix parenthesizes the resulting object literal when the call is the callee of another call (`Object.assign({}, foo)()` → `({ ...foo})()`); ESLint's fixer produces unparsable output there.
-- rslint always recognizes `globalThis.Object.assign(...)`, so it reports and fixes it the same as `Object.assign(...)`. ESLint only does this when `globalThis` is a declared global (e.g. under a sufficiently recent `ecmaVersion`) — under older configurations `globalThis.Object.assign(...)` is left untouched.
 
 ## Original Documentation
 
-[prefer-object-spread](https://eslint.org/docs/latest/rules/prefer-object-spread)
+- [ESLint: prefer-object-spread](https://eslint.org/docs/latest/rules/prefer-object-spread)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-object-spread.js)

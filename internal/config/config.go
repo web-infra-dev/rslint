@@ -252,7 +252,7 @@ func ValidateConfig(config RslintConfig) error {
 		if (entry.Files != nil || entry.FilePatternGroups != nil) && len(entry.Files) == 0 && len(entry.FilePatternGroups) == 0 {
 			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
 		}
-		if err := validateConfigGlobals(entry.LanguageOptions); err != nil {
+		if err := validateLanguageOptions(entry.LanguageOptions); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
 		if err := validateConfigSourceType(entry.LanguageOptions); err != nil {
@@ -263,6 +263,44 @@ func ValidateConfig(config RslintConfig) error {
 		}
 	}
 	return nil
+}
+
+func validateLanguageOptions(languageOptions *LanguageOptions) error {
+	if err := validateConfigGlobals(languageOptions); err != nil {
+		return err
+	}
+	if languageOptions == nil || languageOptions.Raw == nil {
+		return nil
+	}
+
+	if value, present := languageOptions.Raw["ecmaVersion"]; present {
+		if _, ok := normalizeConfigECMAVersion(value); !ok {
+			return fmt.Errorf(
+				"key \"languageOptions.ecmaVersion\": invalid value %v; expected \"latest\", 3, 5, an edition from 6 through %d, or a year from 2015 through %d",
+				value,
+				rule.LatestECMAScriptVersion-2009,
+				rule.LatestECMAScriptVersion,
+			)
+		}
+	}
+
+	return nil
+}
+
+func normalizeConfigECMAVersion(value any) (int, bool) {
+	if text, ok := value.(string); ok {
+		if text == "latest" {
+			// Keep `latest` semantic instead of freezing the config to this
+			// release's numeric edition. rule.LanguageOptions uses zero for latest.
+			return 0, true
+		}
+		return 0, false
+	}
+	version, ok := utils.CoerceIntegral(value)
+	if !ok {
+		return 0, false
+	}
+	return rule.NormalizeECMAScriptVersion(version)
 }
 
 func validateConfigGlobals(languageOptions *LanguageOptions) error {
@@ -332,10 +370,10 @@ func validateConfigRules(rules Rules) error {
 type LanguageOptions struct {
 	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
 	// Raw retains the full languageOptions object as authored (sourceType,
-	// globals, parserOptions.ecmaFeatures, …) — fields the Go core does not
-	// model but the Node eslint-plugin worker needs. Go computes the
-	// per-file merged value via GetConfigForFile and forwards it on the
-	// wire; it is not (de)serialized through this struct's own field tags.
+	// ecmaVersion, globals, parserOptions.ecmaFeatures, …). Go normalizes
+	// ecmaVersion for native globals and forwards the full value to the Node
+	// eslint-plugin worker. It is not (de)serialized through this struct's own
+	// field tags.
 	Raw map[string]any `json:"-"`
 }
 
@@ -356,6 +394,27 @@ func (lo *LanguageOptions) UnmarshalJSON(data []byte) error {
 	lo.ParserOptions = ps.ParserOptions
 	lo.Raw = raw
 	return nil
+}
+
+// MarshalJSON preserves the open languageOptions object captured in Raw while
+// folding any typed ParserOptions updates back into its parserOptions member.
+// Without this counterpart to UnmarshalJSON, a config JSON round trip would
+// silently discard ecmaVersion, globals, sourceType, and unknown parser keys.
+func (lo LanguageOptions) MarshalJSON() ([]byte, error) {
+	raw := deepMergeConfigObjects(nil, lo.Raw)
+	if lo.ParserOptions != nil {
+		encodedParserOptions, err := json.Marshal(lo.ParserOptions)
+		if err != nil {
+			return nil, err
+		}
+		var typedParserOptions map[string]any
+		if err := json.Unmarshal(encodedParserOptions, &typedParserOptions); err != nil {
+			return nil, err
+		}
+		baseParserOptions, _ := configObject(raw["parserOptions"])
+		raw["parserOptions"] = deepMergeConfigObjects(baseParserOptions, typedParserOptions)
+	}
+	return json.Marshal(raw)
 }
 
 // ProjectPaths represents project paths that can be either a single string or an array of strings
@@ -705,6 +764,11 @@ func normalizePattern(pattern string) string {
 // aligns with ESLint v10: `dir/**` blocks directory traversal entirely, and
 // `!` negation cannot undo it.
 func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string) bool {
+	dirPath, ok := ignoreDirectoryPath(filePath, cwd)
+	return ok && isDirAbsolutelyBlocked(dirPath, patterns)
+}
+
+func ignoreDirectoryPath(filePath string, cwd string) (string, bool) {
 	var dirPath string
 	if cwd != "" {
 		dirPath = normalizePath(tspath.GetDirectoryPath(filePath), cwd)
@@ -714,9 +778,36 @@ func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string
 	dirPath = strings.ReplaceAll(dirPath, "\\", "/")
 	dirPath = strings.TrimSuffix(dirPath, "/")
 	if dirPath == "" || dirPath == "." {
+		return "", false
+	}
+	return dirPath, true
+}
+
+// directoryBlockMatcher caches path-only directory decisions for one immutable
+// ignore-pattern set and cwd. The exact lexical parent is the key: no case,
+// separator, realpath, or filesystem equivalence is introduced by the cache.
+type directoryBlockMatcher struct {
+	patterns []IgnorePattern
+	cwd      string
+	results  publishOnceCache[string, bool]
+}
+
+func newDirectoryBlockMatcher(patterns []IgnorePattern, cwd string) *directoryBlockMatcher {
+	if len(patterns) == 0 {
+		return nil
+	}
+	return &directoryBlockMatcher{patterns: patterns, cwd: cwd}
+}
+
+func (matcher *directoryBlockMatcher) blocksFileDirectory(filePath string) bool {
+	if matcher == nil {
 		return false
 	}
-	return isDirAbsolutelyBlocked(dirPath, patterns)
+	lexicalDirectory := tspath.GetDirectoryPath(filePath)
+	return matcher.results.getOrInit(lexicalDirectory, func() bool {
+		dirPath, ok := ignoreDirectoryPath(filePath, matcher.cwd)
+		return ok && isDirAbsolutelyBlocked(dirPath, matcher.patterns)
+	})
 }
 
 // normalizePath converts file path to be relative to cwd for consistent matching
@@ -729,6 +820,34 @@ func normalizePathWithCaseSensitivity(filePath, cwd string, useCaseSensitive boo
 		UseCaseSensitiveFileNames: useCaseSensitive,
 		CurrentDirectory:          cwd,
 	}))
+}
+
+// fileMatchPath keeps the path representations shared by config-entry
+// selectors and file-level ignores for one resolution. It initializes lazily
+// so directory-blocked files and entries without path matchers do no extra
+// normalization work.
+type fileMatchPath struct {
+	original   string
+	cwd        string
+	normalized string
+	unix       string
+	ready      bool
+}
+
+func newFileMatchPath(filePath string, cwd string) fileMatchPath {
+	return fileMatchPath{original: filePath, cwd: cwd}
+}
+
+func (path *fileMatchPath) normalizedPaths() (string, string) {
+	if !path.ready {
+		path.normalized = path.original
+		if path.cwd != "" {
+			path.normalized = normalizePath(path.original, path.cwd)
+		}
+		path.unix = strings.ReplaceAll(path.normalized, "\\", "/")
+		path.ready = true
+	}
+	return path.normalized, path.unix
 }
 
 // MergedConfig is the final computed configuration for a single file
@@ -807,7 +926,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 // patterns supplied by the caller, so repeated calls against the same config
 // (one per lint target) don't re-parse the same ignore pattern strings.
 func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd string, globalIgnorePatterns []IgnorePattern) *MergedConfig {
-	key, matched := config.matchConfigEntries(filePath, cwd, globalIgnorePatterns, nil)
+	key, matched := config.matchConfigEntries(filePath, cwd, globalIgnorePatterns, nil, nil)
 	if !matched {
 		return nil
 	}
@@ -832,14 +951,19 @@ func hasFileSelectors(entry ConfigEntry) bool {
 }
 
 func isFileMatchedByConfigEntry(filePath string, entry ConfigEntry, cwd string) bool {
-	if isFileMatched(filePath, entry.Files, cwd) {
+	matchPath := newFileMatchPath(filePath, cwd)
+	return matchPath.matchesConfigEntry(entry)
+}
+
+func (path *fileMatchPath) matchesConfigEntry(entry ConfigEntry) bool {
+	if path.matchesAny(entry.Files) {
 		return true
 	}
 	for _, group := range entry.FilePatternGroups {
 		// ESLint treats an empty nested selector as a vacuously true AND group.
 		matched := true
 		for _, pattern := range group {
-			if !isSingleFilePatternMatched(filePath, pattern, cwd) {
+			if !path.matchesSingle(pattern) {
 				matched = false
 				break
 			}
@@ -899,46 +1023,45 @@ func cloneConfigValue(value any) any {
 
 // isFileMatched checks if a file matches any of the given glob patterns
 func isFileMatched(filePath string, patterns []string, cwd string) bool {
+	matchPath := newFileMatchPath(filePath, cwd)
+	return matchPath.matchesAny(patterns)
+}
+
+func (path *fileMatchPath) matchesAny(patterns []string) bool {
 	for _, pattern := range patterns {
-		if isSingleFilePatternMatched(filePath, pattern, cwd) {
+		if path.matchesSingle(pattern) {
 			return true
 		}
 	}
 	return false
 }
 
-func isSingleFilePatternMatched(filePath string, pattern string, cwd string) bool {
+func (path *fileMatchPath) matchesSingle(pattern string) bool {
 	negated := false
 	for strings.HasPrefix(pattern, "!") {
 		negated = !negated
 		pattern = strings.TrimPrefix(pattern, "!")
 	}
-	matched := isPositiveFilePatternMatched(filePath, pattern, cwd)
+	matched := path.matchesPositive(pattern)
 	if negated {
 		return !matched
 	}
 	return matched
 }
 
-func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) bool {
-	var normalizedPath string
-	if cwd != "" {
-		normalizedPath = normalizePath(filePath, cwd)
-	} else {
-		normalizedPath = filePath
-	}
+func (path *fileMatchPath) matchesPositive(pattern string) bool {
+	normalizedPath, unixPath := path.normalizedPaths()
 
 	normalizedPattern := normalizePattern(pattern)
 
 	if utils.MatchGlob(normalizedPattern, normalizedPath) {
 		return true
 	}
-	if normalizedPath != filePath {
-		if utils.MatchGlob(normalizedPattern, filePath) {
+	if normalizedPath != path.original {
+		if utils.MatchGlob(normalizedPattern, path.original) {
 			return true
 		}
 	}
-	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 	if unixPath != normalizedPath {
 		if utils.MatchGlob(normalizedPattern, unixPath) {
 			return true
@@ -1013,6 +1136,22 @@ func ExtractSourceType(langOpts *LanguageOptions) string {
 		return ""
 	}
 	return s
+}
+
+// ExtractLanguageOptions normalizes the effective per-file language options
+// for native rules. The zero value deliberately represents ESLint flat-config
+// defaults, so a missing languageOptions object needs no allocation.
+func ExtractLanguageOptions(langOpts *LanguageOptions) rule.LanguageOptions {
+	var result rule.LanguageOptions
+	if langOpts == nil || langOpts.Raw == nil {
+		return result
+	}
+	if value, present := langOpts.Raw["ecmaVersion"]; present {
+		if version, ok := normalizeConfigECMAVersion(value); ok {
+			result.ECMAVersion = version
+		}
+	}
+	return result
 }
 
 // RulePluginPrefix extracts the plugin prefix from a rule name.

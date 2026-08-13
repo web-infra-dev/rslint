@@ -26,4 +26,5 @@ const tagged = tag`${value}`;
 
 ## Original Documentation
 
-- [typescript-eslint no-unnecessary-template-expression](https://typescript-eslint.io/rules/no-unnecessary-template-expression)
+- [typescript-eslint: no-unnecessary-template-expression](https://typescript-eslint.io/rules/no-unnecessary-template-expression)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.29.1/packages/eslint-plugin/src/rules/no-unnecessary-template-expression.ts)

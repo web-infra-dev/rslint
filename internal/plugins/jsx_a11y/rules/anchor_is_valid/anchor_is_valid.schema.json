@@ -26,7 +26,8 @@
           "additionalItems": false,
           "minItems": 1
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "minItems": 0,

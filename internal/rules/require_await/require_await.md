@@ -46,4 +46,5 @@ If you don't want to warn on async functions that have no `await` expression, th
 
 ## Original Documentation
 
-- [ESLint require-await](https://eslint.org/docs/latest/rules/require-await)
+- [ESLint: require-await](https://eslint.org/docs/latest/rules/require-await)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/require-await.js)

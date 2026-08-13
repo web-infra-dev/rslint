@@ -1,6 +1,7 @@
 package no_undef
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,73 +9,93 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_undef.schema.json
+var schemaJSON []byte
+
 // https://eslint.org/docs/latest/rules/no-undef
 //
-// ctx.Refs.Resolve() walks the binder's lexical scope chain first — the same
-// model ESLint's own no-undef uses, and enough on its own, which is what
-// makes this rule useful on plain JS and other files no type checker runs
-// on. When a TypeChecker is available for the file, Resolve() falls back to
-// it for anything the scope walk can't place, so this rule also recognizes
-// DOM/Node globals and other names known only to the type checker there.
+// Like ESLint, this rule is deliberately independent of TypeScript's checker
+// environment. It resolves declarations in the current file, then applies the
+// versioned globals selected by languageOptions and the config/inline globals
+// exposed on RuleContext. For TypeScript syntax, it also mirrors the parser's
+// default esnext type-space globals. DOM, Node, ambient .d.ts, and cross-file
+// declarations are not silently supplied by a TypeChecker.
 
 type options struct {
 	checkTypeof bool
 }
 
-func parseOptions(opts any) options {
+func parseOptions(rawOptions []any) options {
 	result := options{checkTypeof: false}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if v, ok := optsMap["typeof"].(bool); ok {
-			result.checkTypeof = v
-		}
+	if len(rawOptions) == 0 {
+		return result
+	}
+	optsMap, _ := rawOptions[0].(map[string]any)
+	if v, ok := optsMap["typeof"].(bool); ok {
+		result.checkTypeof = v
 	}
 	return result
 }
 
 var NoUndefRule = rule.Rule{
-	Name: "no-undef",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := parseOptions(options)
+	Name:   "no-undef",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		opts := parseOptions(rawOptions)
 
 		if ctx.Refs == nil {
 			return rule.RuleListeners{}
 		}
 
+		var authoredImportBindings map[string]struct{}
+		authoredImportBindingsCollected := false
+
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				// Skip identifiers that are not value references
+				// Skip identifiers that do not create scope references.
 				if shouldSkip(node, opts.checkTypeof) {
 					return
 				}
 
 				name := node.Text()
-
-				// languageOptions.globals / /* global */ comments (merged into
-				// ctx.Globals) take priority over built-ins and over the
-				// checker's lib knowledge; both map lookups come before the
-				// resolver so references to declared or built-in globals never
-				// pay for a failing scope walk plus a checker round trip.
-				if access, ok := ctx.Globals[name]; ok {
-					if access.IsDeclared() {
+				if ctx.Globals.Access(name).IsDeclared() {
+					return
+				}
+				referenceSpace := typescriptESLintReferenceSpace(node)
+				// An explicit `off` removes only implicit globals. A declaration or
+				// import authored in this file still defines its references.
+				if symbol := ctx.Refs.ResolveInFileWithMeaning(node, referenceSpace.symbolMeaning()); symbol != nil {
+					if !isOnlyJSDocImportSymbol(symbol) {
 						return
 					}
-					// An explicit "off" entry un-declares the global: only a
-					// binding this file itself declares can still satisfy the
-					// reference. A symbol the checker fallback found in lib or
-					// ambient declarations elsewhere is the very global that
-					// was switched off, so it still reports.
-					if sym := ctx.Refs.Resolve(node); utils.IsSymbolDeclaredInFile(sym, ctx.SourceFile) {
+					// The binder may keep only the earlier synthetic @import alias
+					// when a real import declares the same local name. Espree sees
+					// only the real import, so recover that authored binding from
+					// syntax before reporting the runtime reference.
+					if !authoredImportBindingsCollected {
+						authoredImportBindings = collectAuthoredImportBindings(ctx.SourceFile)
+						authoredImportBindingsCollected = true
+					}
+					if _, ok := authoredImportBindings[name]; ok {
 						return
 					}
-				} else {
-					if utils.IsECMAScriptGlobal(name) {
-						return
-					}
-					if ctx.Refs.Resolve(node) != nil {
-						return
-					}
+				}
+				// CommonJS's wrapper-level `arguments` binding is lexical rather than
+				// a configurable global, so it remains defined even when a same-named
+				// global is disabled. Check it only after rejecting synthetic JSDoc
+				// symbols above.
+				if ctx.Refs.HasImplicitWrapperBinding(name) {
+					return
+				}
+				// typescript-eslint's scope manager seeds its default `esnext`
+				// library in a separate type namespace. A name such as `Record`
+				// therefore resolves in `type T = Record<string, unknown>`, but the
+				// same spelling in `Record;` remains undefined. Keep this check after
+				// same-file resolution so authored declarations retain normal scope
+				// behavior, and do not consult the TypeChecker: ambient, cross-file,
+				// and host-library symbols are outside core no-undef's inputs.
+				if referenceSpace&eslintReferenceType != 0 && rule.IsDefaultTypeScriptTypeGlobal(name) {
+					return
 				}
 
 				ctx.ReportNode(node, rule.RuleMessage{
@@ -86,9 +107,56 @@ var NoUndefRule = rule.Rule{
 	},
 }
 
-// shouldSkip returns true if the identifier should not be checked for being
-// undefined. This includes property names, declaration names, labels, type
-// positions, and typeof operands (when checkTypeof is false).
+// isOnlyJSDocImportSymbol reports whether every declaration for symbol belongs
+// to a synthetic import declaration reparsed from a JSDoc @import tag. Espree
+// exposes the tag only as a comment, so these synthetic type bindings must not
+// define same-named runtime references for no-undef.
+func isOnlyJSDocImportSymbol(symbol *ast.Symbol) bool {
+	if symbol == nil || len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if !isInJSDocImportDeclaration(declaration) {
+			return false
+		}
+	}
+	return true
+}
+
+func isInJSDocImportDeclaration(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current.Kind == ast.KindJSImportDeclaration &&
+			current.Flags&ast.NodeFlagsReparsed != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func collectAuthoredImportBindings(sourceFile *ast.SourceFile) map[string]struct{} {
+	bindings := make(map[string]struct{})
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && ast.IsDeclarationName(node) {
+			bindings[node.Text()] = struct{}{}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	if sourceFile.Statements != nil {
+		for _, statement := range sourceFile.Statements.Nodes {
+			if statement.Kind == ast.KindImportDeclaration ||
+				statement.Kind == ast.KindImportEqualsDeclaration {
+				statement.ForEachChild(visit)
+			}
+		}
+	}
+	return bindings
+}
+
+// shouldSkip returns true if the identifier does not create a scope reference.
+// This includes property/declaration names, labels, ImportType metadata,
+// synthetic JSDoc syntax, and typeof operands (when checkTypeof is false).
 func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	if node.Parent == nil {
 		return true
@@ -154,14 +222,24 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 		return true
 	}
 
-	// Skip identifiers in type-only positions
-	if isInTypeOnlyPosition(node) {
+	// TypeScript-eslint's scope manager exposes authored type references to
+	// core no-undef. TypeScript-Go also parses JSDoc types into its AST,
+	// however, while upstream parsers leave those comments outside the scope
+	// graph. Keep only those synthetic JSDoc identifiers invisible here.
+	if isInJSDocSyntax(node) {
 		return true
 	}
 
-	// Skip identifiers in qualified names (Namespace.Name in type contexts);
-	// QualifiedName is only used in type positions, not value expressions.
-	if parent.Kind == ast.KindQualifiedName {
+	// `import("pkg").Name` treats both the module argument and qualifier as
+	// module syntax rather than references. Its type arguments remain normal
+	// type references and are deliberately not skipped.
+	if isImportTypeSyntax(node) {
+		return true
+	}
+
+	// In a qualified type name (`Namespace.Name`), only the leftmost root is a
+	// reference. Every right-hand identifier names a member of that root.
+	if parent.Kind == ast.KindQualifiedName && parent.AsQualifiedName().Right == node {
 		return true
 	}
 
@@ -202,47 +280,133 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	return false
 }
 
-// isInTypeOnlyPosition checks whether the identifier is inside a type-only
-// context by walking up the parent chain and matching against explicit
-// type-context node kinds.
-//
-// This follows the same pattern as isInTypeContext in no_unused_vars:
-// explicit Kind matching avoids false positives from the overly broad
-// ast.IsTypeNode() (which includes ExpressionWithTypeArguments).
-//
-// Note: AsExpression, TypeAssertionExpression, and SatisfiesExpression are
-// intentionally excluded. Their expression operand is a value context; only
-// the type annotation part is type-only. Since we walk up from the identifier,
-// a value operand passes through these nodes without being misclassified.
-func isInTypeOnlyPosition(node *ast.Node) bool {
-	current := node.Parent
-	for current != nil {
-		switch current.Kind {
-		// Core type constructs — any identifier under these is type-only
-		case ast.KindTypeReference,
-			ast.KindTypeAliasDeclaration,
-			ast.KindInterfaceDeclaration,
-			ast.KindTypeParameter,
-			ast.KindTypeQuery,
-			ast.KindTypeOperator,
-			ast.KindIndexedAccessType,
-			ast.KindConditionalType,
-			ast.KindInferType,
-			ast.KindTypeLiteral,
-			ast.KindMappedType:
+// isInJSDocSyntax reports whether node came from syntax parsed inside a JSDoc
+// comment. TypeScript-Go deep-clones some of these nodes into the executable
+// tree, preserving NodeFlagsJSDoc on the cloned subtree. Espree and
+// typescript-eslint keep the same text as comments, so none of these names are
+// references for core no-undef.
+func isInJSDocSyntax(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current.Flags&ast.NodeFlagsJSDoc != 0 || ast.IsJSDocNode(current) {
 			return true
-
-		// ExpressionWithTypeArguments wraps identifiers in heritage clauses.
-		// It is type-only EXCEPT in class extends (which is a value position).
-		case ast.KindExpressionWithTypeArguments:
-			if !utils.IsClassExtendsHeritageClause(current) {
-				return true
-			}
-			// class extends — value position, keep walking
 		}
-		current = current.Parent
+		if current.Kind == ast.KindSourceFile {
+			return false
+		}
 	}
 	return false
+}
+
+// isImportTypeSyntax reports whether node belongs to the argument, attributes,
+// or qualifier of an ImportType. Type arguments are siblings of those fields
+// and remain references.
+func isImportTypeSyntax(node *ast.Node) bool {
+	current := node
+	for current.Parent != nil && current.Parent.Kind != ast.KindImportType {
+		current = current.Parent
+	}
+	if current.Parent == nil || current.Parent.Kind != ast.KindImportType {
+		return false
+	}
+	importType := current.Parent.AsImportTypeNode()
+	return importType != nil &&
+		(importType.Argument == current || importType.Attributes == current || importType.Qualifier == current)
+}
+
+type eslintReferenceSpace uint8
+
+const (
+	eslintReferenceValue eslintReferenceSpace = 1 << iota
+	eslintReferenceType
+
+	eslintReferenceDual = eslintReferenceValue | eslintReferenceType
+)
+
+// symbolMeaning translates typescript-eslint's two reference capabilities to
+// TypeScript binder declaration spaces. Namespace declarations are considered
+// both type- and value-capable by scope-manager, and import aliases likewise
+// resolve in either capability regardless of `import type` spelling.
+func (space eslintReferenceSpace) symbolMeaning() ast.SymbolFlags {
+	meaning := ast.SymbolFlagsAlias
+	if space&eslintReferenceValue != 0 {
+		meaning |= ast.SymbolFlagsValue | ast.SymbolFlagsNamespace
+	}
+	if space&eslintReferenceType != 0 {
+		meaning |= ast.SymbolFlagsType | ast.SymbolFlagsNamespace
+	}
+	return meaning
+}
+
+// typescriptESLintReferenceSpace mirrors the reference kind assigned by
+// typescript-eslint's scope manager. Most type references are identified by
+// TypeScript-Go's IsPartOfTypeNode helper; the explicit cases below cover
+// dual-space exports, qualified heritage names, and value-only constructs
+// nested inside type syntax.
+func typescriptESLintReferenceSpace(node *ast.Node) eslintReferenceSpace {
+	if node == nil || node.Parent == nil {
+		return eslintReferenceValue
+	}
+
+	parent := node.Parent
+
+	// `typeof T` and the parameter name in `x is T` are value references.
+	if ast.IsPartOfTypeQuery(node) || parent.Kind == ast.KindTypePredicate {
+		return eslintReferenceValue
+	}
+
+	// TypeScript import-equals visits its module reference as a value, even
+	// though the TypeScript binder can also resolve namespaces there.
+	if isImportEqualsModuleReference(node) {
+		return eslintReferenceValue
+	}
+
+	// A bare identifier in an export assignment/default export, or in a local
+	// export specifier, can resolve either a value or a type upstream.
+	if parent.Kind == ast.KindExportAssignment {
+		return eslintReferenceDual
+	}
+	if parent.Kind == ast.KindExportSpecifier && !utils.IsReExportSpecifier(parent) {
+		if ast.IsTypeOnlyImportOrExportDeclaration(parent) {
+			return eslintReferenceType
+		}
+		return eslintReferenceDual
+	}
+
+	// Only the leftmost identifier of a qualified type name is a reference.
+	// shouldSkip has already removed every right-hand member name.
+	if parent.Kind == ast.KindQualifiedName && parent.AsQualifiedName().Left == node {
+		return eslintReferenceType
+	}
+
+	if ast.IsPartOfTypeNode(node) {
+		return eslintReferenceType
+	}
+
+	// TypeScript represents dotted heritage targets as property-access chains.
+	// Their lexical root is a type reference in `implements` and interface
+	// `extends`, but a value reference in class `extends`.
+	entity := node
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression {
+		access := entity.Parent.AsPropertyAccessExpression()
+		if access == nil || access.Expression != entity {
+			break
+		}
+		entity = entity.Parent
+	}
+	if entity != node && ast.IsPartOfTypeNode(entity) {
+		return eslintReferenceType
+	}
+	return eslintReferenceValue
+}
+
+func isImportEqualsModuleReference(node *ast.Node) bool {
+	entity := node
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindQualifiedName {
+		entity = entity.Parent
+	}
+	return entity.Parent != nil &&
+		entity.Parent.Kind == ast.KindImportEqualsDeclaration &&
+		entity.Parent.AsImportEqualsDeclaration().ModuleReference == entity
 }
 
 // isTypeOfOperand checks if the identifier is the sole operand of a typeof

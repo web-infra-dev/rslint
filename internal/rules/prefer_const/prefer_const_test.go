@@ -291,6 +291,17 @@ func TestPreferConstRule(t *testing.T) {
 				Code:    `function f() { let a: any; let b: any; ({a, b} = ({} as any)); b = 1; void a; }`,
 				Options: map[string]interface{}{"destructuring": "all"},
 			},
+
+			// A write before the declaration still belongs to the binding and
+			// prevents initialized variables from being reported.
+			{Code: `x = 0; let x = 1;`},
+
+			// destructuring: "all" also considers writes to non-let targets in
+			// the same assignment group.
+			{
+				Code:    `function f() { let a: any; var b: any; ({a, b} = ({} as any)); b = 1; }`,
+				Options: map[string]interface{}{"destructuring": "all"},
+			},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -322,6 +333,25 @@ func TestPreferConstRule(t *testing.T) {
 			{
 				Code:   `let x = 1;`,
 				Output: []string{`const x = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 5},
+				},
+			},
+
+			// Reads before an uninitialized declaration do not count as reads
+			// between that declaration and its only assignment.
+			{
+				Code: `void x; let x: any; x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 21},
+				},
+			},
+
+			// The binder resolves a write before an inner declaration to the
+			// future shadowing binding, not to the outer candidate.
+			{
+				Code:   `let x = 0; { x = 1; let x = 2; }`,
+				Output: []string{`const x = 0; { x = 1; let x = 2; }`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 5},
 				},
@@ -416,6 +446,50 @@ func TestPreferConstRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 5},
 					{MessageId: "useConst", Line: 1, Column: 12},
+				},
+			},
+
+			// destructuring: "all" tracks only the destructuring declarator's
+			// candidate range while preserving the shared declaration-list fix.
+			{
+				Code:    `let stable = 1, {a, b} = {a: 2, b: 3};`,
+				Output:  []string{`const stable = 1, {a, b} = {a: 2, b: 3};`},
+				Options: map[string]interface{}{"destructuring": "all"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 5},
+					{MessageId: "useConst", Line: 1, Column: 18},
+					{MessageId: "useConst", Line: 1, Column: 21},
+				},
+			},
+
+			// A partially eligible destructuring group does not suppress an
+			// independent identifier declarator in the same list.
+			{
+				Code:    `let stable = 1, {a, b} = {a: 2, b: 3}; b = 4;`,
+				Options: map[string]interface{}{"destructuring": "all"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 5},
+				},
+			},
+
+			// Multiple destructuring groups keep independent boundaries even
+			// when separated by a plain identifier declarator.
+			{
+				Code:    `let {a, b} = {a: 1, b: 2}, stable = 3, [c, d] = [4, 5]; b++; d++;`,
+				Options: map[string]interface{}{"destructuring": "all"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 28},
+				},
+			},
+
+			// destructuring: "any" keeps candidates independent instead of
+			// applying the all-candidates group constraint.
+			{
+				Code:    `let stable = 1, {a, b} = {a: 2, b: 3}; b = 4;`,
+				Options: map[string]interface{}{"destructuring": "any"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 5},
+					{MessageId: "useConst", Line: 1, Column: 18},
 				},
 			},
 

@@ -13,7 +13,8 @@
           "uniqueItems": true,
           "additionalItems": false
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "minItems": 0,

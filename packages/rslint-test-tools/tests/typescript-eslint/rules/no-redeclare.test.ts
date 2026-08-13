@@ -494,8 +494,9 @@ type T = 2;
       ],
     },
     {
-      // SKIP: rslint's builtin list does not include the TS DOM lib's
-      // `NodeListOf`; `builtinGlobals` covers ES core names only.
+      // SKIP: rslint does not support parserOptions.lib yet. Without that
+      // explicit option, NodeListOf is correctly absent from the default
+      // esnext scope-manager globals.
       code: `
 type NodeListOf = 1;
       `,

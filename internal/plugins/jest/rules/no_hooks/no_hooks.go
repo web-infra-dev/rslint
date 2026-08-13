@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 //go:embed no_hooks.schema.json
@@ -22,13 +23,6 @@ func buildErrorUnexpectedHookMessage(hook string) rule.RuleMessage {
 	}
 }
 
-var allowedHooks = map[string]bool{
-	"beforeEach": true,
-	"afterEach":  true,
-	"beforeAll":  true,
-	"afterAll":   true,
-}
-
 type Options struct {
 	Allow []string `json:"allow"`
 }
@@ -41,7 +35,7 @@ func parseAllowList(raw any) []string {
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		s, ok := item.(string)
-		if ok && allowedHooks[s] {
+		if ok && testFramework.IsHookName(s) {
 			out = append(out, s)
 		}
 	}

@@ -19,8 +19,8 @@ import (
 )
 
 // objectOption is the array-wrapped single-option shape that matches
-// rule_tester's JSON path through utils.GetOptionsMap — the typed-struct
-// shortcut would silently bypass it. See PORT_RULE.md Phase 2 Step 4.
+// rule_tester's JSON path through parseOptions — the typed-struct shortcut
+// would silently bypass it. See PORT_RULE.md Phase 2 Step 4.
 func objectOption(opts map[string]interface{}) []interface{} {
 	return []interface{}{opts}
 }

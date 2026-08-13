@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -49,10 +50,8 @@ func TestNoRedeclareUpstream(t *testing.T) {
 			// SKIP: rslint does not support ESLint's sourceType override plus browser globals.
 			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
 			{Code: "var self = 1", Options: map[string]interface{}{"builtinGlobals": true}},
-			// SKIP: rslint does not model ESLint's ecmaVersion-specific builtin global set.
-			{Code: "var globalThis = foo", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
-			// SKIP: rslint does not model ESLint's ecmaVersion-specific builtin global set.
-			{Code: "var globalThis = foo", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
+			{Code: "var globalThis = foo", Options: map[string]interface{}{"builtinGlobals": true}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015}},
+			{Code: "var globalThis = foo", Options: map[string]interface{}{"builtinGlobals": true}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}},
 
 			// ---- upstream valid: directive comments and configured globals ----
 			{Code: "/*globals Array */", Options: map[string]interface{}{"builtinGlobals": false}},

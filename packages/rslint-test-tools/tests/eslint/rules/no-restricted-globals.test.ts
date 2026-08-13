@@ -37,11 +37,20 @@ ruleTester.run('no-restricted-globals', {
       ] as any,
     },
     // checkGlobalObject defaults to false: plain global-object access is never checked
-    { code: 'window.foo()', options: [{ globals: ['foo'] }] as any },
-    { code: 'self.foo()', options: [{ globals: ['foo'] }] as any },
+    {
+      code: 'window.foo()',
+      languageOptions: { globals: { window: 'readonly' } },
+      options: [{ globals: ['foo'] }] as any,
+    },
+    {
+      code: 'self.foo()',
+      languageOptions: { globals: { self: 'readonly' } },
+      options: [{ globals: ['foo'] }] as any,
+    },
     { code: 'globalThis.foo()', options: [{ globals: ['foo'] }] as any },
     {
       code: 'myGlobal.foo()',
+      languageOptions: { globals: { myGlobal: 'readonly' } },
       options: [{ globals: ['foo'], globalObjects: ['myGlobal'] }] as any,
     },
     // checkGlobalObject: the restricted name must be the final property
@@ -70,10 +79,12 @@ ruleTester.run('no-restricted-globals', {
     // checkGlobalObject: a local shadowing declaration suppresses the report
     {
       code: 'let window; window.foo()',
+      languageOptions: { globals: { window: 'readonly' } },
       options: [{ globals: ['foo'], checkGlobalObject: true }] as any,
     },
     {
       code: 'let self; self.foo()',
+      languageOptions: { globals: { self: 'readonly' } },
       options: [{ globals: ['foo'], checkGlobalObject: true }] as any,
     },
     {
@@ -82,6 +93,7 @@ ruleTester.run('no-restricted-globals', {
     },
     {
       code: 'let myGlobal; myGlobal.foo()',
+      languageOptions: { globals: { myGlobal: 'readonly' } },
       options: [
         {
           globals: ['foo'],
@@ -164,16 +176,19 @@ ruleTester.run('no-restricted-globals', {
     // checkGlobalObject: dot / bracket / optional-chain access
     {
       code: 'window.foo()',
+      languageOptions: { globals: { window: 'readonly' } },
       options: [{ globals: ['foo'], checkGlobalObject: true }] as any,
       errors: [{ messageId: 'defaultMessage' }],
     },
     {
       code: 'self.foo()',
+      languageOptions: { globals: { self: 'readonly' } },
       options: [{ globals: ['foo'], checkGlobalObject: true }] as any,
       errors: [{ messageId: 'defaultMessage' }],
     },
     {
       code: 'window.window.foo()',
+      languageOptions: { globals: { window: 'readonly' } },
       options: [{ globals: ['foo'], checkGlobalObject: true }] as any,
       errors: [{ messageId: 'defaultMessage' }],
     },
@@ -184,6 +199,7 @@ ruleTester.run('no-restricted-globals', {
     },
     {
       code: 'myGlobal.foo()',
+      languageOptions: { globals: { myGlobal: 'readonly' } },
       options: [
         {
           globals: ['foo'],
@@ -195,16 +211,21 @@ ruleTester.run('no-restricted-globals', {
     },
     {
       code: 'window["foo"]',
+      languageOptions: { globals: { window: 'readonly' } },
       options: [{ globals: ['foo'], checkGlobalObject: true }] as any,
       errors: [{ messageId: 'defaultMessage' }],
     },
     {
       code: 'window?.foo()',
+      languageOptions: { globals: { window: 'readonly' } },
       options: [{ globals: ['foo'], checkGlobalObject: true }] as any,
       errors: [{ messageId: 'defaultMessage' }],
     },
     {
       code: 'window.foo(); myGlobal.foo()',
+      languageOptions: {
+        globals: { myGlobal: 'readonly', window: 'readonly' },
+      },
       options: [
         {
           globals: ['foo'],
@@ -219,6 +240,7 @@ ruleTester.run('no-restricted-globals', {
     },
     {
       code: 'function onClick(event) { console.log(event); console.log(window.event); }',
+      languageOptions: { globals: { window: 'readonly' } },
       options: [{ globals: ['event'], checkGlobalObject: true }] as any,
       errors: [{ messageId: 'defaultMessage' }],
     },

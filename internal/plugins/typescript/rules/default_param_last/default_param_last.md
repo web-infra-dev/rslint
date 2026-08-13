@@ -30,4 +30,5 @@ function baz(a: number, b = 1, ...rest: number[]) {}
 
 ## Original Documentation
 
-- [typescript-eslint default-param-last](https://typescript-eslint.io/rules/default-param-last)
+- [typescript-eslint: default-param-last](https://typescript-eslint.io/rules/default-param-last)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/default-param-last.ts)

@@ -14,6 +14,11 @@ type publishOnceEntry[V any] struct {
 }
 
 func (cache *publishOnceCache[K, V]) getOrInit(key K, init func() V) V {
+	if actual, ok := cache.entries.Load(key); ok {
+		// A stored entry may still be initializing; OnceValue waits for its
+		// published result and preserves panic replay semantics.
+		return actual.(*publishOnceEntry[V]).value() //nolint:forcetypeassert
+	}
 	candidate := &publishOnceEntry[V]{value: sync.OnceValue(init)}
 	actual, _ := cache.entries.LoadOrStore(key, candidate)
 	// entries is private and every stored value is a publishOnceEntry[V].

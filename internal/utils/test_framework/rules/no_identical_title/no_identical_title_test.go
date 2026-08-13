@@ -31,12 +31,16 @@ func TestNewRuleParsesEachCallOnce(t *testing.T) {
 	describeCall, nestedCall := calls[0], calls[1]
 	r := NewRule(Config{
 		Name: "test/no-identical-title",
-		Parse: func(node *ast.Node, ctx rule.RuleContext) *ParsedCall {
-			parseCount++
-			if node != describeCall {
-				return nil
+		Prepare: func(ctx rule.RuleContext) Runtime {
+			return Runtime{
+				Parse: func(node *ast.Node) *ParsedCall {
+					parseCount++
+					if node != describeCall {
+						return nil
+					}
+					return &ParsedCall{Call: &testFramework.ParsedCall{Kind: testFramework.FnKindDescribe}}
+				},
 			}
-			return &ParsedCall{Call: &testFramework.ParsedCall{Kind: testFramework.FnKindDescribe}}
 		},
 	})
 

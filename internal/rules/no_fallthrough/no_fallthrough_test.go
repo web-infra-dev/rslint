@@ -70,6 +70,12 @@ func TestNoFallthroughRule(t *testing.T) {
 				Code:    "switch(foo) { case 0: a();\n/* break omitted */\ncase 1: b(); }",
 				Options: []any{map[string]any{"commentPattern": `break[\s\w]*omitted`}},
 			},
+			// Lookbehind is JS-legal but RE2-illegal: a configured pattern is
+			// compiled with the ECMAScript engine, like upstream's `new RegExp`.
+			{
+				Code:    "switch(foo) { case 0: a();\n/* skip fallthrough */\ncase 1: b(); }",
+				Options: []any{map[string]any{"commentPattern": `(?<=skip )fallthrough`}},
+			},
 			// allowEmptyCase with empty statement
 			{
 				Code:    `switch(foo) { case 0: ; case 1: a(); break; }`,
@@ -337,6 +343,16 @@ func TestNoFallthroughRule(t *testing.T) {
 					{MessageId: "case", Line: 2, Column: 1},
 				},
 			},
+			// A configured commentPattern is case-sensitive: upstream compiles
+			// it as `new RegExp(commentPattern, "u")`, without the `i` flag the
+			// default pattern carries.
+			{
+				Code:    "switch(foo) { case 0: a();\n/* break omitted */\ncase 1: b(); }",
+				Options: []any{map[string]any{"commentPattern": `BREAK[\s\w]*OMITTED`}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "case", Line: 3, Column: 1},
+				},
+			},
 			// reportUnusedFallthroughComment — terminal case with comment
 			{
 				Code:    "switch(foo) { case 0: a(); break; /* falls through */\ncase 1: b(); }",
@@ -347,4 +363,23 @@ func TestNoFallthroughRule(t *testing.T) {
 			},
 		},
 	)
+}
+
+// TestNoFallthroughCommentPatternSchema locks in the fail-fast behavior for an
+// invalid commentPattern. Upstream constructs `new RegExp(commentPattern, "u")`
+// while loading the rule, so an invalid pattern like `"("` throws before any
+// linting happens. rslint's equivalent surface is config validation: the schema
+// marks commentPattern with `format: "regex"`, so the config is rejected up
+// front instead of silently linting as if no pattern were configured.
+func TestNoFallthroughCommentPatternSchema(t *testing.T) {
+	invalid := []any{map[string]any{"commentPattern": "("}}
+	if err := NoFallthroughRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid commentPattern regex to fail schema validation")
+	}
+	// Lookbehind is JS-legal but RE2-illegal; it must still validate, proving
+	// the schema checks patterns with the ECMAScript engine, not Go's regexp.
+	valid := []any{map[string]any{"commentPattern": "(?<=a)b"}}
+	if err := NoFallthroughRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid commentPattern regex to pass schema validation, got: %v", err)
+	}
 }

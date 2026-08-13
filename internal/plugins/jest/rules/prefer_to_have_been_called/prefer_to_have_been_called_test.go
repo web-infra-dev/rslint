@@ -86,6 +86,41 @@ func TestPreferToHaveBeenCalledRule(t *testing.T) {
 					{MessageId: "preferMatcher", Line: 1, Column: 16},
 				},
 			},
+			{
+				Code:   `expect(method)[("not")].toHaveBeenCalledTimes(0);`,
+				Output: []string{`expect(method).toHaveBeenCalled();`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferMatcher"},
+				},
+			},
+			{
+				Code:   `expect(method)?.["not"].toHaveBeenCalledTimes?.(0);`,
+				Output: []string{`expect(method)?.toHaveBeenCalled?.();`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferMatcher"},
+				},
+			},
+			{
+				Code:   `expect(method)?.["toHaveBeenCalledTimes"](0);`,
+				Output: []string{`expect(method)?.not['toHaveBeenCalled']();`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferMatcher"},
+				},
+			},
+			{
+				Code:   `(expect(method).toHaveBeenCalledTimes)(0);`,
+				Output: []string{`(expect(method).not.toHaveBeenCalled)();`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferMatcher"},
+				},
+			},
+			{
+				Code:   `(expect(method)?.not).toHaveBeenCalledTimes(0);`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferMatcher"},
+				},
+			},
 		},
 	)
 }

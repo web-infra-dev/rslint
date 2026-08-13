@@ -7,7 +7,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   extension = new Extension(context);
 
   try {
-    await extension.activate();
+    extension.activate();
   } catch (activationError) {
     let closeError: unknown;
     try {

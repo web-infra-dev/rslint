@@ -1,0 +1,28 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowShortCircuit": {
+          "type": "boolean"
+        },
+        "allowTernary": {
+          "type": "boolean"
+        },
+        "allowTaggedTemplates": {
+          "type": "boolean"
+        },
+        "enforceForJSX": {
+          "type": "boolean"
+        },
+        "ignoreDirectives": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -46,6 +46,7 @@ For directory or no-argument lint runs, global ignores in a parent config preven
 export default defineConfig([
   // Global ignore — blocks directory target discovery in these directories
   { ignores: ['**/fixtures/**', 'e2e/**'] },
+  js.configs.recommended,
   ts.configs.recommended,
   // ...
 ]);
@@ -78,12 +79,13 @@ rslint --init
 A typical TypeScript project configuration:
 
 ```ts
-import { defineConfig, globalIgnores, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, js, ts } from '@rslint/core';
 
 export default defineConfig([
   // Global ignores — files excluded from all rules
   globalIgnores(['**/dist/**', '**/fixtures/**']),
-  // Preset with recommended rules
+  // Presets with recommended rules
+  js.configs.recommended,
   ts.configs.recommended,
   // Custom rule overrides
   {
@@ -94,6 +96,10 @@ export default defineConfig([
   },
 ]);
 ```
+
+:::tip
+When using both JavaScript and TypeScript recommended presets, place `js.configs.recommended` before `ts.configs.recommended`. The TypeScript preset disables ESLint core rules that are handled by TypeScript-aware rules, and later config entries override earlier ones.
+:::
 
 For available presets, rule severity, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
@@ -191,6 +197,41 @@ See [ESLint plugin compatibility](/guide/eslint-plugins) for the supported and u
 ### languageOptions
 
 - **Type:** `object`
+
+#### languageOptions.ecmaVersion
+
+- **Type:** `number | 'latest'`
+- **Default:** `'latest'`
+
+Selects the standard ECMAScript globals exposed to native rules. Accepted numbers match ESLint/Espree: `3`, `5`, edition aliases `6` through `17`, or years `2015` through `2026`. Edition aliases are normalized to their year (`6` is ES2015 and `17` is ES2026). The `'latest'` value remains semantic rather than being frozen into the config, so it follows the ESLint version targeted by rslint. This option currently selects globals; it does not change TypeScript's parser target.
+
+```ts
+{
+  languageOptions: {
+    ecmaVersion: 'latest',
+  },
+}
+```
+
+#### languageOptions.sourceType
+
+- **Type:** `'module' | 'script' | 'commonjs'`
+- **Default:** unset
+
+Exposes the configured module kind to rules through their per-file language context. This lets a rule whose behavior depends on module kind distinguish ECMAScript modules, scripts, and CommonJS—for example, to choose between an `import` declaration and a `require()` call. When omitted, the context leaves the value unset so a rule can fall back to structural detection from `import` / `export` syntax.
+
+This option does not change TypeScript parsing or compiler module resolution. Support in an individual native rule depends on that rule consulting the configured value; rules that still document syntax-based module detection continue to use that behavior.
+
+Set `sourceType` directly on `languageOptions`; the legacy `languageOptions.parserOptions.sourceType` location is not supported.
+
+```ts
+{
+  files: ['scripts/**/*.js'],
+  languageOptions: {
+    sourceType: 'commonjs',
+  },
+}
+```
 
 #### languageOptions.parserOptions.projectService
 

@@ -44,4 +44,5 @@ function foo() {
 
 ## Original Documentation
 
-- [ESLint prefer-rest-params](https://eslint.org/docs/latest/rules/prefer-rest-params)
+- [ESLint: prefer-rest-params](https://eslint.org/docs/latest/rules/prefer-rest-params)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-rest-params.js)

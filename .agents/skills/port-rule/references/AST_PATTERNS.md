@@ -375,12 +375,13 @@ See `typescript-go/_packages/api/src/api.ts` for full API:
 
 Reference: `internal/rule/ref_store.go`, consumer examples: `internal/rules/no_var/no_var.go` (References), `internal/rules/prefer_const/prefer_const.go` (Resolve).
 
-`ctx.Refs` is a lazily built per-file identifier-reference index — rslint's stand-in for ESLint's scope manager (`variable.references`, `getScope().references`). It has two methods:
+`ctx.Refs` is a lazily built per-file identifier-reference index — rslint's stand-in for ESLint's scope manager (`variable.references`, `getScope().references`). Its main methods are:
 
-| Method                        | Direction                                                                                                                  | Touches TypeChecker?                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `Resolve(node) *ast.Symbol`   | identifier → its declaring symbol, anywhere the checker can see (this file, cross-file, `.d.ts`, standard-library globals) | Only as a fallback, when the binder scope walk alone can't place the identifier            |
-| `References(sym) []*ast.Node` | symbol → every identifier in this file that references it                                                                  | Same fallback trigger as `Resolve`, plus once per top-level symbol of a global script file |
+| Method                            | Direction                                                                                                                  | Touches TypeChecker?                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `Resolve(node) *ast.Symbol`       | identifier → its declaring symbol, anywhere the checker can see (this file, cross-file, `.d.ts`, standard-library globals) | Only as a fallback, when the binder scope walk alone can't place the identifier            |
+| `ResolveInFile(node) *ast.Symbol` | identifier → its declaration in this file's binder scope graph                                                             | Never                                                                                      |
+| `References(sym) []*ast.Node`     | symbol → every identifier in this file that references it                                                                  | Same fallback trigger as `Resolve`, plus once per top-level symbol of a global script file |
 
 Both resolve identifiers with the binder's scope walk first — the same scope
 walk the checker performs, but without the checker itself — so the common
@@ -391,8 +392,14 @@ outside this file (cross-file, `.d.ts`, standard-library globals) — and a
 TypeChecker was supplied, `Resolve` falls back to it automatically, at the
 cost of a real round-trip for that identifier; `References` picks up the same
 fallback when queried with a symbol `Resolve` obtained that way. Without a
-TypeChecker, that fallback is a no-op and both methods only ever see symbols
-declared in this file.
+TypeChecker, that fallback is a no-op and `Resolve`/`References` only ever see
+symbols declared in this file.
+
+Use `ResolveInFile` when the upstream rule intentionally operates on ESLint's
+file scope and must not acquire names merely because TypeScript can see a DOM
+lib, ambient declaration, or another source file. Core `no-undef` is the
+canonical example: language and authored globals come from `ctx.Globals`, and
+only declarations/imports authored in the file come from `ResolveInFile`.
 
 One further checker round-trip is unavoidable in a global script file (a
 non-module `.ts`/`.js`): the checker merges such a file's top-level

@@ -1,6 +1,8 @@
 package no_misused_spread
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -8,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_misused_spread.schema.json
+var schemaJSON []byte
 
 func buildAddAwaitMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -75,8 +80,21 @@ func buildReplaceMapSpreadInObjectMessage() rule.RuleMessage {
 }
 
 type NoMisusedSpreadOptions struct {
-	Allow       []utils.TypeOrValueSpecifier
-	AllowInline []string
+	Allow []utils.TypeOrValueSpecifier
+}
+
+func parseOptions(options []any) NoMisusedSpreadOptions {
+	opts := NoMisusedSpreadOptions{
+		Allow: []utils.TypeOrValueSpecifier{},
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if specifiers := utils.ParseTypeOrValueSpecifiers(optsMap["allow"]); specifiers != nil {
+		opts.Allow = specifiers
+	}
+	return opts
 }
 
 func isString(t *checker.Type) bool {
@@ -152,23 +170,14 @@ func isClassDeclaration(t *checker.Type) bool {
 
 var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 	Name:             "no-misused-spread",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoMisusedSpreadOptions)
-		if !ok {
-			opts = NoMisusedSpreadOptions{}
-		}
-		if opts.Allow == nil {
-			opts.Allow = []utils.TypeOrValueSpecifier{}
-		}
-		if opts.AllowInline == nil {
-			opts.AllowInline = []string{}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		checkArrayOrCallSpread := func(node *ast.Node) {
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsSpreadElement().Expression)
-			if !utils.TypeMatchesSomeSpecifier(t, opts.Allow, opts.AllowInline, ctx.Program) && isString(t) {
+			if !utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program) && isString(t) {
 				ctx.ReportNode(node, buildNoStringSpreadMessage())
 			}
 		}
@@ -224,7 +233,7 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 		checkObjectSpread := func(node *ast.Node, argument *ast.Node) {
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
 
-			if utils.TypeMatchesSomeSpecifier(t, opts.Allow, opts.AllowInline, ctx.Program) {
+			if utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program) {
 				return
 			}
 

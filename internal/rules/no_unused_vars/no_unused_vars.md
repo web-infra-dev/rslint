@@ -104,3 +104,4 @@ var publicValue = 1;
 ## Original Documentation
 
 - [ESLint: no-unused-vars](https://eslint.org/docs/latest/rules/no-unused-vars)
+- [Source code](https://github.com/eslint/eslint/blob/v9.32.0/lib/rules/no-unused-vars.js)

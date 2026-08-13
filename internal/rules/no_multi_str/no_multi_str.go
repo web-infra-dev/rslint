@@ -10,7 +10,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-multi-str
 var NoMultiStrRule = rule.Rule{
-	Name: "no-multi-str",
+	Name:   "no-multi-str",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindStringLiteral: func(node *ast.Node) {

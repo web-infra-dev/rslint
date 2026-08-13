@@ -62,4 +62,5 @@ Block-level elements (e.g. `<p>`, `<div>`) and custom components (e.g.
 
 ## Original Documentation
 
-- [react/jsx-child-element-spacing](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-child-element-spacing.md)
+- [eslint-plugin-react: jsx-child-element-spacing](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-child-element-spacing.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-child-element-spacing.js)

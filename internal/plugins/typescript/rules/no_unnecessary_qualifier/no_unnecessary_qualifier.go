@@ -27,6 +27,7 @@ import (
 //   - Upstream:  https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/rules/no-unnecessary-qualifier.ts
 var NoUnnecessaryQualifierRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-qualifier",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run:              run,
 })

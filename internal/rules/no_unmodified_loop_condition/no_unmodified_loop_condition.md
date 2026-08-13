@@ -56,4 +56,5 @@ while (obj.ready) {
 
 ## Original Documentation
 
-- [ESLint no-unmodified-loop-condition](https://eslint.org/docs/latest/rules/no-unmodified-loop-condition)
+- [ESLint: no-unmodified-loop-condition](https://eslint.org/docs/latest/rules/no-unmodified-loop-condition)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unmodified-loop-condition.js)

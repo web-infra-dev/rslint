@@ -75,4 +75,5 @@ A: switch (a) {
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/no-labels
+- [ESLint: no-labels](https://eslint.org/docs/latest/rules/no-labels)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-labels.js)

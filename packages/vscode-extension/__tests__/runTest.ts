@@ -61,7 +61,8 @@ async function runIsolatedSuite(
   const profileRoot = await fs.promises.mkdtemp(path.join(tempRoot, 'rsv-'));
   const userDataDir = path.join(profileRoot, 'u');
   const extensionsDir = path.join(profileRoot, 'e');
-  const workspaceCopy = path.join(profileRoot, 'w');
+  const dependencyRoot = path.join(profileRoot, 'p');
+  const workspaceCopy = path.join(dependencyRoot, 'w');
 
   let testError: unknown;
   try {
@@ -93,13 +94,41 @@ async function runIsolatedSuite(
     // Preserve the source workspace's package boundary and dependency lookup
     // without placing a writable node_modules link inside the test workspace.
     const packageRoot = await findPackageRoot(suite.workspace);
-    await fs.promises.copyFile(
-      path.join(packageRoot, 'package.json'),
-      path.join(profileRoot, 'package.json'),
+    const packageJsonPath = path.join(packageRoot, 'package.json');
+    const packageJson: unknown = JSON.parse(
+      await fs.promises.readFile(packageJsonPath, 'utf8'),
     );
+    if (
+      packageJson !== null &&
+      typeof packageJson === 'object' &&
+      !Array.isArray(packageJson) &&
+      'name' in packageJson &&
+      packageJson.name === '@rslint/core'
+    ) {
+      await fs.promises.writeFile(
+        path.join(dependencyRoot, 'package.json'),
+        JSON.stringify({ ...packageJson, name: '@rslint/vscode-test-fixture' }),
+      );
+    } else {
+      await fs.promises.copyFile(
+        packageJsonPath,
+        path.join(dependencyRoot, 'package.json'),
+      );
+    }
     await fs.promises.symlink(
       path.join(packageRoot, 'node_modules'),
-      path.join(profileRoot, 'node_modules'),
+      path.join(dependencyRoot, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    // A package's own node_modules does not contain a link back to itself.
+    // Provide the project-local core one ancestry level higher so every fixture
+    // exercises the extension's normal node_modules lookup without a fallback.
+    const coreScope = path.join(profileRoot, 'node_modules', '@rslint');
+    await fs.promises.mkdir(coreScope, { recursive: true });
+    await fs.promises.symlink(
+      path.dirname(require.resolve('@rslint/core/package.json')),
+      path.join(coreScope, 'core'),
       process.platform === 'win32' ? 'junction' : 'dir',
     );
 
@@ -222,6 +251,16 @@ async function main(): Promise<void> {
       name: 'unicode-bom tests',
       workspace: path.resolve(testsSourceDir, 'fixtures-unicode-bom'),
       tests: path.resolve(__dirname, './suite-unicode-bom'),
+    },
+    {
+      name: 'Generated rule-option-types tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-rule-option-types'),
+      tests: path.resolve(__dirname, './suite-rule-option-types'),
+    },
+    {
+      name: 'import/no-cycle tests',
+      workspace: path.resolve(testsSourceDir, 'fixtures-import-cycle'),
+      tests: path.resolve(__dirname, './suite-import-cycle'),
     },
   ];
 

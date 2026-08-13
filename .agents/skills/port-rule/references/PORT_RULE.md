@@ -14,9 +14,9 @@ Your job is porting the **rule's semantics** — given equivalent input, produce
 - `parserOptions.sourceType` override / `parserOptions.ecmaFeatures.*`
 - `env: 'browser' | 'node' | ...`
 
-Note: `languageOptions.globals` and `/*global ...*/` comments are automatically parsed by rslint and exposed through `ctx.Globals`, a `map[string]utils.GlobalAccess` holding ESLint's three access levels. When porting rules that reference global variables, do not skip these test cases; index the map instead — its zero value, `utils.GlobalAccessUnset`, means neither source mentioned the name, so a missing entry falls through to whatever the rule already knows (e.g. `utils.IsECMAScriptGlobal`). Use `ctx.Globals[name] == utils.GlobalAccessOff` for "the name was explicitly un-declared", `ctx.Globals[name].IsDeclared()` for "the name resolves to a global", and `.IsWritable()` where ESLint distinguishes assignable globals (as `no-global-assign` does). Test cases author these the way an ESLint config does: `Globals: map[string]any{"foo": "readonly"}`.
+Note: rslint combines the ECMAScript globals selected by `languageOptions.ecmaVersion` (default `"latest"`), config `languageOptions.globals`, and `/*global ...*/` comments in the immutable `ctx.Globals` view. When porting a rule that resolves global variables, do not skip these cases or keep a private language-global table: use `ctx.Globals.Access(name)` for the final access after language < config < inline precedence. Use `ctx.Globals.Override(name)` only when upstream distinguishes an explicitly authored setting from an implicit language global; the narrower `LanguageAccess`, `ConfigOverride`, and `ConfiguredAccess` methods are for rules whose upstream behavior genuinely depends on provenance. `InlineDeclarations()` provides ordered comment ranges. Test cases author config globals as `Globals: map[string]any{"foo": "readonly"}` and select a version with `LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}`. Access values support `IsDeclared()` and `IsWritable()`; an explicit `off` is not declared.
 
-Note: ESLint's scope manager (`sourceCode.getScope()`, `variable.references`) has no direct equivalent, but the common case — "every identifier that references this declared symbol" — is served by `ctx.Refs.References(sym)`, a lazily built per-file reference index keyed by binder symbols (`decl.Symbol()`). The reverse direction — "what symbol does this identifier resolve to" — is `ctx.Refs.Resolve(node)`: it tries the binder scope walk first (never touches the checker for a same-file symbol) and falls back to the checker automatically for globals/ambient/cross-file symbols the binder can't place, at the cost of a round-trip for that identifier. Use it instead of walking the AST and calling `ctx.TypeChecker.GetSymbolAtLocation` per identifier, which is a known performance killer — and never hand-roll a "try ctx.Refs, fall back to the checker" wrapper, since `Resolve` already is one. See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for semantics and the nil guard.
+Note: ESLint's scope manager (`sourceCode.getScope()`, `variable.references`) has no direct equivalent, but the common case — "every identifier that references this declared symbol" — is served by `ctx.Refs.References(sym)`, a lazily built per-file reference index keyed by binder symbols (`decl.Symbol()`). The reverse direction — "what symbol does this identifier resolve to" — is `ctx.Refs.Resolve(node)`: it tries the binder scope walk first and falls back to the checker for globals/ambient/cross-file symbols the binder can't place. Use `ctx.Refs.ResolveInFile(node)` instead when an ESLint scope rule must deliberately exclude TypeScript lib, ambient, and cross-file declarations (as core `no-undef` does). Never hand-roll a "try ctx.Refs, fall back to the checker" wrapper or walk the AST while calling `ctx.TypeChecker.GetSymbolAtLocation` per identifier. See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for semantics and the nil guard.
 
 Note: every comment in the file is exposed lazily through `ctx.Comments.All()` as a source-ordered, deduplicated `[]*ast.CommentRange`. If your rule needs to scan all comments (directive comments, "is this line comment-only", etc.), iterate that shared slice — do **not** call `utils.ForEachComment(ctx.SourceFile.AsNode(), ...)`, which re-walks the entire token tree from scratch. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#token-and-comment-iteration) for the full comment-handling API and when each function is appropriate.
 
@@ -157,6 +157,8 @@ Before starting, familiarize yourself with these key source locations:
    - **Priority**: If the user provides an official link, **FIRST** read and analyze that link's content.
    - **Fallback**: If no link is provided, search for the rule documentation (ESLint website or Plugin repo) and source code (GitHub).
    - Find the rule test file (usually `tests/lib/rules/<rule>.js`).
+   - **Source from the latest released tag, not the default branch.** Do not read the rule's behavior off `main`/`master`/HEAD — it may contain half-finished or unreleased changes. Find the upstream project's latest release tag and read the rule's doc/source/tests as they exist at that tag; note the tag, since Phase 2 Step 3 pins the rule doc's links to it — the only record of which upstream version the port targets.
+   - **If the rule (or the specific behavior/option being requested) doesn't exist yet at the latest released tag** — only on the default branch, or in an unpublished PR — stop and tell the user instead of porting it anyway. Don't silently port pre-release behavior just because the user's request didn't mention this.
 
 2. **Determine Rule Origin & Deprecation Status**:
 
@@ -330,7 +332,6 @@ If ≥1 rule in the same plugin already defines a near-equivalent helper, you MU
 - `AreNodes*`, `IsSame*` — structural / reference AST comparison
 - `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
 - `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries. For "all references to this declared symbol" use `ctx.Refs.References(decl.Symbol())`, and for "what does this identifier resolve to" use `ctx.Refs.Resolve(node)`, which also resolves symbols declared outside this file (globals/ambient/cross-file) via its checker fallback — never a hand-rolled AST walk with `GetSymbolAtLocation` per identifier (see [AST_PATTERNS.md — Resolving Identifiers and Collecting References](AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs))
-- `GetOptionsMap` — options parsing (handles both array and map inputs)
 - **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
 
 See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
@@ -407,7 +408,7 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). Write `parseOptions` to take that slice directly and extract the first element's map with `utils.GetOptionsMap()`:
+`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). The framework normalizes options before calling the rule, so write `parseOptions` to take that slice directly, guard its length, and read the first positional option from `options[0]`:
 
 ```go
 Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -417,17 +418,20 @@ Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 func parseOptions(options []any) Options {
     opts := Options{/* defaults */}
-    optsMap := utils.GetOptionsMap(options)
-    if optsMap != nil {
-        // Parse options from optsMap...
+    if len(options) == 0 {
+        return opts
+    }
+    optsMap, _ := options[0].(map[string]any)
+    if value, ok := optsMap["someOption"].(bool); ok {
+        opts.SomeOption = value
     }
     return opts
 }
 ```
 
-`GetOptionsMap` is the only safe extractor — do not reimplement it with a hand-rolled `options[0].(map[string]interface{})` type assertion.
+Do not call `rule.NormalizeOptions` inside `Run` or make `parseOptions` accept a bare map. Configuration loading and `rule_tester.ResolveTestCaseOptions` already normalize inputs to `[]any`; the rule should consume that single representation.
 
-For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...) instead of using `GetOptionsMap`.
+For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...), guarding each position with the corresponding length check before access.
 
 #### Options schema
 
@@ -522,6 +526,27 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 [Link to ESLint documentation]
 ````
 
+**Pin the upstream version** — this is how rslint records which upstream release a rule's _behavior_ was ported/verified against, since nothing else in the repo does.
+
+- **Source code link**: always required, always a `github.com/.../blob/<tag>/...` link pinned to the exact released tag you read while porting — never `main`/`master`/`HEAD`.
+- **Doc link**: text is always `<Family/Plugin name>: <rule-name>` (e.g. `eslint-plugin-unicorn: no-thenable`, `ESLint: no-console`, `typescript-eslint: await-thenable`) — colon included, regardless of family. If the docs are plain markdown files in the project's GitHub repo (`eslint-plugin-unicorn`, `-react`, `-jsx-a11y`, `-jest`, `-promise`, `-import`, ...), pin the URL to the same tag as the source link. If the docs live on a custom website (`eslint.org`, `typescript-eslint.io`, `react.dev`, ...), the URL itself can't be pinned to a release — leave it as the plain rule-page URL.
+
+```markdown
+## Original Documentation
+
+- [eslint-plugin-unicorn: no-thenable](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/docs/rules/no-thenable.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/rules/no-thenable.js)
+```
+
+```markdown
+## Original Documentation
+
+- [ESLint: no-console](https://eslint.org/docs/latest/rules/no-console)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.0/lib/rules/no-console.js)
+```
+
+If a later change re-verifies a rule against a newer upstream release, bumping the pinned tag(s) is the entire re-alignment record — do it once the rule's behavior has actually been checked against the newer release, not preemptively.
+
 **Options in examples**: when a code block demonstrates a specific option combination, precede the `javascript` block with a standalone `json` block containing the rule's config entry — shape: `{ "<rule-name>": ["error", { ...options... }] }`. Let prettier format it (single-line when short, multi-line when the options list grows). Keep the `javascript` block pure source code (no annotations). Do **not** wrap the config entry in a `"rules": { ... }` object (redundant here) and do **not** copy upstream linter directives such as `/* eslint <rule>: [...] */` into the examples.
 
 **Writing a "Differences from ESLint" section** (when the rule has one):
@@ -562,12 +587,12 @@ These docstrings are how a reader (or `grep`) confirms a file is doing its assig
 - Use `rule_tester.RunRuleTester` in each test file (one `Test<Name>` function per file is typical; multiple are fine when it improves grouping).
 - Shared fixtures (option-map literals, expected message strings) can live as package-level vars; both files share the same Go package so they compose freely.
 - Invalid cases **MUST** include `Line` and `Column` assertions.
-- Use `map[string]interface{}` to pass options in Go tests.
+- Use `map[string]any` to pass object options in Go tests.
 - Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`.
 
-**Options coverage — MUST exercise the JSON path.** Passing a typed struct directly (e.g. `Options: MyRuleOptions{CheckX: utils.Ref(true)}`) short-circuits the `options.(MyRuleOptions)` type assertion and never exercises `utils.GetOptionsMap` or JSON round-trip. CLI and JS configs always take the JSON path, so a struct-only suite leaves the CLI-facing wiring untested.
+**Options coverage — MUST exercise JSON-decoded shapes.** `rule_tester.ResolveTestCaseOptions` normalizes each test case's options to `[]any` and validates them against the rule's schema before `Run` executes. Use JSON-shaped maps and slices in tests; a typed options struct does not model configuration input and will be rejected by an object schema.
 
-For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field is `map[string]interface{}{...}` (bare object — matches the single-option CLI shape) or `[]interface{}{map[string]interface{}{...}}` (array-wrapped — matches the multi-element / rule_tester shape). This catches bugs like missing `GetOptionsMap` integration, wrong JSON tag casing, and option-name typos that typed structs silently hide. See `no_floating_promises_test.go → TestNoFloatingPromisesOptionParsing` for a reference suite covering both shapes, nil options, empty arrays, malformed values, and nested specifier arrays.
+For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field uses JSON-shaped values. For a single object option, prefer `map[string]any{...}`; use `[]any{...}` when the rule genuinely has multiple positional options. Both forms reach `Run` as a normalized `[]any`, so do not duplicate a single-object case solely to test bare versus array-wrapped input. These cases catch missing `len(options)` / `options[0]` parsing, wrong key casing, and option-name typos.
 
 **Debug Flags**:
 

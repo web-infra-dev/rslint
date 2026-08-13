@@ -15,10 +15,10 @@ func TestNoVarRequiresRule(t *testing.T) {
 		{Code: "import { bar } from 'foo';"},
 		{Code: "require('foo');"},
 		{Code: "require?.('foo');"},
-		{Code: "const foo = require('foo');", Options: &Options{Allow: []string{"foo"}}},
-		{Code: "const foo = require('./foo');", Options: &Options{Allow: []string{"foo"}}},
-		{Code: "const foo = require('../foo');", Options: &Options{Allow: []string{"foo"}}},
-		{Code: "const foo = require('foo/bar');", Options: &Options{Allow: []string{"bar"}}},
+		{Code: "const foo = require('foo');", Options: map[string]interface{}{"allow": []interface{}{"foo"}}},
+		{Code: "const foo = require('./foo');", Options: map[string]interface{}{"allow": []interface{}{"foo"}}},
+		{Code: "const foo = require('../foo');", Options: map[string]interface{}{"allow": []interface{}{"foo"}}},
+		{Code: "const foo = require('foo/bar');", Options: map[string]interface{}{"allow": []interface{}{"bar"}}},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: "var foo = require('foo');",
@@ -97,7 +97,7 @@ func TestNoVarRequiresRule(t *testing.T) {
 		},
 		{
 			Code:    "const foo = require('foo'), bar = require('bar');",
-			Options: &Options{Allow: []string{"bar"}},
+			Options: map[string]interface{}{"allow": []interface{}{"bar"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noVarReqs",
@@ -108,7 +108,7 @@ func TestNoVarRequiresRule(t *testing.T) {
 		},
 		{
 			Code:    "const foo = require('./foo');",
-			Options: &Options{Allow: []string{"bar"}},
+			Options: map[string]interface{}{"allow": []interface{}{"bar"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noVarReqs",
@@ -134,6 +134,44 @@ func TestNoVarRequiresRule(t *testing.T) {
 					MessageId: "noVarReqs",
 					Line:      1,
 					Column:    18,
+				},
+			},
+		},
+	})
+}
+
+// TestNoVarRequiresAllowSchema locks in that each `allow` entry is validated
+// as a regex. The rule compiles every entry to match require paths, so an
+// unparsable one would otherwise be dropped and that path would keep
+// reporting. Upstream's schema declares a plain array of strings.
+func TestNoVarRequiresAllowSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allow": []any{"("}}}
+	if err := NoVarRequiresRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allow pattern to fail schema validation")
+	}
+	valid := []any{map[string]any{"allow": []any{"/package\\.json$"}}}
+	if err := NoVarRequiresRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allow pattern to pass schema validation, got: %v", err)
+	}
+}
+
+// TestNoVarRequiresAllowLookahead locks in that `allow` patterns are matched
+// with the same ECMAScript regex engine the schema validates them against
+// (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a JS-only
+// pattern that passes schema validation would otherwise silently fail to
+// compile and never allow anything.
+func TestNoVarRequiresAllowLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoVarRequiresRule, []rule_tester.ValidTestCase{
+		{Code: "const foo = require('foo');", Options: map[string]interface{}{"allow": []interface{}{"^(?!bar)"}}},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    "const foo = require('barbaz');",
+			Options: map[string]interface{}{"allow": []interface{}{"^(?!bar)"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noVarReqs",
+					Line:      1,
+					Column:    13,
 				},
 			},
 		},

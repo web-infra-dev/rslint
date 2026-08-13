@@ -87,5 +87,5 @@ If you do not need to restrict imports of any modules, do not enable this rule.
 
 ## Original Documentation
 
-- [typescript-eslint rule documentation](https://typescript-eslint.io/rules/no-restricted-imports)
-- [Base ESLint rule documentation](https://eslint.org/docs/latest/rules/no-restricted-imports)
+- [typescript-eslint: no-restricted-imports](https://typescript-eslint.io/rules/no-restricted-imports)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-restricted-imports.ts)

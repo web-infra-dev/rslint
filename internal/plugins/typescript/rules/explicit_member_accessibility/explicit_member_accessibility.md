@@ -129,4 +129,5 @@ class Test {
 
 ## Original Documentation
 
-- [typescript-eslint explicit-member-accessibility](https://typescript-eslint.io/rules/explicit-member-accessibility)
+- [typescript-eslint: explicit-member-accessibility](https://typescript-eslint.io/rules/explicit-member-accessibility)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/explicit-member-accessibility.ts)

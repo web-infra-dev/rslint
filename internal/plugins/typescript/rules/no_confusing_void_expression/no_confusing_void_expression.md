@@ -36,4 +36,5 @@ const fn = () => void console.log('hello');
 
 ## Original Documentation
 
-- [typescript-eslint no-confusing-void-expression](https://typescript-eslint.io/rules/no-confusing-void-expression)
+- [typescript-eslint: no-confusing-void-expression](https://typescript-eslint.io/rules/no-confusing-void-expression)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-confusing-void-expression.ts)

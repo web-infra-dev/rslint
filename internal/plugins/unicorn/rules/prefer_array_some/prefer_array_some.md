@@ -46,4 +46,5 @@ const index = array.findIndex(element => element === "🦄");
 
 ## Original Documentation
 
-- [eslint-plugin-unicorn / prefer-array-some](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/prefer-array-some.md)
+- [eslint-plugin-unicorn: prefer-array-some](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v73.0.0/docs/rules/prefer-array-some.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v73.0.0/rules/prefer-array-some.js)

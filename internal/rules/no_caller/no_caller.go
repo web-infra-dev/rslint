@@ -9,7 +9,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-caller
 var NoCallerRule = rule.Rule{
-	Name: "no-caller",
+	Name:   "no-caller",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {

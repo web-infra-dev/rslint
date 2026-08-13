@@ -56,4 +56,5 @@ class A extends B {
 
 ## Original Documentation
 
-- [ESLint no-this-before-super](https://eslint.org/docs/latest/rules/no-this-before-super)
+- [ESLint: no-this-before-super](https://eslint.org/docs/latest/rules/no-this-before-super)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-this-before-super.js)

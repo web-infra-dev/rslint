@@ -1,0 +1,27 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "countVoidThis": {
+          "type": "boolean",
+          "description": "Whether to count a `this` declaration when the type is `void`."
+        },
+        "max": {
+          "type": "integer",
+          "description": "A maximum number of parameters in function definitions.",
+          "minimum": 0
+        },
+        "maximum": {
+          "type": "integer",
+          "description": "(deprecated) A maximum number of parameters in function definitions.",
+          "minimum": 0
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

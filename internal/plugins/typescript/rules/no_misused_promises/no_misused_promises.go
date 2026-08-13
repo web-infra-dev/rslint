@@ -1,7 +1,7 @@
 package no_misused_promises
 
 import (
-	"encoding/json"
+	_ "embed"
 	"fmt"
 	"slices"
 
@@ -10,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_misused_promises.schema.json
+var schemaJSON []byte
 
 func buildConditionalMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -67,107 +70,79 @@ func buildVoidReturnVariableMessage() rule.RuleMessage {
 }
 
 type NoMisusedPromisesChecksVoidReturnOptions struct {
-	Arguments        *bool `json:"arguments,omitempty"`
-	Attributes       *bool `json:"attributes,omitempty"`
-	InheritedMethods *bool `json:"inheritedMethods,omitempty"`
-	Properties       *bool `json:"properties,omitempty"`
-	Returns          *bool `json:"returns,omitempty"`
-	Variables        *bool `json:"variables,omitempty"`
+	Arguments        bool
+	Attributes       bool
+	InheritedMethods bool
+	Properties       bool
+	Returns          bool
+	Variables        bool
 }
+
 type NoMisusedPromisesOptions struct {
-	ChecksConditionals   *bool                                     `json:"checksConditionals,omitempty"`
-	ChecksSpreads        *bool                                     `json:"checksSpreads,omitempty"`
-	ChecksVoidReturn     *bool                                     `json:"-"`
-	ChecksVoidReturnOpts *NoMisusedPromisesChecksVoidReturnOptions `json:"-"`
+	ChecksConditionals   bool
+	ChecksSpreads        bool
+	ChecksVoidReturn     bool
+	ChecksVoidReturnOpts NoMisusedPromisesChecksVoidReturnOptions
 }
 
-// rawNoMisusedPromisesOptions mirrors the JSON shape (where checksVoidReturn
-// can be `boolean | object`) so we can unmarshal it without needing a custom
-// schema in TypeScript.
-type rawNoMisusedPromisesOptions struct {
-	ChecksConditionals *bool           `json:"checksConditionals,omitempty"`
-	ChecksSpreads      *bool           `json:"checksSpreads,omitempty"`
-	ChecksVoidReturn   json.RawMessage `json:"checksVoidReturn,omitempty"`
-}
-
-func (o *NoMisusedPromisesOptions) UnmarshalJSON(data []byte) error {
-	var raw rawNoMisusedPromisesOptions
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
+func parseOptions(options []any) NoMisusedPromisesOptions {
+	opts := NoMisusedPromisesOptions{
+		ChecksConditionals: true,
+		ChecksSpreads:      true,
+		ChecksVoidReturn:   true,
+		ChecksVoidReturnOpts: NoMisusedPromisesChecksVoidReturnOptions{
+			Arguments:        true,
+			Attributes:       true,
+			InheritedMethods: true,
+			Properties:       true,
+			Returns:          true,
+			Variables:        true,
+		},
 	}
-	o.ChecksConditionals = raw.ChecksConditionals
-	o.ChecksSpreads = raw.ChecksSpreads
-
-	if len(raw.ChecksVoidReturn) == 0 {
-		return nil
+	if len(options) == 0 {
+		return opts
 	}
-
-	// `checksVoidReturn` may be either a boolean (enable/disable all sub-checks)
-	// or an object overriding individual sub-checks.
-	var asBool bool
-	if err := json.Unmarshal(raw.ChecksVoidReturn, &asBool); err == nil {
-		o.ChecksVoidReturn = utils.Ref(asBool)
-		return nil
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["checksConditionals"].(bool); ok {
+		opts.ChecksConditionals = value
 	}
-
-	var sub NoMisusedPromisesChecksVoidReturnOptions
-	if err := json.Unmarshal(raw.ChecksVoidReturn, &sub); err != nil {
-		return err
+	if value, ok := optsMap["checksSpreads"].(bool); ok {
+		opts.ChecksSpreads = value
 	}
-	o.ChecksVoidReturn = utils.Ref(true)
-	o.ChecksVoidReturnOpts = &sub
-	return nil
+	// `checksVoidReturn` is either a boolean enabling or disabling every
+	// sub-check, or an object overriding them individually.
+	switch value := optsMap["checksVoidReturn"].(type) {
+	case bool:
+		opts.ChecksVoidReturn = value
+	case map[string]any:
+		if v, ok := value["arguments"].(bool); ok {
+			opts.ChecksVoidReturnOpts.Arguments = v
+		}
+		if v, ok := value["attributes"].(bool); ok {
+			opts.ChecksVoidReturnOpts.Attributes = v
+		}
+		if v, ok := value["inheritedMethods"].(bool); ok {
+			opts.ChecksVoidReturnOpts.InheritedMethods = v
+		}
+		if v, ok := value["properties"].(bool); ok {
+			opts.ChecksVoidReturnOpts.Properties = v
+		}
+		if v, ok := value["returns"].(bool); ok {
+			opts.ChecksVoidReturnOpts.Returns = v
+		}
+		if v, ok := value["variables"].(bool); ok {
+			opts.ChecksVoidReturnOpts.Variables = v
+		}
+	}
+	return opts
 }
 
 var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 	Name:             "no-misused-promises",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoMisusedPromisesOptions)
-		if !ok {
-			opts = NoMisusedPromisesOptions{}
-			// Options coming from JS configs / the test runner arrive as
-			// `[]interface{}` whose first element is the actual option object.
-			// Round-trip through JSON to populate the typed struct (matches the
-			// pattern used by other ported rules; malformed input falls back to
-			// defaults — global config-shape validation is a project-level concern).
-			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
-				if optsJSON, err := json.Marshal(optsMap); err == nil {
-					_ = json.Unmarshal(optsJSON, &opts)
-				}
-			}
-		}
-		if opts.ChecksConditionals == nil {
-			opts.ChecksConditionals = utils.Ref(true)
-		}
-		if opts.ChecksSpreads == nil {
-			opts.ChecksSpreads = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturn == nil {
-			opts.ChecksVoidReturn = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts == nil {
-			opts.ChecksVoidReturnOpts = utils.Ref(NoMisusedPromisesChecksVoidReturnOptions{})
-		}
-		if opts.ChecksVoidReturnOpts.Arguments == nil {
-			opts.ChecksVoidReturnOpts.Arguments = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.Attributes == nil {
-			opts.ChecksVoidReturnOpts.Attributes = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.InheritedMethods == nil {
-			opts.ChecksVoidReturnOpts.InheritedMethods = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.Properties == nil {
-			opts.ChecksVoidReturnOpts.Properties = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.Returns == nil {
-			opts.ChecksVoidReturnOpts.Returns = utils.Ref(true)
-		}
-		if opts.ChecksVoidReturnOpts.Variables == nil {
-			opts.ChecksVoidReturnOpts.Variables = utils.Ref(true)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		anySignatureIsThenableType := func(
 			node *ast.Node,
@@ -826,16 +801,16 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 
 		listeners := rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if *opts.ChecksConditionals {
+				if opts.ChecksConditionals {
 					checkConditional(node, false)
 				}
 
-				if *opts.ChecksVoidReturn && *opts.ChecksVoidReturnOpts.Variables && ast.IsAssignmentExpression(node, false) {
+				if opts.ChecksVoidReturn && opts.ChecksVoidReturnOpts.Variables && ast.IsAssignmentExpression(node, false) {
 					checkAssignment(node.AsBinaryExpression())
 				}
 			},
 		}
-		if *opts.ChecksConditionals {
+		if opts.ChecksConditionals {
 			listeners[ast.KindPropertyAccessExpression] = checkArrayPredicates
 			listeners[ast.KindElementAccessExpression] = checkArrayPredicates
 
@@ -853,33 +828,33 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			listeners[ast.KindIfStatement] = func(node *ast.Node) { checkConditional(node.Expression(), true) }
 		}
 
-		if *opts.ChecksVoidReturn {
-			if *opts.ChecksVoidReturnOpts.Arguments {
+		if opts.ChecksVoidReturn {
+			if opts.ChecksVoidReturnOpts.Arguments {
 				listeners[ast.KindCallExpression] = checkArguments
 				listeners[ast.KindNewExpression] = checkArguments
 			}
-			if *opts.ChecksVoidReturnOpts.Attributes {
+			if opts.ChecksVoidReturnOpts.Attributes {
 				listeners[ast.KindJsxAttribute] = func(node *ast.Node) { checkJSXAttribute(node.AsJsxAttribute()) }
 			}
-			if *opts.ChecksVoidReturnOpts.InheritedMethods {
+			if opts.ChecksVoidReturnOpts.InheritedMethods {
 				listeners[ast.KindClassDeclaration] = checkClassLikeOrInterfaceNode
 				listeners[ast.KindClassExpression] = checkClassLikeOrInterfaceNode
 				listeners[ast.KindInterfaceDeclaration] = checkClassLikeOrInterfaceNode
 			}
-			if *opts.ChecksVoidReturnOpts.Properties {
+			if opts.ChecksVoidReturnOpts.Properties {
 				listeners[ast.KindPropertyAssignment] = checkProperty
 				listeners[ast.KindMethodDeclaration] = checkProperty
 				listeners[ast.KindShorthandPropertyAssignment] = checkProperty
 			}
-			if *opts.ChecksVoidReturnOpts.Returns {
+			if opts.ChecksVoidReturnOpts.Returns {
 				listeners[ast.KindReturnStatement] = func(node *ast.Node) { checkReturnStatement(node.AsReturnStatement()) }
 			}
-			if *opts.ChecksVoidReturnOpts.Variables {
+			if opts.ChecksVoidReturnOpts.Variables {
 				listeners[ast.KindVariableDeclaration] = func(node *ast.Node) { checkVariableDeclaration(node.AsVariableDeclaration()) }
 			}
 
 		}
-		if *opts.ChecksSpreads {
+		if opts.ChecksSpreads {
 			listeners[ast.KindSpreadElement] = checkSpread
 			listeners[ast.KindSpreadAssignment] = checkSpread
 		}

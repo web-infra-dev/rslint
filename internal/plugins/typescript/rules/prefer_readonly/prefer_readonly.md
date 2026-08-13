@@ -60,4 +60,5 @@ When set to `true`, only checks members that are assigned an arrow function expr
 
 ## Original Documentation
 
-- [typescript-eslint prefer-readonly](https://typescript-eslint.io/rules/prefer-readonly)
+- [typescript-eslint: prefer-readonly](https://typescript-eslint.io/rules/prefer-readonly)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.54.0/packages/eslint-plugin/src/rules/prefer-readonly.ts)

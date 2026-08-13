@@ -258,3 +258,26 @@ function foox() {
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
 }
+
+// TestNoUnusedVarsIgnorePatternSchema locks in that every `*IgnorePattern`
+// option is validated as a regex. The rule compiles each one to decide what
+// to skip, so an unparsable pattern would otherwise be dropped and the names
+// it was meant to exempt would keep reporting. Upstream's schema declares
+// bare strings.
+func TestNoUnusedVarsIgnorePatternSchema(t *testing.T) {
+	for _, option := range []string{
+		"varsIgnorePattern",
+		"argsIgnorePattern",
+		"caughtErrorsIgnorePattern",
+		"destructuredArrayIgnorePattern",
+	} {
+		invalid := []any{map[string]any{option: "("}}
+		if err := NoUnusedVarsRule.Schema.Validate(invalid); err == nil {
+			t.Errorf("expected an invalid %s regex to fail schema validation", option)
+		}
+		valid := []any{map[string]any{option: "^_"}}
+		if err := NoUnusedVarsRule.Schema.Validate(valid); err != nil {
+			t.Errorf("expected a valid %s regex to pass schema validation, got: %v", option, err)
+		}
+	}
+}

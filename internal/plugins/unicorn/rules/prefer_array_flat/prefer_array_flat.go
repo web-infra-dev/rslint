@@ -363,7 +363,8 @@ func buildFixes(node *ast.Node, match flattenMatch, ctx rule.RuleContext) []rule
 
 func parseFunctions(options []any) []string {
 	functions := make([]string, 0, len(lodashFlattenFunctions))
-	if optionsMap := utils.GetOptionsMap(options); optionsMap != nil {
+	if len(options) > 0 {
+		optionsMap, _ := options[0].(map[string]any)
 		functions = append(functions, utils.ToStringSlice(optionsMap["functions"])...)
 	}
 	return append(functions, lodashFlattenFunctions...)

@@ -82,6 +82,11 @@ func TestNoRedeclareRule(t *testing.T) {
 			{Code: "var self = 0;"},
 			{Code: "var console = 0;"},
 			{Code: "var document = 0;"},
+			// Host-library declarations are not part of scope-manager's default
+			// esnext globals. Supporting parserOptions.lib is a separate feature.
+			{Code: "var AbortController = 0;"},
+			{Code: "type NodeListOf = 1;"},
+			{Code: "type HTMLElement = 1;"},
 			// In a module the directive remains in the outer global scope while
 			// the syntax declaration is module-local; neither declaration repeats.
 			{Code: "export {};\n/*globals top */ var top = 0;"},
@@ -597,25 +602,18 @@ func TestNoRedeclareRule(t *testing.T) {
 					{MessageId: "redeclaredBySyntax", Message: "'document' is already defined by a variable declaration.", Line: 1, Column: 28, EndLine: 1, EndColumn: 36},
 				},
 			},
-			// DOM TYPE_VALUE names do remain implicit lib variables.
+			// Name-level parity includes scope-manager's default esnext type
+			// globals and legal interface augmentations.
 			{
-				Code: "var AbortController = 0;",
+				Code: "type Record = 1;",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Message: "'AbortController' is already defined as a built-in global variable.", Line: 1, Column: 5, EndLine: 1, EndColumn: 20},
-				},
-			},
-			// Name-level parity includes pure type globals and legal interface
-			// augmentations, just as typescript-eslint's scope manager does.
-			{
-				Code: "type NodeListOf = 1;",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 16},
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 12},
 				},
 			},
 			{
-				Code: "type HTMLElement = 1;",
+				Code: "type IteratorObjectConstructor = 1;",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 17},
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 31},
 				},
 			},
 			{

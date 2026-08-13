@@ -55,5 +55,5 @@ class D {
 
 ## Original Documentation
 
-- [ESLint `no-dupe-class-members`](https://eslint.org/docs/latest/rules/no-dupe-class-members)
-- [TypeScript-ESLint `no-dupe-class-members`](https://typescript-eslint.io/rules/no-dupe-class-members/)
+- [typescript-eslint: no-dupe-class-members](https://typescript-eslint.io/rules/no-dupe-class-members)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-dupe-class-members.ts)

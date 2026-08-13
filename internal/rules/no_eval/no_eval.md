@@ -55,4 +55,5 @@ window.eval('var a = 0');
 
 ## Original Documentation
 
-- [ESLint no-eval](https://eslint.org/docs/latest/rules/no-eval)
+- [ESLint: no-eval](https://eslint.org/docs/latest/rules/no-eval)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-eval.js)

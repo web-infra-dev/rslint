@@ -331,6 +331,11 @@ func TestNoNewFuncRule(t *testing.T) {
 				Globals: map[string]any{"Function": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
+			{
+				Code:     `new Function("code");`,
+				TSConfig: "tsconfig.noLib.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
+			},
 
 			// === Ambient augmentations extend the global, they do not shadow it ===
 			{

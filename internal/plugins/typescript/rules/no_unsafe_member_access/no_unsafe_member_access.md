@@ -35,4 +35,5 @@ map[key];
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-member-access](https://typescript-eslint.io/rules/no-unsafe-member-access)
+- [typescript-eslint: no-unsafe-member-access](https://typescript-eslint.io/rules/no-unsafe-member-access)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/no-unsafe-member-access.ts)

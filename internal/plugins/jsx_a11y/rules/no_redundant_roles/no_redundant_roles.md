@@ -71,4 +71,5 @@ Examples of **correct** code for this rule with `{ "ul": ["list"], "ol": ["list"
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-redundant-roles](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-redundant-roles.md)
+- [eslint-plugin-jsx-a11y: no-redundant-roles](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-redundant-roles.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-redundant-roles.js)

@@ -15,6 +15,7 @@ func buildUseThisTypeMessage() rule.RuleMessage {
 
 var PreferReturnThisTypeRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-return-this-type",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var tryGetNameInTypeNode func(name string, node *ast.Node) *ast.Node

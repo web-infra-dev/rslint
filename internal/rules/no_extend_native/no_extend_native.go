@@ -1,52 +1,33 @@
 package no_extend_native
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// nativeBuiltins lists ECMAScript globals whose first letter is uppercase.
-// Mirrors ESLint's `Object.keys(astUtils.ECMASCRIPT_GLOBALS).filter(b => b[0].toUpperCase() === b[0])`,
-// where `ECMASCRIPT_GLOBALS = globals[`es${LATEST_ECMA_VERSION}`]` from the
-// `globals` package. Generated from `globals.es2027` to stay byte-for-byte
-// in sync with upstream ESLint.
-var nativeBuiltins = map[string]bool{
-	"AggregateError": true, "Array": true, "ArrayBuffer": true, "Atomics": true,
-	"BigInt": true, "BigInt64Array": true, "BigUint64Array": true, "Boolean": true,
-	"DataView": true, "Date": true,
-	"Error": true, "EvalError": true,
-	"FinalizationRegistry": true, "Float16Array": true, "Float32Array": true, "Float64Array": true, "Function": true,
-	"Infinity": true, "Int16Array": true, "Int32Array": true, "Int8Array": true, "Intl": true, "Iterator": true,
-	"JSON": true,
-	"Map":  true, "Math": true,
-	"NaN": true, "Number": true,
-	"Object":  true,
-	"Promise": true, "Proxy": true,
-	"RangeError": true, "ReferenceError": true, "Reflect": true, "RegExp": true,
-	"Set": true, "SharedArrayBuffer": true, "String": true, "Symbol": true, "SyntaxError": true,
-	"TypeError": true,
-	"URIError":  true, "Uint16Array": true, "Uint32Array": true, "Uint8Array": true, "Uint8ClampedArray": true,
-	"WeakMap": true, "WeakRef": true, "WeakSet": true,
-}
+//go:embed no_extend_native.schema.json
+var schemaJSON []byte
 
 type options struct {
 	exceptions map[string]bool
 }
 
-func parseOptions(opts any) options {
-	result := options{exceptions: make(map[string]bool)}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if exceptions, ok := optsMap["exceptions"].([]interface{}); ok {
-			for _, e := range exceptions {
-				if s, ok := e.(string); ok {
-					result.exceptions[s] = true
-				}
-			}
+func parseOptions(rawOptions []any) options {
+	opts := options{exceptions: make(map[string]bool)}
+	if len(rawOptions) == 0 {
+		return opts
+	}
+	m, _ := rawOptions[0].(map[string]any)
+	exceptions, _ := m["exceptions"].([]any)
+	for _, e := range exceptions {
+		if s, ok := e.(string); ok {
+			opts.exceptions[s] = true
 		}
 	}
-	return result
+	return opts
 }
 
 // isAssignmentOperator reports whether the given binary operator is a
@@ -111,15 +92,20 @@ func skipParensUp(node *ast.Node) *ast.Node {
 
 // https://eslint.org/docs/latest/rules/no-extend-native
 var NoExtendNativeRule = rule.Rule{
-	Name: "no-extend-native",
-	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
-		opts := rule.LegacyUnwrapOptions(_opts)
-		o := parseOptions(opts)
+	Name:   "no-extend-native",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		o := parseOptions(rawOptions)
 
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.Text()
-				if !nativeBuiltins[name] || o.exceptions[name] {
+				// ESLint builds this rule's candidate set from the latest
+				// ECMAScript globals whose first character is uppercase. Membership
+				// is edition-independent, while Access below decides whether the
+				// candidate exists in this file's effective global scope.
+				if name == "" || name[0] < 'A' || name[0] > 'Z' ||
+					!ctx.Globals.IsECMAScriptGlobalName(name) || o.exceptions[name] {
 					return
 				}
 
@@ -146,11 +132,9 @@ var NoExtendNativeRule = rule.Rule{
 					return
 				}
 
-				// A config `/* global Object: off */` / `languageOptions.globals`
-				// entry un-declares the builtin, so it no longer resolves to a
-				// known global — ESLint's `globalScope.set.get(name)` would be
-				// undefined and the rule stays silent.
-				if ctx.Globals[name] == utils.GlobalAccessOff {
+				// ESLint looks the candidate up in the actual global scope. The
+				// selected edition and authored overrides therefore both apply.
+				if !ctx.Globals.Access(name).IsDeclared() {
 					return
 				}
 

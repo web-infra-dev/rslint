@@ -117,4 +117,5 @@ MyComponent.propTypes = {
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-typos](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-typos.md)
+- [eslint-plugin-react: no-typos](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-typos.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-typos.js)

@@ -10,7 +10,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-octal-escape
 var NoOctalEscapeRule = rule.Rule{
-	Name: "no-octal-escape",
+	Name:   "no-octal-escape",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindStringLiteral: func(node *ast.Node) {

@@ -1,22 +1,27 @@
 package no_sequences
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_sequences.schema.json
+var schemaJSON []byte
+
 type options struct {
 	allowInParentheses bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{allowInParentheses: true}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(raw) == 0 {
 		return opts
 	}
-	if v, ok := optsMap["allowInParentheses"].(bool); ok {
+	m, _ := raw[0].(map[string]any)
+	if v, ok := m["allowInParentheses"].(bool); ok {
 		opts.allowInParentheses = v
 	}
 	return opts
@@ -95,9 +100,9 @@ func firstCommaToken(node *ast.Node) *ast.Node {
 
 // https://eslint.org/docs/latest/rules/no-sequences
 var NoSequencesRule = rule.Rule{
-	Name: "no-sequences",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "no-sequences",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{
