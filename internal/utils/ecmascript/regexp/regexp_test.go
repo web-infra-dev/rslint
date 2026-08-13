@@ -65,6 +65,26 @@ func TestTest(t *testing.T) {
 		{name: "i named backreference", source: `^(?<w>a)\k<w>$`, flags: "i", subject: "aA", want: true},
 		{name: "i numbered backreference", source: `^(a)\1$`, flags: "i", subject: "Aa", want: true},
 
+		// ---- `u` switches `i` to simple case folding, which has no rule
+		// about ASCII, so every pair the plain `i` cases above keep apart
+		// joins back up ----
+		{name: "iu kelvin sign", source: "^k$", flags: "iu", subject: "\u212a", want: true},
+		{name: "iu long s", source: "^s$", flags: "iu", subject: "\u017f", want: true},
+		{name: "iu angstrom sign", source: "^\u00e5$", flags: "iu", subject: "\u212b", want: true},
+		{name: "iu ohm sign", source: "^\u03c9$", flags: "iu", subject: "\u2126", want: true},
+		{name: "iu eszett", source: "^\u00df$", flags: "iu", subject: "\u1e9e", want: true},
+		// What both readings agree on stays put.
+		{name: "iu ascii", source: "^k$", flags: "iu", subject: "K", want: true},
+		{name: "iu sigma final", source: "^\u03a3$", flags: "iu", subject: "\u03c2", want: true},
+		{name: "iu unicode escape", source: `^\u0041$`, flags: "iu", subject: "a", want: true},
+		// A class is widened by the same reading as a literal.
+		{name: "iu class covers kelvin", source: "^[k]$", flags: "iu", subject: "\u212a", want: true},
+		{name: "iu range covers kelvin", source: "^[a-z]$", flags: "iu", subject: "\u212a", want: true},
+		{name: "iu range covers long s", source: "^[a-z]$", flags: "iu", subject: "\u017f", want: true},
+		// A negated class goes on negating whatever the widened class covers.
+		{name: "iu negated class", source: "^[^a]$", flags: "iu", subject: "A"},
+		{name: "iu negated class kelvin", source: "^[^k]$", flags: "iu", subject: "\u212a"},
+
 		// ---- classes only JavaScript spells ----
 		{name: "empty class never matches", source: "[]", subject: "a"},
 		{name: "negated empty class", source: "^[^]$", subject: "\n", want: true},

@@ -33,6 +33,22 @@ func unicode17ToUpper(r rune) (rune, bool) {
 	return r, false
 }
 
+// unicode17Fold returns the other member of the pair r folds together with
+// under Unicode 16 and 17, reporting false when Go's own tables already hold
+// the answer. Each pair is a lowercase character and its uppercase, which
+// simple case folding puts in one orbit.
+func unicode17Fold(r rune) (rune, bool) {
+	for _, pair := range unicode17CasePairs {
+		switch r {
+		case pair[0]:
+			return pair[1], true
+		case pair[1]:
+			return pair[0], true
+		}
+	}
+	return r, false
+}
+
 // unicode17CaseAdditions returns every character the delta names, lowercase and
 // uppercase alike. caseTables walks unicode.CaseRanges to find the characters
 // that canonicalize onto one another, and cannot reach these: Go holds no case

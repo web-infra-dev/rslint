@@ -531,8 +531,10 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			}
 			// A character class is widened as a whole once it closes, so only
 			// a literal standing on its own is widened here.
+			// minimatch builds `new RegExp(re, "i")`, with no `u`, so the
+			// comparison is the one that never crosses into ASCII.
 			if m.options.NoCase && !inClass {
-				if class, widened := esregexp.CaseClass(c); widened {
+				if class, widened := esregexp.CaseClass(c, false); widened {
 					re += class
 					continue
 				}

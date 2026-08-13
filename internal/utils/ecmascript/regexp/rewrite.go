@@ -88,7 +88,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			// An escape that names one character is widened like a literal;
 			// one that names a set — `\d`, `\w`, `\s` — is left alone.
 			if options.ignoreCase && !inClass && next != utf8.RuneError {
-				if class, widened := CaseClass(next); widened {
+				if class, widened := CaseClass(next, options.unicode); widened {
 					out.WriteString(class)
 					i = end
 					continue
@@ -184,7 +184,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 
 		default:
 			if options.ignoreCase {
-				if class, widened := CaseClass(r); widened {
+				if class, widened := CaseClass(r, options.unicode); widened {
 					out.WriteString(class)
 					i += size
 					continue

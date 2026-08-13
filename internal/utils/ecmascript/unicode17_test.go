@@ -33,18 +33,31 @@ func TestUnicode17DeltaStillNeeded(t *testing.T) {
 
 // TestUnicode17Canonicalize covers what the delta is for: JavaScript compares
 // each of these pairs equal under a regexp's `i` flag, and Go's own tables
-// would compare them unequal.
+// would compare them unequal. Both readings of that flag have to reach the
+// delta — the uppercase reading lands on the pair's uppercase, the folding
+// one on the lower of the two — so both are checked.
 func TestUnicode17Canonicalize(t *testing.T) {
 	for _, pair := range unicode17CasePairs {
 		lower, upper := pair[0], pair[1]
-		if got := Canonicalize(lower); got != upper {
-			t.Errorf("Canonicalize(%U) = %U, want %U", lower, got, upper)
+		group := []rune{min(lower, upper), max(lower, upper)}
+
+		if got := Canonicalize(lower, false); got != upper {
+			t.Errorf("Canonicalize(%U, false) = %U, want %U", lower, got, upper)
 		}
-		if got := Canonicalize(upper); got != upper {
-			t.Errorf("Canonicalize(%U) = %U, want it to stand for itself", upper, got)
+		if got := Canonicalize(upper, false); got != upper {
+			t.Errorf("Canonicalize(%U, false) = %U, want it to stand for itself", upper, got)
 		}
-		if want := []rune{min(lower, upper), max(lower, upper)}; !slices.Equal(CaseEquivalents(lower), want) {
-			t.Errorf("CaseEquivalents(%U) = %U, want %U", lower, CaseEquivalents(lower), want)
+		if got := Canonicalize(lower, true); got != group[0] {
+			t.Errorf("Canonicalize(%U, true) = %U, want %U", lower, got, group[0])
+		}
+		if got := Canonicalize(upper, true); got != group[0] {
+			t.Errorf("Canonicalize(%U, true) = %U, want %U", upper, got, group[0])
+		}
+
+		for _, unicodeMode := range []bool{false, true} {
+			if got := CaseEquivalents(lower, unicodeMode); !slices.Equal(got, group) {
+				t.Errorf("CaseEquivalents(%U, %v) = %U, want %U", lower, unicodeMode, got, group)
+			}
 		}
 	}
 }

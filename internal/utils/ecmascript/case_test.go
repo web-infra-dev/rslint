@@ -5,35 +5,50 @@ import (
 	"testing"
 )
 
-// Every expectation here is what `new RegExp("^"+x+"$", "i").test(y)` answers
-// in JavaScript, which is Canonicalize comparing the two characters.
+// Every expectation here is what `new RegExp("^"+x+"$", flags).test(y)` answers
+// in JavaScript, which is Canonicalize comparing the two characters. The two
+// readings are tested together because the whole point of the flag is that they
+// disagree.
 func TestCanonicalize(t *testing.T) {
 	tests := []struct {
 		name  string
 		left  rune
 		right rune
-		same  bool
+		plain bool // same under `i`
+		uFlag bool // same under `iu`
 	}{
-		{name: "ascii", left: 'a', right: 'A', same: true},
-		// A final sigma, a small sigma and a capital sigma are one character.
-		{name: "final sigma", left: 0x03C2, right: 0x03A3, same: true},
-		{name: "small sigma", left: 0x03C3, right: 0x03A3, same: true},
-		{name: "both sigmas", left: 0x03C2, right: 0x03C3, same: true},
-		// A character outside ASCII never canonicalizes into ASCII, which is
-		// where Unicode case folding gives the other answer.
-		{name: "kelvin sign", left: 'k', right: 0x212A, same: false},
-		{name: "long s", left: 's', right: 0x017F, same: false},
-		// The uppercase of an eszett is two characters, so it stays put.
-		{name: "eszett", left: 0x00DF, right: 0x1E9E, same: false},
+		{name: "ascii", left: 'a', right: 'A', plain: true, uFlag: true},
+		// A final sigma, a small sigma and a capital sigma are one character
+		// under either reading.
+		{name: "final sigma", left: 0x03C2, right: 0x03A3, plain: true, uFlag: true},
+		{name: "small sigma", left: 0x03C3, right: 0x03A3, plain: true, uFlag: true},
+		{name: "both sigmas", left: 0x03C2, right: 0x03C3, plain: true, uFlag: true},
+		// Without `u` a character outside ASCII never canonicalizes into
+		// ASCII. Folding has no such rule, so these join up under `u`.
+		{name: "kelvin sign", left: 'k', right: 0x212A, plain: false, uFlag: true},
+		{name: "long s", left: 's', right: 0x017F, plain: false, uFlag: true},
+		// Neither character is ASCII, so the rule above never applies and only
+		// the choice of mapping decides.
+		{name: "angstrom sign", left: 0x00E5, right: 0x212B, plain: false, uFlag: true},
+		{name: "ohm sign", left: 0x03C9, right: 0x2126, plain: false, uFlag: true},
+		// The uppercase of an eszett is two characters, so it stays put; the
+		// capital eszett folds onto the small one.
+		{name: "eszett", left: 0x00DF, right: 0x1E9E, plain: false, uFlag: true},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := Canonicalize(test.left) == Canonicalize(test.right)
-			if got != test.same {
-				t.Errorf("Canonicalize(%U)==Canonicalize(%U) is %v, want %v (got %U and %U)",
-					test.left, test.right, got, test.same,
-					Canonicalize(test.left), Canonicalize(test.right))
+			for _, mode := range []struct {
+				unicodeMode bool
+				want        bool
+				flags       string
+			}{{false, test.plain, "i"}, {true, test.uFlag, "iu"}} {
+				got := Canonicalize(test.left, mode.unicodeMode) == Canonicalize(test.right, mode.unicodeMode)
+				if got != mode.want {
+					t.Errorf("/%s/ Canonicalize(%U)==Canonicalize(%U) is %v, want %v (got %U and %U)",
+						mode.flags, test.left, test.right, got, mode.want,
+						Canonicalize(test.left, mode.unicodeMode), Canonicalize(test.right, mode.unicodeMode))
+				}
 			}
 		})
 	}
@@ -41,9 +56,10 @@ func TestCanonicalize(t *testing.T) {
 
 func TestCaseEquivalents(t *testing.T) {
 	tests := []struct {
-		name string
-		r    rune
-		want []rune
+		name        string
+		r           rune
+		unicodeMode bool
+		want        []rune
 	}{
 		{name: "ascii letter", r: 'k', want: []rune{'K', 'k'}},
 		{name: "sigma", r: 0x03A3, want: []rune{0x03A3, 0x03C2, 0x03C3}},
@@ -51,13 +67,18 @@ func TestCaseEquivalents(t *testing.T) {
 		{name: "kelvin sign", r: 0x212A, want: nil},
 		{name: "long s", r: 0x017F, want: nil},
 		{name: "digit", r: '4', want: nil},
+		// Under `u` the same two characters pull `k` and `s` into their group.
+		{name: "ascii letter under u", r: 'k', unicodeMode: true, want: []rune{'K', 'k', 0x212A}},
+		{name: "kelvin sign under u", r: 0x212A, unicodeMode: true, want: []rune{'K', 'k', 0x212A}},
+		{name: "long s under u", r: 0x017F, unicodeMode: true, want: []rune{'S', 's', 0x017F}},
+		{name: "digit under u", r: '4', unicodeMode: true, want: nil},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := CaseEquivalents(test.r)
+			got := CaseEquivalents(test.r, test.unicodeMode)
 			if !slices.Equal(got, test.want) {
-				t.Errorf("CaseEquivalents(%U) = %U, want %U", test.r, got, test.want)
+				t.Errorf("CaseEquivalents(%U, %v) = %U, want %U", test.r, test.unicodeMode, got, test.want)
 			}
 		})
 	}
@@ -67,22 +88,25 @@ func TestCaseEquivalents(t *testing.T) {
 // member of every group has to look the group back up, and canonicalize onto
 // the same character as the rest of it.
 func TestCaseEquivalenceGroupsAgree(t *testing.T) {
-	groups := CaseEquivalenceGroups()
-	if len(groups) == 0 {
-		t.Fatal("CaseEquivalenceGroups() is empty")
-	}
-	for _, members := range groups {
-		if len(members) < 2 {
-			t.Errorf("group %U has nothing to widen to", members)
+	for _, unicodeMode := range []bool{false, true} {
+		groups := CaseEquivalenceGroups(unicodeMode)
+		if len(groups) == 0 {
+			t.Fatalf("CaseEquivalenceGroups(%v) is empty", unicodeMode)
 		}
-		canonical := Canonicalize(members[0])
-		for _, member := range members {
-			if Canonicalize(member) != canonical {
-				t.Errorf("group %U holds %U, which canonicalizes to %U not %U",
-					members, member, Canonicalize(member), canonical)
+		for _, members := range groups {
+			if len(members) < 2 {
+				t.Errorf("group %U has nothing to widen to", members)
 			}
-			if !slices.Equal(CaseEquivalents(member), members) {
-				t.Errorf("CaseEquivalents(%U) = %U, want the group %U", member, CaseEquivalents(member), members)
+			canonical := Canonicalize(members[0], unicodeMode)
+			for _, member := range members {
+				if Canonicalize(member, unicodeMode) != canonical {
+					t.Errorf("group %U holds %U, which canonicalizes to %U not %U",
+						members, member, Canonicalize(member, unicodeMode), canonical)
+				}
+				if !slices.Equal(CaseEquivalents(member, unicodeMode), members) {
+					t.Errorf("CaseEquivalents(%U, %v) = %U, want the group %U",
+						member, unicodeMode, CaseEquivalents(member, unicodeMode), members)
+				}
 			}
 		}
 	}
