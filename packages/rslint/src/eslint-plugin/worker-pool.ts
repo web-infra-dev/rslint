@@ -165,7 +165,9 @@ export function setWorkerEntryForTests(path: string): void {
 
 const resolveWorkerFile = (): string =>
   testWorkerEntry ??
-  fileURLToPath(new URL('./lint-worker.js', import.meta.url));
+  fileURLToPath(
+    new URL(/* rspackIgnore: true */ './lint-worker.js', import.meta.url),
+  );
 
 /**
  * Grace period to wait for a worker to exit on its own before forcing

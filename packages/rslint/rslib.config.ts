@@ -17,11 +17,12 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *    not share its `tsBuildInfoFile` with the tsgo `typecheck` over the same
  *    `src` — the two tools' incremental formats clash. Hence a tsconfig per
  *    consumer: `tsconfig.lib.json` (here), `tsconfig.worker.json` (below), and
- *    `tsconfig.build.json` (typecheck). `autoExternal` externalizes `dependencies`
- *    (`picomatch`) + `peerDependencies` (`jiti`); `tinyglobby` is a devDep, so
- *    its code bundles in. The public `globals` catalog is also a devDep, but a
- *    Rspack plugin emits one package-internal JSON asset per environment so the
- *    root can load only selected maps. Consumers install neither devDependency.
+ *    `tsconfig.build.json` (typecheck). `output.autoExternal` externalizes
+ *    `dependencies` (`picomatch`) + `peerDependencies` (`jiti`); `tinyglobby` is
+ *    a devDep, so its code bundles in. The public `globals` catalog is also a
+ *    devDep, but a Rspack plugin emits one package-internal JSON asset per
+ *    environment so the root can load only selected maps. Consumers install
+ *    neither devDependency.
  *    `tinyglobby`'s `fdir` loads `picomatch` via `createRequire`,
  *    which rspack can't statically follow — so `picomatch` can't be bundled away
  *    and stays a runtime dep. One `lib` block with all entries: the surface
@@ -43,8 +44,8 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
 const librarySurface = {
   format: 'esm' as const,
   bundle: true,
-  autoExternal: true,
   output: {
+    autoExternal: true,
     target: 'node' as const,
     distPath: { root: './dist' },
   },
@@ -71,8 +72,8 @@ const librarySurface = {
 const workerBase = {
   format: 'esm' as const,
   bundle: true,
-  autoExternal: true,
   output: {
+    autoExternal: true,
     target: 'node' as const,
     distPath: { root: './dist/eslint-plugin' },
   },

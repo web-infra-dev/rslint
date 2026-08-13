@@ -16,7 +16,7 @@ allowBuilds:
 catalog:
   '@microsoft/api-extractor': ^7.58.12
   '@napi-rs/cli': ^3.8.2
-  '@rslib/core': ^0.23.2
+  '@rslib/core': 1.0.0-beta.3
   '@types/picomatch': ^4.0.3
   esbuild: ^0.28.1
   fast-glob: ^3.3.3
@@ -115,6 +115,7 @@ minimumReleaseAgeExclude:
   - '@rslint/*'
   - '@rstackjs/*'
   - '@rstack-dev/*'
+  - rsbuild-plugin-dts
 
 # Prevent un-reviewed build scripts
 strictDepBuilds: true
