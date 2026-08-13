@@ -83,6 +83,282 @@ const extractErrorData = <TData,>(error?: unknown): IError<TData> | null => {
 };
 `},
 
+		// ---- Real-user: rspack normalization.ts inferred object-spread return ----
+		// Spreading an optional generic value preserves T in the inferred return
+		// type, so the parameter occurrence and inferred return occurrence relate
+		// two signature positions. Upstream typescript-eslint 8.65.0 does not
+		// report this shape.
+		{
+			Code:     `const cloneObject = <T>(value?: T) => ({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+function cloneObject<T>(value?: T) {
+  return { ...value };
+}
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code:     `const cloneObject = <T>(value?: T) => ({ tag: 1, ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code:     `const cloneObject = <T>(value?: T) => ({ ...value, tag: 1 });`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		// The legacy inference also flows through containers, branches, wrappers,
+		// and generic return positions. These all resolve to types containing T in
+		// TypeScript 5.9 with omitted strictness options.
+		{
+			Code: `
+declare const flag: boolean;
+const nested = <T>(value?: T) => ({ nested: { ...value } });
+const array = <T>(value?: T) => [{ ...value }];
+const tuple = <T>(value?: T) => [{ ...value }] as const;
+const conditional = <T>(value?: T) => flag ? { ...value } : { ...value };
+const logical = <T>(value?: T) => flag && { ...value };
+const satisfied = <T>(value?: T) => ({ ...value }) satisfies object;
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+declare function identityObject<X>(value: X): X;
+const promised = <T>(value?: T) => Promise.resolve({ ...value });
+const identity = <T>(value?: T) => identityObject({ ...value });
+const getter = <T>(value?: T) => ({ get clone() { return { ...value }; } });
+function* generated<T>(value?: T) { yield { ...value }; }
+const pair = <T, U>(left?: T, right?: U) => ({
+  left: { ...left },
+  right: [{ ...right }],
+});
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+const local = <T>(value?: T) => {
+  const clone = { ...value };
+  return clone;
+};
+const shorthand = <T>(value?: T) => {
+  const clone = { ...value };
+  return { clone };
+};
+const spreadLocal = <T>(value?: T) => {
+  const clone = { ...value };
+  return { ...clone };
+};
+const asynchronous = async <T>(value?: T) => {
+  const clone = { ...value };
+  return clone;
+};
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+declare function chooseRight<A, B>(left: A, right: B, echo: A): B;
+class Box<X> { constructor(readonly value: X) {} }
+const called = <T>(value?: T) => chooseRight({}, { ...value }, {});
+const constructed = <T>(value?: T) => new Box({ ...value });
+const returnedClass = <T>(value?: T) => class {
+  clone() { return { ...value }; }
+};
+const returnedMethod = <T>(value?: T) => ({
+  clone() { return { ...value }; },
+});
+function* generated<T>(value?: T) { yield* [{ ...value }]; }
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+declare const key: 'nested' | 'fixed';
+const dynamic = <T>(value?: T) => ({ nested: { ...value }, fixed: 0 })[key];
+const selected = <T>(value?: T) => {
+  const result = { nested: { ...value }, fixed: 0 };
+  return result.nested;
+};
+const destructured = <T>(value?: T) => {
+  const { nested } = { nested: { ...value }, fixed: 0 };
+  return nested;
+};
+function inferredIdentity<X>(input: X) { return input; }
+const inferred = <T>(value?: T) => inferredIdentity({ ...value });
+const mapped = <T>(value?: T) => [value].map(item => ({ ...item }));
+declare function identityTag<X>(strings: TemplateStringsArray, value: X): X;
+const tagged = <T>(value?: T) => identityTag` + "`" + `${{ ...value }}` + "`" + `;
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+declare function identityObject<X>(value: X): X;
+declare function tupleIdentity<X>(...values: [X]): X;
+const explicit = <T>(value?: T) => identityObject<T>({ ...value });
+const spreadArgument = <T>(value?: T) => tupleIdentity(...[{ ...value }]);
+const arrayDestructured = <T>(value?: T) => {
+  const [clone] = [{ ...value }];
+  return clone;
+};
+const arraySelected = <T>(value?: T) => [{ ...value }][0];
+const spreadOverwrites = <T>(value?: T) =>
+  ({ clone: 0, ...{ clone: { ...value } } }).clone;
+const objectRest = <T>(value?: T) => {
+  const { fixed, ...rest } = { fixed: 0, clone: { ...value } };
+  return rest;
+};
+const localCall = <T>(value?: T) => {
+  const getClone = () => ({ ...value });
+  return getClone();
+};
+const immediateCall = <T>(value?: T) => (() => ({ ...value }))();
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+declare const flag: boolean;
+const arrayRest = <T>(value?: T) => {
+  const [, ...rest] = [0, { ...value }];
+  return rest;
+};
+const objectRestSpreadWins = <T>(value?: T) => {
+  const { ...rest } = { clone: 0, ...{ clone: { ...value } } };
+  return rest;
+};
+const defaultBinding = <T>(value?: T) => {
+  const { clone = { ...value } } = {};
+  return clone;
+};
+const selectedConditional = <T>(value?: T) =>
+  (flag ? { clone: { ...value } } : { clone: 0 }).clone;
+const nestedObjectBinding = <T>(value?: T) => {
+  const { outer: { clone } } = { outer: { clone: { ...value } } };
+  return clone;
+};
+const nestedArrayBinding = <T>(value?: T) => {
+  const [[clone]] = [[{ ...value }]];
+  return clone;
+};
+interface StructuralInput<X> { value: X }
+type StructuralAlias<X> = { value: X };
+declare function structuralResult<X>(value: StructuralInput<X>): X;
+declare function structuralAliasResult<X>(value: StructuralAlias<X>): X;
+const structuralInference = <T>(value?: T) =>
+  structuralResult({ value: { ...value } });
+const structuralAliasInference = <T>(value?: T) =>
+  structuralAliasResult({ value: { ...value } });
+const inferredDefaultParameter = <T>(value?: T, clone = { ...value }) => 0;
+const returnedFunctionDefault = <T>(value?: T) =>
+  (clone = { ...value }) => 0;
+const returnedMethodDefault = <T>(value?: T) => ({
+  clone(input = { ...value }) { return input; },
+});
+const defaultOnlyAndReturned = <T>(clone = { ...({} as T) }) => clone;
+const doubleReturnOnly = <T>() => ({
+  first: { ...({} as T) },
+  second: { ...({} as T) },
+});
+declare function mappedResult<X>(value: { [K in keyof X]: X[K] }): X;
+declare function partialResult<X>(value: Partial<X>): X;
+declare function fixedMappedResult<X>(value: { [K in 'value']: X }): X;
+const mappedInference = <T>(value?: T) =>
+  mappedResult({ clone: { ...value } });
+const partialInference = <T>(value?: T) =>
+  partialResult({ clone: { ...value } });
+const fixedMappedInference = <T>(value?: T) =>
+  fixedMappedResult({ value: { ...value } });
+const constrainedObject = <T extends object>(value?: T) => ({ ...value });
+const constrainedRecord = <T extends Record<string, unknown>>(value?: T) => ({ ...value });
+const mixedLostReturn = <T>() => ({ direct: null as T, ...({} as T | undefined) });
+const nestedDoubleReturnOnly = <T>() => {
+  const inner = { first: { ...({} as T) }, second: { ...({} as T) } };
+  return { ...inner };
+};
+const duplicateLocalReturnOnly = <T>() => {
+  const clone = { ...({} as T | undefined) };
+  return { first: clone, second: clone };
+};
+const duplicateSelectionReturnOnly = <T>() => {
+  const result = { clone: { ...({} as T | undefined) } };
+  return { first: result.clone, second: result.clone };
+};
+const wholeObjectSpreadWins = <T>(value?: T) =>
+  ({ clone: 0, ...{ clone: { ...value } } });
+class CloneMethod { clone() {} }
+const classMethodDoesNotOverwrite = <T>(value?: T) =>
+  ({ clone: { ...value }, ...new CloneMethod() });
+const returnOnlyArray = <T>() => [{ ...({} as T | undefined) }];
+const promisedReturnOnlyArray = <T>() => Promise.resolve([{ ...({} as T | undefined) }]);
+declare function pairResult<A, B>(left: A, right: B): { left: A; right: B };
+const pairCallReturnOnly = <T>() => pairResult(
+  { ...({} as T | undefined) },
+  { ...({} as T | undefined) },
+);
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+const method = <T>(value?: T) => ({ ...({} as { method(): T }) });
+const promise = <T>(value?: T) => ({ ...({} as Promise<T>) });
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		// Adversarial differential cases: legacy inference also preserves T
+		// through nullable object constraints, object intersections, &&, distinct
+		// union branches, and computed string index signatures.
+		{
+			Code: `
+declare const flag: boolean;
+declare const key: 'clone' | 'fixed';
+const nullableConstraint = <T extends object | undefined>(value?: T) => ({ ...value });
+const objectIntersection = <T>(value: (T & object) | undefined) => ({ ...value });
+const logicalAnd = <T>(value?: T) => ({ ...(value && value) });
+const transitiveConstraint = <U, T extends U>(value?: T, echo?: U) => ({ ...value });
+const distinctBranches = <T>() => flag
+  ? { left: { ...({} as T | undefined) } }
+  : { right: { ...({} as T | undefined) } };
+function distinctBlockReturns<T>() {
+  if (flag) return { left: { ...({} as T | undefined) } };
+  return { right: { ...({} as T | undefined) } };
+}
+const computedIndex = <T>() => ({ [key]: { ...({} as T | undefined) } });
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		{
+			Code: `
+type Mapped<X> = { [K in keyof X]: X[K] };
+type StringMap<X> = { [key: string]: X };
+const mapped = <T>(value?: T) => ({ ...({} as Mapped<T>) });
+const indexed = <T>(value?: T) => ({ ...({} as StringMap<T>) });
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		// Object spread copies public class fields, so their value types remain
+		// part of the inferred return surface.
+		{
+			Code: `
+class PublicFields<X> {
+  first!: X;
+  second?: X;
+}
+const clone = <T>(value?: T) => ({ ...({} as PublicFields<T>) });
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+		},
+		// Explicitly disabling strictness already gives tsgo the legacy inference;
+		// the recovery path is only for the omitted-option default mismatch.
+		{
+			Code:     `const cloneObject = <T>(value?: T) => ({ nested: { ...value } });`,
+			TSConfig: "tsconfig.unstrict.json",
+		},
+
 		// ---- Branch lock-in: isTypeParameterRepeatedInAST self-reference exclusion ----
 		// Locks in upstream isTypeParameterRepeatedInAST() arm: a reference to
 		// T inside T's own constraint clause doesn't count toward repetition,
@@ -173,11 +449,9 @@ interface Holder<A> {
 declare function hold<T>(x: Holder<((T))>): void;
 `},
 
-		// ---- Deliberate divergence: mapped-type `as` clause counts as a use ----
-		// A key remapped through `as` is a real signature position, so T relating
-		// the parameter to the remapped key is not a lone use. ESLint misses this
-		// because its type walk never descends into a mapped type's name type,
-		// and reports T here.
+		// ---- Upstream v8.67: mapped-type `as` clause counts as a use ----
+		// Upstream now visits MappedType.nameType, so a key remapped through T is
+		// correctly recognized as a second signature position.
 		{Code: `<T extends string>(t: T) => t as { [K in 'a' as T]: 0 };`},
 
 		// ---- Deliberate divergence: every index signature counts, not just
@@ -190,6 +464,756 @@ declare function hold<T>(x: Holder<((T))>): void;
 		{Code: "declare function patternKeyed<T>(x: number): { [k: `a${string}`]: T };"},
 		{Code: `declare function symbolKeyedParam<T>(x: { [k: symbol]: T }): void;`},
 	}, []rule_tester.InvalidTestCase{
+		// ---- Real-user: inferred object-spread return strictness boundaries ----
+		// With strict null checks enabled, TypeScript 5.9 infers `{}` here and
+		// upstream reports T. The compatibility path must not suppress it.
+		{
+			Code: `const cloneObject = <T>(value?: T) => ({ ...value });`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Message:   "Type parameter T is used only once in the function signature.",
+				Line:      1,
+				Column:    22,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const cloneObject = (value?: unknown) => ({ ...value });`,
+				}},
+			}},
+		},
+		// An assertion on the spread operand erases T before return inference,
+		// so upstream reports this even when strict null checks are disabled.
+		{
+			Code:     `const cloneObject = <T>(value?: T) => ({ ...(value as object) });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Message:   "Type parameter T is used only once in the function signature.",
+				Line:      1,
+				Column:    22,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const cloneObject = (value?: unknown) => ({ ...(value as object) });`,
+				}},
+			}},
+		},
+		// A generic used only by the inferred return still occupies just one
+		// signature position and therefore remains reportable.
+		{
+			Code:     `const createObject = <T>() => ({ ...({} as T) });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Message:   "Type parameter T is used only once in the function signature.",
+				Line:      1,
+				Column:    23,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const createObject = () => ({ ...({} as unknown) });`,
+				}},
+			}},
+		},
+		// A reachable spread is not enough on its own: if a call, sequence, or
+		// property selection erases the spread result from the return type, T is
+		// still used in only one signature position and must be reported.
+		{
+			Code: `declare function discardObject(value: object): number;
+const discarded = <T>(value?: T) => discardObject({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Column:    20,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare function discardObject(value: object): number;
+const discarded = (value?: unknown) => discardObject({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function returnEmptyObject(value: object): {};
+const discarded = <T>(value?: T) => returnEmptyObject({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Column:    20,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare function returnEmptyObject(value: object): {};
+const discarded = (value?: unknown) => returnEmptyObject({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const discarded = <T>(value?: T) => ({ nested: { ...value }, fixed: 0 }).fixed;`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    20,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const discarded = (value?: unknown) => ({ nested: { ...value }, fixed: 0 }).fixed;`,
+				}},
+			}},
+		},
+		{
+			Code:     `const explicit = <T>(value?: T): object => ({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    19,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const explicit = (value?: unknown): object => ({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code: `const discarded = <T>(value?: T) => {
+  const clone = { ...value };
+  return 0;
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    20,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const discarded = (value?: unknown) => {
+  const clone = { ...value };
+  return 0;
+};`,
+				}},
+			}},
+		},
+		{
+			Code: `type EmptyPick<X> = Pick<X, never>;
+const clone = <T>(value?: T) => ({ ...({} as EmptyPick<T>) });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Column:    16,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `type EmptyPick<X> = Pick<X, never>;
+const clone = (value?: unknown) => ({ ...({} as EmptyPick<unknown>) });`,
+				}},
+			}},
+		},
+		{
+			Code: `type PhantomMapped<X> = { [K in never]: X };
+const clone = <T>(value?: T) => ({ ...({} as PhantomMapped<T>) });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Column:    16,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `type PhantomMapped<X> = { [K in never]: X };
+const clone = (value?: unknown) => ({ ...({} as PhantomMapped<unknown>) });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <T>(value?: T) => ({ ...({} as () => T) });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    16,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = (value?: unknown) => ({ ...({} as () => unknown) });`,
+				}},
+			}},
+		},
+		// Explicit type arguments and NoInfer disconnect a spread argument from
+		// the generic return, and a later property overwrite removes it from the
+		// selected return surface.
+		{
+			Code: `declare function identityObject<X>(value: X): X;
+const clone = <T>(value?: T) => identityObject<object>({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare function identityObject<X>(value: X): X;
+const clone = (value?: unknown) => identityObject<object>({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function noInferIdentity<X = object>(value: NoInfer<X>): X;
+const clone = <T>(value?: T) => noInferIdentity({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare function noInferIdentity<X = object>(value: NoInfer<X>): X;
+const clone = (value?: unknown) => noInferIdentity({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>(value?: T) =>
+  ({ clone: { ...value }, ...{ clone: 0 } }).clone;`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) =>
+  ({ clone: { ...value }, ...{ clone: 0 } }).clone;`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>(value?: T) =>
+  ({ clone: { ...value }, ...{ clone: 0 } });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) =>
+  ({ clone: { ...value }, ...{ clone: 0 } });`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>(value?: T) => {
+  const fixed = { clone: 0 };
+  return { clone: { ...value }, ...fixed };
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) => {
+  const fixed = { clone: 0 };
+  return { clone: { ...value }, ...fixed };
+};`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>(value?: T) => {
+  const { generic, ...rest } = { generic: { ...value }, fixed: 0 };
+  return rest;
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) => {
+  const { generic, ...rest } = { generic: { ...value }, fixed: 0 };
+  return rest;
+};`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>(value?: T) => {
+  const { ...rest } = { generic: { ...value }, ...{ generic: 0 } };
+  return rest;
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) => {
+  const { ...rest } = { generic: { ...value }, ...{ generic: 0 } };
+  return rest;
+};`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>(value?: T) => {
+  const { generic = { ...value } }: { generic?: object } = {};
+  return generic;
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) => {
+  const { generic = { ...value } }: { generic?: object } = {};
+  return generic;
+};`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>(value?: T) => {
+  const [fixed] = [0, { ...value }];
+  return fixed;
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) => {
+  const [fixed] = [0, { ...value }];
+  return fixed;
+};`,
+				}},
+			}},
+		},
+		{
+			Code: `interface PhantomInput<X> { fixed: number }
+declare function phantomResult<X>(value: PhantomInput<X>): X;
+const clone = <T>(value?: T) => phantomResult({ fixed: 0, ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      3,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `interface PhantomInput<X> { fixed: number }
+declare function phantomResult<X>(value: PhantomInput<X>): X;
+const clone = (value?: unknown) => phantomResult({ fixed: 0, ...value });`,
+				}},
+			}},
+		},
+		{
+			Code: `type PhantomInput<X> = { fixed: number };
+declare function phantomResult<X>(value: PhantomInput<X>): X;
+const clone = <T>(value?: T) => phantomResult({ fixed: 0, ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      3,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `type PhantomInput<X> = { fixed: number };
+declare function phantomResult<X>(value: PhantomInput<X>): X;
+const clone = (value?: unknown) => phantomResult({ fixed: 0, ...value });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <T>(value?: T, copy: object = { ...value }) => 0;`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = (value?: unknown, copy: object = { ...value }) => 0;`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>() => {
+  const inner = { ...({} as T) };
+  return { ...inner };
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = () => {
+  const inner = { ...({} as unknown) };
+  return { ...inner };
+};`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function erasedMappedResult<X>(value: { [K in keyof X as never]: X[K] }): X;
+const clone = <T>(value?: T) => erasedMappedResult({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare function erasedMappedResult<X>(value: { [K in keyof X as never]: X[K] }): X;
+const clone = (value?: unknown) => erasedMappedResult({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <T extends string>(value?: T) => ({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = (value?: string) => ({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <T extends unknown>(value?: T) => ({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = (value?: unknown) => ({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <T extends object>() => ({ ...({} as T | undefined) });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = () => ({ ...({} as object | undefined) });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <T>() => [{ ...({} as T | undefined) }] as const;`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = () => [{ ...({} as unknown | undefined) }] as const;`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <T>() => ({ list: [{ ...({} as T | undefined) }] });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = () => ({ list: [{ ...({} as unknown | undefined) }] });`,
+				}},
+			}},
+		},
+		{
+			Code: `declare const flag: boolean;
+const clone = <T>() => flag
+  ? { kind: 'a', ...({} as T | undefined) }
+  : { kind: 'b', ...({} as T | undefined) };`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare const flag: boolean;
+const clone = () => flag
+  ? { kind: 'a', ...({} as unknown | undefined) }
+  : { kind: 'b', ...({} as unknown | undefined) };`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function sameResult<X>(left: X, right: X): X;
+const clone = <T>() => sameResult(
+  { ...({} as T | undefined) },
+  { ...({} as T | undefined) },
+);`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare function sameResult<X>(left: X, right: X): X;
+const clone = () => sameResult(
+  { ...({} as unknown | undefined) },
+  { ...({} as unknown | undefined) },
+);`,
+				}},
+			}},
+		},
+		// Repeating the same generic spread on one object surface collapses to a
+		// single T in TypeScript's inferred intersection, so it remains sole.
+		{
+			Code:     `const clone = <T>() => ({ ...({} as T | undefined), ...({} as T | undefined) });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = () => ({ ...({} as unknown | undefined), ...({} as unknown | undefined) });`,
+				}},
+			}},
+		},
+		// Distinct callee type parameters that are returned as a naked
+		// intersection collapse when both arguments infer the same outer T.
+		{
+			Code:     `const clone = <T>() => Object.assign({ ...({} as T | undefined) }, { ...({} as T | undefined) });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = () => Object.assign({ ...({} as unknown | undefined) }, { ...({} as unknown | undefined) });`,
+				}},
+			}},
+		},
+		// Explicit annotations on locals and default parameters erase the spread
+		// from the inferred signature even when that annotated value is returned.
+		{
+			Code: `const clone = <T>(value?: T) => {
+  const copy: object = { ...value };
+  return copy;
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) => {
+  const copy: object = { ...value };
+  return copy;
+};`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <T>(value?: T, copy: object = { ...value }) => copy;`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = (value?: unknown, copy: object = { ...value }) => copy;`,
+				}},
+			}},
+		},
+		// Primitive intersections and single computed properties do not preserve
+		// multiple generic positions in the inferred return type.
+		{
+			Code:     `const clone = <T>(value: (T & string) | undefined) => ({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = (value: (unknown & string) | undefined) => ({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const clone = <U, T extends U & string>(value?: T, echo?: U) => ({ ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    19,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const clone = <U>(value?: U & string, echo?: U) => ({ ...value });`,
+				}},
+			}},
+		},
+		{
+			Code: `declare const key: 'clone';
+const clone = <T>() => ({ [key]: { ...({} as T | undefined) } });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare const key: 'clone';
+const clone = () => ({ [key]: { ...({} as unknown | undefined) } });`,
+				}},
+			}},
+		},
+		{
+			Code: `const clone = <T>(value?: T) => {
+  const { item }: { item: object } = { item: { ...value } };
+  return item;
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const clone = (value?: unknown) => {
+  const { item }: { item: object } = { item: { ...value } };
+  return item;
+};`,
+				}},
+			}},
+		},
+		// Class methods, accessors, and private/protected fields are absent from
+		// the enumerable surface copied by object spread. Each class uses X twice
+		// so the diagnostic isolates the enclosing function.
+		{
+			Code: `
+class MethodSurface<X> {
+  read(input: X): X { return input; }
+}
+const clone = <T>(value?: T) => ({ ...({} as MethodSurface<T>) });
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      5,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `
+class MethodSurface<X> {
+  read(input: X): X { return input; }
+}
+const clone = (value?: unknown) => ({ ...({} as MethodSurface<unknown>) });
+`,
+				}},
+			}},
+		},
+		{
+			Code: `
+class AccessorSurface<X> {
+  get value(): X { throw new Error(); }
+  set value(input: X) {}
+}
+const clone = <T>(value?: T) => ({ ...({} as AccessorSurface<T>) });
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      6,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `
+class AccessorSurface<X> {
+  get value(): X { throw new Error(); }
+  set value(input: X) {}
+}
+const clone = (value?: unknown) => ({ ...({} as AccessorSurface<unknown>) });
+`,
+				}},
+			}},
+		},
+		{
+			Code: `
+class PrivateSurface<X> {
+  private first!: X;
+  private second!: X;
+}
+const clone = <T>(value?: T) => ({ ...({} as PrivateSurface<T>) });
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      6,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `
+class PrivateSurface<X> {
+  private first!: X;
+  private second!: X;
+}
+const clone = (value?: unknown) => ({ ...({} as PrivateSurface<unknown>) });
+`,
+				}},
+			}},
+		},
+		{
+			Code: `
+class ProtectedSurface<X> {
+  protected first!: X;
+  protected second!: X;
+}
+const clone = <T>(value?: T) => ({ ...({} as ProtectedSurface<T>) });
+`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      6,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `
+class ProtectedSurface<X> {
+  protected first!: X;
+  protected second!: X;
+}
+const clone = (value?: unknown) => ({ ...({} as ProtectedSurface<unknown>) });
+`,
+				}},
+			}},
+		},
+		{
+			Code: `declare function chooseRight<A, B>(left: A, right: B, echo: A): B;
+const discarded = <T>(value?: T) => chooseRight({ ...value }, {}, { ...value });`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      2,
+				Column:    20,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `declare function chooseRight<A, B>(left: A, right: B, echo: A): B;
+const discarded = (value?: unknown) => chooseRight({ ...value }, {}, { ...value });`,
+				}},
+			}},
+		},
+		{
+			Code:     `const asserted = <T>(value?: T) => ({ ...value }) as object;`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    19,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output:    `const asserted = (value?: unknown) => ({ ...value }) as object;`,
+				}},
+			}},
+		},
+		{
+			Code: `const discarded = <T>(value?: T) => {
+  const result = { nested: { ...value }, fixed: 0 };
+  return result.fixed;
+};`,
+			TSConfig: "tsconfig.default-strictness.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "sole",
+				Line:      1,
+				Column:    20,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceUsagesWithConstraint",
+					Output: `const discarded = (value?: unknown) => {
+  const result = { nested: { ...value }, fixed: 0 };
+  return result.fixed;
+};`,
+				}},
+			}},
+		},
+
 		// A comment after the separator belongs to the following type parameter.
 		// Removing the first parameter must preserve it, matching upstream.
 		{
