@@ -166,7 +166,7 @@ func validatePattern(pattern string, flags string) string {
 	// the set syntax it adds is not supported, so it is read as the `u` it
 	// builds on.
 	compileFlags := ""
-	for _, flag := range "imsu" {
+	for _, flag := range "imsu" { // cspell:ignore imsu
 		if strings.ContainsRune(flags, flag) {
 			compileFlags += string(flag)
 		}
