@@ -638,13 +638,16 @@ func TestBooleanPropNamingRule(t *testing.T) {
         `, Tsx: true, Options: optsIs},
 
 		// ---- Numeric / unicode regex pattern ----
-		// rule pattern that accepts 中文 prefix; matching name passes.
+		// A rule pattern that accepts a CJK name; the matching name passes.
+		// Upstream builds `new RegExp(config.rule)` with no flags, so the range
+		// is spelled out — `\p{L}` names a property class only under `u`, and
+		// this pattern carries no flags at all.
 		{Code: `
           class Hello extends React.Component {
             static propTypes = { 是否启用: PropTypes.bool };
             render() { return <div/>; }
           }
-        `, Tsx: true, Options: []interface{}{map[string]interface{}{"rule": "^[\\p{L}]+$"}}},
+        `, Tsx: true, Options: []interface{}{map[string]interface{}{"rule": "^[\\u4e00-\\u9fff]+$"}}},
 
 		// ---- 5-level validateNested (depth) ----
 		{Code: `
@@ -736,6 +739,24 @@ func TestBooleanPropNamingRule(t *testing.T) {
           export { Card, Avatar };
         `, Tsx: true, Options: optsIs},
 	}, []rule_tester.InvalidTestCase{
+		// ---- without `u` a `\p{L}` is the letter `p`, not a property class ----
+		// The pattern then names `p`, `{`, `L` and `}` and nothing else, which no
+		// CJK name matches. Go's own regexp reads the property class whatever the
+		// flags, which is where it parts company with JavaScript.
+		{
+			Code: `
+          class Hello extends React.Component {
+            static propTypes = { 是否启用: PropTypes.bool };
+            render() { return <div/>; }
+          }
+        `,
+			Tsx:     true,
+			Options: []interface{}{map[string]interface{}{"rule": "^[\\p{L}]+$"}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "patternMismatch",
+			}},
+		},
+
 		// ---- a lookahead in `rule` is ordinary JavaScript, so the rule runs ----
 		// `^(?=is)` asks for a name starting with `is`; `something` does not.
 		{
