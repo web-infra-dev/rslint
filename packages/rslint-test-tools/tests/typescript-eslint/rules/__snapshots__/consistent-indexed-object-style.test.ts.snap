@@ -1,0 +1,1722 @@
+// Rstest Snapshot v1
+
+exports[`consistent-indexed-object-style > invalid 1`] = `
+{
+  "code": "
+interface Foo {
+  [key: string]: any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Record<string, any>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 2`] = `
+{
+  "code": "
+interface Foo {
+  readonly [key: string]: any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Readonly<Record<string, any>>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 3`] = `
+{
+  "code": "
+interface Foo<A> {
+  [key: string]: A;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<A> = Record<string, A>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 4`] = `
+{
+  "code": "
+interface Foo<A = any> {
+  [key: string]: A;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<A = any> = Record<string, A>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 5`] = `
+{
+  "code": "
+interface B extends A {
+  [index: number]: unknown;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 6`] = `
+{
+  "code": "
+interface Foo<A> {
+  readonly [key: string]: A;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<A> = Readonly<Record<string, A>>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 7`] = `
+{
+  "code": "
+interface Foo<A, B> {
+  [key: A]: B;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<A, B> = Record<A, B>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 8`] = `
+{
+  "code": "
+interface Foo<A, B> {
+  readonly [key: A]: B;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<A, B> = Readonly<Record<A, B>>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 9`] = `
+{
+  "code": "type Foo = { [key: string]: any };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = Record<string, any>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 10`] = `
+{
+  "code": "type Foo = { readonly [key: string]: any };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = Readonly<Record<string, any>>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 11`] = `
+{
+  "code": "type Foo = Generic<{ [key: string]: any }>;",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = Generic<Record<string, any>>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 12`] = `
+{
+  "code": "type Foo = Generic<{ readonly [key: string]: any }>;",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = Generic<Readonly<Record<string, any>>>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 13`] = `
+{
+  "code": "function foo(arg: { [key: string]: any }) {}",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "function foo(arg: Record<string, any>) {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 14`] = `
+{
+  "code": "function foo(): { [key: string]: any } {}",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "function foo(): Record<string, any> {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 15`] = `
+{
+  "code": "function foo(arg: { readonly [key: string]: any }) {}",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "function foo(arg: Readonly<Record<string, any>>) {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 16`] = `
+{
+  "code": "function foo(): { readonly [key: string]: any } {}",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "function foo(): Readonly<Record<string, any>> {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 17`] = `
+{
+  "code": "type Foo = Record<string, any>;",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = { [key: string]: any };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 18`] = `
+{
+  "code": "type Foo<T> = Record<string, T>;",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo<T> = { [key: string]: T };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 19`] = `
+{
+  "code": "type Foo = { [k: string]: A.Foo };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = Record<string, A.Foo>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 20`] = `
+{
+  "code": "type Foo = { [key: string]: AnotherFoo };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = Record<string, AnotherFoo>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 21`] = `
+{
+  "code": "type Foo = { [key: string]: { [key: string]: Foo } };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = { [key: string]: Record<string, Foo> };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 22`] = `
+{
+  "code": "type Foo = { [key: string]: string } | Foo;",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = Record<string, string> | Foo;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 23`] = `
+{
+  "code": "
+interface Foo<T> {
+  [k: string]: T;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<T> = Record<string, T>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 24`] = `
+{
+  "code": "
+interface Foo {
+  [k: string]: A.Foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Record<string, A.Foo>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 25`] = `
+{
+  "code": "
+interface Foo {
+  [k: string]: { [key: string]: Foo };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  [k: string]: Record<string, Foo>;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 26`] = `
+{
+  "code": "
+interface Foo {
+  [key: string]: { foo: Foo };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Record<string, { foo: Foo }>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 27`] = `
+{
+  "code": "
+interface Foo {
+  [key: string]: Foo[];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Record<string, Foo[]>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 28`] = `
+{
+  "code": "
+interface Foo {
+  [key: string]: () => Foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Record<string, () => Foo>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 29`] = `
+{
+  "code": "
+interface Foo {
+  [s: string]: [Foo];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Record<string, [Foo]>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 30`] = `
+{
+  "code": "
+interface Foo1 {
+  [key: string]: Foo2;
+}
+
+interface Foo2 {
+  [key: string]: Foo3;
+}
+
+interface Foo3 {
+  [key: string]: Foo2;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo1 = Record<string, Foo2>;
+
+interface Foo2 {
+  [key: string]: Foo3;
+}
+
+interface Foo3 {
+  [key: string]: Foo2;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 31`] = `
+{
+  "code": "
+interface Foo1 {
+  [key: string]: Record<string, Foo2>;
+}
+
+interface Foo2 {
+  [key: string]: Foo3;
+}
+
+interface Foo3 {
+  [key: string]: Foo2;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo1 = Record<string, Record<string, Foo2>>;
+
+interface Foo2 {
+  [key: string]: Foo3;
+}
+
+interface Foo3 {
+  [key: string]: Foo2;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 32`] = `
+{
+  "code": "
+type Foo1 = {
+  [key: string]: { foo2: Foo2 };
+};
+
+type Foo2 = {
+  [key: string]: Foo3;
+};
+
+type Foo3 = {
+  [key: string]: Record<string, Foo1>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 8,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 12,
+        },
+        "start": {
+          "column": 13,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+type Foo1 = Record<string, { foo2: Foo2 }>;
+
+type Foo2 = Record<string, Foo3>;
+
+type Foo3 = Record<string, Record<string, Foo1>>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 33`] = `
+{
+  "code": "
+type Foos<K extends string = never> = {
+  [k in K]: { foo: Foo };
+};
+
+type Foo = Foos;
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 39,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foos<K extends string = never> = Record<K, { foo: Foo }>;
+
+type Foo = Foos;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 34`] = `
+{
+  "code": "
+type Foos<K extends string = never> = {
+  [k in K]: Foo[];
+};
+
+type Foo = Foos;
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 39,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foos<K extends string = never> = Record<K, Foo[]>;
+
+type Foo = Foos;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 35`] = `
+{
+  "code": "type Foo = Generic<Record<string, any>>;",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = Generic<{ [key: string]: any }>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 36`] = `
+{
+  "code": "type Foo = Record<string | number, any>;",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 37`] = `
+{
+  "code": "type Foo = Record<Exclude<'a' | 'b' | 'c', 'a'>, any>;",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 38`] = `
+{
+  "code": "type Foo = Record<number, any>;",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = { [key: number]: any };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 39`] = `
+{
+  "code": "type Foo = Record<symbol, any>;",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = { [key: symbol]: any };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 40`] = `
+{
+  "code": "function foo(arg: Record<string, any>) {}",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "function foo(arg: { [key: string]: any }) {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 41`] = `
+{
+  "code": "function foo(): Record<string, any> {}",
+  "diagnostics": [
+    {
+      "message": "An index signature is preferred over a record.",
+      "messageId": "preferIndexSignature",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "function foo(): { [key: string]: any } {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 42`] = `
+{
+  "code": "type T = { readonly [key in string]: number };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = Readonly<Record<string, number>>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 43`] = `
+{
+  "code": "type T = { +readonly [key in string]: number };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = Readonly<Record<string, number>>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 44`] = `
+{
+  "code": "type T = { -readonly [key in string]: number };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 45`] = `
+{
+  "code": "type T = { [key in string]: number };",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = Record<string, number>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 46`] = `
+{
+  "code": "
+function foo(e: { [key in PropertyKey]?: string }) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(e: Partial<Record<PropertyKey, string>>) {}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 47`] = `
+{
+  "code": "
+function foo(e: { [key in PropertyKey]+?: string }) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(e: Partial<Record<PropertyKey, string>>) {}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 48`] = `
+{
+  "code": "
+function foo(e: { [key in PropertyKey]-?: string }) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(e: Required<Record<PropertyKey, string>>) {}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 49`] = `
+{
+  "code": "
+function foo(e: { readonly [key in PropertyKey]-?: string }) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(e: Readonly<Required<Record<PropertyKey, string>>>) {}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 50`] = `
+{
+  "code": "
+type Options = [
+  { [Type in (typeof optionTesters)[number]['option']]?: boolean } & {
+    allow?: TypeOrValueSpecifier[];
+  },
+];
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Options = [
+  Partial<Record<(typeof optionTesters)[number]['option'], boolean>> & {
+    allow?: TypeOrValueSpecifier[];
+  },
+];
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 51`] = `
+{
+  "code": "
+export type MakeRequired<Base, Key extends keyof Base> = {
+  [K in Key]-?: NonNullable<Base[Key]>;
+} & Omit<Base, Key>;
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 58,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export type MakeRequired<Base, Key extends keyof Base> = Required<Record<Key, NonNullable<Base[Key]>>> & Omit<Base, Key>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 52`] = `
+{
+  "code": "
+function f(): {
+  [k in (keyof ParseResult)]: unknown;
+} {
+  return {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function f(): Record<keyof ParseResult, unknown> {
+  return {};
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 53`] = `
+{
+  "code": "
+interface Foo {
+  [key: string]: Bar;
+}
+
+interface Bar {
+  [key: string];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Record<string, Bar>;
+
+interface Bar {
+  [key: string];
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 54`] = `
+{
+  "code": "
+type Foo = {
+  [k in string];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "A record is preferred over an index signature.",
+      "messageId": "preferRecord",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-indexed-object-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = Record<string, any>;
+      ",
+  "ruleCount": 1,
+}
+`;
