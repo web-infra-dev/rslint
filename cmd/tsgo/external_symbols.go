@@ -135,9 +135,12 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 			symbol = target
 		}
 	}
+	if symbol == nil {
+		return
+	}
 	isAcceptedTypeOnly := isAcceptedTypeOnlySymbol(symbol.Name)
-	isTypeOnly := symbol != nil && symbol.Flags&ast.SymbolFlagsValue == 0
-	if symbol == nil || isTypeOnly && !isAcceptedTypeOnly {
+	isTypeOnly := symbol.Flags&ast.SymbolFlagsValue == 0
+	if isTypeOnly && !isAcceptedTypeOnly {
 		return
 	}
 
