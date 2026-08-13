@@ -10,15 +10,20 @@
 //     compile at all, and a rule that shrugs off the compile error silently
 //     drops whatever option it came from.
 //   - regexp2 backtracks and so takes the syntax, and its ECMAScript mode gets
-//     most of the semantics right. Three things it still reads differently: a
-//     `.` matches U+2028 and U+2029, `^` and `$` under `m` break on `\n` alone
-//     where JavaScript breaks on all four line terminators, and ignoring case
-//     folds by Unicode's rules rather than JavaScript's.
+//     most of the semantics right. What it still reads differently:
+//     a `.` matches U+2028 and U+2029; `^` and `$` under `m` break on `\n`
+//     alone where JavaScript breaks on all four line terminators; ignoring
+//     case folds by Unicode's rules rather than JavaScript's; `\b` is drawn
+//     over .NET's Unicode word set where ECMAScript keeps it to ASCII; an
+//     escape .NET reads for itself — `\A`, `\a`, `\e` — is a plain character
+//     to JavaScript, and one .NET does not know at all makes it refuse a
+//     pattern JavaScript accepts; and `y` says where a match may start, which
+//     regexp2 has no flag for.
 //
-// This package takes the second one and closes those three gaps by rewriting
-// the pattern before handing it over. It also bounds how long a match may run:
-// a backtracking engine on a pattern a user wrote is a way to hang the linter,
-// and a match that overruns is reported as no match.
+// This package takes the second one and closes every one of those gaps by
+// rewriting the pattern before handing it over. It also bounds how long a
+// match may run: a backtracking engine on a pattern a user wrote is a way to
+// hang the linter, and a match that overruns is reported as no match.
 //
 // Three things are deliberately not covered:
 //
