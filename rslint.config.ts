@@ -1,5 +1,4 @@
-import { defineConfig, globalIgnores, js, ts } from '@rslint/core';
-import globals from 'globals';
+import { defineConfig, globalIgnores, globals, js, ts } from '@rslint/core';
 
 export default defineConfig([
   globalIgnores([

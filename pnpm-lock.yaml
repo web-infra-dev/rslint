@@ -172,8 +172,8 @@ catalogs:
       specifier: ^3.3.3
       version: 3.3.3
     globals:
-      specifier: ^17.7.0
-      version: 17.7.0
+      specifier: 17.9.0
+      version: 17.9.0
     husky:
       specifier: ^9.1.7
       version: 9.1.7
@@ -284,9 +284,6 @@ importers:
       ajv:
         specifier: 'catalog:'
         version: 6.15.0
-      globals:
-        specifier: 'catalog:'
-        version: 17.7.0
       husky:
         specifier: 'catalog:'
         version: 9.1.7
@@ -384,7 +381,7 @@ importers:
         version: 1.7.0
       globals:
         specifier: 'catalog:'
-        version: 17.7.0
+        version: 17.9.0
       json-schema-to-typescript:
         specifier: 'catalog:'
         version: 15.0.4
@@ -4173,8 +4170,8 @@ packages:
     engines: {node: '>=12'}
     deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
-  globals@17.7.0:
-    resolution: {integrity: sha512-Czmyns5dUsq4seFBR/Kdydhmo8y9kC79hiSkPn0YcGtNnYWnrgt0vjrSjx9tspoDGWm2CMarffRuLjM4xUz8xg==}
+  globals@17.9.0:
+    resolution: {integrity: sha512-m/MvAW61QVU5VDNF1Vj8axt016h8w7L5TU1e9zlab7XIttAT2YAlCwl75K1fOqvMM9apmD7lbCIRhpfkhmxhCg==}
     engines: {node: '>=18'}
 
   globalthis@1.0.4:
@@ -9571,7 +9568,7 @@ snapshots:
   eslint-plugin-cypress@6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.8.0(jiti@2.7.0)
-      globals: 17.7.0
+      globals: 17.9.0
     optionalDependencies:
       '@typescript-eslint/parser': 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
 
@@ -9585,7 +9582,7 @@ snapshots:
   eslint-plugin-playwright@2.11.0(eslint@10.8.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.8.0(jiti@2.7.0)
-      globals: 17.7.0
+      globals: 17.9.0
 
   eslint-plugin-promise@7.3.0(eslint@10.8.0(jiti@2.7.0)):
     dependencies:
@@ -9607,7 +9604,7 @@ snapshots:
       bytes: 3.1.2
       eslint: 10.8.0(jiti@2.7.0)
       functional-red-black-tree: 1.0.1
-      globals: 17.7.0
+      globals: 17.9.0
       jsx-ast-utils-x: 0.1.0
       lodash.merge: 4.6.2
       minimatch: 10.2.5
@@ -9628,7 +9625,7 @@ snapshots:
       entities: 4.5.0
       eslint: 10.8.0(jiti@2.7.0)
       find-up-simple: 1.0.1
-      globals: 17.7.0
+      globals: 17.9.0
       indent-string: 5.0.0
       is-builtin-module: 5.0.0
       is-identifier: 1.1.0
@@ -9939,7 +9936,7 @@ snapshots:
       minimatch: 5.1.9
       once: 1.4.0
 
-  globals@17.7.0: {}
+  globals@17.9.0: {}
 
   globalthis@1.0.4:
     dependencies:

@@ -143,7 +143,19 @@ export interface LanguageOptions {
    * un-declares a global inherited from an earlier entry.
    *
    * @example
-   * globals: { myGlobal: 'readonly' }
+   * import { defineConfig, globals } from '@rslint/core';
+   *
+   * export default defineConfig([
+   *   {
+   *     files: ['src/*.js'],
+   *     languageOptions: {
+   *       globals: {
+   *         ...globals.browser,
+   *         BUILD_ID: 'readonly',
+   *       },
+   *     },
+   *   },
+   * ]);
    */
   globals?: GlobalsConfig;
 }

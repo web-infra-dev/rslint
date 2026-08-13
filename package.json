@@ -42,7 +42,6 @@
     "@rstest/core": "catalog:",
     "@types/react": "catalog:",
     "ajv": "catalog:",
-    "globals": "catalog:",
     "husky": "catalog:",
     "lint-staged": "catalog:",
     "prettier": "catalog:",
