@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -722,13 +723,13 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 			return noopRule()
 		},
 	}
-	if _, err := PrepareLintPlan(opts); err != errNilProgram {
+	if _, err := PrepareLintPlan(opts); !errors.Is(err, errNilProgram) {
 		t.Fatalf("PrepareLintPlan nil Program error = %v", err)
 	}
 	if ruleCalls.Load() != 0 || filterCalls.Load() != 0 {
 		t.Fatalf("PrepareLintPlan produced side effects before rejecting nil Program: rules=%d filters=%d", ruleCalls.Load(), filterCalls.Load())
 	}
-	if _, err := RunLinter(opts); err != errNilProgram {
+	if _, err := RunLinter(opts); !errors.Is(err, errNilProgram) {
 		t.Fatalf("RunLinter nil Program error = %v", err)
 	}
 	if ruleCalls.Load() != 0 || filterCalls.Load() != 0 {
@@ -739,7 +740,7 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 		TypeCheck: true,
 	}
 	typeCheckOnly.Programs = append(typeCheckOnly.Programs, nil)
-	if _, err := RunLinter(typeCheckOnly); err != errNilProgram {
+	if _, err := RunLinter(typeCheckOnly); !errors.Is(err, errNilProgram) {
 		t.Fatalf("type-check-only RunLinter nil Program error = %v", err)
 	}
 	noOp, err := RunLinter(RunLinterOptions{Programs: []*lintprogram.Program{nil}})
@@ -752,10 +753,10 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 		Programs:        []*lintprogram.Program{invalid},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
 	}
-	if _, err := PrepareLintPlan(invalidOpts); err != errInvalidProgram {
+	if _, err := PrepareLintPlan(invalidOpts); !errors.Is(err, errInvalidProgram) {
 		t.Fatalf("PrepareLintPlan zero Program error = %v", err)
 	}
-	if _, err := RunLinter(invalidOpts); err != errInvalidProgram {
+	if _, err := RunLinter(invalidOpts); !errors.Is(err, errInvalidProgram) {
 		t.Fatalf("RunLinter zero Program error = %v", err)
 	}
 	invalidSkipMask := RunLinterOptions{
@@ -763,7 +764,7 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 		TypeCheck:             true,
 		SkipTypeCheckPrograms: []bool{},
 	}
-	if _, err := RunLinter(invalidSkipMask); err != errInvalidTypeCheckSkipMask {
+	if _, err := RunLinter(invalidSkipMask); !errors.Is(err, errInvalidTypeCheckSkipMask) {
 		t.Fatalf("RunLinter invalid type-check skip mask error = %v", err)
 	}
 }
