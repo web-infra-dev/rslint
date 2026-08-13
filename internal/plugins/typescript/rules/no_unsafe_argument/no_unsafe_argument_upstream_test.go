@@ -1,3 +1,7 @@
+// TestNoUnsafeArgumentUpstream migrates the full valid/invalid suite from
+// upstream packages/eslint-plugin/tests/rules/no-unsafe-argument.test.ts 1:1.
+// Position assertions cover line and column for every invalid case. rslint-
+// specific lock-ins live in no_unsafe_argument_extras_test.go.
 package no_unsafe_argument
 
 import (
@@ -7,7 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoUnsafeArgumentRule(t *testing.T) {
+func TestNoUnsafeArgumentUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeArgumentRule, []rule_tester.ValidTestCase{
 		{Code: `
 doesNotExist(1 as any);
@@ -116,6 +120,7 @@ foo(1 as any);
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `number`.",
 					Line:      3,
 					Column:    5,
 					EndColumn: 13,
@@ -130,6 +135,7 @@ foo(error);
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type error typed assigned to a parameter of type `number`.",
 					Line:      3,
 					Column:    5,
 					EndColumn: 10,
@@ -193,6 +199,7 @@ foo(...(x as any));
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeSpread",
+					Message:   "Unsafe spread of an `any` type.",
 					Line:      4,
 					Column:    5,
 					EndColumn: 18,
@@ -208,6 +215,7 @@ foo(...(x as any[]));
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeArraySpread",
+					Message:   "Unsafe spread of an `any[]` array type.",
 					Line:      4,
 					Column:    5,
 					EndColumn: 20,
@@ -225,6 +233,7 @@ foo(...errors);
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeArraySpread",
+					Message:   "Unsafe spread of an error array type.",
 					Line:      6,
 					Column:    5,
 					EndColumn: 14,
@@ -241,6 +250,7 @@ foo(...x);
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeTupleSpread",
+					Message:   "Unsafe spread of a tuple type. The argument is of type `any` and is assigned to a parameter of type `number`.",
 					Line:      5,
 					Column:    5,
 					EndColumn: 9,
@@ -257,6 +267,7 @@ foo(...x);
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsafeTupleSpread",
+					Message:   "Unsafe spread of a tuple type. The argument is error typed and is assigned to a parameter of type `number`.",
 					Line:      5,
 					Column:    5,
 					EndColumn: 9,
