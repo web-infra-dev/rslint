@@ -12,14 +12,7 @@
 // caller in this repository wants.
 package isglob
 
-import (
-	"regexp"
-	"strings"
-)
-
-// extglobPattern is is-extglob's own regexp, kept verbatim. The first group
-// swallows an escaped character so that `\@(a)` does not read as a list.
-var extglobPattern = regexp.MustCompile(`(\\).|([@?!+*]\(.*\))`)
+import "strings"
 
 // Is reports whether str was written as a glob pattern.
 func Is(str string) bool {
@@ -30,22 +23,6 @@ func Is(str string) bool {
 		return true
 	}
 	return strictCheck(str)
-}
-
-// IsExtglob reports whether str carries an extended glob list — `!(a)`,
-// `@(a|b)`, `+(a)`, `?(a)` or `*(a)`.
-func IsExtglob(str string) bool {
-	for str != "" {
-		match := extglobPattern.FindStringSubmatchIndex(str)
-		if match == nil {
-			return false
-		}
-		if match[4] != -1 {
-			return true
-		}
-		str = str[match[1]:]
-	}
-	return false
 }
 
 func strictCheck(str string) bool {

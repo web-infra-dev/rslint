@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildPreferRegExpExecMessage() rule.RuleMessage {
@@ -314,7 +315,7 @@ func buildRegexLiteralFromString(pattern string) (string, bool) {
 	}
 	b.WriteByte('/')
 	literal := b.String()
-	if !utils.IsValidRegexLiteral(literal) {
+	if !ecmascript.IsValidRegexLiteral(literal) {
 		return "", false
 	}
 	return literal, true

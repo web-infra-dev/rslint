@@ -30,10 +30,10 @@ func Canonicalize(r rune) rune {
 	if r > 0xFFFF || expandsOnUppercase(r) {
 		return r
 	}
-	for _, pair := range unicode17CasePairs {
-		if r == pair[0] {
-			return pair[1]
-		}
+	// Go's tables are an older Unicode than the one JavaScript reads; see
+	// unicode17.go.
+	if upper, ok := unicode17ToUpper(r); ok {
+		return upper
 	}
 	upper := unicode.ToUpper(r)
 	if r >= utf8.RuneSelf && upper < utf8.RuneSelf {
@@ -49,21 +49,6 @@ func expandsOnUppercase(r rune) bool {
 		r >= 0x1F90 && r <= 0x1F97 ||
 		r >= 0x1FA0 && r <= 0x1FA7 ||
 		r == 0x1FB3 || r == 0x1FC3 || r == 0x1FF3
-}
-
-// unicode17CasePairs are the simple uppercase mappings Unicode 16 and 17 added
-// that Go 1.26's Unicode 15 tables do not have. Node 26 canonicalizes by
-// Unicode 17, and naming the delta here states that target without depending on
-// a Node installation or a generated table.
-var unicode17CasePairs = [...][2]rune{
-	{0x019B, 0xA7DC},
-	{0x0264, 0xA7CB},
-	{0x1C8A, 0x1C89},
-	{0xA7CD, 0xA7CC},
-	{0xA7CF, 0xA7CE},
-	{0xA7D3, 0xA7D2},
-	{0xA7D5, 0xA7D4},
-	{0xA7DB, 0xA7DA},
 }
 
 // CaseEquivalents returns every character that Canonicalize maps onto the same
@@ -110,9 +95,8 @@ var caseTables = sync.OnceValues(func() (map[rune][]rune, [][]rune) {
 		}
 	}
 	// Except the ones Go has no case mapping for at all.
-	for _, pair := range unicode17CasePairs {
-		record(pair[0])
-		record(pair[1])
+	for _, r := range unicode17CaseAdditions() {
+		record(r)
 	}
 
 	byMember := map[rune][]rune{}

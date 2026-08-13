@@ -1,4 +1,4 @@
-package minimatch
+package minimatch3
 
 import "testing"
 

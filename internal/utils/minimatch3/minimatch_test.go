@@ -1,4 +1,4 @@
-package minimatch_test
+package minimatch3_test
 
 import (
 	"strconv"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/minimatch"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 // TestMatch pins this port against minimatch 3.1.5 itself: every expectation
@@ -199,7 +199,7 @@ func TestMatch(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.pattern+" vs "+test.path, func(t *testing.T) {
-			got := minimatch.Match(test.pattern, test.path, minimatch.Options{})
+			got := minimatch3.Match(test.pattern, test.path, minimatch3.Options{})
 			if got != test.want {
 				t.Errorf("Match(%q, %q) = %v, want %v", test.pattern, test.path, got, test.want)
 			}
@@ -213,91 +213,91 @@ func TestMatchOptions(t *testing.T) {
 		name    string
 		pattern string
 		path    string
-		options minimatch.Options
+		options minimatch3.Options
 		want    bool
 	}{
 		{
 			name:    "Dot lets a wildcard reach a dot name",
 			pattern: "/src/*",
 			path:    "/src/.hidden.ts",
-			options: minimatch.Options{Dot: true},
+			options: minimatch3.Options{Dot: true},
 			want:    true,
 		},
 		{
 			name:    "NoExt leaves a list to match literally",
 			pattern: "/src/?(server)/*",
 			path:    "/src/server/a.ts",
-			options: minimatch.Options{NoExt: true},
+			options: minimatch3.Options{NoExt: true},
 			want:    false,
 		},
 		{
 			name:    "NoBrace leaves a brace set to match literally",
 			pattern: "/src/{a,b}/x.ts",
 			path:    "/src/a/x.ts",
-			options: minimatch.Options{NoBrace: true},
+			options: minimatch3.Options{NoBrace: true},
 			want:    false,
 		},
 		{
 			name:    "NoCase ignores case",
 			pattern: "/src/Server/*.ts",
 			path:    "/src/server/a.ts",
-			options: minimatch.Options{NoCase: true},
+			options: minimatch3.Options{NoCase: true},
 			want:    true,
 		},
 		{
 			name:    "NoGlobStar keeps `**` inside one part",
 			pattern: "/src/**/a.ts",
 			path:    "/src/one/two/a.ts",
-			options: minimatch.Options{NoGlobStar: true},
+			options: minimatch3.Options{NoGlobStar: true},
 			want:    false,
 		},
 		{
 			name:    "NoNegate keeps a leading `!` literal",
 			pattern: "!/src/a.ts",
 			path:    "/src/a.ts",
-			options: minimatch.Options{NoNegate: true},
+			options: minimatch3.Options{NoNegate: true},
 			want:    false,
 		},
 		{
 			name:    "MatchBase matches a slashless pattern against the basename",
 			pattern: "a?c.ts",
 			path:    "/src/deep/abc.ts",
-			options: minimatch.Options{MatchBase: true},
+			options: minimatch3.Options{MatchBase: true},
 			want:    true,
 		},
 		{
 			name:    "FlipNegate reports the hit of a negated pattern",
 			pattern: "!/src/**",
 			path:    "/src/a.ts",
-			options: minimatch.Options{FlipNegate: true},
+			options: minimatch3.Options{FlipNegate: true},
 			want:    true,
 		},
 		{
 			name:    "a comment matches nothing",
 			pattern: "#/src/a.ts",
 			path:    "#/src/a.ts",
-			options: minimatch.Options{},
+			options: minimatch3.Options{},
 			want:    false,
 		},
 		{
 			name:    "NoComment keeps a leading `#` literal",
 			pattern: "#/src/a.ts",
 			path:    "#/src/a.ts",
-			options: minimatch.Options{NoComment: true},
+			options: minimatch3.Options{NoComment: true},
 			want:    true,
 		},
 		{
 			name:    "an empty pattern matches only the empty path",
 			pattern: "",
 			path:    "",
-			options: minimatch.Options{},
+			options: minimatch3.Options{},
 			want:    true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := minimatch.Match(test.pattern, test.path, test.options)
+			got := minimatch3.Match(test.pattern, test.path, test.options)
 			if got != test.want {
 				t.Errorf("Match(%q, %q, %+v) = %v, want %v", test.pattern, test.path, test.options, got, test.want)
 			}
@@ -394,7 +394,7 @@ func TestMatchNoCase(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.pattern+" vs "+test.path, func(t *testing.T) {
-			got := minimatch.Match(test.pattern, test.path, minimatch.Options{NoCase: true})
+			got := minimatch3.Match(test.pattern, test.path, minimatch3.Options{NoCase: true})
 			if got != test.want {
 				t.Errorf("Match(%q, %q, NoCase) = %v, want %v", test.pattern, test.path, got, test.want)
 			}
@@ -432,7 +432,7 @@ func TestMatchOverLongPattern(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := minimatch.Match(test.pattern, test.path, minimatch.Options{})
+			got := minimatch3.Match(test.pattern, test.path, minimatch3.Options{})
 			if got != test.want {
 				t.Errorf("Match(<%d bytes>, <%d bytes>) = %v, want %v", len(test.pattern), len(test.path), got, test.want)
 			}
@@ -466,7 +466,7 @@ func TestMatchManyGlobstars(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			start := time.Now()
-			got := minimatch.Match(test.pattern, path, minimatch.Options{})
+			got := minimatch3.Match(test.pattern, path, minimatch3.Options{})
 			if got != test.want {
 				t.Errorf("Match(%q, %q) = %v, want %v", test.pattern, path, got, test.want)
 			}
@@ -520,7 +520,7 @@ func TestBraceExpand(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.pattern, func(t *testing.T) {
-			got := minimatch.BraceExpand(test.pattern)
+			got := minimatch3.BraceExpand(test.pattern)
 			if len(got) != len(test.want) {
 				t.Fatalf("BraceExpand(%q) = %q, want %q", test.pattern, got, test.want)
 			}

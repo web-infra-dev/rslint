@@ -475,7 +475,7 @@ var ValidTitleRule = rule.Rule{
 				}
 
 				if !co.ignoreSpaces {
-					trimmed := ecmascript.Trim(title)
+					trimmed := ecmascript.StringTrim(title)
 					if len(trimmed) != len(title) {
 						raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 						fix := accidentalSpaceReplacement(raw)

@@ -6,17 +6,17 @@
 //
 // Regenerate by running the corpus through minimatch and grouping per pattern;
 // do not hand-edit an expectation to make a change pass.
-package minimatch_test
+package minimatch3_test
 
 import (
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/minimatch"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 type corpusCase struct {
 	pattern string
-	options minimatch.Options
+	options minimatch3.Options
 	matches []string
 	misses  []string
 }
@@ -291,19 +291,19 @@ var corpus = []corpusCase{
 	},
 	{
 		pattern: `XYZ`,
-		options: minimatch.Options{NoCase: true},
+		options: minimatch3.Options{NoCase: true},
 		matches: []string{`xYz`},
 		misses:  []string{`ABC`, `IjK`},
 	},
 	{
 		pattern: `ab*`,
-		options: minimatch.Options{NoCase: true},
+		options: minimatch3.Options{NoCase: true},
 		matches: []string{`ABC`},
 		misses:  []string{`xYz`, `IjK`},
 	},
 	{
 		pattern: `[ia]?[ck]`,
-		options: minimatch.Options{NoCase: true},
+		options: minimatch3.Options{NoCase: true},
 		matches: []string{`ABC`, `IjK`},
 		misses:  []string{`xYz`},
 	},
@@ -323,13 +323,13 @@ var corpus = []corpusCase{
 	},
 	{
 		pattern: `a/*/b`,
-		options: minimatch.Options{Dot: true},
+		options: minimatch3.Options{Dot: true},
 		matches: []string{`a/c/b`, `a/.d/b`},
 		misses:  []string{`a/./b`, `a/../b`},
 	},
 	{
 		pattern: `a/.*/b`,
-		options: minimatch.Options{Dot: true},
+		options: minimatch3.Options{Dot: true},
 		matches: []string{`a/./b`, `a/../b`, `a/.d/b`},
 		misses:  []string{`a/c/b`},
 	},
@@ -345,7 +345,7 @@ var corpus = []corpusCase{
 	},
 	{
 		pattern: `**`,
-		options: minimatch.Options{Dot: true},
+		options: minimatch3.Options{Dot: true},
 		matches: []string{`.a/.d`, `a/.d`, `a/b`},
 	},
 	{
@@ -394,19 +394,19 @@ var corpus = []corpusCase{
 	},
 	{
 		pattern: `*(a|{b|c,c})`,
-		options: minimatch.Options{NoExt: true},
+		options: minimatch3.Options{NoExt: true},
 		matches: []string{`x(a|b|c)`, `x(a|c)`, `(a|b|c)`, `(a|c)`},
 		misses:  []string{`a`, `b`, `c`, `d`, `ab`, `ac`, `ad`, `bc`, `cb`, `bc,d`, `c,db`, `c,d`, `d)`, `(b|c`, `*(b|c`, `b|c`, `b|cc`, `cb|c`},
 	},
 	{
 		pattern: `a?b`,
-		options: minimatch.Options{MatchBase: true},
+		options: minimatch3.Options{MatchBase: true},
 		matches: []string{`x/y/acb`, `acb/`},
 		misses:  []string{`acb/d/e`, `x/y/acb/d`},
 	},
 	{
 		pattern: `#*`,
-		options: minimatch.Options{NoComment: true},
+		options: minimatch3.Options{NoComment: true},
 		matches: []string{`#a`, `#b`},
 		misses:  []string{`c#d`},
 	},
@@ -417,7 +417,7 @@ var corpus = []corpusCase{
 	},
 	{
 		pattern: `!a*`,
-		options: minimatch.Options{NoNegate: true},
+		options: minimatch3.Options{NoNegate: true},
 		matches: []string{`!ab`, `!abc`},
 		misses:  []string{`d`, `e`, `a!b`, `\!a`},
 	},
@@ -462,7 +462,7 @@ var corpus = []corpusCase{
 // TestCorpus runs every corpus case in both directions.
 func TestCorpus(t *testing.T) {
 	for _, test := range corpus {
-		matcher := minimatch.New(test.pattern, test.options)
+		matcher := minimatch3.New(test.pattern, test.options)
 		for _, path := range test.matches {
 			if !matcher.Match(path) {
 				t.Errorf("Match(%q, %q, %+v) = false, want true", test.pattern, path, test.options)

@@ -1,12 +1,15 @@
-// Package minimatch ports minimatch 3.1.5 and the brace-expansion 1.1.16 it
+// Package minimatch3 ports minimatch 3.1.5 and the brace-expansion 1.1.16 it
 // pulls in, the glob matcher an ESLint plugin compares paths with. It covers
 // the extended glob syntax — `!(a)`, `@(a|b)`, `+(a)`, `?(a)`, `*(a)` — that
 // the general-purpose Go glob libraries leave out, so a rule ported from an
 // ESLint plugin can accept the same patterns its upstream does.
 //
-// Plugins are what this is for, so 3.x is the version to answer like. ESLint
-// itself moved on to minimatch 10 for the paths it matches on its own behalf,
-// which reads a handful of patterns differently.
+// The major version is in the name because a single ESLint run reads globs by
+// two of them. A plugin declares its own dependency and the ecosystem sits on
+// 3.x — eslint-plugin-import and eslint-plugin-react both pin `^3.1.2` — while
+// ESLint matches its own flat config `files` and `ignores` with minimatch 10.
+// The two disagree on more than the version bump suggests, so a port that did
+// not say which one it answers like would be read as either.
 //
 // Patterns compile to regexp2 rather than the standard library's regexp,
 // because a negated list needs the lookahead RE2 has no syntax for.
@@ -32,7 +35,7 @@
 // later minimatch stopped rewriting by default too.
 //
 // See the LICENSE file in this directory for the upstream copyright notices.
-package minimatch
+package minimatch3
 
 import (
 	"strings"
@@ -152,7 +155,7 @@ func New(pattern string, options Options) *Matcher {
 		return m
 	}
 
-	m.pattern = ecmascript.Trim(pattern)
+	m.pattern = ecmascript.StringTrim(pattern)
 	m.make()
 	return m
 }

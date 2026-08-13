@@ -5,24 +5,23 @@
 // each of those is specified by ECMAScript, and each of them differs from the
 // Go equivalent in ways a rule ported from ESLint can observe.
 //
+// A helper standing in for something JavaScript exposes carries that thing's
+// name with its receiver in front — [StringTrim] for String.prototype.trim,
+// [NumberToString] for Number::toString — so that a reader checking the port
+// against the language has one name to look for. Everything else names what
+// ECMAScript names it: a grammar production ([IsWhiteSpace]), an abstract
+// operation ([Canonicalize]), or, where the language spells out no name at
+// all, the question being asked ([IsBlank]).
+//
 // Everything here is a pure function of its arguments. Only
 // [IsValidRegexLiteral] reaches past the standard library, for the scanner that
 // reads a regexp literal, and a rule carries that dependency already.
 //
-// The larger pieces of JavaScript a rule has to reproduce live alongside, each
-// in its own package so that only what needs a dependency carries one:
-//
-//   - [ecmascript/regexp] compiles a JavaScript RegExp, closing the gaps
-//     between what ECMAScript specifies and what a Go engine does.
-//   - [ecmascript/minimatch] ports the glob matcher an ESLint plugin compares
-//     paths with, extended glob syntax included.
-//   - [ecmascript/isglob] answers whether a string was written as a glob at
-//     all.
-//
-// Config-level path matching is deliberately not here: ESLint matches a flat
-// config's own `files` and `ignores` with a later minimatch than the one
-// plugins use, so that layer stays on doublestar rather than borrowing a
-// fidelity it does not want.
+// The one larger piece of the language a rule has to reproduce lives in
+// [ecmascript/regexp], which compiles a JavaScript RegExp and closes the gaps
+// between what ECMAScript specifies and what a Go engine does. It is a package
+// of its own so that only a caller who needs a backtracking engine carries the
+// dependency on one.
 package ecmascript
 
 import (
@@ -70,8 +69,8 @@ func IsWhiteSpace(r rune) bool {
 	return unicode.Is(unicode.Zs, r)
 }
 
-// Trim trims s the way String.prototype.trim does.
-func Trim(s string) string {
+// StringTrim trims s the way String.prototype.trim does.
+func StringTrim(s string) string {
 	return strings.TrimFunc(s, IsWhiteSpace)
 }
 

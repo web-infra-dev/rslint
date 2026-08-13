@@ -61,13 +61,13 @@ func TestContainsLineTerminator(t *testing.T) {
 		{"LF", "a\nb", true},
 		{"CR", "a\rb", true},
 		{"CRLF", "a\r\nb", true},
-		{"LS", "a b", true},
-		{"PS", "a b", true},
-		{"NBSP only — NOT a line terminator", "a b", false},
+		{"LS", "a\u2028b", true},
+		{"PS", "a\u2029b", true},
+		{"NBSP only — NOT a line terminator", "a\u00A0b", false},
 		{"IDEO only", "a\u3000b", false},
-		{"LS at start", " b", true},
-		{"LS at end", "a ", true},
-		{"PS at end", "a ", true},
+		{"LS at start", "\u2028b", true},
+		{"LS at end", "a\u2028", true},
+		{"PS at end", "a\u2029", true},
 		// CJK "啊" is E5 95 8A — must NOT trigger.
 		{"CJK no false-positive", "\u554A\u554A", false},
 		// U+2030 = E2 80 B0 (per mille) — has E2 80 prefix but third byte
@@ -108,11 +108,11 @@ func TestSkipTrailingWhitespace(t *testing.T) {
 		{"multi ASCII whitespace", "ab \t\n", 2},
 		{"only whitespace returns low", "   ", 0},
 		// NBSP is 2 bytes; trailing NBSP must be fully skipped.
-		{"NBSP trailing", "ab ", 2},
-		{"NBSP + ASCII trailing", "ab  \t", 2},
+		{"NBSP trailing", "ab\u00A0", 2},
+		{"NBSP + ASCII trailing", "ab\u00A0 \t", 2},
 		// LS is 3 bytes.
-		{"LS trailing", "ab ", 2},
-		{"PS + space trailing", "ab  ", 2},
+		{"LS trailing", "ab\u2028", 2},
+		{"PS + space trailing", "ab\u2029 ", 2},
 		{"IDEO trailing", "ab\u3000", 2},
 		{"BOM trailing", "ab\uFEFF", 2},
 		// Non-whitespace non-ASCII must NOT be skipped.

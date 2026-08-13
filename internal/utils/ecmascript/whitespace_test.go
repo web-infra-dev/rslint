@@ -63,7 +63,7 @@ func TestIsLineTerminator(t *testing.T) {
 	}
 }
 
-func TestTrim(t *testing.T) {
+func TestStringTrim(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
@@ -83,8 +83,8 @@ func TestTrim(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := Trim(test.in); got != test.want {
-				t.Errorf("Trim(%q) = %q, want %q", test.in, got, test.want)
+			if got := StringTrim(test.in); got != test.want {
+				t.Errorf("StringTrim(%q) = %q, want %q", test.in, got, test.want)
 			}
 		})
 	}

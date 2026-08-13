@@ -509,7 +509,7 @@ var ValidTitleRule = rule.Rule{
 				// title like ' describe foo' reports twice. That is upstream
 				// behaviour (valid-title.ts:304-333).
 				if !co.ignoreSpaces {
-					trimmed := ecmascript.Trim(title)
+					trimmed := ecmascript.StringTrim(title)
 					if len(trimmed) != len(title) {
 						raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 						fix := accidentalSpaceReplacement(raw)

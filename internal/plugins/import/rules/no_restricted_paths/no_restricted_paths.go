@@ -10,8 +10,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/isglob"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/minimatch"
+	"github.com/web-infra-dev/rslint/internal/utils/isglob"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 //go:embed no_restricted_paths.schema.json
@@ -181,7 +181,7 @@ func isMatchingZone(z zone, basePath string, currentFilename string, windows boo
 
 func isMatchingTargetPath(fileName string, targetPath string, windows bool) bool {
 	if isglob.Is(targetPath) {
-		return minimatch.Match(targetPath, fileName, minimatch.Options{})
+		return minimatch3.Match(targetPath, fileName, minimatch3.Options{})
 	}
 	return containsPath(fileName, targetPath, windows)
 }
@@ -225,7 +225,7 @@ func makePathValidators(fromPaths []string, except []string, basePath string, wi
 // resolving them against `basePath` first, so only absolute exception patterns
 // can ever match a resolved import path.
 func computeGlobPatternPathValidator(absoluteFrom string, except []string, windows bool) pathValidator {
-	fromMatcher := minimatch.New(absoluteFrom, minimatch.Options{})
+	fromMatcher := minimatch3.New(absoluteFrom, minimatch3.Options{})
 	validator := pathValidator{
 		isPathRestricted: func(absoluteImportPath string) bool {
 			return fromMatcher.Match(absoluteImportPath)
@@ -249,12 +249,12 @@ func computeGlobPatternPathValidator(absoluteFrom string, except []string, windo
 	// Minimatch constructor rewrites the platform separator to `/` before it
 	// compiles a pattern; without the same rewrite the backslashes would be
 	// read as escapes and could never match an import path normalized to `/`.
-	matchers := make([]*minimatch.Matcher, 0, len(except))
+	matchers := make([]*minimatch3.Matcher, 0, len(except))
 	for _, exception := range except {
 		if windows {
 			exception = strings.ReplaceAll(exception, `\`, "/")
 		}
-		matchers = append(matchers, minimatch.New(exception, minimatch.Options{}))
+		matchers = append(matchers, minimatch3.New(exception, minimatch3.Options{}))
 	}
 	validator.isPathException = func(absoluteImportPath string) bool {
 		for _, matcher := range matchers {
