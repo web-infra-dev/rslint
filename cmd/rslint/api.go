@@ -610,7 +610,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// Build one run descriptor and prepared plan shared by native lint and
 	// plugin dispatch, keeping both paths on the exact same file/rule selection.
 	runOpts := linter.RunLinterOptions{
-		Programs:       lintprogram.WrapTypeScriptPrograms(programs),
+		Programs:       lintprogram.NewFromCompilers(programs),
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
 		Cwd:            currentDirectory,
 		Scope:          linter.FileScope{Files: allowedFiles},

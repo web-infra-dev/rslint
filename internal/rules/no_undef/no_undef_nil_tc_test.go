@@ -96,7 +96,7 @@ undeclaredName123;
 					"myOffGlobal":        utils.GlobalAccessOff,
 					"myOffLocal":         utils.GlobalAccessOff,
 				}, nil, nil),
-			}).WithProgram(lintprogram.NewTypeScript(program)).WithReporter("test/no-undef", rule.SeverityError, func(d rule.RuleDiagnostic) {
+			}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/no-undef", rule.SeverityError, func(d rule.RuleDiagnostic) {
 				reported = append(reported, d.Message.Description)
 			})
 

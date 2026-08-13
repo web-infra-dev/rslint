@@ -224,7 +224,7 @@ func TestLintConfigResolver_UsesConfigPathAliasForRulesAndGlobals(t *testing.T) 
 	if len(rules) != 1 || rules[0].Name != "no-console" {
 		t.Fatalf("expected aliased source path to use config path rules, got %v", configuredRuleNameSet(rules))
 	}
-	if access := rules[0].Globals["aliasedGlobal"]; access != utils.GlobalAccessReadonly {
+	if access := rules[0].Environment.Globals["aliasedGlobal"]; access != utils.GlobalAccessReadonly {
 		t.Fatalf("expected aliased source path to carry globals from config path, got %v", access)
 	}
 	if resolver.ConfigForFile("/outside/real-a.ts") == nil {

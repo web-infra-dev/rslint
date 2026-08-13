@@ -331,8 +331,8 @@ func configuredRuleViews(rules []linter.ConfiguredRule) []configuredRuleView {
 	for index, configuredRule := range rules {
 		views[index] = configuredRuleView{
 			name:               configuredRule.Name,
-			settings:           configuredRule.Settings,
-			globals:            configuredRule.Globals,
+			settings:           configuredRule.Environment.Settings,
+			globals:            configuredRule.Environment.Globals,
 			severity:           int(configuredRule.Severity),
 			requiresTypeInfo:   configuredRule.RequiresTypeInfo,
 			isEslintPluginRule: configuredRule.IsEslintPluginRule,

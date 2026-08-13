@@ -186,7 +186,7 @@ console.log(mutateParameter);
 		SourceFile:  sourceFile,
 		TypeChecker: typeChecker,
 		Refs:        rule.NewRefStore(sourceFile, program.Options(), typeChecker, rule.RefStoreInit{}),
-	}).WithProgram(lintprogram.NewTypeScript(program))
+	}).WithProgram(lintprogram.NewFromCompiler(program))
 	globalSourceFile := ast.IsGlobalSourceFile(sourceFile.AsNode())
 	selfModifyingCount := 0
 

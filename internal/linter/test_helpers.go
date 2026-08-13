@@ -31,7 +31,7 @@ func runLinterPositional(
 		}
 	}
 	return RunLinter(RunLinterOptions{
-		Programs:         lintprogram.WrapTypeScriptPrograms(programs),
+		Programs:         lintprogram.NewFromCompilers(programs),
 		SingleThreaded:   singleThreaded,
 		Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
 		ExcludePaths:     excludedPaths,
@@ -84,7 +84,7 @@ func RunLinterInProgram(
 		// runs. The returned LintResult.LintedFileCount equals what
 		// runLintRulesInProgram would have returned for this single program.
 		res, _ := RunLinter(RunLinterOptions{
-			Programs:         []*lintprogram.Program{lintprogram.NewTypeScript(program)},
+			Programs:         []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 			SingleThreaded:   true,
 			Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
 			ExcludePaths:     excludes,
@@ -108,15 +108,19 @@ func RunLinterInProgram(
 		}
 		return res.LintedFileCount
 	}
-	return runLintRulesInProgram(runProgramOptions{
-		Program:          lintprogram.NewTypeScript(program),
+	plan, err := prepareProgramLintPlan(programPlanOptions{
+		Program:          lintprogram.NewFromCompiler(program),
 		Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
 		ExcludePaths:     excludes,
 		FileFilter:       ff,
 		GetRulesForFile:  getRulesForFile,
 		TypeInfoFiles:    typeInfoFiles,
 		SyntaxErrorFiles: syntaxErrorFiles,
-	}, rule.DiagnosticConsumer{
+	})
+	if err != nil {
+		panic(err)
+	}
+	return runLintRulesInProgram(&plan, programRunOptions{}, rule.DiagnosticConsumer{
 		Demand: rule.EditDemandAll,
 		Report: onDiagnostic,
 	}).lintedFileCount

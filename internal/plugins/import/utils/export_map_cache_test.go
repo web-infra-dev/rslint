@@ -31,6 +31,11 @@ func exportMapNames(exportMap *import_utils.ExportMap, candidates []string) map[
 // shared by every context over it, so these see each other's work the way two
 // files of one lint run do.
 func contextsForFiles(t *testing.T, files map[string]string, entries ...string) []rule.RuleContext {
+	contexts, _ := contextsForFilesWithCompiler(t, files, entries...)
+	return contexts
+}
+
+func contextsForFilesWithCompiler(t *testing.T, files map[string]string, entries ...string) ([]rule.RuleContext, *compiler.Program) {
 	t.Helper()
 
 	rootDir := fixtures.GetRootDir()
@@ -45,19 +50,16 @@ func contextsForFiles(t *testing.T, files map[string]string, entries ...string) 
 		t.Fatalf("CreateProgram: %v", err)
 	}
 
-	sourceProgram := lintprogram.NewTypeScript(program)
+	sourceProgram := lintprogram.NewFromCompiler(program)
 	contexts := make([]rule.RuleContext, 0, len(entries))
 	for _, entry := range entries {
 		sourceFile := program.GetSourceFile(entry)
 		if sourceFile == nil {
 			t.Fatalf("entry %q was not parsed", entry)
 		}
-		contexts = append(contexts, (rule.RuleContext{
-			SourceFile: sourceFile,
-			Modules:    rule.NewModuleGraph(sourceProgram),
-		}).WithProgram(sourceProgram))
+		contexts = append(contexts, (rule.RuleContext{SourceFile: sourceFile}).WithProgram(sourceProgram))
 	}
-	return contexts
+	return contexts, program
 }
 
 func firstImportSpecifier(t *testing.T, sourceFile *ast.SourceFile) *ast.Node {
@@ -215,12 +217,12 @@ func TestIndexReleasesItsProgram(t *testing.T) {
 	// The Program, its contexts, and the map built from it are confined to
 	// this call, so afterwards only the cache could still be holding it.
 	func() {
-		contexts := contextsForFiles(t, map[string]string{
+		contexts, raw := contextsForFilesWithCompiler(t, map[string]string{
 			"release-entry.ts":  `import { value } from "./release-target"; export const used = value;`,
 			"release-target.ts": `export const value = 1;`,
 		}, "release-entry.ts")
 
-		key = weak.Make(contexts[0].TypeScriptProgram())
+		key = weak.Make(raw)
 
 		// Reach the index the way import/namespace and import/default do, so
 		// the entry under test is a populated ModuleIndex rather than an

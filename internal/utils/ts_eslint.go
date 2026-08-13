@@ -12,9 +12,9 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/program"
 )
 
 type ConstraintTypeInfo struct {
@@ -1077,7 +1077,7 @@ const (
 func DiscriminateAnyType(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
+	program *program.Program,
 	node *ast.Node,
 ) DiscriminatedAnyType {
 	return discriminateAnyTypeWorker(t, typeChecker, program, node, NewSetFromItems[*checker.Type]())
@@ -1086,7 +1086,7 @@ func DiscriminateAnyType(
 func discriminateAnyTypeWorker(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
+	program *program.Program,
 	node *ast.Node,
 	// TODO(port): do we really need visited here?
 	visited *Set[*checker.Type],

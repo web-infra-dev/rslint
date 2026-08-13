@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"gotest.tools/v3/assert"
 )
 
@@ -29,7 +30,7 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 
 	runTestForAliasDeclaration := func(code string, expected bool) {
 		program, symbol := getTypes(code)
-		result := IsSymbolFromDefaultLibrary(program, symbol)
+		result := IsSymbolFromDefaultLibrary(lintprogram.NewFromCompiler(program), symbol)
 		if result != expected {
 			t.Errorf("Expected %v. Actual %v", expected, result)
 		}
@@ -74,7 +75,7 @@ func TestAddDefaultLibraryGlobals(t *testing.T) {
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()
 	globals := map[string]bool{}
-	AddDefaultLibraryGlobals(globals, program, typeChecker)
+	AddDefaultLibraryGlobals(globals, lintprogram.NewFromCompiler(program), typeChecker)
 
 	for _, name := range []string{"Object", "Promise", "top"} {
 		if !globals[name] {
@@ -96,7 +97,7 @@ func TestAddDefaultLibraryTypeGlobalNames(t *testing.T) {
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()
 	typeGlobals := map[string]bool{}
-	AddDefaultLibraryTypeGlobalNames(typeGlobals, program, typeChecker)
+	AddDefaultLibraryTypeGlobalNames(typeGlobals, lintprogram.NewFromCompiler(program), typeChecker)
 
 	for _, name := range []string{"Object", "NodeListOf", "ImportMeta"} {
 		if !typeGlobals[name] {

@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -303,7 +304,7 @@ func TestLintSingleFile_TargetsImportedNonRootFile(t *testing.T) {
 
 	var linted []string
 	LintSingleFile(LintSingleFileOptions{
-		Program: program,
+		Program: lintprogram.NewFromCompiler(program),
 		File:    target,
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
 			linted = append(linted, sf.FileName())

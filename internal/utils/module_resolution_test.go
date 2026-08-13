@@ -7,10 +7,10 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -209,7 +209,7 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 
 // contextForRequire parses fileName out of an in-memory tree and returns the
 // argument of the first `require()` call in it.
-func programForRequire(t *testing.T, files map[string]string, fileName string, options *core.CompilerOptions) (*compiler.Program, *ast.SourceFile, *ast.Node) {
+func programForRequire(t *testing.T, files map[string]string, fileName string, options *core.CompilerOptions) (*lintprogram.Program, *ast.SourceFile, *ast.Node) {
 	t.Helper()
 
 	// Every file outside node_modules is a root, the way a tsconfig covering the
@@ -229,16 +229,17 @@ func programForRequire(t *testing.T, files map[string]string, fileName string, o
 // contextForRequireRoots parses fileName out of an in-memory tree the Program
 // loads rootFiles from, and returns the argument of the first `require()` call
 // in it.
-func programForRequireRoots(t *testing.T, files map[string]string, rootFiles []string, fileName string, options *core.CompilerOptions) (*compiler.Program, *ast.SourceFile, *ast.Node) {
+func programForRequireRoots(t *testing.T, files map[string]string, rootFiles []string, fileName string, options *core.CompilerOptions) (*lintprogram.Program, *ast.SourceFile, *ast.Node) {
 	t.Helper()
 
 	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), files)
 	host := utils.CreateCompilerHost("/", fs)
-	program, err := utils.CreateProgramFromOptions(true, options, rootFiles, host)
+	raw, err := utils.CreateProgramFromOptions(true, options, rootFiles, host)
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptions: %v", err)
 	}
 
+	program := lintprogram.NewFromCompiler(raw)
 	sourceFile := program.GetSourceFile(fileName)
 	if sourceFile == nil {
 		t.Fatalf("%s was not parsed", fileName)
@@ -268,7 +269,7 @@ func programForRequireRoots(t *testing.T, files map[string]string, rootFiles []s
 
 // programForImport parses fileName out of an in-memory tree and returns the
 // module specifier of the first import declaration in it.
-func programForImport(t *testing.T, files map[string]string, fileName string) (*compiler.Program, *ast.SourceFile, *ast.Node) {
+func programForImport(t *testing.T, files map[string]string, fileName string) (*lintprogram.Program, *ast.SourceFile, *ast.Node) {
 	t.Helper()
 
 	rootFiles := make([]string, 0, len(files))
@@ -279,11 +280,12 @@ func programForImport(t *testing.T, files map[string]string, fileName string) (*
 
 	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), files)
 	host := utils.CreateCompilerHost("/", fs)
-	program, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{}, rootFiles, host)
+	raw, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{}, rootFiles, host)
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptions: %v", err)
 	}
 
+	program := lintprogram.NewFromCompiler(raw)
 	sourceFile := program.GetSourceFile(fileName)
 	if sourceFile == nil {
 		t.Fatalf("%s was not parsed", fileName)

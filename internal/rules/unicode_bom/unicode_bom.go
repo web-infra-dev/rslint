@@ -40,7 +40,7 @@ func parseOptions(options []any) bool {
 // overlays on the authoritative ctx.HasBOM path, while the metadata comparison
 // detects stale cached stats after a fix rewrites only the mark.
 func hasBOM(ctx rule.RuleContext) bool {
-	fileSystem := ctx.FileSystem()
+	fileSystem := ctx.Program().FS()
 	if fileSystem != nil && ctx.SourceFile != nil && !ctx.SourceFile.ContainsNonASCII {
 		path := ctx.SourceFile.FileName()
 		vfsInfo := fileSystem.Stat(path)

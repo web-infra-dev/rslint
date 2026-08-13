@@ -246,7 +246,7 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	diagnostics := []rule.RuleDiagnostic{}
 	var diagnosticsMu sync.Mutex
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{lintprogram.NewTypeScript(program)},
+		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 		SingleThreaded: true,
 		Scope: linter.FileScope{
 			Files: []string{sourceFile.FileName()},

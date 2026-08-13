@@ -258,8 +258,8 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 		}
 
 		// Derive allowIndexSignaturePropertyAccess from tsconfig option as well (currently not used directly)
-		if ctx.TypeScriptProgram() != nil {
-			_ = ctx.TypeScriptProgram().Options()
+		if ctx.Program() != nil {
+			_ = ctx.Program().Options()
 		}
 
 		fixer := dotNotationFixer{
@@ -272,8 +272,8 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 		// rule option and the `noPropertyAccessFromIndexSignature` tsconfig flag
 		// (same derivation as typescript-eslint).
 		allowIndexAccess := opts.AllowIndexSignaturePropertyAccess
-		if ctx.TypeScriptProgram() != nil {
-			if copts := ctx.TypeScriptProgram().Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
+		if ctx.Program() != nil {
+			if copts := ctx.Program().Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
 				allowIndexAccess = true
 			}
 		}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -154,24 +155,22 @@ func TestHasExport(t *testing.T) {
 	}
 }
 
-func TestExportQueriesSupportStandaloneProgram(t *testing.T) {
-	programContext, specifier := contextForImport(t, "./re-export")
-	program := programContext.Program()
-	if program == nil {
+func TestExportQueriesSupportSourceOnlyProgram(t *testing.T) {
+	programContext, specifier, raw := contextForImportWithCompiler(t, "./re-export")
+	if programContext.Program() == nil || raw == nil {
 		t.Fatal("fixture did not create a Program")
 	}
 
-	standalone, err := lintprogram.NewStandaloneFromTypeScriptSources(
-		program.TypeScriptProgram(),
-		program.SourceFiles(),
+	standalone, err := lintprogram.NewFromBoundSources(
+		raw,
+		raw.SourceFiles(),
 	)
 	if err != nil {
-		t.Fatalf("NewStandaloneFromTypeScriptSources: %v", err)
+		t.Fatalf("NewFromBoundSources: %v", err)
 	}
 	standaloneContext := (rule.RuleContext{
 		SourceFile: programContext.SourceFile,
 	}).WithProgram(standalone)
-	standaloneContext.Modules = rule.NewModuleGraph(standalone)
 
 	if found, ok := import_utils.HasExport(standaloneContext, specifier, "baz"); !ok || !found {
 		t.Fatalf("standalone HasExport = (%v, %v), want (true, true)", found, ok)
@@ -527,7 +526,7 @@ func TestHasDefaultExportFollowsHostCaseSensitivity(t *testing.T) {
 			t.Parallel()
 
 			ctx, specifier := contextForImportWithFS(t, tc.fs, consumerPath)
-			resolved := ctx.TypeScriptProgram().GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, specifier)
+			resolved := ctx.Program().GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, specifier)
 			if (resolved != nil && resolved.ResolvedFileName != "") != tc.wantResolve {
 				t.Fatalf("resolved = %#v, want resolved %v", resolved, tc.wantResolve)
 			}
@@ -595,6 +594,11 @@ func (fsys *caseInsensitiveOverlayFS) findVirtualPath(path string) (string, bool
 }
 
 func contextForImport(t *testing.T, source string) (rule.RuleContext, *ast.Node) {
+	ctx, specifier, _ := contextForImportWithCompiler(t, source)
+	return ctx, specifier
+}
+
+func contextForImportWithCompiler(t *testing.T, source string) (rule.RuleContext, *ast.Node, *compiler.Program) {
 	t.Helper()
 
 	rootDir := fixtures.GetRootDir()
@@ -610,17 +614,17 @@ func contextForImport(t *testing.T, source string) (rule.RuleContext, *ast.Node)
 	sourceFile := program.GetSourceFile(fileName)
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) == 0 {
 		t.Fatal("test source file was not parsed")
-		return rule.RuleContext{}, nil
+		return rule.RuleContext{}, nil, nil
 	}
 	importDecl := sourceFile.Statements.Nodes[0].AsImportDeclaration()
 	if importDecl == nil || importDecl.ModuleSpecifier == nil {
 		t.Fatal("test import declaration was not parsed")
-		return rule.RuleContext{}, nil
+		return rule.RuleContext{}, nil, nil
 	}
 
 	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}).WithProgram(lintprogram.NewTypeScript(program)), importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewFromCompiler(program)), importDecl.ModuleSpecifier, program
 }
 
 func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.RuleContext, *ast.Node) {
@@ -648,7 +652,7 @@ func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.Rule
 
 	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}).WithProgram(lintprogram.NewTypeScript(program)), importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewFromCompiler(program)), importDecl.ModuleSpecifier
 }
 
 func contextForImportWithCompilerOptions(t *testing.T, source string, options *core.CompilerOptions) (rule.RuleContext, *ast.Node) {
@@ -678,5 +682,5 @@ func contextForImportWithCompilerOptions(t *testing.T, source string, options *c
 
 	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}).WithProgram(lintprogram.NewTypeScript(program)), importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewFromCompiler(program)), importDecl.ModuleSpecifier
 }

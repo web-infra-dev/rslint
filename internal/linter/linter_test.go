@@ -159,10 +159,12 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 	result, err := runLinterPositional([]*compiler.Program{program}, true, []string{paths["globals.ts"]}, nil, utils.ExcludePaths,
 		func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
-				Name:            "capture-globals",
-				LanguageOptions: languageOptions,
-				Globals:         configGlobals,
-				Severity:        rule.SeverityWarning,
+				Name: "capture-globals",
+				Environment: &RuleEnvironment{
+					LanguageOptions: languageOptions,
+					Globals:         configGlobals,
+				},
+				Severity: rule.SeverityWarning,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
 					captured = &ctx
 					return nil

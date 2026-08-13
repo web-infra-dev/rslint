@@ -8,17 +8,17 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 )
 
-func mustStandaloneTestProgram(t testing.TB, typeScript *compiler.Program, files []*ast.SourceFile) *lintprogram.Program {
+func mustSourceOnlyTestProgram(t testing.TB, typeScript *compiler.Program, files []*ast.SourceFile) *lintprogram.Program {
 	t.Helper()
-	standalone, err := lintprogram.NewStandaloneFromTypeScriptSources(typeScript, files)
+	sourceProgram, err := lintprogram.NewFromBoundSources(typeScript, files)
 	if err != nil {
-		t.Fatalf("NewStandaloneFromTypeScriptSources: %v", err)
+		t.Fatalf("NewFromBoundSources: %v", err)
 	}
-	return standalone
+	return sourceProgram
 }
 
 func wrapTestPrograms(programs ...*compiler.Program) []*lintprogram.Program {
-	return lintprogram.WrapTypeScriptPrograms(programs)
+	return lintprogram.NewFromCompilers(programs)
 }
 
 func testPrograms(programs ...*lintprogram.Program) []*lintprogram.Program {

@@ -86,7 +86,7 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-		compilerOptions := ctx.TypeScriptProgram().Options()
+		compilerOptions := ctx.Program().Options()
 		isNoImplicitThis := compilerOptions.GetStrictOptionValue(compilerOptions.NoImplicitThis)
 
 		stateCache := map[*ast.Node]state{}

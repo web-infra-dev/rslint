@@ -439,7 +439,7 @@ type lintTargetBinding struct {
 	TargetPathBySourcePath     map[string]string
 	ConfigPathBySourcePath     map[string]string
 	OwnerConfigDirBySourcePath map[string]string
-	StandaloneGapGroups        [][]resolvedLintTarget
+	GapGroups                  [][]resolvedLintTarget
 }
 
 func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.SourceFile {
@@ -885,9 +885,9 @@ func finalizeLintTargetBinding(binding *lintTargetBinding) {
 	for i := range binding.TargetsByProgram {
 		sort.Strings(binding.TargetsByProgram[i])
 	}
-	for i := range binding.StandaloneGapGroups {
-		sort.Slice(binding.StandaloneGapGroups[i], func(left, right int) bool {
-			return binding.StandaloneGapGroups[i][left].Path < binding.StandaloneGapGroups[i][right].Path
+	for i := range binding.GapGroups {
+		sort.Slice(binding.GapGroups[i], func(left, right int) bool {
+			return binding.GapGroups[i][left].Path < binding.GapGroups[i][right].Path
 		})
 	}
 	if len(binding.GapFiles) == 0 {
@@ -896,8 +896,8 @@ func finalizeLintTargetBinding(binding *lintTargetBinding) {
 	if len(binding.TargetPathBySourcePath) == 0 {
 		binding.TargetPathBySourcePath = nil
 	}
-	if len(binding.StandaloneGapGroups) == 0 {
-		binding.StandaloneGapGroups = nil
+	if len(binding.GapGroups) == 0 {
+		binding.GapGroups = nil
 	}
 }
 
@@ -917,7 +917,7 @@ func bindLintTargetPlan(
 	return binding, nil
 }
 
-func allGapRootsSupportedByStandaloneRuntime(gaps []resolvedLintTarget, useCaseSensitive bool) bool {
+func allGapRootsSupportedByRootParser(gaps []resolvedLintTarget, useCaseSensitive bool) bool {
 	options := fallbackCompilerOptions()
 	supportedExtensions := tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule(options, tspath.AllSupportedExtensions)
 	for _, gap := range gaps {
@@ -939,8 +939,8 @@ func allGapRootsSupportedByStandaloneRuntime(gaps []resolvedLintTarget, useCaseS
 	return true
 }
 
-// bindCLILintTargetPlan represents every supported gap as standalone
-// parser/binder input. Unsupported roots retain the legacy Program admission
+// bindCLILintTargetPlan represents every supported gap as parser/binder input
+// to an rslint Program. Unsupported roots retain the legacy ts-go admission
 // and error behavior.
 func bindCLILintTargetPlan(
 	set lintProgramSet,
@@ -958,12 +958,12 @@ func bindCLILintTargetPlan(
 	if fsys := buildContext.FS(); fsys != nil {
 		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
 	}
-	if !allGapRootsSupportedByStandaloneRuntime(gaps, useCaseSensitive) {
+	if !allGapRootsSupportedByRootParser(gaps, useCaseSensitive) {
 		if err := appendFallbackPrograms(&binding, gaps, currentDirectory, buildContext, singleThreaded); err != nil {
 			return lintTargetBinding{}, err
 		}
 	} else {
-		binding.StandaloneGapGroups = groupFallbackTargets(gaps, currentDirectory, useCaseSensitive)
+		binding.GapGroups = groupFallbackTargets(gaps, currentDirectory, useCaseSensitive)
 	}
 	finalizeLintTargetBinding(&binding)
 	return binding, nil
@@ -982,7 +982,7 @@ func typeScriptRuleDiagnostic(file *ast.SourceFile, diagnostic *ast.Diagnostic) 
 	}
 }
 
-func buildStandaloneGapPrograms(
+func buildGapPrograms(
 	groups [][]resolvedLintTarget,
 	currentDirectory string,
 	buildContext *utils.ProgramBuildContext,
@@ -1000,7 +1000,7 @@ func buildStandaloneGapPrograms(
 		for targetIndex, target := range group {
 			rootFileNames[targetIndex] = target.Path
 		}
-		standalone, err := lintprogram.NewStandalone(lintprogram.StandaloneOptions{
+		gapProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
 			RootFileNames:   rootFileNames,
 			Host:            buildContext.NewTransientCompilerHost(currentDirectory),
 			CompilerOptions: fallbackCompilerOptions(),
@@ -1009,9 +1009,9 @@ func buildStandaloneGapPrograms(
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		programs[groupIndex] = standalone
-		for _, file := range standalone.SourceFiles() {
-			fileDiagnostics := standalone.SyntacticDiagnostics(context.Background(), file)
+		programs[groupIndex] = gapProgram
+		for _, file := range gapProgram.SourceFiles() {
+			fileDiagnostics := gapProgram.SyntacticDiagnostics(context.Background(), file)
 			if len(fileDiagnostics) > 0 {
 				syntaxErrorFiles[file.FileName()] = struct{}{}
 			}
@@ -1023,25 +1023,28 @@ func buildStandaloneGapPrograms(
 	return programs, diagnostics, syntaxErrorFiles, nil
 }
 
-// combineLintPrograms preserves the CLI binding order while turning ts-go and
-// standalone backends into one rslint Program sequence. Target/type-check
-// policy remains parallel run metadata rather than becoming Program state.
+// combineLintPrograms preserves CLI binding order while adapting project
+// generations and appending already-built gap generations into one rslint
+// Program sequence. Target/type-check policy remains run metadata rather than
+// becoming Program state. A Program that cannot produce program-wide type
+// diagnostics needs no source-kind skip entry: the facade answers that
+// capability with an empty result.
 func combineLintPrograms(
 	typeScriptPrograms []*compiler.Program,
-	standalonePrograms []*lintprogram.Program,
+	gapPrograms []*lintprogram.Program,
 	targetFiles [][]string,
 	skipTypeCheck []bool,
 ) ([]*lintprogram.Program, [][]string, []bool) {
-	programs := lintprogram.WrapTypeScriptPrograms(typeScriptPrograms)
-	programs = append(programs, standalonePrograms...)
-	if len(standalonePrograms) == 0 {
+	programs := lintprogram.NewFromCompilers(typeScriptPrograms)
+	programs = append(programs, gapPrograms...)
+	if len(gapPrograms) == 0 {
 		return programs, targetFiles, skipTypeCheck
 	}
 
 	combinedTargets := make([][]string, len(typeScriptPrograms), len(programs))
 	copy(combinedTargets, targetFiles)
-	for _, standalone := range standalonePrograms {
-		files := standalone.SourceFiles()
+	for _, gapProgram := range gapPrograms {
+		files := gapProgram.SourceFiles()
 		targets := make([]string, len(files))
 		for fileIndex, file := range files {
 			targets[fileIndex] = file.FileName()
@@ -1049,10 +1052,10 @@ func combineLintPrograms(
 		combinedTargets = append(combinedTargets, targets)
 	}
 
-	combinedSkip := make([]bool, len(programs))
-	copy(combinedSkip, skipTypeCheck)
-	for programIndex := len(typeScriptPrograms); programIndex < len(programs); programIndex++ {
-		combinedSkip[programIndex] = true
+	var combinedSkip []bool
+	if skipTypeCheck != nil {
+		combinedSkip = make([]bool, len(programs))
+		copy(combinedSkip, skipTypeCheck)
 	}
 	return programs, combinedTargets, combinedSkip
 }

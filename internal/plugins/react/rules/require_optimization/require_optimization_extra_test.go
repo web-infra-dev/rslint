@@ -2462,7 +2462,7 @@ class Disabled extends React.Component {}
 			TypeChecker:    typeChecker,
 			Comments:       comments,
 			DisableManager: rule.NewDisableManager(sourceFile, comments),
-		}).WithProgram(lintprogram.NewTypeScript(program)).WithDiagnosticConsumer(RequireOptimizationRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+		}).WithProgram(lintprogram.NewFromCompiler(program)).WithDiagnosticConsumer(RequireOptimizationRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {
 				diagnostics = append(diagnostics, diagnostic)
@@ -2575,7 +2575,7 @@ const ArrowComp = (p) => <div />;
 		SourceFile:  sourceFile,
 		Settings:    map[string]interface{}{},
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithProgram(lintprogram.NewTypeScript(program)).WithReporter("test/require-optimization", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
+	}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/require-optimization", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
 
 	defer func() {
 		if r := recover(); r != nil {

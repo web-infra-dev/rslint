@@ -64,7 +64,7 @@ function MyComponent({ theme }: { theme: string }) {
 		SourceFile:  sourceFile,
 		Settings:    nil,
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithProgram(lintprogram.NewTypeScript(program)).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
+	}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
 		diagnosticCount++
 	})
 

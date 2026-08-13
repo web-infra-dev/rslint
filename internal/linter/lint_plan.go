@@ -20,10 +20,19 @@ type LintPlan struct {
 }
 
 type programLintPlan struct {
-	program     *program.Program
-	files       []*ast.SourceFile
-	rules       [][]ConfiguredRule
-	hasTypeInfo []bool
+	program *program.Program
+	files   []lintFilePlan
+}
+
+// lintFilePlan freezes one AST generation, its resolved rules, shared rule
+// environment, and checker policy as a coherent execution unit. Parallel
+// slices would allow these decisions to drift by index across plan reuse.
+type lintFilePlan struct {
+	file           *ast.SourceFile
+	rules          []ConfiguredRule
+	environment    *RuleEnvironment
+	checkerCapable bool
+	useTypeChecker bool
 }
 
 type lintPlanFileRef struct {
@@ -43,8 +52,8 @@ type LintTarget struct {
 // Rule resolution uses at most GOMAXPROCS workers unless SingleThreaded is set.
 // GetRulesForFile must therefore support concurrent calls whenever the caller
 // requests normal parallel execution, matching Consumer.Report's run-scoped
-// concurrency requirement. Standalone source validation happens once in
-// program.NewStandalone, before the Program can reach this planner.
+// concurrency requirement. Source-universe validation happens once in the
+// internal/program constructor, before the Program can reach this planner.
 func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 	if opts.GetRulesForFile == nil {
 		return &LintPlan{}, nil
@@ -59,10 +68,10 @@ func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 	}
 
 	plan := &LintPlan{programs: make([]programLintPlan, len(opts.Programs))}
-	programOpts := make([]runProgramOptions, len(opts.Programs))
+	programOpts := make([]programPlanOptions, len(opts.Programs))
 	totalFiles := 0
 	for programIndex := range opts.Programs {
-		programOpts[programIndex] = runProgramOptionsFor(opts, programIndex, nil)
+		programOpts[programIndex] = programPlanOptionsFor(opts, programIndex)
 		programPlan, err := newProgramLintPlan(programOpts[programIndex])
 		if err != nil {
 			return nil, err
@@ -115,20 +124,22 @@ func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 	return plan, nil
 }
 
-func newProgramLintPlan(opts runProgramOptions) (programLintPlan, error) {
+func newProgramLintPlan(opts programPlanOptions) (programLintPlan, error) {
 	if err := validateProgram(opts.Program); err != nil {
 		return programLintPlan{}, err
 	}
 	files := collectFilesToLint(opts)
+	filePlans := make([]lintFilePlan, len(files))
+	for index, file := range files {
+		filePlans[index].file = file
+	}
 	return programLintPlan{
-		program:     opts.Program,
-		files:       files,
-		rules:       make([][]ConfiguredRule, len(files)),
-		hasTypeInfo: make([]bool, len(files)),
+		program: opts.Program,
+		files:   filePlans,
 	}, nil
 }
 
-func prepareProgramLintPlan(opts runProgramOptions) (programLintPlan, error) {
+func prepareProgramLintPlan(opts programPlanOptions) (programLintPlan, error) {
 	plan, err := newProgramLintPlan(opts)
 	if err != nil {
 		return programLintPlan{}, err
@@ -140,22 +151,33 @@ func prepareProgramLintPlan(opts runProgramOptions) (programLintPlan, error) {
 	return plan, nil
 }
 
-func resolveProgramLintPlanFile(opts runProgramOptions, plan *programLintPlan, fileIndex int, ctx context.Context) {
-	file := plan.files[fileIndex]
+func resolveProgramLintPlanFile(opts programPlanOptions, plan *programLintPlan, fileIndex int, ctx context.Context) {
+	filePlan := &plan.files[fileIndex]
+	file := filePlan.file
 	if shouldSkipRulesForSyntax(opts, file, ctx) {
 		return
 	}
 	rules := opts.GetRulesForFile(file)
-	if opts.Program.IsStandalone() {
-		plan.rules[fileIndex] = FilterNonTypeAwareRules(rules)
-		return
-	}
-	plan.hasTypeInfo[fileIndex] = fileHasTypeInfo(file.FileName(), opts.TypeInfoFiles)
-	if plan.hasTypeInfo[fileIndex] {
-		plan.rules[fileIndex] = rules
+	// Rule eligibility is the intersection of source capability and explicit
+	// run policy. Neither side reveals or branches on a private Program adapter.
+	filePlan.checkerCapable = opts.Program.CanProvideTypeChecker(file)
+	filePlan.useTypeChecker = filePlan.checkerCapable &&
+		fileHasTypeInfo(file.FileName(), opts.TypeInfoFiles)
+	if filePlan.useTypeChecker {
+		filePlan.rules = rules
 	} else {
-		plan.rules[fileIndex] = FilterNonTypeAwareRules(rules)
+		filePlan.rules = FilterNonTypeAwareRules(rules)
 	}
+	filePlan.environment = firstNativeRuleEnvironment(filePlan.rules)
+}
+
+func firstNativeRuleEnvironment(rules []ConfiguredRule) *RuleEnvironment {
+	for _, configuredRule := range rules {
+		if !configuredRule.IsEslintPluginRule && configuredRule.Environment != nil {
+			return configuredRule.Environment
+		}
+	}
+	return nil
 }
 
 // Targets returns the plan's plugin-facing projection in stable Program/file
@@ -166,32 +188,24 @@ func (p *LintPlan) Targets() []LintTarget {
 	}
 	var targets []LintTarget
 	for _, programPlan := range p.programs {
-		for fileIndex, file := range programPlan.files {
-			rules := programPlan.rules[fileIndex]
+		for _, filePlan := range programPlan.files {
+			rules := filePlan.rules
 			if len(rules) == 0 {
 				continue
 			}
-			targets = append(targets, LintTarget{File: file, Rules: rules})
+			targets = append(targets, LintTarget{File: filePlan.file, Rules: rules})
 		}
 	}
 	return targets
 }
 
-func runProgramOptionsFor(opts RunLinterOptions, programIndex int, prepared *programLintPlan) runProgramOptions {
-	programOpts := runProgramOptions{
-		Program:              opts.Programs[programIndex],
-		Cwd:                  opts.Cwd,
-		ExcludePaths:         opts.ExcludePaths,
-		GetRulesForFile:      opts.GetRulesForFile,
-		CollectExecutedRules: true,
-		SyntaxErrorFiles:     opts.SyntaxErrorFiles,
-		SingleThreaded:       opts.SingleThreaded,
-		TypeInfoFiles:        opts.TypeInfoFiles,
-		Timing:               opts.Timing,
-		PreparedPlan:         prepared,
-	}
-	if prepared != nil {
-		return programOpts
+func programPlanOptionsFor(opts RunLinterOptions, programIndex int) programPlanOptions {
+	programOpts := programPlanOptions{
+		Program:          opts.Programs[programIndex],
+		ExcludePaths:     opts.ExcludePaths,
+		GetRulesForFile:  opts.GetRulesForFile,
+		SyntaxErrorFiles: opts.SyntaxErrorFiles,
+		TypeInfoFiles:    opts.TypeInfoFiles,
 	}
 
 	if programIndex < len(opts.PerProgramFilter) {

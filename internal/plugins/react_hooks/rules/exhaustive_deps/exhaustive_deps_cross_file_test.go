@@ -216,7 +216,7 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 	}()
 
 	if _, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{lintprogram.NewTypeScript(program)},
+		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 		SingleThreaded: true,
 		Scope:          linter.FileScope{Files: []string{tsxPath}},
 		ExcludePaths:   []string{},

@@ -3,7 +3,7 @@ package no_unsafe_return
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -58,7 +58,7 @@ func buildUnsafeReturnThisMessage(t string) rule.RuleMessage {
 func discriminateReturnType(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
+	sourceProgram *program.Program,
 	node *ast.Node,
 ) utils.DiscriminatedAnyType {
 	if utils.IsTypeAnyType(t) {
@@ -70,7 +70,7 @@ func discriminateReturnType(
 	if utils.IsTypeAnyArrayType(t, typeChecker) {
 		return utils.DiscriminatedAnyTypeAnyArray
 	}
-	return utils.DiscriminateAnyType(t, typeChecker, program, node)
+	return utils.DiscriminateAnyType(t, typeChecker, sourceProgram, node)
 }
 
 var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
@@ -78,7 +78,7 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		compilerOptions := ctx.TypeScriptProgram().Options()
+		compilerOptions := ctx.Program().Options()
 		// When noImplicitThis is not enabled (considering strict mode), object literal methods
 		// can have implicit any this. We need to use IsStrictCompilerOptionEnabled to properly
 		// handle the case where noImplicitThis is inherited from strict mode.
@@ -97,7 +97,7 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			anyType := discriminateReturnType(
 				returnNodeType,
 				ctx.TypeChecker,
-				ctx.TypeScriptProgram(),
+				ctx.Program(),
 				returnNode,
 			)
 			if anyType == utils.DiscriminatedAnyTypeSafe &&

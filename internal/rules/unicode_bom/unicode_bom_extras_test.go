@@ -360,7 +360,7 @@ func runUnicodeBom(t *testing.T, code string, demand rule.EditDemand) []rule.Rul
 
 	var diagnostics []rule.RuleDiagnostic
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{lintprogram.NewTypeScript(program)},
+		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 		SingleThreaded: true,
 		Scope:          linter.FileScope{Files: []string{program.GetSourceFile(fileName).FileName()}},
 		ExcludePaths:   []string{},

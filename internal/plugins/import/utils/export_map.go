@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -97,7 +98,7 @@ func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 // The map is read-only and may be shared with every other file of the run that
 // imports the same module; so may any ExportMeta.Namespace reached through it.
 func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, bool) {
-	if !ctx.HasProgram() || ctx.SourceFile == nil {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return nil, false
 	}
 	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.Program()))
@@ -115,14 +116,14 @@ func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, 
 // query that built them.
 type exportBuilder struct {
 	index *ModuleIndex
-	// runtime is the source environment every file this builder reaches belongs
-	// to. It is
+	// sourceProgram is the source environment every file this builder reaches
+	// belongs to. It is
 	// held here, on a value that lasts one query, rather than on the index,
 	// which can last as long as the Program cache entry and must not keep a
 	// Program alive.
-	runtime  rslint_utils.ModuleResolutionRuntime
-	building map[*ast.SourceFile]*ExportMap
-	seen     map[exportKey]bool
+	sourceProgram *program.Program
+	building      map[*ast.SourceFile]*ExportMap
+	seen          map[exportKey]bool
 	// onStack holds the files whose maps are still being filled, so that
 	// reaching one again is recognized as a cycle rather than as reuse.
 	onStack map[*ast.SourceFile]bool
@@ -134,31 +135,31 @@ type exportBuilder struct {
 	sawCycle bool
 }
 
-func newExportBuilder(index *ModuleIndex, runtime rslint_utils.ModuleResolutionRuntime) *exportBuilder {
+func newExportBuilder(index *ModuleIndex, sourceProgram *program.Program) *exportBuilder {
 	return &exportBuilder{
-		index:    index,
-		runtime:  runtime,
-		building: make(map[*ast.SourceFile]*ExportMap),
-		seen:     make(map[exportKey]bool),
-		onStack:  make(map[*ast.SourceFile]bool),
-		unstable: make(map[*ast.SourceFile]bool),
+		index:         index,
+		sourceProgram: sourceProgram,
+		building:      make(map[*ast.SourceFile]*ExportMap),
+		seen:          make(map[exportKey]bool),
+		onStack:       make(map[*ast.SourceFile]bool),
+		unstable:      make(map[*ast.SourceFile]bool),
 	}
 }
 
-func (builder *exportBuilder) moduleRuntime() rslint_utils.ModuleResolutionRuntime {
+func (builder *exportBuilder) program() *program.Program {
 	if builder == nil {
 		return nil
 	}
-	return builder.runtime
+	return builder.sourceProgram
 }
 
 func getExportMap(origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *exportBuilder) (*ExportMap, bool) {
-	runtime := builder.moduleRuntime()
-	if runtime == nil || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+	sourceProgram := builder.program()
+	if !sourceProgram.IsValid() || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return nil, false
 	}
 
-	link := resolveExportLink(runtime, origin, builder.index.settings, moduleSpecifier)
+	link := resolveExportLink(sourceProgram, origin, builder.index.settings, moduleSpecifier)
 	if !link.Resolved {
 		return nil, false
 	}
@@ -194,7 +195,7 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	enclosing := builder.sawCycle
 	builder.sawCycle = false
 
-	local := builder.index.localExportsOf(builder.moduleRuntime(), sourceFile)
+	local := builder.index.localExportsOf(builder.program(), sourceFile)
 	for _, step := range local.Steps {
 		builder.applyStep(exports, local, step)
 	}

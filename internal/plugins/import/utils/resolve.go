@@ -12,7 +12,7 @@ import (
 // rules, and lives in utils; this is the spelling the import rules read most
 // naturally.
 func Resolve(moduleSpecifier *ast.StringLiteralLike, ctx rule.RuleContext) (string, bool) {
-	if !ctx.HasProgram() {
+	if !ctx.Program().IsValid() {
 		return "", false
 	}
 	return rslint_utils.ResolveModulePath(ctx.Program(), ctx.SourceFile, moduleSpecifier)

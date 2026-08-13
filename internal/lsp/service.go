@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -241,7 +242,7 @@ func fileURIFromPath(filePath string) lsproto.URI {
 
 // reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
 // The LSP reuses projects already loaded by project service and builds a
-// standalone Program for a declared custom project. Resolving
+// session-external ts-go Program for a declared custom project. Resolving
 // project paths here preserves declaration order and ensures type-aware rules
 // run only when the governing config's first containing project supplies type
 // information.
@@ -1020,7 +1021,7 @@ func runLintWithProgramLoader(
 		fileConfigResolver,
 		rule.EditDemandAll,
 		// Normal diagnostics can receive reused SourceFiles from the Session even
-		// when the standalone Program store is unavailable. Fresh fallbacks are
+		// when the resident project Program store is unavailable. Fresh fallbacks are
 		// safe too: attached syntax data dies with their transient SourceFiles.
 		true,
 		ctx,
@@ -1073,7 +1074,8 @@ func lintSingleFile(
 	if sourceFile == nil {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}
 	}
-	if syntacticDiagnostics := program.GetSyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
+	sourceProgram := lintprogram.NewFromCompiler(program)
+	if syntacticDiagnostics := sourceProgram.SyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
 		diagnostics := make([]rule.RuleDiagnostic, 0, len(syntacticDiagnostics))
 		for _, diagnostic := range syntacticDiagnostics {
 			diagnostics = append(diagnostics, rule.RuleDiagnostic{
@@ -1102,7 +1104,7 @@ func lintSingleFile(
 	}
 
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:               program,
+		Program:               sourceProgram,
 		File:                  sourceFile.FileName(),
 		Cwd:                   processCwd,
 		HasTypeInfo:           hasTypeInfo,
@@ -1144,7 +1146,7 @@ func selectLintProgram(
 	// Type information follows parserOptions.project declaration order, not the
 	// TypeScript session's default-project heuristic. Prefer an already-loaded
 	// containing project. Custom config names that the main project service has
-	// not loaded are supplied by rslint-owned standalone Programs.
+	// not loaded are supplied by rslint-owned session-external ts-go Programs.
 	loadedByConfig := make(map[string]*compiler.Program, len(loadedProjects))
 	for _, candidate := range loadedProjects {
 		if candidate == nil || candidate.GetProgram() == nil {

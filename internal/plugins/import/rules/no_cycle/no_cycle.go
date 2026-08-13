@@ -112,7 +112,7 @@ func normalizeDepth(depth int) (int, bool) {
 }
 
 func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
-	if ctx.SourceFile == nil || !ctx.HasProgram() {
+	if ctx.SourceFile == nil || !ctx.Program().IsValid() {
 		return
 	}
 
@@ -126,11 +126,12 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 	// graph, is what keeps an import-free file off the build: the graph spans
 	// the whole effective source set, and the editor discards it on every keystroke, so
 	// there is no run to amortize it over on that path.
-	if len(ctx.Modules.Edges(ctx.SourceFile, opts.syntax)) == 0 {
+	sourceGraph := rule.ModuleGraphFor(ctx.Program())
+	if len(sourceGraph.Edges(ctx.SourceFile, opts.syntax)) == 0 {
 		return
 	}
 
-	graph := moduleGraphFor(ctx, opts)
+	graph := moduleGraphFor(ctx, sourceGraph, opts)
 	if graph == nil {
 		return
 	}

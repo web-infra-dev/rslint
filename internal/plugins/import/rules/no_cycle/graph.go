@@ -27,7 +27,8 @@ type graphKey struct {
 
 // moduleNode holds one file's references together with the edges they resolve
 // to. Both are derived from the file's syntax, so the whole node is a property
-// of the source set and is computed once per lint run.
+// of the Program generation and is computed once per configuration-complete
+// cache key.
 type moduleNode struct {
 	refs []rule.ModuleEdge
 	// edge[i] is the node that reference i points at, or -1 when the
@@ -57,9 +58,9 @@ type moduleGraph struct {
 	group []int32
 }
 
-// moduleGraphFor returns the source set's dependency graph for these options,
-// building it on the first file of the run that asks for it.
-func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
+// moduleGraphFor returns the Program generation's dependency graph for these
+// options, building it on the first file that asks for it.
+func moduleGraphFor(ctx rule.RuleContext, sourceGraph *rule.ModuleGraph, opts ruleOptions) *moduleGraph {
 	settings := import_utils.SettingsFor(ctx)
 	key := graphKey{
 		settings:           settings.Key(),
@@ -68,12 +69,12 @@ func moduleGraphFor(ctx rule.RuleContext, opts ruleOptions) *moduleGraph {
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
 	}
 	return rule.CachedByProgram(ctx, key, func() *moduleGraph {
-		return buildModuleGraph(ctx, settings, opts)
+		return buildModuleGraph(ctx, sourceGraph, settings, opts)
 	})
 }
 
-func buildModuleGraph(ctx rule.RuleContext, settings *import_utils.ModuleSettings, opts ruleOptions) *moduleGraph {
-	files := ctx.Modules.Files()
+func buildModuleGraph(ctx rule.RuleContext, sourceGraph *rule.ModuleGraph, settings *import_utils.ModuleSettings, opts ruleOptions) *moduleGraph {
+	files := sourceGraph.Files()
 	graph := &moduleGraph{
 		nodes: make([]moduleNode, len(files)),
 		index: make(map[*ast.SourceFile]int32, len(files)),
@@ -91,7 +92,7 @@ func buildModuleGraph(ctx rule.RuleContext, settings *import_utils.ModuleSetting
 		if fileIsExcluded(settings, opts, file) {
 			continue
 		}
-		refs := ctx.Modules.Edges(file, opts.syntax)
+		refs := sourceGraph.Edges(file, opts.syntax)
 		if len(refs) == 0 {
 			continue
 		}

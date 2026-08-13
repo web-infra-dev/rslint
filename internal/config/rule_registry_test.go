@@ -52,6 +52,11 @@ func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
 	if _, ok := ruleMap["for-direction"]; ok {
 		t.Error("Expected for-direction to be excluded (set to off)")
 	}
+
+	if ruleMap["no-debugger"].Environment == nil ||
+		ruleMap["no-debugger"].Environment != ruleMap["no-console"].Environment {
+		t.Fatal("rules from one resolved file config did not share one environment")
+	}
 }
 
 func TestGetEnabledRules_IgnoredFileReturnsNil(t *testing.T) {
@@ -666,10 +671,10 @@ func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T
 	}
 	for _, rules := range [][]linter.ConfiguredRule{cachedRules, registryRules} {
 		for _, rule := range rules {
-			if rule.Globals["readonlyGlobal"] != utils.GlobalAccessReadonly {
+			if rule.Environment.Globals["readonlyGlobal"] != utils.GlobalAccessReadonly {
 				t.Fatalf("expected resolver/registry rule %q to carry declared global", rule.Name)
 			}
-			if rule.Globals["disabledGlobal"] != utils.GlobalAccessOff {
+			if rule.Environment.Globals["disabledGlobal"] != utils.GlobalAccessOff {
 				t.Fatalf("expected resolver/registry rule %q to carry disabled global as off", rule.Name)
 			}
 		}

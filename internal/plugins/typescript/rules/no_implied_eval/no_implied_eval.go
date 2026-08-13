@@ -59,7 +59,7 @@ var NoImpliedEvalRule = rule.CreateRule(rule.Rule{
 				return true
 			}
 
-			if utils.IsBuiltinSymbolLike(ctx.TypeScriptProgram(), ctx.TypeChecker, t, "Function") {
+			if utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, t, "Function") {
 				return true
 			}
 
@@ -99,7 +99,7 @@ var NoImpliedEvalRule = rule.CreateRule(rule.Rule{
 				symbol := checker.Type_symbol(t)
 
 				if symbol != nil {
-					if utils.IsBuiltinSymbolLike(ctx.TypeScriptProgram(), ctx.TypeChecker, t, "FunctionConstructor") {
+					if utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, t, "FunctionConstructor") {
 						ctx.ReportNode(node, buildNoFunctionConstructorMessage())
 						return
 					}

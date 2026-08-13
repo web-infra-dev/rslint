@@ -1204,8 +1204,8 @@ func (index *configDirectoryIndex) assignExplicitFiles(files []string) map[strin
 // DiscoverGapFiles returns resolved lint targets that are absent from existing
 // Programs. The filesystem walk and config/default-files matching are owned by
 // DiscoverLintFiles; this helper only subtracts programFiles for callers that
-// need a non-project-backed source host. The caller chooses a standalone
-// parser/binder runtime or a compatibility fallback Program.
+// need a non-project-backed source host. The caller chooses a parser/binder
+// rslint Program or a compatibility ts-go Program.
 //
 // Files pass through these filters in DiscoverLintFiles:
 //  1. Inside CLI/API file or directory scope

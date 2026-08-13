@@ -1,6 +1,8 @@
 package rule
 
 import (
+	"sync/atomic"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -83,29 +85,33 @@ func (edge ModuleEdge) Dynamic() bool {
 	return edge.Kind == ModuleEdgeDynamicImport
 }
 
-// ModuleGraph answers which modules each file of one source set references
-// and what they resolve to. A file's answer is derived once per lint run
-// however many rules and files ask for it. Its syntax-only half can outlive
-// the run when the caller opts into SourceFile-owned reuse; resolution remains
-// local to this source set's runtime.
+// ModuleGraph answers which modules each file of one Program references and
+// what they resolve to. Resolved edges are derived once per immutable Program
+// generation however many rules, files, or lint passes ask for them. Their
+// syntax-only half can additionally follow an exact SourceFile across editor
+// Programs when the caller opts into SourceFile-owned reuse.
 //
 // It reports what the syntax says and nothing more. Which of these references
 // a rule treats as a dependency — whether type-only imports count, whether
 // anything under node_modules counts — is the rule's own question.
 type ModuleGraph struct {
 	program *program.Program
-	// Standalone Programs have no ts-go Program identity for the weak derived
-	// cache. Their run-scoped derived structures share this cache instead.
-	cache programCache
+	data    *moduleGraphData
 	// Collection is pure, so LazyMap's build-outside-the-lock contract holds:
 	// two files racing on their first request for one key cost one redundant
 	// collection at worst, which is cheaper than serializing every file in the
 	// run behind one mutex.
-	edges utils.LazyMap[moduleEdgeKey, []ModuleEdge]
-	// cacheModuleSpecifiers attaches the syntactic half to each immutable
-	// SourceFile. Resolution remains local to this graph's Program.
-	cacheModuleSpecifiers bool
 }
+
+type moduleGraphData struct {
+	edges utils.LazyMap[moduleEdgeKey, []ModuleEdge]
+	// cacheModuleSpecifiers is enabled before an opted-in run starts. It is
+	// atomic because multiple lint requests may share one compiler generation;
+	// enabling it is monotonic and never changes resolved-edge semantics.
+	cacheModuleSpecifiers atomic.Bool
+}
+
+type moduleGraphCacheKey struct{}
 
 // moduleEdgeKey pairs a file with the syntaxes the caller asked about, which
 // is what decides the answer.
@@ -114,23 +120,27 @@ type moduleEdgeKey struct {
 	syntax ModuleSyntax
 }
 
-func NewModuleGraph(sourceProgram *program.Program) *ModuleGraph {
+func ModuleGraphFor(sourceProgram *program.Program) *ModuleGraph {
 	if !sourceProgram.IsValid() {
 		return &ModuleGraph{}
 	}
-	// The Program owns an immutable source-file slice for the graph's lifetime,
-	// so retain that owner instead of copying every file pointer per lint pass.
-	return &ModuleGraph{program: sourceProgram}
+	// Only backend-independent derived data is cached. The cached value never
+	// points back to Program, preserving the generation cache's ownership
+	// contract; this lightweight view supplies the source authority.
+	data := program.Cached(sourceProgram, moduleGraphCacheKey{}, func() *moduleGraphData {
+		return &moduleGraphData{}
+	})
+	return &ModuleGraph{program: sourceProgram, data: data}
 }
 
-// NewCachedModuleGraph returns a graph that shares its syntax-only collection
-// with other graphs holding the exact same SourceFile objects. Each graph
-// still resolves those specifiers against its own Program.
-func NewCachedModuleGraph(sourceProgram *program.Program) *ModuleGraph {
-	if !sourceProgram.IsValid() {
-		return &ModuleGraph{}
+// EnableModuleSpecifierCaching opts one Program generation into syntax-only
+// reuse attached to its exact SourceFiles. Resolved targets stay in that
+// Program's module-graph data and are never shared across generations.
+func EnableModuleSpecifierCaching(sourceProgram *program.Program) {
+	graph := ModuleGraphFor(sourceProgram)
+	if graph.data != nil {
+		graph.data.cacheModuleSpecifiers.Store(true)
 	}
-	return &ModuleGraph{program: sourceProgram, cacheModuleSpecifiers: true}
 }
 
 // Files returns every file of the source set in its stable input order. A
@@ -147,12 +157,13 @@ func (graph *ModuleGraph) Files() []*ast.SourceFile {
 // source order. The result is shared with every other caller and must not be
 // modified.
 func (graph *ModuleGraph) Edges(file *ast.SourceFile, syntax ModuleSyntax) []ModuleEdge {
-	if graph == nil || graph.program == nil || file == nil || syntax.none() {
+	if graph == nil || graph.program == nil || graph.data == nil ||
+		!graph.program.OwnsSourceFile(file) || syntax.none() {
 		return nil
 	}
 
 	key := moduleEdgeKey{file: file, syntax: syntax}
-	return graph.edges.Get(key, func() []ModuleEdge {
+	return graph.data.edges.Get(key, func() []ModuleEdge {
 		return graph.resolveAll(file, graph.specifiersOf(file, syntax))
 	})
 }
@@ -161,7 +172,7 @@ func (graph *ModuleGraph) Edges(file *ast.SourceFile, syntax ModuleSyntax) []Mod
 // file's own syntax, so an attached answer is valid for that SourceFile's
 // entire lifetime.
 func (graph *ModuleGraph) specifiersOf(file *ast.SourceFile, syntax ModuleSyntax) []moduleSpecifier {
-	if !graph.cacheModuleSpecifiers {
+	if graph.data == nil || !graph.data.cacheModuleSpecifiers.Load() {
 		return collectSpecifiers(file, syntax)
 	}
 	return cachedModuleSpecifiers(file, syntax)

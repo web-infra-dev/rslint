@@ -3,10 +3,7 @@ package rule
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/module"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -57,30 +54,19 @@ type RuleContext struct {
 	// that need "all references to this declared symbol" should query this
 	// instead of walking the AST and calling TypeChecker.GetSymbolAtLocation
 	// per identifier. Keys are binder symbols (node.Symbol()); see RefStore.
-	// Nil when no Program is available.
+	// Manually assembled contexts may leave it nil.
 	Refs *RefStore
 	// BOM lazily answers whether this file's source text began with a byte
 	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
 	// false, which is what a context with no Program can say.
 	BOM *SourceBOM
-	// Modules answers which modules each file of the effective source set references and
-	// what they resolve to, derived once per lint run rather than once per
-	// rule and file. Nil when no Program is available.
-	Modules *ModuleGraph
-	// program is the authoritative rslint source universe. typeScriptProgram
-	// is its immutable optional capability projection. WithProgram binds both
-	// views once so they cannot diverge.
-	program           *program.Program
-	typeScriptProgram *compiler.Program
-	TypeChecker       *checker.Checker
-	DisableManager    *DisableManager
-	reporter          ruleContextReporter
-}
-
-// HasProgram reports whether source, filesystem, and module-resolution
-// services are available for this rule context.
-func (ctx *RuleContext) HasProgram() bool {
-	return ctx != nil && ctx.program.IsValid()
+	// program is the sole source authority for this context. Parser, filesystem,
+	// package, module-resolution, syntax, and optional type services all derive
+	// from this one immutable generation.
+	program        *program.Program
+	TypeChecker    *checker.Checker
+	DisableManager *DisableManager
+	reporter       ruleContextReporter
 }
 
 // Program returns the authoritative rslint source universe.
@@ -91,38 +77,22 @@ func (ctx *RuleContext) Program() *program.Program {
 	return ctx.program
 }
 
-// TypeScriptProgram returns the optional ts-go capability projected from
-// Program when the context is assembled. Its presence does not by itself
-// imply type-aware rule eligibility; TypeChecker is the per-file boundary.
-func (ctx *RuleContext) TypeScriptProgram() *compiler.Program {
-	if ctx == nil {
-		return nil
-	}
-	return ctx.typeScriptProgram
-}
-
-// WithProgram binds the source authority and its optional ts-go capability
-// projection. It is a one-time assembly hook for linter and rule tests;
-// rebinding an assembled context to a different Program would leave its other
-// source-derived state incoherent and therefore panics.
+// WithProgram binds the source authority. It is a one-time assembly hook for
+// the linter and rule tests. Rebinding an assembled context to a different
+// Program would leave its other source-derived state incoherent and therefore
+// panics.
 func (ctx RuleContext) WithProgram(sourceProgram *program.Program) RuleContext {
 	if ctx.program != nil && ctx.program != sourceProgram {
 		panic("rule: cannot rebind RuleContext to a different Program")
 	}
+	if sourceProgram != nil && !sourceProgram.IsValid() {
+		panic("rule: cannot bind RuleContext to an invalid Program")
+	}
+	if sourceProgram != nil && ctx.SourceFile != nil && !sourceProgram.OwnsSourceFile(ctx.SourceFile) {
+		panic("rule: RuleContext source file does not belong to Program")
+	}
 	ctx.program = sourceProgram
-	ctx.typeScriptProgram = nil
-	if sourceProgram != nil {
-		ctx.typeScriptProgram = sourceProgram.TypeScriptProgram()
-	}
 	return ctx
-}
-
-// CompilerOptions returns the effective source Program's options.
-func (ctx *RuleContext) CompilerOptions() *core.CompilerOptions {
-	if ctx == nil || ctx.program == nil {
-		return nil
-	}
-	return ctx.program.Options()
 }
 
 // ProcessCurrentDirectory returns the normalized working directory of the
@@ -133,67 +103,6 @@ func (ctx *RuleContext) ProcessCurrentDirectory() string {
 		return ""
 	}
 	return ctx.fileCache.processCurrentDirectory
-}
-
-// FileSystem returns the effective source environment's VFS.
-func (ctx *RuleContext) FileSystem() vfs.FS {
-	if ctx == nil || ctx.program == nil {
-		return nil
-	}
-	return ctx.program.FS()
-}
-
-func (ctx *RuleContext) CurrentDirectory() string {
-	if ctx == nil || ctx.program == nil {
-		return ""
-	}
-	return ctx.program.CurrentDirectory()
-}
-
-func (ctx *RuleContext) NearestPackageJSONDirectory(directory string) string {
-	if ctx == nil || ctx.program == nil {
-		return ""
-	}
-	return ctx.program.NearestPackageJSONDirectory(directory)
-}
-
-func (ctx *RuleContext) FileExists(path string) bool {
-	return ctx != nil && ctx.program != nil && ctx.program.FileExists(path)
-}
-
-func (ctx *RuleContext) GetModeForUsageLocation(sourceFile ast.HasFileName, location *ast.StringLiteralLike) core.ResolutionMode {
-	if ctx == nil || ctx.program == nil {
-		return core.ResolutionModeNone
-	}
-	return ctx.program.GetModeForUsageLocation(sourceFile, location)
-}
-
-func (ctx *RuleContext) GetResolvedModule(sourceFile ast.HasFileName, moduleReference string, mode core.ResolutionMode) *module.ResolvedModule {
-	if ctx == nil || ctx.program == nil {
-		return nil
-	}
-	return ctx.program.GetResolvedModule(sourceFile, moduleReference, mode)
-}
-
-func (ctx *RuleContext) ResolveModuleName(moduleName string, containingFile string, mode core.ResolutionMode) *module.ResolvedModule {
-	if ctx == nil || ctx.program == nil {
-		return nil
-	}
-	return ctx.program.ResolveModuleName(moduleName, containingFile, mode)
-}
-
-func (ctx *RuleContext) GetSourceFileForResolvedModule(fileName string) *ast.SourceFile {
-	if ctx == nil || ctx.program == nil {
-		return nil
-	}
-	return ctx.program.GetSourceFileForResolvedModule(fileName)
-}
-
-func (ctx *RuleContext) GetSourceFile(fileName string) *ast.SourceFile {
-	if ctx == nil || ctx.program == nil {
-		return nil
-	}
-	return ctx.program.GetSourceFile(fileName)
 }
 
 // ruleContextReporter is immutable after Rule.Run starts. Keeping only the

@@ -101,7 +101,7 @@ func TestRuleRegistryPropagatesLanguageOptions(t *testing.T) {
 		t.Fatalf("configured rules = %d, want 1", len(configured))
 	}
 	want := rule.LanguageOptions{ECMAVersion: 2025}
-	if got := configured[0].LanguageOptions; got != want {
+	if got := configured[0].Environment.LanguageOptions; got != want {
 		t.Fatalf("configured language options = %+v, want %+v", got, want)
 	}
 }

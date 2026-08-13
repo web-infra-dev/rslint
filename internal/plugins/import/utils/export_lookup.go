@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -24,7 +25,7 @@ func HasDefaultExport(ctx rule.RuleContext, moduleSpecifier *ast.Node) (bool, bo
 // the resolved module statically exports exportName. The second result is false
 // when the target is unresolved or is not an ES module.
 func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName string) (bool, bool) {
-	if !ctx.HasProgram() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return false, false
 	}
 	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.Program()))
@@ -39,7 +40,7 @@ type exportKey struct {
 }
 
 func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName string, builder *exportBuilder) (bool, bool) {
-	link := resolveExportLinkForLookup(builder.moduleRuntime(), origin, builder.index.settings, moduleSpecifier)
+	link := resolveExportLinkForLookup(builder.program(), origin, builder.index.settings, moduleSpecifier)
 	if link.Target == nil {
 		return false, false
 	}
@@ -49,8 +50,8 @@ func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName str
 // resolveExportLinkForLookup is the name-lookup counterpart of
 // resolveExportLink: it stops before the is-an-ES-module test, which
 // sourceFileHasExport applies itself.
-func resolveExportLinkForLookup(runtime rslint_utils.ModuleResolutionRuntime, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
-	_, sourceFile, ok := rslint_utils.ResolveModuleFile(runtime, origin, moduleSpecifier)
+func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
+	_, sourceFile, ok := rslint_utils.ResolveModuleFile(sourceProgram, origin, moduleSpecifier)
 	if !ok || settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
@@ -85,11 +86,11 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 
 		switch stmt.Kind {
 		case ast.KindExportAssignment:
-			if exportName == defaultExportName && exportAssignmentHasDefault(builder.moduleRuntime(), sourceFile, stmt.AsExportAssignment()) {
+			if exportName == defaultExportName && exportAssignmentHasDefault(builder.program(), sourceFile, stmt.AsExportAssignment()) {
 				return true, true
 			}
 		case ast.KindNamespaceExportDeclaration:
-			if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.moduleRuntime()) {
+			if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.program()) {
 				return true, true
 			}
 		case ast.KindExportDeclaration:
@@ -100,7 +101,7 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 		}
 	}
 
-	if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.moduleRuntime()) && sourceFileHasDirectNamespaceExport(sourceFile) {
+	if exportName == defaultExportName && compilerOptionsESModuleInterop(builder.program()) && sourceFileHasDirectNamespaceExport(sourceFile) {
 		return true, true
 	}
 
@@ -132,7 +133,7 @@ func exportedDeclarationHasName(stmt *ast.Node, exportName string) bool {
 	return false
 }
 
-func exportAssignmentHasDefault(runtime rslint_utils.ModuleResolutionRuntime, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
+func exportAssignmentHasDefault(sourceProgram *program.Program, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
 	if exportAssignment == nil {
 		return false
 	}
@@ -154,7 +155,7 @@ func exportAssignmentHasDefault(runtime rslint_utils.ModuleResolutionRuntime, so
 	if kind != exportAssignmentLocalDeclarationModule {
 		return true
 	}
-	return compilerOptionsESModuleInterop(runtime)
+	return compilerOptionsESModuleInterop(sourceProgram)
 }
 
 // exportAssignmentReferencedIdentifier returns the identifier an expression
@@ -179,11 +180,11 @@ func exportAssignmentReferencedIdentifier(expr *ast.Node) (string, bool) {
 // The tsgo shim exposes CompilerOptions fields but not GetESModuleInterop.
 //
 //nolint:staticcheck // esModuleInterop still needs to be inspected for import/export compatibility.
-func compilerOptionsESModuleInterop(runtime rslint_utils.ModuleResolutionRuntime) bool {
-	if runtime == nil || runtime.Options() == nil {
+func compilerOptionsESModuleInterop(sourceProgram *program.Program) bool {
+	if !sourceProgram.IsValid() || sourceProgram.Options() == nil {
 		return false
 	}
-	options := runtime.Options()
+	options := sourceProgram.Options()
 	if options.ESModuleInterop != core.TSUnknown {
 		return options.ESModuleInterop == core.TSTrue
 	}

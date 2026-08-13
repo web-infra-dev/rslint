@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -24,11 +25,15 @@ var specifierCacheESM = ModuleSyntax{ESModule: true}
 // TestCachedModuleGraphReusesSourceFileCollection locks in the graph-to-cache
 // boundary: two runs holding the same unchanged SourceFile share collection.
 func TestCachedModuleGraphReusesSourceFileCollection(t *testing.T) {
-	program, _ := specifierCacheProgram(t, specifierCacheFiles(false))
-	file := specifierCacheFile(t, program)
+	rawProgram, _ := specifierCacheProgram(t, specifierCacheFiles(false))
+	file := specifierCacheFile(t, rawProgram)
+	firstProgram := lintprogram.NewFromCompiler(rawProgram)
+	secondProgram := lintprogram.NewFromCompiler(rawProgram)
+	EnableModuleSpecifierCaching(firstProgram)
+	EnableModuleSpecifierCaching(secondProgram)
 
-	first := NewCachedModuleGraph(program).specifiersOf(file, specifierCacheESM)
-	second := NewCachedModuleGraph(program).specifiersOf(file, specifierCacheESM)
+	first := ModuleGraphFor(firstProgram).specifiersOf(file, specifierCacheESM)
+	second := ModuleGraphFor(secondProgram).specifiersOf(file, specifierCacheESM)
 
 	if len(first) != 1 {
 		t.Fatalf("collected %d specifiers, want 1", len(first))
@@ -226,8 +231,12 @@ func TestCachedModuleGraphResolvesPerProgram(t *testing.T) {
 	if updated.GetSourceFile(specifierCacheTarget) == program.GetSourceFile(specifierCacheTarget) {
 		t.Fatal("the update reused the edited file; the test proves nothing")
 	}
-	before := NewCachedModuleGraph(program).Edges(file, specifierCacheESM)
-	after := NewCachedModuleGraph(updated).Edges(file, specifierCacheESM)
+	beforeProgram := lintprogram.NewFromCompiler(program)
+	afterProgram := lintprogram.NewFromCompiler(updated)
+	EnableModuleSpecifierCaching(beforeProgram)
+	EnableModuleSpecifierCaching(afterProgram)
+	before := ModuleGraphFor(beforeProgram).Edges(file, specifierCacheESM)
+	after := ModuleGraphFor(afterProgram).Edges(file, specifierCacheESM)
 
 	if len(before) != 1 || len(after) != 1 {
 		t.Fatalf("resolved %d and %d edges, want 1 each", len(before), len(after))

@@ -81,7 +81,7 @@ function MyComponent({theme}) {
 		SourceFile:  sourceFile,
 		Settings:    settings,
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithProgram(lintprogram.NewTypeScript(program)).WithReporter("test/exhaustive-deps", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
+	}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/exhaustive-deps", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
 
 	defer func() {
 		if r := recover(); r != nil {

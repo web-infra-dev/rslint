@@ -63,7 +63,7 @@ func sourceHasPromiseBinding(ctx rule.RuleContext) bool {
 }
 
 func isGlobalPromiseReference(ctx rule.RuleContext, identifier *ast.Node) bool {
-	compilerOptions := ctx.CompilerOptions()
+	compilerOptions := ctx.Program().Options()
 	if compilerOptions != nil && ctx.SourceFile != nil && ctx.SourceFile.IsBound() {
 		if ast.IsGlobalSourceFile(ctx.SourceFile.AsNode()) && ctx.SourceFile.Locals["Promise"] != nil {
 			// ESLint stores user declarations and configured globals in one

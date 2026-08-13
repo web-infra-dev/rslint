@@ -342,19 +342,20 @@ func readJestVersionFromPackageJson(ctx rule.RuleContext) string {
 	if ctx.SourceFile == nil {
 		return ""
 	}
-	if !ctx.HasProgram() {
+	if !ctx.Program().IsValid() {
 		return ""
 	}
+	sourceProgram := ctx.Program()
 	dir := tspath.GetDirectoryPath(ctx.SourceFile.FileName())
-	pkgDir := ctx.NearestPackageJSONDirectory(dir)
+	pkgDir := sourceProgram.NearestPackageJSONDirectory(dir)
 	if pkgDir == "" {
 		return ""
 	}
 	pkgPath := tspath.CombinePaths(pkgDir, "package.json")
-	if !ctx.FileExists(pkgPath) {
+	if !sourceProgram.FileExists(pkgPath) {
 		return ""
 	}
-	fileSystem := ctx.FileSystem()
+	fileSystem := sourceProgram.FS()
 	if fileSystem == nil {
 		return ""
 	}

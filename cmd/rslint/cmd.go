@@ -148,7 +148,7 @@ type typeScriptDiagnosticDedupeKey struct {
 
 // deduplicateTypeScriptDiagnostics joins the lint-target syntax path and the
 // program-wide type-check path. A file governed by a config without a tsconfig
-// can be parsed into a standalone rslint Program while also belonging to another
+// can be parsed into a gap rslint Program while also belonging to another
 // config's ts-go Program; --type-check legitimately visits both, but the same TypeScript
 // diagnostic must be reported once.
 func deduplicateTypeScriptDiagnostics(
@@ -308,7 +308,7 @@ func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions)
 // collectAllowFileWarnings explains, for each CLI-specified file in
 // allowFiles, why it won't be visited by Phase 1 (lint). Program membership
 // is deliberately not consulted: lint targets are resolved before type-info
-// binding, so a file outside every tsconfig can still be linted standalone.
+// binding, so a file outside every tsconfig can still be linted as a gap.
 // Returns nil for empty allowFiles.
 //
 // This is a Phase-1 concern only. In --type-check-only mode the lint phase
@@ -672,7 +672,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 
 	// Run-scoped source services shared by the initial Program build,
-	// standalone gap parsing, compatibility fallbacks, and --fix rebuilds. The
+	// gap parsing, compatibility fallbacks, and --fix rebuilds. The
 	// context wraps the final VFS view and is discarded after this invocation;
 	// no package-level cache is used.
 	buildContext := utils.NewProgramBuildContext(fs)
@@ -835,7 +835,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		targetPathBySourcePath     map[string]string
 		configPathBySourcePath     map[string]string
 		ownerConfigDirBySourcePath map[string]string
-		standaloneGapGroups        [][]resolvedLintTarget
+		gapGroups                  [][]resolvedLintTarget
 	)
 	// --type-check-only is program-wide and pays no lint-target discovery,
 	// gap binding/parsing, config-resolution, or Program-binding cost.
@@ -878,14 +878,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		targetPathBySourcePath = binding.TargetPathBySourcePath
 		configPathBySourcePath = binding.ConfigPathBySourcePath
 		ownerConfigDirBySourcePath = binding.OwnerConfigDirBySourcePath
-		standaloneGapGroups = binding.StandaloneGapGroups
+		gapGroups = binding.GapGroups
 	}
 
-	// Real Program construction and target binding are complete. Evict parsed
-	// AST entries that ended up in no Program before parsing standalone gaps.
+	// Project Program construction and target binding are complete. Evict parsed
+	// AST entries that ended up in no Program before parsing gaps.
 	buildContext.RetainOnlySourceFiles(programs)
-	standalonePrograms, standaloneSyntaxDiagnostics, standaloneSyntaxErrorFiles, err := buildStandaloneGapPrograms(
-		standaloneGapGroups,
+	gapPrograms, gapSyntaxDiagnostics, gapSyntaxErrorFiles, err := buildGapPrograms(
+		gapGroups,
 		currentDirectory,
 		buildContext,
 		singleThreaded,
@@ -896,8 +896,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 
 	// Rebuild ts-go Programs and bind the original stable target plan again on
-	// every fix pass. A target can move between compiler-backed and standalone
-	// rslint Programs when fixes change the import graph.
+	// every fix pass. A target can move between rslint Programs when fixes
+	// change the import graph.
 	createPrograms := func() (lintTargetBinding, error) {
 		var rebuilt lintProgramSet
 		var err error
@@ -950,13 +950,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// resolved in targetsByProgram.
 	// Programs not backed by a real tsconfig are excluded from --type-check:
 	// their CompilerOptions are synthesized defaults, not the user's tsconfig,
-	// so semantic diagnostics there would be unreliable. Supported CLI gaps are
-	// standalone and therefore absent from this Program mask; the legacy
-	// fallback remains only for roots that ts-go would reject as Program roots.
+	// so semantic diagnostics there would be unreliable. The compatibility
+	// fallback is the only such compiler Program; gap Programs simply expose no
+	// program-wide diagnostic capability through the common facade.
 	skipTypeCheck := buildTypeCheckSkipMask(programs)
 	lintPrograms, targetsByProgram, skipTypeCheck := combineLintPrograms(
 		programs,
-		standalonePrograms,
+		gapPrograms,
 		targetsByProgram,
 		skipTypeCheck,
 	)
@@ -967,8 +967,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		typeCheck,
 		typeCheckOnly,
 	)
-	syntaxDiagnostics = append(syntaxDiagnostics, standaloneSyntaxDiagnostics...)
-	for fileName := range standaloneSyntaxErrorFiles {
+	syntaxDiagnostics = append(syntaxDiagnostics, gapSyntaxDiagnostics...)
+	for fileName := range gapSyntaxErrorFiles {
 		syntaxErrorFiles[fileName] = struct{}{}
 	}
 	for _, diagnostic := range syntaxDiagnostics {
@@ -1091,7 +1091,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				return 1
 			}
 			newPrograms := newBinding.Programs
-			if len(newPrograms) == 0 && len(newBinding.StandaloneGapGroups) == 0 {
+			if len(newPrograms) == 0 && len(newBinding.GapGroups) == 0 {
 				fmt.Fprintln(os.Stderr, "error rebuilding Programs after fixes: no Program returned")
 				return 1
 			}
@@ -1103,14 +1103,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// end of this function, so its objects are alive regardless and
 			// keeping their entries costs nothing because RetainOnly only deletes.
 			buildContext.RetainOnlySourceFiles(append(slices.Clone(newPrograms), programs...))
-			fixStandalonePrograms, fixStandaloneSyntaxDiagnostics, fixStandaloneSyntaxErrorFiles, err := buildStandaloneGapPrograms(
-				newBinding.StandaloneGapGroups,
+			fixGapPrograms, fixGapSyntaxDiagnostics, fixGapSyntaxErrorFiles, err := buildGapPrograms(
+				newBinding.GapGroups,
 				currentDirectory,
 				buildContext,
 				singleThreaded,
 			)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error rebuilding standalone lint sources after fixes: %v\n", err)
+				fmt.Fprintf(os.Stderr, "error rebuilding gap lint Programs after fixes: %v\n", err)
 				return 1
 			}
 
@@ -1120,7 +1120,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
 			fixLintPrograms, fixTargetsByProgram, fixSkipMask := combineLintPrograms(
 				newPrograms,
-				fixStandalonePrograms,
+				fixGapPrograms,
 				fixTargetsByProgram,
 				fixSkipMask,
 			)
@@ -1157,8 +1157,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				typeCheck,
 				typeCheckOnly,
 			)
-			fixSyntaxDiagnostics = append(fixSyntaxDiagnostics, fixStandaloneSyntaxDiagnostics...)
-			for fileName := range fixStandaloneSyntaxErrorFiles {
+			fixSyntaxDiagnostics = append(fixSyntaxDiagnostics, fixGapSyntaxDiagnostics...)
+			for fileName := range fixGapSyntaxErrorFiles {
 				fixSyntaxErrorFiles[fileName] = struct{}{}
 			}
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)

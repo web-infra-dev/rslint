@@ -9,10 +9,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// ModuleSettings is the `import/` settings block compiled once per source set and
-// configuration. The raw settings are re-read for every reference otherwise,
-// which means recompiling the import/ignore patterns and re-deriving the
-// external module folders each time.
+// ModuleSettings is the `import/` settings block compiled once per Program
+// generation and configuration. The raw settings are re-read for every
+// reference otherwise, which means recompiling the import/ignore patterns and
+// re-deriving the external module folders each time.
 type ModuleSettings struct {
 	ignore          []*regexp.Regexp
 	externalFolders []string
@@ -27,7 +27,7 @@ type settingsKey struct {
 // SettingsFor returns the compiled `import/` settings of this rule
 // configuration, compiling them on the first rule of the run that asks for
 // them. Only the cache key is derived per call; compiling the settings —
-// notably their regexps — happens inside the build, once per source set and key.
+// notably their regexps — happens inside the build, once per Program and key.
 func SettingsFor(ctx rule.RuleContext) *ModuleSettings {
 	key := moduleSettingsKey(ctx.Settings)
 	settings := ctx.Settings

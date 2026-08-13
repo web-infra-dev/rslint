@@ -46,7 +46,7 @@ var NoRestrictedPathsRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-		if len(opts.zones) == 0 || !ctx.HasProgram() {
+		if len(opts.zones) == 0 || !ctx.Program().IsValid() {
 			return rule.RuleListeners{}
 		}
 
@@ -116,7 +116,7 @@ var NoRestrictedPathsRule = rule.Rule{
 func resolveBasePath(ctx rule.RuleContext, configured string) string {
 	cwd := ctx.ProcessCurrentDirectory()
 	if cwd == "" {
-		cwd = ctx.CurrentDirectory()
+		cwd = ctx.Program().CurrentDirectory()
 	}
 	if configured == "" {
 		return tspath.NormalizePath(cwd)

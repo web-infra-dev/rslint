@@ -40,7 +40,7 @@ var NoUnsafeCallRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		compilerOptions := ctx.TypeScriptProgram().Options()
+		compilerOptions := ctx.Program().Options()
 		// When noImplicitThis is not enabled (considering strict mode), object literal methods
 		// can have implicit any this. We need to use IsStrictCompilerOptionEnabled to properly
 		// handle the case where noImplicitThis is inherited from strict mode.
@@ -110,7 +110,7 @@ var NoUnsafeCallRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if utils.IsBuiltinSymbolLike(ctx.TypeScriptProgram(), ctx.TypeChecker, t, "Function") {
+			if utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, t, "Function") {
 				// this also matches subtypes of `Function`, like `interface Foo extends Function {}`.
 				//
 				// For weird TS reasons that I don't understand, these are

@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -52,7 +53,7 @@ func programOver(t *testing.T, content string) (string, string, *compiler.Progra
 func lintOffTheEditorPath(program *compiler.Program, file string, resolver *config.FileConfigResolver) []rule.RuleDiagnostic {
 	var reported []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program: program,
+		Program: lintprogram.NewFromCompiler(program),
 		File:    file,
 		GetRulesForFile: func(f *ast.SourceFile) []linter.ConfiguredRule {
 			return resolver.ActiveRulesForFileHasTypeInfo(f.FileName(), true)

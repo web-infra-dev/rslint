@@ -1,8 +1,8 @@
 package rule
 
-// FileCache holds values derived from one source file for the duration of that
-// file's lint pass. Rules on one file run serially, so the cache intentionally
-// does not synchronize access.
+// FileCache holds file-pass shared values for the duration of one source
+// file's lint. Rules on one file run serially, so the cache intentionally does
+// not synchronize access.
 type FileCache struct {
 	values                  map[any]any
 	processCurrentDirectory string
@@ -30,8 +30,7 @@ func (ctx RuleContext) WithFileCache(cache *FileCache) RuleContext {
 
 // CachedByFile returns the value stored for the current file under key,
 // calling build on the first request. A manually constructed RuleContext with
-// no file cache calls build every time, preserving standalone rule-test
-// behavior.
+// no file cache calls build every time, preserving direct rule-test behavior.
 //
 // Callers must use an unexported comparable key type so keys from different
 // packages cannot collide. Cached values must be derived from the current

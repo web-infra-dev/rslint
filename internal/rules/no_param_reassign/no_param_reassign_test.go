@@ -967,7 +967,7 @@ function shadowed(a: number) {
 					TypeChecker:    checker,
 					Comments:       comments,
 					DisableManager: rule.NewDisableManager(sourceFile, comments),
-				}).WithProgram(lintprogram.NewTypeScript(program)).WithDiagnosticConsumer(NoParamReassignRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+				}).WithProgram(lintprogram.NewFromCompiler(program)).WithDiagnosticConsumer(NoParamReassignRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
 					Demand: demand,
 					Report: func(diagnostic rule.RuleDiagnostic) {
 						diagnostics = append(diagnostics, diagnostic)

@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -103,7 +103,7 @@ func isString(t *checker.Type) bool {
 	})
 }
 
-func isPromise(program *compiler.Program, typeChecker *checker.Checker, t *checker.Type) bool {
+func isPromise(program *program.Program, typeChecker *checker.Checker, t *checker.Type) bool {
 	return utils.TypeRecurser(t, func(t *checker.Type) bool {
 		return utils.IsPromiseLike(program, typeChecker, t)
 	})
@@ -115,7 +115,7 @@ func isFunctionWithoutProps(typeChecker *checker.Checker, t *checker.Type) bool 
 	})
 }
 
-func isMap(program *compiler.Program, typeChecker *checker.Checker, t *checker.Type) bool {
+func isMap(program *program.Program, typeChecker *checker.Checker, t *checker.Type) bool {
 	return utils.TypeRecurser(t, func(t *checker.Type) bool {
 		return utils.IsBuiltinSymbolLike(program, typeChecker, t, "Map", "ReadonlyMap", "WeakMap")
 	})
@@ -177,7 +177,7 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 
 		checkArrayOrCallSpread := func(node *ast.Node) {
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsSpreadElement().Expression)
-			if !utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.TypeScriptProgram()) && isString(t) {
+			if !utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program()) && isString(t) {
 				ctx.ReportNode(node, buildNoStringSpreadMessage())
 			}
 		}
@@ -197,7 +197,7 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 		getMapSpreadSuggestions := func(node *ast.Node, argument *ast.Node, t *checker.Type) []rule.RuleSuggestion {
 			// TODO(port): do we need this loop?
 			for _, t := range utils.UnionTypeParts(t) {
-				if !isMap(ctx.TypeScriptProgram(), ctx.TypeChecker, t) {
+				if !isMap(ctx.Program(), ctx.TypeChecker, t) {
 					return []rule.RuleSuggestion{}
 				}
 			}
@@ -233,11 +233,11 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 		checkObjectSpread := func(node *ast.Node, argument *ast.Node) {
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
 
-			if utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.TypeScriptProgram()) {
+			if utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program()) {
 				return
 			}
 
-			if isPromise(ctx.TypeScriptProgram(), ctx.TypeChecker, t) {
+			if isPromise(ctx.Program(), ctx.TypeChecker, t) {
 				ctx.ReportNodeWithSuggestions(node, buildNoPromiseSpreadInObjectMessage(), rule.RuleSuggestion{
 					Message:  buildAddAwaitMessage(),
 					FixesArr: insertAwaitFix(ast.SkipParentheses(argument)),
@@ -252,7 +252,7 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if isMap(ctx.TypeScriptProgram(), ctx.TypeChecker, t) {
+			if isMap(ctx.Program(), ctx.TypeChecker, t) {
 				ctx.ReportNodeWithSuggestions(node, buildNoMapSpreadInObjectMessage(), getMapSpreadSuggestions(node, argument, t)...)
 
 				return

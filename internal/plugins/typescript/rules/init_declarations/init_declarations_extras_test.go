@@ -850,7 +850,7 @@ let visibleAgain: number;
 		t.Run(test.name, func(t *testing.T) {
 			var diagnostics []rule.RuleDiagnostic
 			_, err := linter.RunLinter(linter.RunLinterOptions{
-				Programs:       []*lintprogram.Program{lintprogram.NewTypeScript(program)},
+				Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 				SingleThreaded: true,
 				TargetFiles:    [][]string{{sourceFile.FileName()}},
 				ExcludePaths:   []string{},

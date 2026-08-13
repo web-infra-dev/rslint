@@ -1980,8 +1980,8 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 			nodeType := ctx.TypeChecker.GetTypeAtLocation(node)
-			return utils.TypeMatchesSomeSpecifier(nodeType, allowSpecifiers, nil, ctx.TypeScriptProgram()) ||
-				utils.ValueMatchesSomeSpecifier(node, allowSpecifiers, ctx.TypeScriptProgram(), nodeType)
+			return utils.TypeMatchesSomeSpecifier(nodeType, allowSpecifiers, nil, ctx.Program()) ||
+				utils.ValueMatchesSomeSpecifier(node, allowSpecifiers, ctx.Program(), nodeType)
 		}
 		// A computed access names no value of its own, so only the type carrying
 		// the deprecated property can be allowed there. That type is the one
@@ -1992,7 +1992,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 			objectType := ctx.TypeChecker.GetTypeAtLocation(expression)
-			return utils.TypeMatchesSomeSpecifier(objectType, allowSpecifiers, nil, ctx.TypeScriptProgram())
+			return utils.TypeMatchesSomeSpecifier(objectType, allowSpecifiers, nil, ctx.Program())
 		}
 		sourceFile := ctx.SourceFile
 		if sourceFile.AsNode().Flags&ast.NodeFlagsAmbient != 0 {

@@ -264,7 +264,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 		// I am doing" flag, the rule reports a single noStrictNullCheck
 		// diagnostic anchored at the start of the file and still walks the
 		// rest of the file.
-		compilerOptions := ctx.TypeScriptProgram().Options()
+		compilerOptions := ctx.Program().Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,

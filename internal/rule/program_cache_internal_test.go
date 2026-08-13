@@ -1,10 +1,7 @@
 package rule
 
 import (
-	"runtime"
 	"testing"
-	"time"
-	"weak"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/binder"
@@ -18,31 +15,27 @@ import (
 
 type programCacheTestKey struct{}
 
-func TestRuleContextWithProgramBindsCapabilityOnce(t *testing.T) {
-	typeScript := programCacheTestProgram(t)
-	sourceFile := typeScript.GetSourceFile("/program-cache-fixture/file.ts")
+func TestRuleContextBindsOneProgramGeneration(t *testing.T) {
+	raw := programCacheTestProgram(t)
+	sourceFile := raw.GetSourceFile("/program-cache-fixture/file.ts")
 	if sourceFile == nil {
 		t.Fatal("fixture source file was not parsed")
 	}
 	if !sourceFile.IsBound() {
 		binder.BindSourceFile(sourceFile)
 	}
-	standalone, err := lintprogram.NewStandaloneFromTypeScriptSources(
-		typeScript,
-		[]*ast.SourceFile{sourceFile},
-	)
+	sourceOnly, err := lintprogram.NewFromBoundSources(raw, []*ast.SourceFile{sourceFile})
 	if err != nil {
-		t.Fatalf("NewStandaloneFromTypeScriptSources: %v", err)
+		t.Fatalf("NewFromBoundSources: %v", err)
 	}
 
-	compilerBacked := lintprogram.NewTypeScript(typeScript)
-	ctx := (RuleContext{}).WithProgram(compilerBacked)
-	if ctx.Program() != compilerBacked || ctx.TypeScriptProgram() != typeScript {
-		t.Fatal("compiler-backed context lost its source capability")
+	compilerBacked := lintprogram.NewFromCompiler(raw)
+	ctx := (RuleContext{SourceFile: sourceFile}).WithProgram(compilerBacked)
+	if ctx.Program() != compilerBacked {
+		t.Fatal("context lost its Program generation")
 	}
-	standaloneCtx := (RuleContext{}).WithProgram(standalone)
-	if standaloneCtx.Program() != standalone || standaloneCtx.TypeScriptProgram() != nil {
-		t.Fatal("standalone context gained a ts-go capability")
+	if sourceOnly.CanProvideTypeChecker(sourceFile) {
+		t.Fatal("source-only Program unexpectedly provided a checker")
 	}
 
 	defer func() {
@@ -50,14 +43,29 @@ func TestRuleContextWithProgramBindsCapabilityOnce(t *testing.T) {
 			t.Fatal("rebinding a context to another Program did not panic")
 		}
 	}()
-	_ = ctx.WithProgram(standalone)
+	_ = ctx.WithProgram(sourceOnly)
 }
 
-// TestCachedByTypeScriptProgramReusesWithinOneProgram locks in the point of the cache:
-// two callers asking about the same Program under the same key get the value
-// the first of them built.
-func TestCachedByTypeScriptProgramReusesWithinOneProgram(t *testing.T) {
-	program := programCacheTestProgram(t)
+func TestRuleContextRejectsForeignSourceGeneration(t *testing.T) {
+	owner := lintprogram.NewFromCompiler(programCacheTestProgram(t))
+	foreignRaw := programCacheTestProgram(t)
+	foreign := foreignRaw.GetSourceFile("/program-cache-fixture/file.ts")
+	if foreign == nil {
+		t.Fatal("foreign fixture source file was not parsed")
+	}
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("binding a foreign AST generation did not panic")
+		}
+	}()
+	_ = (RuleContext{SourceFile: foreign}).WithProgram(owner)
+}
+
+func TestCachedByProgramSharesCompilerGenerationAcrossFacades(t *testing.T) {
+	raw := programCacheTestProgram(t)
+	firstContext := (RuleContext{}).WithProgram(lintprogram.NewFromCompiler(raw))
+	secondContext := (RuleContext{}).WithProgram(lintprogram.NewFromCompiler(raw))
 
 	builds := 0
 	build := func() *int {
@@ -65,63 +73,24 @@ func TestCachedByTypeScriptProgramReusesWithinOneProgram(t *testing.T) {
 		value := builds
 		return &value
 	}
-
-	first := CachedByTypeScriptProgram(program, programCacheTestKey{}, build)
-	second := CachedByTypeScriptProgram(program, programCacheTestKey{}, build)
-
-	if builds != 1 {
-		t.Fatalf("build ran %d times, want 1", builds)
+	first := CachedByProgram(firstContext, programCacheTestKey{}, build)
+	second := CachedByProgram(secondContext, programCacheTestKey{}, build)
+	if builds != 1 || first != second {
+		t.Fatalf("shared generation cache: builds=%d same=%v", builds, first == second)
 	}
-	if first != second {
-		t.Fatalf("second call returned a different value")
-	}
-	runtime.KeepAlive(program)
-}
-
-// TestCachedByTypeScriptProgramReleasesCollectedPrograms locks in that an entry never
-// outlives the Program it belongs to. The cache is reachable for the life of
-// the process, so an entry that kept its Program alive would hold every source
-// file of every Program the process ever linted.
-func TestCachedByTypeScriptProgramReleasesCollectedPrograms(t *testing.T) {
-	var key weak.Pointer[compiler.Program]
-
-	// The Program is confined to this call so that nothing in the test frame
-	// keeps it reachable afterwards.
-	func() {
-		program := programCacheTestProgram(t)
-		key = weak.Make(program)
-		CachedByTypeScriptProgram(program, programCacheTestKey{}, func() *int {
-			value := 1
-			return &value
-		})
-		if _, ok := programCaches.Load(key); !ok {
-			t.Fatal("CachedByProgram stored no entry for the program")
-		}
-	}()
-
-	// Cleanups run on a collection and then on their own goroutine, so the
-	// entry disappears shortly after the Program becomes unreachable rather
-	// than at a point this test can name.
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		if _, ok := programCaches.Load(key); !ok {
-			return
-		}
-		runtime.GC()
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Fatal("the cache entry outlived its program")
 }
 
 func programCacheTestProgram(t *testing.T) *compiler.Program {
 	t.Helper()
-
-	files := map[string]string{"/program-cache-fixture/file.ts": "export const value = 1;\n"}
+	files := map[string]string{
+		"/program-cache-fixture/file.ts":       `import "./dependency"; export const value = 1;`,
+		"/program-cache-fixture/dependency.ts": "export const dependency = 1;\n",
+	}
 	fs := rslint_utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), files)
 	host := rslint_utils.CreateCompilerHost("/", fs)
-	program, err := rslint_utils.CreateProgramFromOptions(true, &core.CompilerOptions{}, []string{"/program-cache-fixture/file.ts"}, host)
+	raw, err := rslint_utils.CreateProgramFromOptions(true, &core.CompilerOptions{}, []string{"/program-cache-fixture/file.ts"}, host)
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptions: %v", err)
 	}
-	return program
+	return raw
 }

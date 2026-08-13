@@ -83,7 +83,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	}
 
 	opts := parseOptions(options)
-	compilerOptions := ctx.TypeScriptProgram().Options()
+	compilerOptions := ctx.Program().Options()
 	isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.StrictNullChecks)
 	if !isStrictNullChecks && !opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing {
 		ctx.ReportRange(core.NewTextRange(0, 0), buildNoStrictNullCheckMessage())
