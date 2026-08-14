@@ -39,6 +39,8 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `import assert from "node:assert"; test("case", () => { promise.then(value => assert.equal(value, 1)); });`},
 			{Code: `import { assert } from "chai"; test("case", () => { promise.then(value => assert.equal(value, 1)); });`},
 			{Code: `const assert = createAssertionLibrary(); test("case", () => { promise.then(value => assert.equal(value, 1)); });`},
+			{Code: `function handler() { queue.then(handler); } test("case", () => promise.then(handler));`},
+			{Code: `function first() { queue.then(second); } function second() { queue.then(first); } test("case", () => promise.then(first));`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

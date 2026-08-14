@@ -69,6 +69,12 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       test('case', callback);`,
     },
     {
+      code: `function handler() {
+        queue.then(handler);
+      }
+      test('case', () => promise.then(handler));`,
+    },
+    {
       code: `test('case', async () => {
         const pending = load().then(value => expect(value).toBe(1));
         try {

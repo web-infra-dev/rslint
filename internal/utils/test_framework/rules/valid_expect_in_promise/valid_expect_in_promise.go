@@ -63,18 +63,13 @@ type analyzer struct {
 	runtime   Runtime
 	groups    map[groupKey]*chainGroup
 	ordered   []*chainGroup
-	analyzing map[functionOwner]bool
+	analyzing map[*ast.Node]bool
 	message   rule.RuleMessage
 }
 
 type groupKey struct {
 	root  *ast.Node
 	owner *chainGroup
-}
-
-type functionOwner struct {
-	function *ast.Node
-	owner    *chainGroup
 }
 
 func buildFloatingPromiseMessage(description string) rule.RuleMessage {
@@ -94,7 +89,7 @@ func NewRule(config Config) rule.Rule {
 				ctx:       ctx,
 				runtime:   runtime,
 				groups:    map[groupKey]*chainGroup{},
-				analyzing: map[functionOwner]bool{},
+				analyzing: map[*ast.Node]bool{},
 				message:   buildFloatingPromiseMessage(config.MessageDescription),
 			}
 			for function := range runtime.TestCallbackFunctions {
@@ -114,12 +109,11 @@ func (a *analyzer) collectFunction(function *ast.Node, owner *chainGroup) {
 	if function == nil {
 		return
 	}
-	key := functionOwner{function: function, owner: owner}
-	if a.analyzing[key] {
+	if a.analyzing[function] {
 		return
 	}
-	a.analyzing[key] = true
-	defer delete(a.analyzing, key)
+	a.analyzing[function] = true
+	defer delete(a.analyzing, function)
 
 	body := function.Body()
 	if body == nil {

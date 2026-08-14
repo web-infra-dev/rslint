@@ -42,6 +42,8 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("done", done => { promise.then(value => { expect(value).toBe(1); done(); }); });`},
 			{Code: `function callback() { const pending = promise.then(value => expect(value).toBe(1)); return pending; } test("case", callback);`},
 			{Code: `function handler(value) { expect(value).toBe(1); } test("one", () => promise.then(handler)); test("two", () => promise.then(handler));`},
+			{Code: `function handler() { queue.then(handler); } test("case", () => promise.then(handler));`},
+			{Code: `function first() { queue.then(second); } function second() { queue.then(first); } test("case", () => promise.then(first));`},
 			{Code: `test("done", done => { test("nested", () => {}); promise.then(value => { expect(value).toBe(1); done(); }); });`},
 		},
 		[]rule_tester.InvalidTestCase{

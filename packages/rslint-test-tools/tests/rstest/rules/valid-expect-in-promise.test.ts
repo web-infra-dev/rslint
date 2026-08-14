@@ -102,6 +102,15 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
         load().then(value => assert.equal(value, 1));
       });`,
     },
+    {
+      code: `function first() {
+        queue.then(second);
+      }
+      function second() {
+        queue.then(first);
+      }
+      test('case', () => promise.then(first));`,
+    },
   ],
   invalid: [
     {
