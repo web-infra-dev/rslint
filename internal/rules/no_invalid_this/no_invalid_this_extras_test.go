@@ -1,0 +1,425 @@
+// TestNoInvalidThisExtras locks in branches and edge shapes that the
+// upstream ESLint core test suite doesn't exercise. Each case carries an
+// inline comment pointing at the specific branch / Dimension 4 row / tsgo
+// AST quirk it covers, so future refactors can't silently regress them
+// without breaking a named lock-in.
+package no_invalid_this
+
+import (
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+)
+
+func TestNoInvalidThisExtras(t *testing.T) {
+	unexpected := func(line, col int) []rule_tester.InvalidTestCaseError {
+		return []rule_tester.InvalidTestCaseError{
+			{MessageId: "unexpectedThis", Line: line, Column: col},
+		}
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoInvalidThisRule,
+		[]rule_tester.ValidTestCase{
+			// ---- Dimension 4: multi-level parenthesized receiver on .call/.bind/.apply ----
+			{Code: `
+export {};
+((function () {
+  this;
+})).call(obj);
+    `},
+
+			// ---- Dimension 4: ElementAccessExpression form of .call/.bind/.apply (not just dotted) ----
+			// Locks in the `KindElementAccessExpression` arm of isDefaultThisBinding,
+			// which no upstream test reaches (upstream only uses dotted access).
+			{Code: `
+export {};
+(function () {
+  this;
+})['call'](obj);
+    `},
+			{Code: "export {};\n(function () {\n  this;\n})[`bind`](obj);\n"},
+
+			// ---- Dimension 4: ElementAccessExpression form of array-thisArg methods ----
+			// Locks in the ElementAccessExpression arm of isMethodWhichHasThisArg.
+			{Code: `
+export {};
+foo['forEach'](function () {
+  this;
+}, obj);
+    `},
+
+			// ---- Dimension 4: generator function / async function / async generator ----
+			// hasThisParameter / isStrictFunction / isDefaultThisBinding must not
+			// care about the async/generator modifiers.
+			{Code: `
+export {};
+(function* () {
+  this;
+}).call(obj);
+    `},
+			{Code: `
+export {};
+(async function () {
+  this;
+}).call(obj);
+    `},
+			{Code: `
+export {};
+(async function* () {
+  this;
+}).call(obj);
+    `},
+			{Code: `
+export {};
+function Foo(this: T) {
+  this;
+}
+    `},
+
+			// ---- Dimension 4: class expression (not just class declaration) ----
+			{Code: `
+export {};
+const C = class {
+  foo() {
+    this;
+  }
+};
+    `},
+			{Code: `
+export {};
+const C = class Named {
+  static foo() {
+    this;
+  }
+};
+    `},
+
+			// ---- Dimension 4: PrivateIdentifier method (not just private field) ----
+			{Code: `
+export {};
+class A {
+  #foo() {
+    this;
+  }
+}
+    `},
+			{Code: `
+export {};
+class A {
+  get #foo() {
+    return this;
+  }
+  set #foo(v) {
+    this;
+  }
+}
+    `},
+
+			// ---- Dimension 4: graceful degradation — body-absent forms must not crash ----
+			// Overload signatures, abstract methods, and ambient declarations have no
+			// body — hasThisParameter/isStrictFunction must tolerate a nil Body().
+			{Code: `
+export {};
+declare function foo(x: number): void;
+    `},
+			{Code: `
+export {};
+abstract class A {
+  abstract foo(): void;
+}
+    `},
+			{Code: `
+export {};
+function overloaded(x: number): void;
+function overloaded(x: string): void;
+function overloaded(x: unknown): void {
+  console.log(x);
+}
+    `},
+			{Code: `
+export {};
+class A {
+  declare foo: string;
+}
+    `},
+
+			// ---- Dimension 4: graceful degradation — spread/rest must not crash or mask siblings ----
+			{Code: `
+export {};
+var obj = {
+  ...spread,
+  foo: function () {
+    this;
+  },
+};
+    `},
+			{Code: `
+export {};
+function foo({ ...rest }) {
+  console.log(rest);
+}
+    `},
+			{Code: `
+export {};
+var obj = { foo: function () { this; }.bind(obj), ...rest };
+    `},
+
+			// ---- Dimension 4: empty bodies ----
+			{Code: `
+export {};
+class A {
+  foo() {}
+}
+    `},
+			{Code: `
+export {};
+(function () {}).call(obj);
+    `},
+
+			// ---- Locks in isDefaultThisBinding ShorthandPropertyAssignment arm: uppercase name (ES5 constructor) ----
+			// Not reached by any upstream test — only the array-destructuring
+			// AssignmentExpression form (`[Foo = function(){}] = a`) is migrated
+			// upstream; this is the OBJECT shorthand-default form.
+			{Code: `
+export {};
+var { Foo = function () { this; } } = obj;
+    `},
+
+			// ---- Locks in isDefaultThisBinding KindBindingElement arm: declaration-context default, uppercase ----
+			// Not reached by any upstream test — upstream's parameter-default case
+			// uses simple Identifier parameters (KindParameter), never a
+			// destructuring BindingElement default.
+			{Code: `
+export {};
+var [Foo = function () { this; }] = a;
+    `},
+			{Code: `
+export {};
+function foo([Foo = function () { this; }]) {}
+    `},
+
+			// ---- Decorator on a method: `this` resolves to the enclosing (valid) scope, not the method's own frame ----
+			// No upstream test exercises decorators (a TS-only / stage-3 syntax);
+			// this locks in decoratorOfMethodLikeAncestor's non-computed-key peek.
+			{Code: `
+export {};
+function outer(this: Ctx) {
+  class C {
+    @deco(this)
+    foo() {}
+  }
+}
+    `},
+			// ---- Decorator on a computed-key method: no peek needed (push already deferred) ----
+			{Code: `
+export {};
+function outer(this: Ctx) {
+  class C {
+    @deco(this)
+    [computedName]() {}
+  }
+}
+    `},
+
+			// ---- Dimension 4: arrow function's OWN "use strict" directive does not affect strictness ----
+			// Strictness is decided by the nearest non-arrow container (here, the
+			// sloppy-mode outer function), never by an inner arrow's own directive —
+			// arrows never push a frame or gate on their own body.
+			{Code: `
+function foo() {
+  var f = () => {
+    "use strict";
+    console.log(this);
+  };
+}
+    `},
+
+			// ---- Real-user (eslint/eslint#14534): typed arrow class field, private/public modifiers ----
+			// https://github.com/eslint/eslint/issues/14534
+			{Code: `
+export {};
+class TestClass {
+  private mText: string = "test";
+
+  public Baz = (): void => {
+    console.log(this.mText);
+  }
+
+  public Foo(): void {
+    console.log(this.mText);
+  }
+}
+    `},
+
+			// ---- Real-user (eslint/eslint#13894): field initialized by a factory-method call, method returning an arrow ----
+			// https://github.com/eslint/eslint/issues/13894
+			{Code: `
+export {};
+class BufferedLog {
+  private pendingLogs: Array<PendingLog> = [];
+
+  debug = this.addLogFunction(LogLevel.Debug);
+
+  private addLogFunction(level: LogLevel): (message: string) => void {
+    return (message: string): void => {
+      this.pendingLogs.push(new PendingLog(level, message));
+    };
+  }
+}
+    `},
+		},
+		[]rule_tester.InvalidTestCase{
+			// ---- Dimension 4: ElementAccessExpression .call with null receiver ----
+			{
+				Code: `
+export {};
+(function () {
+  this;
+})['call'](null);
+    `,
+				Errors: unexpected(4, 3),
+			},
+
+			// ---- Dimension 4: generator / async function without a this-binding call ----
+			{
+				Code: `
+export {};
+(function* () {
+  this;
+});
+    `,
+				Errors: unexpected(4, 3),
+			},
+			{
+				Code: `
+export {};
+(async function () {
+  this;
+});
+    `,
+				Errors: unexpected(4, 3),
+			},
+
+			// ---- Dimension 4: class expression method returning a standalone function ----
+			{
+				Code: `
+export {};
+const C = class {
+  foo() {
+    return function () {
+      this;
+    };
+  }
+};
+    `,
+				Errors: unexpected(6, 7),
+			},
+
+			// ---- Dimension 4: PrivateIdentifier method, standalone (not bound) ----
+			{
+				Code: `
+export {};
+class A {
+  #foo() {
+    return function () {
+      this;
+    };
+  }
+}
+    `,
+				Errors: unexpected(6, 7),
+			},
+
+			// ---- Locks in Reflect.apply arg-count guard: too few args falls through to default-bound ----
+			{
+				Code: `
+export {};
+Reflect.apply(function () { this; }, obj);
+    `,
+				Errors: unexpected(3, 29),
+			},
+
+			// ---- Locks in isDefaultThisBinding ShorthandPropertyAssignment arm: lowercase name (not a constructor) ----
+			{
+				Code: `
+export {};
+var { func = function () { this; } } = obj;
+    `,
+				Errors: unexpected(3, 28),
+			},
+
+			// ---- Locks in isDefaultThisBinding KindBindingElement arm: declaration-context default, lowercase ----
+			{
+				Code: `
+export {};
+var [func = function () { this; }] = a;
+    `,
+				Errors: unexpected(3, 27),
+			},
+			{
+				Code: `
+export {};
+function foo([func = function () { this; }]) {}
+    `,
+				Errors: unexpected(3, 36),
+			},
+
+			// ---- Decorator NOT on the method itself: `this` inside the method body is still the method's own (VALID) — contrast case ----
+			// Confirms the decorator peek doesn't leak into the method body.
+			{
+				Code: `
+export {};
+function outer(this: Ctx) {
+  class C {
+    @deco(this)
+    foo() {
+      return function () {
+        this;
+      };
+    }
+  }
+}
+    `,
+				Errors: unexpected(8, 9),
+			},
+
+			// ---- Decorator's `this` genuinely resolves to the enclosing scope, not the method's always-valid frame ----
+			// `outer` here is a plain strict function (no this-param, lowercase
+			// name) so its own `this` is default-bound/INVALID. If the peek
+			// were broken and fell back to the method's own frame (always
+			// valid), this would wrongly report as valid — this is the
+			// discriminating half of the "Decorator on a method" valid case.
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(this)
+    foo() {}
+  }
+}
+    `,
+				Errors: unexpected(6, 11),
+			},
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(this)
+    [computedName]() {}
+  }
+}
+    `,
+				Errors: unexpected(6, 11),
+			},
+		},
+	)
+}

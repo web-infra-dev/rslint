@@ -65,6 +65,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
+	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_this"
 	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
 	"github.com/web-infra-dev/rslint/internal/rules/no_iterator"
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
@@ -277,6 +278,7 @@ func GetAllRules() []rule.Rule {
 		prefer_spread.PreferSpreadRule,
 		no_empty_character_class.NoEmptyCharacterClassRule,
 		no_invalid_regexp.NoInvalidRegexpRule,
+		no_invalid_this.NoInvalidThisRule,
 		no_iterator.NoIteratorRule,
 		no_setter_return.NoSetterReturnRule,
 		no_unsafe_negation.NoUnsafeNegationRule,
