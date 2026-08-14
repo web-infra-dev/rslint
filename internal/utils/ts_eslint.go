@@ -1627,11 +1627,12 @@ func IsSameReference(left, right *ast.Node) bool {
 			return false
 		}
 
-		// Non-static: fall back to same-kind, same-index comparison (e.g. a[x] = a[x]).
+		// Non-static: fall back to comparing the index expressions themselves
+		// as references (e.g. a[x] = a[x], a[c[0]] = a[c[0]]).
 		if left.Kind == right.Kind && left.Kind == ast.KindElementAccessExpression {
 			leftArg := left.AsElementAccessExpression().ArgumentExpression
 			rightArg := right.AsElementAccessExpression().ArgumentExpression
-			if isSameSimpleNode(leftArg, rightArg) {
+			if IsSameReference(leftArg, rightArg) {
 				return IsSameReference(left.AsElementAccessExpression().Expression, right.AsElementAccessExpression().Expression)
 			}
 		}
@@ -1691,21 +1692,6 @@ func AccessExpressionObject(node *ast.Node) *ast.Node {
 		return node.AsElementAccessExpression().Expression
 	}
 	return nil
-}
-
-// isSameSimpleNode checks if two nodes are the same simple reference (Identifier or ThisKeyword).
-// Used as a fallback for comparing non-static element access arguments like a[x] vs a[x].
-func isSameSimpleNode(left, right *ast.Node) bool {
-	if left == nil || right == nil || left.Kind != right.Kind {
-		return false
-	}
-	switch left.Kind {
-	case ast.KindIdentifier:
-		return left.AsIdentifier().Text == right.AsIdentifier().Text
-	case ast.KindThisKeyword:
-		return true
-	}
-	return false
 }
 
 // CollectBindingNames recursively extracts all identifier names from a binding
