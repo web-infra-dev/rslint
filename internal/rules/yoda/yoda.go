@@ -153,14 +153,46 @@ func (v literalValue) lessOrEqual(other literalValue) bool {
 	if v.kind == "bigint" && other.kind == "bigint" {
 		return v.big.Cmp(other.big) <= 0
 	}
+	// A BigInt/Number pair must compare exactly: JS's abstract relational
+	// comparison never rounds the BigInt through a float64 (unlike
+	// numeric()'s general fallback below), so a bound beyond 2^53 doesn't
+	// silently lose precision against its counterpart.
+	if v.kind == "bigint" && other.kind == "number" {
+		cmp, ok := compareBigIntFloat(v.big, other.num)
+		return ok && cmp <= 0
+	}
+	if v.kind == "number" && other.kind == "bigint" {
+		cmp, ok := compareBigIntFloat(other.big, v.num)
+		return ok && cmp >= 0
+	}
 	return v.numeric() <= other.numeric()
 }
 
+// compareBigIntFloat compares b against f using exact arithmetic, matching
+// JS's BigInt-vs-Number abstract relational comparison (which compares
+// mathematical values, not float64-rounded ones): -1/0/1 as b is
+// less/equal/greater than f. ok is false when f is NaN, mirroring JS's
+// "any comparison against NaN is false".
+func compareBigIntFloat(b *big.Int, f float64) (cmp int, ok bool) {
+	if math.IsNaN(f) {
+		return 0, false
+	}
+	if math.IsInf(f, 1) {
+		return -1, true
+	}
+	if math.IsInf(f, -1) {
+		return 1, true
+	}
+	return new(big.Rat).SetInt(b).Cmp(new(big.Rat).SetFloat64(f)), true
+}
+
 // numeric converts v to a float64 following JS's ToNumber coercion closely
-// enough for range-test bound comparison: numbers and bigints convert
-// directly (bigint loses precision beyond 2^53, which is acceptable for a
-// range-test heuristic), strings parse as a JS number literal (empty/blank
-// is 0, anything else that doesn't parse is NaN).
+// enough for range-test bound comparison: numbers convert directly, strings
+// parse as a JS number literal (empty/blank is 0, anything else that doesn't
+// parse is NaN). A bigint bound only reaches this lossy path when paired
+// with another string/bigint-less combination that lessOrEqual doesn't
+// special-case; bigint-vs-number pairs use compareBigIntFloat's exact
+// comparison instead.
 func (v literalValue) numeric() float64 {
 	switch v.kind {
 	case "number":
@@ -203,6 +235,14 @@ func normalizedLiteralValue(node *ast.Node) (literalValue, bool) {
 		return literalValue{kind: "number", num: 0}, true
 	case ast.KindNullKeyword:
 		return literalValue{kind: "number", num: 0}, true
+	case ast.KindRegularExpressionLiteral:
+		// ESLint's getNormalizedLiteral returns any `Literal` node verbatim,
+		// including regex literals — it only checks node.type, not the
+		// runtime type of node.value. JS's abstract relational comparison
+		// then coerces a RegExp operand via ToPrimitive, which falls back to
+		// RegExp.prototype.toString() (there is no valueOf override), i.e.
+		// its source text. Treat it as a string bound for the same reason.
+		return literalValue{kind: "string", str: node.Text()}, true
 	case ast.KindPrefixUnaryExpression:
 		unary := node.AsPrefixUnaryExpression()
 		if unary.Operator != ast.KindMinusToken {

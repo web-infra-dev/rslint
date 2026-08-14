@@ -82,6 +82,13 @@ func TestYodaExtras(t *testing.T) {
 			// ---- Combination matrix: exceptRange and onlyEquality both true; onlyEquality
 			// alone already exempts the non-equality range comparisons ----
 			{Code: `if (0 <= x && x < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true, "onlyEquality": true}}},
+
+			// ---- Bug fix: a regex literal is a valid Literal bound for upstream's
+			// getNormalizedLiteral (it only checks node.type === "Literal", not the
+			// value's runtime type). JS's abstract relational comparison coerces a
+			// RegExp via ToPrimitive to its source text, so "/a/" <= "/b/" compares
+			// lexicographically and the range is ascending ----
+			{Code: `if (/a/ <= x && x < /b/) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Real-user: optional chaining under "always" mode ----
@@ -136,6 +143,19 @@ func TestYodaExtras(t *testing.T) {
 				Output:  []string{"if (x >=\n  0) {}"},
 				Options: "never",
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 2, EndColumn: 4}},
+			},
+
+			// ---- Bug fix: mixed BigInt/Number range bounds must compare exactly, not
+			// through a lossy float64 conversion. 9007199254740993n rounds to
+			// 9007199254740992 in float64 (both exceed 2^53), which would make the
+			// bounds look ascending when they are not; JS's actual BigInt-vs-Number
+			// abstract relational comparison is exact, so this is not a valid range
+			// test and exceptRange must not exempt it ----
+			{
+				Code:    `if (9007199254740993n <= x && x < 9007199254740992) {}`,
+				Output:  []string{`if (x >= 9007199254740993n && x < 9007199254740992) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5}},
 			},
 		},
 	)
