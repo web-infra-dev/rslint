@@ -51,4 +51,4 @@ void someFunction();
 ## Original Documentation
 
 - [ESLint: no-void](https://eslint.org/docs/latest/rules/no-void)
-- [Source code](https://github.com/eslint/eslint/blob/main/lib/rules/no-void.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-void.js)
