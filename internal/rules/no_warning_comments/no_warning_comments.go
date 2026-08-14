@@ -188,6 +188,45 @@ func jsTrim(s string) string {
 	return s[start:end]
 }
 
+// jsSplitOnWhitespace splits s on runs of ECMAScript WhiteSpace/LineTerminator
+// runes, discarding empty leading/trailing pieces — matching JS
+// `comment.trim().split(/\s+/u)` (JS regex `\s` uses that same WhiteSpace
+// production, not a broader Unicode property). strings.Fields can't be reused
+// here: Go's unicode.IsSpace disagrees with JS `\s` on exactly two runes — it
+// treats U+0085 NEL as whitespace (JS doesn't) and does not treat U+FEFF BOM
+// as whitespace (JS does).
+func jsSplitOnWhitespace(s string) []string {
+	var words []string
+	i := 0
+	for i < len(s) {
+		i = utils.SkipLeadingWhitespace(s, i, len(s))
+		if i >= len(s) {
+			break
+		}
+		start := i
+		for i < len(s) {
+			if s[i] < 0x80 {
+				if utils.IsTriviaWhitespaceByte(s[i]) {
+					break
+				}
+				i++
+				continue
+			}
+			r, size := utf8.DecodeRuneInString(s[i:])
+			if size == 0 {
+				i++
+				continue
+			}
+			if utils.IsTriviaWhitespaceRune(r) {
+				break
+			}
+			i += size
+		}
+		words = append(words, s[start:i])
+	}
+	return words
+}
+
 func checkComment(ctx rule.RuleContext, text string, comment *ast.CommentRange, terms []string, warningRegExps []*regexp.Regexp) {
 	value := commentValue(text, comment)
 
@@ -212,7 +251,7 @@ func truncateForDisplay(comment string) string {
 	truncated := false
 	first := true
 
-	for _, word := range strings.Fields(comment) {
+	for _, word := range jsSplitOnWhitespace(comment) {
 		var candidate string
 		if first {
 			candidate = word

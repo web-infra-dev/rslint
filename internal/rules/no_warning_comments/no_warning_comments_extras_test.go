@@ -205,6 +205,37 @@ func TestNoWarningCommentsExtras(t *testing.T) {
 					},
 				},
 			},
+			// ---- Locks in truncateForDisplay()'s word-splitting boundary: JS
+			// `\s` (used by upstream's `comment.trim().split(/\s+/u)`) does NOT
+			// treat U+0085 NEL as whitespace, so a NEL between "TODO" and "more"
+			// leaves them fused into a single word in the displayed text —
+			// verified against real ESLint ----
+			{
+				Code:    "// TODO\u0085more text here to check splitting behavior around a NEL char boundary case",
+				Options: map[string]any{"terms": []interface{}{"todo"}, "location": "anywhere"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "unexpectedComment",
+						Message:   "Unexpected 'todo' comment: 'TODO\u0085more text here to check splitting...'.",
+						Line:      1, Column: 1,
+					},
+				},
+			},
+			// ---- Locks in truncateForDisplay()'s word-splitting boundary: JS
+			// `\s` DOES treat U+FEFF BOM as whitespace, so a BOM between "TODO"
+			// and "more" splits them into two separate words in the displayed
+			// text — verified against real ESLint ----
+			{
+				Code:    "// TODO\uFEFFmore text here to check splitting behavior around a BOM char boundary case",
+				Options: map[string]any{"terms": []interface{}{"todo"}, "location": "anywhere"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "unexpectedComment",
+						Message:   "Unexpected 'todo' comment: 'TODO more text here to check splitting...'.",
+						Line:      1, Column: 1,
+					},
+				},
+			},
 			// ---- Dimension 4: term boundary uses ASCII-only \w on both sides
 			// (matching JS `\w`, unaffected by the `u` flag), so a term ending in
 			// a non-ASCII letter is not word-boundary-checked against a directly
