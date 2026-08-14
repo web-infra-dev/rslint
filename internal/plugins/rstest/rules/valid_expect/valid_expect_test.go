@@ -60,6 +60,11 @@ func TestValidExpectRule(t *testing.T) {
 			// vitest: only resolves/rejects modifiers and asyncMatchers require
 			// await), so a poll chain without await is not reported here.
 			{Code: `test("t", () => { expect.poll(() => value).toBe(1); });`},
+			{Code: `expect(1, 2).toBe(1);`, Options: []any{map[string]any{"maxArgs": 2}}},
+			{
+				Code:    `test("t", async () => { await expect(p).toResolveEventually(); });`,
+				Options: []any{map[string]any{"asyncMatchers": []any{"toResolveEventually"}}},
+			},
 
 			// Provenance: non-Rstest expect and local shadow are ignored.
 			{Code: `import { expect } from "vitest"; expect(1);`},
@@ -161,6 +166,29 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "promisesWithAsyncAssertionsMustBeAwaited"},
 				},
 				Output: []string{`test("t", async () => { const all = await Promise.all([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]); });`},
+			},
+			{
+				Code:    `test("t", () => { return expect(p).resolves.toBe(1); });`,
+				Options: []any{map[string]any{"alwaysAwait": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await expect(p).resolves.toBe(1); });`},
+			},
+			{
+				Code:    `expect(value).toBe(1);`,
+				Options: []any{map[string]any{"minArgs": 2}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notEnoughArgs"},
+				},
+			},
+			{
+				Code:    `test("t", () => { expect(p).toResolveEventually(); });`,
+				Options: []any{map[string]any{"asyncMatchers": []any{"toResolveEventually"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await expect(p).toResolveEventually(); });`},
 			},
 
 			// --- provenance (resolved by the expect parser) ---

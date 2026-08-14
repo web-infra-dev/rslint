@@ -26,23 +26,11 @@ func isPromiseMethodCall(node *ast.Node) bool {
 	}
 
 	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
-	if !isMemberAccessNode(callee) {
+	if !ast.IsAccessExpression(callee) {
 		return false
 	}
 
 	return testFramework.CalleeChainName(internalUtils.AccessExpressionObject(callee)) == "Promise"
-}
-
-func isMemberAccessNode(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		return true
-	default:
-		return false
-	}
 }
 
 func getPromiseCallExpressionNode(node *ast.Node) *ast.Node {
@@ -77,7 +65,7 @@ func getParentIfPromiseChained(node *ast.Node) *ast.Node {
 	}
 
 	grandParent := node.Parent.Parent
-	if grandParent.Kind != ast.KindCallExpression || !isMemberAccessNode(grandParent.AsCallExpression().Expression) {
+	if grandParent.Kind != ast.KindCallExpression || !ast.IsAccessExpression(grandParent.AsCallExpression().Expression) {
 		return node
 	}
 
