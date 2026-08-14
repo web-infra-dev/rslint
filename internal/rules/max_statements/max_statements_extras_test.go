@@ -35,6 +35,12 @@ func TestMaxStatementsExtras(t *testing.T) {
 			// ---- Dimension 4: empty static block never exceeds and never reports ----
 			{Code: "class C { static {} }", Options: option(0)},
 
+			// ---- Dimension 1: TS namespace/module body (tsgo KindModuleBlock, distinct
+			// from KindBlock) is invisible to statement counting, matching upstream where
+			// TSModuleBlock isn't a BlockStatement either — its statements don't leak into
+			// the enclosing function's count ----
+			{Code: "function foo() { namespace N { one; two; three; four; five; six; seven; eight; nine; ten; } }", Options: option(1)},
+
 			// Locks in upstream reportIfTooManyStatements() arm: `option.maximum || option.max`
 			// when maximum is explicitly 0 (falsy) falls through to `max`, not "no limit".
 			{Code: "function foo() { 1; 2; 3; }", Options: option(map[string]interface{}{"maximum": 0, "max": 3})},
