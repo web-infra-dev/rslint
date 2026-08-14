@@ -104,6 +104,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_shadow_restricted_names"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
+	"github.com/web-infra-dev/rslint/internal/rules/no_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unassigned_vars"
@@ -252,6 +253,7 @@ func GetAllRules() []rule.Rule {
 		no_shadow_restricted_names.NoShadowRestrictedNamesRule,
 		strict.StrictRule,
 		no_template_curly_in_string.NoTemplateCurlyInStringRule,
+		no_ternary.NoTernaryRule,
 		no_useless_computed_key.NoUselessComputedKeyRule,
 		no_useless_concat.NoUselessConcatRule,
 		no_sparse_arrays.NoSparseArraysRule,
