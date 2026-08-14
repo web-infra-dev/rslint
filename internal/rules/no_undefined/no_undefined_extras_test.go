@@ -50,6 +50,18 @@ func TestNoUndefinedExtras(t *testing.T) {
 			{Code: `type T = [undefined: string];`},
 			// Locks in isNonBindingUndefinedPosition() KindJsxAttribute arm
 			{Code: `const el = <div undefined="x" />;`, Tsx: true},
+			// Locks in the ast.IsJsxTagName() fallback: a lowercase tag name is
+			// an intrinsic element, so it names no variable.
+			{Code: `const el = <undefined />;`, Tsx: true},
+			// Locks in isNonBindingUndefinedPosition() KindJsxNamespacedName
+			// attribute side: a namespaced attribute names a slot on the
+			// element in either half.
+			{Code: `const el = <div undefined:attr="x" />;`, Tsx: true},
+			{Code: `const el = <div attr:undefined="x" />;`, Tsx: true},
+			// Locks in isNonBindingUndefinedPosition() KindParameter arm: an
+			// index signature's parameter labels the key type, not a binding.
+			{Code: `interface I { [undefined: string]: any; }`},
+			{Code: `class C { [undefined: string]: any; }`},
 			// PrivateIdentifier is a distinct Kind from Identifier, so `#undefined`
 			// never reaches the ast.KindIdentifier listener at all.
 			{Code: `class C { #undefined = 1; get() { return this.#undefined; } }`},
@@ -103,6 +115,13 @@ func TestNoUndefinedExtras(t *testing.T) {
 			// node is a StringLiteral, never an Identifier, so it can never
 			// reach this rule's listener regardless of its text.
 			{Code: `module "undefined" {}`},
+			// Locks in isDottedModuleNameSegment(): every segment of a dotted
+			// namespace name only qualifies the path, in both the head
+			// position (body branch) and the tail position (parent branch).
+			{Code: `namespace undefined.A { export const a = 1; }`},
+			{Code: `namespace A.undefined { export const a = 1; }`},
+			{Code: `namespace A.undefined.B { export const a = 1; }`},
+			{Code: `declare module undefined.A {}`},
 
 			// ---- Real-user: common default-parameter and config-object
 			// shapes that use `undefined` as an explicit sentinel value ----
@@ -218,6 +237,45 @@ func TestNoUndefinedExtras(t *testing.T) {
 			{
 				Code:   `export as namespace undefined;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 21}},
+			},
+			// A namespace nested by block syntax declares its own name, unlike
+			// the segments of a dotted name.
+			{
+				Code:   `namespace A { namespace undefined { export const a = 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 25}},
+			},
+			{
+				Code:   `namespace A.B { namespace undefined { export const a = 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 27}},
+			},
+
+			// ---- Dimension 4: access/key forms — a namespaced JSX tag name
+			// references both of its segments, in the opening and the closing
+			// tag alike ----
+			{
+				Code:   `const el = <undefined:tag />;`,
+				Tsx:    true,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 13, EndLine: 1, EndColumn: 22}},
+			},
+			// A dotted tag name resolves its root against the enclosing scope,
+			// so the root stays a reference.
+			{
+				Code:   `const el = <undefined.tag />;`,
+				Tsx:    true,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 13, EndLine: 1, EndColumn: 22}},
+			},
+			{
+				Code:   `const el = <ns:undefined />;`,
+				Tsx:    true,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 16}},
+			},
+			{
+				Code: `const el = <undefined:tag></undefined:tag>;`,
+				Tsx:  true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedUndefined", Line: 1, Column: 13},
+					{MessageId: "unexpectedUndefined", Line: 1, Column: 29},
+				},
 			},
 
 			// ---- Dimension 4: declaration/container forms — TS import-type
@@ -364,6 +422,47 @@ func TestNoUndefinedExtras(t *testing.T) {
 			{
 				Code:   `undefined`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 1, EndLine: 1, EndColumn: 10}},
+			},
+
+			// ---- Position assertions: a declaration name carries its own
+			// optional marker and type annotation, so the report runs through
+			// the annotation. Locks in declarationNameEnd()'s parameter and
+			// variable branches, and its rest-parameter carve-out. ----
+			{
+				Code:   `function f(undefined: number) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 12, EndLine: 1, EndColumn: 29}},
+			},
+			{
+				Code:   `function f(undefined: number = 1) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 12, EndLine: 1, EndColumn: 29}},
+			},
+			{
+				Code:   `function f(undefined?) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 12, EndLine: 1, EndColumn: 22}},
+			},
+			{
+				Code:   `function f(undefined) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 12, EndLine: 1, EndColumn: 21}},
+			},
+			// A rest parameter's annotation belongs to the rest element
+			// upstream, so the report stops at the identifier.
+			{
+				Code:   `function f(...undefined: number[]) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 15, EndLine: 1, EndColumn: 24}},
+			},
+			{
+				Code:   `let undefined!: number;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 5, EndLine: 1, EndColumn: 23}},
+			},
+			{
+				Code:   `const undefined: Array<string> = [];`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 7, EndLine: 1, EndColumn: 31}},
+			},
+			// A destructured binding's annotation belongs to the pattern, not
+			// to the name inside it.
+			{
+				Code:   `const { a: undefined }: { a: number } = obj;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedUndefined", Line: 1, Column: 12, EndLine: 1, EndColumn: 21}},
 			},
 
 			// ---- Intentional divergence from ESLint: a scope-manager

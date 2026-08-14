@@ -2,6 +2,7 @@ package no_undefined
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -31,7 +32,7 @@ var NoUndefinedRule = rule.Rule{
 				if isNonBindingUndefinedPosition(node) {
 					return
 				}
-				ctx.ReportNode(node, rule.RuleMessage{
+				ctx.ReportRange(undefinedReportRange(ctx.SourceFile, node), rule.RuleMessage{
 					Id:          "unexpectedUndefined",
 					Description: "Unexpected use of undefined.",
 				})
@@ -81,8 +82,22 @@ func isNonBindingUndefinedPosition(node *ast.Node) bool {
 		// import ... with { undefined: "json" } — an attribute key, not a variable.
 		return parent.AsImportAttribute().Name() == node
 
+	case ast.KindParameter:
+		// An index signature's parameter (`interface I { [undefined: string]: any }`)
+		// names the key slot rather than a variable. Every other parameter name is
+		// a real binding, and an initializer identifier is a reference either way.
+		return parent.Name() == node && parent.Parent != nil && parent.Parent.Kind == ast.KindIndexSignature
+
+	case ast.KindModuleDeclaration:
+		// Only a standalone `namespace undefined {}` binds a variable; the
+		// segments of a dotted name (`namespace undefined.A {}`) do not.
+		return parent.Name() == node && isDottedModuleNameSegment(parent)
+
 	case ast.KindJsxNamespacedName:
-		return true
+		// A namespaced tag name (`<undefined:foo />`) references both of its
+		// segments, while a namespaced attribute name (`<X undefined:attr />`)
+		// names a slot on the element.
+		return !ast.IsJsxTagName(parent)
 
 	case ast.KindQualifiedName:
 		// In `A.undefined` (a type-space qualified name), only the leftmost
@@ -106,6 +121,64 @@ func isNonBindingUndefinedPosition(node *ast.Node) bool {
 	}
 
 	return false
+}
+
+// isDottedModuleNameSegment reports whether decl is one link of a dotted
+// namespace name. tsgo lowers `namespace A.B {}` to nested module declarations
+// — the outer one holds another module declaration as its body, and the inner
+// one is that body — so both shapes identify a segment that only qualifies the
+// namespace path instead of declaring a name of its own.
+func isDottedModuleNameSegment(decl *ast.Node) bool {
+	if body := decl.Body(); body != nil && ast.IsModuleDeclaration(body) {
+		return true
+	}
+	return decl.Parent != nil && ast.IsModuleDeclaration(decl.Parent) && decl.Parent.Body() == decl
+}
+
+// undefinedReportRange spans what typescript-eslint hands ESLint as the
+// reported node. A declaration name there carries its own optional marker and
+// type annotation inside the identifier, so `function f(undefined: number) {}`
+// reports through the annotation; every other occurrence spans the bare
+// identifier.
+func undefinedReportRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	identifierRange := utils.TrimNodeTextRange(sourceFile, node)
+	if end := declarationNameEnd(node); end > identifierRange.End() {
+		return identifierRange.WithEnd(end)
+	}
+	return identifierRange
+}
+
+// declarationNameEnd returns the end of the trailing marker or annotation that
+// belongs to node's declaration name, or 0 when node names nothing that can
+// carry one.
+func declarationNameEnd(node *ast.Node) int {
+	parent := node.Parent
+	if parent == nil || parent.Name() != node {
+		return 0
+	}
+
+	switch parent.Kind {
+	case ast.KindParameter:
+		decl := parent.AsParameterDeclaration()
+		// A rest parameter's annotation belongs to the rest element upstream,
+		// which leaves the identifier itself bare.
+		if decl.DotDotDotToken != nil {
+			return 0
+		}
+		if decl.Type != nil {
+			return decl.Type.End()
+		}
+		if decl.QuestionToken != nil {
+			return decl.QuestionToken.End()
+		}
+
+	case ast.KindVariableDeclaration:
+		if declType := parent.AsVariableDeclaration().Type; declType != nil {
+			return declType.End()
+		}
+	}
+
+	return 0
 }
 
 // isNonBindingExportSpecifierName classifies the two name slots of an
