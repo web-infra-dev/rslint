@@ -38,7 +38,13 @@ func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	visit = func(node *ast.Node) {
 		if node.Kind == ast.KindVariableDeclarationList && utils.IsVarKeyword(node) {
 			scopeRange := blockScopeRange(ctx.SourceFile, node)
-			utils.ForEachVariableDeclarationBinding(node, func(_ *ast.Node, identifier *ast.Node, _ string) {
+			// A for-in/for-of head has no `=` of its own, but the loop
+			// implicitly assigns into the binding on every iteration, which
+			// ESLint's scope analysis treats the same as an explicit
+			// initializer for this rule's purposes.
+			isForInOrForOf := node.Parent != nil &&
+				(node.Parent.Kind == ast.KindForInStatement || node.Parent.Kind == ast.KindForOfStatement)
+			utils.ForEachVariableDeclarationBinding(node, func(declaration *ast.Node, identifier *ast.Node, _ string) {
 				symbol := identifier.Parent.Symbol()
 				if symbol == nil {
 					return
@@ -48,7 +54,13 @@ func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 					symbol:     symbol,
 					scopeRange: scopeRange,
 				})
-				declsBySymbol[symbol] = append(declsBySymbol[symbol], identifier)
+				// ESLint's eslint-scope only creates a self-reference for a
+				// declarator that is assigned a value — a bare `var a;` never
+				// becomes a "reference," so it can never flag (or be flagged
+				// by) a sibling `var` declaration of the same name.
+				if isForInOrForOf || hasInitializer(declaration) {
+					declsBySymbol[symbol] = append(declsBySymbol[symbol], identifier)
+				}
 			})
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
@@ -84,8 +96,9 @@ type diagnostic struct {
 // checkOccurrence collects a diagnostic for every use of occurrence's
 // declared variable that falls outside the block scope that was active when
 // it was declared. "Uses" include both ordinary reads/writes and the binding
-// identifiers of any sibling `var` declarations of the same variable
-// elsewhere in the file — ESLint's scope analysis treats every declarator's
+// identifiers of any sibling `var` declarations of the same variable that
+// have their own initializer (or are a for-in/for-of loop's binding)
+// elsewhere in the file — ESLint's scope analysis treats such a declarator's
 // own identifier as a reference too, which is what lets two sibling `var`
 // declarations of the same name flag each other.
 func checkOccurrence(ctx rule.RuleContext, occurrence varOccurrence, siblingDeclarations []*ast.Node) []diagnostic {
@@ -117,6 +130,13 @@ func checkOccurrence(ctx rule.RuleContext, occurrence varOccurrence, siblingDecl
 		}
 	}
 	return diagnostics
+}
+
+// hasInitializer reports whether a VariableDeclaration node has an `=`
+// initializer.
+func hasInitializer(declaration *ast.Node) bool {
+	variableDeclaration := declaration.AsVariableDeclaration()
+	return variableDeclaration != nil && variableDeclaration.Initializer != nil
 }
 
 // blockScopeRange returns the range of the nearest enclosing block scope for

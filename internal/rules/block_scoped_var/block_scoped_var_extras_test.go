@@ -42,6 +42,12 @@ func TestBlockScopedVarExtras(t *testing.T) {
 
 			// ---- Real-user: catch-clause param shadows an unrelated same-named outer var ----
 			{Code: "function f() { var e = 1; try {} catch (e) { e; } e; }"},
+
+			// ---- Locks in: a bare `var` declarator (no initializer) never
+			// ---- creates a self-reference, so two sibling bare declarations
+			// ---- of the same name never cross-flag each other. ----
+			{Code: "if (true) { var a; } else { var a; }"},
+			{Code: "function f() { for (var a;;) {} for (var a;;) {} }"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: TS wrappers around an out-of-scope read still flag the identifier ----
@@ -87,6 +93,18 @@ func TestBlockScopedVarExtras(t *testing.T) {
 				scopeErr("result", 1, 35, 1, 71),
 				scopeErr("result", 1, 35, 1, 95),
 				scopeErr("result", 1, 71, 1, 95)),
+
+			// ---- Locks in: an initialized `var` declarator's self-reference
+			// ---- only fires against a sibling declarator that itself has an
+			// ---- initializer (or is a for-in/for-of binding) — a bare
+			// ---- sibling declarator is never flagged and never flags back.
+			outOfScope("function f() { try { var a = compute(); } catch (e) { var a; } return a; }",
+				scopeErr("a", 1, 59, 1, 26),
+				scopeErr("a", 1, 26, 1, 71),
+				scopeErr("a", 1, 59, 1, 71)),
+			outOfScope("function f() { for (var a in {}) {} for (var a in {}) {} }",
+				scopeErr("a", 1, 46, 1, 25),
+				scopeErr("a", 1, 25, 1, 46)),
 		},
 	)
 }
