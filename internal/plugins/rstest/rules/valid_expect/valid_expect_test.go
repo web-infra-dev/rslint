@@ -46,6 +46,11 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", () => expect(p).resolves.to.be.true);`},
 			// A Chai chain may carry several matchers; the await/return check
 			// looks at the outermost expression, not the first matcher.
+			// Parentheses are nodes in the TypeScript AST but not in ESTree, so
+			// the await/return check must look past them to match upstream.
+			{Code: `test("t", async () => { await (expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", () => { return (expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await ((expect(p).resolves.to.be.true)); });`},
 			{Code: `test("t", async () => { await expect(p).resolves.to.be.a("string").that.contains("x"); });`},
 			{Code: `test("t", async () => { await expect(p).resolves.to.be.an("object").that.is.ok; });`},
 			{Code: `test("t", () => { return expect(p).resolves.to.be.a("string").that.contains("x"); });`},
@@ -131,6 +136,15 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited"},
 				},
 				Output: []string{`test("t", async () => { await expect(p).resolves.to.be.true; });`},
+			},
+			{
+				// A parenthesized assertion that nothing awaits still reports,
+				// and the fix goes inside the parentheses.
+				Code: `test("t", async () => { (expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { (await expect(p).resolves.toBe(1)); });`},
 			},
 			{
 				// A multi-matcher chain still reports when it is not awaited,
