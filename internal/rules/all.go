@@ -131,6 +131,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
+	"github.com/web-infra-dev/rslint/internal/rules/no_void"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
 	"github.com/web-infra-dev/rslint/internal/rules/one_var"
@@ -268,6 +269,7 @@ func GetAllRules() []rule.Rule {
 		prefer_template.PreferTemplateRule,
 		no_this_before_super.NoThisBeforeSuperRule,
 		no_var.NoVarRule,
+		no_void.NoVoidRule,
 		no_with.NoWithRule,
 		prefer_rest_params.PreferRestParamsRule,
 		prefer_spread.PreferSpreadRule,

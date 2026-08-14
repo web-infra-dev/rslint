@@ -88,6 +88,7 @@ export default defineConfig({
     './tests/eslint/rules/no-eval.test.ts',
     './tests/eslint/rules/no-implicit-coercion.test.ts',
     './tests/eslint/rules/no-implied-eval.test.ts',
+    './tests/eslint/rules/no-void.test.ts',
     './tests/eslint/rules/no-iterator.test.ts',
     './tests/eslint/rules/getter-return.test.ts',
     './tests/eslint/rules/guard-for-in.test.ts',
