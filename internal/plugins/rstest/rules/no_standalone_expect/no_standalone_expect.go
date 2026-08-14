@@ -131,7 +131,10 @@ func getTemplateScopeRange(node *ast.Node) (int, int, bool) {
 		return 0, 0, false
 	}
 
-	return callExpr.Expression.Pos(), callExpr.Expression.End(), true
+	// The scope has to span the whole call, not just the tagged template that is
+	// its callee: what a tagged template registers is the call it returns, so the
+	// callback handed to that call is the part an `expect` can sit in.
+	return node.Pos(), node.End(), true
 }
 
 func isStaticExpectCall(parsed *rstestUtils.ParsedRstestExpectCall) bool {

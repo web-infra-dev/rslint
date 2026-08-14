@@ -71,6 +71,18 @@ test.each` + "`" + `
   expect(value).toBe(true);
 });`,
 			},
+			// A tagged template that is not a known registration still returns the
+			// call that registers the cases, so the callback of that call is inside
+			// the template scope.
+			{
+				Code: `
+myEach` + "`" + `
+  value
+  ${true}
+` + "`" + `("case", ({ value }) => {
+  expect(value).toBe(true);
+});`,
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
