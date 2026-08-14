@@ -44,6 +44,11 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", async () => { await expect(p).resolves.to.be.true; });`},
 			{Code: `test("t", () => { return expect(p).resolves.to.be.true; });`},
 			{Code: `test("t", () => expect(p).resolves.to.be.true);`},
+			// A Chai chain may carry several matchers; the await/return check
+			// looks at the outermost expression, not the first matcher.
+			{Code: `test("t", async () => { await expect(p).resolves.to.be.a("string").that.contains("x"); });`},
+			{Code: `test("t", async () => { await expect(p).resolves.to.be.an("object").that.is.ok; });`},
+			{Code: `test("t", () => { return expect(p).resolves.to.be.a("string").that.contains("x"); });`},
 			{Code: `expect(value).not.toBe(1);`},
 			{Code: `test("t", async () => { await expect.poll(() => value).toBe(1); });`},
 			// poll/element are not treated as async by valid-expect (matching
@@ -126,6 +131,15 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited"},
 				},
 				Output: []string{`test("t", async () => { await expect(p).resolves.to.be.true; });`},
+			},
+			{
+				// A multi-matcher chain still reports when it is not awaited,
+				// and the fix covers the whole chain.
+				Code: `test("t", async () => { expect(p).resolves.to.be.a("string").that.contains("x"); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await expect(p).resolves.to.be.a("string").that.contains("x"); });`},
 			},
 			{
 				Code: `test("t", async () => { const all = Promise.all([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]); });`,

@@ -46,6 +46,14 @@ ruleTester.run('valid-expect', {} as never, {
         test('t', () => expect(promise).resolves.to.be.true);
       `,
     },
+    {
+      code: `
+        import { expect, test } from '@rstest/core';
+        test('t', async () => {
+          await expect(promise).resolves.to.be.a('string').that.contains('x');
+        });
+      `,
+    },
   ],
   invalid: [
     {

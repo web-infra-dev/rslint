@@ -353,30 +353,18 @@ func shouldBeAwaited(parsed *rstestUtils.ParsedRstestExpectCall, asyncMatchers [
 }
 
 // resolveAsyncAssertionReportNode mirrors the jest rule: from the complete
-// matcher expression it walks out through chained .then/.catch, notes whether
+// assertion expression it walks out through chained .then/.catch, notes whether
 // the assertion sits inside a Promise.all([...]) array, and decides whether the
-// resulting node must be awaited or returned. A call-style matcher's complete
-// expression is its parent CallExpression, while a Chai property matcher is
-// already complete at the member-access expression.
+// resulting node must be awaited or returned. assertionNode must be the
+// outermost expression of the chain — ParsedRstestExpectCall.Expression — so
+// that a Chai chain carrying several matchers, such as
+// expect(p).resolves.to.be.a("string").that.contains("x"), is inspected as a
+// whole rather than at its first matcher.
 func resolveAsyncAssertionReportNode(
-	matcher rstestUtils.ParsedRstestExpectMatcher,
+	assertionNode *ast.Node,
 	alwaysAwait bool,
 ) (reportNode *ast.Node, promiseWrapped bool, insideAssertionArray bool, shouldReport bool) {
-	if matcher.Entry.Node == nil || matcher.Entry.Node.Parent == nil {
-		return nil, false, false, false
-	}
-
-	matcherMemberNode := matcher.Entry.Node.Parent
-	assertionNode := matcherMemberNode
-	switch matcher.Kind {
-	case rstestUtils.RstestExpectMatcherCall:
-		if matcherMemberNode.Parent == nil {
-			return nil, false, false, false
-		}
-		assertionNode = matcherMemberNode.Parent
-	case rstestUtils.RstestExpectMatcherProperty:
-		// The member access itself executes a Chai property matcher.
-	default:
+	if assertionNode == nil {
 		return nil, false, false, false
 	}
 
@@ -470,7 +458,7 @@ var ValidExpectRule = rule.Rule{
 				}
 
 				reportNode, promiseWrapped, insideAssertionArray, shouldReport := resolveAsyncAssertionReportNode(
-					parsed.Matchers[0],
+					parsed.Expression,
 					opts.AlwaysAwait,
 				)
 				if reportNode == nil {
