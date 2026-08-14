@@ -967,7 +967,7 @@ type lintProgramLoader func(
 ) (*compiler.Program, *ast.SourceFile, error)
 
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
-	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil, false)
+	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil)
 	return result.Diagnostics, err
 }
 
@@ -986,7 +986,6 @@ func runLintWithProgramLoader(
 	tsConfigPaths []string,
 	fs vfs.FS,
 	loadProgram lintProgramLoader,
-	cacheModuleSpecifiers bool,
 ) (lintPassResult, error) {
 	filename := uriToPath(uri)
 	configFilePath, configCwd := config.ResolveConfigPathSpace(filename, cwd, fs)
@@ -1020,7 +1019,10 @@ func runLintWithProgramLoader(
 		hasTypeInfo,
 		fileConfigResolver,
 		rule.EditDemandAll,
-		cacheModuleSpecifiers,
+		// Normal diagnostics can receive reused SourceFiles from the Session even
+		// when the standalone Program store is unavailable. Fresh fallbacks are
+		// safe too: attached syntax data dies with their transient SourceFiles.
+		true,
 		ctx,
 	), nil
 }
@@ -1281,13 +1283,8 @@ func (s *Server) runConfiguredLint(
 ) (lintPassResult, error) {
 	loadProgram := s.newStandaloneLintProgramLoader(uri)
 	finalize := func() {}
-	// The resident-capable diagnostics path opts into SourceFile-owned reuse. If
-	// selection falls back to a fresh Program, its attached data dies with those
-	// transient SourceFiles and cannot become Server-owned state.
-	cacheModuleSpecifiers := false
 	if s.lintPrograms != nil && s.lintPrograms.Usable() {
 		loadProgram, finalize = s.lintPrograms.Request(ctx, uri)
-		cacheModuleSpecifiers = true
 	}
 	defer finalize()
 	return runLintWithProgramLoader(
@@ -1301,7 +1298,6 @@ func (s *Server) runConfiguredLint(
 		tsConfigPaths,
 		s.fs,
 		loadProgram,
-		cacheModuleSpecifiers,
 	)
 }
 

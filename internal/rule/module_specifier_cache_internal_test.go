@@ -21,14 +21,14 @@ const specifierCacheTarget = "/specifier-cache-fixture/target.ts"
 
 var specifierCacheESM = ModuleSyntax{ESModule: true}
 
-// TestSourceFileModuleSpecifierCacheReusesCollection locks in the point of the
-// cache: two runs holding the same unchanged SourceFile share its collection.
-func TestSourceFileModuleSpecifierCacheReusesCollection(t *testing.T) {
+// TestCachedModuleGraphReusesSourceFileCollection locks in the graph-to-cache
+// boundary: two runs holding the same unchanged SourceFile share collection.
+func TestCachedModuleGraphReusesSourceFileCollection(t *testing.T) {
 	program, _ := specifierCacheProgram(t, specifierCacheFiles(false))
 	file := specifierCacheFile(t, program)
 
-	first := cachedModuleSpecifiers(file, specifierCacheESM)
-	second := cachedModuleSpecifiers(file, specifierCacheESM)
+	first := NewCachedModuleGraph(program).specifiersOf(file, specifierCacheESM)
+	second := NewCachedModuleGraph(program).specifiersOf(file, specifierCacheESM)
 
 	if len(first) != 1 {
 		t.Fatalf("collected %d specifiers, want 1", len(first))

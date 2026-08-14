@@ -12,9 +12,12 @@ import (
 var moduleSpecifierCacheKey = ast.NewSourceFileDataKey[*sourceFileModuleSpecifierCache]()
 
 // sourceFileModuleSpecifierCache separates the syntax combinations requested
-// for one immutable SourceFile. Collection stays in LazyMap rather than the
-// SourceFile data cell's sync.Once: a panicking collection is not published and
-// can be retried, matching the run-local graph's existing behavior.
+// for one immutable SourceFile. Its values may contain only scalar data and
+// nodes owned by that same SourceFile: Program state, resolved targets, checker
+// state, and other SourceFiles belong to shorter or independent lifetimes.
+// Collection stays in LazyMap rather than the SourceFile data cell's sync.Once:
+// a panicking collection is not published and can be retried, matching the
+// run-local graph's existing behavior.
 type sourceFileModuleSpecifierCache struct {
 	bySyntax utils.LazyMap[ModuleSyntax, []moduleSpecifier]
 }
