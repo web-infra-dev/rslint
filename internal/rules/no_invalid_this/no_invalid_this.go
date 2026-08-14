@@ -39,34 +39,70 @@ var NoInvalidThisRule = rule.Rule{
 	Run:    run,
 }
 
-type ruleOptions struct {
-	// capIsConstructor: when true (default), a capitalized-name function is
+// Options is the parsed option set — shared with
+// `@typescript-eslint/no-invalid-this`, which reuses ParseOptions directly.
+type Options struct {
+	// CapIsConstructor: when true (default), a capitalized-name function is
 	// treated as an ES5 constructor and its `this` is considered valid.
-	capIsConstructor bool
+	CapIsConstructor bool
 }
 
-func parseOptions(options []any) ruleOptions {
-	opts := ruleOptions{capIsConstructor: true}
+// ParseOptions parses the rule's single object option. Exported so
+// `@typescript-eslint/no-invalid-this` — which accepts the identical option
+// shape — can reuse it instead of re-implementing the same map access.
+func ParseOptions(options []any) Options {
+	opts := Options{CapIsConstructor: true}
 	if len(options) == 0 {
 		return opts
 	}
 	m, _ := options[0].(map[string]interface{})
 	if v, ok := m["capIsConstructor"]; ok {
 		if b, ok := v.(bool); ok {
-			opts.capIsConstructor = b
+			opts.CapIsConstructor = b
 		}
 	}
 	return opts
 }
 
-func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
-	opts := parseOptions(options)
-	sf := ctx.SourceFile
+// EngineOptions configures BuildListeners with the two policy points
+// that genuinely differ between `no-invalid-this` and
+// `@typescript-eslint/no-invalid-this` (see BuildListeners doc comment).
+// Everything else — the parent-chain walker, JSDoc/this-param recognition,
+// computed-key deferral, decorator handling — is identical between the two
+// rules and lives here as the single shared implementation.
+type EngineOptions struct {
+	CapIsConstructor bool
+	// TopLevelValid is the validity of `this` when no function/class-member
+	// frame is on the stack (i.e. at the top level of the file).
+	TopLevelValid bool
+	// IsStrict decides whether a FunctionDeclaration/FunctionExpression
+	// frame requires the full default-binding computation (true) or is
+	// unconditionally valid (false — the sloppy-mode default-this-is-the-
+	// global-object outcome). Class members, fields, and static blocks are
+	// unaffected by this policy: they are always valid regardless of
+	// strict mode (see the `enterMethodLike` / `enterPropertyDeclaration`
+	// doc comments below), matching both rules identically.
+	IsStrict func(fn *ast.Node, sf *ast.SourceFile) bool
+}
 
-	// Top-level `this` refers to the global object in scripts (always
-	// valid) and is `undefined` in ES modules (always invalid) — independent
-	// of strict mode.
-	topLevelValid := !ast.IsExternalModule(sf)
+// BuildListeners is the shared `this`-validity walker behind both
+// `no-invalid-this` (this package) and `@typescript-eslint/no-invalid-this`
+// (internal/plugins/typescript/rules/no_invalid_this), which wraps this
+// function directly rather than duplicating it. The two rules differ in
+// exactly two respects, captured by EngineOptions:
+//   - `no-invalid-this` gates function frames on real strict-mode detection
+//     and derives top-level validity from `ast.IsExternalModule`.
+//   - `@typescript-eslint/no-invalid-this` assumes `sourceType: "module"`
+//     (typescript-eslint's RuleTester default), so every function frame is
+//     always strict and top-level `this` is always invalid.
+//
+// Everything else — the AST shapes recognized, the order branches are
+// checked in, computed-key and decorator handling — is identical, since
+// ESLint core's own algorithm already natively recognizes the TypeScript
+// `this` parameter and `accessor` class fields that typescript-eslint's
+// wrapper was originally written to add on top of an older core rule.
+func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
+	sf := ctx.SourceFile
 
 	// Stack of `this`-validity flags, one per non-arrow function-like /
 	// class-member container currently on the visitor's path. Arrow functions
@@ -88,7 +124,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	}
 
 	pushFunction := func(node *ast.Node) {
-		push(computeFunctionValid(node, sf, ctx.Comments.All(), opts.capIsConstructor))
+		push(computeFunctionValid(node, sf, ctx.Comments.All(), eo.CapIsConstructor, eo.IsStrict))
 	}
 
 	// enterMethodLike defers push past the computed key (if any). Applies
@@ -201,7 +237,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			idx := len(stack) - 1 - skip
 			var valid bool
 			if idx < 0 {
-				valid = topLevelValid
+				valid = eo.TopLevelValid
 			} else {
 				valid = stack[idx]
 			}
@@ -210,6 +246,18 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			}
 		},
 	}
+}
+
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := ParseOptions(options)
+	return BuildListeners(ctx, EngineOptions{
+		CapIsConstructor: opts.CapIsConstructor,
+		// Top-level `this` refers to the global object in scripts (always
+		// valid) and is `undefined` in ES modules (always invalid) —
+		// independent of strict mode.
+		TopLevelValid: !ast.IsExternalModule(ctx.SourceFile),
+		IsStrict:      isStrictFunction,
+	})
 }
 
 // computeFunctionValid produces the `this`-validity flag pushed when a
@@ -227,8 +275,8 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 //  5. Otherwise, walk the parent chain via `isDefaultThisBinding` — VALID
 //     iff the surrounding context binds `this` explicitly (method assignment,
 //     `.call`/`.apply`/`.bind`, `Reflect.apply`, array-method `thisArg`, …).
-func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, comments []*ast.CommentRange, capIsConstructor bool) bool {
-	if !isStrictFunction(node, sf) {
+func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, comments []*ast.CommentRange, capIsConstructor bool, isStrict func(*ast.Node, *ast.SourceFile) bool) bool {
+	if !isStrict(node, sf) {
 		return true
 	}
 	if hasThisParameter(node) {

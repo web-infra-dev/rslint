@@ -152,26 +152,6 @@ var obj = {
   },
 };
     `},
-			// ---- Wrapper-bug lock-in: `this` in computed key of class field is masked ----
-			// Upstream wrapper pushes `valid=true` on `PropertyDefinition` /
-			// `AccessorProperty` entry, which fires BEFORE the computed key
-			// is visited. The wrapper's `ThisExpression` listener then
-			// short-circuits and never delegates to baseRule, so the
-			// otherwise-valid report at top-level is silently masked. rslint
-			// reproduces this behavior verbatim for byte-level alignment with
-			// `@typescript-eslint/no-invalid-this`. A separate Layer-3 test
-			// (the method/accessor counterpart above) confirms that
-			// non-field computed keys still report correctly.
-			{Code: `
-class A {
-  [this.foo] = 1;
-}
-    `},
-			{Code: `
-class A {
-  accessor [this.foo] = 1;
-}
-    `},
 			// ---- Wrapper-bug lock-in: `this` in decorator on a field is masked ----
 			// PropertyDefinition / AccessorProperty push happens on entry,
 			// so decorators on these (visited after entry) see the field's
@@ -477,6 +457,33 @@ var obj = {
 };
       `,
 				Errors: unexpected(3, 4),
+			},
+			// ---- Dimension 4: `this` inside a computed key of a class FIELD ----
+			// Same "computed key sees the enclosing scope, not the member's
+			// own frame" reasoning as the method/accessor cases above.
+			// Genuine `@typescript-eslint/no-invalid-this` masks this report
+			// (its wrapper's `PropertyDefinition`/`AccessorProperty` listeners
+			// push a valid frame on entry, before the key is visited, and its
+			// `ThisExpression` listener never delegates to baseRule once that
+			// frame is on top) — this port intentionally diverges from that
+			// wrapper-specific bug in favor of reusing ESLint core's correct,
+			// already-verified algorithm; see this rule's .md "Differences
+			// from ESLint" section.
+			{
+				Code: `
+class A {
+  [this.foo] = 1;
+}
+      `,
+				Errors: unexpected(3, 4),
+			},
+			{
+				Code: `
+class A {
+  accessor [this.foo] = 1;
+}
+      `,
+				Errors: unexpected(3, 13),
 			},
 			// ---- Dimension 4: `this` in decorator on a method ----
 			// Decorators on method-likes run at class-evaluation time, so

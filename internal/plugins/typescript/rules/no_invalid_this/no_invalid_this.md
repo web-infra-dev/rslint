@@ -190,6 +190,10 @@ class Foo {
 }
 ```
 
+## Differences from ESLint
+
+- rslint reports `this` used inside a computed key of a class field, e.g. `class A { [this.foo] = 1; }`. `@typescript-eslint/no-invalid-this` never reports this — its own implementation always treats a class field as fully valid before visiting the field's key, masking the report.
+
 ## When Not To Use It
 
 If you do not want to be notified about usage of the `this` keyword outside of classes or class-like objects, you can safely disable this rule.
