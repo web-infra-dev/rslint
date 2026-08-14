@@ -1,7 +1,9 @@
 // Package valid_expect_in_promise holds the framework-neutral promise-chain
-// collection and consumption analysis shared by Jest and Rstest. Framework
-// adapters inject callback discovery, assertion provenance, and async assertion
-// sinks through Runtime.
+// collection and consumption analysis shared by Jest and Rstest. Each function
+// body and promise-chain call is collected once; assertion reachability then
+// flows over the finite graph between handler summaries and their owner chains.
+// Framework adapters inject callback discovery, assertion provenance, and async
+// assertion sinks through Runtime.
 package valid_expect_in_promise
 
 import (
@@ -26,14 +28,21 @@ type Config struct {
 }
 
 type chainGroup struct {
-	root            *ast.Node
+	root         *ast.Node
+	function     *functionSummary
+	hasAssertion bool
+	safe         bool
+	reachable    bool
+	binding      *chainBinding
+	reportNode   *ast.Node
+}
+
+type functionSummary struct {
 	function        *ast.Node
-	owner           *chainGroup
+	owners          map[*chainGroup]struct{}
 	directAssertion bool
-	safe            bool
-	reachable       bool
-	binding         *chainBinding
-	reportNode      *ast.Node
+	hasAssertion    bool
+	collected       bool
 }
 
 type chainBinding struct {
@@ -61,15 +70,10 @@ type flowEvent struct {
 type analyzer struct {
 	ctx       rule.RuleContext
 	runtime   Runtime
-	groups    map[groupKey]*chainGroup
+	functions map[*ast.Node]*functionSummary
+	groups    map[*ast.Node]*chainGroup
 	ordered   []*chainGroup
-	analyzing map[*ast.Node]bool
 	message   rule.RuleMessage
-}
-
-type groupKey struct {
-	root  *ast.Node
-	owner *chainGroup
 }
 
 func buildFloatingPromiseMessage(description string) rule.RuleMessage {
@@ -88,8 +92,8 @@ func NewRule(config Config) rule.Rule {
 			analyzer := &analyzer{
 				ctx:       ctx,
 				runtime:   runtime,
-				groups:    map[groupKey]*chainGroup{},
-				analyzing: map[*ast.Node]bool{},
+				functions: map[*ast.Node]*functionSummary{},
+				groups:    map[*ast.Node]*chainGroup{},
 				message:   buildFloatingPromiseMessage(config.MessageDescription),
 			}
 			for function := range runtime.TestCallbackFunctions {
@@ -109,68 +113,80 @@ func (a *analyzer) collectFunction(function *ast.Node, owner *chainGroup) {
 	if function == nil {
 		return
 	}
-	if a.analyzing[function] {
+
+	summary := a.functions[function]
+	if summary == nil {
+		summary = &functionSummary{
+			function: function,
+			owners:   map[*chainGroup]struct{}{},
+		}
+		a.functions[function] = summary
+	}
+	if owner != nil {
+		summary.owners[owner] = struct{}{}
+	}
+	if summary.collected {
 		return
 	}
-	a.analyzing[function] = true
-	defer delete(a.analyzing, function)
+	// Publish the summary before walking the body. Recursive and mutually
+	// recursive handlers then add an owner edge to the existing summary instead
+	// of re-entering the walk.
+	summary.collected = true
 
 	body := function.Body()
 	if body == nil {
 		return
 	}
-	a.walk(body, function, owner)
+	a.walk(body, summary)
 }
 
-func (a *analyzer) walk(node, currentFunction *ast.Node, owner *chainGroup) {
+func (a *analyzer) walk(node *ast.Node, currentFunction *functionSummary) {
 	if node == nil {
 		return
 	}
-	if node != currentFunction && testFramework.IsFunction(node) {
+	if node != currentFunction.function && testFramework.IsFunction(node) {
 		return
 	}
 	if node.Kind == ast.KindCallExpression {
 		if testFramework.IsPromiseChainCall(node) {
-			group := a.groupFor(node, currentFunction, owner)
+			group := a.groupFor(node, currentFunction)
 			call := node.AsCallExpression()
-			a.walk(call.Expression, currentFunction, owner)
+			a.walk(call.Expression, currentFunction)
 			if call.Arguments != nil {
 				for _, argument := range call.Arguments.Nodes {
 					if function := a.resolveFunction(argument); function != nil {
 						a.collectFunction(function, group)
 						continue
 					}
-					a.walk(argument, currentFunction, owner)
+					a.walk(argument, currentFunction)
 				}
 			}
 			return
 		}
-		if owner != nil && a.isAssertionCall(node) {
-			owner.directAssertion = true
+		if a.isAssertionCall(node) {
+			currentFunction.directAssertion = true
 		}
 	}
 	node.ForEachChild(func(child *ast.Node) bool {
-		a.walk(child, currentFunction, owner)
+		a.walk(child, currentFunction)
 		return false
 	})
 }
 
 func (a *analyzer) groupFor(
-	call, function *ast.Node,
-	owner *chainGroup,
+	call *ast.Node,
+	function *functionSummary,
 ) *chainGroup {
 	root := topMostPromiseChainCall(call)
-	key := groupKey{root: root, owner: owner}
-	if group := a.groups[key]; group != nil {
+	if group := a.groups[root]; group != nil {
 		return group
 	}
 	group := &chainGroup{
 		root:       root,
 		function:   function,
-		owner:      owner,
-		reportNode: promiseReportNode(root, function),
+		reportNode: promiseReportNode(root, function.function),
 	}
-	a.groups[key] = group
+	a.groups[root] = group
 	a.ordered = append(a.ordered, group)
 	return group
 }
@@ -258,7 +274,7 @@ func (a *analyzer) isAssertionCall(node *ast.Node) bool {
 }
 
 func (a *analyzer) resolveConsumption() {
-	groupsByFunction := map[*ast.Node][]*chainGroup{}
+	groupsByFunction := map[*functionSummary][]*chainGroup{}
 	for _, group := range a.ordered {
 		groupsByFunction[group.function] = append(groupsByFunction[group.function], group)
 	}
@@ -268,7 +284,7 @@ func (a *analyzer) resolveConsumption() {
 }
 
 func (a *analyzer) resolveFunctionConsumption(
-	function *ast.Node,
+	function *functionSummary,
 	groups []*chainGroup,
 ) {
 	groupsByRoot := map[*ast.Node][]*chainGroup{}
@@ -287,7 +303,7 @@ func (a *analyzer) resolveFunctionConsumption(
 		}
 	}
 
-	graph := cfg.Build(function, cfg.Hooks[flowEvent]{
+	graph := cfg.Build(function.function, cfg.Hooks[flowEvent]{
 		Expression: func(builder *cfg.Builder[flowEvent], node *ast.Node) {
 			if builder.Current().Reachable {
 				for _, group := range groupsByRoot[node] {
@@ -296,7 +312,7 @@ func (a *analyzer) resolveFunctionConsumption(
 			}
 		},
 		Read: func(builder *cfg.Builder[flowEvent], node *ast.Node) {
-			if !a.isSafeIdentifierUse(node, function) {
+			if !a.isSafeIdentifierUse(node, function.function) {
 				return
 			}
 			if symbol := a.symbolOf(node); symbol != nil {
@@ -323,7 +339,7 @@ func (a *analyzer) resolveFunctionConsumption(
 		},
 		Statement: func(builder *cfg.Builder[flowEvent], node *ast.Node) {
 			if node.Kind == ast.KindThrowStatement &&
-				testFramework.AbruptCompletionPropagatesFailure(node, function) {
+				testFramework.AbruptCompletionPropagatesFailure(node, function.function) {
 				builder.Emit(flowEvent{kind: flowFailureExit})
 			}
 		},
@@ -336,7 +352,7 @@ func (a *analyzer) resolveFunctionConsumption(
 			continue
 		}
 		if group.binding == nil {
-			group.safe = a.isDirectlyConsumed(group.root, function)
+			group.safe = a.isDirectlyConsumed(group.root, function.function)
 		}
 	}
 }
@@ -741,16 +757,43 @@ func (a *analyzer) runDataflow(graph *cfg.Graph[flowEvent]) {
 }
 
 func (a *analyzer) propagateAndReport() {
+	functionQueue := make([]*functionSummary, 0, len(a.functions))
+	groupQueue := make([]*chainGroup, 0, len(a.ordered))
+	for _, function := range a.functions {
+		if !function.directAssertion {
+			continue
+		}
+		function.hasAssertion = true
+		functionQueue = append(functionQueue, function)
+	}
+
+	for len(functionQueue) > 0 || len(groupQueue) > 0 {
+		if len(functionQueue) > 0 {
+			function := functionQueue[0]
+			functionQueue = functionQueue[1:]
+			for owner := range function.owners {
+				if owner.hasAssertion {
+					continue
+				}
+				owner.hasAssertion = true
+				groupQueue = append(groupQueue, owner)
+			}
+			continue
+		}
+
+		group := groupQueue[0]
+		groupQueue = groupQueue[1:]
+		if !group.safe || group.function.hasAssertion {
+			continue
+		}
+		group.function.hasAssertion = true
+		functionQueue = append(functionQueue, group.function)
+	}
+
 	reported := map[*ast.Node]bool{}
 	for index := len(a.ordered) - 1; index >= 0; index-- {
 		group := a.ordered[index]
-		if !group.directAssertion {
-			continue
-		}
-		if group.safe {
-			if group.owner != nil {
-				group.owner.directAssertion = true
-			}
+		if !group.hasAssertion || group.safe {
 			continue
 		}
 		if reported[group.reportNode] {

@@ -75,6 +75,13 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       test('case', () => promise.then(handler));`,
     },
     {
+      code: `function handler(value) {
+        expect(value).toBe(1);
+        return queue.then(handler);
+      }
+      test('case', () => promise.then(handler));`,
+    },
+    {
       code: `test('case', async () => {
         const pending = load().then(value => expect(value).toBe(1));
         try {
@@ -131,6 +138,24 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
     },
   ],
   invalid: [
+    {
+      code: `function leaf(value) {
+        expect(value).toBe(1);
+      }
+      function shared() {
+        return queue.then(leaf);
+      }
+      test('one', () => {
+        promise.then(shared);
+      });
+      test('two', () => {
+        promise.then(shared);
+      });`,
+      errors: [
+        { messageId: 'expectInFloatingPromise' },
+        { messageId: 'expectInFloatingPromise' },
+      ],
+    },
     {
       code: `test('case', () => {
         load().then(value => expect(value).toBe(1));

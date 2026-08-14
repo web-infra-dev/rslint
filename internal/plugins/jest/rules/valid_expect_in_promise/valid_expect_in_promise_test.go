@@ -44,6 +44,7 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `function handler(value) { expect(value).toBe(1); } test("one", () => promise.then(handler)); test("two", () => promise.then(handler));`},
 			{Code: `function handler() { queue.then(handler); } test("case", () => promise.then(handler));`},
 			{Code: `function first() { queue.then(second); } function second() { queue.then(first); } test("case", () => promise.then(first));`},
+			{Code: `function handler(value) { expect(value).toBe(1); return queue.then(handler); } test("case", () => promise.then(handler));`},
 			{Code: `test("done", done => { test("nested", () => {}); promise.then(value => { expect(value).toBe(1); done(); }); });`},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -138,6 +139,19 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 				Code: `function handler(value) { expect(value).toBe(1); } test("one", () => { promise.then(handler); }); test("two", () => { promise.then(handler); });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectInFloatingPromise"},
+					{MessageId: "expectInFloatingPromise"},
+				},
+			},
+			{
+				Code: `function leaf(value) { expect(value).toBe(1); } function shared() { return queue.then(leaf); } test("one", () => { promise.then(shared); }); test("two", () => { promise.then(shared); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expectInFloatingPromise"},
+					{MessageId: "expectInFloatingPromise"},
+				},
+			},
+			{
+				Code: `function leaf(value) { expect(value).toBe(1); } function shared() { queue.then(leaf); } test("one", () => promise.then(shared)); test("two", () => promise.then(shared));`,
+				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectInFloatingPromise"},
 				},
 			},

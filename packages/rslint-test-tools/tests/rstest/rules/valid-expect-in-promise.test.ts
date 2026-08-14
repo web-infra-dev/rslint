@@ -111,8 +111,33 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       }
       test('case', () => promise.then(first));`,
     },
+    {
+      code: `function handler(value) {
+        assert.equal(value, 1);
+        return queue.then(handler);
+      }
+      test('case', () => promise.then(handler));`,
+    },
   ],
   invalid: [
+    {
+      code: `function leaf(value) {
+        assert.equal(value, 1);
+      }
+      function shared() {
+        return queue.then(leaf);
+      }
+      test('one', () => {
+        promise.then(shared);
+      });
+      test('two', () => {
+        promise.then(shared);
+      });`,
+      errors: [
+        { messageId: 'expectInFloatingPromise' },
+        { messageId: 'expectInFloatingPromise' },
+      ],
+    },
     {
       code: `test('case', context => {
         load().then(value => context.expect(value).toBe(1));
