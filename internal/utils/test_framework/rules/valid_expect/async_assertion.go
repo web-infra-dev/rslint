@@ -50,6 +50,7 @@ func getPromiseCallExpressionNode(node *ast.Node) *ast.Node {
 }
 
 func findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
+	node = internalUtils.OutermostParenthesizedExpression(node)
 	if node == nil || node.Parent == nil || node.Parent.Parent == nil {
 		return nil
 	}
@@ -60,11 +61,12 @@ func findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
 }
 
 func getParentIfPromiseChained(node *ast.Node) *ast.Node {
-	if node == nil || node.Parent == nil || node.Parent.Parent == nil {
+	outer := internalUtils.OutermostParenthesizedExpression(node)
+	if outer == nil || outer.Parent == nil || outer.Parent.Parent == nil {
 		return node
 	}
 
-	grandParent := node.Parent.Parent
+	grandParent := outer.Parent.Parent
 	if grandParent.Kind != ast.KindCallExpression || !ast.IsAccessExpression(grandParent.AsCallExpression().Expression) {
 		return node
 	}
@@ -122,10 +124,11 @@ func AsyncInsertFix(sourceFile *ast.SourceFile, fn *ast.Node) rule.RuleFix {
 // AwaitFix awaits an async assertion, replacing a `return` with `await` when
 // returning it is not accepted.
 func AwaitFix(sourceFile *ast.SourceFile, node *ast.Node, alwaysAwait bool) rule.RuleFix {
-	if alwaysAwait && node.Parent != nil && node.Parent.Kind == ast.KindReturnStatement {
-		ret := node.Parent
+	outer := internalUtils.OutermostParenthesizedExpression(node)
+	if alwaysAwait && outer.Parent != nil && outer.Parent.Kind == ast.KindReturnStatement {
+		ret := outer.Parent
 		retRange := internalUtils.TrimNodeTextRange(sourceFile, ret)
-		nodeRange := internalUtils.TrimNodeTextRange(sourceFile, node)
+		nodeRange := internalUtils.TrimNodeTextRange(sourceFile, outer)
 		return rule.RuleFixReplaceRange(core.NewTextRange(retRange.Pos(), nodeRange.Pos()), "await ")
 	}
 	return rule.RuleFixInsertBefore(sourceFile, node, "await ")
@@ -149,7 +152,8 @@ func ResolveAsyncAssertionReportNode(
 	}
 
 	promiseChainedAssertionNode := getParentIfPromiseChained(assertionNode)
-	insideAssertionArray = promiseChainedAssertionNode.Parent != nil && promiseChainedAssertionNode.Parent.Kind == ast.KindArrayLiteralExpression
+	outerChained := internalUtils.OutermostParenthesizedExpression(promiseChainedAssertionNode)
+	insideAssertionArray = outerChained.Parent != nil && outerChained.Parent.Kind == ast.KindArrayLiteralExpression
 	reportNode = promiseChainedAssertionNode
 	if promiseCallNode := findPromiseCallExpressionNode(promiseChainedAssertionNode); promiseCallNode != nil {
 		reportNode = promiseCallNode

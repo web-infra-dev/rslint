@@ -32,6 +32,8 @@ func TestValidExpectRule(t *testing.T) {
 			// the await/return check must look past them to match upstream.
 			{Code: "test(\"valid-expect\", async () => { await (expect(Promise.resolve(2)).resolves.toBeDefined()); });"},
 			{Code: "test(\"valid-expect\", () => { return (expect(Promise.resolve(2)).resolves.toBeDefined()); });"},
+			{Code: "test(\"valid-expect\", async () => { await Promise.all([(expect(Promise.resolve(2)).resolves.toBeDefined()), expect(Promise.resolve(3)).resolves.toBeDefined()]); });"},
+			{Code: "test(\"valid-expect\", async () => { await (expect(Promise.resolve(2)).resolves.toBeDefined()).then(() => {}); });"},
 			{Code: "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).rejects.not.toBeDefined(); });"},
 			{Code: "test(\"valid-expect\", function () { return expect(Promise.resolve(2)).resolves.not.toBeDefined(); });"},
 			{Code: "test(\"valid-expect\", function () { return expect(Promise.resolve(2)).rejects.not.toBeDefined(); });"},
@@ -264,6 +266,14 @@ func TestValidExpectRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "asyncMustBeAwaited", Column: 1, EndColumn: 50},
 				},
+			},
+			{
+				Code:    "test(\"valid-expect\", () => { return (expect(Promise.resolve(2)).resolves.toBeDefined()); });",
+				Options: map[string]interface{}{"alwaysAwait": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{"test(\"valid-expect\", async () => { await (expect(Promise.resolve(2)).resolves.toBeDefined()); });"},
 			},
 			{
 				Code: `expect.extend({
@@ -596,6 +606,13 @@ func TestValidExpectRule(t *testing.T) {
       `},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "promisesWithAsyncAssertionsMustBeAwaited", Line: 2, Column: 3, EndLine: 5, EndColumn: 5},
+				},
+			},
+			{
+				Code:   `test("valid-expect", () => { Promise.all([(expect(Promise.resolve(2)).resolves.toBeDefined()), expect(Promise.resolve(3)).resolves.toBeDefined()]); });`,
+				Output: []string{`test("valid-expect", async () => { await Promise.all([(expect(Promise.resolve(2)).resolves.toBeDefined()), expect(Promise.resolve(3)).resolves.toBeDefined()]); });`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "promisesWithAsyncAssertionsMustBeAwaited"},
 				},
 			},
 			{

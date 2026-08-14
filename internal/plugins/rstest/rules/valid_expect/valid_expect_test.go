@@ -51,6 +51,8 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", async () => { await (expect(p).resolves.toBe(1)); });`},
 			{Code: `test("t", () => { return (expect(p).resolves.toBe(1)); });`},
 			{Code: `test("t", async () => { await ((expect(p).resolves.to.be.true)); });`},
+			{Code: `test("t", async () => { await Promise.all([(expect(p).resolves.toBe(1)), expect(q).resolves.toBe(2)]); });`},
+			{Code: `test("t", async () => { await (expect(p).resolves.toBe(1)).then(() => {}); });`},
 			{Code: `test("t", async () => { await expect(p).resolves.to.be.a("string").that.contains("x"); });`},
 			{Code: `test("t", async () => { await expect(p).resolves.to.be.an("object").that.is.ok; });`},
 			{Code: `test("t", () => { return expect(p).resolves.to.be.a("string").that.contains("x"); });`},
@@ -152,6 +154,14 @@ func TestValidExpectRule(t *testing.T) {
 				Output: []string{`test("t", async () => { (await expect(p).resolves.toBe(1)); });`},
 			},
 			{
+				Code:    `test("t", () => { return (expect(p).resolves.toBe(1)); });`,
+				Options: []any{map[string]any{"alwaysAwait": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await (expect(p).resolves.toBe(1)); });`},
+			},
+			{
 				// A multi-matcher chain still reports when it is not awaited,
 				// and the fix covers the whole chain.
 				Code: `test("t", async () => { expect(p).resolves.to.be.a("string").that.contains("x"); });`,
@@ -166,6 +176,13 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "promisesWithAsyncAssertionsMustBeAwaited"},
 				},
 				Output: []string{`test("t", async () => { const all = await Promise.all([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]); });`},
+			},
+			{
+				Code: `test("t", async () => { Promise.all([(expect(p).resolves.toBe(1)), expect(q).resolves.toBe(2)]); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "promisesWithAsyncAssertionsMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await Promise.all([(expect(p).resolves.toBe(1)), expect(q).resolves.toBe(2)]); });`},
 			},
 			{
 				Code:    `test("t", () => { return expect(p).resolves.toBe(1); });`,
