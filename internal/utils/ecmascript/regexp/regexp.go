@@ -28,10 +28,16 @@
 // Three things are deliberately not covered:
 //
 //   - The `v` flag's set syntax, which Compile refuses outright.
-//   - Comparing a backreference without regard to case. JavaScript compares
-//     one by the same canonicalization it compares a literal by; a rewritten
-//     pattern cannot say that, so a pattern using a backreference under `i`
-//     falls back to regexp2's own case-insensitivity, which is close.
+//   - Comparing a backreference, or a `\p{…}` property escape, without regard
+//     to case. JavaScript compares a backreference by the same canonicalization
+//     it compares a literal by, and draws a property escape from Unicode's own
+//     tables; a rewritten pattern can spell neither, so a pattern using one
+//     under `i` falls back to regexp2's own case-insensitivity, which is close.
+//     `\P{…}` under `i` is where it is furthest off: JavaScript asks whether
+//     any character comparing equal to this one is outside the property, and
+//     regexp2 asks only about the one at hand. The fallback belongs to the
+//     whole pattern, so a `(?i:…)` group in a pattern that does not itself
+//     carry `i` has none to make, and compares both exactly.
 //   - Exhaustive syntax validation under `u`. The `u` flag makes JavaScript
 //     reject constructs it otherwise tolerates — a bare `]` outside a class is
 //     the usual one — and those still compile here. Every pattern JavaScript

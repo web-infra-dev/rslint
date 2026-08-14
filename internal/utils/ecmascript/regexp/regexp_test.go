@@ -85,6 +85,32 @@ func TestTest(t *testing.T) {
 		{name: "iu negated class", source: "^[^a]$", flags: "iu", subject: "A"},
 		{name: "iu negated class kelvin", source: "^[^k]$", flags: "iu", subject: "\u212a"},
 
+		// ---- a property escape names a set the pattern cannot spell back, so
+		// under `i` it is compared by regexp2 rather than widened. Its name is
+		// part of the escape and must not be widened as text ----
+		{name: "u property escape", source: `^\p{Ll}$`, flags: "u", subject: "a", want: true},
+		{name: "u property escape is exact", source: `^\p{Ll}$`, flags: "u", subject: "A"},
+		{name: "iu property escape", source: `^\p{Ll}$`, flags: "iu", subject: "A", want: true},
+		{name: "iu property escape in class", source: `^[\p{Ll}]$`, flags: "iu", subject: "A", want: true},
+		{name: "iu property escape beside a literal", source: `^[\p{Ll}x]$`, flags: "iu", subject: "X", want: true},
+		{name: "iu property escape the other way", source: `^\p{Lu}$`, flags: "iu", subject: "a", want: true},
+
+		// ---- `(?i-m:…)` turns a flag on or off over one group ----
+		{name: "modifier group turns i on", source: "^(?i:a)$", subject: "A", want: true},
+		{name: "modifier group ends at its close", source: "^(?i:a)b$", subject: "AB"},
+		{name: "modifier group restores at its close", source: "^(?i:a)b$", subject: "Ab", want: true},
+		{name: "modifier group turns i off", source: "^(?-i:b)$", flags: "i", subject: "B"},
+		{name: "modifier group turns i off and matches", source: "^(?-i:b)$", flags: "i", subject: "b", want: true},
+		{name: "modifier group nests", source: "^(?i:a(?-i:b)c)$", subject: "AbC", want: true},
+		{name: "modifier group nests and holds", source: "^(?i:a(?-i:b)c)$", subject: "ABC"},
+		{name: "modifier group turns s on", source: "^(?s:.)$", subject: "\n", want: true},
+		{name: "modifier group turns s off", source: "^(?-s:.)$", flags: "s", subject: "\n"},
+		{name: "modifier group turns m on", source: "(?m:^b)", subject: "a\nb", want: true},
+		{name: "modifier group turns m off", source: "(?-m:^b)", flags: "m", subject: "a\nb"},
+		{name: "modifier group takes both sides", source: "^(?i-m:a)$", flags: "m", subject: "A", want: true},
+		{name: "modifier group takes an empty second side", source: "^(?i-:a)$", subject: "A", want: true},
+		{name: "modifier group reaches a word boundary", source: `(?i:\b)`, flags: "u", subject: "\u017f", want: true},
+
 		// ---- an escape that resolves to a character is written as that
 		// character; passed through, .NET would read its own meaning ----
 		{name: "identity A anchor", source: `\A`, flags: "", subject: "B"},
@@ -153,6 +179,12 @@ func TestCompileRejects(t *testing.T) {
 		// Taking it would give the pattern a meaning its author never wrote.
 		{name: "inline flags", source: "(?i)a", is: ErrUnsupportedSyntax},
 		{name: "atomic group", source: "(?>a)", is: ErrUnsupportedSyntax},
+		// A modifier group names each of `i`, `m` and `s` once at most, over
+		// both of its sides, and names at least one of them.
+		{name: "modifier repeated", source: "(?ii:a)", is: ErrUnsupportedSyntax},
+		{name: "modifier on both sides", source: "(?i-i:a)", is: ErrUnsupportedSyntax},
+		{name: "modifier group naming none", source: "(?-:a)", is: ErrUnsupportedSyntax},
+		{name: "modifier group naming a flag it cannot turn", source: "(?u:a)", is: ErrUnsupportedSyntax},
 	}
 
 	for _, test := range tests {

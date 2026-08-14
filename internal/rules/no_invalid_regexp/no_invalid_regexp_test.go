@@ -28,6 +28,9 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			{Code: `new RegExp('\\\\d+')`},     // escaped digits
 			{Code: `new RegExp('[abc]')`},      // character class
 			{Code: `new RegExp('(?:a)')`},      // non-capturing group
+			{Code: `new RegExp('(?i:a)')`},     // modifier group
+			{Code: `new RegExp('(?i-m:a)')`},   // modifier group turning one on and one off
+			{Code: `new RegExp('(?-ims:a)')`},  // modifier group turning three off
 			{Code: `RegExp('a{1,2}')`},         // quantifier
 			{Code: `new RegExp('.', 'v')`},     // v flag alone is valid
 			{Code: `new RegExp('.', 'u')`},     // u flag alone is valid
@@ -491,35 +494,30 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// Inline modifier validation
 			{
 				Code: `new RegExp('(?ii:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('(?-ii:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('(?i-i:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('(?-:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('(?-u:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},

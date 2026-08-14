@@ -101,10 +101,11 @@ type rewriteOptions struct {
 // what a character means depends on whether it is escaped and whether it sits
 // inside a character class.
 //
-// The second result is false when the source uses a backreference under `i`.
-// JavaScript compares a backreference by the same canonicalization it compares
-// a literal by, and a widened pattern cannot say that — the caller falls back
-// to regexp2's own case-insensitivity there, which is close but not exact.
+// The second result is false when the source uses a backreference or a
+// property escape under `i`. JavaScript compares a backreference by the same
+// canonicalization it compares a literal by, and it draws `\p{…}` from
+// Unicode's own tables; a widened pattern can name neither, so the caller falls
+// back to regexp2's own case-insensitivity there, which is close but not exact.
 func rewrite(source string, options rewriteOptions) (string, bool, error) {
 	var out strings.Builder
 	out.Grow(len(source))
@@ -112,6 +113,11 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 	exact := true
 	inClass := false
 	classBodyStart := 0
+	// current is what the flags say here, which a modifier group changes for
+	// the span of one group. groups holds what to restore as each open `(`
+	// closes; only a modifier group makes an entry differ from the one below.
+	current := options
+	groups := []rewriteOptions{}
 
 	for i := 0; i < len(source); {
 		r, size := utf8.DecodeRuneInString(source[i:])
@@ -121,14 +127,14 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			// `\k<name>` names a group. The name is not text to be matched,
 			// so widening the letters in it would rewrite the reference.
 			if name, nameSize, ok := namedBackreference(source[i:]); ok {
-				if options.ignoreCase {
+				if current.ignoreCase {
 					exact = false
 				}
 				out.WriteString(name)
 				i += nameSize
 				continue
 			}
-			next, nextSize, ok := decodeEscape(source, i+size, options.unicode)
+			next, nextSize, ok := decodeEscape(source, i+size, current.unicode)
 			if !ok {
 				// A trailing backslash, which regexp2 can judge for itself.
 				out.WriteString(source[i:])
@@ -136,13 +142,18 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				continue
 			}
 			end := i + size + nextSize
-			if options.ignoreCase && isBackreference(source[i+size:i+size+nextSize]) {
+			if current.ignoreCase && isBackreference(source[i+size:i+size+nextSize]) {
+				exact = false
+			}
+			// A property escape names a set out of Unicode's tables, which a
+			// widened pattern has no way to name back.
+			if current.ignoreCase && current.unicode && isPropertyEscape(source[i+size:i+size+nextSize]) {
 				exact = false
 			}
 			// An escape that names one character is widened like a literal;
 			// one that names a set — `\d`, `\w`, `\s` — is left alone.
-			if options.ignoreCase && !inClass && next != utf8.RuneError {
-				if class, widened := CaseClass(next, options.unicode); widened {
+			if current.ignoreCase && !inClass && next != utf8.RuneError {
+				if class, widened := CaseClass(next, current.unicode); widened {
 					out.WriteString(class)
 					i = end
 					continue
@@ -161,7 +172,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			// `\b` and `\B` are boundaries, and only out here — inside a class
 			// a `\b` is a backspace, which regexp2 already reads that way.
 			if !inClass && nextSize == 1 && (source[i+size] == 'b' || source[i+size] == 'B') {
-				out.WriteString(wordBoundary(source[i+size] == 'B', options))
+				out.WriteString(wordBoundary(source[i+size] == 'B', current))
 				i = end
 				continue
 			}
@@ -181,8 +192,8 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 		case inClass:
 			if r == ']' {
 				body := out.String()[classBodyStart:]
-				if options.ignoreCase {
-					rest := CaseCloseClass(body, options.unicode)
+				if current.ignoreCase {
+					rest := CaseCloseClass(body, current.unicode)
 					trimmed := out.String()[:classBodyStart]
 					out.Reset()
 					out.WriteString(trimmed)
@@ -201,14 +212,42 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			// `(?<name>` opens a named group. Same as `\k<name>`: the name is
 			// not text, so it goes through untouched.
 			if opener, openerSize, ok := namedGroupOpener(source[i:]); ok {
+				groups = append(groups, current)
 				out.WriteString(opener)
+				i += openerSize
+				continue
+			}
+			// `(?i-m:…)` turns a flag on or off over one group. The rewrite
+			// answers to the flags as they stand here, so the group opens as a
+			// plain one and the walk goes on under what it says.
+			if inside, openerSize, ok := modifierGroup(source[i:], current); ok {
+				groups = append(groups, current)
+				current = inside
+				if options.ignoreCase && !inside.ignoreCase {
+					// A pattern that falls back hands ignoring case to regexp2
+					// for the whole of itself, and this group is the one place
+					// it must not reach.
+					out.WriteString(`(?-i:`)
+				} else {
+					out.WriteString(`(?:`)
+				}
 				i += openerSize
 				continue
 			}
 			if err := checkGroupConstruct(source[i:]); err != nil {
 				return "", false, err
 			}
+			groups = append(groups, current)
 			out.WriteByte('(')
+			i += size
+			continue
+
+		case r == ')':
+			if last := len(groups) - 1; last >= 0 {
+				current = groups[last]
+				groups = groups[:last]
+			}
+			out.WriteByte(')')
 			i += size
 			continue
 
@@ -236,7 +275,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			continue
 
 		case r == '.':
-			if options.dotAll {
+			if current.dotAll {
 				out.WriteString(anyCharacter)
 			} else {
 				out.WriteString(nonTerminator)
@@ -245,7 +284,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			continue
 
 		case r == '^':
-			if options.multiline {
+			if current.multiline {
 				out.WriteString(lineStart)
 			} else {
 				out.WriteString(inputStart)
@@ -254,7 +293,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			continue
 
 		case r == '$':
-			if options.multiline {
+			if current.multiline {
 				out.WriteString(lineEnd)
 			} else {
 				out.WriteString(inputEnd)
@@ -263,8 +302,8 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			continue
 
 		default:
-			if options.ignoreCase {
-				if class, widened := CaseClass(r, options.unicode); widened {
+			if current.ignoreCase {
+				if class, widened := CaseClass(r, current.unicode); widened {
 					out.WriteString(class)
 					i += size
 					continue
@@ -324,6 +363,14 @@ func decodeEscape(source string, i int, unicode bool) (rune, int, bool) {
 		// A property class, but only under `u`. Without it JavaScript reads
 		// `\p` as the letter, where .NET reads a property either way.
 		if unicode {
+			// The name belongs to the escape: `\p{Script=Greek}`. Taking it
+			// along keeps the walk from reading the letters in it as text and
+			// widening them under `i`.
+			if strings.HasPrefix(source[i+size:], "{") {
+				if end := strings.IndexByte(source[i+size:], '}'); end >= 0 {
+					return utf8.RuneError, size + end + 1, true
+				}
+			}
 			return utf8.RuneError, size, true
 		}
 		return r, size, true
@@ -387,6 +434,59 @@ func isBackreference(body string) bool {
 		return false
 	}
 	return (body[0] >= '1' && body[0] <= '9') || body[0] == 'k'
+}
+
+// isPropertyEscape reports whether an escape body is a `\p{…}` or `\P{…}`,
+// which names a set Unicode draws rather than characters the pattern spells.
+func isPropertyEscape(body string) bool {
+	return body != "" && (body[0] == 'p' || body[0] == 'P')
+}
+
+// modifierGroup reads a `(?flags:` or `(?flags-flags:` opener — the syntax
+// JavaScript spells turning `i`, `m` or `s` on or off over one group with — and
+// returns the flags that hold inside it. A modifier may be named once across
+// both sides, and naming none at all is `(?:`, an ordinary group.
+func modifierGroup(source string, current rewriteOptions) (rewriteOptions, int, bool) {
+	if !strings.HasPrefix(source, "(?") {
+		return current, 0, false
+	}
+	rest := source[len("(?"):]
+	end := strings.IndexByte(rest, ':')
+	if end <= 0 {
+		return current, 0, false
+	}
+
+	inside := current
+	named := map[byte]bool{}
+	enable := true
+	for i := range end {
+		flag := rest[i]
+		if flag == '-' {
+			if !enable {
+				return current, 0, false
+			}
+			enable = false
+			continue
+		}
+		if named[flag] {
+			return current, 0, false
+		}
+		named[flag] = true
+		switch flag {
+		case 'i':
+			inside.ignoreCase = enable
+		case 'm':
+			inside.multiline = enable
+		case 's':
+			inside.dotAll = enable
+		default:
+			return current, 0, false
+		}
+	}
+	if len(named) == 0 {
+		return current, 0, false
+	}
+	return inside, len("(?") + end + 1, true
 }
 
 // checkGroupConstruct rejects a `(?…` opener JavaScript has no syntax for.
