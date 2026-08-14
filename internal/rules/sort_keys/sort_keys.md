@@ -114,7 +114,7 @@ The 2nd option is an object with the following properties.
 
 ## Differences from ESLint
 
-- For the `natural` option, key comparison operates on Unicode code points; ESLint compares by UTF-16 code unit. The two agree except for keys containing characters outside the Basic Multilingual Plane (e.g. many emoji), where the sort order may differ.
+- Key comparison, in every mode (`asc`/`desc`, with or without `natural`), operates on Unicode code points; ESLint compares by UTF-16 code unit. The two agree except for keys containing characters outside the Basic Multilingual Plane (e.g. many emoji), where the sort order may differ.
 
 ## Original Documentation
 
