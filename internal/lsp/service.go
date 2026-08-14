@@ -153,7 +153,6 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 	if s.watchEnabled && s.outgoingQueue != nil {
 		s.lintPrograms = newLintProgramStore(s)
 	}
-	s.moduleSpecifiers = rule.NewModuleSpecifierCache()
 
 	// Populate the global rule registry once per process; the LSP request path
 	// resolves rule names against it after config merging.
@@ -968,7 +967,7 @@ type lintProgramLoader func(
 ) (*compiler.Program, *ast.SourceFile, error)
 
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
-	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil, nil)
+	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil)
 	return result.Diagnostics, err
 }
 
@@ -987,7 +986,6 @@ func runLintWithProgramLoader(
 	tsConfigPaths []string,
 	fs vfs.FS,
 	loadProgram lintProgramLoader,
-	moduleSpecifiers *rule.ModuleSpecifierCache,
 ) (lintPassResult, error) {
 	filename := uriToPath(uri)
 	configFilePath, configCwd := config.ResolveConfigPathSpace(filename, cwd, fs)
@@ -1021,7 +1019,10 @@ func runLintWithProgramLoader(
 		hasTypeInfo,
 		fileConfigResolver,
 		rule.EditDemandAll,
-		moduleSpecifiers,
+		// Normal diagnostics can receive reused SourceFiles from the Session even
+		// when the standalone Program store is unavailable. Fresh fallbacks are
+		// safe too: attached syntax data dies with their transient SourceFiles.
+		true,
 		ctx,
 	), nil
 }
@@ -1066,7 +1067,7 @@ func lintSingleFile(
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
 	editDemand rule.EditDemand,
-	moduleSpecifiers *rule.ModuleSpecifierCache,
+	cacheModuleSpecifiers bool,
 	ctx context.Context,
 ) lintPassResult {
 	if sourceFile == nil {
@@ -1101,11 +1102,11 @@ func lintSingleFile(
 	}
 
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:          program,
-		File:             sourceFile.FileName(),
-		Cwd:              processCwd,
-		HasTypeInfo:      hasTypeInfo,
-		ModuleSpecifiers: moduleSpecifiers,
+		Program:               program,
+		File:                  sourceFile.FileName(),
+		Cwd:                   processCwd,
+		HasTypeInfo:           hasTypeInfo,
+		CacheModuleSpecifiers: cacheModuleSpecifiers,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return rulesServedToEditors(fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo))
 		},
@@ -1282,15 +1283,8 @@ func (s *Server) runConfiguredLint(
 ) (lintPassResult, error) {
 	loadProgram := s.newStandaloneLintProgramLoader(uri)
 	finalize := func() {}
-	// Only the resident Programs hand the same file objects to the next run.
-	// The standalone loader builds over a host of its own every time, so every
-	// file it produces is a new object the cache could only miss on and then
-	// hold — pinning the discarded Program's whole tree until the request after
-	// next displaced it. That path passes none, as the speculative one does.
-	var moduleSpecifiers *rule.ModuleSpecifierCache
 	if s.lintPrograms != nil && s.lintPrograms.Usable() {
 		loadProgram, finalize = s.lintPrograms.Request(ctx, uri)
-		moduleSpecifiers = s.moduleSpecifiers
 	}
 	defer finalize()
 	return runLintWithProgramLoader(
@@ -1304,7 +1298,6 @@ func (s *Server) runConfiguredLint(
 		tsConfigPaths,
 		s.fs,
 		loadProgram,
-		moduleSpecifiers,
 	)
 }
 
@@ -1336,10 +1329,9 @@ func (s *Server) runConfiguredLintForContent(
 	s.addEditorOverlayFile(files, filename, content)
 	overlayFS := utils.NewOverlayVFS(s.fs, files)
 
-	// This path builds its Program over a filesystem of its own on every
-	// request, so its files are new objects that share nothing with the
-	// server's cache and would only displace what the diagnostics path put
-	// there. It passes none.
+	// This path builds a request-local Program over its own filesystem. It
+	// cannot hand the same SourceFiles to a later lint pass, so module syntax
+	// collection stays inside this pass's graph.
 	for _, tsConfigPath := range tsConfigPaths {
 		program, err := createStandaloneLintProgram(tsConfigPath, overlayFS)
 		if err != nil {
@@ -1354,7 +1346,7 @@ func (s *Server) runConfiguredLintForContent(
 				true,
 				resolver,
 				rule.EditDemandAutofix,
-				nil,
+				false,
 				ctx,
 			), nil
 		}
@@ -1372,7 +1364,7 @@ func (s *Server) runConfiguredLintForContent(
 		false,
 		resolver,
 		rule.EditDemandAutofix,
-		nil,
+		false,
 		ctx,
 	), nil
 }

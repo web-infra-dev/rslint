@@ -16,8 +16,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-
-	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type lintProgramStoreFixture struct {
@@ -116,36 +114,6 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 	}
 	if sourceFile.Text() != changed {
 		t.Fatalf("updated source text = %q, want %q", sourceFile.Text(), changed)
-	}
-}
-
-// TestLintProgramStoreDiscardReleasesModuleSpecifiers locks in that the
-// resident Programs and the collections read from their files go away
-// together. A rebuilt Program hands its files' paths to the run that rebuilds
-// it, which supersedes their entries; a discarded one hands them to nobody, so
-// its trees would sit in the cache for the rest of the session.
-func TestLintProgramStoreDiscardReleasesModuleSpecifiers(t *testing.T) {
-	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
-	fixture.server.moduleSpecifiers = rule.NewModuleSpecifierCache()
-
-	program := fixture.load(t)
-	sourceFile := program.GetSourceFile(fixture.sourcePath)
-	if sourceFile == nil {
-		t.Fatal("the resident Program does not contain the lint target")
-		return
-	}
-	rule.NewCachedModuleGraph(program, fixture.server.moduleSpecifiers).
-		Edges(sourceFile, rule.ModuleSyntax{ESModule: true})
-	if fixture.server.moduleSpecifiers.Len() == 0 {
-		t.Fatal("the run read nothing into the cache; the test proves nothing")
-	}
-
-	if !fixture.store.Invalidate() {
-		t.Fatal("the store had no resident Program to discard")
-	}
-
-	if held := fixture.server.moduleSpecifiers.Len(); held != 0 {
-		t.Fatalf("the cache holds %d paths of the discarded Program, want 0", held)
 	}
 }
 
