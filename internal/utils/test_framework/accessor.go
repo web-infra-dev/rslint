@@ -58,9 +58,9 @@ func IsComputedIdentifierAccessor(node *ast.Node) bool {
 	return false
 }
 
-// accessorReceiverAndParent returns the receiver and accessor expression that
+// AccessorReceiverAndParent returns the receiver and accessor expression that
 // own entry. Parentheses around a computed key are transparent.
-func accessorReceiverAndParent(entry *MemberEntry) (*ast.Node, *ast.Node) {
+func AccessorReceiverAndParent(entry *MemberEntry) (*ast.Node, *ast.Node) {
 	if entry == nil || entry.Node == nil {
 		return nil, nil
 	}
@@ -91,8 +91,8 @@ func accessorReceiverAndParent(entry *MemberEntry) (*ast.Node, *ast.Node) {
 	}
 }
 
-// accessorQuestionDotToken returns the optional-chain token owned by accessor.
-func accessorQuestionDotToken(accessor *ast.Node) *ast.Node {
+// AccessorQuestionDotToken returns the optional-chain token owned by accessor.
+func AccessorQuestionDotToken(accessor *ast.Node) *ast.Node {
 	if accessor == nil {
 		return nil
 	}
@@ -138,12 +138,12 @@ func RemoveAccessorEntryRanges(
 	if sourceFile == nil || entry == nil {
 		return nil, false
 	}
-	receiver, accessor := accessorReceiverAndParent(entry)
+	receiver, accessor := AccessorReceiverAndParent(entry)
 	if receiver == nil || accessor == nil {
 		return nil, false
 	}
 
-	questionDot := accessorQuestionDotToken(accessor)
+	questionDot := AccessorQuestionDotToken(accessor)
 	start := receiver.End()
 	if questionDot != nil {
 		start = questionDot.End()
@@ -182,7 +182,7 @@ func RemoveAccessorEntryRanges(
 		if element.Expression != accessor {
 			return nil, false
 		}
-		if nextQuestionDot := accessorQuestionDotToken(next); nextQuestionDot != nil {
+		if nextQuestionDot := AccessorQuestionDotToken(next); nextQuestionDot != nil {
 			nextQuestionDotRange := utils.TrimNodeTextRange(sourceFile, nextQuestionDot)
 			if utils.HasCommentInSpan(comments, accessor.End(), nextQuestionDotRange.End()) {
 				ranges = append(ranges, nextQuestionDotRange)
