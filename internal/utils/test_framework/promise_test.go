@@ -120,6 +120,30 @@ func TestAbruptCompletionPropagatesFailure(t *testing.T) {
 			kind: ast.KindReturnStatement,
 			want: false,
 		},
+		{
+			name: "uncaught throw propagates failure",
+			code: `function callback() { throw new Error("no"); }`,
+			kind: ast.KindThrowStatement,
+			want: true,
+		},
+		{
+			name: "catch suppresses throw",
+			code: `function callback() { try { throw new Error("caught"); } catch {} }`,
+			kind: ast.KindThrowStatement,
+			want: false,
+		},
+		{
+			name: "rethrow preserves thrown failure",
+			code: `function callback() { try { throw new Error("caught"); } catch (error) { throw error; } }`,
+			kind: ast.KindThrowStatement,
+			want: true,
+		},
+		{
+			name: "finally return suppresses throw",
+			code: `function callback() { try { throw new Error("suppressed"); } finally { return; } }`,
+			kind: ast.KindThrowStatement,
+			want: false,
+		},
 	}
 
 	for _, test := range tests {

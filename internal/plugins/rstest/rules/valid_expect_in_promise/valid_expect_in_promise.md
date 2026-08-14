@@ -35,4 +35,6 @@ Rstest does not support Jest-style `done` callbacks. A regular test callback's f
 
 The rule follows promises stored in local bindings, including statically mappable array and object destructuring, and requires every reachable path to consume them. `Promise.resolve` and `Promise.all` preserve assertion failure. `Promise.reject` and `Promise.allSettled` are not safe sinks.
 
+An awaited chain is safe only when its rejection can escape the test callback. An enclosing `catch` that may swallow the rejection, or a `finally` block that may `return`, `break`, or `continue`, does not count as safe consumption. A `catch` that always rethrows preserves the failure.
+
 This rule has no options and does not provide an autofix.

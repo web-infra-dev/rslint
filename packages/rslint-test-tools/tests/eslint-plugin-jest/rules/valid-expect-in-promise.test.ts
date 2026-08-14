@@ -79,6 +79,24 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       });`,
     },
     {
+      code: `test('case', async () => {
+        const pending = load().then(value => expect(value).toBe(1));
+        if (!ready) throw new Error('no');
+        await pending;
+      });`,
+    },
+    {
+      code: `test('case', async () => {
+        const pending = load().then(value => expect(value).toBe(1));
+        try {
+          setup();
+          await pending;
+        } catch (error) {
+          throw error;
+        }
+      });`,
+    },
+    {
       code: `try {
         test('case', async () => {
           const pending = load().then(value => expect(value).toBe(1));
@@ -140,6 +158,26 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
         try {
           await pending;
         } catch {}
+      });`,
+      errors: [{ messageId: 'expectInFloatingPromise' }],
+    },
+    {
+      code: `test('case', async () => {
+        const pending = load().then(value => expect(value).toBe(1));
+        try {
+          throw new Error('caught');
+        } catch {}
+      });`,
+      errors: [{ messageId: 'expectInFloatingPromise' }],
+    },
+    {
+      code: `test('case', async () => {
+        const pending = load().then(value => expect(value).toBe(1));
+        try {
+          throw new Error('suppressed');
+        } finally {
+          return;
+        }
       });`,
       errors: [{ messageId: 'expectInFloatingPromise' }],
     },

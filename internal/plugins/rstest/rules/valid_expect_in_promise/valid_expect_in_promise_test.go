@@ -29,6 +29,9 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", () => { let pending; [pending] = [promise.then(value => assert.equal(value, 1))]; return pending; });`},
 			{Code: `test("case", () => { let pending; ({ pending } = { pending: promise.then(value => assert.equal(value, 1)) }); return pending; });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } catch (error) { throw error; } });`},
+			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); if (!ready) { throw new Error("no"); } await pending; });`},
+			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { setup(); await pending; } catch (error) { throw error; } });`},
+			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { throw new Error("no"); } finally { cleanup(); } });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } finally { cleanup(); } });`},
 			{Code: `try { test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); await pending; }); } catch (error) {}`},
 			{Code: `try { test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); return Promise.resolve(pending); }); } catch (error) {}`},
@@ -174,6 +177,18 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			},
 			{
 				Code: `test("case", () => { const pending = promise.then(value => assert.equal(value, 1)); return condition && pending; });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { throw new Error("caught"); } catch {} });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { throw new Error("suppressed"); } finally { return; } });`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "expectInFloatingPromise",
 				}},
