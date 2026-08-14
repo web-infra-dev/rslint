@@ -1,0 +1,105 @@
+// Rstest Snapshot v1
+
+exports[`no-continue > invalid 1`] = `
+{
+  "code": "var sum = 0, i; for(i = 0; i < 10; i++){ if(i <= 5) { continue; } sum += i; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of continue statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-continue",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-continue > invalid 2`] = `
+{
+  "code": "var sum = 0, i; myLabel: for(i = 0; i < 10; i++){ if(i <= 5) { continue myLabel; } sum += i; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of continue statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 64,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-continue",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-continue > invalid 3`] = `
+{
+  "code": "var sum = 0, i = 0; while(i < 10) { if(i <= 5) { i++; continue; } sum += i; i++; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of continue statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-continue",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-continue > invalid 4`] = `
+{
+  "code": "var sum = 0, i = 0; myLabel: while(i < 10) { if(i <= 5) { i++; continue myLabel; } sum += i; i++; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of continue statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 64,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-continue",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
