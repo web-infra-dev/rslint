@@ -616,6 +616,13 @@ func TestValidExpectRule(t *testing.T) {
 				},
 			},
 			{
+				Code:   `test("valid-expect", () => { Promise.all(([expect(Promise.resolve(2)).resolves.toBeDefined(), expect(Promise.resolve(3)).resolves.toBeDefined()])); });`,
+				Output: []string{`test("valid-expect", async () => { await Promise.all(([expect(Promise.resolve(2)).resolves.toBeDefined(), expect(Promise.resolve(3)).resolves.toBeDefined()])); });`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "promisesWithAsyncAssertionsMustBeAwaited"},
+				},
+			},
+			{
 				Code: `test("valid-expect", () => {
   Promise.x([
     expect(Promise.resolve(2)).resolves.not.toBeDefined(),

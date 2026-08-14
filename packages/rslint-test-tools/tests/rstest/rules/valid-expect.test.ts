@@ -54,6 +54,14 @@ ruleTester.run('valid-expect', {} as never, {
         });
       `,
     },
+    {
+      code: `
+        import { expect, test } from '@rstest/core';
+        test('t', async () => {
+          await Promise.all(([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]));
+        });
+      `,
+    },
   ],
   invalid: [
     {
@@ -84,6 +92,21 @@ ruleTester.run('valid-expect', {} as never, {
         import { expect, test } from '@rstest/core';
         test('t', async () => {
           await expect(promise).resolves.to.be.true;
+        });
+      `,
+    },
+    {
+      code: `
+        import { expect, test } from '@rstest/core';
+        test('t', () => {
+          Promise.all(([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]));
+        });
+      `,
+      errors: [{ messageId: 'promisesWithAsyncAssertionsMustBeAwaited' }],
+      output: `
+        import { expect, test } from '@rstest/core';
+        test('t', async () => {
+          await Promise.all(([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]));
         });
       `,
     },

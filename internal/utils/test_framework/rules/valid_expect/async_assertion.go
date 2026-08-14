@@ -38,8 +38,8 @@ func getPromiseCallExpressionNode(node *ast.Node) *ast.Node {
 		return nil
 	}
 
-	if node.Kind == ast.KindArrayLiteralExpression && node.Parent != nil && node.Parent.Kind == ast.KindCallExpression {
-		node = node.Parent
+	if outer := internalUtils.OutermostParenthesizedExpression(node); node.Kind == ast.KindArrayLiteralExpression && outer.Parent != nil && outer.Parent.Kind == ast.KindCallExpression {
+		node = outer.Parent
 	}
 
 	if isPromiseMethodCall(node) {
