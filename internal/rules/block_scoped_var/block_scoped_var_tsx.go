@@ -279,16 +279,17 @@ func (state *blockScopedVarState) implicitTypeGlobalGroups() map[string]*varGrou
 	}
 
 	activeTypeGlobals := make(map[string]bool)
-	if state.ctx.Program != nil && state.ctx.TypeChecker != nil {
-		utils.AddDefaultLibraryTypeGlobalNames(activeTypeGlobals, state.ctx.Program, state.ctx.TypeChecker)
+	sourceProgram := state.ctx.Program()
+	if sourceProgram != nil && state.ctx.TypeChecker != nil {
+		utils.AddDefaultLibraryTypeGlobalNames(activeTypeGlobals, sourceProgram, state.ctx.TypeChecker)
 	}
 	// Without a Program, scope-manager 8.65 seeds its generated esnext
 	// catalog. With a Program it derives the catalog from target and, notably,
 	// ignores noLib; reuse that same public catalog for the ESNext/noLib case
 	// that the checker omits.
-	defaultESNext := state.ctx.Program == nil ||
-		(state.ctx.Program.Options().NoLib.IsTrue() &&
-			state.ctx.Program.Options().GetEmitScriptTarget() == core.ScriptTargetESNext)
+	defaultESNext := sourceProgram == nil ||
+		(sourceProgram.Options().NoLib.IsTrue() &&
+			sourceProgram.Options().GetEmitScriptTarget() == core.ScriptTargetESNext)
 	if defaultESNext {
 		for _, group := range state.groupOrder {
 			if rule.IsDefaultTypeScriptTypeGlobal(group.name) {
@@ -321,7 +322,8 @@ func (state *blockScopedVarState) implicitTypeGlobalGroups() map[string]*varGrou
 }
 
 func (state *blockScopedVarState) isDefaultLibrarySymbol(symbol *ast.Symbol) bool {
-	return state.ctx.Program != nil && utils.IsSymbolFromDefaultLibrary(state.ctx.Program, symbol)
+	sourceProgram := state.ctx.Program()
+	return sourceProgram != nil && utils.IsSymbolFromDefaultLibrary(sourceProgram, symbol)
 }
 
 // mergedGroupForTypeTarget joins TypeScript's local/export symbol pair without
@@ -510,8 +512,8 @@ func (state *blockScopedVarState) addTSXFactoryReferences() {
 
 	factoryName := "React"
 	fragmentName := ""
-	if state.ctx.Program != nil {
-		options := state.ctx.Program.Options()
+	if sourceProgram := state.ctx.Program(); sourceProgram != nil {
+		options := sourceProgram.Options()
 		if options.JsxFactory != "" {
 			factoryName = jsxFactoryRoot(options.JsxFactory)
 		}

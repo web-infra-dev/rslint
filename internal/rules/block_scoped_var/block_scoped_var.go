@@ -87,8 +87,8 @@ func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	}
 
 	options := &core.CompilerOptions{}
-	if ctx.Program != nil {
-		options = ctx.Program.Options()
+	if sourceProgram := ctx.Program(); sourceProgram != nil {
+		options = sourceProgram.Options()
 	}
 	resolver := binder.NameResolver{CompilerOptions: options}
 	if ctx.SourceFile.IsBound() && ast.IsGlobalSourceFile(ctx.SourceFile.AsNode()) {
