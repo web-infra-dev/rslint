@@ -134,6 +134,7 @@ export default defineConfig({
     './tests/eslint/rules/no-useless-assignment.test.ts',
     './tests/eslint/rules/no-useless-computed-key.test.ts',
     './tests/eslint/rules/no-useless-concat.test.ts',
+    './tests/eslint/rules/no-warning-comments.test.ts',
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
@@ -502,7 +503,6 @@ export default defineConfig({
     './tests/eslint/rules/require-yield.test.ts',
     './tests/eslint/rules/symbol-description.test.ts',
     './tests/eslint/rules/unicode-bom.test.ts',
-    './tests/eslint/rules/no-warning-comments.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
