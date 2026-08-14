@@ -273,9 +273,11 @@ The workflow is complete ONLY when all tasks created during Planning are marked 
 | A regexp option or a `new RegExp(...)`          | `utils/ecmascript/regexp`, imported as `esregexp` |
 | A glob option (upstream on `minimatch@3`)       | `utils/minimatch3`                                |
 | "Is this a glob or a plain path?"               | `utils/isglob`                                    |
-| Upstream reads globs with **`minimatch@10`**    | **Not ported — stop and report to the user**      |
+| Any other glob package, **`minimatch@10`** too  | **Not ported — stop and report to the user**      |
 
-`minimatch@10` has no port and no safe substitute: `minimatch3` differs from it on POSIX classes, and `doublestar` differs on far more than extended glob syntax (`src/**` matches `src` under doublestar but not under minimatch). Report which package and version the rule needs and which patterns would be misread; do not quietly swap in either one. See [UTILS_REFERENCE.md § JavaScript Semantics](references/UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
+The stdlib `regexp` is not banned outright: a pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. A pattern out of a rule option, a config file or the source under lint takes `esregexp`, however plain it looks.
+
+Only minimatch 3 and is-glob are ported, and a third has no safe substitute: `minimatch3` differs from `minimatch@10` on POSIX classes, and `doublestar` differs on far more than extended glob syntax (`src/**` matches `src` under doublestar but not under minimatch). Report which package and version the rule needs and which patterns would be misread; do not quietly swap in either one, and do not port a new glob package without asking first. See [UTILS_REFERENCE.md § JavaScript Semantics](references/UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
 
 **Directory Structure**:
 

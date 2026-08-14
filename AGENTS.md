@@ -36,7 +36,9 @@ This document summarizes how to work on rslint effectively and consistently.
 - TS/JS/MD/CSS use Prettier via `pnpm run format`.
 - Rules: `internal/plugins/typescript/rules/<rule>/`; tests: `<rule>_test.go`.
 - Prefer table-driven tests and existing helpers in `internal/utils`.
-- A value that came from JavaScript — a string to trim, a number to print, a regexp or glob out of a rule option — is read through `internal/utils/ecmascript`, `ecmascript/regexp`, `minimatch3`, or `isglob`, never through `strings.TrimSpace`, the stdlib `regexp`, or `doublestar`. `depguard` enforces the last two under `internal/rules/**` and `internal/plugins/**`. **minimatch 10 is not ported**: if a rule being ported needs it, report that to the user instead of substituting `minimatch3` or `doublestar`.
+- A value that came from JavaScript — a string to trim, a number to print, a regexp or glob out of a rule option — is read through `internal/utils/ecmascript`, `ecmascript/regexp`, `minimatch3`, or `isglob`, never through `strings.TrimSpace`, the stdlib `regexp`, or `doublestar`. `depguard` enforces the last two under `internal/rules/**` and `internal/plugins/**`.
+- The stdlib `regexp` is for a pattern written in this repository that RE2 and JavaScript read the same way and that no user input reaches. A pattern out of a rule option, a config file or the source under lint takes `esregexp`, however plain it looks.
+- **Only minimatch 3 and is-glob are ported.** A rule that needs another glob package — minimatch 10 included — is reported to the user, naming the package and version, rather than being pointed at `minimatch3` or `doublestar` or given a fresh port.
 
 ## Testing Guidelines
 

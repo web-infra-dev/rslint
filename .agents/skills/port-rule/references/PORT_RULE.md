@@ -272,16 +272,18 @@ Before starting, familiarize yourself with these key source locations:
 
    If the rule accepts a regexp or a glob — in a rule option, or read out of the source under lint — find the library upstream reads it with. Check the rule's own imports and the plugin's `package.json`, and note the **major version**. Go's standard library and general-purpose glob packages answer differently, so the port has a matching package for each:
 
-   | Upstream reads the pattern with        | Use in the port                                                  |
-   | -------------------------------------- | ---------------------------------------------------------------- |
-   | a regexp literal or `new RegExp(...)`  | `utils/ecmascript/regexp`, imported as `esregexp`                |
-   | `minimatch` at `^3.x`                  | `utils/minimatch3`                                               |
-   | `is-glob`                              | `utils/isglob`                                                   |
-   | `ignore` (gitignore syntax, not globs) | a gitignore matcher — see `internal/rules/no_restricted_imports` |
+   | Upstream reads the pattern with       | Use in the port                                             |
+   | ------------------------------------- | ----------------------------------------------------------- |
+   | a regexp literal or `new RegExp(...)` | `utils/ecmascript/regexp`, imported as `esregexp`           |
+   | `minimatch` at `^3.x`                 | `utils/minimatch3`                                          |
+   | `is-glob`                             | `utils/isglob`                                              |
+   | any other glob package                | **not supported — stop and report to the user (see below)** |
 
    `depguard` denies `regexp2` and `doublestar` under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. Trimming, blankness, case comparison and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
 
-   **`minimatch@10` is not ported. If the rule depends on it, stop and report that to the user before writing the port** — do not substitute `minimatch3` or `doublestar` and carry on. ESLint itself moved to minimatch 10 for its own flat-config `files`/`ignores` and a plugin may follow, but only the 3.x reading is ported, because that is what the plugin ecosystem pins. `minimatch3` differs from 10 on POSIX character classes; `doublestar` differs on 13 of 37 sampled patterns, and not only on extended glob syntax — `src/**` matches `src` itself under doublestar but not under minimatch, and a leading `!` is a literal rather than a negation. Report which package and version the rule needs and which of its patterns would be misread; the user decides whether to port minimatch 10, accept a documented divergence, or skip the rule.
+   The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks, because RE2 refuses syntax JavaScript accepts and the caller usually swallows the compile error.
+
+   **Only minimatch 3 and is-glob are ported. If the rule reads globs with anything else, stop and report that to the user before writing the port** — do not substitute `minimatch3` or `doublestar` and carry on, and do not port a new glob package on your own initiative. `minimatch@10` is the one to expect: ESLint moved to it for its own flat-config `files`/`ignores` and a plugin may follow, but only the 3.x reading is ported, because that is what the plugin ecosystem pins. `minimatch3` differs from 10 on POSIX character classes; `doublestar` differs on 13 of 37 sampled patterns, and not only on extended glob syntax — `src/**` matches `src` itself under doublestar but not under minimatch, and a leading `!` is a literal rather than a negation. Report which package and version the rule needs and which of its patterns would be misread; the user decides whether to port it, accept a documented divergence, or skip the rule.
 
 ---
 

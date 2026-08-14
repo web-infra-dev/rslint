@@ -769,26 +769,27 @@ isglob.IsExtglob("@(a|b)") // true, the extended-list question on its own
 
 Open the upstream rule's imports and its plugin's `package.json`, then match:
 
-| Upstream reads the pattern with        | Use                                                              |
-| -------------------------------------- | ---------------------------------------------------------------- |
-| a regexp literal or `new RegExp(...)`  | `utils/ecmascript/regexp` (import as `esregexp`)                 |
-| `minimatch` at `^3.x`                  | `utils/minimatch3`                                               |
-| `is-glob`                              | `utils/isglob`                                                   |
-| `ignore` (gitignore syntax, not globs) | a gitignore matcher — see `internal/rules/no_restricted_imports` |
-| **`minimatch` at `^10.x`**             | **not supported — stop and report to the user (see below)**      |
+| Upstream reads the pattern with       | Use                                                         |
+| ------------------------------------- | ----------------------------------------------------------- |
+| a regexp literal or `new RegExp(...)` | `utils/ecmascript/regexp` (import as `esregexp`)            |
+| `minimatch` at `^3.x`                 | `utils/minimatch3`                                          |
+| `is-glob`                             | `utils/isglob`                                              |
+| any other glob package                | **not supported — stop and report to the user (see below)** |
 
-### ⚠️ minimatch 10 is not ported
+The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks: RE2 refuses syntax JavaScript accepts, and the caller usually swallows the compile error and reports nothing.
 
-**If the rule you are porting reads globs with minimatch 10, stop and report it to the user. Do not substitute `minimatch3` or `doublestar` and carry on.**
+### ⚠️ Only minimatch 3 and is-glob are ported
 
-ESLint moved to minimatch 10 for the paths it matches on its own behalf (flat config `files` / `ignores`), and a plugin may follow. Only the 3.x reading is ported, because that is what the plugin ecosystem pins — `eslint-plugin-import` and `eslint-plugin-react` both depend on `minimatch@^3.1.2`.
+**If the rule you are porting reads globs with anything else, stop and report it to the user. Do not substitute `minimatch3` or `doublestar` and carry on, and do not port the package yourself.**
+
+`minimatch@10` is the one to expect. ESLint moved to it for the paths it matches on its own behalf (flat config `files` / `ignores`), and a plugin may follow. Only the 3.x reading is ported, because that is what the plugin ecosystem pins — `eslint-plugin-import` and `eslint-plugin-react` both depend on `minimatch@^3.1.2`.
 
 The substitutions are not close enough to make quietly:
 
 - **`minimatch3`** differs from 10 on POSIX character classes: `a[[:alpha:]]b` matches `aXb` under 10, and does not under 3.
 - **`doublestar`** differs from 10 on 13 of 37 sampled patterns. Six are extended glob syntax, which it does not implement at all. The other seven are not exotic: `src/**` matches `src` itself under doublestar but not under minimatch, POSIX classes and `{1..3}` ranges are unsupported, a leading `!` is a literal rather than a negation, and the empty path and `a//b` are handled differently.
 
-Report which upstream package and version the rule depends on, and which of its patterns would be read differently. The user decides whether to port minimatch 10, accept a documented divergence, or skip the rule.
+Report which upstream package and version the rule depends on, and which of its patterns would be read differently. The user decides whether to port it, accept a documented divergence, or skip the rule.
 
 ---
 
