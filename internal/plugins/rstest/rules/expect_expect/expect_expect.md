@@ -75,9 +75,15 @@ matching the two assertion entry points Rstest exposes as globals. Names support
 wildcards: `request.*.expect`, `request.**.expect`, `expect*`.
 
 Rstest's own `expect` counts whatever the callee looks like, so these names only
-need to cover assertion helpers the rule cannot resolve. `context.expect(...)`,
-`rstest.expect(...)`, an aliased `import { expect as check }` and
-`import.meta.rstest.expect(...)` are all recognized without configuration.
+need to cover assertion helpers the rule cannot resolve — a wrapper of your own,
+or a third-party assertion library. `context.expect(...)`, `rstest.expect(...)`,
+an aliased `import { expect as check }` and `import.meta.rstest.expect(...)` are
+all recognized without configuration.
+
+The list replaces the default rather than extending it, so name `assert` again if
+you still want it. Naming your own helpers cannot switch Rstest's `expect` off
+though — it is recognized whether or not the list mentions it, unlike in
+`eslint-plugin-jest`, where dropping `expect` from the list stops it counting.
 
 ### `additionalTestBlockFunctions`
 
