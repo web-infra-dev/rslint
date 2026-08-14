@@ -77,10 +77,6 @@ func isNonBindingUndefinedPosition(node *ast.Node) bool {
 	case ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement:
 		return true
 
-	case ast.KindMetaProperty:
-		// new.target / import.meta — syntactic, not a variable reference.
-		return true
-
 	case ast.KindImportAttribute:
 		// import ... with { undefined: "json" } — an attribute key, not a variable.
 		return parent.AsImportAttribute().Name() == node
@@ -106,10 +102,7 @@ func isNonBindingUndefinedPosition(node *ast.Node) bool {
 		return true
 	}
 	if ast.IsJsxTagName(node) {
-		text := node.Text()
-		if len(text) == 0 || (text[0] >= 'a' && text[0] <= 'z') {
-			return true
-		}
+		return true
 	}
 
 	return false
