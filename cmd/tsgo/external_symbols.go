@@ -13,9 +13,13 @@ import (
 
 const globalNamespace = "global"
 
+var acceptedTypeOnlySymbolPaths = []string{
+	"JSX.IntrinsicElements",
+	"React.JSX.IntrinsicElements",
+}
+
 type externalModuleRoot struct {
 	namespace string
-	prefix    string
 	fileName  string
 }
 
@@ -75,13 +79,12 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 			if resolution == nil || !resolution.IsResolved() || !resolution.IsExternalLibraryImport {
 				continue
 			}
-			namespace, prefix, ok := externalModuleName(key.Name)
+			namespace, ok := externalModuleName(key.Name)
 			if !ok {
 				continue
 			}
 			roots[externalModuleRoot{
 				namespace: namespace,
-				prefix:    prefix,
 				fileName:  resolution.ResolvedFileName,
 			}] = struct{}{}
 		}
@@ -97,9 +100,6 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 		if left.namespace != right.namespace {
 			return left.namespace < right.namespace
 		}
-		if left.prefix != right.prefix {
-			return left.prefix < right.prefix
-		}
 		return left.fileName < right.fileName
 	})
 
@@ -113,8 +113,7 @@ func (c *externalSymbolCollector) collectDependencies(program *compiler.Program)
 			return exports[i].Name < exports[j].Name
 		})
 		for _, symbol := range exports {
-			name := joinExternalName(root.prefix, symbol.Name)
-			c.collect(root.namespace, name, symbol)
+			c.collect(root.namespace, symbol.Name, symbol)
 		}
 	}
 }
@@ -128,7 +127,12 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 			symbol = target
 		}
 	}
-	if symbol == nil || symbol.Flags&ast.SymbolFlagsValue == 0 {
+	if symbol == nil {
+		return
+	}
+	isAcceptedTypeOnly := isAcceptedTypeOnlySymbolPath(name)
+	isTypeOnly := symbol.Flags&ast.SymbolFlagsValue == 0
+	if isTypeOnly && !isAcceptedTypeOnly {
 		return
 	}
 
@@ -141,7 +145,28 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 	}
 	c.expanded[expandedKey] = name
 
-	ty := c.tc.GetTypeOfSymbol(symbol)
+	if symbol.Flags&ast.SymbolFlagsModule != 0 {
+		properties := c.tc.GetExportsAndPropertiesOfModule(symbol)
+		sort.Slice(properties, func(i int, j int) bool {
+			return properties[i].Name < properties[j].Name
+		})
+		for _, property := range properties {
+			childName := joinExternalName(name, property.Name)
+			if isAcceptedTypeOnlySymbolPath(childName) {
+				c.collect(namespace, childName, property)
+			}
+		}
+		if isTypeOnly {
+			return
+		}
+	}
+
+	var ty *checker.Type
+	if isTypeOnly {
+		ty = c.tc.GetDeclaredTypeOfSymbol(symbol)
+	} else {
+		ty = c.tc.GetTypeOfSymbol(symbol)
+	}
 	if ty == nil {
 		return
 	}
@@ -152,6 +177,17 @@ func (c *externalSymbolCollector) collect(namespace string, name string, symbol 
 	for _, property := range properties {
 		c.collect(namespace, joinExternalName(name, property.Name), property)
 	}
+}
+
+func isAcceptedTypeOnlySymbolPath(name string) bool {
+	for _, accepted := range acceptedTypeOnlySymbolPaths {
+		if name == accepted ||
+			strings.HasPrefix(accepted, name+".") ||
+			strings.HasPrefix(name, accepted+".") {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *externalSymbolCollector) record(namespace string, name string, symbol *ast.Symbol) {
@@ -171,20 +207,19 @@ func (c *externalSymbolCollector) record(namespace string, name string, symbol *
 	}
 }
 
-func externalModuleName(moduleName string) (namespace string, prefix string, ok bool) {
+func externalModuleName(moduleName string) (namespace string, ok bool) {
 	if moduleName == "" || tspath.IsExternalModuleNameRelative(moduleName) || strings.HasPrefix(moduleName, "#") {
-		return "", "", false
+		return "", false
 	}
 	if strings.HasPrefix(moduleName, "node:") {
-		return moduleName, "", true
+		return moduleName, true
 	}
 
-	namespace, prefix = module.ParsePackageName(moduleName)
-	if namespace == "" {
-		return "", "", false
+	packageName, _ := module.ParsePackageName(moduleName)
+	if packageName == "" {
+		return "", false
 	}
-	prefix = strings.ReplaceAll(prefix, "/", ".")
-	return namespace, prefix, true
+	return moduleName, true
 }
 
 func joinExternalName(prefix string, name string) string {
