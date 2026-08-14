@@ -221,7 +221,7 @@ enum foo {
       "ruleName": "@typescript-eslint/no-magic-numbers",
     },
     {
-      "message": "No magic number: 1.",
+      "message": "No magic number: +1.",
       "messageId": "noMagic",
       "range": {
         "end": {
@@ -229,7 +229,7 @@ enum foo {
           "line": 6,
         },
         "start": {
-          "column": 10,
+          "column": 9,
           "line": 6,
         },
       },
@@ -332,7 +332,7 @@ class Foo {
       "ruleName": "@typescript-eslint/no-magic-numbers",
     },
     {
-      "message": "No magic number: 6.",
+      "message": "No magic number: +6.",
       "messageId": "noMagic",
       "range": {
         "end": {
@@ -340,7 +340,7 @@ class Foo {
           "line": 8,
         },
         "start": {
-          "column": 17,
+          "column": 16,
           "line": 8,
         },
       },

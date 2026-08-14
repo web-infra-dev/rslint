@@ -362,9 +362,9 @@ enum foo {
           messageId: 'noMagic',
         },
         {
-          column: 10,
+          column: 9,
           data: {
-            raw: '1',
+            raw: '+1',
           },
           line: 6,
           messageId: 'noMagic',
@@ -426,9 +426,9 @@ class Foo {
           messageId: 'noMagic',
         },
         {
-          column: 17,
+          column: 16,
           data: {
-            raw: '6',
+            raw: '+6',
           },
           line: 8,
           messageId: 'noMagic',
