@@ -53,6 +53,10 @@ func TestMaxStatementsExtras(t *testing.T) {
 			// that isn't nested in any function must not crash and must not report.
 			{Code: "{ one; two; three; four; five; }", Options: option(1)},
 
+			// ---- Dimension 1: a decorated member is a single top-level function
+			// (the decorator holds no function of its own), so it stays exempt ----
+			{Code: "class C { @dec(1) get foo() { one; two; } }", Options: optionsWithTopLevel(1, true)},
+
 			// Locks in endFunction(): overload signatures never enter topLevelFunctions,
 			// so the lone implementation is still "the" top-level function and is
 			// exempted by the topLevelFunctions.length === 1 check, despite exceeding max.
@@ -166,6 +170,83 @@ func TestMaxStatementsExtras(t *testing.T) {
 				Code:    "function foo(x: number): void;\nfunction foo(x: string): void;\nfunction foo(x: any) { 1; 2; 3; }",
 				Options: option(2),
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Function 'foo'", 3, 2), Line: 3, Column: 1, EndLine: 3, EndColumn: 13}},
+			},
+
+			// ---- Dimension 1: a function in a member's computed name is a sibling of the
+			// member in ESTree, so both count as top-level and neither is exempted ----
+			{
+				Code:    "class C { [(() => {})()]() { one; two; } }",
+				Options: optionsWithTopLevel(1, true),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 25}},
+			},
+			// ---- Dimension 1: same for an object-literal method's computed key ----
+			{
+				Code:    "var o = { [(() => {})()]() { one; two; } };",
+				Options: optionsWithTopLevel(1, true),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 25}},
+			},
+			// ---- Dimension 1: a function in a decorator is likewise a sibling of the member ----
+			{
+				Code:    "class C { @dec(() => {}) foo() { one; two; } }",
+				Options: optionsWithTopLevel(1, true),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'foo'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 29}},
+			},
+			// ---- Dimension 2: statements in a decorator's function belong to that function
+			// only — the member's own count is unaffected by hiding its frame. Listed in
+			// emission order (inner function exits first); the API and CLI sort a file's
+			// diagnostics by start position before handing them out. ----
+			{
+				Code:    "class C { @dec(function () { a; b; }) foo() { one; two; } }",
+				Options: option(1),
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "exceed", Message: exceedMessage("Function", 2, 1), Line: 1, Column: 16, EndLine: 1, EndColumn: 25},
+					{MessageId: "exceed", Message: exceedMessage("Method 'foo'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 42},
+				},
+			},
+			// ---- Dimension 2: a computed name's function keeps its own count, and it is
+			// nested when the enclosing class sits inside a function ----
+			{
+				Code:    "function outer() { class C { [(() => { a; b; })()]() { one; } } }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 35, EndLine: 1, EndColumn: 37}},
+			},
+			// ---- Dimension 2: a parameter default *is* inside the member's function in
+			// ESTree, so it stays nested and is reported directly rather than deferred ----
+			{
+				Code:    "class C { m(a = () => { x; y; }) { one; } }",
+				Options: optionsWithTopLevel(1, true),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 20, EndLine: 1, EndColumn: 22}},
+			},
+
+			// ---- Dimension 3: core ESLint's getFunctionHeadLoc starts a class member's
+			// report at the member itself, decorators included (unlike the
+			// typescript-eslint variant the shared helper mirrors) ----
+			{
+				Code:    "class C { @dec(1) foo() { one; two; } }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'foo'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 22}},
+			},
+			{
+				Code:    "class C { @dec(1) get foo() { one; two; } }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Getter 'foo'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 26}},
+			},
+			{
+				Code:    "class C { @dec(1)\n  @dec2\n  static async foo() { one; two; } }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Static async method 'foo'", 2, 1), Line: 1, Column: 11, EndLine: 3, EndColumn: 19}},
+			},
+			// ---- Dimension 3: the same start applies to a decorated field's initializer,
+			// whose ESTree parent is the PropertyDefinition ----
+			{
+				Code:    "class C { @dec(1) foo = function () { one; two; } }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'foo'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 34}},
+			},
+			{
+				Code:    "class C { @dec(1) foo = () => { one; two; } }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'foo'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 25}},
 			},
 
 			// ---- Real-user: eslint/eslint#12950 — ignoreTopLevelFunctions only exempts a

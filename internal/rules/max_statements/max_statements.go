@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -40,7 +41,7 @@ var MaxStatementsRule = rule.Rule{
 				return
 			}
 			name := utils.UpperCaseFirstASCII(utils.GetFunctionNameWithKindCore(node))
-			ctx.ReportRange(utils.GetFunctionHeadLoc(ctx.SourceFile, node), rule.RuleMessage{
+			ctx.ReportRange(functionHeadLoc(ctx.SourceFile, node), rule.RuleMessage{
 				Id: "exceed",
 				Description: fmt.Sprintf(
 					"%s has too many statements (%d). Maximum allowed is %d.",
@@ -80,6 +81,31 @@ var MaxStatementsRule = rule.Rule{
 			}
 		}
 
+		// tsgo keeps a class member's decorators and computed name inside the
+		// member node, so ForEachChild walks them while the member's frame is
+		// open. ESTree hangs both off MethodDefinition — a sibling of the
+		// FunctionExpression this rule listens for — so a function written
+		// there is not nested in the member. Hide the member's frame while
+		// traversing that metadata so nesting depth, and with it the
+		// `ignoreTopLevelFunctions` bookkeeping, matches upstream.
+		var hiddenFrames []int
+		hideMemberFrame := func(node *ast.Node) {
+			if !isMemberMetadata(node) {
+				return
+			}
+			n := len(stack) - 1
+			hiddenFrames = append(hiddenFrames, stack[n])
+			stack = stack[:n]
+		}
+		restoreMemberFrame := func(node *ast.Node) {
+			if !isMemberMetadata(node) {
+				return
+			}
+			n := len(hiddenFrames) - 1
+			stack = append(stack, hiddenFrames[n])
+			hiddenFrames = hiddenFrames[:n]
+		}
+
 		// A class static block always has a body and never reports — it is
 		// tracked only so statements inside it do not leak into the enclosing
 		// function's count.
@@ -107,6 +133,11 @@ var MaxStatementsRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindConstructor):                 endFunc,
 			ast.KindClassStaticBlockDeclaration:                      startStaticBlock,
 			rule.ListenerOnExit(ast.KindClassStaticBlockDeclaration): endStaticBlock,
+
+			ast.KindDecorator:                                 hideMemberFrame,
+			rule.ListenerOnExit(ast.KindDecorator):            restoreMemberFrame,
+			ast.KindComputedPropertyName:                      hideMemberFrame,
+			rule.ListenerOnExit(ast.KindComputedPropertyName): restoreMemberFrame,
 
 			// tsgo wraps a class static block's body in a real Block node (not
 			// flattened the way ESTree flattens StaticBlock.body), so counting
@@ -137,6 +168,65 @@ var MaxStatementsRule = rule.Rule{
 			},
 		}
 	},
+}
+
+// isClassMember reports whether node is one of the function-like kinds that
+// ESTree models as a `MethodDefinition` (or object-literal `Property`) wrapping
+// a `FunctionExpression`, i.e. the kinds whose decorators and computed name
+// live outside the function in upstream's AST.
+func isClassMember(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		return true
+	default:
+		return false
+	}
+}
+
+// isMemberMetadata reports whether node is a decorator or computed name that
+// belongs to a member this rule opened a frame for.
+func isMemberMetadata(node *ast.Node) bool {
+	parent := node.Parent
+	return parent != nil && isClassMember(parent) && parent.Body() != nil
+}
+
+// hasDecorator reports whether node carries at least one decorator.
+func hasDecorator(node *ast.Node) bool {
+	mods := node.Modifiers()
+	if mods == nil {
+		return false
+	}
+	for _, mod := range mods.Nodes {
+		if mod.Kind == ast.KindDecorator {
+			return true
+		}
+	}
+	return false
+}
+
+// functionHeadLoc mirrors core ESLint's getFunctionHeadLoc, which starts a
+// class member's report at the member's own start — decorators included. The
+// shared helper follows typescript-eslint's variant, which deliberately skips
+// them, so restore the member start for decorated members.
+func functionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	loc := utils.GetFunctionHeadLoc(sourceFile, node)
+
+	member := node
+	switch {
+	case isClassMember(node):
+	case node.Kind == ast.KindArrowFunction || node.Kind == ast.KindFunctionExpression:
+		if node.Parent == nil || node.Parent.Kind != ast.KindPropertyDeclaration {
+			return loc
+		}
+		member = node.Parent
+	default:
+		return loc
+	}
+
+	if !hasDecorator(member) {
+		return loc
+	}
+	return core.NewTextRange(utils.TrimNodeTextRange(sourceFile, member).Pos(), loc.End())
 }
 
 type ruleOptions struct {
