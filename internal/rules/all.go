@@ -134,6 +134,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
 	"github.com/web-infra-dev/rslint/internal/rules/one_var"
+	"github.com/web-infra-dev/rslint/internal/rules/operator_assignment"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_arrow_callback"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_destructuring"
@@ -312,5 +313,6 @@ func GetAllRules() []rule.Rule {
 		symbol_description.SymbolDescriptionRule,
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
 		unicode_bom.UnicodeBomRule,
+		operator_assignment.OperatorAssignmentRule,
 	}
 }

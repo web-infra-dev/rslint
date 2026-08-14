@@ -1585,58 +1585,107 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 // It recursively compares member expression chains (PropertyAccessExpression,
 // ElementAccessExpression), walking through the object/property structure.
 //
+// disableStaticComputedKey mirrors ESLint's astUtils.isSameReference parameter
+// of the same name. When false (the common case), a.b and a['b'] (and a[0] /
+// a['0']) compare equal via their shared static property name. When true, that
+// fast path is skipped and a.b / a['b'] are compared structurally instead —
+// same access-expression Kind (non-computed vs computed) and the same
+// property node — so a.b and a['b'] are no longer considered the same
+// reference even though they name the same runtime property. ESLint rules use
+// `true` for backward compatibility in specific contexts (e.g. operator-assignment).
+//
 // Behavior details:
-//   - Parenthesized expressions and type assertions (as, <T>) are transparently
-//     unwrapped on both sides via [ast.SkipOuterExpressions].
+//   - Parenthesized expressions and type assertions (as, <T>, satisfies, the
+//     non-null `!` operator) are transparently unwrapped on both sides via
+//     [ast.SkipOuterExpressions].
 //   - Optional chaining is ignored: a.b and a?.b are considered the same reference,
 //     matching ESLint's isSameReference semantics.
-//   - Cross-syntax comparison is supported via static property names:
-//     a.b and a['b'] are the same reference; a[0] and a['0'] likewise.
+//   - When disableStaticComputedKey is false, cross-syntax comparison is
+//     supported via static property names: a.b and a['b'] are the same
+//     reference; a[0] and a['0'] likewise.
 //   - For non-static element access (a[x]), falls back to comparing the argument
-//     nodes structurally (same Kind + same Identifier/ThisKeyword).
+//     nodes recursively (same Kind + same Identifier/ThisKeyword/literal value).
 //   - Function calls break the chain: a.b() and a.b() are NOT the same reference,
 //     because each call may return a different value.
 //
 // This implements the same logic as ESLint's astUtils.isSameReference combined
 // with astUtils.getStaticPropertyName, adapted for the TypeScript AST.
-func IsSameReference(left, right *ast.Node) bool {
-	left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKTypeAssertions)
-	right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKTypeAssertions)
+func IsSameReference(left, right *ast.Node, disableStaticComputedKey bool) bool {
+	left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKAssertions)
+	right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKAssertions)
 
 	if left == nil || right == nil {
 		return false
 	}
 
-	// Base cases: Identifier and ThisKeyword.
+	// Base cases: Identifier, PrivateIdentifier, ThisKeyword, and literal keys
+	// (e.g. `x[0]` vs `x[0]`, reached recursively when disableStaticComputedKey
+	// skips the static-name fast path below).
 	if left.Kind == ast.KindIdentifier && right.Kind == ast.KindIdentifier {
 		return left.AsIdentifier().Text == right.AsIdentifier().Text
+	}
+	if left.Kind == ast.KindPrivateIdentifier && right.Kind == ast.KindPrivateIdentifier {
+		return left.AsPrivateIdentifier().Text == right.AsPrivateIdentifier().Text
 	}
 	if left.Kind == ast.KindThisKeyword && right.Kind == ast.KindThisKeyword {
 		return true
 	}
+	if left.Kind == right.Kind &&
+		(left.Kind == ast.KindNullKeyword || left.Kind == ast.KindTrueKeyword || left.Kind == ast.KindFalseKeyword) {
+		return true
+	}
+	if left.Kind == right.Kind && ast.IsLiteralKind(left.Kind) {
+		return sameReferenceLiteralValue(left, right)
+	}
 
 	// Member expression comparison.
 	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
-		// Try static property name comparison first (handles cross-type: a.b vs a['b']).
-		leftName, leftOK := AccessExpressionStaticName(left)
-		if leftOK {
-			rightName, rightOK := AccessExpressionStaticName(right)
-			if rightOK && leftName == rightName {
-				return IsSameReference(AccessExpressionObject(left), AccessExpressionObject(right))
+		if !disableStaticComputedKey {
+			// Try static property name comparison first (handles cross-type: a.b vs a['b']).
+			leftName, leftOK := AccessExpressionStaticName(left)
+			if leftOK {
+				rightName, rightOK := AccessExpressionStaticName(right)
+				if rightOK && leftName == rightName {
+					return IsSameReference(AccessExpressionObject(left), AccessExpressionObject(right), disableStaticComputedKey)
+				}
+				return false
 			}
-			return false
 		}
 
-		// Non-static: fall back to same-kind, same-index comparison (e.g. a[x] = a[x]).
-		if left.Kind == right.Kind && left.Kind == ast.KindElementAccessExpression {
-			leftArg := left.AsElementAccessExpression().ArgumentExpression
-			rightArg := right.AsElementAccessExpression().ArgumentExpression
-			if isSameSimpleNode(leftArg, rightArg) {
-				return IsSameReference(left.AsElementAccessExpression().Expression, right.AsElementAccessExpression().Expression)
-			}
+		// Non-static (or disabled): same computed-ness (same Kind), same object,
+		// and the same property node (e.g. a[x] = a[x], or a.b = a.b when disabled).
+		if left.Kind != right.Kind {
+			return false
+		}
+		if !IsSameReference(AccessExpressionObject(left), AccessExpressionObject(right), disableStaticComputedKey) {
+			return false
+		}
+		switch left.Kind {
+		case ast.KindPropertyAccessExpression:
+			return IsSameReference(left.AsPropertyAccessExpression().Name(), right.AsPropertyAccessExpression().Name(), disableStaticComputedKey)
+		case ast.KindElementAccessExpression:
+			return IsSameReference(left.AsElementAccessExpression().ArgumentExpression, right.AsElementAccessExpression().ArgumentExpression, disableStaticComputedKey)
 		}
 	}
 
+	return false
+}
+
+// sameReferenceLiteralValue compares two same-Kind literal nodes by value, for
+// use as a property key in [IsSameReference]. Unlike [AreNodesStructurallyEqual],
+// this only needs the leaf-literal cases: a literal can never contain a nested
+// access expression worth recursing into.
+func sameReferenceLiteralValue(left, right *ast.Node) bool {
+	switch left.Kind {
+	case ast.KindStringLiteral:
+		return left.AsStringLiteral().Text == right.AsStringLiteral().Text
+	case ast.KindNumericLiteral:
+		return NormalizeNumericLiteral(left.AsNumericLiteral().Text) == NormalizeNumericLiteral(right.AsNumericLiteral().Text)
+	case ast.KindBigIntLiteral:
+		return NormalizeBigIntLiteral(left.AsBigIntLiteral().Text) == NormalizeBigIntLiteral(right.AsBigIntLiteral().Text)
+	case ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral:
+		return left.Text() == right.Text()
+	}
 	return false
 }
 
@@ -1691,21 +1740,6 @@ func AccessExpressionObject(node *ast.Node) *ast.Node {
 		return node.AsElementAccessExpression().Expression
 	}
 	return nil
-}
-
-// isSameSimpleNode checks if two nodes are the same simple reference (Identifier or ThisKeyword).
-// Used as a fallback for comparing non-static element access arguments like a[x] vs a[x].
-func isSameSimpleNode(left, right *ast.Node) bool {
-	if left == nil || right == nil || left.Kind != right.Kind {
-		return false
-	}
-	switch left.Kind {
-	case ast.KindIdentifier:
-		return left.AsIdentifier().Text == right.AsIdentifier().Text
-	case ast.KindThisKeyword:
-		return true
-	}
-	return false
 }
 
 // CollectBindingNames recursively extracts all identifier names from a binding

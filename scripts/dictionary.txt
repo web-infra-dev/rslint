@@ -171,6 +171,7 @@ fieldset
 figcaption
 fileless
 finalizer
+fixability
 fixall
 flaggable
 flowto
