@@ -157,6 +157,23 @@ func TestYodaExtras(t *testing.T) {
 				Options: []any{"never", map[string]any{"exceptRange": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5}},
 			},
+
+			// ---- Bug fix: mixed BigInt/String range bounds must also compare exactly.
+			// JS's abstract relational comparison converts the String bound via
+			// StringToBigInt for an exact BigInt comparison, never through a lossy
+			// float64 conversion ----
+			{
+				Code:    `if (9007199254740993n <= x && x < "9007199254740992") {}`,
+				Output:  []string{`if (x >= 9007199254740993n && x < "9007199254740992") {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5}},
+			},
+			{
+				Code:    `if ("9007199254740993" <= x && x < 9007199254740992n) {}`,
+				Output:  []string{`if (x >= "9007199254740993" && x < 9007199254740992n) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5}},
+			},
 		},
 	)
 }

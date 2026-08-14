@@ -165,7 +165,60 @@ func (v literalValue) lessOrEqual(other literalValue) bool {
 		cmp, ok := compareBigIntFloat(other.big, v.num)
 		return ok && cmp >= 0
 	}
+	// A BigInt/String pair also compares exactly: JS converts the String
+	// operand via StringToBigInt for an exact BigInt comparison rather than
+	// parsing it as a Number.
+	if v.kind == "bigint" && other.kind == "string" {
+		n, ok := stringToBigInt(other.str)
+		return ok && v.big.Cmp(n) <= 0
+	}
+	if v.kind == "string" && other.kind == "bigint" {
+		n, ok := stringToBigInt(v.str)
+		return ok && n.Cmp(other.big) <= 0
+	}
 	return v.numeric() <= other.numeric()
+}
+
+// stringToBigInt parses s the way JS's StringToBigInt does: surrounding
+// whitespace is trimmed, an empty string is 0, and the remainder must be a
+// (optionally signed) decimal integer or an unsigned 0x/0o/0b-prefixed
+// integer — no decimal point, exponent, or trailing garbage. Anything else
+// fails to parse, matching JS returning undefined (which makes the
+// comparison false, not a numeric fallback).
+func stringToBigInt(s string) (*big.Int, bool) {
+	rest := strings.TrimSpace(s)
+	if rest == "" {
+		return big.NewInt(0), true
+	}
+	neg := false
+	if rest[0] == '+' || rest[0] == '-' {
+		neg = rest[0] == '-'
+		rest = rest[1:]
+	}
+	base := 10
+	if len(rest) > 1 && rest[0] == '0' {
+		switch rest[1] {
+		case 'x', 'X':
+			base, rest = 16, rest[2:]
+		case 'o', 'O':
+			base, rest = 8, rest[2:]
+		case 'b', 'B':
+			base, rest = 2, rest[2:]
+		}
+	}
+	if base != 10 && neg {
+		// JS's StringIntegerLiteral only allows a sign before a decimal
+		// StrNumericLiteral; a signed 0x/0o/0b literal never parses.
+		return nil, false
+	}
+	n, ok := new(big.Int).SetString(rest, base)
+	if !ok {
+		return nil, false
+	}
+	if neg {
+		n.Neg(n)
+	}
+	return n, true
 }
 
 // compareBigIntFloat compares b against f using exact arithmetic, matching
@@ -189,17 +242,12 @@ func compareBigIntFloat(b *big.Int, f float64) (cmp int, ok bool) {
 // numeric converts v to a float64 following JS's ToNumber coercion closely
 // enough for range-test bound comparison: numbers convert directly, strings
 // parse as a JS number literal (empty/blank is 0, anything else that doesn't
-// parse is NaN). A bigint bound only reaches this lossy path when paired
-// with another string/bigint-less combination that lessOrEqual doesn't
-// special-case; bigint-vs-number pairs use compareBigIntFloat's exact
-// comparison instead.
+// parse is NaN). lessOrEqual never calls this for a bigint bound — every
+// bigint/other-kind pairing has its own exact comparison above.
 func (v literalValue) numeric() float64 {
 	switch v.kind {
 	case "number":
 		return v.num
-	case "bigint":
-		f, _ := new(big.Float).SetInt(v.big).Float64()
-		return f
 	case "string":
 		trimmed := strings.TrimSpace(v.str)
 		if trimmed == "" {
