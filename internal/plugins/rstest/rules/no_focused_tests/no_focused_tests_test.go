@@ -146,6 +146,24 @@ func TestNoFocusedTests(t *testing.T) {
 				"const base = test;\nconst focused = base;\nfocused('case', fn)",
 				3, 1, 8,
 			),
+			// Alias-hidden focus with members of its own at the call site: the
+			// report belongs on the identifier carrying the focus, not on the
+			// unrelated last member, which is often the opposite of focus.
+			focused(
+				"const focused = test.only;\nfocused.skip('case', fn)",
+				"const focused = test;\nfocused.skip('case', fn)",
+				2, 1, 8,
+			),
+			focused(
+				"const focused = test.only;\nfocused.each(rows)('case', fn)",
+				"const focused = test;\nfocused.each(rows)('case', fn)",
+				2, 1, 8,
+			),
+			focused(
+				"const focused = describe.only;\nfocused.sequential('case', fn)",
+				"const focused = describe;\nfocused.sequential('case', fn)",
+				2, 1, 8,
+			),
 			{
 				Code: "const focused = test.only;\nfocused('first', fn);\nfocused('second', fn)",
 				Errors: []rule_tester.InvalidTestCaseError{

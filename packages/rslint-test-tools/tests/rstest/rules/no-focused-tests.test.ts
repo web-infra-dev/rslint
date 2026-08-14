@@ -179,6 +179,25 @@ focused('case', fn)`,
     },
     {
       code: `const focused = test.only;
+focused.skip('case', fn)`,
+      errors: [
+        {
+          line: 2,
+          column: 1,
+          endColumn: 8,
+          messageId: 'focusedTest',
+          suggestions: [
+            {
+              messageId: 'suggestRemoveFocus',
+              output: `const focused = test;
+focused.skip('case', fn)`,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `const focused = test.only;
 focused('first', fn);
 focused('second', fn)`,
       errors: [

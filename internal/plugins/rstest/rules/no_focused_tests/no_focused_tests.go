@@ -94,14 +94,20 @@ func focusedCallReportNode(
 		}
 	}
 
+	// No focus entry belongs to this call site, so the focus came in through an
+	// alias. The call site's own members are then whatever was chained onto the
+	// alias — `.skip`, `.each` — and pointing "Unexpected focused test" at one
+	// of those names the reader did not write as focus is actively misleading.
+	// The identifier that resolves to the focused API is the honest anchor, and
+	// it is what the member-less alias case already reports on.
+	if parsed.Head.Local.Node != nil {
+		return parsed.Head.Local.Node
+	}
 	if len(parsed.MemberEntries) > 0 {
 		lastEntry := parsed.MemberEntries[len(parsed.MemberEntries)-1]
 		if lastEntry.Node != nil {
 			return lastEntry.Node
 		}
-	}
-	if parsed.Head.Local.Node != nil {
-		return parsed.Head.Local.Node
 	}
 	return node
 }
