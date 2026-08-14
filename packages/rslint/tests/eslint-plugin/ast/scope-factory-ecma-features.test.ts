@@ -264,8 +264,8 @@ describe("scope-factory: globals: { name: 'off' } restores refs to gs.through", 
 describe('scope-factory: global access aliases', () => {
   interface GlobalProbeVariable {
     name: string;
-    defs?: unknown[];
-    writeable: boolean;
+    defs?: Array<{ isVariableDefinition?: boolean }>;
+    writeable?: boolean;
     eslintImplicitGlobalSetting?: 'readonly' | 'writable';
     references: Array<{ resolved?: unknown }>;
   }
@@ -335,11 +335,11 @@ describe('scope-factory: global access aliases', () => {
     expect(set.has('Object')).toBe(false);
   });
 
-  test('configured globals never remove or rewrite source declarations', () => {
+  test('configured modes apply without removing source declarations', () => {
     const { variables, set, scopeManager } = makeScopeManager();
     const lexical = {
       name: 'Array',
-      defs: [{}],
+      defs: [{ isVariableDefinition: true }],
       writeable: false,
       references: [],
     } satisfies GlobalProbeVariable;
@@ -348,11 +348,13 @@ describe('scope-factory: global access aliases', () => {
 
     seedGlobals(scopeManager, { Array: 'writable' });
     expect(set.get('Array')).toBe(lexical);
-    expect(lexical.writeable).toBe(false);
-    expect(lexical).not.toHaveProperty('eslintImplicitGlobalSetting');
+    expect(lexical.writeable).toBe(true);
+    expect(lexical.eslintImplicitGlobalSetting).toBe('writable');
 
     seedGlobals(scopeManager, { Array: 'off' });
     expect(set.get('Array')).toBe(lexical);
     expect(variables).toContain(lexical);
+    expect(lexical).not.toHaveProperty('writeable');
+    expect(lexical).not.toHaveProperty('eslintImplicitGlobalSetting');
   });
 });

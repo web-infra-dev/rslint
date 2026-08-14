@@ -41,7 +41,8 @@
   },
   "files": [
     "bin/rslint.js",
-    "dist/"
+    "dist/",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "bin": {
     "rslint": "./bin/rslint.js"

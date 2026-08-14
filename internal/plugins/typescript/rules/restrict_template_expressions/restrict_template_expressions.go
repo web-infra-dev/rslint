@@ -2,10 +2,11 @@ package restrict_template_expressions
 
 import (
 	_ "embed"
-	"fmt"
+	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -24,12 +25,14 @@ type RestrictTemplateExpressionsOptions struct {
 	AllowRegExp  bool
 }
 
+var defaultAllowedTypes = []utils.TypeOrValueSpecifier{{
+	From: utils.TypeOrValueSpecifierFromLib,
+	Name: utils.NameList{"Error", "URL", "URLSearchParams"},
+}}
+
 func parseOptions(options []any) RestrictTemplateExpressionsOptions {
 	opts := RestrictTemplateExpressionsOptions{
-		Allow: []utils.TypeOrValueSpecifier{{
-			From: utils.TypeOrValueSpecifierFromLib,
-			Name: utils.NameList{"Error", "URL", "URLSearchParams"},
-		}},
+		Allow:        defaultAllowedTypes,
 		AllowAny:     true,
 		AllowBoolean: true,
 		AllowNullish: true,
@@ -70,7 +73,7 @@ func parseOptions(options []any) RestrictTemplateExpressionsOptions {
 func buildInvalidTypeMessage(t string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "invalidType",
-		Description: fmt.Sprintf("Invalid type \"%v\" of template literal expression.", t),
+		Description: "Invalid type \"" + t + "\" of template literal expression.",
 	}
 }
 
@@ -90,29 +93,128 @@ func getBaseTypesForType(typeChecker *checker.Checker, t *checker.Type) []*check
 	return checker.Checker_getBaseTypes(typeChecker, target)
 }
 
-// matchesTypeOrBaseType reports whether the type or any of its base types
-// satisfies the matcher.
-func matchesTypeOrBaseType(
+// matchesAllowedTypeOrBaseType reports whether the type or any of its base
+// types satisfies one of the configured allow specifiers. It only allocates a
+// visited set when there are base types to traverse.
+func matchesAllowedTypeOrBaseType(
 	typeChecker *checker.Checker,
-	matcher func(t *checker.Type) bool,
 	t *checker.Type,
+	allow []utils.TypeOrValueSpecifier,
+	program *compiler.Program,
+) bool {
+	if utils.TypeMatchesSomeSpecifier(t, allow, nil, program) {
+		return true
+	}
+
+	baseTypes := getBaseTypesForType(typeChecker, t)
+	if len(baseTypes) == 0 {
+		return false
+	}
+
+	seen := make(map[*checker.Type]struct{}, len(baseTypes)+1)
+	seen[t] = struct{}{}
+	for _, base := range baseTypes {
+		if matchesAllowedBaseType(typeChecker, base, allow, program, seen) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesAllowedBaseType(
+	typeChecker *checker.Checker,
+	t *checker.Type,
+	allow []utils.TypeOrValueSpecifier,
+	program *compiler.Program,
 	seen map[*checker.Type]struct{},
 ) bool {
 	if _, ok := seen[t]; ok {
 		return false
 	}
 	seen[t] = struct{}{}
-
-	if matcher(t) {
+	if utils.TypeMatchesSomeSpecifier(t, allow, nil, program) {
 		return true
 	}
-
 	for _, base := range getBaseTypesForType(typeChecker, t) {
-		if matchesTypeOrBaseType(typeChecker, matcher, base, seen) {
+		if matchesAllowedBaseType(typeChecker, base, allow, program, seen) {
 			return true
 		}
 	}
 	return false
+}
+
+type templateExpressionTypeChecker struct {
+	typeChecker *checker.Checker
+	program     *compiler.Program
+	options     RestrictTemplateExpressionsOptions
+}
+
+func (c *templateExpressionTypeChecker) isAllowed(innerType *checker.Type, arrayPath []*checker.Type) bool {
+	if innerType == nil {
+		return false
+	}
+	if utils.IsUnionType(innerType) {
+		for _, part := range innerType.Types() {
+			if !c.isAllowed(part, arrayPath) {
+				return false
+			}
+		}
+		return true
+	}
+	if utils.IsIntersectionType(innerType) {
+		for _, part := range innerType.Types() {
+			if c.isAllowed(part, arrayPath) {
+				return true
+			}
+		}
+		return false
+	}
+
+	if utils.IsTypeFlagSet(innerType, checker.TypeFlagsStringLike) {
+		return true
+	}
+
+	// These checks are pure alternatives to the allow list. Checking them first
+	// avoids symbol and declaration work for the common primitive paths.
+	if c.options.AllowAny && utils.IsTypeAnyType(innerType) {
+		return true
+	}
+	if c.options.AllowArray &&
+		(checker.Checker_isArrayType(c.typeChecker, innerType) || checker.IsTupleType(innerType)) {
+		if !slices.Contains(arrayPath, innerType) {
+			if arrayPath == nil {
+				arrayPath = make([]*checker.Type, 0, 4)
+			}
+			if c.isAllowed(
+				utils.GetNumberIndexType(c.typeChecker, innerType),
+				append(arrayPath, innerType),
+			) {
+				return true
+			}
+		}
+	}
+	if c.options.AllowBoolean && utils.IsTypeFlagSet(innerType, checker.TypeFlagsBooleanLike) {
+		return true
+	}
+	if c.options.AllowNullish && utils.IsTypeFlagSet(innerType, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
+		return true
+	}
+	if c.options.AllowNumber && utils.IsTypeFlagSet(innerType, checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) {
+		return true
+	}
+	if c.options.AllowNever && utils.IsTypeFlagSet(innerType, checker.TypeFlagsNever) {
+		return true
+	}
+
+	if len(c.options.Allow) > 0 && matchesAllowedTypeOrBaseType(
+		c.typeChecker,
+		innerType,
+		c.options.Allow,
+		c.program,
+	) {
+		return true
+	}
+	return c.options.AllowRegExp && utils.GetTypeName(c.typeChecker, innerType) == "RegExp"
 }
 
 var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
@@ -120,55 +222,10 @@ var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Schema:           rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := parseOptions(options)
-
-		var recursivelyCheckType func(innerType *checker.Type) bool
-		recursivelyCheckType = func(innerType *checker.Type) bool {
-			if innerType == nil {
-				return false
-			}
-			if utils.IsUnionType(innerType) {
-				return utils.Every(innerType.Types(), recursivelyCheckType)
-			}
-			if utils.IsIntersectionType(innerType) {
-				return utils.Some(innerType.Types(), recursivelyCheckType)
-			}
-
-			if utils.IsTypeFlagSet(innerType, checker.TypeFlagsStringLike) {
-				return true
-			}
-
-			if len(opts.Allow) > 0 && matchesTypeOrBaseType(ctx.TypeChecker, func(t *checker.Type) bool {
-				return utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program)
-			}, innerType, map[*checker.Type]struct{}{}) {
-				return true
-			}
-
-			if opts.AllowAny && utils.IsTypeAnyType(innerType) {
-				return true
-			}
-			if opts.AllowArray &&
-				(checker.Checker_isArrayType(ctx.TypeChecker, innerType) || checker.IsTupleType(innerType)) &&
-				recursivelyCheckType(utils.GetNumberIndexType(ctx.TypeChecker, innerType)) {
-				return true
-			}
-			if opts.AllowBoolean && utils.IsTypeFlagSet(innerType, checker.TypeFlagsBooleanLike) {
-				return true
-			}
-			if opts.AllowNullish && utils.IsTypeFlagSet(innerType, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-				return true
-			}
-			if opts.AllowNumber && utils.IsTypeFlagSet(innerType, checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) {
-				return true
-			}
-			if opts.AllowRegExp && utils.GetTypeName(ctx.TypeChecker, innerType) == "RegExp" {
-				return true
-			}
-			if opts.AllowNever && utils.IsTypeFlagSet(innerType, checker.TypeFlagsNever) {
-				return true
-			}
-
-			return false
+		typeChecker := templateExpressionTypeChecker{
+			typeChecker: ctx.TypeChecker,
+			program:     ctx.Program,
+			options:     parseOptions(options),
 		}
 
 		return rule.RuleListeners{
@@ -181,7 +238,12 @@ var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
 				for _, span := range node.AsTemplateExpression().TemplateSpans.Nodes {
 					expression := span.AsTemplateSpan().Expression
 					expressionType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression)
-					if !recursivelyCheckType(expressionType) {
+					// Keep the overwhelmingly common direct-string path out of the
+					// recursive checker.
+					if expressionType != nil && utils.IsTypeFlagSet(expressionType, checker.TypeFlagsStringLike) {
+						continue
+					}
+					if !typeChecker.isAllowed(expressionType, nil) {
 						ctx.ReportNode(expression, buildInvalidTypeMessage(ctx.TypeChecker.TypeToString(expressionType)))
 					}
 				}

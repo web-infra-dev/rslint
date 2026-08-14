@@ -74,6 +74,10 @@ type Func = (test: string) => typeof test;
 ### `allow`, `builtinGlobals`, `ignoreOnInitialization`
 
 Same semantics and defaults as the ESLint core rule.
+When `builtinGlobals` is enabled, names from
+[`languageOptions.globals`](/config/#languageoptionsglobals) participate too;
+the `globals` catalog exported by `@rslint/core` provides runtime environment
+maps.
 
 ## Original Documentation
 

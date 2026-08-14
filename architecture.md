@@ -498,10 +498,12 @@ Rslint supports two configuration formats following ESLint flat config semantics
 
 #### JS/TS Configuration (Recommended)
 
-Rslint automatically discovers `rslint.config.js`, `rslint.config.mjs`, `rslint.config.ts`, and `rslint.config.mts`. Explicit configuration paths also support `.cjs` and `.cts` files through CLI `--config` and API `overrideConfigFile`. JS/TS config files support preset composition via `defineConfig()`:
+Rslint automatically discovers `rslint.config.js`, `rslint.config.mjs`, `rslint.config.ts`, and `rslint.config.mts`. Explicit configuration paths also support `.cjs` and `.cts` files through CLI `--config` and API `overrideConfigFile`. JS/TS config files support preset composition via `defineConfig()`. The package root exports the complete catalog from its pinned build-time `globals` dependency, so consumers use the same flat-config composition shape without installing another package. During the library-surface Rspack compilation, an asset plugin mechanically splits every upstream top-level set into `dist/globals/<name>.json`. The root contains only the ordered upstream set-name table and synchronous accessors: importing it or calling `Object.keys(globals)` parses no environment data; the first `globals.browser` access loads and caches only `browser.json`. Rslint-specific sets that do not exist upstream are small ordinary objects registered directly in the runtime catalog; they neither pass through the asset plugin nor issue a runtime `require`. Operations that read every upstream value, such as `{ ...globals }`, intentionally load every upstream set. These assets share the existing worker distribution contract: direct package use works, while a redistributor must preserve the complete `dist` layout or leave `@rslint/core` external instead of treating one entry file as a self-contained bundle. The pinned package's exact readonly/literal declarations are shipped in the private `dist/globals/index.d.ts` module; the root declaration uses an `import()` type query, so upstream declaration names stay isolated and consumers have no dependency on `globals`.
+
+A selected map enters the existing `languageOptions.globals` path as an explicit declaration: config matching, flat merge, the Go rule runtime, and the ESLint-plugin worker all consume the same effective globals. This does not enable any runtime environment by default or change the parser edition. The data assets are emitted only with the root library surface, not duplicated into the service, internal, or worker outputs. The worker keeps a small edition-aware ECMAScript table aligned with the Go catalog; for TypeScript ASTs it reconciles scope-manager's value bindings to that table while retaining its type-only lib bindings.
 
 ```typescript
-import { defineConfig, js, ts } from '@rslint/core';
+import { defineConfig, globals, js, ts } from '@rslint/core';
 
 export default defineConfig([
   {
@@ -509,6 +511,10 @@ export default defineConfig([
   },
   js.configs.recommended,
   ts.configs.recommended,
+  {
+    files: ['**/*.js'],
+    languageOptions: { globals: globals.node },
+  },
   {
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
@@ -1117,6 +1123,7 @@ goroutines remain outside that guarantee.
 - **LSP Session Reuse**: `internal/lsp` builds a shared ts-go `project.Session`, so configured projects, inferred projects, and overlay document state are reused across requests.
 - **LSP Standalone Program Ownership**: rslint retains standalone Programs only for declared custom projects that the main Session does not own. The owner is keyed by the exact config path, receives serialized LSP document events, and uses ts-go's incremental Program update only for known source changes. Config, project-shape, and covered filesystem changes discard the affected resident state. Filesystem reads made during Program construction and lazy checker work are mapped to client watchers with ts-go's existing watch utilities; registration failure falls back to fresh standalone construction. Clients without watched-file support also retain the fresh behavior. No second Session or rslint ParseCache is introduced.
 - **Parse Cache in LSP**: the LSP server passes a shared ts-go `project.ParseCache` into the session to avoid re-parsing from scratch on every change.
+- **SourceFile-Owned Module Syntax Reuse**: normal LSP diagnostics may attach the syntax-only module-specifier projection to an immutable ts-go `SourceFile`, independently of standalone Program or watcher availability. Programs reusing that exact file object share collection, while module resolution remains local to each `Program`. Attached values may contain only scalars and nodes owned by that SourceFile—never a `Program`, resolved target, checker state, or another SourceFile. Replaced files and files removed from a Program carry the attached data out with their own AST lifetime; no LSP Server map, project-membership sweep, or explicit reset owns this cache. A fresh fallback can retain data only for its transient SourceFile lifetime. Speculative LSP Programs, CLI, and API runs keep collection run-local.
 - **Incremental LSP Document Sync**: editor changes reach the server immediately and are applied in order to both rslint's document mirror and the ts-go Session overlay. rslint selects the mandatory LSP UTF-16 encoding so incoming changes, native diagnostics, plugin diagnostics, and edits share VS Code's coordinate model. Whole-document changes remain a supported protocol fallback.
 - **Server-Owned Debounced Re-linting**: `refreshCh` and `debounceCh` collapse bursts of file changes and session refreshes onto the main dispatch loop. The server remains the single owner of the 200 ms typing debounce; open and save diagnostics stay immediate, while save, fix-all, and close discard redundant pending work for their target document.
 - **CLI/API Are Mostly Fresh Runs**: CLI and one-shot API requests generally rebuild `Program` state per run; there is no repository-local rule-result cache or persistent incremental lint cache in the main CLI path today. JavaScript API path canonicalization is also scoped to one `lintFiles()` call.

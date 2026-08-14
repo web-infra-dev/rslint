@@ -50,8 +50,10 @@ namespace Foo {}
 
 When `true`, the rule reports redeclaring ECMAScript built-in globals and names
 provided by TypeScript's active lib type definitions, such as `Object`,
-`Promise`, or `HTMLElement`. Configured `languageOptions.globals` also
-participate as built-ins. Active `/* global */` directives participate as
+`Promise`, or `HTMLElement`. Configured
+[`languageOptions.globals`](/config/#languageoptionsglobals) also participate as
+built-ins; use the `globals` catalog exported by `@rslint/core` to select a
+runtime environment. Active `/* global */` directives participate as
 declarations in either mode; a final `:off` setting removes that inline global.
 Turning off a value global does not remove a same-named TypeScript type global.
 

@@ -268,23 +268,44 @@ A disabled value removes a declaration inherited from an earlier matching entry,
 }
 ```
 
-ECMAScript built-ins such as `Array` and `Promise` are always declared. Globals a runtime adds on top of those — `window` and `document` in a browser, `process` and `__dirname` in Node.js — are not, so declare the ones your files use. The [`globals`](https://www.npmjs.com/package/globals) package collects them per environment; spread in every environment the matched files run in:
+ECMAScript built-ins are declared according to `languageOptions.ecmaVersion` (`Array` from ES3, `Promise` from ES2015, and so on). Globals a runtime adds on top of those — `window` and `document` in a browser, `process` and `__dirname` in Node.js — are not enabled by default. `@rslint/core` includes the [`globals`](https://www.npmjs.com/package/globals) catalog and exports its environment maps directly, so no extra dependency is required:
 
 ```ts
-import globals from 'globals';
+import { globals } from '@rslint/core';
 
 export default [
   {
     files: ['**/*.js'],
     languageOptions: {
-      globals: { ...globals.browser, ...globals.node },
+      globals: {
+        ...globals.browser,
+        BUILD_ID: 'readonly',
+      },
     },
   },
 ];
 ```
 
+The export has the same set names, global names, and boolean access values as importing the npm package directly: `false` means read-only and `true` means writable. In the published package, each set is synchronously loaded and cached the first time its property is read, so importing `@rslint/core` does not parse the complete catalog. Compose multiple environments with ordinary object spreads; later spreads and explicit properties take precedence:
+
+```ts
+languageOptions: {
+  globals: {
+    ...globals.browser,
+    ...globals.worker,
+    location: 'off',
+  },
+}
+```
+
+`globals.node` includes the CommonJS globals (`require`, `module`, `exports`, `__dirname`, and `__filename`); use `globals.nodeBuiltin` for Node.js ESM files that should not receive them. The included catalog also exposes the upstream `builtin`, `es3`, `es5`, and `es20xx` maps for API parity, but `languageOptions.ecmaVersion` is the preferred way to select standard-language globals because it keeps parsing and both rule runtimes on the same edition.
+
+Every map is an explicit globals declaration. It does not change the parser edition, and it can intentionally override the edition-derived set. For example, an upstream host map containing `Temporal` declares that name even when `ecmaVersion` is `2025`. Loaded maps are shared and cached, so compose and override them with object spreads instead of mutating `globals.browser` or another map in place. Enumerating only `Object.keys(globals)` remains lazy; reading or spreading the complete `globals` object necessarily loads every map.
+
+Flat config continues to merge individual global names in matching-entry order. Scope environment maps with `files`, and use a later explicit `{ process: 'off' }` when one inherited global must be removed.
+
 :::tip
-TypeScript files resolve globals from the declaration files their tsconfig pulls in — `lib.dom.d.ts` for `window` and `document`, `@types/node` for `process` and `__dirname`, and any `.d.ts` in the project that declares one. Reach for `globals` on the entries covering plain JavaScript files.
+TypeScript's compiler and type-aware rules can resolve declarations from `lib.dom.d.ts`, `@types/node`, and project `.d.ts` files. ESLint-compatible global rules such as `no-undef` and `no-global-assign` intentionally use the flat config's globals instead of TypeScript ambient declarations. The TypeScript presets disable `no-undef`; if you enable such a global rule for TypeScript files, configure their runtime environments too.
 :::
 
 ### settings

@@ -35,7 +35,9 @@ var Hello = require('./Hello');
 
 ### `allowGlobals`
 
-When `false` (default), a JSX tag identifier in a module (a file with `import`/`export`) is only recognized if it's declared in the source file (via `var` / `let` / `const` / `function` / `class` / `enum` / `namespace` / `import` / `declare` / function parameter / catch binding / loop binding) — names declared only via config `languageOptions.globals` or `/* global */` comments are still reported. Set `allowGlobals: true` to also allow those. Script files (no `import`/`export`) always consult declared globals, regardless of this option — matching ESLint.
+When `false` (default), a JSX tag identifier in a module (a file with `import`/`export`) is only recognized if it's declared in the source file (via `var` / `let` / `const` / `function` / `class` / `enum` / `namespace` / `import` / `declare` / function parameter / catch binding / loop binding) — names declared only via config [`languageOptions.globals`](/config/#languageoptionsglobals) or `/* global */` comments are still reported. Set `allowGlobals: true` to also allow those. Script files (no `import`/`export`) always consult declared globals, regardless of this option — matching ESLint.
+
+Use the `globals` catalog exported by `@rslint/core` when JSX components are provided by a runtime or test environment rather than imported by the file.
 
 ## Original Documentation
 

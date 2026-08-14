@@ -22,6 +22,7 @@ analysed
 anee
 anyfunc
 anyof
+applescript
 apos
 argl
 Armn
@@ -31,6 +32,7 @@ arrayliteralexpression
 ascript
 assertee
 asynchrony
+atomtest
 autobinding
 autofixers
 autofocus
@@ -142,6 +144,7 @@ DPUB
 dropeffect
 eacute
 embedfs
+embertest
 endline
 englishish
 enochian
@@ -334,6 +337,7 @@ mynamespace
 módulo
 nanotime
 napi
+nashorn
 native
 nbsp
 neighbour
@@ -418,6 +422,7 @@ promisify
 promisifying
 propertyassignment
 proptypes
+prototypejs
 psdifjo
 Ptrs
 pullquote
@@ -501,6 +506,7 @@ Seeked
 segs
 semacquire
 serde
+serviceworker
 setsize
 Setstate
 setstate

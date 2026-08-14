@@ -15,6 +15,7 @@
         },
         "defaultCaseCommentPattern": {
           "type": "string",
+          "format": "regex",
           "description": "Regular expression for a comment that can indicate an intentionally omitted default case."
         },
         "requireDefaultForNonUnion": {

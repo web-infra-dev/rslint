@@ -31,7 +31,10 @@ import * as tsScopeManagerPkg from '@typescript-eslint/scope-manager';
 import * as eslintScopePkg from 'eslint-scope';
 
 import { VISITOR_KEYS } from './visitor-keys.js';
-import { BUILTIN_GLOBAL_NAMES } from './builtin-globals.js';
+import {
+  ECMASCRIPT_GLOBALS,
+  LATEST_ECMASCRIPT_VERSION,
+} from './builtin-globals.js';
 import type { GlobalAccess } from '../types.js';
 
 type NormalizedGlobalAccess = 'readonly' | 'writable' | 'off';
@@ -123,11 +126,12 @@ export function makeScopeManagerFactory(
 
 function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
   const useTs = shouldUseTsScopeManager(opts.filePath);
+  const ecmaVersion = normalizeEcmaVersion(opts.ecmaVersion);
   if (useTs) {
     const tsScope = tsScopeManagerPkg as unknown as {
       analyze: (ast: object, options?: object) => unknown;
     };
-    return tsScope.analyze(ast, {
+    const scopeManager = tsScope.analyze(ast, {
       sourceType: opts.sourceType ?? 'module',
       // eslint-scope (the JS-side analyzer) auto-enables nodejsScope
       // when `sourceType === 'commonjs'` — see its `isImpliedStrict()`
@@ -151,7 +155,13 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
       // override via languageOptions.parserOptions.ecmaFeatures.
       jsxPragma: opts.jsxPragma ?? 'React',
       jsxFragmentName: opts.jsxFragmentName ?? 'Fragment',
+      // Keep scope-manager's established esnext *type* catalog, but never let
+      // it independently decide runtime globals. seedEcmaGlobals reconciles
+      // every value binding with the same ecmaVersion table used by native
+      // rules while retaining type-only bindings.
+      lib: ['esnext'],
     });
+    return scopeManager;
   }
 
   const eslintScope = eslintScopePkg as unknown as {
@@ -170,8 +180,7 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
   // `eslint-visitor-keys` `KEYS` on JS / JSX / decorator scope trees
   // before the switch (identical scope trees).
   return eslintScope.analyze(ast, {
-    ecmaVersion:
-      opts.ecmaVersion === 'latest' ? 2025 : (opts.ecmaVersion ?? 2025),
+    ecmaVersion,
     sourceType: opts.sourceType ?? 'module',
     // ESLint v10 default `false` — see jsdoc on ScopeFactoryOptions.
     impliedStrict: opts.impliedStrict ?? false,
@@ -193,30 +202,152 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
 
 // Minimal shape of an eslint-scope Variable that the
 // post-analyze resolution loop and downstream plugin rules read.
+interface GlobalReference {
+  identifier?: { name?: string };
+  resolved?: unknown;
+  isTypeReference?: boolean;
+  isValueReference?: boolean;
+}
+
 interface SyntheticGlobal {
   name: string;
-  defs: unknown[];
+  defs: Array<{ isVariableDefinition?: boolean }>;
   identifiers: unknown[];
-  references: Array<{ identifier?: { name?: string }; resolved?: unknown }>;
-  writeable: boolean;
+  references: GlobalReference[];
+  writeable?: boolean;
   eslintImplicitGlobalSetting?: 'readonly' | 'writable';
   scope: unknown;
+  isTypeVariable?: boolean;
+  isValueVariable?: boolean;
 }
 
 const syntheticGlobals = new WeakSet<object>();
+const promotedTypeOnlyGlobals = new WeakSet<object>();
 
 interface GlobalScopeLike {
   variables: SyntheticGlobal[];
   set?: Map<string, SyntheticGlobal>;
-  through?: Array<{ identifier?: { name?: string }; resolved?: unknown }>;
+  through?: GlobalReference[];
+}
+
+function normalizeEcmaVersion(
+  ecmaVersion: number | 'latest' | undefined,
+): number {
+  const resolvedVersion =
+    ecmaVersion == null || ecmaVersion === 'latest'
+      ? LATEST_ECMASCRIPT_VERSION
+      : ecmaVersion;
+  const latestEditionAlias = LATEST_ECMASCRIPT_VERSION - 2009;
+  return resolvedVersion >= 6 && resolvedVersion <= latestEditionAlias
+    ? resolvedVersion + 2009
+    : resolvedVersion;
+}
+
+function isTypeScriptImplicitLibVariable(variable: SyntheticGlobal): boolean {
+  return (
+    !syntheticGlobals.has(variable) &&
+    Object.hasOwn(variable, 'isTypeVariable') &&
+    Object.hasOwn(variable, 'isValueVariable')
+  );
+}
+
+function hasRuntimeDefinition(variable: SyntheticGlobal): boolean {
+  return variable.defs.some(
+    (definition) => definition.isVariableDefinition === true,
+  );
+}
+
+function isTypeOnlySourceGlobal(variable: SyntheticGlobal): boolean {
+  return (
+    !syntheticGlobals.has(variable) &&
+    !isTypeScriptImplicitLibVariable(variable) &&
+    (promotedTypeOnlyGlobals.has(variable) ||
+      (variable.defs.length > 0 &&
+        !hasRuntimeDefinition(variable) &&
+        variable.isTypeVariable === true &&
+        variable.isValueVariable === false))
+  );
+}
+
+function clearGlobalMode(variable: SyntheticGlobal): void {
+  // The TS analyzer's ImplicitLibVariable eagerly carries readonly metadata.
+  // Remove it when the value is outside ecmaVersion or explicitly off. A real
+  // source value may remain resolved, but it must not masquerade as a builtin.
+  Reflect.deleteProperty(variable, 'writeable');
+  Reflect.deleteProperty(variable, 'eslintImplicitGlobalSetting');
+}
+
+function promoteTypeOnlySourceGlobal(variable: SyntheticGlobal): void {
+  // Variable exposes isValueVariable through a getter, so assignment cannot
+  // override it. An own, configurable value half models ScopeManager.addGlobals
+  // and lets `off` later restore the original type-only getter semantics.
+  Object.defineProperty(variable, 'isValueVariable', {
+    configurable: true,
+    enumerable: true,
+    value: true,
+    writable: true,
+  });
+  promotedTypeOnlyGlobals.add(variable);
+}
+
+function canResolveReference(
+  variable: SyntheticGlobal,
+  reference: GlobalReference,
+): boolean {
+  if (
+    typeof variable.isTypeVariable !== 'boolean' ||
+    typeof variable.isValueVariable !== 'boolean' ||
+    (typeof reference.isTypeReference !== 'boolean' &&
+      typeof reference.isValueReference !== 'boolean')
+  ) {
+    return true;
+  }
+  return (
+    (reference.isTypeReference === true && variable.isTypeVariable) ||
+    (reference.isValueReference === true && variable.isValueVariable)
+  );
+}
+
+function restoreUnresolvedReferences(
+  gs: GlobalScopeLike,
+  variable: SyntheticGlobal,
+  keepResolved: (reference: GlobalReference) => boolean,
+): void {
+  if (variable.references.length === 0) return;
+  const through = gs.through ?? (gs.through = []);
+  const retained: GlobalReference[] = [];
+  for (const reference of variable.references) {
+    if (keepResolved(reference)) {
+      retained.push(reference);
+      continue;
+    }
+    reference.resolved = null;
+    through.push(reference);
+  }
+  variable.references = retained;
+}
+
+function demoteTypeScriptValueGlobal(
+  gs: GlobalScopeLike,
+  variable: SyntheticGlobal,
+): void {
+  if (promotedTypeOnlyGlobals.has(variable)) {
+    Reflect.deleteProperty(variable, 'isValueVariable');
+    promotedTypeOnlyGlobals.delete(variable);
+  } else {
+    variable.isValueVariable = false;
+  }
+  clearGlobalMode(variable);
+  restoreUnresolvedReferences(gs, variable, (reference) =>
+    canResolveReference(variable, reference),
+  );
 }
 
 /**
  * Add or update a synthetic global Variable in `globalScope`. Returns
  * the (newly created or existing) Variable.
  *
- * Mode is synced to `mode` for existing synthetic entries. Source-declared
- * Variables are left unchanged. ESLint's
+ * Mode is synced to `mode` for existing entries. ESLint's
  * apply-environments + apply-globals pipeline lets user globals
  * (`languageOptions.globals: { Array: 'writable' }`) override the
  * built-in mode flags layered earlier by `seedEcmaGlobals`. Pre-fix
@@ -235,13 +366,21 @@ function ensureGlobal(
 ): SyntheticGlobal {
   const existing = gs.set?.get(name);
   if (existing) {
-    // A source declaration can share a name with a configured/built-in global.
-    // Config globals must not rewrite that lexical Variable's semantics.
-    if (!syntheticGlobals.has(existing)) return existing;
-    // Sync mode — see jsdoc. The Variable's identity stays; only the
-    // mode flags shift. Downstream rules consult `writeable` (the
-    // typo'd-as-eslint-compat field) and `eslintImplicitGlobalSetting`
-    // (the modern name); both must move in lockstep.
+    // TS type declarations share a namespace with runtime globals. If an
+    // interface/type alias shadows a configured name, add only the value half;
+    // a later `off` can remove it without disturbing type references.
+    if (isTypeOnlySourceGlobal(existing)) {
+      promoteTypeOnlySourceGlobal(existing);
+    } else if (
+      isTypeScriptImplicitLibVariable(existing) &&
+      !hasRuntimeDefinition(existing)
+    ) {
+      existing.isValueVariable = true;
+    }
+    // ScopeManager.addGlobals preserves an existing source Variable but ESLint
+    // still applies the configured mode. This matters when an ImplicitLibVariable
+    // has merged with a runtime declaration: stale lib readonly metadata must
+    // not defeat an explicit writable override.
     existing.writeable = mode === 'writable';
     existing.eslintImplicitGlobalSetting = mode;
     return existing;
@@ -286,7 +425,7 @@ function resolveThroughReferences(gs: GlobalScopeLike): void {
       continue;
     }
     const v = gs.set?.get(name);
-    if (v) {
+    if (v && canResolveReference(v, ref)) {
       v.references.push(ref);
       ref.resolved = v;
     } else {
@@ -298,25 +437,46 @@ function resolveThroughReferences(gs: GlobalScopeLike): void {
 }
 
 /**
- * Seed ECMA built-in globals (`globals.builtin` from the `globals` npm
- * package: parseInt, NaN, Infinity, Array, Object, ...) into the
- * global scope as `readonly` Variables. ESLint's flat-config does this
- * by default before any user-supplied `languageOptions.globals` are
- * applied; rslint mirrors that here so plugin rules that walk the
- * global scope (e.g. via `ReferenceTracker.iterateGlobalReferences`)
- * see the same variable set on both engines.
+ * Seed the ECMAScript globals selected by `languageOptions.ecmaVersion` into
+ * the global scope as `readonly` Variables. The versioned table is generated
+ * from Go's native-rule source of truth so native rules and community plugins
+ * see the same language globals. User `languageOptions.globals` are layered on
+ * afterward and may override or disable them.
  *
  * Idempotent: calling twice doesn't duplicate entries.
  */
-export function seedEcmaGlobals(scopeManager: unknown): void {
+export function seedEcmaGlobals(
+  scopeManager: unknown,
+  ecmaVersion: number | 'latest' = 'latest',
+): void {
   if (!scopeManager) return;
   const sm = scopeManager as { globalScope?: GlobalScopeLike };
   const gs = sm.globalScope;
   if (!gs) return;
 
-  for (const name of BUILTIN_GLOBAL_NAMES) {
-    ensureGlobal(gs, name, 'readonly');
+  const normalizedVersion = normalizeEcmaVersion(ecmaVersion);
+  const selectedNames = new Set<string>();
+  for (const [name, introducedIn] of ECMASCRIPT_GLOBALS) {
+    if (introducedIn <= normalizedVersion) {
+      selectedNames.add(name);
+    }
   }
+
+  // The TypeScript analyzer needs lib data for type bindings, but its value
+  // catalog must not bypass languageOptions.ecmaVersion (or introduce esnext
+  // proposals that native rules do not know). Demote only the value side;
+  // type-only references remain resolved against the lib variable.
+  for (const variable of gs.variables) {
+    if (!isTypeScriptImplicitLibVariable(variable)) continue;
+    if (selectedNames.has(variable.name)) continue;
+    if (hasRuntimeDefinition(variable)) {
+      variable.isValueVariable = true;
+      clearGlobalMode(variable);
+    } else {
+      demoteTypeScriptValueGlobal(gs, variable);
+    }
+  }
+  for (const name of selectedNames) ensureGlobal(gs, name, 'readonly');
   resolveThroughReferences(gs);
 }
 
@@ -353,9 +513,17 @@ export function seedGlobals(
     const mode = normalizeGlobalAccess(access);
     if (mode == null) continue;
     if (mode === 'off') {
-      // 'off' explicitly removes the binding — drop any synthetic entry.
+      // 'off' explicitly removes the runtime binding. A TypeScript lib entry
+      // may also carry a type binding, so retain that half while restoring all
+      // value references to `through`.
       const v = gs.set?.get(name);
-      if (v && syntheticGlobals.has(v)) {
+      if (
+        v &&
+        (promotedTypeOnlyGlobals.has(v) ||
+          (isTypeScriptImplicitLibVariable(v) && !hasRuntimeDefinition(v)))
+      ) {
+        demoteTypeScriptValueGlobal(gs, v);
+      } else if (v && syntheticGlobals.has(v)) {
         // Restore any references that `seedEcmaGlobals` previously
         // moved from `gs.through` onto this Variable. Without this,
         // every ref is left dangling on a deleted Variable —
@@ -372,17 +540,17 @@ export function seedGlobals(
         // identifier" — i.e. its refs become unresolved-throughs,
         // exactly the state they'd be in if seedEcmaGlobals had
         // never added the Variable to begin with.
-        if (Array.isArray(v.references) && v.references.length > 0) {
-          const through = gs.through ?? (gs.through = []);
-          for (const ref of v.references) {
-            (ref as { resolved?: unknown }).resolved = null;
-            through.push(ref);
-          }
-          v.references = [];
-        }
+        restoreUnresolvedReferences(gs, v, () => false);
         const idx = gs.variables.indexOf(v);
         if (idx >= 0) gs.variables.splice(idx, 1);
         gs.set?.delete(name);
+      } else if (v) {
+        // `off` removes only the configured/global-object meaning. Source
+        // declarations keep their value binding and references.
+        if (isTypeScriptImplicitLibVariable(v) && hasRuntimeDefinition(v)) {
+          v.isValueVariable = true;
+        }
+        clearGlobalMode(v);
       }
       continue;
     }
