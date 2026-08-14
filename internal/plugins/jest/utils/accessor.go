@@ -20,7 +20,7 @@ func AccessorQuestionDotToken(accessor *ast.Node) *ast.Node {
 // shared with the Rstest plugin. That version derives the operation following
 // the removed accessor from the AST rather than from the next element of the
 // parsed chain, which is both what an alias-resolved entry needs — its
-// neighbours are not in that chain at all — and one fewer way for two copies of
+// neighbors are not in that chain at all — and one fewer way for two copies of
 // this logic to drift apart. It is also why this takes the entry itself: the
 // surrounding slice and an index into it are no longer needed.
 func RemoveMemberAccessorFixes(
