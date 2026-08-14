@@ -3,55 +3,23 @@ package utils
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
 )
 
-func ComparePaths(a string, b string, program *compiler.Program) int {
+func ComparePaths(a string, b string, program *program.Program) int {
 	return tspath.ComparePaths(a, b, tspath.ComparePathsOptions{
-		CurrentDirectory:          program.Host().GetCurrentDirectory(),
-		UseCaseSensitiveFileNames: program.Host().FS().UseCaseSensitiveFileNames(),
+		CurrentDirectory:          program.CurrentDirectory(),
+		UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames(),
 	})
 }
 
-func IsSourceFileDefaultLibrary(program *compiler.Program, file *ast.SourceFile) bool {
-	if !file.IsDeclarationFile {
-		return false
-	}
-
-	if program.IsSourceFileDefaultLibrary(file.Path()) {
-		return true
-	}
-
-	options := program.Options()
-
-	if options.NoLib.IsTrue() {
-		return false
-	}
-
-	// copied from program.go
-	var libs []string
-	if options.Lib == nil {
-		name := tsoptions.GetDefaultLibFileName(options)
-		libs = append(libs, tspath.CombinePaths(program.Host().DefaultLibraryPath(), name))
-	} else {
-		for _, lib := range options.Lib {
-			name, ok := tsoptions.GetLibFileName(lib)
-			if ok {
-				libs = append(libs, tspath.CombinePaths(program.Host().DefaultLibraryPath(), name))
-			}
-			// !!! error on unknown name
-		}
-	}
-
-	return Some(libs, func(lib string) bool {
-		return ComparePaths(file.FileName(), lib, program) == 0
-	})
+func IsSourceFileDefaultLibrary(program *program.Program, file *ast.SourceFile) bool {
+	return program != nil && program.IsSourceFileDefaultLibrary(file)
 }
 
 func IsSymbolFromDefaultLibrary(
-	program *compiler.Program,
+	program *program.Program,
 	symbol *ast.Symbol,
 ) bool {
 	if symbol == nil {
@@ -72,22 +40,22 @@ func IsSymbolFromDefaultLibrary(
 // TypeScript default libraries to dst. Symbols are collected from a default-lib
 // source location so a same-named declaration in the linted module cannot hide
 // the global from GetSymbolsInScope.
-func AddDefaultLibraryGlobals(dst map[string]bool, program *compiler.Program, typeChecker *checker.Checker) {
+func AddDefaultLibraryGlobals(dst map[string]bool, program *program.Program, typeChecker *checker.Checker) {
 	addDefaultLibraryGlobalNames(dst, program, typeChecker, ast.SymbolFlagsValue)
 }
 
 // AddDefaultLibraryTypeGlobalNames adds the type-space subset of active
 // TypeScript default-library global names to dst.
-func AddDefaultLibraryTypeGlobalNames(dst map[string]bool, program *compiler.Program, typeChecker *checker.Checker) {
+func AddDefaultLibraryTypeGlobalNames(dst map[string]bool, program *program.Program, typeChecker *checker.Checker) {
 	addDefaultLibraryGlobalNames(dst, program, typeChecker, ast.SymbolFlagsType)
 }
 
-func addDefaultLibraryGlobalNames(dst map[string]bool, program *compiler.Program, typeChecker *checker.Checker, flags ast.SymbolFlags) {
+func addDefaultLibraryGlobalNames(dst map[string]bool, program *program.Program, typeChecker *checker.Checker, flags ast.SymbolFlags) {
 	if dst == nil || program == nil || typeChecker == nil {
 		return
 	}
 
-	for _, sourceFile := range program.GetSourceFiles() {
+	for _, sourceFile := range program.SourceFiles() {
 		if !IsSourceFileDefaultLibrary(program, sourceFile) {
 			continue
 		}
@@ -111,7 +79,7 @@ func addDefaultLibraryGlobalNames(dst map[string]bool, program *compiler.Program
  * ```
  */
 func IsPromiseLike(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type) bool {
 	return IsBuiltinSymbolLike(program, typeChecker, t, "Promise")
@@ -126,7 +94,7 @@ func IsPromiseLike(
  * ```
  */
 func IsPromiseConstructorLike(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) bool {
@@ -142,7 +110,7 @@ func IsPromiseConstructorLike(
  * ```
  */
 func IsErrorLike(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type) bool {
 	return IsBuiltinSymbolLike(program, typeChecker, t, "Error")
@@ -156,7 +124,7 @@ func IsErrorLike(
  * ```
  */
 func IsReadonlyErrorLike(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) bool {
@@ -176,7 +144,7 @@ func IsReadonlyErrorLike(
  * ```
  */
 func IsReadonlyTypeLike(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	predicate func(subType *checker.Type) bool,
@@ -195,7 +163,7 @@ const (
 )
 
 func IsBuiltinTypeAliasLike(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	predicate func(subType *checker.Type) bool,
@@ -215,7 +183,7 @@ func IsBuiltinTypeAliasLike(
 }
 
 func IsBuiltinSymbolLike(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	symbolNames ...string,
@@ -237,7 +205,7 @@ func IsBuiltinSymbolLike(
 }
 
 func IsAnyBuiltinSymbolLike(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) bool {
@@ -256,7 +224,7 @@ func IsAnyBuiltinSymbolLike(
 }
 
 func IsBuiltinSymbolLikeRecurser(
-	program *compiler.Program,
+	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	predicate func(subType *checker.Type) builtinPredicateMatches,

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -15,7 +14,7 @@ func runPatternTraversalTest(t *testing.T, source string, listeners rule.RuleLis
 
 	program, paths := createTestProgramWithFiles(t, map[string]string{"input.ts": source})
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["input.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {

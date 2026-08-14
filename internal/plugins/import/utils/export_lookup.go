@@ -2,8 +2,8 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -25,10 +25,10 @@ func HasDefaultExport(ctx rule.RuleContext, moduleSpecifier *ast.Node) (bool, bo
 // the resolved module statically exports exportName. The second result is false
 // when the target is unresolved or is not an ES module.
 func HasExport(ctx rule.RuleContext, moduleSpecifier *ast.Node, exportName string) (bool, bool) {
-	if ctx.Program == nil || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return false, false
 	}
-	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.Program))
+	return hasExport(ctx.SourceFile, moduleSpecifier, exportName, newExportBuilder(IndexFor(ctx), ctx.Program()))
 }
 
 // exportKey is one (file, name) lookup in flight, so a re-export chain that
@@ -50,8 +50,8 @@ func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName str
 // resolveExportLinkForLookup is the name-lookup counterpart of
 // resolveExportLink: it stops before the is-an-ES-module test, which
 // sourceFileHasExport applies itself.
-func resolveExportLinkForLookup(program *compiler.Program, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
-	_, sourceFile, ok := rslint_utils.ResolveModuleFile(program, origin, moduleSpecifier)
+func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
+	_, sourceFile, ok := rslint_utils.ResolveModuleFile(sourceProgram, origin, moduleSpecifier)
 	if !ok || settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
@@ -133,7 +133,7 @@ func exportedDeclarationHasName(stmt *ast.Node, exportName string) bool {
 	return false
 }
 
-func exportAssignmentHasDefault(program *compiler.Program, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
+func exportAssignmentHasDefault(sourceProgram *program.Program, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
 	if exportAssignment == nil {
 		return false
 	}
@@ -155,7 +155,7 @@ func exportAssignmentHasDefault(program *compiler.Program, sourceFile *ast.Sourc
 	if kind != exportAssignmentLocalDeclarationModule {
 		return true
 	}
-	return compilerOptionsESModuleInterop(program)
+	return compilerOptionsESModuleInterop(sourceProgram)
 }
 
 // exportAssignmentReferencedIdentifier returns the identifier an expression
@@ -180,11 +180,11 @@ func exportAssignmentReferencedIdentifier(expr *ast.Node) (string, bool) {
 // The tsgo shim exposes CompilerOptions fields but not GetESModuleInterop.
 //
 //nolint:staticcheck // esModuleInterop still needs to be inspected for import/export compatibility.
-func compilerOptionsESModuleInterop(program *compiler.Program) bool {
-	if program == nil || program.Options() == nil {
+func compilerOptionsESModuleInterop(sourceProgram *program.Program) bool {
+	if !sourceProgram.IsValid() || sourceProgram.Options() == nil {
 		return false
 	}
-	options := program.Options()
+	options := sourceProgram.Options()
 	if options.ESModuleInterop != core.TSUnknown {
 		return options.ESModuleInterop == core.TSTrue
 	}

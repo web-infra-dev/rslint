@@ -63,7 +63,7 @@ func isUserBoundSymbol(ctx rule.RuleContext, callee *ast.Node) bool {
 	if !ctx.Globals.Access("Symbol").IsDeclared() {
 		return true
 	}
-	if ctx.TypeChecker == nil || ctx.Program == nil {
+	if ctx.TypeChecker == nil || ctx.Program() == nil {
 		return false
 	}
 	sym := ctx.TypeChecker.GetSymbolAtLocation(callee)
@@ -81,7 +81,7 @@ func isUserBoundSymbol(ctx rule.RuleContext, callee *ast.Node) bool {
 			continue
 		}
 		sf := ast.GetSourceFileOfNode(decl)
-		if sf != nil && !utils.IsSourceFileDefaultLibrary(ctx.Program, sf) {
+		if sf != nil && !utils.IsSourceFileDefaultLibrary(ctx.Program(), sf) {
 			return true
 		}
 	}

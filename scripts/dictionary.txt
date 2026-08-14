@@ -281,6 +281,7 @@ Lingui
 lingui
 lintable
 lintedfile
+lintprogram
 listitem
 llms
 lockdown

@@ -91,6 +91,18 @@ func (c *ProgramBuildContext) compilerFS() vfs.FS {
 // Project-reference configs are registered before ts-go reads them; extended
 // configs are registered by programExtendedConfigCache.
 func (c *ProgramBuildContext) NewCompilerHost(cwd string) compiler.CompilerHost {
+	host := c.newCompilerHost(cwd)
+	return WithParseCache(host, c.parseCache)
+}
+
+// NewTransientCompilerHost shares source snapshots with Program construction
+// without publishing standalone ASTs into the Program-owned parse cache.
+func (c *ProgramBuildContext) NewTransientCompilerHost(cwd string) compiler.CompilerHost {
+	host := c.newCompilerHost(cwd)
+	return WithSourceSnapshots(host, c.parseCache)
+}
+
+func (c *ProgramBuildContext) newCompilerHost(cwd string) compiler.CompilerHost {
 	host := compiler.NewCompilerHost(cwd, c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil)
 	if c.metadataFS != nil {
 		host = &programBuildCompilerHost{
@@ -98,7 +110,7 @@ func (c *ProgramBuildContext) NewCompilerHost(cwd string) compiler.CompilerHost 
 			context:      c,
 		}
 	}
-	return WithParseCache(host, c.parseCache)
+	return host
 }
 
 // CreateProgram creates a tsconfig-backed Program and preserves the strict

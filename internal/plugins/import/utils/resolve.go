@@ -8,8 +8,12 @@ import (
 )
 
 // Resolve names the file a specifier in the linted file points at. Resolution
-// itself is a property of the Program rather than of these rules, and lives in
-// utils; this is the spelling the import rules read most naturally.
+// itself is a property of the effective Program rather than of these
+// rules, and lives in utils; this is the spelling the import rules read most
+// naturally.
 func Resolve(moduleSpecifier *ast.StringLiteralLike, ctx rule.RuleContext) (string, bool) {
-	return rslint_utils.ResolveModulePath(ctx.Program, ctx.SourceFile, moduleSpecifier)
+	if !ctx.Program().IsValid() {
+		return "", false
+	}
+	return rslint_utils.ResolveModulePath(ctx.Program(), ctx.SourceFile, moduleSpecifier)
 }

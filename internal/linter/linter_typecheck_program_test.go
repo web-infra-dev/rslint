@@ -65,7 +65,7 @@ const v: number = bad;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -109,7 +109,7 @@ export const x: T = {} as T;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -150,7 +150,7 @@ export const x: T = {} as T;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -205,7 +205,7 @@ func TestTypeCheck_DedupsAcrossPrograms(t *testing.T) {
 
 	var ts2322 int
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{progA, progB},
+		Programs:        wrapTestPrograms(progA, progB),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -238,7 +238,7 @@ func TestTypeCheck_SkipTypeCheckProgramsHonored(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:              []*compiler.Program{program},
+		Programs:              wrapTestPrograms(program),
 		SingleThreaded:        true,
 		GetRulesForFile:       func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:             true,
@@ -274,7 +274,7 @@ const x: number = 1;
 
 	var found bool
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -60,7 +59,7 @@ func TestTypeCheckOnly_NoLintDiagnostics(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil, // <-- type-check-only path
@@ -86,7 +85,7 @@ func TestTypeCheckOnly_StillReportsTSErrors(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
@@ -122,7 +121,7 @@ func TestTypeCheckOnly_LintedFileCountIsZero(t *testing.T) {
 	})
 
 	result, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
@@ -145,7 +144,7 @@ func TestTypeCheckOnly_ExecutedRulesIsEmpty(t *testing.T) {
 	})
 
 	result, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
@@ -175,7 +174,7 @@ func TestTypeCheckOnly_BaselineLintWouldFire(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return triggerOnIdentifierRule() },
@@ -207,7 +206,7 @@ func TestTypeCheckOnly_PerProgramFilterIgnoredByTypeCheck(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:         []*compiler.Program{program},
+		Programs:         wrapTestPrograms(program),
 		SingleThreaded:   true,
 		ExcludePaths:     utils.ExcludePaths,
 		PerProgramFilter: []FileFilter{rejectAll},
@@ -236,7 +235,7 @@ func TestTypeCheckOnly_RespectsSkipMask(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:              []*compiler.Program{program},
+		Programs:              wrapTestPrograms(program),
 		SingleThreaded:        true,
 		ExcludePaths:          utils.ExcludePaths,
 		GetRulesForFile:       nil,
@@ -265,7 +264,7 @@ func TestTypeCheckOnly_TypeCheckFalseProducesNothing(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,

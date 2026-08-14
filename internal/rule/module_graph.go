@@ -1,8 +1,10 @@
 package rule
 
 import (
+	"sync/atomic"
+
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -46,7 +48,7 @@ type ModuleEdge struct {
 	// From is the file the specifier was written in.
 	From *ast.SourceFile
 	// Target is the file it names, nil when nothing in the Program answers
-	// for it. A specifier can resolve to a path the Program never loaded, in
+	// for it. A specifier can resolve to a path the Program never materialized, in
 	// which case ResolvedPath is set and Target is not.
 	Target *ast.SourceFile
 	// ResolvedPath is the path the specifier resolves to, empty when it
@@ -67,7 +69,7 @@ func (edge ModuleEdge) Text() string {
 	return edge.Specifier.Text()
 }
 
-// Path is the file the reference names: the Program's file for it when there
+// Path is the file the reference names: the runtime's file for it when there
 // is one, and otherwise the path it resolved to. Empty when it resolves
 // nowhere.
 func (edge ModuleEdge) Path() string {
@@ -84,26 +86,32 @@ func (edge ModuleEdge) Dynamic() bool {
 }
 
 // ModuleGraph answers which modules each file of one Program references and
-// what they resolve to. A file's answer is derived once per lint run however
-// many rules and files ask for it — the alternative being that each rule
-// re-reads and re-resolves the same imports for every file it looks past. What
-// the file itself decides can outlive the run when the caller opts into
-// SourceFile-owned reuse.
+// what they resolve to. Resolved edges are derived once per immutable Program
+// generation however many rules, files, or lint passes ask for them. Their
+// syntax-only half can additionally follow an exact SourceFile across editor
+// Programs when the caller opts into SourceFile-owned reuse.
 //
 // It reports what the syntax says and nothing more. Which of these references
 // a rule treats as a dependency — whether type-only imports count, whether
 // anything under node_modules counts — is the rule's own question.
 type ModuleGraph struct {
-	program *compiler.Program
+	program *program.Program
+	data    *moduleGraphData
 	// Collection is pure, so LazyMap's build-outside-the-lock contract holds:
 	// two files racing on their first request for one key cost one redundant
 	// collection at worst, which is cheaper than serializing every file in the
 	// run behind one mutex.
-	edges utils.LazyMap[moduleEdgeKey, []ModuleEdge]
-	// cacheModuleSpecifiers attaches the syntactic half to each immutable
-	// SourceFile. Resolution remains local to this graph's Program.
-	cacheModuleSpecifiers bool
 }
+
+type moduleGraphData struct {
+	edges utils.LazyMap[moduleEdgeKey, []ModuleEdge]
+	// cacheModuleSpecifiers is enabled before an opted-in run starts. It is
+	// atomic because multiple lint requests may share one compiler generation;
+	// enabling it is monotonic and never changes resolved-edge semantics.
+	cacheModuleSpecifiers atomic.Bool
+}
+
+type moduleGraphCacheKey struct{}
 
 // moduleEdgeKey pairs a file with the syntaxes the caller asked about, which
 // is what decides the answer.
@@ -112,20 +120,32 @@ type moduleEdgeKey struct {
 	syntax ModuleSyntax
 }
 
-func NewModuleGraph(program *compiler.Program) *ModuleGraph {
-	return &ModuleGraph{program: program}
+func ModuleGraphFor(sourceProgram *program.Program) *ModuleGraph {
+	if !sourceProgram.IsValid() {
+		return &ModuleGraph{}
+	}
+	// Only backend-independent derived data is cached. The cached value never
+	// points back to Program, preserving the generation cache's ownership
+	// contract; this lightweight view supplies the source authority.
+	data := program.Cached(sourceProgram, moduleGraphCacheKey{}, func() *moduleGraphData {
+		return &moduleGraphData{}
+	})
+	return &ModuleGraph{program: sourceProgram, data: data}
 }
 
-// NewCachedModuleGraph returns a graph that shares its syntax-only collection
-// with other graphs holding the exact same SourceFile objects. Each graph
-// still resolves those specifiers against its own Program.
-func NewCachedModuleGraph(program *compiler.Program) *ModuleGraph {
-	return &ModuleGraph{program: program, cacheModuleSpecifiers: true}
+// EnableModuleSpecifierCaching opts one Program generation into syntax-only
+// reuse attached to its exact SourceFiles. Resolved targets stay in that
+// Program's module-graph data and are never shared across generations.
+func EnableModuleSpecifierCaching(sourceProgram *program.Program) {
+	graph := ModuleGraphFor(sourceProgram)
+	if graph.data != nil {
+		graph.data.cacheModuleSpecifiers.Store(true)
+	}
 }
 
-// Files returns every file of the Program, in the Program's own order. A
+// Files returns every file of the source set in its stable input order. A
 // file's position in this slice is stable for the lifetime of the graph, so
-// callers that need a dense numbering of the Program can adopt it.
+// callers that need a dense numbering can adopt it. The result is read-only.
 func (graph *ModuleGraph) Files() []*ast.SourceFile {
 	if graph == nil || graph.program == nil {
 		return nil
@@ -137,12 +157,13 @@ func (graph *ModuleGraph) Files() []*ast.SourceFile {
 // source order. The result is shared with every other caller and must not be
 // modified.
 func (graph *ModuleGraph) Edges(file *ast.SourceFile, syntax ModuleSyntax) []ModuleEdge {
-	if graph == nil || graph.program == nil || file == nil || syntax.none() {
+	if graph == nil || graph.program == nil || graph.data == nil ||
+		!graph.program.OwnsSourceFile(file) || syntax.none() {
 		return nil
 	}
 
 	key := moduleEdgeKey{file: file, syntax: syntax}
-	return graph.edges.Get(key, func() []ModuleEdge {
+	return graph.data.edges.Get(key, func() []ModuleEdge {
 		return graph.resolveAll(file, graph.specifiersOf(file, syntax))
 	})
 }
@@ -151,7 +172,7 @@ func (graph *ModuleGraph) Edges(file *ast.SourceFile, syntax ModuleSyntax) []Mod
 // file's own syntax, so an attached answer is valid for that SourceFile's
 // entire lifetime.
 func (graph *ModuleGraph) specifiersOf(file *ast.SourceFile, syntax ModuleSyntax) []moduleSpecifier {
-	if !graph.cacheModuleSpecifiers {
+	if graph.data == nil || !graph.data.cacheModuleSpecifiers.Load() {
 		return collectSpecifiers(file, syntax)
 	}
 	return cachedModuleSpecifiers(file, syntax)

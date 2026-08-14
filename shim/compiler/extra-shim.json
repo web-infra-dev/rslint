@@ -1,0 +1,6 @@
+{
+  "ExtraFunctions": [
+    "getAdditionalJSSyntacticDiagnostics",
+    "getModeForUsageLocation"
+  ]
+}

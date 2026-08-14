@@ -107,8 +107,9 @@ func collectProgramTypeDiagnostics(
 	t.Helper()
 
 	var diags []rule.RuleDiagnostic
+	lintPrograms, _, skip := combineLintPrograms(programs, nil, nil, skip)
 	_, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:              programs,
+		Programs:              lintPrograms,
 		SingleThreaded:        true,
 		TypeCheck:             true,
 		SkipTypeCheckPrograms: skip,

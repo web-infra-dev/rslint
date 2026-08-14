@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -580,6 +581,7 @@ const x: Foo = { a: 'hello' };
 
 func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "export const value = 1;"})
+	sourceProgram := lintprogram.NewFromCompiler(program)
 	sourceFile := program.GetSourceFile(paths["a.ts"])
 	if sourceFile == nil {
 		t.Fatal("expected a.ts source file")
@@ -605,7 +607,7 @@ func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.
 		"Source",
 		"Target",
 	))
-	if typeCheckDedupeKeyForDiagnostic(program, withChainA) == typeCheckDedupeKeyForDiagnostic(program, withChainB) {
+	if typeCheckDedupeKeyForDiagnostic(sourceProgram, withChainA) == typeCheckDedupeKeyForDiagnostic(sourceProgram, withChainB) {
 		t.Fatal("message-chain differences must remain distinct in the dedupe key")
 	}
 
@@ -623,7 +625,7 @@ func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.
 		"second",
 		"Target",
 	))
-	if typeCheckDedupeKeyForDiagnostic(program, withRelatedA) == typeCheckDedupeKeyForDiagnostic(program, withRelatedB) {
+	if typeCheckDedupeKeyForDiagnostic(sourceProgram, withRelatedA) == typeCheckDedupeKeyForDiagnostic(sourceProgram, withRelatedB) {
 		t.Fatal("related-information differences must remain distinct in the dedupe key")
 	}
 }
@@ -645,12 +647,13 @@ func TestTypeCheckDedupeSurvivorUsesProgramOrder(t *testing.T) {
 
 func TestTypeCheckFilesystemPathIDIsStableAcrossSymlinkAliases(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "export const value = 1;"})
+	sourceProgram := lintprogram.NewFromCompiler(program)
 	realPath := paths["a.ts"]
 	aliasPath := filepath.Join(filepath.Dir(realPath), "alias.ts")
 	if err := os.Symlink(realPath, aliasPath); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	if typeCheckFilesystemPathID(program, realPath) != typeCheckFilesystemPathID(program, aliasPath) {
+	if typeCheckFilesystemPathID(sourceProgram, realPath) != typeCheckFilesystemPathID(sourceProgram, aliasPath) {
 		t.Fatalf("expected real and alias paths to share a typecheck identity: real=%q alias=%q", realPath, aliasPath)
 	}
 }
@@ -684,7 +687,7 @@ func TestTypeCheckFilesystemPathIDPreservesDistinctCanonicalCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
 	}
-	if typeCheckFilesystemPathID(program, upper) == typeCheckFilesystemPathID(program, lower) {
+	if typeCheckFilesystemPathID(lintprogram.NewFromCompiler(program), upper) == typeCheckFilesystemPathID(lintprogram.NewFromCompiler(program), lower) {
 		t.Fatalf("distinct canonical paths must retain exact identity: upper=%q lower=%q", upper, lower)
 	}
 }

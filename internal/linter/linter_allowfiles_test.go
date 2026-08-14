@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -229,7 +230,7 @@ func TestRunLinter_TargetFilesEmptyDoesNotScanProgram(t *testing.T) {
 
 	called := false
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{nil},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -247,8 +248,8 @@ func TestRunLinter_TargetFilesEmptyDoesNotScanProgram(t *testing.T) {
 		t.Fatalf("expected zero linted files for an empty target plan, got %d", result.LintedFileCount)
 	}
 
-	targets := PrepareLintPlan(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+	targets := mustPrepareLintPlan(t, RunLinterOptions{
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{nil},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -266,7 +267,7 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 
 	var linted []string
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{target}},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -284,8 +285,8 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 		t.Fatalf("expected only lib.ts to be linted, got %v", linted)
 	}
 
-	targets := PrepareLintPlan(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+	targets := mustPrepareLintPlan(t, RunLinterOptions{
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{target}},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -303,7 +304,7 @@ func TestLintSingleFile_TargetsImportedNonRootFile(t *testing.T) {
 
 	var linted []string
 	LintSingleFile(LintSingleFileOptions{
-		Program: program,
+		Program: lintprogram.NewFromCompiler(program),
 		File:    target,
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
 			linted = append(linted, sf.FileName())

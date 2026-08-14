@@ -93,7 +93,7 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, descriptor string) {
 			counts = countTypeParameterUsage(
 				ctx.TypeChecker,
 				node,
-				ctx.Program != nil && needsLegacyObjectSpreadRecovery(ctx.Program.Options()),
+				ctx.Program() != nil && needsLegacyObjectSpreadRecovery(ctx.Program().Options()),
 			)
 		}
 		useCount := counts[nameNode]
