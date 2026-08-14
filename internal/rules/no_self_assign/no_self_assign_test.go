@@ -320,6 +320,13 @@ func TestNoSelfAssignRule(t *testing.T) {
 					{MessageId: "selfAssignment", Line: 1, Column: 10},
 				},
 			},
+			// `super` is a same-reference base case upstream, exactly like `this`.
+			{
+				Code: `class B { x: any } class C extends B { m() { super.x = super.x; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Line: 1, Column: 56},
+				},
+			},
 			{
 				Code:    `a.b = a.b`,
 				Options: []interface{}{map[string]interface{}{"props": true}},

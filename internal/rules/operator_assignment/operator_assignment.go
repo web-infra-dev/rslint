@@ -229,13 +229,17 @@ func checkNever(ctx rule.RuleContext, node *ast.Node) {
 		leftText := text[nodeRange.Pos():opRange.Pos()]
 		plainOperatorText := scanner.TokenToString(plainOperatorKind)
 
-		rightPrecedence := ast.GetExpressionPrecedence(binExpr.Right)
-		newOperatorPrecedence := ast.GetBinaryOperatorPrecedence(plainOperatorKind)
+		rightPrecedence := utils.EslintLikePrecedence(binExpr.Right)
+		newOperatorPrecedence := utils.EslintLikeBinaryOperatorPrecedence(plainOperatorKind)
 
 		var rightText string
 		if rightPrecedence <= newOperatorPrecedence {
 			// A lower- (or equal-) precedence right side needs parentheses to
 			// preserve grouping (e.g. `foo *= bar + 1` -> `foo * (bar + 1)`).
+			// TS-only right sides (`y!`, `y as T`, `y satisfies T`, `<T>y`) are
+			// unknown to ESLint's precedence table and land here too, so they
+			// get parenthesized just as upstream does with
+			// @typescript-eslint/parser.
 			// An already-parenthesized right side reports the maximum
 			// precedence here, so this branch is never hit for it — the
 			// existing parentheses are instead preserved verbatim by the

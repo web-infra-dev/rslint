@@ -1174,42 +1174,7 @@ func EslintLikePrecedence(node *ast.Node) int {
 		if bin.OperatorToken == nil {
 			return -1
 		}
-		op := bin.OperatorToken.Kind
-		if op == ast.KindCommaToken {
-			return 0
-		}
-		if ast.IsAssignmentOperator(op) {
-			return 1
-		}
-		switch op {
-		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			return 4
-		case ast.KindAmpersandAmpersandToken:
-			return 5
-		case ast.KindBarToken:
-			return 6
-		case ast.KindCaretToken:
-			return 7
-		case ast.KindAmpersandToken:
-			return 8
-		case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken,
-			ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
-			return 9
-		case ast.KindLessThanToken, ast.KindLessThanEqualsToken,
-			ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken,
-			ast.KindInKeyword, ast.KindInstanceOfKeyword:
-			return 10
-		case ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
-			ast.KindGreaterThanGreaterThanGreaterThanToken:
-			return 11
-		case ast.KindPlusToken, ast.KindMinusToken:
-			return 12
-		case ast.KindAsteriskToken, ast.KindSlashToken, ast.KindPercentToken:
-			return 13
-		case ast.KindAsteriskAsteriskToken:
-			return 15
-		}
-		return 20
+		return EslintLikeBinaryOperatorPrecedence(bin.OperatorToken.Kind)
 	case ast.KindPrefixUnaryExpression:
 		op := node.AsPrefixUnaryExpression().Operator
 		if op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
@@ -1242,6 +1207,55 @@ func EslintLikePrecedence(node *ast.Node) int {
 	// TypeAssertionExpression, ...) and any other kind ESLint does not
 	// classify: return -1 to force wrapping for safety.
 	return -1
+}
+
+// EslintLikeBinaryOperatorPrecedence returns the precedence ESLint's
+// astUtils.getPrecedence assigns to a binary expression with the given operator
+// token, on the same scale as [EslintLikePrecedence]. Fixers that need the
+// precedence of an operator they are about to write — rather than of an
+// existing node — call this with the new operator, mirroring upstream's
+// `getPrecedence({ type: "BinaryExpression", operator })`.
+//
+// tsgo also models comma expressions and assignments as BinaryExpression; those
+// map to ESTree's SequenceExpression (0) and AssignmentExpression (1).
+func EslintLikeBinaryOperatorPrecedence(operator ast.Kind) int {
+	if operator == ast.KindCommaToken {
+		return 0
+	}
+	if ast.IsAssignmentOperator(operator) {
+		return 1
+	}
+	switch operator {
+	case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+		return 4
+	case ast.KindAmpersandAmpersandToken:
+		return 5
+	case ast.KindBarToken:
+		return 6
+	case ast.KindCaretToken:
+		return 7
+	case ast.KindAmpersandToken:
+		return 8
+	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken,
+		ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+		return 9
+	case ast.KindLessThanToken, ast.KindLessThanEqualsToken,
+		ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken,
+		ast.KindInKeyword, ast.KindInstanceOfKeyword:
+		return 10
+	case ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
+		ast.KindGreaterThanGreaterThanGreaterThanToken:
+		return 11
+	case ast.KindPlusToken, ast.KindMinusToken:
+		return 12
+	case ast.KindAsteriskToken, ast.KindSlashToken, ast.KindPercentToken:
+		return 13
+	case ast.KindAsteriskAsteriskToken:
+		return 15
+	}
+	// Upstream's switch has no case for the remaining operators, so it falls
+	// through to the UnaryExpression case.
+	return 16
 }
 
 func IsStrongPrecedenceNode(innerNode *ast.Node) bool {
@@ -1603,6 +1617,8 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 //   - When disableStaticComputedKey is false, cross-syntax comparison is
 //     supported via static property names: a.b and a['b'] are the same
 //     reference; a[0] and a['0'] likewise.
+//   - `this` and `super` each compare equal to themselves, so this.a / this.a
+//     and super.a / super.a are the same reference.
 //   - For non-static element access (a[x]), falls back to comparing the argument
 //     nodes recursively (same Kind + same Identifier/ThisKeyword/literal value).
 //   - Function calls break the chain: a.b() and a.b() are NOT the same reference,
@@ -1618,7 +1634,7 @@ func IsSameReference(left, right *ast.Node, disableStaticComputedKey bool) bool 
 		return false
 	}
 
-	// Base cases: Identifier, PrivateIdentifier, ThisKeyword, and literal keys
+	// Base cases: Identifier, PrivateIdentifier, ThisKeyword, SuperKeyword, and literal keys
 	// (e.g. `x[0]` vs `x[0]`, reached recursively when disableStaticComputedKey
 	// skips the static-name fast path below).
 	if left.Kind == ast.KindIdentifier && right.Kind == ast.KindIdentifier {
@@ -1627,7 +1643,8 @@ func IsSameReference(left, right *ast.Node, disableStaticComputedKey bool) bool 
 	if left.Kind == ast.KindPrivateIdentifier && right.Kind == ast.KindPrivateIdentifier {
 		return left.AsPrivateIdentifier().Text == right.AsPrivateIdentifier().Text
 	}
-	if left.Kind == ast.KindThisKeyword && right.Kind == ast.KindThisKeyword {
+	if left.Kind == right.Kind &&
+		(left.Kind == ast.KindThisKeyword || left.Kind == ast.KindSuperKeyword) {
 		return true
 	}
 	if left.Kind == right.Kind &&

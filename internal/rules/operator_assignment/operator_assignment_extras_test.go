@@ -164,6 +164,25 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 1}},
 			},
 
+			// ---- Dimension 4: `super` is a same-reference base case upstream
+			// (isSameReference returns true for two Super nodes), so the
+			// assignment is reported; canBeFixed still rejects it because the
+			// receiver is neither an Identifier nor `this` ----
+			{
+				Code:   `class B { x: any } class C extends B { m(y: any) { super.x = super.x + y; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 52}},
+			},
+			{
+				Code:   `class B { x: any } class C extends B { m(y: any) { super["x"] = super["x"] + y; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 52}},
+			},
+			// ---- Dimension 4: non-static computed key on `super` — the
+			// structural fallback compares the key nodes recursively ----
+			{
+				Code:   `class B { x: any } class C extends B { m(y: any) { super[y] = super[y] + y; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 52}},
+			},
+
 			// ---- Locks in upstream branch: a different non-commutative operator with no upstream case (modulo) ----
 			// (kept invalid to prove the rule DOES report the forward form for
 			// contrast with the reversed-operand valid case above)
@@ -184,6 +203,45 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 			{
 				Code:    `foo -= bar.baz`,
 				Output:  []string{`foo = foo - bar.baz`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			// ---- Locks in "never" fixer precedence branch: an optional-chain
+			// right side is a ChainExpression upstream (precedence 18), so it
+			// needs no parens ----
+			{
+				Code:    `foo -= bar?.baz`,
+				Output:  []string{`foo = foo - bar?.baz`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			// ---- Locks in "never" fixer precedence branch: TS-only right sides
+			// are unknown to ESLint's precedence table, which assigns them the
+			// lowest precedence so they get parenthesized. Verified against
+			// ESLint 10.8.1 + @typescript-eslint/parser ----
+			{
+				Code:    `foo -= bar!`,
+				Output:  []string{`foo = foo - (bar!)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `foo -= bar as number`,
+				Output:  []string{`foo = foo - (bar as number)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `foo -= bar satisfies number`,
+				Output:  []string{`foo = foo - (bar satisfies number)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			// ---- ... but an already-parenthesized TS-only right side keeps its
+			// own parentheses instead of gaining a second pair ----
+			{
+				Code:    `foo -= (bar!)`,
+				Output:  []string{`foo = foo - (bar!)`},
 				Options: []any{"never"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
 			},
