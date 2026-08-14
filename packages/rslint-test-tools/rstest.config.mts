@@ -70,6 +70,7 @@ export default defineConfig({
     // eslint
     './tests/eslint/rules/accessor-pairs.test.ts',
     './tests/eslint/rules/arrow-body-style.test.ts',
+    './tests/eslint/rules/block-scoped-var.test.ts',
     './tests/eslint/rules/curly.test.ts',
     './tests/eslint/rules/default-case.test.ts',
     './tests/eslint/rules/dot-notation.test.ts',
