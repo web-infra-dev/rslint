@@ -55,5 +55,20 @@ ruleTester.run('catch-error-name', null as never, {
       options: [{ ignore: ['unicorn'] }],
       errors: [error('notMatching', 'error')],
     },
+    {
+      code: 'try {} catch (e) {}',
+      options: [{ name: 'has_space_after ' }],
+      errors: [error('e', 'has_space_after ')],
+    },
+    {
+      code: 'try {} catch (e) {}',
+      options: [{ name: '1_start_with_a_number' }],
+      errors: [error('e', '1_start_with_a_number')],
+    },
+    {
+      code: 'try {} catch (e) {}',
+      options: [{ name: '_){} evilCode; if(false' }],
+      errors: [error('e', '_){} evilCode; if(false')],
+    },
   ],
 });

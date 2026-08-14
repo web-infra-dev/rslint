@@ -37,6 +37,12 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("const error = 1; try {} catch (bad) { use(bad, error) }", "const error = 1; try {} catch (error_) { use(error_, error) }", "bad", "error_"),
 			// Locks in renameVariable() shorthand expansion.
 			invalid("try {} catch (bad) { use({bad}) }", "try {} catch (error) { use({bad: error}) }", "bad", "error"),
+			// Locks in getAvailableVariableName(): reserved words gain a suffix.
+			invalid("try {} catch (bad) {}", "try {} catch (class_) {}", "bad", "class_", map[string]any{"name": "class"}),
+			// Locks in unresolved references in the handler scope.
+			invalid("try {} catch (err) { error(err) }", "try {} catch (error_) { error(error_) }", "err", "error_"),
+			// Locks in declarations inside a Promise rejection handler.
+			invalid("promise.catch(bad => { const error = 1; use(error) })", "promise.catch(error_ => { const error = 1; use(error) })", "bad", "error_"),
 		},
 	)
 }

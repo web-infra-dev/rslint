@@ -36,6 +36,12 @@ func invalid(code, output, original, fixed string, options ...any) rule_tester.I
 	return result
 }
 
+func invalidWithoutFix(code, original, fixed string, options ...any) rule_tester.InvalidTestCase {
+	result := invalid(code, code, original, fixed, options...)
+	result.Output = nil
+	return result
+}
+
 func TestCatchErrorNameUpstream(t *testing.T) {
 	customErr := map[string]any{"name": "err"}
 	rule_tester.RunRuleTester(
@@ -71,6 +77,10 @@ func TestCatchErrorNameUpstream(t *testing.T) {
 			invalid("obj?.catch(err => err)", "obj?.catch(error => error)", "err", "error"),
 			invalid("try {} catch (_) { console.log(_) }", "try {} catch (error) { console.log(error) }", "_", "error"),
 			invalid("try {} catch (notMatching) {}", "try {} catch (error) {}", "notMatching", "error", map[string]any{"ignore": []any{"unicorn"}}),
+			// Upstream's invalid-name cases must report without offering a fix.
+			invalidWithoutFix("try {} catch (e) {}", "e", "has_space_after ", map[string]any{"name": "has_space_after "}),
+			invalidWithoutFix("try {} catch (e) {}", "e", "1_start_with_a_number", map[string]any{"name": "1_start_with_a_number"}),
+			invalidWithoutFix("try {} catch (e) {}", "e", "_){} evilCode; if(false", map[string]any{"name": "_){} evilCode; if(false"}),
 		},
 	)
 }

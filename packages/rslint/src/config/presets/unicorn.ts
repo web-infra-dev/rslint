@@ -17,7 +17,7 @@ const recommended: RslintConfigEntry = {
     // 'no-process-exit': 'off',
 
     // 'unicorn/better-dom-traversing': 'error', // not implemented
-    // 'unicorn/catch-error-name': 'error', // not implemented
+    'unicorn/catch-error-name': 'error',
     // 'unicorn/class-reference-in-static-methods': 'error', // not implemented
     // 'unicorn/comment-content': 'off', // not implemented
     // 'unicorn/consistent-assert': 'error', // not implemented

@@ -7,12 +7,28 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const messageID = "catch-error-name"
+
+var reservedWords = map[string]bool{
+	"break": true, "case": true, "catch": true, "class": true, "const": true,
+	"continue": true, "debugger": true, "default": true, "delete": true, "do": true,
+	"else": true, "enum": true, "export": true, "extends": true, "false": true,
+	"finally": true, "for": true, "function": true, "if": true, "import": true,
+	"in": true, "instanceof": true, "new": true, "null": true, "return": true,
+	"super": true, "switch": true, "this": true, "throw": true, "true": true,
+	"try": true, "typeof": true, "var": true, "void": true, "while": true,
+	"with": true, "as": true, "implements": true, "interface": true, "let": true,
+	"package": true, "private": true, "protected": true, "public": true, "static": true,
+	"yield": true, "any": true, "boolean": true, "constructor": true, "declare": true,
+	"get": true, "module": true, "require": true, "number": true, "set": true,
+	"string": true, "symbol": true, "type": true, "from": true, "of": true,
+}
 
 //go:embed catch_error_name.schema.json
 var schemaJSON []byte
@@ -121,8 +137,59 @@ func isPromiseCatchParameter(identifier *ast.Node) bool {
 	return ok && match.Call.Arguments()[1] == function
 }
 
-func availableName(identifier *ast.Node, references []*ast.Node, expected string) string {
-	for candidate := expected; ; candidate += "_" {
+func isValidVariableName(name string) bool {
+	return scanner.IsValidIdentifier(name) && !reservedWords[name]
+}
+
+func handlerBody(identifier *ast.Node) *ast.Node {
+	declaration := bindingDeclaration(identifier)
+	if declaration == nil || declaration.Parent == nil {
+		return nil
+	}
+	parent := declaration.Parent
+	if parent.Kind == ast.KindCatchClause {
+		return parent.AsCatchClause().Block
+	}
+	return parent.Body()
+}
+
+func bodyHasNameConflict(ctx rule.RuleContext, body *ast.Node, originalSymbol *ast.Symbol, candidate string) bool {
+	conflict := false
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil || conflict {
+			return
+		}
+		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == candidate {
+			if symbol := utils.BindingNameSymbol(node); symbol != nil {
+				conflict = symbol != originalSymbol
+			} else if !utils.IsNonReferenceIdentifier(node) {
+				conflict = ctx.Refs.Resolve(node) != originalSymbol
+			}
+			if conflict {
+				return
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return conflict
+		})
+	}
+	walk(body)
+	return conflict
+}
+
+func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast.Node, expected string) string {
+	candidate := expected
+	if !isValidVariableName(candidate) {
+		candidate += "_"
+		if !isValidVariableName(candidate) {
+			return ""
+		}
+	}
+	originalSymbol := bindingDeclaration(identifier).Symbol()
+	body := handlerBody(identifier)
+	for {
 		available := !utils.IsShadowed(identifier, candidate)
 		if available {
 			for _, reference := range references {
@@ -132,12 +199,13 @@ func availableName(identifier *ast.Node, references []*ast.Node, expected string
 				}
 			}
 		}
+		if available && bodyHasNameConflict(ctx, body, originalSymbol, candidate) {
+			available = false
+		}
 		if available {
 			return candidate
 		}
-		if len(candidate) > len(expected)+100 {
-			return ""
-		}
+		candidate += "_"
 	}
 }
 
@@ -177,7 +245,7 @@ var CatchErrorNameRule = rule.Rule{
 				if originalName == "_" && len(references) == 0 {
 					return
 				}
-				fixedName := availableName(identifier, references, opts.name)
+				fixedName := availableName(ctx, identifier, references, opts.name)
 				messageName := fixedName
 				if messageName == "" {
 					messageName = opts.name
