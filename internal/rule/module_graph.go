@@ -84,10 +84,11 @@ func (edge ModuleEdge) Dynamic() bool {
 }
 
 // ModuleGraph answers which modules each file of one Program references and
-// what they resolve to. A file's answer depends only on its own syntax, so it
-// is derived once per lint run however many rules and files ask for it — the
-// alternative being that each rule re-reads and re-resolves the same imports
-// for every file it looks past.
+// what they resolve to. A file's answer is derived once per lint run however
+// many rules and files ask for it — the alternative being that each rule
+// re-reads and re-resolves the same imports for every file it looks past. What
+// the file itself decides can outlive the run when the caller opts into
+// SourceFile-owned reuse.
 //
 // It reports what the syntax says and nothing more. Which of these references
 // a rule treats as a dependency — whether type-only imports count, whether
@@ -99,6 +100,9 @@ type ModuleGraph struct {
 	// collection at worst, which is cheaper than serializing every file in the
 	// run behind one mutex.
 	edges utils.LazyMap[moduleEdgeKey, []ModuleEdge]
+	// cacheModuleSpecifiers attaches the syntactic half to each immutable
+	// SourceFile. Resolution remains local to this graph's Program.
+	cacheModuleSpecifiers bool
 }
 
 // moduleEdgeKey pairs a file with the syntaxes the caller asked about, which
@@ -110,6 +114,13 @@ type moduleEdgeKey struct {
 
 func NewModuleGraph(program *compiler.Program) *ModuleGraph {
 	return &ModuleGraph{program: program}
+}
+
+// NewCachedModuleGraph returns a graph that shares its syntax-only collection
+// with other graphs holding the exact same SourceFile objects. Each graph
+// still resolves those specifiers against its own Program.
+func NewCachedModuleGraph(program *compiler.Program) *ModuleGraph {
+	return &ModuleGraph{program: program, cacheModuleSpecifiers: true}
 }
 
 // Files returns every file of the Program, in the Program's own order. A
@@ -132,28 +143,71 @@ func (graph *ModuleGraph) Edges(file *ast.SourceFile, syntax ModuleSyntax) []Mod
 
 	key := moduleEdgeKey{file: file, syntax: syntax}
 	return graph.edges.Get(key, func() []ModuleEdge {
-		return graph.collect(file, syntax)
+		return graph.resolveAll(file, graph.specifiersOf(file, syntax))
 	})
 }
 
-func (graph *ModuleGraph) collect(file *ast.SourceFile, syntax ModuleSyntax) []ModuleEdge {
+// specifiersOf returns what file writes. Collection is a pure function of the
+// file's own syntax, so an attached answer is valid for that SourceFile's
+// entire lifetime.
+func (graph *ModuleGraph) specifiersOf(file *ast.SourceFile, syntax ModuleSyntax) []moduleSpecifier {
+	if !graph.cacheModuleSpecifiers {
+		return collectSpecifiers(file, syntax)
+	}
+	return cachedModuleSpecifiers(file, syntax)
+}
+
+// resolveAll turns what a file writes into what it references, which is the
+// half of the answer only this Program can give.
+func (graph *ModuleGraph) resolveAll(file *ast.SourceFile, specifiers []moduleSpecifier) []ModuleEdge {
+	if len(specifiers) == 0 {
+		return nil
+	}
+	edges := make([]ModuleEdge, len(specifiers))
+	for i := range specifiers {
+		edges[i] = ModuleEdge{
+			Specifier:   specifiers[i].specifier,
+			Declaration: specifiers[i].declaration,
+			From:        file,
+			Kind:        specifiers[i].kind,
+			TypeOnly:    specifiers[i].typeOnly,
+		}
+		edges[i].ResolvedPath, edges[i].Target, _ =
+			utils.ResolveModuleFile(graph.program, file, specifiers[i].specifier)
+	}
+	return edges
+}
+
+// moduleSpecifier is the half of a ModuleEdge that a file's own syntax
+// decides: which string literal names a module, what syntax it was written
+// in, and whether that syntax survives into emitted JavaScript. What the
+// specifier resolves to is deliberately absent — that is the Program's answer,
+// and two Programs holding the same unchanged file can disagree about it.
+type moduleSpecifier struct {
+	specifier   *ast.Node
+	declaration *ast.Node
+	kind        ModuleEdgeKind
+	typeOnly    bool
+}
+
+func collectSpecifiers(file *ast.SourceFile, syntax ModuleSyntax) []moduleSpecifier {
 	// SourceFile.Imports is populated by the parser and avoids walking every
 	// AST node in the usual static-ESM case. The generic collector remains
 	// necessary for call-based references, parser recovery, and imports
 	// inside module bodies.
 	if syntax.CommonJS || syntax.AMD || needsFullModuleScan(file) {
-		return graph.collectByWalk(file, syntax)
+		return collectByWalk(file, syntax)
 	}
-	return graph.collectStaticImports(file)
+	return collectStaticImports(file)
 }
 
 // collectStaticImports reads the module specifiers the parser already
 // recorded. It handles the shapes those specifiers can take in a file with no
 // dynamic import, no module declaration and no parse error, which is what
 // needsFullModuleScan checks for.
-func (graph *ModuleGraph) collectStaticImports(file *ast.SourceFile) []ModuleEdge {
+func collectStaticImports(file *ast.SourceFile) []moduleSpecifier {
 	imports := file.Imports()
-	edges := make([]ModuleEdge, 0, len(imports))
+	specifiers := make([]moduleSpecifier, 0, len(imports))
 	for _, specifier := range imports {
 		declaration := ast.TryGetImportFromModuleSpecifier(specifier)
 		if declaration == nil {
@@ -173,9 +227,14 @@ func (graph *ModuleGraph) collectStaticImports(file *ast.SourceFile) []ModuleEdg
 			continue
 		}
 
-		edges = append(edges, graph.newEdge(file, specifier, declaration, kind, typeOnly))
+		specifiers = append(specifiers, moduleSpecifier{
+			specifier:   specifier,
+			declaration: declaration,
+			kind:        kind,
+			typeOnly:    typeOnly,
+		})
 	}
-	return edges
+	return specifiers
 }
 
 // needsFullModuleScan reports whether file can hold module specifiers that are
@@ -193,8 +252,8 @@ func needsFullModuleScan(file *ast.SourceFile) bool {
 	return false
 }
 
-func (graph *ModuleGraph) collectByWalk(file *ast.SourceFile, syntax ModuleSyntax) []ModuleEdge {
-	var edges []ModuleEdge
+func collectByWalk(file *ast.SourceFile, syntax ModuleSyntax) []moduleSpecifier {
+	var specifiers []moduleSpecifier
 	// A module specifier can appear anywhere a call can, so every subtree is
 	// walked; no node accounts for its own children here.
 	utils.VisitDescendants(file.AsNode(), func(node *ast.Node) bool {
@@ -204,7 +263,7 @@ func (graph *ModuleGraph) collectByWalk(file *ast.SourceFile, syntax ModuleSynta
 				return true
 			}
 			importDecl := node.AsImportDeclaration()
-			graph.appendEdge(&edges, file, importDecl.ModuleSpecifier, node, ModuleEdgeImport, importDeclarationOnlyImportsTypes(importDecl))
+			appendSpecifier(&specifiers, importDecl.ModuleSpecifier, node, ModuleEdgeImport, importDeclarationOnlyImportsTypes(importDecl))
 		case ast.KindExportDeclaration:
 			if !syntax.ESModule {
 				return true
@@ -212,16 +271,16 @@ func (graph *ModuleGraph) collectByWalk(file *ast.SourceFile, syntax ModuleSynta
 			exportDecl := node.AsExportDeclaration()
 			// tsgo matches eslint-plugin-import here: only `export type * from`
 			// is exclusively type-only; named type re-exports still stay edges.
-			graph.appendEdge(&edges, file, exportDecl.ModuleSpecifier, node, ModuleEdgeExport, ast.IsTypeOnlyImportOrExportDeclaration(node))
+			appendSpecifier(&specifiers, exportDecl.ModuleSpecifier, node, ModuleEdgeExport, ast.IsTypeOnlyImportOrExportDeclaration(node))
 		case ast.KindCallExpression:
-			graph.appendCallEdges(&edges, file, node.AsCallExpression(), syntax)
+			appendCallSpecifiers(&specifiers, node.AsCallExpression(), syntax)
 		}
 		return true
 	})
-	return edges
+	return specifiers
 }
 
-func (graph *ModuleGraph) appendCallEdges(edges *[]ModuleEdge, file *ast.SourceFile, call *ast.CallExpression, syntax ModuleSyntax) {
+func appendCallSpecifiers(specifiers *[]moduleSpecifier, call *ast.CallExpression, syntax ModuleSyntax) {
 	if call == nil {
 		return
 	}
@@ -235,7 +294,7 @@ func (graph *ModuleGraph) appendCallEdges(edges *[]ModuleEdge, file *ast.SourceF
 		if len(call.Arguments.Nodes) == 0 {
 			return
 		}
-		graph.appendEdge(edges, file, ast.SkipParentheses(call.Arguments.Nodes[0]), call.AsNode(), ModuleEdgeDynamicImport, false)
+		appendSpecifier(specifiers, ast.SkipParentheses(call.Arguments.Nodes[0]), call.AsNode(), ModuleEdgeDynamicImport, false)
 		return
 	}
 
@@ -247,7 +306,7 @@ func (graph *ModuleGraph) appendCallEdges(edges *[]ModuleEdge, file *ast.SourceF
 	if syntax.CommonJS && ast.IsRequireCall(call.AsNode(), false) {
 		arg := ast.SkipParentheses(call.Arguments.Nodes[0])
 		if arg != nil && ast.IsStringLiteralLike(arg) {
-			graph.appendEdge(edges, file, arg, call.AsNode(), ModuleEdgeRequire, false)
+			appendSpecifier(specifiers, arg, call.AsNode(), ModuleEdgeRequire, false)
 		}
 		return
 	}
@@ -265,12 +324,12 @@ func (graph *ModuleGraph) appendCallEdges(edges *[]ModuleEdge, file *ast.SourceF
 			if element == nil || !ast.IsStringLiteralLike(element) {
 				continue
 			}
-			graph.appendEdge(edges, file, element, call.AsNode(), ModuleEdgeAMD, false)
+			appendSpecifier(specifiers, element, call.AsNode(), ModuleEdgeAMD, false)
 		}
 	}
 }
 
-func (graph *ModuleGraph) appendEdge(edges *[]ModuleEdge, file *ast.SourceFile, specifier *ast.Node, declaration *ast.Node, kind ModuleEdgeKind, typeOnly bool) {
+func appendSpecifier(specifiers *[]moduleSpecifier, specifier *ast.Node, declaration *ast.Node, kind ModuleEdgeKind, typeOnly bool) {
 	if specifier == nil {
 		return
 	}
@@ -278,19 +337,12 @@ func (graph *ModuleGraph) appendEdge(edges *[]ModuleEdge, file *ast.SourceFile, 
 	if specifier == nil || !ast.IsStringLiteralLike(specifier) {
 		return
 	}
-	*edges = append(*edges, graph.newEdge(file, specifier, declaration, kind, typeOnly))
-}
-
-func (graph *ModuleGraph) newEdge(file *ast.SourceFile, specifier *ast.Node, declaration *ast.Node, kind ModuleEdgeKind, typeOnly bool) ModuleEdge {
-	edge := ModuleEdge{
-		Specifier:   specifier,
-		Declaration: declaration,
-		From:        file,
-		Kind:        kind,
-		TypeOnly:    typeOnly,
-	}
-	edge.ResolvedPath, edge.Target, _ = utils.ResolveModuleFile(graph.program, file, specifier)
-	return edge
+	*specifiers = append(*specifiers, moduleSpecifier{
+		specifier:   specifier,
+		declaration: declaration,
+		kind:        kind,
+		typeOnly:    typeOnly,
+	})
 }
 
 func importDeclarationOnlyImportsTypes(importDecl *ast.ImportDeclaration) bool {
