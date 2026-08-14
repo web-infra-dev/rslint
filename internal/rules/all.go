@@ -16,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines_per_function"
@@ -172,6 +173,7 @@ func GetAllRules() []rule.Rule {
 		for_direction.ForDirectionRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
+		init_declarations.InitDeclarationsRule,
 		max_depth.MaxDepthRule,
 		max_lines.MaxLinesRule,
 		max_lines_per_function.MaxLinesPerFunctionRule,
