@@ -114,6 +114,7 @@ export default defineConfig({
     './tests/eslint/rules/no-self-assign.test.ts',
     './tests/eslint/rules/no-undef.test.ts',
     './tests/eslint/rules/no-undef-init.test.ts',
+    './tests/eslint/rules/no-undefined.test.ts',
     './tests/eslint/rules/no-unassigned-vars.test.ts',
     './tests/eslint/rules/no-unused-vars.test.ts',
     './tests/eslint/rules/no-unused-private-class-members.test.ts',

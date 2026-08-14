@@ -336,6 +336,7 @@ napi
 nashorn
 native
 nbsp
+ndefined
 neighbour
 neighbouring
 nend
