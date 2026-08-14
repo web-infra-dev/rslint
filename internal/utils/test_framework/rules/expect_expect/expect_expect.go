@@ -53,6 +53,17 @@ type NamedCallback struct {
 type Runtime struct {
 	ClassifyTest         func(node *ast.Node) TestClassification
 	ResolveNamedCallback func(callNode *ast.Node) NamedCallback
+	// IsAssertion recognizes assertions the configured assertFunctionNames
+	// patterns cannot express, because they match callee text only: a framework
+	// whose `expect` reaches the call site through the test context, a namespace
+	// import or an import alias produces a callee chain (`ctx.expect`,
+	// `rstest.expect`, `check`) that no pattern for `expect` matches. It is
+	// consulted only after the patterns miss, so the common bare `expect(...)`
+	// never pays for it. Frameworks whose `expect` is always a bare global —
+	// jest — leave it nil. Assertions it recognizes always count, including when
+	// assertFunctionNames is configured without `expect`: the option names extra
+	// asserting calls, it does not hide the framework's own.
+	IsAssertion func(node *ast.Node) bool
 }
 
 type Config struct {
@@ -190,6 +201,27 @@ func markAsserted(
 	delete(uncheckedByName, fnName)
 }
 
+// checkCallExpressionUsed walks up from an asserting call and clears the
+// registrations it covers: the nearest enclosing test call is dequeued, and any
+// enclosing named callback declaration is marked asserted so registrations that
+// reference it by declaration or by name are cleared too.
+//
+// Known limitation (deliberate, in favor of under-reporting): the walk credits
+// every declaration it crosses, without checking whether the assertion can
+// actually run when that declaration is used as the test callback. Both of the
+// following go unreported, while eslint-plugin-jest reports them:
+//
+//	const outerCb = () => { test("inner", () => { expect(v).toBe(1) }) }
+//	test("outer", outerCb)   // asserts only in the inner test's callback
+//
+//	const makeCb = () => () => { expect(v).toBe(1) }
+//	test("x", makeCb)        // returns an asserting closure, asserts nothing
+//
+// Bounding the walk correctly would mean stopping once it crosses a function
+// that is itself registered as another test's callback, and refusing to credit
+// across a returned inner function. Both cost more than they buy here: the
+// failure mode of getting them wrong is a false "Test has no assertions" on
+// valid code, which is worse than missing these shapes.
 func checkCallExpressionUsed(
 	assertNode *ast.Node,
 	unchecked *[]*ast.Node,
@@ -283,7 +315,12 @@ func NewRule(config Config) rule.Rule {
 						return
 					}
 
-					if !matchesAssertName(calleeName, compiled) {
+					// Assertions are the union of the configured name patterns and
+					// whatever the framework can resolve; patterns run first because
+					// they answer the overwhelmingly common bare `expect(...)`
+					// without touching the framework analysis.
+					if !matchesAssertName(calleeName, compiled) &&
+						(runtime.IsAssertion == nil || !runtime.IsAssertion(node)) {
 						return
 					}
 					checkCallExpressionUsed(

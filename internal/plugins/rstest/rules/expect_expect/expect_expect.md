@@ -74,9 +74,13 @@ Names of functions treated as assertions. Defaults to `["expect", "assert"]`,
 matching the two assertion entry points Rstest exposes as globals. Names support
 wildcards: `request.*.expect`, `request.**.expect`, `expect*`.
 
+Rstest's own `expect` counts whatever the callee looks like, so these names only
+need to cover assertion helpers the rule cannot resolve. `context.expect(...)`,
+`rstest.expect(...)`, an aliased `import { expect as check }` and
+`import.meta.rstest.expect(...)` are all recognized without configuration.
+
 ### `additionalTestBlockFunctions`
 
 Additional function names to treat as test blocks.
 
-The rule matches assertions by callee name only; unlike `no-conditional-expect`
-it does not resolve the module origin of `expect`. It provides no automatic fix.
+The rule provides no automatic fix.

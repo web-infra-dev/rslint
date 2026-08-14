@@ -54,10 +54,21 @@ test("case", () => { expect(value).toBe(1); });`},
   test("case", () => { expect(value).toBe(1); });
 }`},
 
-			// Custom test / parameterized. Assertions here use the bare `expect`
-			// global, which matches the default assertFunctionNames; namespace or
-			// context expect (rstest.expect / context.expect) would need a custom
-			// assertFunctionNames pattern and is not exercised by the default.
+			// Expect forms the callee-text patterns cannot match: the analysis
+			// resolves them, exactly as rstest/no-conditional-expect does.
+			{Code: `test("case", context => { context.expect(value).toBe(1); });`},
+			{Code: `test.for([{ enabled: true }])("case", (row, context) => { context.expect(row).toBeDefined(); });`},
+			{Code: `import * as rstest from "@rstest/core";
+rstest.test("case", () => { rstest.expect(value).toBe(1); });`},
+			{Code: `import { test, expect as check } from "@rstest/core";
+test("case", () => { check(value).toBe(1); });`},
+			{Code: `if (import.meta.rstest) {
+  import.meta.rstest.test("case", () => {
+    import.meta.rstest.expect(value).toBe(1);
+  });
+}`},
+
+			// Custom test / parameterized.
 			{Code: `const appTest = test.extend({ user: async ({}, use) => use({}) });
 appTest("case", ({ expect }) => { expect(value).toBe(1); });`},
 			{Code: `test.each([[1]])("case", value => { expect(value).toBe(1); });`},
@@ -136,6 +147,15 @@ custom("case", () => {});`,
 appTest("case", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noAssertions", Line: 2, Column: 1, EndLine: 2, EndColumn: 8},
+				},
+			},
+			// A member call named `expect` that the analysis does not resolve to a
+			// Rstest expect stays unrecognized: the resolving hook only widens to
+			// what the analysis can prove.
+			{
+				Code: `test("case", () => { agent.expect(200); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
 				},
 			},
 			// Assertion name does not match.

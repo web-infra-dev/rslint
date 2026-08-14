@@ -7,6 +7,19 @@ import (
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/expect_expect"
 )
 
+// sourceMayContainRstestExpect reports whether the file mentions `expect` at
+// all. Every form the analysis can resolve — `ctx.expect`, `rstest.expect`,
+// `import { expect as check }`, `import.meta.rstest.expect` — spells the
+// identifier somewhere, so a file without it can skip the resolving hook and
+// avoid forcing the analysis to collect test callbacks.
+func sourceMayContainRstestExpect(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	_, ok := sourceFile.Identifiers["expect"]
+	return ok
+}
+
 var ExpectExpectRule = shared.NewRule(shared.Config{
 	Name: "rstest/expect-expect",
 	// Rstest ships both `expect` and `assert` (chai) as globals
@@ -15,7 +28,18 @@ var ExpectExpectRule = shared.NewRule(shared.Config{
 	DefaultAssertFunctionNames: []string{"expect", "assert"},
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		// Rstest reaches `expect` through the test context, namespace imports and
+		// import aliases, none of which the callee-text patterns can match. Reuse
+		// the same resolution rstest/no-conditional-expect consumes so both rules
+		// agree on what an assertion is.
+		var isAssertion func(node *ast.Node) bool
+		if sourceMayContainRstestExpect(ctx.SourceFile) {
+			isAssertion = func(node *ast.Node) bool {
+				return analysis.IsExpectCall(node)
+			}
+		}
 		return shared.Runtime{
+			IsAssertion: isAssertion,
 			ClassifyTest: func(node *ast.Node) shared.TestClassification {
 				parsed := analysis.ParseFnCall(node)
 				if parsed == nil || parsed.Kind != rstestUtils.RstestFnTypeTest {

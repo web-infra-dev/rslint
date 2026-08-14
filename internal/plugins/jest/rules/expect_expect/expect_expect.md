@@ -8,7 +8,7 @@ Skipped [`test.todo` / `it.todo`](https://jestjs.io/docs/api#testtodotitle) bodi
 
 ### Divergence from `eslint-plugin-jest`
 
-For a named callback whose declaration is asserting, this rule intentionally treats the registration as covered **independent of source order**, whereas upstream `eslint-plugin-jest` only clears a registration if it was already seen when the assertion was walked. Concretely:
+When a callback is passed by reference, this rule resolves its declaration and counts the assertions found there, wherever that declaration sits:
 
 ```js
 function myTest() {
@@ -17,7 +17,9 @@ function myTest() {
 it('should pass', myTest);
 ```
 
-Upstream reports `Test has no assertions` here (the assertion is walked before the `it(...)` registration is queued), while this rule does not. Because the function declaration is hoisted, this snippet is runtime-equivalent to the call-first form `it('should pass', myTest); function myTest() { ... }`, which both implementations already accept — so treating the two forms identically is the correct behavior and removes an order-dependent false positive.
+Upstream `eslint-plugin-jest` reports `Test has no assertions` here, because it clears a registration only when the registration was already seen at the time the assertion was walked. The declaration is hoisted, so this is the same program as the call-first form `it('should pass', myTest); function myTest() { ... }` that both rules accept, and reporting one but not the other is an order-dependent false positive.
+
+Callbacks declared with `const` or `var` are resolved the same way, which upstream does not do at all — it only ever looks at function declarations, so it reports those tests in either order.
 
 Examples of **incorrect** code for this rule:
 
