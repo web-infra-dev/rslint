@@ -16,7 +16,7 @@ import (
 const specifierCacheImporter = "/specifier-cache-fixture/importer.ts"
 const specifierCacheTarget = "/specifier-cache-fixture/target.ts"
 
-var esm = ModuleSyntax{ESModule: true}
+var specifierCacheESM = ModuleSyntax{ESModule: true}
 
 // TestModuleSpecifierCacheReusesOneFilesCollection locks in the point of the
 // cache: a second run over the same unchanged file is answered from the first
@@ -26,8 +26,8 @@ func TestModuleSpecifierCacheReusesOneFilesCollection(t *testing.T) {
 	file := specifierCacheFile(t, program)
 	cache := NewModuleSpecifierCache()
 
-	first := cache.get(file, esm)
-	second := cache.get(file, esm)
+	first := cache.get(file, specifierCacheESM)
+	second := cache.get(file, specifierCacheESM)
 
 	if len(first) != 1 {
 		t.Fatalf("collected %d specifiers, want 1", len(first))
@@ -45,7 +45,7 @@ func TestModuleSpecifierCacheSeparatesSyntaxes(t *testing.T) {
 	file := specifierCacheFile(t, program)
 	cache := NewModuleSpecifierCache()
 
-	esmOnly := cache.get(file, esm)
+	esmOnly := cache.get(file, specifierCacheESM)
 	withCommonJS := cache.get(file, ModuleSyntax{ESModule: true, CommonJS: true})
 
 	if len(esmOnly) != 1 {
@@ -54,7 +54,7 @@ func TestModuleSpecifierCacheSeparatesSyntaxes(t *testing.T) {
 	if len(withCommonJS) != 2 {
 		t.Fatalf("collected %d specifiers with commonjs, want 2", len(withCommonJS))
 	}
-	if reused := cache.get(file, esm); &reused[0] != &esmOnly[0] {
+	if reused := cache.get(file, specifierCacheESM); &reused[0] != &esmOnly[0] {
 		t.Fatal("the commonjs request displaced the ES module answer")
 	}
 }
@@ -84,6 +84,35 @@ func TestModuleSpecifierCacheSupersedesReplacedFiles(t *testing.T) {
 	}
 	if len(after) != 2 {
 		t.Fatalf("collected %d specifiers after the edit, want 2", len(after))
+	}
+}
+
+// TestModuleSpecifierCacheResetReleasesEntries locks in what bounds the cache.
+// An entry stays until a later run over the same path supersedes it, so an
+// owner that discards the Programs — and with them the runs that would have
+// named those paths again — has to say so, or the trees those entries hold
+// outlive every Program that ever held them.
+func TestModuleSpecifierCacheResetReleasesEntries(t *testing.T) {
+	program, _ := specifierCacheProgram(t, specifierCacheFiles(false))
+	file := specifierCacheFile(t, program)
+	cache := NewModuleSpecifierCache()
+
+	first := cache.get(file, specifierCacheESM)
+	if held := cache.Len(); held != 1 {
+		t.Fatalf("the cache holds %d paths after one file, want 1", held)
+	}
+
+	cache.Reset()
+
+	if held := cache.Len(); held != 0 {
+		t.Fatalf("the cache holds %d paths after Reset, want 0", held)
+	}
+	recollected := cache.get(file, specifierCacheESM)
+	if len(recollected) != 1 {
+		t.Fatalf("collected %d specifiers after Reset, want 1", len(recollected))
+	}
+	if &recollected[0] == &first[0] {
+		t.Fatal("Reset kept the entry it was told to drop")
 	}
 }
 
@@ -117,8 +146,8 @@ func TestCachedModuleGraphResolvesPerProgram(t *testing.T) {
 	}
 	cache := NewModuleSpecifierCache()
 
-	before := NewCachedModuleGraph(program, cache).Edges(file, esm)
-	after := NewCachedModuleGraph(updated, cache).Edges(file, esm)
+	before := NewCachedModuleGraph(program, cache).Edges(file, specifierCacheESM)
+	after := NewCachedModuleGraph(updated, cache).Edges(file, specifierCacheESM)
 
 	if len(before) != 1 || len(after) != 1 {
 		t.Fatalf("resolved %d and %d edges, want 1 each", len(before), len(after))

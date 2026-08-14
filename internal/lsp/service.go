@@ -1282,8 +1282,15 @@ func (s *Server) runConfiguredLint(
 ) (lintPassResult, error) {
 	loadProgram := s.newStandaloneLintProgramLoader(uri)
 	finalize := func() {}
+	// Only the resident Programs hand the same file objects to the next run.
+	// The standalone loader builds over a host of its own every time, so every
+	// file it produces is a new object the cache could only miss on and then
+	// hold — pinning the discarded Program's whole tree until the request after
+	// next displaced it. That path passes none, as the speculative one does.
+	var moduleSpecifiers *rule.ModuleSpecifierCache
 	if s.lintPrograms != nil && s.lintPrograms.Usable() {
 		loadProgram, finalize = s.lintPrograms.Request(ctx, uri)
+		moduleSpecifiers = s.moduleSpecifiers
 	}
 	defer finalize()
 	return runLintWithProgramLoader(
@@ -1297,7 +1304,7 @@ func (s *Server) runConfiguredLint(
 		tsConfigPaths,
 		s.fs,
 		loadProgram,
-		s.moduleSpecifiers,
+		moduleSpecifiers,
 	)
 }
 
