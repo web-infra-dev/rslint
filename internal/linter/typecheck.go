@@ -16,13 +16,13 @@ import (
 // typeCheckRequest bundles the inputs for runTypeCheckAcrossPrograms.
 type typeCheckRequest struct {
 	Programs       []*program.Program
-	Skip           []bool // parallel to Programs; nil → check all
 	SingleThreaded bool
 	OnDiagnostic   DiagnosticHandler
 }
 
 // runTypeCheckAcrossPrograms runs program-scoped semantic diagnostics
-// against every program except those explicitly opted out.
+// against every Program that exposes that capability. The source construction
+// strategy remains private; the linter schedules only the capability it needs.
 //
 // Aggregates diagnostics via collectNoEmitDiagnostics, which mirrors
 // compiler.GetDiagnosticsOfAnyProgram(file=nil) but enforces tsc --noEmit
@@ -43,7 +43,7 @@ func runTypeCheckAcrossPrograms(req typeCheckRequest) {
 	collected := make([][]collectedTypeCheckDiagnostic, len(req.Programs))
 	wg := core.NewWorkGroup(req.SingleThreaded)
 	for i, prog := range req.Programs {
-		if i < len(req.Skip) && req.Skip[i] {
+		if !prog.CanProvideProgramDiagnostics() {
 			continue
 		}
 		programIndex := i

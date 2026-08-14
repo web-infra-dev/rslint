@@ -1,4 +1,4 @@
-package utils_test
+package program_test
 
 import (
 	"slices"
@@ -22,7 +22,7 @@ func TestResolveSourceFileFromSourceFile(t *testing.T) {
 		"/import-fixture/bar.ts":  "export default 1;\n",
 	}, "/import-fixture/file.ts")
 
-	resolvedPath, target, ok := utils.ResolveModuleFile(program, sourceFile, specifier)
+	resolvedPath, target, ok := program.ResolveModule(sourceFile, specifier)
 	if !ok {
 		t.Fatal("ResolveSourceFileFromSourceFile() did not resolve ./bar")
 	}
@@ -46,7 +46,7 @@ func TestResolveSourceFileFromSourceFileInvalidInput(t *testing.T) {
 		"/import-fixture/bar.ts":  "export default 1;\n",
 	}, "/import-fixture/file.ts")
 
-	if resolvedPath, target, ok := utils.ResolveModuleFile(program, sourceFile, nil); ok || resolvedPath != "" || target != nil {
+	if resolvedPath, target, ok := program.ResolveModule(sourceFile, nil); ok || resolvedPath != "" || target != nil {
 		t.Fatalf("ResolveSourceFileFromSourceFile(nil) = (%q, %#v, %v), want empty result", resolvedPath, target, ok)
 	}
 }
@@ -99,7 +99,7 @@ func TestResolveFromSourceFileRequire(t *testing.T) {
 				AllowJs: core.TSTrue,
 			})
 
-			resolvedPath, ok := utils.ResolveModulePath(program, sourceFile, specifier)
+			resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
 			if ok != (test.wantPath != "") {
 				t.Fatalf("ResolveFromSourceFile() ok = %v, want %v (path %q)", ok, test.wantPath != "", resolvedPath)
 			}
@@ -129,7 +129,7 @@ func TestResolveFromSourceFileModuleSuffixes(t *testing.T) {
 		ModuleSuffixes: []string{".ios", ""},
 	})
 
-	resolvedPath, ok := utils.ResolveModulePath(program, sourceFile, specifier)
+	resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
 	if !ok {
 		t.Fatal("ResolveFromSourceFile() did not resolve ./dep")
 	}
@@ -161,16 +161,15 @@ func TestResolveFromSourceFileUnloadedTarget(t *testing.T) {
 		ModuleSuffixes: []string{".ios", ""},
 	})
 
-	resolvedPath, ok := utils.ResolveModulePath(program, sourceFile, specifier)
+	resolvedPath, target, ok := program.ResolveModule(sourceFile, specifier)
 	if !ok {
 		t.Fatal("ResolveFromSourceFile() did not resolve ./dep")
 	}
 	if got, want := tspath.NormalizeSlashes(resolvedPath), "/unloaded-fixture/dep.ios.ts"; got != want {
 		t.Fatalf("resolvedPath = %q, want %q", got, want)
 	}
-
-	if resolvedPath, target, ok := utils.ResolveModuleFile(program, sourceFile, specifier); ok || target != nil {
-		t.Fatalf("ResolveSourceFileFromSourceFile() = (%q, %#v, %v), want empty result", resolvedPath, target, ok)
+	if target != nil {
+		t.Fatalf("ResolveModule() target = %#v, want nil for a resolved file outside the Program", target)
 	}
 }
 
@@ -198,7 +197,7 @@ func TestResolveFromSourceFileParenthesizedRequireCondition(t *testing.T) {
 		ModuleResolution: core.ModuleResolutionKindNodeNext,
 	})
 
-	resolvedPath, ok := utils.ResolveModulePath(program, sourceFile, specifier)
+	resolvedPath, _, ok := program.ResolveModule(sourceFile, specifier)
 	if !ok {
 		t.Fatal("ResolveFromSourceFile() did not resolve some-package")
 	}

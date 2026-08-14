@@ -1231,8 +1231,6 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
-	programs := binding.Programs
-	typeInfoFiles := binding.TypeInfoFiles
 	targetsByProgram := binding.TargetsByProgram
 	targetFiles := make([]string, 0, len(targetPlan.Targets))
 	for _, target := range targetPlan.Targets {
@@ -1244,14 +1242,13 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 
 	rslintconfig.RegisterAllRules()
 	var diagnostics []rule.RuleDiagnostic
-	lintPrograms, targetsByProgram, _ := combineLintPrograms(programs, nil, targetsByProgram, nil)
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       lintPrograms,
+		Programs:       binding.Programs,
 		SingleThreaded: true,
 		TargetFiles:    targetsByProgram,
-		TypeInfoFiles:  typeInfoFiles,
 		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
-			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(activeConfig, sf.FileName(), dir, false, typeInfoFiles)
+			rules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(activeConfig, sf.FileName(), dir, false)
+			return rules
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,

@@ -160,7 +160,7 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 		func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
 				Name: "capture-globals",
-				Environment: &RuleEnvironment{
+				Environment: &rule.RuleEnvironment{
 					LanguageOptions: languageOptions,
 					Globals:         configGlobals,
 				},

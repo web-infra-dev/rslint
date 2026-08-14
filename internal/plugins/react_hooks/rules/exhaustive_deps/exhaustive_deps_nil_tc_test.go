@@ -14,8 +14,8 @@ import (
 
 // TestExhaustiveDepsRule_NilTypeChecker verifies the rule operates
 // without panicking when the TypeChecker is unavailable. rslint
-// schedules rules without `RequiresTypeInfo: true` against "gap files"
-// (files in the program but not in `typeInfoFiles`) with a nil checker;
+// schedules rules without `RequiresTypeInfo: true` against Programs without
+// checker capability with a nil checker;
 // every code path that would normally consult TC must degrade
 // gracefully via the structural / name-walk fallback.
 //

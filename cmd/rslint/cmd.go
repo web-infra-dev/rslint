@@ -20,6 +20,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 
@@ -698,7 +699,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Program-wide type checking builds every configured project. Plain linting
 	// waits for target discovery and builds only the projects owned by configs
 	// that govern at least one selected target.
-	var realProgramSet lintProgramSet
+	var realProgramSet compilerProgramSet
 	buildAllPrograms := typeCheck || typeCheckOnly
 
 	if usesJSConfig {
@@ -825,12 +826,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 
 	// --- Lint target discovery and project/gap binding ---
-	programs := realProgramSet.Programs
+	compilerPrograms := realProgramSet.CompilerPrograms
+	var programs []*lintprogram.Program
 	programConfigMap := configMap
 	buildSingleConfigPrograms := buildAllPrograms
 	var (
 		targetPlan                 lintTargetPlan
-		typeInfoFiles              map[string]struct{}
 		targetsByProgram           [][]string
 		targetPathBySourcePath     map[string]string
 		configPathBySourcePath     map[string]string
@@ -872,19 +873,24 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
+		compilerPrograms = binding.CompilerPrograms
 		programs = binding.Programs
-		typeInfoFiles = binding.TypeInfoFiles
 		targetsByProgram = binding.TargetsByProgram
 		targetPathBySourcePath = binding.TargetPathBySourcePath
 		configPathBySourcePath = binding.ConfigPathBySourcePath
 		ownerConfigDirBySourcePath = binding.OwnerConfigDirBySourcePath
 		gapGroups = binding.GapGroups
 	}
+	if programs == nil {
+		// Type-check-only skips target binding, so adapt its already-built project
+		// generations here. Lint modes receive their exact wrappers from binding.
+		programs = lintprogram.NewFromCompilers(compilerPrograms)
+	}
 
 	// Project Program construction and target binding are complete. Evict parsed
 	// AST entries that ended up in no Program before parsing gaps.
-	buildContext.RetainOnlySourceFiles(programs)
-	gapPrograms, gapSyntaxDiagnostics, gapSyntaxErrorFiles, err := buildGapPrograms(
+	buildContext.RetainOnlySourceFiles(compilerPrograms)
+	gapPrograms, gapSyntaxDiagnostics, err := buildGapPrograms(
 		gapGroups,
 		currentDirectory,
 		buildContext,
@@ -899,7 +905,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// every fix pass. A target can move between rslint Programs when fixes
 	// change the import graph.
 	createPrograms := func() (lintTargetBinding, error) {
-		var rebuilt lintProgramSet
+		var rebuilt compilerProgramSet
 		var err error
 		if configMap != nil {
 			rebuilt, err = createProgramSetForConfigs(programConfigMap, singleThreaded, buildContext)
@@ -935,42 +941,33 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		Config:                     rslintConfig,
 		CurrentDirectory:           currentDirectory,
 		EnforcePlugins:             enforcePlugins,
-		TypeInfoFiles:              typeInfoFiles,
 		ConfigPathBySourcePath:     configPathBySourcePath,
 		OwnerConfigDirBySourcePath: ownerConfigDirBySourcePath,
 		SourceMappingsCanonical:    true,
 		FS:                         fs,
 	})
-	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-		return fileConfigResolver.ActiveRulesForFile(sourceFile.FileName())
+	getRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+		return fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
 	}
 
 	// Target discovery already excluded default paths, global ignores, and
 	// .gitignore entries. Target ownership and deduplication were already
 	// resolved in targetsByProgram.
-	// Programs not backed by a real tsconfig are excluded from --type-check:
-	// their CompilerOptions are synthesized defaults, not the user's tsconfig,
-	// so semantic diagnostics there would be unreliable. The compatibility
-	// fallback is the only such compiler Program; gap Programs simply expose no
-	// program-wide diagnostic capability through the common facade.
-	skipTypeCheck := buildTypeCheckSkipMask(programs)
-	lintPrograms, targetsByProgram, skipTypeCheck := combineLintPrograms(
-		programs,
-		gapPrograms,
-		targetsByProgram,
-		skipTypeCheck,
-	)
-	syntaxDiagnostics, syntaxErrorFiles := collectTargetSyntacticDiagnostics(
+	// Source-only compatibility and gap Programs expose no checker or
+	// program-wide diagnostic capability; the linter consumes that distinction
+	// through the common Program contract rather than a parallel skip mask.
+	syntaxDiagnostics := collectTargetSyntacticDiagnostics(
 		programs,
 		targetsByProgram,
-		skipTypeCheck,
 		typeCheck,
 		typeCheckOnly,
 	)
 	syntaxDiagnostics = append(syntaxDiagnostics, gapSyntaxDiagnostics...)
-	for fileName := range gapSyntaxErrorFiles {
-		syntaxErrorFiles[fileName] = struct{}{}
-	}
+	programs, targetsByProgram = appendGapPrograms(
+		programs,
+		gapPrograms,
+		targetsByProgram,
+	)
 	for _, diagnostic := range syntaxDiagnostics {
 		diagnosticsChan <- diagnostic
 	}
@@ -988,17 +985,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		nativeEditDemand = rule.EditDemandAutofix
 	}
 	runOpts := linter.RunLinterOptions{
-		Programs:              lintPrograms,
-		SingleThreaded:        singleThreaded,
-		Cwd:                   cwd,
-		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-		TargetFiles:           targetsByProgram,
-		GetRulesForFile:       rulesForFile,
-		TypeInfoFiles:         typeInfoFiles,
-		SyntaxErrorFiles:      syntaxErrorFiles,
-		TypeCheck:             typeCheck,
-		SkipTypeCheckPrograms: skipTypeCheck,
-		Timing:                timingCollector,
+		Programs:        programs,
+		SingleThreaded:  singleThreaded,
+		Cwd:             cwd,
+		Scope:           linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+		TargetFiles:     targetsByProgram,
+		GetRulesForFile: rulesForFile,
+		TypeCheck:       typeCheck,
+		Timing:          timingCollector,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: nativeEditDemand,
 			Report: func(d rule.RuleDiagnostic) {
@@ -1090,8 +1084,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				fmt.Fprintf(os.Stderr, "error rebuilding Programs after fixes: %v\n", err)
 				return 1
 			}
-			newPrograms := newBinding.Programs
-			if len(newPrograms) == 0 && len(newBinding.GapGroups) == 0 {
+			newCompilerPrograms := newBinding.CompilerPrograms
+			if len(newCompilerPrograms) == 0 && len(newBinding.GapGroups) == 0 {
 				fmt.Fprintln(os.Stderr, "error rebuilding Programs after fixes: no Program returned")
 				return 1
 			}
@@ -1102,8 +1096,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// the initial ones — the initial slice stays referenced until the
 			// end of this function, so its objects are alive regardless and
 			// keeping their entries costs nothing because RetainOnly only deletes.
-			buildContext.RetainOnlySourceFiles(append(slices.Clone(newPrograms), programs...))
-			fixGapPrograms, fixGapSyntaxDiagnostics, fixGapSyntaxErrorFiles, err := buildGapPrograms(
+			buildContext.RetainOnlySourceFiles(append(slices.Clone(newCompilerPrograms), compilerPrograms...))
+			fixGapPrograms, fixGapSyntaxDiagnostics, err := buildGapPrograms(
 				newBinding.GapGroups,
 				currentDirectory,
 				buildContext,
@@ -1117,27 +1111,18 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// Re-lint using the fresh binding derived from the stable target plan.
 			fixTargetsByProgram := newBinding.TargetsByProgram
 			fixTargetPathBySourcePath := newBinding.TargetPathBySourcePath
-			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
-			fixLintPrograms, fixTargetsByProgram, fixSkipMask := combineLintPrograms(
-				newPrograms,
-				fixGapPrograms,
-				fixTargetsByProgram,
-				fixSkipMask,
-			)
-			fixTypeInfoFiles := newBinding.TypeInfoFiles
 			fixConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
 				ConfigMap:                  configMap,
 				Config:                     rslintConfig,
 				CurrentDirectory:           currentDirectory,
 				EnforcePlugins:             enforcePlugins,
-				TypeInfoFiles:              fixTypeInfoFiles,
 				ConfigPathBySourcePath:     newBinding.ConfigPathBySourcePath,
 				OwnerConfigDirBySourcePath: newBinding.OwnerConfigDirBySourcePath,
 				SourceMappingsCanonical:    true,
 				FS:                         fs,
 			})
-			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-				return fixConfigResolver.ActiveRulesForFile(sourceFile.FileName())
+			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+				return fixConfigResolver.EnabledRulesForFile(sourceFile.FileName())
 			}
 			var fixRulesForFile linter.RuleHandler
 			if !typeCheckOnly {
@@ -1150,30 +1135,28 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				passEditDemand = rule.EditDemandNone
 			}
 			var passDiags []rule.RuleDiagnostic
-			fixSyntaxDiagnostics, fixSyntaxErrorFiles := collectTargetSyntacticDiagnostics(
-				newPrograms,
+			fixSyntaxDiagnostics := collectTargetSyntacticDiagnostics(
+				newBinding.Programs,
 				fixTargetsByProgram,
-				fixSkipMask,
 				typeCheck,
 				typeCheckOnly,
 			)
 			fixSyntaxDiagnostics = append(fixSyntaxDiagnostics, fixGapSyntaxDiagnostics...)
-			for fileName := range fixGapSyntaxErrorFiles {
-				fixSyntaxErrorFiles[fileName] = struct{}{}
-			}
+			fixPrograms, fixTargetsByProgram := appendGapPrograms(
+				newBinding.Programs,
+				fixGapPrograms,
+				fixTargetsByProgram,
+			)
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)
 			fixRunOpts := linter.RunLinterOptions{
-				Programs:              fixLintPrograms,
-				SingleThreaded:        singleThreaded,
-				Cwd:                   cwd,
-				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-				TargetFiles:           fixTargetsByProgram,
-				GetRulesForFile:       fixRulesForFile,
-				TypeInfoFiles:         fixTypeInfoFiles,
-				SyntaxErrorFiles:      fixSyntaxErrorFiles,
-				TypeCheck:             typeCheck,
-				SkipTypeCheckPrograms: fixSkipMask,
-				Timing:                timingCollector,
+				Programs:        fixPrograms,
+				SingleThreaded:  singleThreaded,
+				Cwd:             cwd,
+				Scope:           linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+				TargetFiles:     fixTargetsByProgram,
+				GetRulesForFile: fixRulesForFile,
+				TypeCheck:       typeCheck,
+				Timing:          timingCollector,
 				Consumer: rule.DiagnosticConsumer{
 					Demand: passEditDemand,
 					Report: func(d rule.RuleDiagnostic) {
@@ -1272,14 +1255,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	typeCheckedFileCount := 0
 	if typeCheck {
-		// Count non-skipped Program root files (tsconfig include/files), not
-		// transitive declarations, for every summary that includes type-check.
+		// Count compiler-capable Program root files (tsconfig include/files),
+		// not transitive declarations, for every summary that includes type-check.
 		seen := make(map[string]struct{})
-		for i, prog := range programs {
-			if i < len(skipTypeCheck) && skipTypeCheck[i] {
+		for _, prog := range programs {
+			if !prog.CanProvideProgramDiagnostics() {
 				continue
 			}
-			for _, fileName := range prog.CommandLine().FileNames() {
+			for _, fileName := range prog.RootFileNames() {
 				seen[fileName] = struct{}{}
 			}
 		}

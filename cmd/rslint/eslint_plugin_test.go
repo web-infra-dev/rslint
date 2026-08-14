@@ -127,7 +127,7 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 	}
 }
 
-func TestLintConfigResolver_NearestConfigAndTypeInfoGate(t *testing.T) {
+func TestLintConfigResolver_NearestConfigWithoutProgramPolicy(t *testing.T) {
 	rslintconfig.RegisterAllRules()
 
 	configMap := map[string]rslintconfig.RslintConfig{
@@ -143,36 +143,29 @@ func TestLintConfigResolver_NearestConfigAndTypeInfoGate(t *testing.T) {
 			},
 		}},
 	}
-	typeInfoFiles := map[string]struct{}{
-		"/repo/packages/app/src/typed.ts": {},
-	}
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:     configMap,
-		TypeInfoFiles: typeInfoFiles,
+		ConfigMap: configMap,
 	})
 
-	gapRules := configuredRuleNameSet(resolver.ActiveRulesForFile("/repo/packages/app/src/gap.ts"))
-	if gapRules["@typescript-eslint/require-await"] {
-		t.Fatal("expected type-aware app rule to be filtered for file without type info")
-	}
-	if !gapRules["no-debugger"] {
-		t.Fatal("expected nearest app config to enable no-debugger")
+	gapRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/packages/app/src/gap.ts"))
+	if !gapRules["@typescript-eslint/require-await"] || !gapRules["no-debugger"] {
+		t.Fatal("expected config resolution to return both nearest app rules")
 	}
 	if gapRules["no-console"] {
 		t.Fatal("did not expect parent config rule for file owned by nearest app config")
 	}
 
-	typedRules := configuredRuleNameSet(resolver.ActiveRulesForFile("/repo/packages/app/src/typed.ts"))
+	typedRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/packages/app/src/typed.ts"))
 	if !typedRules["@typescript-eslint/require-await"] || !typedRules["no-debugger"] {
 		t.Fatalf("expected typed app file to keep both app rules, got %v", typedRules)
 	}
 
-	rootRules := configuredRuleNameSet(resolver.ActiveRulesForFile("/repo/root.ts"))
+	rootRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/root.ts"))
 	if !rootRules["no-console"] || rootRules["no-debugger"] {
 		t.Fatalf("expected root file to use root config only, got %v", rootRules)
 	}
 
-	if rules := resolver.ActiveRulesForFile("/outside/a.ts"); len(rules) != 0 {
+	if rules := resolver.EnabledRulesForFile("/outside/a.ts"); len(rules) != 0 {
 		t.Fatalf("expected file outside every config to have no rules, got %v", rules)
 	}
 }
@@ -195,7 +188,7 @@ func TestLintConfigResolver_UsesBoundOwnerForAliasedSource(t *testing.T) {
 		OwnerConfigDirBySourcePath: map[string]string{sourcePath: "/repo"},
 	})
 
-	rules := configuredRuleNameSet(resolver.ActiveRulesForFile(sourcePath))
+	rules := configuredRuleNameSet(resolver.EnabledRulesForFile(sourcePath))
 	if !rules["no-console"] || rules["no-debugger"] {
 		t.Fatalf("expected the binding's root owner to win over source-path inference, got %v", rules)
 	}
@@ -216,11 +209,10 @@ func TestLintConfigResolver_UsesConfigPathAliasForRulesAndGlobals(t *testing.T) 
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
 		Config:                 cfg,
 		CurrentDirectory:       "/repo",
-		TypeInfoFiles:          map[string]struct{}{"/outside/real-a.ts": {}},
 		ConfigPathBySourcePath: map[string]string{"/outside/real-a.ts": "/repo/src/a.ts"},
 	})
 
-	rules := resolver.ActiveRulesForFile("/outside/real-a.ts")
+	rules := resolver.EnabledRulesForFile("/outside/real-a.ts")
 	if len(rules) != 1 || rules[0].Name != "no-console" {
 		t.Fatalf("expected aliased source path to use config path rules, got %v", configuredRuleNameSet(rules))
 	}
@@ -259,7 +251,7 @@ func TestLintConfigResolver_SourceMappingsUseCanonicalFilesystemIdentity(t *test
 		FS: fsys,
 	})
 
-	rules := resolver.ActiveRulesForFile(sourcePath)
+	rules := resolver.EnabledRulesForFile(sourcePath)
 	if len(rules) != 1 || rules[0].Name != "no-console" {
 		t.Fatalf("expected case-equivalent source mapping to retain config rules, got %v", configuredRuleNameSet(rules))
 	}

@@ -205,8 +205,8 @@ func resolveExportLink(sourceProgram *program.Program, sourceFile *ast.SourceFil
 	if !sourceProgram.IsValid() || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return exportLink{}
 	}
-	_, target, ok := rslint_utils.ResolveModuleFile(sourceProgram, sourceFile, moduleSpecifier)
-	if !ok || settings.IsIgnoredPath(target.FileName()) || !ast.IsExternalModule(target) {
+	_, target, ok := sourceProgram.ResolveModule(sourceFile, moduleSpecifier)
+	if !ok || target == nil || settings.IsIgnoredPath(target.FileName()) || !ast.IsExternalModule(target) {
 		return exportLink{}
 	}
 	return exportLink{Target: target, Resolved: true}

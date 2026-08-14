@@ -44,6 +44,8 @@ A quick reference for common commands, file locations, and checklists when porti
 | References to one declared symbol              | `ctx.Refs.References(decl.Symbol())`                                    | Full-file AST walk with one `GetSymbolAtLocation` call per identifier        |
 | Identifier → symbol, including globals/`.d.ts` | `ctx.Refs.Resolve(node)`                                                | A hand-rolled "try `ctx.Refs`, fall back to the checker" wrapper             |
 | Every comment in the file                      | `ctx.Comments.All()`                                                    | Calling `ForEachComment` on `ctx.SourceFile.AsNode()`                        |
+| Resolve a module/source target                 | `ctx.Program().ResolveModule(...)`                                      | A resolver helper in `internal/utils` or a raw compiler Program              |
+| Enumerate generic module references            | `ctx.Program().ModuleGraph().References(...)`                           | A second graph/runtime stored in `RuleContext`                               |
 
 Deferred edit builders may return nil and run synchronously only when their
 artifact category is requested and the diagnostic is not suppressed. Detection,
@@ -100,6 +102,9 @@ import (
     // Core rule interface
     "github.com/web-infra-dev/rslint/internal/rule"
 
+    // Unified source/module facade (only when naming Program module types)
+    "github.com/web-infra-dev/rslint/internal/program"
+
     // AST and type system (from typescript-go submodule)
     "github.com/microsoft/typescript-go/shim/ast"
     "github.com/microsoft/typescript-go/shim/checker"
@@ -128,6 +133,7 @@ import (
 - [ ] Autofixes/suggestions use deferred report builders and have `Test<Rule>EditDemand` in the existing extras test file
 - [ ] ESLint `variable.references` usage maps to `ctx.Refs` with a binder symbol
 - [ ] Whole-file comment scans use `ctx.Comments.All()`
+- [ ] Cross-file source/module queries use `ctx.Program()` without backend-kind branches
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
 - [ ] Spell check passes (`pnpm -w run check-spell`)

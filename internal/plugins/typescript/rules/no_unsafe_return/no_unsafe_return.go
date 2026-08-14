@@ -3,7 +3,6 @@ package no_unsafe_return
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -58,7 +57,6 @@ func buildUnsafeReturnThisMessage(t string) rule.RuleMessage {
 func discriminateReturnType(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	sourceProgram *program.Program,
 	node *ast.Node,
 ) utils.DiscriminatedAnyType {
 	if utils.IsTypeAnyType(t) {
@@ -70,7 +68,7 @@ func discriminateReturnType(
 	if utils.IsTypeAnyArrayType(t, typeChecker) {
 		return utils.DiscriminatedAnyTypeAnyArray
 	}
-	return utils.DiscriminateAnyType(t, typeChecker, sourceProgram, node)
+	return utils.DiscriminateAnyType(t, typeChecker, node)
 }
 
 var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
@@ -97,7 +95,6 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			anyType := discriminateReturnType(
 				returnNodeType,
 				ctx.TypeChecker,
-				ctx.Program(),
 				returnNode,
 			)
 			if anyType == utils.DiscriminatedAnyTypeSafe &&

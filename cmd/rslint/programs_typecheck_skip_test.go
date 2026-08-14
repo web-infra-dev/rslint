@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -100,20 +101,15 @@ func writeProgramTestFiles(t *testing.T, dir string, files map[string]string) {
 
 func collectProgramTypeDiagnostics(
 	t *testing.T,
-	programs []*compiler.Program,
-	skip []bool,
-	typeInfoFiles map[string]struct{},
+	programs []*lintprogram.Program,
 ) []rule.RuleDiagnostic {
 	t.Helper()
 
 	var diags []rule.RuleDiagnostic
-	lintPrograms, _, skip := combineLintPrograms(programs, nil, nil, skip)
 	_, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:              lintPrograms,
-		SingleThreaded:        true,
-		TypeCheck:             true,
-		SkipTypeCheckPrograms: skip,
-		TypeInfoFiles:         typeInfoFiles,
+		Programs:       programs,
+		SingleThreaded: true,
+		TypeCheck:      true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				diags = append(diags, d)
@@ -138,7 +134,7 @@ func containsTSDiagnostic(diags []rule.RuleDiagnostic, code string) bool {
 
 func resolveAndBindTestTargets(
 	t *testing.T,
-	set lintProgramSet,
+	set compilerProgramSet,
 	cfg rslintconfig.RslintConfig,
 	dir string,
 	fsys vfs.FS,
@@ -176,8 +172,8 @@ func TestTypeCheck_SkipsNoTsconfigTargetFallbackProgram(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
-	if len(programSet.Programs) != 0 {
-		t.Fatalf("expected no tsconfig-backed programs, got %d", len(programSet.Programs))
+	if len(programSet.CompilerPrograms) != 0 {
+		t.Fatalf("expected no tsconfig-backed programs, got %d", len(programSet.CompilerPrograms))
 	}
 
 	_, binding := resolveAndBindTestTargets(
@@ -190,17 +186,12 @@ func TestTypeCheck_SkipsNoTsconfigTargetFallbackProgram(t *testing.T) {
 		nil,
 		buildContext,
 	)
-	programs := binding.Programs
-	typeInfoFiles := binding.TypeInfoFiles
-	gapFiles := binding.GapFiles
+	programs := binding.CompilerPrograms
 	if len(programs) != 1 {
 		t.Fatalf("expected one files-driven fallback program, got %d", len(programs))
 	}
-	if len(gapFiles) == 0 {
-		t.Fatalf("expected files-driven fallback roots, got %v", gapFiles)
-	}
-	if typeInfoFiles == nil || len(typeInfoFiles) != 0 {
-		t.Fatalf("expected empty type-info set for no-tsconfig fallback, got %v", typeInfoFiles)
+	if len(binding.Programs) != 1 || binding.Programs[0].CanProvideProgramDiagnostics() {
+		t.Fatalf("expected one source-only fallback Program, got %+v", binding.Programs)
 	}
 	if got := programs[0].Options().ConfigFilePath; got != "" {
 		t.Fatalf("expected files-driven fallback program to have no ConfigFilePath, got %q", got)
@@ -208,12 +199,7 @@ func TestTypeCheck_SkipsNoTsconfigTargetFallbackProgram(t *testing.T) {
 	if !programs[0].Options().NoLib.IsTrue() || !programs[0].Options().NoResolve.IsTrue() {
 		t.Fatalf("expected files-driven fallback to stay non-project-backed, got options %+v", programs[0].Options())
 	}
-	skip := buildTypeCheckSkipMask(programs)
-	if len(skip) != 1 || !skip[0] {
-		t.Fatalf("expected no-tsconfig fallback program to be skipped for type-check, got %v", skip)
-	}
-
-	if diags := collectProgramTypeDiagnostics(t, programs, skip, typeInfoFiles); containsTSDiagnostic(diags, "TS2322") {
+	if diags := collectProgramTypeDiagnostics(t, binding.Programs); containsTSDiagnostic(diags, "TS2322") {
 		t.Fatalf("did not expect semantic diagnostics from a no-tsconfig fallback program: %+v", diags)
 	}
 }
@@ -250,19 +236,19 @@ export const value: Bad | null = null;
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
-	programs := programSet.Programs
+	programs := programSet.CompilerPrograms
 	if len(programs) != 1 {
 		t.Fatalf("expected one tsconfig-backed program, got %d", len(programs))
 	}
 	if got := programs[0].Options().ConfigFilePath; got == "" {
 		t.Fatal("expected tsconfig-backed program to carry ConfigFilePath")
 	}
-	skip := buildTypeCheckSkipMask(programs)
-	if skip != nil {
-		t.Fatalf("expected tsconfig-backed program to participate in type-check, got %v", skip)
+	lintPrograms := lintprogram.NewFromCompilers(programs)
+	if !lintPrograms[0].CanProvideProgramDiagnostics() {
+		t.Fatal("expected tsconfig-backed Program to expose type-check capability")
 	}
 
-	diags := collectProgramTypeDiagnostics(t, programs, skip, nil)
+	diags := collectProgramTypeDiagnostics(t, lintPrograms)
 	if !containsTSDiagnostic(diags, "TS2304") {
 		var rendered []string
 		for _, d := range diags {
@@ -308,11 +294,11 @@ export const value: Bad | null = null;
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
-	if len(programSet.Programs) != 1 {
-		t.Fatalf("expected one tsconfig-backed program before gap fallback, got %d", len(programSet.Programs))
+	if len(programSet.CompilerPrograms) != 1 {
+		t.Fatalf("expected one tsconfig-backed program before gap fallback, got %d", len(programSet.CompilerPrograms))
 	}
-	if skip := buildTypeCheckSkipMask(programSet.Programs); skip != nil {
-		t.Fatalf("expected tsconfig-backed program to participate in type-check, got %v", skip)
+	if !lintprogram.NewFromCompiler(programSet.CompilerPrograms[0]).CanProvideProgramDiagnostics() {
+		t.Fatal("expected tsconfig-backed Program to participate in type-check")
 	}
 
 	_, binding := resolveAndBindTestTargets(
@@ -325,15 +311,13 @@ export const value: Bad | null = null;
 		nil,
 		buildContext,
 	)
-	programs := binding.Programs
-	typeInfoFiles := binding.TypeInfoFiles
-	gapFiles := binding.GapFiles
+	programs := binding.CompilerPrograms
 	if len(programs) != 2 {
 		t.Fatalf("expected the gap fallback program to be appended, got %d programs", len(programs))
 	}
 	gapPath := filepath.ToSlash(filepath.Join(dir, "gap.ts"))
-	if !slices.Contains(gapFiles, gapPath) {
-		t.Fatalf("expected gap.ts to be discovered as a gap file, got %v", gapFiles)
+	if !slices.Contains(binding.TargetsByProgram[1], gapPath) {
+		t.Fatalf("expected gap.ts to target the source-only Program, got %v", binding.TargetsByProgram)
 	}
 	if got := programs[0].Options().ConfigFilePath; got == "" {
 		t.Fatal("expected original tsconfig-backed program to carry ConfigFilePath")
@@ -344,12 +328,13 @@ export const value: Bad | null = null;
 	if !programs[1].Options().NoLib.IsTrue() || !programs[1].Options().NoResolve.IsTrue() {
 		t.Fatalf("expected gap fallback to stay non-project-backed, got options %+v", programs[1].Options())
 	}
-	skip := buildTypeCheckSkipMask(programs)
-	if len(skip) != 2 || skip[0] || !skip[1] {
-		t.Fatalf("expected only the gap fallback program to be skipped, got %v", skip)
+	if len(binding.Programs) != 2 ||
+		!binding.Programs[0].CanProvideProgramDiagnostics() ||
+		binding.Programs[1].CanProvideProgramDiagnostics() {
+		t.Fatalf("unexpected Program diagnostic capabilities: %+v", binding.Programs)
 	}
 
-	diags := collectProgramTypeDiagnostics(t, programs, skip, typeInfoFiles)
+	diags := collectProgramTypeDiagnostics(t, binding.Programs)
 	if !containsTSDiagnostic(diags, "TS2322") {
 		t.Fatalf("expected the tsconfig-backed Program to retain semantic diagnostics: %+v", diags)
 	}
@@ -381,8 +366,8 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
-	if len(programSet.Programs) != 1 {
-		t.Fatalf("expected one tsconfig-backed program, got %d", len(programSet.Programs))
+	if len(programSet.CompilerPrograms) != 1 {
+		t.Fatalf("expected one tsconfig-backed program, got %d", len(programSet.CompilerPrograms))
 	}
 	if _, ok := programSet.ConfigOrders[0][exactFilesystemPathID(dir)]; !ok {
 		t.Fatalf("config order was not keyed by normalized directory identity: %v", programSet.ConfigOrders[0])
@@ -399,19 +384,14 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 		nil,
 		buildContext,
 	)
-	programs := binding.Programs
-	typeInfoFiles := binding.TypeInfoFiles
-	gapFiles := binding.GapFiles
+	programs := binding.CompilerPrograms
 	targetFiles := []string{plan.Targets[0].Path}
 	targetsByProgram := binding.TargetsByProgram
 	if len(programs) != 1 {
 		t.Fatalf("imported non-root target should reuse existing Program, got %d programs", len(programs))
 	}
-	if len(gapFiles) != 0 {
-		t.Fatalf("imported non-root target should not become a gap file, got %v", gapFiles)
-	}
-	if typeInfoFiles != nil {
-		t.Fatalf("no fallback appended, so typeInfoFiles should stay nil, got %v", typeInfoFiles)
+	if len(binding.Programs) != 1 || !binding.Programs[0].CanProvideTypeChecker(binding.Programs[0].GetSourceFile(targetsByProgram[0][0])) {
+		t.Fatal("imported non-root target lost its compiler-capable Program")
 	}
 	if len(targetFiles) != 1 || targetFiles[0] != libPath {
 		t.Fatalf("expected lib.ts as the only target, got %v", targetFiles)
@@ -423,8 +403,8 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 }
 
 func TestOrderedProgramIndexesForConfig_NormalizesDirectorySeparators(t *testing.T) {
-	set := lintProgramSet{
-		Programs: []*compiler.Program{nil},
+	set := compilerProgramSet{
+		CompilerPrograms: []*compiler.Program{nil},
 		ConfigOrders: []programConfigOrders{{
 			exactFilesystemPathID(`C:\Repo`): 0,
 		}},
@@ -469,7 +449,7 @@ func TestBuildProgramsWithLintTargets_BindsRealpathTargetToProgramSourceName(t *
 	if err != nil {
 		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
-	programs := programSet.Programs
+	programs := programSet.CompilerPrograms
 	if len(programs) != 1 {
 		t.Fatalf("expected one tsconfig-backed program, got %d", len(programs))
 	}
@@ -498,20 +478,12 @@ func TestBuildProgramsWithLintTargets_BindsRealpathTargetToProgramSourceName(t *
 		nil,
 		buildContext,
 	)
-	programs = binding.Programs
-	typeInfoFiles := binding.TypeInfoFiles
-	gapFiles := binding.GapFiles
+	programs = binding.CompilerPrograms
 	targetFiles := []string{plan.Targets[0].Path}
 	targetsByProgram := binding.TargetsByProgram
 	targetPathBySourcePath := binding.TargetPathBySourcePath
 	if len(programs) != 1 {
 		t.Fatalf("realpath target should reuse existing Program, got %d programs", len(programs))
-	}
-	if len(gapFiles) != 0 {
-		t.Fatalf("realpath target should not become a gap file, got %v", gapFiles)
-	}
-	if typeInfoFiles != nil {
-		t.Fatalf("no fallback appended, so typeInfoFiles should stay nil, got %v", typeInfoFiles)
 	}
 	if len(targetFiles) != 1 || targetFiles[0] != realTarget {
 		t.Fatalf("expected realpath target as the only discovered target, got %v", targetFiles)
@@ -548,8 +520,8 @@ func TestBindLintTargetPlan_UsesPhysicalConfigSpaceForSymlinkedConfigRoot(t *tes
 	}}
 	buildContext := utils.NewProgramBuildContext(fsys)
 	set, err := createProgramSetForConfig(linkDir, cfg, true, buildContext)
-	if err != nil || len(set.Programs) != 1 {
-		t.Fatalf("create Program through symlinked config root: err=%v programs=%d", err, len(set.Programs))
+	if err != nil || len(set.CompilerPrograms) != 1 {
+		t.Fatalf("create Program through symlinked config root: err=%v programs=%d", err, len(set.CompilerPrograms))
 	}
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, linkDir, realTarget)}}
 	binding, err := bindLintTargetPlan(set, plan, linkDir, buildContext, true)
@@ -569,12 +541,11 @@ func TestBindLintTargetPlan_UsesPhysicalConfigSpaceForSymlinkedConfigRoot(t *tes
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
 		Config:                     cfg,
 		CurrentDirectory:           linkDir,
-		TypeInfoFiles:              binding.TypeInfoFiles,
 		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
 		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
 		FS:                         fsys,
 	})
-	rules := resolver.ActiveRulesForFile(sourcePath)
+	rules := resolver.EnabledRulesForFile(sourcePath)
 	if len(rules) != 1 || rules[0].Name != "no-debugger" {
 		t.Fatalf("expected files selector to match in physical config space, got %v", configuredRuleNameSet(rules))
 	}
@@ -605,8 +576,8 @@ func TestBindLintTargetPlan_ConfigMatchingDoesNotDependOnProgramSourcePath(t *te
 	}}
 	buildContext := utils.NewProgramBuildContext(fsys)
 	set, err := createProgramSetForConfig(rootDir, cfg, true, buildContext)
-	if err != nil || len(set.Programs) != 1 {
-		t.Fatalf("create Program: err=%v programs=%d", err, len(set.Programs))
+	if err != nil || len(set.CompilerPrograms) != 1 {
+		t.Fatalf("create Program: err=%v programs=%d", err, len(set.CompilerPrograms))
 	}
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{testLintTarget(fsys, rootDir, linkPath)}}
 	binding, err := bindLintTargetPlan(set, plan, rootDir, buildContext, true)
@@ -630,12 +601,11 @@ func TestBindLintTargetPlan_ConfigMatchingDoesNotDependOnProgramSourcePath(t *te
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
 		Config:                     cfg,
 		CurrentDirectory:           rootDir,
-		TypeInfoFiles:              binding.TypeInfoFiles,
 		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
 		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
 		FS:                         fsys,
 	})
-	rules := resolver.ActiveRulesForFile(sourcePath)
+	rules := resolver.EnabledRulesForFile(sourcePath)
 	if len(rules) != 1 || rules[0].Name != "no-console" {
 		t.Fatalf("Program membership changed the lexical files match: %v", configuredRuleNameSet(rules))
 	}
@@ -662,11 +632,11 @@ func TestBindLintTargetPlan_BindsFileSymlinkOutsideProgramRoot(t *testing.T) {
 	buildContext := utils.NewProgramBuildContext(fsys)
 	cfg := projectConfig("./tsconfig.json")
 	set, err := createProgramSetForConfig(repoDir, cfg, true, buildContext)
-	if err != nil || len(set.Programs) != 1 {
-		t.Fatalf("expected one Program for file-symlink fixture, err=%v programs=%d", err, len(set.Programs))
+	if err != nil || len(set.CompilerPrograms) != 1 {
+		t.Fatalf("expected one Program for file-symlink fixture, err=%v programs=%d", err, len(set.CompilerPrograms))
 	}
 	var sourceName string
-	for _, sourceFile := range set.Programs[0].GetSourceFiles() {
+	for _, sourceFile := range set.CompilerPrograms[0].GetSourceFiles() {
 		if strings.HasSuffix(sourceFile.FileName(), "/linked.ts") || sourceFile.FileName() == realTarget {
 			sourceName = sourceFile.FileName()
 			break
@@ -684,8 +654,8 @@ func TestBindLintTargetPlan_BindsFileSymlinkOutsideProgramRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
-	if len(binding.GapFiles) != 0 || len(binding.Programs) != 1 {
-		t.Fatalf("real target should bind through the Program's file symlink, gaps=%v programs=%d", binding.GapFiles, len(binding.Programs))
+	if len(binding.CompilerPrograms) != 1 || len(binding.TargetsByProgram[0]) != 1 {
+		t.Fatalf("real target should bind through the Program's file symlink, targets=%v", binding.TargetsByProgram)
 	}
 	if len(binding.TargetsByProgram[0]) != 1 || binding.TargetsByProgram[0][0] != sourceName {
 		t.Fatalf("expected target to bind to Program source %q, got %v", sourceName, binding.TargetsByProgram)
@@ -736,8 +706,8 @@ func TestBindLintTargetPlan_DoesNotBorrowParentConfigProgram(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createProgramSetForConfigs: %v", err)
 	}
-	if len(set.Programs) != 1 {
-		t.Fatalf("expected only the root tsconfig Program, got %d", len(set.Programs))
+	if len(set.CompilerPrograms) != 1 {
+		t.Fatalf("expected only the root tsconfig Program, got %d", len(set.CompilerPrograms))
 	}
 
 	targetPath := filepath.Join(childDir, "target.ts")
@@ -747,18 +717,15 @@ func TestBindLintTargetPlan_DoesNotBorrowParentConfigProgram(t *testing.T) {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
 
-	if len(binding.GapFiles) != 1 || binding.GapFiles[0] != tspath.NormalizePath(targetPath) {
-		t.Fatalf("child-owned target must use fallback instead of borrowing the parent Program: %v", binding.GapFiles)
-	}
-	if len(binding.Programs) != 2 || len(binding.TargetsByProgram[0]) != 0 || len(binding.TargetsByProgram[1]) != 1 {
+	if len(binding.CompilerPrograms) != 2 || len(binding.TargetsByProgram[0]) != 0 || len(binding.TargetsByProgram[1]) != 1 {
 		t.Fatalf("expected target only in fallback Program, got targets=%v", binding.TargetsByProgram)
 	}
 	fallbackSource := binding.TargetsByProgram[1][0]
 	if owner := binding.OwnerConfigDirBySourcePath[fallbackSource]; owner != tspath.NormalizePath(childDir) {
 		t.Fatalf("expected fallback source owner %q, got %q", tspath.NormalizePath(childDir), owner)
 	}
-	if binding.TypeInfoFiles == nil || len(binding.TypeInfoFiles) != 0 {
-		t.Fatalf("expected an explicit empty type-info set for the child gap target, got %v", binding.TypeInfoFiles)
+	if binding.Programs[1].CanProvideTypeChecker(binding.Programs[1].SourceFiles()[0]) {
+		t.Fatal("child gap target unexpectedly received type services")
 	}
 }
 
@@ -788,16 +755,15 @@ func TestTypeCheckDeduplicatesSyntaxFromGoverningFallbackAndParentProgram(t *tes
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
-	if len(binding.GapFiles) != 1 {
-		t.Fatalf("child-owned target must remain on fallback, got gaps %v", binding.GapFiles)
+	if len(binding.CompilerPrograms) != 2 || len(binding.TargetsByProgram[1]) != 1 {
+		t.Fatalf("child-owned target must remain on fallback, got targets %v", binding.TargetsByProgram)
 	}
 
-	skip := buildTypeCheckSkipMask(binding.Programs)
-	diagnostics, syntaxErrorFiles := collectTargetSyntacticDiagnostics(binding.Programs, binding.TargetsByProgram, skip, true, false)
-	if len(syntaxErrorFiles) != 1 {
-		t.Fatalf("expected one malformed lint target, got %v", syntaxErrorFiles)
+	diagnostics := collectTargetSyntacticDiagnostics(binding.Programs, binding.TargetsByProgram, true, false)
+	if len(diagnostics) != 1 {
+		t.Fatalf("expected one malformed fallback lint target, got %v", diagnostics)
 	}
-	diagnostics = append(diagnostics, collectProgramTypeDiagnostics(t, binding.Programs, skip, binding.TypeInfoFiles)...)
+	diagnostics = append(diagnostics, collectProgramTypeDiagnostics(t, binding.Programs)...)
 	remapDiagnosticTargetPaths(diagnostics, binding.TargetPathBySourcePath)
 	if len(diagnostics) < 2 {
 		t.Fatalf("fixture must exercise both fallback syntax and parent Program type-check paths, got %+v", diagnostics)
@@ -833,8 +799,8 @@ func TestCreateProgramSetForConfigs_DeduplicatesSharedTsconfigAndRetainsOwners(t
 	if err != nil {
 		t.Fatalf("createProgramSetForConfigs: %v", err)
 	}
-	if len(set.Programs) != 1 || len(set.ConfigOrders) != 1 {
-		t.Fatalf("shared tsconfig must produce one Program, got programs=%d orders=%d", len(set.Programs), len(set.ConfigOrders))
+	if len(set.CompilerPrograms) != 1 || len(set.ConfigOrders) != 1 {
+		t.Fatalf("shared tsconfig must produce one Program, got programs=%d orders=%d", len(set.CompilerPrograms), len(set.ConfigOrders))
 	}
 	if order, ok := set.ConfigOrders[0][rootKey]; !ok || order != 0 {
 		t.Fatalf("missing root config association: %v", set.ConfigOrders[0])
@@ -876,7 +842,7 @@ func TestCreateProgramSetForConfigs_BoundsParallelBuildsAndPreservesOrder(t *tes
 		release:    make(chan struct{}),
 	}
 	type result struct {
-		set lintProgramSet
+		set compilerProgramSet
 		err error
 	}
 	done := make(chan result, 1)
@@ -904,10 +870,10 @@ func TestCreateProgramSetForConfigs_BoundsParallelBuildsAndPreservesOrder(t *tes
 	if got := fsys.peakConcurrency(); got != expectedConcurrency {
 		t.Fatalf("peak Program build concurrency = %d, want %d", got, expectedConcurrency)
 	}
-	if len(got.set.Programs) != configCount {
-		t.Fatalf("Programs = %d, want %d", len(got.set.Programs), configCount)
+	if len(got.set.CompilerPrograms) != configCount {
+		t.Fatalf("Programs = %d, want %d", len(got.set.CompilerPrograms), configCount)
 	}
-	for index, program := range got.set.Programs {
+	for index, program := range got.set.CompilerPrograms {
 		want := tspath.ResolvePath(rootDir, projects[index])
 		if got := tspath.NormalizePath(program.Options().ConfigFilePath); got != want {
 			t.Fatalf("Program %d config path = %q, want %q", index, got, want)
@@ -1042,11 +1008,11 @@ func TestCreateProgramSetForConfigs_PreservesSymlinkedTsconfigBase(t *testing.T)
 	if err != nil {
 		t.Fatalf("createProgramSetForConfigs: %v", err)
 	}
-	if len(set.Programs) != 2 {
-		t.Fatalf("distinct declared tsconfig paths must produce two Programs, got %d", len(set.Programs))
+	if len(set.CompilerPrograms) != 2 {
+		t.Fatalf("distinct declared tsconfig paths must produce two Programs, got %d", len(set.CompilerPrograms))
 	}
-	programByConfigPath := make(map[string]*compiler.Program, len(set.Programs))
-	for _, program := range set.Programs {
+	programByConfigPath := make(map[string]*compiler.Program, len(set.CompilerPrograms))
+	for _, program := range set.CompilerPrograms {
 		programByConfigPath[exactFilesystemPathID(program.Options().ConfigFilePath)] = program
 	}
 	aliasConfigPath := tspath.ResolvePath(aliasDir, "tsconfig.json")
@@ -1084,8 +1050,8 @@ func TestBindLintTargetPlan_UsesGoverningConfigProjectOrder(t *testing.T) {
 		true,
 		buildContext,
 	)
-	if err != nil || len(set.Programs) != 2 {
-		t.Fatalf("expected two ordered Programs, err=%v programs=%d", err, len(set.Programs))
+	if err != nil || len(set.CompilerPrograms) != 2 {
+		t.Fatalf("expected two ordered Programs, err=%v programs=%d", err, len(set.CompilerPrograms))
 	}
 
 	targetPath := filepath.Join(dir, "shared.ts")
@@ -1122,8 +1088,8 @@ func TestBindLintTargetPlan_RecomputesProgramMembershipAfterImportGraphChange(t 
 	if err != nil {
 		t.Fatalf("initial bindLintTargetPlan: %v", err)
 	}
-	if len(initial.GapFiles) != 0 || len(initial.Programs) != 1 || len(initial.TargetsByProgram[0]) != 1 {
-		t.Fatalf("imported target should initially use the real Program, got gaps=%v targets=%v", initial.GapFiles, initial.TargetsByProgram)
+	if len(initial.Programs) != 1 || len(initial.TargetsByProgram[0]) != 1 {
+		t.Fatalf("imported target should initially use the real Program, got targets=%v", initial.TargetsByProgram)
 	}
 
 	if err := os.WriteFile(filepath.Join(dir, "main.ts"), []byte(`export const main = 1;`), 0644); err != nil {
@@ -1142,8 +1108,8 @@ func TestBindLintTargetPlan_RecomputesProgramMembershipAfterImportGraphChange(t 
 	if err != nil {
 		t.Fatalf("rebuilt bindLintTargetPlan: %v", err)
 	}
-	if len(afterFix.GapFiles) != 1 || len(afterFix.Programs) != 2 || len(afterFix.TargetsByProgram[1]) != 1 {
-		t.Fatalf("target must move to fallback after its importing edge is removed, got gaps=%v targets=%v", afterFix.GapFiles, afterFix.TargetsByProgram)
+	if len(afterFix.Programs) != 2 || len(afterFix.TargetsByProgram[1]) != 1 {
+		t.Fatalf("target must move to fallback after its importing edge is removed, got targets=%v", afterFix.TargetsByProgram)
 	}
 }
 
@@ -1279,8 +1245,8 @@ func TestPlainProgramSetSkipsInactiveConfigProjects(t *testing.T) {
 
 	activeConfigMap := configsForLintTargetPlan(configMap, plan)
 	set, err := createProgramSetForConfigs(activeConfigMap, true, utils.NewProgramBuildContext(fsys))
-	if err != nil || len(set.Programs) != 1 {
-		t.Fatalf("plain lint should build only the active config Program: programs=%d err=%v", len(set.Programs), err)
+	if err != nil || len(set.CompilerPrograms) != 1 {
+		t.Fatalf("plain lint should build only the active config Program: programs=%d err=%v", len(set.CompilerPrograms), err)
 	}
 	if _, err := createProgramSetForConfigs(configMap, true, utils.NewProgramBuildContext(fsys)); err == nil || !strings.Contains(err.Error(), "missing.json") {
 		t.Fatalf("the all-project type-check scope must still reject the inactive missing project, got %v", err)
@@ -1385,9 +1351,9 @@ func TestBindLintTargetPlan_RejectsCaseFoldedSourceWithDifferentCanonicalIdentit
 		t.Fatalf("fixture must exercise case-folded Program lookup, got %v", source)
 	}
 
-	set := lintProgramSet{
-		Programs:     []*compiler.Program{program},
-		ConfigOrders: []programConfigOrders{{configDir: 0}},
+	set := compilerProgramSet{
+		CompilerPrograms: []*compiler.Program{program},
+		ConfigOrders:     []programConfigOrders{{configDir: 0}},
 	}
 	plan := lintTargetPlan{Targets: []resolvedLintTarget{{
 		Path:           lower,
@@ -1398,7 +1364,7 @@ func TestBindLintTargetPlan_RejectsCaseFoldedSourceWithDifferentCanonicalIdentit
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
-	if len(binding.Programs) != 2 || len(binding.TargetsByProgram[0]) != 0 {
+	if len(binding.CompilerPrograms) != 2 || len(binding.TargetsByProgram[0]) != 0 {
 		t.Fatalf("lower-case target must not bind to the distinct upper-case source: %+v", binding.TargetsByProgram)
 	}
 	if got := binding.TargetsByProgram[1]; len(got) != 1 || got[0] != lower {
@@ -1421,12 +1387,12 @@ func TestBindLintTargetPlan_SplitsFallbackProgramsForCaseFoldedPathCollisions(t 
 		{Path: upper, CanonicalPath: upper, OwnerConfigDir: configDir},
 		{Path: lower, CanonicalPath: lower, OwnerConfigDir: configDir},
 	}}
-	binding, err := bindLintTargetPlan(lintProgramSet{}, plan, configDir, utils.NewProgramBuildContext(fsys), true)
+	binding, err := bindLintTargetPlan(compilerProgramSet{}, plan, configDir, utils.NewProgramBuildContext(fsys), true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
-	if len(binding.Programs) != 2 || len(binding.TargetsByProgram) != 2 {
-		t.Fatalf("case-folded root names require separate fallback Programs, got %d", len(binding.Programs))
+	if len(binding.CompilerPrograms) != 2 || len(binding.TargetsByProgram) != 2 {
+		t.Fatalf("case-folded root names require separate fallback Programs, got %d", len(binding.CompilerPrograms))
 	}
 	bound := []string{binding.TargetsByProgram[0][0], binding.TargetsByProgram[1][0]}
 	slices.Sort(bound)

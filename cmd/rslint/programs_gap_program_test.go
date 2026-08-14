@@ -8,7 +8,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -18,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	default_rule "github.com/web-infra-dev/rslint/internal/plugins/import/rules/default"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -74,16 +74,19 @@ func TestGapProgramsMatchFallbackProgram(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createFallbackProgram: %v", err)
 	}
-	legacyDiagnostics, _ := collectTargetSyntacticDiagnostics(
-		[]*compiler.Program{fallback},
+	legacyProgram, err := lintprogram.NewFromBoundSources(fallback, fallback.SourceFiles())
+	if err != nil {
+		t.Fatalf("adapt fallback Program: %v", err)
+	}
+	legacyDiagnostics := collectTargetSyntacticDiagnostics(
+		[]*lintprogram.Program{legacyProgram},
 		[][]string{rootFiles},
-		[]bool{true},
 		false,
 		false,
 	)
 
 	directContext := gapProgramTestBuildContext()
-	programs, directDiagnostics, _, err := buildGapPrograms(
+	programs, directDiagnostics, err := buildGapPrograms(
 		[][]resolvedLintTarget{plan.Targets},
 		dir,
 		directContext,
@@ -151,7 +154,7 @@ func TestGapProgramsMatchFallbackProgram(t *testing.T) {
 func TestGapProgramsReportUnreadableTarget(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	target := tspath.ResolvePath(dir, "missing.ts")
-	_, _, _, err := buildGapPrograms(
+	_, _, err := buildGapPrograms(
 		[][]resolvedLintTarget{{{
 			Path:           target,
 			CanonicalPath:  target,
@@ -174,7 +177,7 @@ func TestGapProgramSupportsCrossFileImportRules(t *testing.T) {
 		"b.ts": "import './a';\nexport const b = 1;\n",
 	})
 	plan := gapProgramTestPlan(dir, "a.ts", "b.ts")
-	programs, diagnostics, syntaxErrorFiles, err := buildGapPrograms(
+	programs, diagnostics, err := buildGapPrograms(
 		[][]resolvedLintTarget{plan.Targets},
 		dir,
 		gapProgramTestBuildContext(),
@@ -189,10 +192,8 @@ func TestGapProgramSupportsCrossFileImportRules(t *testing.T) {
 
 	var cycleReports, defaultReports int
 	opts := linter.RunLinterOptions{
-		Programs:         programs,
-		SingleThreaded:   true,
-		TypeInfoFiles:    map[string]struct{}{},
-		SyntaxErrorFiles: syntaxErrorFiles,
+		Programs:       programs,
+		SingleThreaded: true,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return []linter.ConfiguredRule{
 				{
@@ -290,11 +291,11 @@ func TestBindCLILintTargetPlanMatchesFallbackRootAdmission(t *testing.T) {
 
 			legacyContext := newContext()
 			legacy := runGapProgramBind(func() (lintTargetBinding, error) {
-				return bindLintTargetPlan(lintProgramSet{}, plan, configDir, legacyContext, true)
+				return bindLintTargetPlan(compilerProgramSet{}, plan, configDir, legacyContext, true)
 			})
 			directContext := newContext()
 			direct := runGapProgramBind(func() (lintTargetBinding, error) {
-				return bindCLILintTargetPlan(lintProgramSet{}, plan, configDir, directContext, true)
+				return bindCLILintTargetPlan(compilerProgramSet{}, plan, configDir, directContext, true)
 			})
 
 			legacyError, directError := "", ""
@@ -314,17 +315,16 @@ func TestBindCLILintTargetPlanMatchesFallbackRootAdmission(t *testing.T) {
 			if legacy.err != nil || direct.err != nil || legacy.panicText != "" || direct.panicText != "" {
 				t.Fatalf("supported root failed: legacy=(%v, %q) direct=(%v, %q)", legacy.err, legacy.panicText, direct.err, direct.panicText)
 			}
-			if len(direct.binding.Programs) != 0 || len(direct.binding.GapGroups) != 1 {
-				t.Fatalf("supported root did not use root construction: programs=%d groups=%d", len(direct.binding.Programs), len(direct.binding.GapGroups))
+			if len(direct.binding.CompilerPrograms) != 0 || len(direct.binding.GapGroups) != 1 {
+				t.Fatalf("supported root did not use root construction: programs=%d groups=%d", len(direct.binding.CompilerPrograms), len(direct.binding.GapGroups))
 			}
-			legacyDiagnostics, _ := collectTargetSyntacticDiagnostics(
+			legacyDiagnostics := collectTargetSyntacticDiagnostics(
 				legacy.binding.Programs,
 				legacy.binding.TargetsByProgram,
-				buildTypeCheckSkipMask(legacy.binding.Programs),
 				false,
 				false,
 			)
-			_, directDiagnostics, _, err := buildGapPrograms(
+			_, directDiagnostics, err := buildGapPrograms(
 				direct.binding.GapGroups,
 				configDir,
 				directContext,
@@ -376,19 +376,19 @@ func TestGapProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 	}}
 
 	legacyContext := utils.NewProgramBuildContext(newFS())
-	legacy, err := bindLintTargetPlan(lintProgramSet{}, plan, configDir, legacyContext, true)
+	legacy, err := bindLintTargetPlan(compilerProgramSet{}, plan, configDir, legacyContext, true)
 	if err != nil {
 		t.Fatalf("bindLintTargetPlan: %v", err)
 	}
 	directContext := utils.NewProgramBuildContext(newFS())
-	direct, err := bindCLILintTargetPlan(lintProgramSet{}, plan, configDir, directContext, true)
+	direct, err := bindCLILintTargetPlan(compilerProgramSet{}, plan, configDir, directContext, true)
 	if err != nil {
 		t.Fatalf("bindCLILintTargetPlan: %v", err)
 	}
 	if len(direct.GapGroups) != 2 {
 		t.Fatalf("case-folded targets share a Program: groups=%d", len(direct.GapGroups))
 	}
-	programs, directDiagnostics, _, err := buildGapPrograms(
+	programs, directDiagnostics, err := buildGapPrograms(
 		direct.GapGroups,
 		configDir,
 		directContext,
@@ -397,10 +397,9 @@ func TestGapProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildGapPrograms: %v", err)
 	}
-	legacyDiagnostics, _ := collectTargetSyntacticDiagnostics(
+	legacyDiagnostics := collectTargetSyntacticDiagnostics(
 		legacy.Programs,
 		legacy.TargetsByProgram,
-		buildTypeCheckSkipMask(legacy.Programs),
 		false,
 		false,
 	)
@@ -414,7 +413,7 @@ func TestGapProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 	}
 	legacyExternal := make(map[string]bool, 2)
 	for _, program := range legacy.Programs {
-		for _, file := range program.GetSourceFiles() {
+		for _, file := range program.SourceFiles() {
 			legacyExternal[file.FileName()] = file.ExternalModuleIndicator != nil
 		}
 	}
@@ -449,11 +448,11 @@ func TestGapProgramSyntaxDeduplicatesAgainstNonGoverningTypeCheckProgram(t *test
 	if err != nil {
 		t.Fatalf("bindCLILintTargetPlan: %v", err)
 	}
-	if len(binding.Programs) != 1 || len(binding.GapGroups) != 1 {
-		t.Fatalf("fixture did not create a non-governing Program plus gap Program: programs=%d groups=%d", len(binding.Programs), len(binding.GapGroups))
+	if len(binding.CompilerPrograms) != 1 || len(binding.GapGroups) != 1 {
+		t.Fatalf("fixture did not create a non-governing Program plus gap Program: programs=%d groups=%d", len(binding.CompilerPrograms), len(binding.GapGroups))
 	}
 
-	_, diagnostics, _, err := buildGapPrograms(
+	_, diagnostics, err := buildGapPrograms(
 		binding.GapGroups,
 		rootDir,
 		buildContext,
@@ -464,7 +463,7 @@ func TestGapProgramSyntaxDeduplicatesAgainstNonGoverningTypeCheckProgram(t *test
 	}
 	diagnostics = append(
 		diagnostics,
-		collectProgramTypeDiagnostics(t, binding.Programs, buildTypeCheckSkipMask(binding.Programs), binding.TypeInfoFiles)...,
+		collectProgramTypeDiagnostics(t, binding.Programs)...,
 	)
 	if len(diagnostics) < 2 {
 		t.Fatalf("fixture did not produce cross-phase duplicate diagnostics: %+v", diagnostics)

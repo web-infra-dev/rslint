@@ -81,7 +81,7 @@ func isUserBoundSymbol(ctx rule.RuleContext, callee *ast.Node) bool {
 			continue
 		}
 		sf := ast.GetSourceFileOfNode(decl)
-		if sf != nil && !utils.IsSourceFileDefaultLibrary(ctx.Program(), sf) {
+		if sf != nil && !ctx.Program().IsSourceFileDefaultLibrary(sf) {
 			return true
 		}
 	}

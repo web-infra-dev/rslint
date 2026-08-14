@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -76,10 +77,9 @@ var gapFileFixtureSources = map[string]string{
 // TestGapFile_OptionalTypeCheckerRules_DoNotPanic is a regression sweep for
 // the bug class behind https://github.com/web-infra-dev/rslint/issues/781.
 //
-// Rules that do NOT set RequiresTypeInfo: true are scheduled on "gap files"
-// — files in the program but outside typeInfoFiles (see linter.go) — with a
-// nil ctx.TypeChecker. A rule that calls a checker-dependent helper without
-// a nil guard crashes the whole lint goroutine.
+// Rules that do NOT set RequiresTypeInfo: true are scheduled on source-only
+// gap Programs with a nil ctx.TypeChecker. A rule that calls a
+// checker-dependent helper without a nil guard crashes the lint goroutine.
 //
 // This test runs EVERY currently-registered non-type-aware rule against a
 // gap-file fixture and asserts no panic. It is intentionally a sweep, not a
@@ -95,11 +95,10 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 
 	program := createGapFileProgram(t, gapFileFixtureSources)
 
-	// Empty (but non-nil) typeInfoFiles → every fixture file is treated as
-	// a gap file by RunLinterInProgram, so every rule on every file
-	// receives a nil TypeChecker. The parameter name mirrors the linter's
-	// API so the intent reads the same on both sides.
-	typeInfoFiles := map[string]struct{}{}
+	sourceProgram, err := lintprogram.NewFromBoundSources(program, program.SourceFiles())
+	if err != nil {
+		t.Fatalf("create source-only Program: %v", err)
+	}
 
 	sweep := collectNonTypeAwareRules(t)
 	if len(sweep) == 0 {
@@ -123,11 +122,10 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 	}
 	configured := append(sweep, probe)
 
-	linter.RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	linter.RunLinterInProgram(sourceProgram, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []linter.ConfiguredRule { return configured },
 		false,
 		func(d rule.RuleDiagnostic) {},
-		typeInfoFiles,
 		nil,
 	)
 

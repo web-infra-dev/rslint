@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -148,18 +149,20 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 		},
 	}
 
-	var typeInfoFiles map[string]struct{}
+	sourceProgram := lintprogram.NewFromCompiler(program)
 	if withTypeChecker {
-		// nil typeInfoFiles → linter passes the real TypeChecker to every rule.
-		typeInfoFiles = nil
+		// The compiler-capable Program supplies the checker.
 	} else {
-		// Non-nil but empty → file is treated as a gap file, so the linter
-		// substitutes a nil TypeChecker (matching CLI gap-file behavior).
-		typeInfoFiles = map[string]struct{}{}
+		// A source-only Program matches CLI gap-file behavior without a parallel
+		// production policy map.
+		sourceProgram, err = lintprogram.NewFromBoundSources(program, program.SourceFiles())
+		if err != nil {
+			t.Fatalf("create source-only Program: %v", err)
+		}
 	}
 
 	count := 0
-	linter.RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	linter.RunLinterInProgram(sourceProgram, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []linter.ConfiguredRule {
 			if sf.FileName() != filePath {
 				return nil
@@ -168,7 +171,6 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 		},
 		false,
 		func(d rule.RuleDiagnostic) { count++ },
-		typeInfoFiles,
 		nil,
 	)
 	return count

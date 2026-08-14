@@ -51,8 +51,8 @@ func hasExport(origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName str
 // resolveExportLink: it stops before the is-an-ES-module test, which
 // sourceFileHasExport applies itself.
 func resolveExportLinkForLookup(sourceProgram *program.Program, origin *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
-	_, sourceFile, ok := rslint_utils.ResolveModuleFile(sourceProgram, origin, moduleSpecifier)
-	if !ok || settings.IsIgnoredPath(sourceFile.FileName()) {
+	_, sourceFile, ok := sourceProgram.ResolveModule(origin, moduleSpecifier)
+	if !ok || sourceFile == nil || settings.IsIgnoredPath(sourceFile.FileName()) {
 		return exportLink{}
 	}
 	return exportLink{Target: sourceFile, Resolved: true}
