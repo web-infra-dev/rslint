@@ -54,6 +54,15 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 			// be treated as the same reference (different Kind entirely) ----
 			{Code: `class C { #x = 0; m() { this.#x = this["#x"] + 1; } }`},
 
+			// ---- Dimension 4: no-substitution-template-literal computed key
+			// must NOT be treated as the same reference. ESTree gives `` `y` ``
+			// its own "TemplateLiteral" type, distinct from "Literal", and
+			// ESLint's isSameReference has no case for it (falls to
+			// `default: return false`). Verified against real ESLint 10.8.1:
+			// `x[`a`] = x[`a`] + y` reports nothing, unlike the string-literal
+			// equivalent `x["a"] = x["a"] + y` ----
+			{Code: "x[`y`] = x[`y`] + z"},
+
 			// ---- Dimension 4: graceful degradation — destructuring assignment
 			// target (ArrayLiteralExpression) on the left must not crash or
 			// misfire; isSameReference has no case for it ----
@@ -129,12 +138,6 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 			{
 				Code:   `x[0n] = x[0n] + y`,
 				Output: []string{`x[0n] += y`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 1}},
-			},
-			// ---- Dimension 4: no-substitution-template-literal computed key ----
-			{
-				Code:   "x[`y`] = x[`y`] + z",
-				Output: []string{"x[`y`] += z"},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 1}},
 			},
 			// ---- Dimension 4: regular-expression-literal computed key ----

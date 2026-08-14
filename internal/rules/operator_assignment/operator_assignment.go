@@ -13,63 +13,65 @@ import (
 //go:embed operator_assignment.schema.json
 var schemaJSON []byte
 
-// compoundAssignmentPlainOperator maps a compound-assignment operator token
-// (e.g. `*=`) to its plain binary-operator token (`*`). Only the 12 operators
-// with a shorthand form are present; logical assignment (`&&=`, `||=`, `??=`)
-// and plain `=` are intentionally absent.
-var compoundAssignmentPlainOperator = map[ast.Kind]ast.Kind{
-	ast.KindPlusEqualsToken:                              ast.KindPlusToken,
-	ast.KindMinusEqualsToken:                             ast.KindMinusToken,
-	ast.KindAsteriskEqualsToken:                          ast.KindAsteriskToken,
-	ast.KindSlashEqualsToken:                             ast.KindSlashToken,
-	ast.KindPercentEqualsToken:                           ast.KindPercentToken,
-	ast.KindAsteriskAsteriskEqualsToken:                  ast.KindAsteriskAsteriskToken,
-	ast.KindLessThanLessThanEqualsToken:                  ast.KindLessThanLessThanToken,
-	ast.KindGreaterThanGreaterThanEqualsToken:            ast.KindGreaterThanGreaterThanToken,
-	ast.KindGreaterThanGreaterThanGreaterThanEqualsToken: ast.KindGreaterThanGreaterThanGreaterThanToken,
-	ast.KindAmpersandEqualsToken:                         ast.KindAmpersandToken,
-	ast.KindCaretEqualsToken:                             ast.KindCaretToken,
-	ast.KindBarEqualsToken:                               ast.KindBarToken,
+// shorthandOperator describes one of the 12 operators with an assignment
+// shorthand form: its plain binary-operator token (`+`), the corresponding
+// compound-assignment token (`+=`), and whether it is commutative. Logical
+// assignment (`&&=`, `||=`, `??=`) and plain `=` are intentionally absent.
+type shorthandOperator struct {
+	plain       ast.Kind
+	compound    ast.Kind
+	commutative bool
 }
 
-func isCommutativeShorthandOperator(kind ast.Kind) bool {
-	switch kind {
-	case ast.KindAsteriskToken, ast.KindAmpersandToken, ast.KindCaretToken, ast.KindBarToken:
-		return true
-	}
-	return false
+var shorthandOperators = []shorthandOperator{
+	{ast.KindPlusToken, ast.KindPlusEqualsToken, false},
+	{ast.KindMinusToken, ast.KindMinusEqualsToken, false},
+	{ast.KindAsteriskToken, ast.KindAsteriskEqualsToken, true},
+	{ast.KindSlashToken, ast.KindSlashEqualsToken, false},
+	{ast.KindPercentToken, ast.KindPercentEqualsToken, false},
+	{ast.KindAsteriskAsteriskToken, ast.KindAsteriskAsteriskEqualsToken, false},
+	{ast.KindLessThanLessThanToken, ast.KindLessThanLessThanEqualsToken, false},
+	{ast.KindGreaterThanGreaterThanToken, ast.KindGreaterThanGreaterThanEqualsToken, false},
+	{ast.KindGreaterThanGreaterThanGreaterThanToken, ast.KindGreaterThanGreaterThanGreaterThanEqualsToken, false},
+	{ast.KindAmpersandToken, ast.KindAmpersandEqualsToken, true},
+	{ast.KindCaretToken, ast.KindCaretEqualsToken, true},
+	{ast.KindBarToken, ast.KindBarEqualsToken, true},
 }
 
-func isNonCommutativeShorthandOperator(kind ast.Kind) bool {
-	switch kind {
-	case ast.KindPlusToken, ast.KindMinusToken, ast.KindSlashToken, ast.KindPercentToken,
-		ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
-		ast.KindGreaterThanGreaterThanGreaterThanToken, ast.KindAsteriskAsteriskToken:
-		return true
+// shorthandOperatorsByPlain and shorthandOperatorsByCompound index
+// shorthandOperators by each of its two token forms, so checkAlways (which
+// starts from a plain operator) and checkNever (which starts from a compound
+// operator) both read from the single source of truth above.
+var (
+	shorthandOperatorsByPlain    = map[ast.Kind]shorthandOperator{}
+	shorthandOperatorsByCompound = map[ast.Kind]shorthandOperator{}
+)
+
+func init() {
+	for _, op := range shorthandOperators {
+		shorthandOperatorsByPlain[op.plain] = op
+		shorthandOperatorsByCompound[op.compound] = op
 	}
-	return false
 }
 
 // isLiteralPropertyKey reports whether node is a literal usable as a computed
 // property key without side effects (matches ESTree's unified "Literal" type:
 // string / numeric / bigint / regex literals, plus the `true` / `false` /
-// `null` keyword literals).
+// `null` keyword literals). A no-substitution template literal (a backtick
+// string with no interpolation) is deliberately excluded: ESTree gives it its
+// own "TemplateLiteral" type, not "Literal", so upstream's
+// `node.property.type === "Literal"` check — and its isSameReference call,
+// which has no case for "TemplateLiteral" either — reject it too. Verified
+// against ESLint 10.8.1: a template-literal computed key reports nothing,
+// while the equivalent string-literal key does.
 func isLiteralPropertyKey(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
-		ast.KindRegularExpressionLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindRegularExpressionLiteral,
 		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
 		return true
 	}
 	return false
-}
-
-// skipReceiverWrappers unwraps parentheses and TS-only wrappers (`as`,
-// `satisfies`, the non-null `!` operator) that have no runtime effect of
-// their own, so a receiver like `(x)`, `x!`, or `(x as T)` is treated the
-// same as a bare `x`.
-func skipReceiverWrappers(node *ast.Node) *ast.Node {
-	return ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
 }
 
 // canBeFixed reports whether node can be safely rewritten between `x = x op y`
@@ -82,7 +84,7 @@ func skipReceiverWrappers(node *ast.Node) *ast.Node {
 // optional chain is always wrapped in a ChainExpression there, which matches
 // neither of its two accepted shapes.
 func canBeFixed(node *ast.Node) bool {
-	node = skipReceiverWrappers(node)
+	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
 	}
@@ -93,18 +95,18 @@ func canBeFixed(node *ast.Node) bool {
 		if ast.IsOptionalChain(node) {
 			return false
 		}
-		object := skipReceiverWrappers(node.AsPropertyAccessExpression().Expression)
+		object := utils.SkipAssertionsAndParens(node.AsPropertyAccessExpression().Expression)
 		return object != nil && (object.Kind == ast.KindIdentifier || object.Kind == ast.KindThisKeyword)
 	case ast.KindElementAccessExpression:
 		if ast.IsOptionalChain(node) {
 			return false
 		}
 		elementAccess := node.AsElementAccessExpression()
-		object := skipReceiverWrappers(elementAccess.Expression)
+		object := utils.SkipAssertionsAndParens(elementAccess.Expression)
 		if object == nil || (object.Kind != ast.KindIdentifier && object.Kind != ast.KindThisKeyword) {
 			return false
 		}
-		argument := skipReceiverWrappers(elementAccess.ArgumentExpression)
+		argument := utils.SkipAssertionsAndParens(elementAccess.ArgumentExpression)
 		return argument != nil && isLiteralPropertyKey(argument)
 	}
 	return false
@@ -140,10 +142,11 @@ func checkAlways(ctx rule.RuleContext, node *ast.Node) {
 	}
 	rhsExpr := rhs.AsBinaryExpression()
 	operatorKind := rhsExpr.OperatorToken.Kind
-	commutative := isCommutativeShorthandOperator(operatorKind)
-	if !commutative && !isNonCommutativeShorthandOperator(operatorKind) {
+	op, ok := shorthandOperatorsByPlain[operatorKind]
+	if !ok {
 		return
 	}
+	commutative := op.commutative
 
 	left := binExpr.Left
 	replacementOperator := scanner.TokenToString(operatorKind) + "="
@@ -198,10 +201,11 @@ func reportReplaced(
 // assignment operators should be written as `x = x op y` instead.
 func checkNever(ctx rule.RuleContext, node *ast.Node) {
 	binExpr := node.AsBinaryExpression()
-	plainOperatorKind, ok := compoundAssignmentPlainOperator[binExpr.OperatorToken.Kind]
+	op, ok := shorthandOperatorsByCompound[binExpr.OperatorToken.Kind]
 	if !ok {
 		return
 	}
+	plainOperatorKind := op.plain
 
 	operatorText := scanner.TokenToString(binExpr.OperatorToken.Kind)
 	msg := unexpectedMessage(operatorText)
@@ -243,7 +247,7 @@ func checkNever(ctx rule.RuleContext, node *ast.Node) {
 			rest := text[opRange.End():node.End()]
 			prefix := ""
 			if firstRune, size := utf8.DecodeRuneInString(rest); firstRune != utf8.RuneError && size > 0 {
-				if !isJSWhitespace(firstRune) && !utils.CanTokenTextsBeAdjacent(plainOperatorText, rest[:size]) {
+				if !utils.CanTokenTextsBeAdjacent(plainOperatorText, rest[:size]) {
 					prefix = " "
 				}
 			}
@@ -253,14 +257,6 @@ func checkNever(ctx rule.RuleContext, node *ast.Node) {
 		replacement := leftText + "= " + leftText + plainOperatorText + rightText
 		return []rule.RuleFix{rule.RuleFixReplace(sourceFile, node, replacement)}
 	})
-}
-
-func isJSWhitespace(r rune) bool {
-	switch r {
-	case ' ', '\t', '\n', '\r', '\v', '\f':
-		return true
-	}
-	return false
 }
 
 // https://eslint.org/docs/latest/rules/operator-assignment

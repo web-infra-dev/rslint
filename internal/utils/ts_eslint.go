@@ -1634,7 +1634,7 @@ func IsSameReference(left, right *ast.Node, disableStaticComputedKey bool) bool 
 		(left.Kind == ast.KindNullKeyword || left.Kind == ast.KindTrueKeyword || left.Kind == ast.KindFalseKeyword) {
 		return true
 	}
-	if left.Kind == right.Kind && ast.IsLiteralKind(left.Kind) {
+	if left.Kind == right.Kind && isSameReferenceLiteralKind(left.Kind) {
 		return sameReferenceLiteralValue(left, right)
 	}
 
@@ -1671,10 +1671,30 @@ func IsSameReference(left, right *ast.Node, disableStaticComputedKey bool) bool 
 	return false
 }
 
+// isSameReferenceLiteralKind reports whether kind is one of the node kinds
+// [sameReferenceLiteralValue] handles. This intentionally excludes
+// NoSubstitutionTemplateLiteral even though [ast.IsLiteralKind] considers it a
+// literal: ESTree gives a no-substitution template literal (a backtick string
+// with no interpolation) its own "TemplateLiteral" type, distinct from
+// "Literal", and ESLint's isSameReference switch has no case for
+// "TemplateLiteral" — it falls through to `default: return false`. So two
+// matching no-substitution template-literal computed keys are NOT the same
+// reference when disableStaticComputedKey skips the static-name fast path,
+// matching upstream.
+func isSameReferenceLiteralKind(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindRegularExpressionLiteral:
+		return true
+	}
+	return false
+}
+
 // sameReferenceLiteralValue compares two same-Kind literal nodes by value, for
 // use as a property key in [IsSameReference]. Unlike [AreNodesStructurallyEqual],
 // this only needs the leaf-literal cases: a literal can never contain a nested
-// access expression worth recursing into.
+// access expression worth recursing into. Callers must first confirm
+// [isSameReferenceLiteralKind] to stay aligned with ESLint's isSameReference,
+// which has no "TemplateLiteral" case.
 func sameReferenceLiteralValue(left, right *ast.Node) bool {
 	switch left.Kind {
 	case ast.KindStringLiteral:
@@ -1683,7 +1703,7 @@ func sameReferenceLiteralValue(left, right *ast.Node) bool {
 		return NormalizeNumericLiteral(left.AsNumericLiteral().Text) == NormalizeNumericLiteral(right.AsNumericLiteral().Text)
 	case ast.KindBigIntLiteral:
 		return NormalizeBigIntLiteral(left.AsBigIntLiteral().Text) == NormalizeBigIntLiteral(right.AsBigIntLiteral().Text)
-	case ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral:
+	case ast.KindRegularExpressionLiteral:
 		return left.Text() == right.Text()
 	}
 	return false

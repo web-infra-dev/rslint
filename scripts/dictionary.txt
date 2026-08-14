@@ -611,6 +611,7 @@ unrepresentable
 unrooted
 unshadowed
 unshift
+unspaced
 unstarted
 unstrict
 unstub
