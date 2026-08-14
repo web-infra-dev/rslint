@@ -439,6 +439,9 @@ func GetNonAssignedNameOfDeclaration(declaration *ast.Node) *ast.Node
 func GetNonAugmentationDeclaration(symbol *ast.Symbol) *ast.Node
 //go:linkname GetOperatorPrecedence github.com/microsoft/typescript-go/internal/ast.GetOperatorPrecedence
 func GetOperatorPrecedence(nodeKind ast.Kind, operatorKind ast.Kind, flags ast.OperatorPrecedenceFlags) ast.OperatorPrecedence
+func GetOrComputeSourceFileData[T any](file *ast.SourceFile, key *ast.SourceFileDataKey[T], compute func(*ast.SourceFile) T) T {
+	return ast.GetOrComputeSourceFileData[T](file, key, compute)
+}
 //go:linkname GetPragmaArgument github.com/microsoft/typescript-go/internal/ast.GetPragmaArgument
 func GetPragmaArgument(pragma *ast.Pragma, name string) string
 //go:linkname GetPragmaFromSourceFile github.com/microsoft/typescript-go/internal/ast.GetPragmaFromSourceFile
@@ -2166,6 +2169,9 @@ func NewHasFileName(fileName string, path tspath.Path) ast.HasFileName
 func NewNodeFactory(hooks ast.NodeFactoryHooks) *ast.NodeFactory
 //go:linkname NewNodeVisitor github.com/microsoft/typescript-go/internal/ast.NewNodeVisitor
 func NewNodeVisitor(visit func(node *ast.Node) *ast.Node, factory *ast.NodeFactory, hooks ast.NodeVisitorHooks) *ast.NodeVisitor
+func NewSourceFileDataKey[T any]() *ast.SourceFileDataKey[T] {
+	return ast.NewSourceFileDataKey[T]()
+}
 type NoSubstitutionTemplateLiteral = ast.NoSubstitutionTemplateLiteral
 type NoSubstitutionTemplateLiteralNode = ast.NoSubstitutionTemplateLiteralNode
 type Node = ast.Node

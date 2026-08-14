@@ -87,7 +87,8 @@ func (edge ModuleEdge) Dynamic() bool {
 // what they resolve to. A file's answer is derived once per lint run however
 // many rules and files ask for it — the alternative being that each rule
 // re-reads and re-resolves the same imports for every file it looks past. What
-// the file itself decides can outlive the run; see ModuleSpecifierCache.
+// the file itself decides can outlive the run when the caller opts into
+// SourceFile-owned reuse.
 //
 // It reports what the syntax says and nothing more. Which of these references
 // a rule treats as a dependency — whether type-only imports count, whether
@@ -99,10 +100,9 @@ type ModuleGraph struct {
 	// collection at worst, which is cheaper than serializing every file in the
 	// run behind one mutex.
 	edges utils.LazyMap[moduleEdgeKey, []ModuleEdge]
-	// specifiers, when the caller supplies one, carries the syntactic half of
-	// the answer across the Programs of one editor session. nil confines every
-	// answer to this run.
-	specifiers *ModuleSpecifierCache
+	// cacheModuleSpecifiers attaches the syntactic half to each immutable
+	// SourceFile. Resolution remains local to this graph's Program.
+	cacheModuleSpecifiers bool
 }
 
 // moduleEdgeKey pairs a file with the syntaxes the caller asked about, which
@@ -116,11 +116,11 @@ func NewModuleGraph(program *compiler.Program) *ModuleGraph {
 	return &ModuleGraph{program: program}
 }
 
-// NewCachedModuleGraph returns a graph that reads its syntactic half from
-// cache, which the caller owns and reuses across runs. See ModuleSpecifierCache
-// for what that does and does not carry over.
-func NewCachedModuleGraph(program *compiler.Program, cache *ModuleSpecifierCache) *ModuleGraph {
-	return &ModuleGraph{program: program, specifiers: cache}
+// NewCachedModuleGraph returns a graph that shares its syntax-only collection
+// with other graphs holding the exact same SourceFile objects. Each graph
+// still resolves those specifiers against its own Program.
+func NewCachedModuleGraph(program *compiler.Program) *ModuleGraph {
+	return &ModuleGraph{program: program, cacheModuleSpecifiers: true}
 }
 
 // Files returns every file of the Program, in the Program's own order. A
@@ -147,14 +147,14 @@ func (graph *ModuleGraph) Edges(file *ast.SourceFile, syntax ModuleSyntax) []Mod
 	})
 }
 
-// specifiersOf returns what file writes, reading the caller's cache when there
-// is one. Collection is a pure function of the file's own syntax, so a cached
-// answer is the answer for as long as that exact file object exists.
+// specifiersOf returns what file writes. Collection is a pure function of the
+// file's own syntax, so an attached answer is valid for that SourceFile's
+// entire lifetime.
 func (graph *ModuleGraph) specifiersOf(file *ast.SourceFile, syntax ModuleSyntax) []moduleSpecifier {
-	if graph.specifiers == nil {
+	if !graph.cacheModuleSpecifiers {
 		return collectSpecifiers(file, syntax)
 	}
-	return graph.specifiers.get(file, syntax)
+	return cachedModuleSpecifiers(file, syntax)
 }
 
 // resolveAll turns what a file writes into what it references, which is the

@@ -1,7 +1,10 @@
 package rule
 
 import (
+	"runtime"
 	"testing"
+	"time"
+	"weak"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
@@ -18,16 +21,14 @@ const specifierCacheTarget = "/specifier-cache-fixture/target.ts"
 
 var specifierCacheESM = ModuleSyntax{ESModule: true}
 
-// TestModuleSpecifierCacheReusesOneFilesCollection locks in the point of the
-// cache: a second run over the same unchanged file is answered from the first
-// run's collection rather than by reading the file again.
-func TestModuleSpecifierCacheReusesOneFilesCollection(t *testing.T) {
+// TestSourceFileModuleSpecifierCacheReusesCollection locks in the point of the
+// cache: two runs holding the same unchanged SourceFile share its collection.
+func TestSourceFileModuleSpecifierCacheReusesCollection(t *testing.T) {
 	program, _ := specifierCacheProgram(t, specifierCacheFiles(false))
 	file := specifierCacheFile(t, program)
-	cache := NewModuleSpecifierCache()
 
-	first := cache.get(file, specifierCacheESM)
-	second := cache.get(file, specifierCacheESM)
+	first := cachedModuleSpecifiers(file, specifierCacheESM)
+	second := cachedModuleSpecifiers(file, specifierCacheESM)
 
 	if len(first) != 1 {
 		t.Fatalf("collected %d specifiers, want 1", len(first))
@@ -37,16 +38,15 @@ func TestModuleSpecifierCacheReusesOneFilesCollection(t *testing.T) {
 	}
 }
 
-// TestModuleSpecifierCacheSeparatesSyntaxes locks in that one file's entry
+// TestSourceFileModuleSpecifierCacheSeparatesSyntaxes locks in that one file
 // answers for the syntaxes it was asked about and no others: a `require` call
 // is a reference under commonjs and nothing at all without it.
-func TestModuleSpecifierCacheSeparatesSyntaxes(t *testing.T) {
+func TestSourceFileModuleSpecifierCacheSeparatesSyntaxes(t *testing.T) {
 	program, _ := specifierCacheProgram(t, specifierCacheFiles(true))
 	file := specifierCacheFile(t, program)
-	cache := NewModuleSpecifierCache()
 
-	esmOnly := cache.get(file, specifierCacheESM)
-	withCommonJS := cache.get(file, ModuleSyntax{ESModule: true, CommonJS: true})
+	esmOnly := cachedModuleSpecifiers(file, specifierCacheESM)
+	withCommonJS := cachedModuleSpecifiers(file, ModuleSyntax{ESModule: true, CommonJS: true})
 
 	if len(esmOnly) != 1 {
 		t.Fatalf("collected %d ES module specifiers, want 1", len(esmOnly))
@@ -54,16 +54,16 @@ func TestModuleSpecifierCacheSeparatesSyntaxes(t *testing.T) {
 	if len(withCommonJS) != 2 {
 		t.Fatalf("collected %d specifiers with commonjs, want 2", len(withCommonJS))
 	}
-	if reused := cache.get(file, specifierCacheESM); &reused[0] != &esmOnly[0] {
+	if reused := cachedModuleSpecifiers(file, specifierCacheESM); &reused[0] != &esmOnly[0] {
 		t.Fatal("the commonjs request displaced the ES module answer")
 	}
 }
 
-// TestModuleSpecifierCacheSupersedesReplacedFiles locks in what makes the
-// cache safe to keep across an editing session without invalidating it: an
-// entry answers for one file object, and an editor replaces that object
-// whenever the text behind it changes.
-func TestModuleSpecifierCacheSupersedesReplacedFiles(t *testing.T) {
+// TestSourceFileModuleSpecifierCacheSeparatesSourceFiles locks in that pointer
+// identity, not a path, owns an answer. Two hosts can parse different text at
+// the same path and their SourceFiles must never displace or answer for one
+// another.
+func TestSourceFileModuleSpecifierCacheSeparatesSourceFiles(t *testing.T) {
 	originalProgram, _ := specifierCacheProgram(t, specifierCacheFiles(false))
 	editedProgram, _ := specifierCacheProgram(t, specifierCacheFiles(true))
 	original := specifierCacheFile(t, originalProgram)
@@ -74,10 +74,9 @@ func TestModuleSpecifierCacheSupersedesReplacedFiles(t *testing.T) {
 	if original.Path() != edited.Path() {
 		t.Fatal("the fixture files disagree on their path; the test proves nothing")
 	}
-	cache := NewModuleSpecifierCache()
-
-	before := cache.get(original, ModuleSyntax{ESModule: true, CommonJS: true})
-	after := cache.get(edited, ModuleSyntax{ESModule: true, CommonJS: true})
+	syntax := ModuleSyntax{ESModule: true, CommonJS: true}
+	before := cachedModuleSpecifiers(original, syntax)
+	after := cachedModuleSpecifiers(edited, syntax)
 
 	if len(before) != 1 {
 		t.Fatalf("collected %d specifiers before the edit, want 1", len(before))
@@ -85,35 +84,118 @@ func TestModuleSpecifierCacheSupersedesReplacedFiles(t *testing.T) {
 	if len(after) != 2 {
 		t.Fatalf("collected %d specifiers after the edit, want 2", len(after))
 	}
+	if reused := cachedModuleSpecifiers(original, syntax); &reused[0] != &before[0] {
+		t.Fatal("the other SourceFile displaced the original answer")
+	}
 }
 
-// TestModuleSpecifierCacheResetReleasesEntries locks in what bounds the cache.
-// An entry stays until a later run over the same path supersedes it, so an
-// owner that discards the Programs — and with them the runs that would have
-// named those paths again — has to say so, or the trees those entries hold
-// outlive every Program that ever held them.
-func TestModuleSpecifierCacheResetReleasesEntries(t *testing.T) {
-	program, _ := specifierCacheProgram(t, specifierCacheFiles(false))
+// TestSourceFileModuleSpecifierCachePublishesConcurrentCollections locks in
+// concurrent editor runs sharing one SourceFile. Misses may redundantly perform
+// the pure collection, but every caller must receive the single published
+// read-only slice for its requested syntax.
+func TestSourceFileModuleSpecifierCachePublishesConcurrentCollections(t *testing.T) {
+	program, _ := specifierCacheProgram(t, specifierCacheFiles(true))
 	file := specifierCacheFile(t, program)
-	cache := NewModuleSpecifierCache()
+	syntaxes := [...]ModuleSyntax{
+		specifierCacheESM,
+		{ESModule: true, CommonJS: true},
+	}
+	type result struct {
+		syntaxIndex int
+		collected   []moduleSpecifier
+	}
+	const callers = 64
+	start := make(chan struct{})
+	results := make(chan result, callers)
+	for i := range callers {
+		syntaxIndex := i % len(syntaxes)
+		go func() {
+			<-start
+			results <- result{
+				syntaxIndex: syntaxIndex,
+				collected:   cachedModuleSpecifiers(file, syntaxes[syntaxIndex]),
+			}
+		}()
+	}
+	close(start)
 
-	first := cache.get(file, specifierCacheESM)
-	if held := cache.Len(); held != 1 {
-		t.Fatalf("the cache holds %d paths after one file, want 1", held)
+	var published [len(syntaxes)][]moduleSpecifier
+	for range callers {
+		result := <-results
+		wantLength := result.syntaxIndex + 1
+		if len(result.collected) != wantLength {
+			t.Fatalf("syntax %d collected %d specifiers, want %d", result.syntaxIndex, len(result.collected), wantLength)
+		}
+		if published[result.syntaxIndex] == nil {
+			published[result.syntaxIndex] = result.collected
+			continue
+		}
+		if &result.collected[0] != &published[result.syntaxIndex][0] {
+			t.Fatalf("syntax %d published more than one collection", result.syntaxIndex)
+		}
 	}
+}
 
-	cache.Reset()
+// TestSourceFileModuleSpecifierCacheReleasesReplacedAndRemovedFiles reproduces
+// the incremental lifetime boundary. Removing an import rebuilds the Program,
+// replacing the importer and removing its dependency. Their attached answers
+// must not make either old AST reachable while the new Program remains live.
+func TestSourceFileModuleSpecifierCacheReleasesReplacedAndRemovedFiles(t *testing.T) {
+	var replaced weak.Pointer[ast.SourceFile]
+	var removed weak.Pointer[ast.SourceFile]
+	var updated *compiler.Program
 
-	if held := cache.Len(); held != 0 {
-		t.Fatalf("the cache holds %d paths after Reset, want 0", held)
+	func() {
+		files := specifierCacheFiles(false)
+		program, fs := specifierCacheProgram(t, files)
+		importer := specifierCacheFile(t, program)
+		target := program.GetSourceFile(specifierCacheTarget)
+		if target == nil {
+			t.Fatal("the fixture target is not in the program")
+		}
+		replaced = weak.Make(importer)
+		removed = weak.Make(target)
+
+		if collected := cachedModuleSpecifiers(importer, specifierCacheESM); len(collected) != 1 {
+			t.Fatalf("collected %d importer specifiers, want 1", len(collected))
+		}
+		cachedModuleSpecifiers(target, specifierCacheESM)
+
+		files[specifierCacheImporter] = "export const used = 1;\n"
+		changed := tspath.ToPath(
+			specifierCacheImporter,
+			program.GetCurrentDirectory(),
+			fs.UseCaseSensitiveFileNames(),
+		)
+		var reused bool
+		updated, _, reused = program.UpdateProgram(changed, program.Host(), nil)
+		if updated == nil || reused {
+			t.Fatalf("the import graph change did not rebuild the program (reused=%v)", reused)
+		}
+		updated.BindSourceFiles()
+		if specifierCacheFile(t, updated) == importer {
+			t.Fatal("the rebuilt Program retained the replaced importer")
+		}
+		if updated.GetSourceFile(specifierCacheTarget) != nil {
+			t.Fatal("the rebuilt Program retained the removed dependency")
+		}
+	}()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		runtime.GC()
+		if replaced.Value() == nil && removed.Value() == nil {
+			runtime.KeepAlive(updated)
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
-	recollected := cache.get(file, specifierCacheESM)
-	if len(recollected) != 1 {
-		t.Fatalf("collected %d specifiers after Reset, want 1", len(recollected))
-	}
-	if &recollected[0] == &first[0] {
-		t.Fatal("Reset kept the entry it was told to drop")
-	}
+	runtime.KeepAlive(updated)
+	t.Fatalf(
+		"attached cache retained old ASTs (replaced=%v, removed=%v)",
+		replaced.Value() != nil,
+		removed.Value() != nil,
+	)
 }
 
 // TestCachedModuleGraphResolvesPerProgram locks in the half the cache
@@ -144,10 +226,8 @@ func TestCachedModuleGraphResolvesPerProgram(t *testing.T) {
 	if updated.GetSourceFile(specifierCacheTarget) == program.GetSourceFile(specifierCacheTarget) {
 		t.Fatal("the update reused the edited file; the test proves nothing")
 	}
-	cache := NewModuleSpecifierCache()
-
-	before := NewCachedModuleGraph(program, cache).Edges(file, specifierCacheESM)
-	after := NewCachedModuleGraph(updated, cache).Edges(file, specifierCacheESM)
+	before := NewCachedModuleGraph(program).Edges(file, specifierCacheESM)
+	after := NewCachedModuleGraph(updated).Edges(file, specifierCacheESM)
 
 	if len(before) != 1 || len(after) != 1 {
 		t.Fatalf("resolved %d and %d edges, want 1 each", len(before), len(after))
