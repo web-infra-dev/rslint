@@ -39,6 +39,13 @@ func TestInitDeclarationsExtras(t *testing.T) {
 			// ---- Dimension 4: nesting/traversal boundary — `declare global` ----
 			{Code: `declare global { var x: number; }`, Options: []any{"always"}},
 
+			// ---- Locks in upstream isInitialized(): unbraced for-loop body ----
+			// A braced for-loop body is an ordinary nested VariableStatement,
+			// not the loop's own init/left slot and not the unbraced-body
+			// special case either — it must fall through to the plain
+			// explicit-initializer check.
+			{Code: `for (var a in []) { var foo = 1; }`, Options: []any{"always"}},
+
 			// ---- Real-user: typescript-eslint#4392 eg.2 ----
 			// A `declare const` sibling inside a declared namespace must not
 			// disturb ambient status for a later, non-declared nested
@@ -131,6 +138,26 @@ declare namespace A {
 					Message:   "Variable 'count' should not be initialized on declaration.",
 					Line:      1, Column: 5, EndLine: 1, EndColumn: 14,
 				}},
+			},
+
+			// ---- Locks in upstream isInitialized(): unbraced for-loop body ----
+			// tsgo wraps a for-loop's unbraced body in a VariableStatement
+			// (unlike ESTree, which uses the VariableDeclaration directly as
+			// the body), so `foo` is NOT the loop's init/left slot — it must
+			// be treated as always-uninitialized, the same as upstream,
+			// regardless of its own explicit initializer.
+			{
+				Code:    `for (var a in []) var foo = 1;`,
+				Options: []any{"always"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "initialized", Line: 1, Column: 23, EndLine: 1, EndColumn: 30}},
+			},
+			// Under "never", only `a` (the loop's own binding, unconditionally
+			// "initialized") is reportable — `foo` must NOT also be reported
+			// even though it has an explicit initializer.
+			{
+				Code:    `for (var a in []) var foo = 1;`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "notInitialized", Line: 1, Column: 10, EndLine: 1, EndColumn: 11}},
 			},
 		},
 	)

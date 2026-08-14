@@ -86,6 +86,23 @@ func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, opts ini
 	kind := utils.GetVarDeclListKind(node)
 	isConstantBinding := kind == "const" || kind == "using" || kind == "await using"
 
+	// Upstream's isInitialized() walks straight from the declarator to its
+	// enclosing VariableDeclaration to THAT node's parent, and treats a
+	// for-loop parent as init/left-slot identity — true only when the
+	// declaration literally IS the loop's init/left slot, false otherwise
+	// (never falling back to checking the initializer). An unbraced for-loop
+	// body that is itself a var declaration (`for (...) var x = 1;`) hits
+	// this false branch: ESTree represents the body as the VariableDeclaration
+	// node directly (no wrapper), so its parent is the for-loop, but it isn't
+	// the init/left slot. tsgo instead always wraps a declaration statement —
+	// including a for-loop's unbraced body — in a VariableStatement, so the
+	// equivalent structural check here is one level up: a
+	// VariableDeclarationList whose parent is a VariableStatement whose own
+	// parent is a for-loop is unambiguously that body (init/left slots are
+	// bare VariableDeclarationLists in tsgo, never VariableStatement-wrapped).
+	isUnbracedForLoopBody := !inForLoop && parent != nil && parent.Kind == ast.KindVariableStatement &&
+		parent.Parent != nil && isForLoopKind(parent.Parent.Kind)
+
 	for _, decl := range declList.Declarations.Nodes {
 		varDecl := decl.AsVariableDeclaration()
 		if varDecl == nil {
@@ -99,14 +116,13 @@ func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, opts ini
 			continue
 		}
 
-		// Upstream's isInitialized(): a for-loop binding (`for (var i ...)`,
-		// `for (var k in x)`, `for (var v of x)`) is always considered
-		// initialized, even without an explicit initializer — the loop's
-		// init/left slot IS the declaration by AST construction, so upstream's
-		// `block.init === declaration` / `block.left === declaration` checks
-		// are trivially true whenever a VariableDeclarationList's parent is a
-		// for-loop. Otherwise, initialized means an explicit initializer.
-		initialized := inForLoop || varDecl.Initializer != nil
+		// Upstream's isInitialized(): a for-loop's own init/left binding
+		// (`for (var i ...)`, `for (var k in x)`, `for (var v of x)`) is
+		// always considered initialized, even without an explicit
+		// initializer — see isUnbracedForLoopBody's comment above for why an
+		// unbraced for-loop body is a distinct, always-uninitialized case
+		// instead. Otherwise, initialized means an explicit initializer.
+		initialized := inForLoop || (!isUnbracedForLoopBody && varDecl.Initializer != nil)
 
 		var messageId string
 		switch {
