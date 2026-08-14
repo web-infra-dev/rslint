@@ -111,7 +111,7 @@ func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
 			resolver := config.NewFileConfigResolver(cfg, dir, false)
 
 			served := lintSingleFile(
-				program, sourceFile, file, dir, true, resolver, rule.EditDemandAll, context.Background(),
+				program, sourceFile, file, dir, true, resolver, rule.EditDemandAll, false, context.Background(),
 			).Diagnostics
 
 			if len(served) != 0 {
@@ -157,7 +157,7 @@ func TestOtherRulesStillRunInTheEditor(t *testing.T) {
 	resolver := config.NewFileConfigResolver(cfg, dir, false)
 
 	served := lintSingleFile(
-		program, sourceFile, file, dir, true, resolver, rule.EditDemandAll, context.Background(),
+		program, sourceFile, file, dir, true, resolver, rule.EditDemandAll, false, context.Background(),
 	).Diagnostics
 
 	byRule := make(map[string][]rule.RuleFix, len(served))

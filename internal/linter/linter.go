@@ -91,6 +91,10 @@ type runProgramOptions struct {
 	// PreparedPlan supplies the already-collected files and resolved rules for
 	// this Program. nil preserves the direct collection/callback path.
 	PreparedPlan *programLintPlan
+	// CacheModuleSpecifiers lets module graphs sharing exact SourceFile objects
+	// reuse their syntax-only collection across Programs. Resolution remains
+	// local to this run.
+	CacheModuleSpecifiers bool
 }
 
 type programLintResult struct {
@@ -170,10 +174,14 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 		return result
 	}
 
-	// One module graph shared by every rule on every file of this Program.
-	// What a file imports is a property of the Program, so it is derived on
-	// the first file that asks and the rest of the run reuses it.
+	// One module graph is shared by every rule on every file of this Program.
+	// Module syntax belongs to the immutable SourceFile and resolution belongs
+	// to the Program; the graph derives the final edges on first use and reuses
+	// them for the rest of this run.
 	moduleGraph := rule.NewModuleGraph(opts.Program)
+	if opts.CacheModuleSpecifiers {
+		moduleGraph = rule.NewCachedModuleGraph(opts.Program)
+	}
 
 	// lintFile lints one file with its already-resolved rules and checker. Its
 	// comments, DisableManager, and rule contexts are per-file. The listener
@@ -657,13 +665,14 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		}
 	}
 	runLintRulesInProgram(runProgramOptions{
-		Program:          opts.Program,
-		Cwd:              opts.Cwd,
-		ExcludePaths:     opts.ExcludePaths,
-		TargetFiles:      []string{opts.File},
-		HasTargetFiles:   true,
-		GetRulesForFile:  getRulesForFile,
-		SyntaxErrorFiles: map[string]struct{}{},
+		Program:               opts.Program,
+		Cwd:                   opts.Cwd,
+		ExcludePaths:          opts.ExcludePaths,
+		TargetFiles:           []string{opts.File},
+		HasTargetFiles:        true,
+		GetRulesForFile:       getRulesForFile,
+		CacheModuleSpecifiers: opts.CacheModuleSpecifiers,
+		SyntaxErrorFiles:      map[string]struct{}{},
 		// A single file is a single shard — run it on the calling goroutine
 		// instead of scheduling a background task.
 		SingleThreaded: true,

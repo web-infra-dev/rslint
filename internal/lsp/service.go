@@ -1019,6 +1019,10 @@ func runLintWithProgramLoader(
 		hasTypeInfo,
 		fileConfigResolver,
 		rule.EditDemandAll,
+		// Normal diagnostics can receive reused SourceFiles from the Session even
+		// when the standalone Program store is unavailable. Fresh fallbacks are
+		// safe too: attached syntax data dies with their transient SourceFiles.
+		true,
 		ctx,
 	), nil
 }
@@ -1063,6 +1067,7 @@ func lintSingleFile(
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
 	editDemand rule.EditDemand,
+	cacheModuleSpecifiers bool,
 	ctx context.Context,
 ) lintPassResult {
 	if sourceFile == nil {
@@ -1097,10 +1102,11 @@ func lintSingleFile(
 	}
 
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:     program,
-		File:        sourceFile.FileName(),
-		Cwd:         processCwd,
-		HasTypeInfo: hasTypeInfo,
+		Program:               program,
+		File:                  sourceFile.FileName(),
+		Cwd:                   processCwd,
+		HasTypeInfo:           hasTypeInfo,
+		CacheModuleSpecifiers: cacheModuleSpecifiers,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return rulesServedToEditors(fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo))
 		},
@@ -1323,6 +1329,9 @@ func (s *Server) runConfiguredLintForContent(
 	s.addEditorOverlayFile(files, filename, content)
 	overlayFS := utils.NewOverlayVFS(s.fs, files)
 
+	// This path builds a request-local Program over its own filesystem. It
+	// cannot hand the same SourceFiles to a later lint pass, so module syntax
+	// collection stays inside this pass's graph.
 	for _, tsConfigPath := range tsConfigPaths {
 		program, err := createStandaloneLintProgram(tsConfigPath, overlayFS)
 		if err != nil {
@@ -1337,6 +1346,7 @@ func (s *Server) runConfiguredLintForContent(
 				true,
 				resolver,
 				rule.EditDemandAutofix,
+				false,
 				ctx,
 			), nil
 		}
@@ -1354,6 +1364,7 @@ func (s *Server) runConfiguredLintForContent(
 		false,
 		resolver,
 		rule.EditDemandAutofix,
+		false,
 		ctx,
 	), nil
 }
