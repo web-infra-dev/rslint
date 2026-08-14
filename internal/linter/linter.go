@@ -91,6 +91,10 @@ type runProgramOptions struct {
 	// PreparedPlan supplies the already-collected files and resolved rules for
 	// this Program. nil preserves the direct collection/callback path.
 	PreparedPlan *programLintPlan
+	// ModuleSpecifiers, when non-nil, lets the module graph read the syntactic
+	// half of its answers from a cache the caller carries across runs. nil
+	// confines every answer to this run.
+	ModuleSpecifiers *rule.ModuleSpecifierCache
 }
 
 type programLintResult struct {
@@ -173,7 +177,7 @@ func runLintRulesInProgram(opts runProgramOptions, consumer rule.DiagnosticConsu
 	// One module graph shared by every rule on every file of this Program.
 	// What a file imports is a property of the Program, so it is derived on
 	// the first file that asks and the rest of the run reuses it.
-	moduleGraph := rule.NewModuleGraph(opts.Program)
+	moduleGraph := rule.NewCachedModuleGraph(opts.Program, opts.ModuleSpecifiers)
 
 	// lintFile lints one file with its already-resolved rules and checker. Its
 	// comments, DisableManager, and rule contexts are per-file. The listener
@@ -663,6 +667,7 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		TargetFiles:      []string{opts.File},
 		HasTargetFiles:   true,
 		GetRulesForFile:  getRulesForFile,
+		ModuleSpecifiers: opts.ModuleSpecifiers,
 		SyntaxErrorFiles: map[string]struct{}{},
 		// A single file is a single shard — run it on the calling goroutine
 		// instead of scheduling a background task.

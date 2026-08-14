@@ -302,7 +302,19 @@ func (s *lintProgramStore) isOpenSourceOverlayWatchChange(
 func (s *lintProgramStore) Invalidate() bool {
 	hadPrograms := len(s.programs) != 0
 	clear(s.programs)
+	if hadPrograms {
+		s.discarded()
+	}
 	return hadPrograms
+}
+
+// discarded reports that Programs this store was going to reuse are gone. A
+// Program that is rebuilt hands its files' paths to the run that rebuilt it,
+// which supersedes their cached collections; one that is dropped hands them to
+// nobody, so what the cache holds for them — including files the project no
+// longer contains — would outlive every Program that ever held them.
+func (s *lintProgramStore) discarded() {
+	s.server.moduleSpecifiers.Reset()
 }
 
 func (s *lintProgramStore) markContent(
@@ -350,6 +362,9 @@ func (s *lintProgramStore) markContent(
 			delete(s.programs, configFileName)
 			discarded = true
 		}
+	}
+	if discarded {
+		s.discarded()
 	}
 	return discarded
 }
