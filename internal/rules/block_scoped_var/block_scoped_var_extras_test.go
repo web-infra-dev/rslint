@@ -48,6 +48,25 @@ func TestBlockScopedVarExtras(t *testing.T) {
 			// ---- of the same name never cross-flag each other. ----
 			{Code: "if (true) { var a; } else { var a; }"},
 			{Code: "function f() { for (var a;;) {} for (var a;;) {} }"},
+
+			// ---- Locks in: a for-of/for-in binding's implicit self-reference
+			// ---- does not extend to an unrelated later bare `var` of the
+			// ---- same name — it is still gated on that later declarator
+			// ---- having its own initializer.
+			{Code: "function f() { for (var a of []) {} var a; }"},
+
+			// ---- Real-user: class static blocks are independent var scopes,
+			// ---- so the same name declared in two different static blocks
+			// ---- of one class never cross-flags, with or without an
+			// ---- initializer.
+			{Code: "class C { static { var a; a; } static { var a; a; } }"},
+			{Code: "class C { static { var a = 1; } static { var a = 2; } }"},
+
+			// ---- Real-user: a nested function's `var` never cross-flags an
+			// ---- outer function's same-named `var` — they are different
+			// ---- symbols in different var scopes, even with matching
+			// ---- initializer shapes.
+			{Code: "function outer() { if (true) { var a = 1; } function inner() { if (true) { var a = 2; } } }"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: TS wrappers around an out-of-scope read still flag the identifier ----
@@ -105,6 +124,38 @@ func TestBlockScopedVarExtras(t *testing.T) {
 			outOfScope("function f() { for (var a in {}) {} for (var a in {}) {} }",
 				scopeErr("a", 1, 46, 1, 25),
 				scopeErr("a", 1, 25, 1, 46)),
+
+			// ---- Locks in: `hasInitializer` is checked per declarator, not
+			// ---- per declaration list — a bare declarator sitting next to an
+			// ---- initialized one in the same `var` statement keeps its own
+			// ---- gating.
+			outOfScope("if (true) { var a, b = 1; } else { var a = 2, b; }",
+				scopeErr("b", 1, 47, 1, 20),
+				scopeErr("a", 1, 17, 1, 40)),
+
+			// ---- Locks in: a for-of binding's implicit self-reference does
+			// ---- cross-flag against a *later* declarator that has its own
+			// ---- initializer.
+			outOfScope("function f() { for (var a of []) {} var a = 1; }",
+				scopeErr("a", 1, 25, 1, 41)),
+
+			// ---- Real-user: a fully bare branch among initialized ones is
+			// ---- still checked as an occurrence (against reads and against
+			// ---- initialized siblings) even though it never joins the
+			// ---- sibling list itself.
+			outOfScope("if (x) { var a = 1; } else if (y) { var a; } else { var a = 3; }",
+				scopeErr("a", 1, 41, 1, 14),
+				scopeErr("a", 1, 57, 1, 14),
+				scopeErr("a", 1, 14, 1, 57),
+				scopeErr("a", 1, 41, 1, 57)),
+
+			// ---- Dimension 4: eslint-scope double-references a defaulted
+			// ---- binding-pattern element, so ESLint would report this exact
+			// ---- diagnostic twice; this port reports it once (see
+			// ---- "Differences from ESLint" in block_scoped_var.md).
+			outOfScope("if (true) { var { a = 1 } = {}; } else { var { a = 1 } = {}; }",
+				scopeErr("a", 1, 48, 1, 19),
+				scopeErr("a", 1, 19, 1, 48)),
 		},
 	)
 }

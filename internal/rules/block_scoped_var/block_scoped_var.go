@@ -59,6 +59,15 @@ func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 				// becomes a "reference," so it can never flag (or be flagged
 				// by) a sibling `var` declaration of the same name.
 				if isForInOrForOf || hasInitializer(declaration) {
+					// NOTE: Unlike ESLint, a binding-pattern element with its
+					// own default value (`var { a = 1 } = x`) is only added
+					// once here, not twice. eslint-scope creates two
+					// self-references for such an element instead of one,
+					// which (only when that element is later cross-checked
+					// against a sibling `var` of the same name) makes ESLint
+					// emit the exact same diagnostic twice. This is an
+					// eslint-scope implementation quirk, not a deliberate
+					// part of the rule; see "Differences from ESLint" below.
 					declsBySymbol[symbol] = append(declsBySymbol[symbol], identifier)
 				}
 			})

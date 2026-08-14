@@ -103,6 +103,14 @@ class C {
 
 This rule has no options.
 
+## Differences from ESLint
+
+- When a destructuring binding element with its own default value (e.g. the
+  `a` in `var { a = 1 } = x;`) is flagged for being used outside the block
+  where a sibling `var` of the same name is declared, it is reported once.
+  ESLint's scope analysis creates two internal references for such an
+  element, so it reports the identical diagnostic twice in that situation.
+
 ## Original Documentation
 
 - [ESLint: block-scoped-var](https://eslint.org/docs/latest/rules/block-scoped-var)
