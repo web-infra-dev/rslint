@@ -127,9 +127,7 @@ func TestNoWarningCommentsExtras(t *testing.T) {
 				},
 			},
 			// ---- Dimension 4: leading NBSP (U+00A0) counts as whitespace for the
-			// "start" prefix, matching ECMAScript WhiteSpace/JS `\s` — RE2's
-			// built-in `\s` is ASCII-only, so this exercises the rule's explicit
-			// jsWhitespaceClass rather than RE2's default ----
+			// "start" prefix, matching ECMAScript WhiteSpace/JS `\s` ----
 			{
 				Code:    "// TODO",
 				Options: map[string]any{"terms": []interface{}{"todo"}, "location": "start"},

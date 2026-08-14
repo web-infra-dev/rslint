@@ -3,10 +3,10 @@ package no_warning_comments
 import (
 	_ "embed"
 	"fmt"
-	"regexp"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -18,15 +18,6 @@ var schemaJSON []byte
 
 const charLimit = 40
 
-// jsWhitespaceClass lists, as Go regexp bracket-expression members, every
-// rune ECMAScript's WhiteSpace/LineTerminator grammar treats as `\s` (the
-// same set utils.IsTriviaWhitespaceByte/IsTriviaWhitespaceRune recognize —
-// keep the two definitions in sync). RE2 has no built-in equivalent: its
-// `\s` is ASCII-only, so the upstream `[\s<decoration>]*` prefix class is
-// rebuilt explicitly rather than reused.
-const jsWhitespaceClass = `\t\n\v\f\r ` +
-	`\x{00a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}`
-
 // NoWarningCommentsRule disallows specified warning terms in comments.
 // https://eslint.org/docs/latest/rules/no-warning-comments
 var NoWarningCommentsRule = rule.Rule{
@@ -35,7 +26,7 @@ var NoWarningCommentsRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		escapedDecoration := escapeRegExp(strings.Join(opts.Decoration, ""))
-		warningRegExps := make([]*regexp.Regexp, len(opts.Terms))
+		warningRegExps := make([]*regexp2.Regexp, len(opts.Terms))
 		for i, term := range opts.Terms {
 			warningRegExps[i] = convertToRegExp(term, opts.Location, escapedDecoration)
 		}
@@ -89,9 +80,9 @@ func parseOptions(options []any) ruleOptions {
 }
 
 // escapeRegExp mirrors the `escape-string-regexp` npm package upstream uses:
-// backslash-escape the regexp metacharacters, and additionally escape `-` so
-// a decoration/term string embedded inside a `[...]` character class can
-// never be misread as forming a range.
+// backslash-escape the regexp metacharacters, and encode `-` as `\x2d` so a
+// decoration/term string embedded inside a `[...]` character class can never
+// be misread as forming a range.
 func escapeRegExp(s string) string {
 	var b strings.Builder
 	for i := range len(s) {
@@ -101,7 +92,7 @@ func escapeRegExp(s string) string {
 			b.WriteByte('\\')
 			b.WriteByte(c)
 		case '-':
-			b.WriteString(`\-`)
+			b.WriteString(`\x2d`)
 		default:
 			b.WriteByte(c)
 		}
@@ -109,48 +100,52 @@ func escapeRegExp(s string) string {
 	return b.String()
 }
 
-// isWordChar mirrors JS `\w` (`[A-Za-z0-9_]`), which stays ASCII-only even
-// under the `u` flag — the same definition RE2's `\b` uses, so the two
-// engines agree on where a word boundary falls.
-func isWordChar(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
-}
+// termStartsWithWordChar / termEndsWithWordChar port upstream's `/^\w/u` and
+// `/\w$/u` term probes, which decide whether a word boundary is required on
+// that side of the term.
+var (
+	termStartsWithWordChar = regexp2.MustCompile(`^\w`, utils.JSUnicodeRegexOptions)
+	termEndsWithWordChar   = regexp2.MustCompile(`\w$`, utils.JSUnicodeRegexOptions)
+)
 
 // convertToRegExp ports the upstream rule's convertToRegExp 1:1: build a
 // case-insensitive regexp that matches `term` as a whole word in the
 // configured location. See the source comment in ESLint's
 // lib/rules/no-warning-comments.js for the rationale behind each prefix /
-// suffix case.
-func convertToRegExp(term, location, escapedDecoration string) *regexp.Regexp {
+// suffix case. A term that cannot be compiled yields a nil regexp, which
+// utils.Regexp2MatchString treats as never matching.
+func convertToRegExp(term, location, escapedDecoration string) *regexp2.Regexp {
 	escaped := escapeRegExp(term)
 
 	var prefix string
 	if location == "start" {
-		prefix = `^[` + jsWhitespaceClass + escapedDecoration + `]*`
-	} else {
-		if r, size := utf8.DecodeRuneInString(term); size > 0 && isWordChar(r) {
-			prefix = `\b`
-		}
+		prefix = `^[\s` + escapedDecoration + `]*`
+	} else if utils.Regexp2MatchString(termStartsWithWordChar, term) {
+		prefix = `\b`
 	}
 
 	suffix := ""
-	if r, size := utf8.DecodeLastRuneInString(term); size > 0 && isWordChar(r) {
+	if utils.Regexp2MatchString(termEndsWithWordChar, term) {
 		suffix = `\b`
 	}
 
-	return regexp.MustCompile("(?i)" + prefix + escaped + suffix)
+	re, err := utils.CompileRegexp2(prefix+escaped+suffix, utils.JSUnicodeRegexOptions|regexp2.IgnoreCase)
+	if err != nil {
+		return nil
+	}
+	return re
 }
 
 // selfConfigRegex mirrors upstream's hardcoded self-reference guard: a
 // directive comment that mentions this rule's own name is exempt from
 // matching, so a comment documenting `no-warning-comments` configuration
 // doesn't accidentally trip its own configured terms.
-var selfConfigRegex = regexp.MustCompile(`\bno-warning-comments\b`)
+var selfConfigRegex = regexp2.MustCompile(`\bno-warning-comments\b`, utils.JSUnicodeRegexOptions)
 
 // eslintDirectivePattern ports astUtils.ESLINT_DIRECTIVE_PATTERN, used to
 // recognize block-comment directives (`/*eslint ...*/`, `/*global ...*/`,
 // `/*exported ...*/`) by their leading text.
-var eslintDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`)
+var eslintDirectivePattern = regexp2.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`, utils.JSUnicodeRegexOptions)
 
 // isDirectiveComment ports astUtils.isDirectiveComment: a Line comment is a
 // directive if its trimmed text starts with "eslint-"; a Block comment is a
@@ -160,7 +155,7 @@ func isDirectiveComment(kind ast.Kind, trimmedValue string) bool {
 	case ast.KindSingleLineCommentTrivia:
 		return strings.HasPrefix(trimmedValue, "eslint-")
 	case ast.KindMultiLineCommentTrivia:
-		return eslintDirectivePattern.MatchString(trimmedValue)
+		return utils.Regexp2MatchString(eslintDirectivePattern, trimmedValue)
 	default:
 		return false
 	}
@@ -227,15 +222,15 @@ func jsSplitOnWhitespace(s string) []string {
 	return words
 }
 
-func checkComment(ctx rule.RuleContext, text string, comment *ast.CommentRange, terms []string, warningRegExps []*regexp.Regexp) {
+func checkComment(ctx rule.RuleContext, text string, comment *ast.CommentRange, terms []string, warningRegExps []*regexp2.Regexp) {
 	value := commentValue(text, comment)
 
-	if isDirectiveComment(comment.Kind, jsTrim(value)) && selfConfigRegex.MatchString(value) {
+	if isDirectiveComment(comment.Kind, jsTrim(value)) && utils.Regexp2MatchString(selfConfigRegex, value) {
 		return
 	}
 
 	for i, re := range warningRegExps {
-		if re.MatchString(value) {
+		if utils.Regexp2MatchString(re, value) {
 			reportMatch(ctx, comment, terms[i], value)
 		}
 	}
