@@ -71,6 +71,23 @@ test.each` + "`" + `
   expect(value).toBe(true);
 });`,
 			},
+			// A nested registration with no inline callback must not close the
+			// scope of the test it sits in, whichever form leaves it without one.
+			{Code: `test("outer", () => { test.todo("inner"); expect(1).toBe(1); });`},
+			{Code: `test("outer", () => { test("inner", callback); expect(1).toBe(1); }); function callback() {}`},
+			{Code: `describe("suite", () => { test("outer", () => { test.todo("inner"); expect(1).toBe(1); }); });`},
+			{Code: `test.each([1])("outer", value => { test.todo("inner"); expect(value).toBe(1); });`},
+			{Code: `test.for([1])("outer", value => { test.todo("inner"); expect(value).toBe(1); });`},
+			{
+				Code:    `test("outer", () => { t("inner"); expect(1).toBe(1); });`,
+				Options: []any{map[string]any{"additionalTestBlockFunctions": []any{"t"}}},
+			},
+			// The fallback range covers the arguments of a registration that has
+			// no callback, which is where upstream also allows an assertion.
+			{Code: `test.todo(expect(1).toBe(1));`},
+			// Same asymmetry in the arrow branch: an arrow passed to a call opens
+			// no scope, so its exit must not close the enclosing arrow's.
+			{Code: `const outer = () => foo(() => {}) || expect(1).toBe(1);`},
 			// A tagged template that is not a known registration still returns the
 			// call that registers the cases, so the callback of that call is inside
 			// the template scope.
