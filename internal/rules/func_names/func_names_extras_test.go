@@ -57,6 +57,25 @@ func TestFuncNamesExtras(t *testing.T) {
 			// recursive named function expressions, each guarded by its own
 			// self-reference, including the outer one which calls itself too. ----
 			{Code: "var a = function foo() { foo(); return function bar() { return bar(); }; };", Options: []any{"never"}},
+
+			// ---- Dimension 4: computed key with a string-literal expression
+			// (`['foo']`, as opposed to the bare string-literal-key form
+			// `{"foo": ...}` already covered above) — GetStaticPropertyName
+			// must unwrap the ComputedPropertyName to statically resolve it. ----
+			{Code: "({['foo']: function(){}});", Options: []any{"as-needed"}},
+
+			// ---- Dimension 4: class field with a definite-assignment `!`
+			// postfix token on the property name — PostfixToken sits beside
+			// Initializer, not between it and the FunctionExpression, so it
+			// must not interfere with the PropertyDeclaration match. ----
+			{Code: "class C { foo!: () => void = function() {}; }", Options: []any{"as-needed"}},
+
+			// ---- Locks in upstream handleFunction() arm: the recursion
+			// guard's reference lookup is scope-correct across a *non*-
+			// function boundary — a nested arrow function body still resolves
+			// `foo()` back to the enclosing named function expression (arrows
+			// don't introduce a new lexical binding for it). ----
+			{Code: "var a = function foo() { var g = () => foo(); return g; };", Options: []any{"never"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: numeric-literal key naming, "never" mode ----
@@ -165,6 +184,43 @@ func TestFuncNamesExtras(t *testing.T) {
 				Options: []any{"always"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnamed", Message: "Unexpected unnamed method 'foo'.", Line: 2, Column: 3, EndLine: 2, EndColumn: 16},
+				},
+			},
+
+			// ---- Dimension 4: TS non-null assertion wrapper — like `as` /
+			// `satisfies`, `!` is a real intermediate node (NonNullExpression)
+			// that WalkUpParenthesizedExpressions does not see through, so it
+			// breaks the inferred-name walk the same way. ----
+			{
+				Code:    "var foo = (function(){})!;",
+				Options: []any{"as-needed"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnamed", Message: "Unexpected unnamed function.", Line: 1, Column: 12, EndLine: 1, EndColumn: 20},
+				},
+			},
+
+			// ---- Locks in upstream getConfigForNode() arm: the `generators`
+			// override also applies to a FunctionDeclaration (the
+			// `export default function*` form), not just FunctionExpression —
+			// GetFunctionFlags must read the asterisk off both node kinds. ----
+			{
+				Code:    "export default function*() {}",
+				Options: []any{"as-needed", map[string]any{"generators": "as-needed"}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnamed", Message: "Unexpected unnamed generator function.", Line: 1, Column: 16, EndLine: 1, EndColumn: 25},
+				},
+			},
+
+			// ---- Locks in upstream handleFunction() arm: the recursion
+			// guard's reference lookup is scope-correct — an arrow function's
+			// *own* parameter can shadow the enclosing named function
+			// expression's recursion binding, same as a nested declaration
+			// would, leaving the outer name unreferenced and reportable. ----
+			{
+				Code:    "var a = function foo() { var g = (foo) => foo(); return g; };",
+				Options: []any{"never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "named", Message: "Unexpected named function 'foo'.", Line: 1, Column: 9, EndLine: 1, EndColumn: 21},
 				},
 			},
 		},
