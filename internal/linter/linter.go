@@ -662,8 +662,8 @@ func filePassesLintProjection(opts programPlanOptions, file *ast.SourceFile, all
 }
 
 func collectExactFilesToLint(opts programPlanOptions) []*ast.SourceFile {
-	// CLI gap generations commonly target their complete universe in the same
-	// stable order. Preserve the Program-owned slice when exact selection makes
+	// Exact target plans commonly select a Program's complete universe in the
+	// same stable order. Preserve the Program-owned slice when selection makes
 	// no change, avoiding a map and pointer-slice allocation without inspecting
 	// how the Program was constructed.
 	files := opts.Program.SourceFiles()
@@ -778,8 +778,8 @@ func composeOwnedFilter(extra FileFilter, owned map[string]struct{}) FileFilter 
 	}
 }
 
-// buildOwnedFileSet returns a set of file names that this program directly owns
-// (listed in its tsconfig include/files patterns, or as gap file root files).
+// buildOwnedFileSet returns a set of file names that this Program directly owns
+// through its root-file contract.
 // Files in GetSourceFiles() but NOT in this set were pulled in through import
 // resolution or project references — they belong to other programs.
 // Returns nil for programs with no root files (should not happen in practice).

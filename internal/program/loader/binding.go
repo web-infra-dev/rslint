@@ -1,4 +1,4 @@
-package main
+package loader
 
 import (
 	"fmt"
@@ -10,18 +10,58 @@ import (
 	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-type lintTargetBinding struct {
-	CompilerPrograms           []*compiler.Program
+// LoadResult is the complete Program input for one lint generation. It carries
+// only the unified Program sequence, lint projection, and source/config path
+// mappings needed by integrations; compiler and parser assembly details remain
+// private to the loader. Its slices and maps are immutable after LoadCLI or
+// LoadAPI returns.
+type LoadResult struct {
+	compilerPrograms           []*compiler.Program
 	Programs                   []*lintprogram.Program
 	TargetsByProgram           [][]string
 	TargetPathBySourcePath     map[string]string
 	ConfigPathBySourcePath     map[string]string
 	OwnerConfigDirBySourcePath map[string]string
-	GapGroups                  [][]resolvedLintTarget
+}
+
+func sourceOnlyCompilerOptions() *core.CompilerOptions {
+	return &core.CompilerOptions{
+		Target:    core.ScriptTargetESNext,
+		Module:    core.ModuleKindESNext,
+		Jsx:       core.JsxEmitPreserve,
+		AllowJs:   core.TSTrue,
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
+	}
+}
+
+func authoritativePath(filePath string, fsys vfs.FS) string {
+	filePath = tspath.NormalizePath(filePath)
+	if fsys != nil {
+		if realPath := fsys.Realpath(filePath); realPath != "" {
+			return tspath.NormalizePath(realPath)
+		}
+	}
+	return filePath
+}
+
+func canonicalPathID(filePath string, fsys vfs.FS) string {
+	return exactPathID(authoritativePath(filePath, fsys))
+}
+
+func storeSourcePathMapping(mapping map[string]string, sourcePath string, canonicalSourcePath string, value string) {
+	if mapping == nil {
+		return
+	}
+	normalizedSource := tspath.NormalizePath(sourcePath)
+	mapping[normalizedSource] = value
+	if canonicalSourcePath != "" {
+		mapping[exactPathID(canonicalSourcePath)] = value
+	}
 }
 
 func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.SourceFile {
@@ -30,7 +70,7 @@ func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.S
 	}
 	targetPath = tspath.NormalizePath(targetPath)
 	sourceFile := program.GetSourceFile(targetPath)
-	if sourceFile == nil || exactFilesystemPathID(sourceFile.FileName()) != exactFilesystemPathID(targetPath) {
+	if sourceFile == nil || exactPathID(sourceFile.FileName()) != exactPathID(targetPath) {
 		return nil
 	}
 	return sourceFile
@@ -44,7 +84,7 @@ func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.S
 // across all Programs in the pass.
 type programFileIndex struct {
 	programs              []*compiler.Program
-	targets               []resolvedLintTarget
+	targets               []rslintconfig.DiscoveredLintTarget
 	fsys                  vfs.FS
 	singleThreaded        bool
 	initialized           bool
@@ -57,7 +97,7 @@ type programFileIndex struct {
 
 func newProgramFileIndex(
 	programs []*compiler.Program,
-	targets []resolvedLintTarget,
+	targets []rslintconfig.DiscoveredLintTarget,
 	fsys vfs.FS,
 	singleThreaded bool,
 ) *programFileIndex {
@@ -84,7 +124,7 @@ func (index *programFileIndex) initialize() {
 		if target.CanonicalPath == "" {
 			continue
 		}
-		canonicalID := exactFilesystemPathID(target.CanonicalPath)
+		canonicalID := exactPathID(target.CanonicalPath)
 		index.targetCanonicalIDs[canonicalID] = struct{}{}
 		index.canonicalBySourcePath[canonicalID] = canonicalID
 	}
@@ -92,9 +132,9 @@ func (index *programFileIndex) initialize() {
 		if target.Path == "" || target.CanonicalPath == "" {
 			continue
 		}
-		sourcePathID := exactFilesystemPathID(target.Path)
+		sourcePathID := exactPathID(target.Path)
 		if _, isCanonicalTarget := index.targetCanonicalIDs[sourcePathID]; !isCanonicalTarget {
-			index.canonicalBySourcePath[sourcePathID] = exactFilesystemPathID(target.CanonicalPath)
+			index.canonicalBySourcePath[sourcePathID] = exactPathID(target.CanonicalPath)
 		}
 	}
 	index.targets = nil
@@ -113,7 +153,7 @@ func (index *programFileIndex) sourceFile(
 	if !index.builtByProgram[programIndex] {
 		index.buildPrograms(programIndexes)
 	}
-	return index.sourcesByProgram[programIndex][exactFilesystemPathID(canonicalTarget)]
+	return index.sourcesByProgram[programIndex][exactPathID(canonicalTarget)]
 }
 
 type programSourceMembership struct {
@@ -168,7 +208,7 @@ func (index *programFileIndex) canonicalSourcePathIDs(sourcePaths []string) []st
 	directoryPathByID := make(map[string]string)
 	for i, sourcePath := range sourcePaths {
 		directoryPath := tspath.GetDirectoryPath(sourcePath)
-		directoryID := exactFilesystemPathID(directoryPath)
+		directoryID := exactPathID(directoryPath)
 		directoryPathByID[directoryID] = directoryPath
 		sourceIndexesByDirectoryID[directoryID] = append(sourceIndexesByDirectoryID[directoryID], i)
 	}
@@ -191,11 +231,11 @@ func (index *programFileIndex) canonicalSourcePathIDs(sourcePaths []string) []st
 				useCaseSensitive,
 			)
 			if regular {
-				canonicalIDs[sourceIndex] = exactFilesystemPathID(
+				canonicalIDs[sourceIndex] = exactPathID(
 					tspath.CombinePaths(directory.canonicalPath, fileName),
 				)
 			} else {
-				canonicalIDs[sourceIndex] = canonicalFilesystemPathID(sourcePath, index.fsys)
+				canonicalIDs[sourceIndex] = canonicalPathID(sourcePath, index.fsys)
 			}
 		})
 	}
@@ -205,7 +245,7 @@ func (index *programFileIndex) canonicalSourcePathIDs(sourcePaths []string) []st
 		if len(sourceIndexes) == 1 && !cached {
 			sourceIndex := sourceIndexes[0]
 			work.Queue(func() {
-				canonicalIDs[sourceIndex] = canonicalFilesystemPathID(sourcePaths[sourceIndex], index.fsys)
+				canonicalIDs[sourceIndex] = canonicalPathID(sourcePaths[sourceIndex], index.fsys)
 			})
 			continue
 		}
@@ -217,7 +257,7 @@ func (index *programFileIndex) canonicalSourcePathIDs(sourcePaths []string) []st
 			work.Queue(func() {
 				directoryPath := directoryPathByID[directoryID]
 				directory = programDirectoryIdentity{
-					canonicalPath: authoritativeFilesystemPath(directoryPath, index.fsys),
+					canonicalPath: authoritativePath(directoryPath, index.fsys),
 					entries:       index.fsys.GetAccessibleEntries(directoryPath),
 				}
 				pendingIdentities[directoryIndex] = directory
@@ -260,7 +300,7 @@ func (index *programFileIndex) buildPrograms(programIndexes []int) {
 		}
 		for _, sourceFile := range program.GetSourceFiles() {
 			sourcePath := tspath.NormalizePath(sourceFile.FileName())
-			sourcePathID := exactFilesystemPathID(sourcePath)
+			sourcePathID := exactPathID(sourcePath)
 			canonicalID, known := index.canonicalBySourcePath[sourcePathID]
 			sourceIndex := -1
 			if !known {
@@ -307,19 +347,19 @@ func (index *programFileIndex) buildPrograms(programIndexes []int) {
 	}
 }
 
-func groupFallbackTargets(
-	gaps []resolvedLintTarget,
+func groupUnboundTargets(
+	targets []rslintconfig.DiscoveredLintTarget,
 	currentDirectory string,
 	useCaseSensitive bool,
-) [][]resolvedLintTarget {
-	if len(gaps) == 0 {
+) [][]rslintconfig.DiscoveredLintTarget {
+	if len(targets) == 0 {
 		return nil
 	}
 
-	groups := make([][]resolvedLintTarget, 0, 1)
+	groups := make([][]rslintconfig.DiscoveredLintTarget, 0, 1)
 	keysByGroup := make([]map[tspath.Path]struct{}, 0, 1)
-	for _, gap := range gaps {
-		key := tspath.ToPath(gap.Path, currentDirectory, useCaseSensitive)
+	for _, target := range targets {
+		key := tspath.ToPath(target.Path, currentDirectory, useCaseSensitive)
 		groupIndex := -1
 		for i, keys := range keysByGroup {
 			if _, exists := keys[key]; !exists {
@@ -332,25 +372,25 @@ func groupFallbackTargets(
 			groups = append(groups, nil)
 			keysByGroup = append(keysByGroup, make(map[tspath.Path]struct{}))
 		}
-		groups[groupIndex] = append(groups[groupIndex], gap)
+		groups[groupIndex] = append(groups[groupIndex], target)
 		keysByGroup[groupIndex][key] = struct{}{}
 	}
 	return groups
 }
 
-func orderedProgramIndexesForConfig(set compilerProgramSet, configDir string) []int {
-	configDirID := exactFilesystemPathID(configDir)
-	indexes := make([]int, 0, len(set.CompilerPrograms))
-	for i := range set.CompilerPrograms {
-		if i < len(set.ConfigOrders) {
-			if _, ok := set.ConfigOrders[i][configDirID]; ok {
+func orderedProgramIndexesForConfig(set ProjectSet, configDir string) []int {
+	configDirID := exactPathID(configDir)
+	indexes := make([]int, 0, len(set.compilerPrograms))
+	for i := range set.compilerPrograms {
+		if i < len(set.configOrders) {
+			if _, ok := set.configOrders[i][configDirID]; ok {
 				indexes = append(indexes, i)
 			}
 		}
 	}
 	sort.SliceStable(indexes, func(i, j int) bool {
-		left := set.ConfigOrders[indexes[i]][configDirID]
-		right := set.ConfigOrders[indexes[j]][configDirID]
+		left := set.configOrders[indexes[i]][configDirID]
+		right := set.configOrders[indexes[j]][configDirID]
 		if left != right {
 			return left < right
 		}
@@ -359,34 +399,33 @@ func orderedProgramIndexesForConfig(set compilerProgramSet, configDir string) []
 	return indexes
 }
 
-func bindLintTargetsToRealPrograms(
-	set compilerProgramSet,
-	plan lintTargetPlan,
-	buildContext *utils.ProgramBuildContext,
+func (s *Session) bindTargetsToProjects(
+	set ProjectSet,
+	plan rslintconfig.LintTargetPlan,
 	singleThreaded bool,
-) (lintTargetBinding, []resolvedLintTarget) {
-	fsys := buildContext.FS()
-	binding := lintTargetBinding{
-		CompilerPrograms:           append([]*compiler.Program(nil), set.CompilerPrograms...),
-		Programs:                   lintprogram.NewFromCompilers(set.CompilerPrograms),
-		TargetsByProgram:           make([][]string, len(set.CompilerPrograms)),
+) (LoadResult, []rslintconfig.DiscoveredLintTarget) {
+	fsys := s.FS()
+	binding := LoadResult{
+		compilerPrograms:           append([]*compiler.Program(nil), set.compilerPrograms...),
+		Programs:                   append([]*lintprogram.Program(nil), set.programs...),
+		TargetsByProgram:           make([][]string, len(set.compilerPrograms)),
 		TargetPathBySourcePath:     make(map[string]string),
 		ConfigPathBySourcePath:     make(map[string]string),
 		OwnerConfigDirBySourcePath: make(map[string]string),
 	}
 
-	var gaps []resolvedLintTarget
+	var unbound []rslintconfig.DiscoveredLintTarget
 	programIndexesByConfig := make(map[string][]int)
-	programFiles := newProgramFileIndex(set.CompilerPrograms, plan.Targets, fsys, singleThreaded)
+	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Targets, fsys, singleThreaded)
 	for _, target := range plan.Targets {
-		programIndexes, cached := programIndexesByConfig[target.OwnerConfigDir]
+		programIndexes, cached := programIndexesByConfig[target.ConfigDirectory]
 		if !cached {
-			programIndexes = orderedProgramIndexesForConfig(set, target.OwnerConfigDir)
-			programIndexesByConfig[target.OwnerConfigDir] = programIndexes
+			programIndexes = orderedProgramIndexesForConfig(set, target.ConfigDirectory)
+			programIndexesByConfig[target.ConfigDirectory] = programIndexes
 		}
 		bound := false
 		for _, programIndex := range programIndexes {
-			sourceFile := exactProgramSourceFile(set.CompilerPrograms[programIndex], target.Path)
+			sourceFile := exactProgramSourceFile(set.compilerPrograms[programIndex], target.Path)
 			if sourceFile == nil {
 				sourceFile = programFiles.sourceFile(programIndexes, programIndex, target.CanonicalPath)
 			}
@@ -395,8 +434,8 @@ func bindLintTargetsToRealPrograms(
 			}
 			sourcePath := sourceFile.FileName()
 			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.OwnerConfigDir)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, configPathForLintTarget(target, fsys))
+			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.ConfigDirectory)
+			storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, target.MatchPath(fsys))
 			if tspath.NormalizePath(sourcePath) != target.Path {
 				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.CanonicalPath, target.Path)
 			}
@@ -404,107 +443,106 @@ func bindLintTargetsToRealPrograms(
 			break
 		}
 		if !bound {
-			gaps = append(gaps, target)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, target.Path, target.CanonicalPath, target.OwnerConfigDir)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, target.Path, target.CanonicalPath, configPathForLintTarget(target, fsys))
+			unbound = append(unbound, target)
+			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, target.Path, target.CanonicalPath, target.ConfigDirectory)
+			storeSourcePathMapping(binding.ConfigPathBySourcePath, target.Path, target.CanonicalPath, target.MatchPath(fsys))
 		}
 	}
-	return binding, gaps
+	return binding, unbound
 }
 
-func appendFallbackPrograms(
-	binding *lintTargetBinding,
-	gaps []resolvedLintTarget,
+func (s *Session) appendCompatibilityPrograms(
+	binding *LoadResult,
+	targets []rslintconfig.DiscoveredLintTarget,
 	currentDirectory string,
-	buildContext *utils.ProgramBuildContext,
 	singleThreaded bool,
 ) error {
-	if len(gaps) == 0 {
+	if len(targets) == 0 {
 		return nil
 	}
-	fsys := buildContext.FS()
+	fsys := s.FS()
 	useCaseSensitive := true
 	if fsys != nil {
 		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
 	}
-	for _, fallbackTargets := range groupFallbackTargets(gaps, currentDirectory, useCaseSensitive) {
-		fallbackFiles := make([]string, 0, len(fallbackTargets))
-		for _, gap := range fallbackTargets {
-			fallbackFiles = append(fallbackFiles, gap.Path)
+	for _, group := range groupUnboundTargets(targets, currentDirectory, useCaseSensitive) {
+		rootFileNames := make([]string, 0, len(group))
+		for _, target := range group {
+			rootFileNames = append(rootFileNames, target.Path)
 		}
-		fallback, err := createFallbackProgram(fallbackFiles, singleThreaded, currentDirectory, buildContext)
+		compilerProgram, err := s.context.createCompatibilityProgram(
+			singleThreaded,
+			currentDirectory,
+			sourceOnlyCompilerOptions(),
+			rootFileNames,
+		)
 		if err != nil {
-			return err
+			return fmt.Errorf("create Program for %d lint target(s): %w", len(rootFileNames), err)
 		}
-		if fallback == nil {
-			return fmt.Errorf("create fallback Program for %d lint target(s): no Program returned", len(fallbackTargets))
+		if compilerProgram == nil {
+			return fmt.Errorf("create Program for %d lint target(s): no Program returned", len(group))
 		}
-		fallbackIndex := len(binding.CompilerPrograms)
-		binding.CompilerPrograms = append(binding.CompilerPrograms, fallback)
-		fallbackProgram, err := lintprogram.NewFromBoundSources(fallback, fallback.SourceFiles())
+		programIndex := len(binding.compilerPrograms)
+		binding.compilerPrograms = append(binding.compilerPrograms, compilerProgram)
+		sourceProgram, err := lintprogram.NewFromBoundSources(compilerProgram, compilerProgram.SourceFiles())
 		if err != nil {
-			return fmt.Errorf("adapt fallback Program: %w", err)
+			return fmt.Errorf("adapt source-only Program: %w", err)
 		}
-		binding.Programs = append(binding.Programs, fallbackProgram)
+		binding.Programs = append(binding.Programs, sourceProgram)
 		binding.TargetsByProgram = append(binding.TargetsByProgram, nil)
-		for _, gap := range fallbackTargets {
-			sourceFile := exactProgramSourceFile(fallback, gap.Path)
+		for _, target := range group {
+			sourceFile := exactProgramSourceFile(compilerProgram, target.Path)
 			if sourceFile == nil {
-				return fmt.Errorf("fallback Program did not contain lint target %q", gap.Path)
+				return fmt.Errorf("program did not contain lint target %q", target.Path)
 			}
 			sourcePath := sourceFile.FileName()
-			binding.TargetsByProgram[fallbackIndex] = append(binding.TargetsByProgram[fallbackIndex], sourcePath)
-			if tspath.NormalizePath(sourcePath) != gap.Path {
-				storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, gap.CanonicalPath, gap.OwnerConfigDir)
-				storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, gap.CanonicalPath, binding.ConfigPathBySourcePath[tspath.NormalizePath(gap.Path)])
-				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, gap.CanonicalPath, gap.Path)
+			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
+			if tspath.NormalizePath(sourcePath) != target.Path {
+				storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.ConfigDirectory)
+				storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, binding.ConfigPathBySourcePath[tspath.NormalizePath(target.Path)])
+				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.CanonicalPath, target.Path)
 			}
 		}
 	}
 	return nil
 }
 
-func finalizeLintTargetBinding(binding *lintTargetBinding) {
+func finalizeResult(binding *LoadResult) {
 	for i := range binding.TargetsByProgram {
 		sort.Strings(binding.TargetsByProgram[i])
-	}
-	for i := range binding.GapGroups {
-		sort.Slice(binding.GapGroups[i], func(left, right int) bool {
-			return binding.GapGroups[i][left].Path < binding.GapGroups[i][right].Path
-		})
 	}
 	if len(binding.TargetPathBySourcePath) == 0 {
 		binding.TargetPathBySourcePath = nil
 	}
-	if len(binding.GapGroups) == 0 {
-		binding.GapGroups = nil
-	}
 }
 
-// bindLintTargetPlan retains the Program-backed API contract.
-func bindLintTargetPlan(
-	set compilerProgramSet,
-	plan lintTargetPlan,
+// LoadAPI preserves the API's compatibility Program admission behavior while
+// returning only unified Programs to the caller.
+func (s *Session) LoadAPI(
+	set ProjectSet,
+	plan rslintconfig.LintTargetPlan,
 	currentDirectory string,
-	buildContext *utils.ProgramBuildContext,
 	singleThreaded bool,
-) (lintTargetBinding, error) {
-	binding, gaps := bindLintTargetsToRealPrograms(set, plan, buildContext, singleThreaded)
-	if err := appendFallbackPrograms(&binding, gaps, currentDirectory, buildContext, singleThreaded); err != nil {
-		return lintTargetBinding{}, err
+) (LoadResult, error) {
+	if err := s.validate(); err != nil {
+		return LoadResult{}, err
 	}
-	finalizeLintTargetBinding(&binding)
+	binding, unbound := s.bindTargetsToProjects(set, plan, singleThreaded)
+	if err := s.appendCompatibilityPrograms(&binding, unbound, currentDirectory, singleThreaded); err != nil {
+		return LoadResult{}, err
+	}
+	finalizeResult(&binding)
 	return binding, nil
 }
 
-func allGapRootsSupportedByRootParser(gaps []resolvedLintTarget, useCaseSensitive bool) bool {
-	options := fallbackCompilerOptions()
+func allRootsSupportedByParser(targets []rslintconfig.DiscoveredLintTarget, useCaseSensitive bool) bool {
+	options := sourceOnlyCompilerOptions()
 	supportedExtensions := tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule(options, tspath.AllSupportedExtensions)
-	for _, gap := range gaps {
-		if !tspath.HasExtension(gap.Path) {
+	for _, target := range targets {
+		if !tspath.HasExtension(target.Path) {
 			return false
 		}
-		fileName := tspath.GetCanonicalFileName(gap.Path, useCaseSensitive)
+		fileName := tspath.GetCanonicalFileName(target.Path, useCaseSensitive)
 		supported := false
 		for _, extensions := range supportedExtensions {
 			if tspath.FileExtensionIsOneOf(fileName, extensions) {
@@ -519,32 +557,74 @@ func allGapRootsSupportedByRootParser(gaps []resolvedLintTarget, useCaseSensitiv
 	return true
 }
 
-// bindCLILintTargetPlan represents every supported gap as parser/binder input
-// to an rslint Program. Unsupported roots retain the legacy ts-go admission
-// and error behavior.
-func bindCLILintTargetPlan(
-	set compilerProgramSet,
-	plan lintTargetPlan,
+func (s *Session) appendRootPrograms(
+	binding *LoadResult,
+	groups [][]rslintconfig.DiscoveredLintTarget,
 	currentDirectory string,
-	buildContext *utils.ProgramBuildContext,
 	singleThreaded bool,
-) (lintTargetBinding, error) {
-	binding, gaps := bindLintTargetsToRealPrograms(set, plan, buildContext, singleThreaded)
-	if len(gaps) == 0 {
-		finalizeLintTargetBinding(&binding)
-		return binding, nil
+) error {
+	for _, group := range groups {
+		sort.Slice(group, func(left, right int) bool {
+			return group[left].Path < group[right].Path
+		})
+		rootFileNames := make([]string, len(group))
+		for index, target := range group {
+			rootFileNames[index] = target.Path
+		}
+		rootProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+			RootFileNames:   rootFileNames,
+			Host:            s.context.newTransientCompilerHost(currentDirectory),
+			CompilerOptions: sourceOnlyCompilerOptions(),
+			SingleThreaded:  singleThreaded,
+		})
+		if err != nil {
+			return err
+		}
+		binding.Programs = append(binding.Programs, rootProgram)
+		files := rootProgram.SourceFiles()
+		targets := make([]string, len(files))
+		for index, file := range files {
+			targets[index] = file.FileName()
+		}
+		binding.TargetsByProgram = append(binding.TargetsByProgram, targets)
 	}
+	return nil
+}
+
+// LoadCLI binds targets into one backend-agnostic Program sequence. Supported
+// project-external roots use the native parser/binder facade; roots that the
+// facade cannot admit retain the compatibility compiler behavior internally.
+func (s *Session) LoadCLI(
+	set ProjectSet,
+	plan rslintconfig.LintTargetPlan,
+	currentDirectory string,
+	singleThreaded bool,
+) (LoadResult, error) {
+	if err := s.validate(); err != nil {
+		return LoadResult{}, err
+	}
+	binding, unbound := s.bindTargetsToProjects(set, plan, singleThreaded)
 	useCaseSensitive := true
-	if fsys := buildContext.FS(); fsys != nil {
+	if fsys := s.FS(); fsys != nil {
 		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
 	}
-	if !allGapRootsSupportedByRootParser(gaps, useCaseSensitive) {
-		if err := appendFallbackPrograms(&binding, gaps, currentDirectory, buildContext, singleThreaded); err != nil {
-			return lintTargetBinding{}, err
+	if !allRootsSupportedByParser(unbound, useCaseSensitive) {
+		if err := s.appendCompatibilityPrograms(&binding, unbound, currentDirectory, singleThreaded); err != nil {
+			return LoadResult{}, err
 		}
 	} else {
-		binding.GapGroups = groupFallbackTargets(gaps, currentDirectory, useCaseSensitive)
+		groups := groupUnboundTargets(unbound, currentDirectory, useCaseSensitive)
+		// Project ASTs that were parsed while building broad tsconfigs but retained
+		// by no current compiler Program are evicted before root parsing. The root
+		// backend shares source snapshots, not bound compiler AST objects.
+		s.retainCompilerPrograms(binding.compilerPrograms)
+		if err := s.appendRootPrograms(&binding, groups, currentDirectory, singleThreaded); err != nil {
+			return LoadResult{}, err
+		}
+		finalizeResult(&binding)
+		return binding, nil
 	}
-	finalizeLintTargetBinding(&binding)
+	s.retainCompilerPrograms(binding.compilerPrograms)
+	finalizeResult(&binding)
 	return binding, nil
 }

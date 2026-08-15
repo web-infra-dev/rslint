@@ -26,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
+	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1218,18 +1219,18 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	activeConfig := append(append(rslintconfig.RslintConfig(nil), baseConfig...), *cliEntry)
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	buildContext := utils.NewProgramBuildContext(fs)
-	programSet, err := createProgramSetForConfig(dir, activeConfig, true, buildContext)
+	programSession := loader.NewSession(fs)
+	programSet, err := programSession.BuildProject(dir, activeConfig, true)
 	if err != nil {
-		t.Fatalf("createProgramSetForConfig: %v", err)
+		t.Fatalf("BuildProject: %v", err)
 	}
-	targetPlan, err := resolveLintTargetPlan(nil, targetConfig, dir, nil, fs, nil, []string{tspath.NormalizePath(dir)}, true)
+	targetPlan, err := rslintconfig.ResolveLintTargetPlan(nil, targetConfig, dir, nil, fs, nil, []string{tspath.NormalizePath(dir)}, true)
 	if err != nil {
-		t.Fatalf("resolveLintTargetPlan: %v", err)
+		t.Fatalf("ResolveLintTargetPlan: %v", err)
 	}
-	binding, err := bindLintTargetPlan(programSet, targetPlan, dir, buildContext, true)
+	binding, err := programSession.LoadAPI(programSet, targetPlan, dir, true)
 	if err != nil {
-		t.Fatalf("bindLintTargetPlan: %v", err)
+		t.Fatalf("LoadAPI: %v", err)
 	}
 	targetsByProgram := binding.TargetsByProgram
 	targetFiles := make([]string, 0, len(targetPlan.Targets))

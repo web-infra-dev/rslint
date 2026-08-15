@@ -24,6 +24,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -251,8 +252,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// The Program context must wrap the fully composed request VFS so metadata
 	// snapshots observe overlay contents and canonical aliases exactly as the
 	// rest of this request does. A new context is created for every API call.
-	buildContext := utils.NewProgramBuildContext(fs)
-	fs = buildContext.FS()
+	programSession := loader.NewSession(fs)
+	fs = programSession.FS()
 
 	var (
 		configMap              map[string]rslintconfig.RslintConfig
@@ -421,33 +422,33 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		UseCaseSensitiveFileNames: true,
 	}
 
-	// Resolve the exact lint target set, bind targets to existing Programs, and
-	// append a non-project-backed fallback Program for selected files absent from
-	// every Program (the typical lintText/lintFiles in-memory file). Identical to
-	// the CLI via the shared helper. Native discovery can supply a hierarchical
+	// Resolve the exact lint target set and load one unified Program sequence.
+	// Selected files outside configured projects (the typical lintText/lintFiles
+	// in-memory file) are represented by source-only Programs. Native discovery
+	// can supply a hierarchical
 	// configMap; low-level config and explicit overrideConfigFile requests remain
 	// invocation-wide single-config paths.
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	targetPlan, err := resolveLintTargetPlan(configMap, rslintConfig, configDirectory, configTargetScopes, fs, allowedFiles, nil, false)
+	targetPlan, err := rslintconfig.ResolveLintTargetPlan(configMap, rslintConfig, configDirectory, configTargetScopes, fs, allowedFiles, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
 	}
 	// A plain API lint only needs type information when at least one target is
 	// selected. Resolve the target plan before project paths so an ignored or
 	// empty request cannot fail on an inactive project declaration.
-	var programSet compilerProgramSet
+	var projectSet loader.ProjectSet
 	if len(targetPlan.Targets) > 0 {
 		if configMap != nil {
-			programSet, err = createProgramSetForConfigs(configsForLintTargetPlan(configMap, targetPlan), false, buildContext)
+			projectSet, err = programSession.BuildProjects(targetPlan.ActiveConfigs(configMap), false)
 		} else {
-			programSet, err = createProgramSetForConfig(configDirectory, rslintConfig, false, buildContext)
+			projectSet, err = programSession.BuildProject(configDirectory, rslintConfig, false)
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
-	binding, err := bindLintTargetPlan(programSet, targetPlan, configDirectory, buildContext, false)
+	binding, err := programSession.LoadAPI(projectSet, targetPlan, configDirectory, false)
 	if err != nil {
 		return nil, err
 	}
@@ -755,7 +756,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			// consumed it — so put it back before fixing. Output is what the
 			// JS side writes to disk, and it has to be the whole file.
 			originalContent := fileDiags[0].SourceFile.Text()
-			if utils.SourceHasBOM(buildContext.FS(), filePath) {
+			if utils.SourceHasBOM(programSession.FS(), filePath) {
 				originalContent = utils.BOM + originalContent
 			}
 			fixedContent, _, didFix := linter.ApplyRuleFixes(originalContent, fileDiags)

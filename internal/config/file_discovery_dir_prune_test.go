@@ -12,7 +12,7 @@ import (
 )
 
 // Integration tests for gap-directory pruning: the canPruneDir predicate
-// (config.go) wired into the DiscoverGapFiles walk. Predicate unit tests live
+// (config.go) wired into the discoverFilesOutsideProgramsForTest walk. Predicate unit tests live
 // in ignore_pattern_test.go.
 
 // dirAccessed reports whether any walked directory path is, or sits under, a
@@ -29,7 +29,7 @@ func dirAccessed(dirs []string, seg string) bool {
 
 // Core fix: a gitignore file-level dir (target/ → **/target/**/*) is pruned
 // during the gap walk, and the gap-file set is unchanged.
-func TestDiscoverGapFiles_PrunesGitignoreFileLevelDir(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PrunesGitignoreFileLevelDir(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"target/build/a.ts",
@@ -42,7 +42,7 @@ func TestDiscoverGapFiles_PrunesGitignoreFileLevelDir(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	// target/ must NOT be entered.
 	for _, dir := range spy.snapshotAccessedDirs() {
@@ -57,7 +57,7 @@ func TestDiscoverGapFiles_PrunesGitignoreFileLevelDir(t *testing.T) {
 
 // Negation re-includes a full path (rspack's !tests/.../target case): the
 // top-level target is pruned, but the re-included path is walked.
-func TestDiscoverGapFiles_NegationReincludeFullPath(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_NegationReincludeFullPath(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"target/x.ts",
@@ -69,7 +69,7 @@ func TestDiscoverGapFiles_NegationReincludeFullPath(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 	dirs := spy.snapshotAccessedDirs()
 
 	// Top-level target NOT entered; the re-included sub/path/target IS entered.
@@ -88,7 +88,7 @@ func TestDiscoverGapFiles_NegationReincludeFullPath(t *testing.T) {
 
 // Negation re-includes a child of an excluded directory: the parent must NOT
 // be pruned (rslint's file-level isFileIgnored re-includes the child).
-func TestDiscoverGapFiles_NegationReincludeChildNotOverPruned(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_NegationReincludeChildNotOverPruned(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"target/keep/x.ts",
@@ -100,7 +100,7 @@ func TestDiscoverGapFiles_NegationReincludeChildNotOverPruned(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	// Must reach target/keep.
 	assert.Assert(t, dirAccessed(spy.snapshotAccessedDirs(), "target/keep"), "target/keep must be walked")
@@ -113,7 +113,7 @@ func TestDiscoverGapFiles_NegationReincludeChildNotOverPruned(t *testing.T) {
 
 // Unrooted negation (!**/keep/) forces conservative behavior: the file-level
 // directory is not pruned (a keep/ could appear at any depth inside it).
-func TestDiscoverGapFiles_UnrootedNegationConservative(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_UnrootedNegationConservative(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"build/keep/x.ts",
@@ -125,7 +125,7 @@ func TestDiscoverGapFiles_UnrootedNegationConservative(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	assert.Assert(t, dirAccessed(spy.snapshotAccessedDirs(), "build"), "build must be walked (unrooted negation)")
 
@@ -138,7 +138,7 @@ func TestDiscoverGapFiles_UnrootedNegationConservative(t *testing.T) {
 // A case-insensitive anchored negation protects only its own subtree. It must
 // not disable pruning for unrelated file-level covers, which previously made
 // macOS/Windows walks enter every ignored directory in large repositories.
-func TestDiscoverGapFiles_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"target/deep/x.ts",
@@ -157,7 +157,7 @@ func TestDiscoverGapFiles_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *t
 	}, true)
 
 	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
 	dirs := spy.snapshotAccessedDirs()
 
 	assert.Assert(t, !dirAccessed(dirs, "target"), "unrelated target must be pruned")
@@ -172,7 +172,7 @@ func TestDiscoverGapFiles_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *t
 
 // Directory-level `dir/**` (absolute, not negatable) vs file-level `dir/**/*`
 // (negation-aware): pruning behavior differs and stays aligned with ESLint v10.
-func TestDiscoverGapFiles_DirLevelVsFileLevel(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_DirLevelVsFileLevel(t *testing.T) {
 	// 6a: dir-level — absolutely pruned; ! cannot re-include.
 	t.Run("dir-level absolute", func(t *testing.T) {
 		configDir, paths := setupDiscoveryFixture(t, []string{
@@ -183,7 +183,7 @@ func TestDiscoverGapFiles_DirLevelVsFileLevel(t *testing.T) {
 			{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 		}
 		spy := &spyFS{FS: osvfs.FS()}
-		gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+		gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 		for _, d := range spy.snapshotAccessedDirs() {
 			if strings.Contains(d, "dist") {
 				t.Errorf("dir-level dist must be absolutely pruned, entered: %s", d)
@@ -204,7 +204,7 @@ func TestDiscoverGapFiles_DirLevelVsFileLevel(t *testing.T) {
 			{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 		}
 		spy := &spyFS{FS: osvfs.FS()}
-		gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+		gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 		assert.Assert(t, dirAccessed(spy.snapshotAccessedDirs(), "dist"), "file-level dist must be walked for negation")
 		gapSet := toSet(gapFiles)
 		assert.Assert(t, gapSet[paths["dist/keep.ts"]], "file-level ! re-includes keep.ts")
@@ -215,7 +215,7 @@ func TestDiscoverGapFiles_DirLevelVsFileLevel(t *testing.T) {
 // Real gitignore conversion path: `target/` in a .gitignore prunes target/.
 // Uses a spy to assert the pruning actually happens (not just that the gap-file
 // set is correct, which would pass even with pruning disabled).
-func TestDiscoverGapFiles_GitignoreTargetPrunedE2E(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_GitignoreTargetPrunedE2E(t *testing.T) {
 	files := map[string]string{
 		".gitignore":       "target/\n",
 		"src/index.ts":     "x",
@@ -229,7 +229,7 @@ func TestDiscoverGapFiles_GitignoreTargetPrunedE2E(t *testing.T) {
 	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, dir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, spy, map[string]struct{}{}, nil, nil, false)
 
 	// The actual optimization: target/ must NOT be entered.
 	assert.Assert(t, !dirAccessed(spy.snapshotAccessedDirs(), "target"), "target should be pruned via gitignore")
@@ -244,7 +244,7 @@ func TestDiscoverGapFiles_GitignoreTargetPrunedE2E(t *testing.T) {
 // it. The re-included subtree must be walked and discovered; the top-level
 // build/ must still be pruned. Exercises the conversion → negPrefix → prune
 // chain for nested-gitignore negations end to end.
-func TestDiscoverGapFiles_NestedGitignoreNegationE2E(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_NestedGitignoreNegationE2E(t *testing.T) {
 	files := map[string]string{
 		".gitignore":        "build/\n",
 		"sub/.gitignore":    "!build/\n",
@@ -259,7 +259,7 @@ func TestDiscoverGapFiles_NestedGitignoreNegationE2E(t *testing.T) {
 	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, dir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, spy, map[string]struct{}{}, nil, nil, false)
 	gapSet := toSet(gapFiles)
 
 	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/src/a.ts")])
@@ -277,9 +277,9 @@ func TestDiscoverGapFiles_NestedGitignoreNegationE2E(t *testing.T) {
 // --- Strongest regression: pruning must not change the gap-file set ---
 //
 // Oracle = { f : f matches **/*.ts ∧ f∉programFiles ∧ GetConfigForFile(f)≠nil }.
-// This is exactly the linter's per-file decision; DiscoverGapFiles must equal
+// This is exactly the linter's per-file decision; discoverFilesOutsideProgramsForTest must equal
 // it regardless of directory pruning.
-func TestDiscoverGapFiles_PruningPreservesGapFiles(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PruningPreservesGapFiles(t *testing.T) {
 	filesPatterns := []string{"**/*.ts", "**/*.tsx"}
 	fixtures := []struct {
 		name    string
@@ -336,7 +336,7 @@ func TestDiscoverGapFiles_PruningPreservesGapFiles(t *testing.T) {
 			}
 
 			// Oracle = the linter's own per-file decision: matches a files
-			// pattern AND GetConfigForFile != nil. DiscoverGapFiles must equal
+			// pattern AND GetConfigForFile != nil. discoverFilesOutsideProgramsForTest must equal
 			// this set regardless of directory pruning.
 			var oracle []string
 			for _, abs := range paths {
@@ -349,7 +349,7 @@ func TestDiscoverGapFiles_PruningPreservesGapFiles(t *testing.T) {
 			}
 			sort.Strings(oracle)
 
-			got := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+			got := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 			sort.Strings(got)
 
 			assert.DeepEqual(t, got, oracle)
@@ -363,7 +363,7 @@ func TestDiscoverGapFiles_PruningPreservesGapFiles(t *testing.T) {
 // only the global ignores and prunes target/ — which stays consistent with the
 // linter (it also excludes target/keep). Locks down the "per-entry config
 // cannot cause over-prune" invariant.
-func TestDiscoverGapFiles_PerEntryNegationDoesNotResurrect(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PerEntryNegationDoesNotResurrect(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"target/x.ts",
@@ -375,7 +375,7 @@ func TestDiscoverGapFiles_PerEntryNegationDoesNotResurrect(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 	gapSet := toSet(gapFiles)
 
 	assert.Assert(t, gapSet[paths["src/a.ts"]])
@@ -387,7 +387,7 @@ func TestDiscoverGapFiles_PerEntryNegationDoesNotResurrect(t *testing.T) {
 }
 
 // Pruning must produce identical gap files in parallel and single-threaded mode.
-func TestDiscoverGapFiles_PruneSingleThreadedEquivalence(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PruneSingleThreadedEquivalence(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"target/x.ts",
@@ -399,8 +399,8 @@ func TestDiscoverGapFiles_PruneSingleThreadedEquivalence(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	par := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
-	seq := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, true)
+	par := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+	seq := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, true)
 	sort.Strings(par)
 	sort.Strings(seq)
 	assert.DeepEqual(t, par, seq)
