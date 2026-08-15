@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"gotest.tools/v3/assert"
 )
 
@@ -27,14 +28,25 @@ func dirAccessed(dirs []string, seg string) bool {
 	return false
 }
 
+func setupDiscoveryTxtarFixture(t *testing.T, name string) (string, map[string]string) {
+	t.Helper()
+	archive := txtarfs.MustParseFile(t, "testdata/file_discovery.txtar")
+	names, err := archive.FileNames(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configDir := tspath.NormalizePath(archive.Materialize(t, name))
+	paths := make(map[string]string, len(names))
+	for _, relativeName := range names {
+		paths[relativeName] = tspath.ResolvePath(configDir, relativeName)
+	}
+	return configDir, paths
+}
+
 // Core fix: a gitignore file-level dir (target/ → **/target/**/*) is pruned
 // during the gap walk, and the gap-file set is unchanged.
 func TestDiscoverFilesOutsidePrograms_PrunesGitignoreFileLevelDir(t *testing.T) {
-	configDir, paths := setupDiscoveryFixture(t, []string{
-		"src/index.ts",
-		"target/build/a.ts",
-		"target/build/deep/b.ts",
-	})
+	configDir, paths := setupDiscoveryTxtarFixture(t, "prunes-gitignore")
 	// Simulate gitignore `target/` → file-level glob (what convertSinglePattern emits).
 	config := RslintConfig{
 		{Ignores: []string{"**/target/**/*"}},
@@ -58,11 +70,7 @@ func TestDiscoverFilesOutsidePrograms_PrunesGitignoreFileLevelDir(t *testing.T) 
 // Negation re-includes a full path (rspack's !tests/.../target case): the
 // top-level target is pruned, but the re-included path is walked.
 func TestDiscoverFilesOutsidePrograms_NegationReincludeFullPath(t *testing.T) {
-	configDir, paths := setupDiscoveryFixture(t, []string{
-		"src/a.ts",
-		"target/x.ts",
-		"sub/path/target/y.ts",
-	})
+	configDir, paths := setupDiscoveryTxtarFixture(t, "negation-full-path")
 	config := RslintConfig{
 		{Ignores: []string{"**/target/**/*", "!sub/path/target/**/*"}},
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
@@ -89,11 +97,7 @@ func TestDiscoverFilesOutsidePrograms_NegationReincludeFullPath(t *testing.T) {
 // Negation re-includes a child of an excluded directory: the parent must NOT
 // be pruned (rslint's file-level isFileIgnored re-includes the child).
 func TestDiscoverFilesOutsidePrograms_NegationReincludeChildNotOverPruned(t *testing.T) {
-	configDir, paths := setupDiscoveryFixture(t, []string{
-		"src/a.ts",
-		"target/keep/x.ts",
-		"target/other/y.ts",
-	})
+	configDir, paths := setupDiscoveryTxtarFixture(t, "negation-child")
 	config := RslintConfig{
 		{Ignores: []string{"target/**/*", "!target/keep/**/*"}},
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
@@ -114,11 +118,7 @@ func TestDiscoverFilesOutsidePrograms_NegationReincludeChildNotOverPruned(t *tes
 // Unrooted negation (!**/keep/) forces conservative behavior: the file-level
 // directory is not pruned (a keep/ could appear at any depth inside it).
 func TestDiscoverFilesOutsidePrograms_UnrootedNegationConservative(t *testing.T) {
-	configDir, paths := setupDiscoveryFixture(t, []string{
-		"src/a.ts",
-		"build/keep/x.ts",
-		"build/other/y.ts",
-	})
+	configDir, paths := setupDiscoveryTxtarFixture(t, "unrooted-negation")
 	config := RslintConfig{
 		{Ignores: []string{"**/build/**/*", "!**/keep/**/*"}},
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
@@ -139,12 +139,7 @@ func TestDiscoverFilesOutsidePrograms_UnrootedNegationConservative(t *testing.T)
 // not disable pruning for unrelated file-level covers, which previously made
 // macOS/Windows walks enter every ignored directory in large repositories.
 func TestDiscoverFilesOutsidePrograms_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *testing.T) {
-	configDir, paths := setupDiscoveryFixture(t, []string{
-		"src/a.ts",
-		"target/deep/x.ts",
-		"scripts/debug/keep.ts",
-		"scripts/other/drop.ts",
-	})
+	configDir, paths := setupDiscoveryTxtarFixture(t, "case-insensitive")
 	config := ConfigWithCollectedGitignore(RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}, []gitignore.Pattern{
@@ -175,9 +170,7 @@ func TestDiscoverFilesOutsidePrograms_CaseInsensitiveAnchoredNegationPrunesUnrel
 func TestDiscoverFilesOutsidePrograms_DirLevelVsFileLevel(t *testing.T) {
 	// 6a: dir-level — absolutely pruned; ! cannot re-include.
 	t.Run("dir-level absolute", func(t *testing.T) {
-		configDir, paths := setupDiscoveryFixture(t, []string{
-			"src/a.ts", "dist/keep.ts", "dist/other.ts",
-		})
+		configDir, paths := setupDiscoveryTxtarFixture(t, "dir-level")
 		config := RslintConfig{
 			{Ignores: []string{"dist/**", "!dist/keep.ts"}},
 			{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
@@ -196,9 +189,7 @@ func TestDiscoverFilesOutsidePrograms_DirLevelVsFileLevel(t *testing.T) {
 
 	// 6b: file-level — not pruned (negation protects keep.ts).
 	t.Run("file-level negation-aware", func(t *testing.T) {
-		configDir, paths := setupDiscoveryFixture(t, []string{
-			"src/a.ts", "dist/keep.ts", "dist/other.ts",
-		})
+		configDir, paths := setupDiscoveryTxtarFixture(t, "dir-level")
 		config := RslintConfig{
 			{Ignores: []string{"dist/**/*", "!dist/keep.ts"}},
 			{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
@@ -216,13 +207,7 @@ func TestDiscoverFilesOutsidePrograms_DirLevelVsFileLevel(t *testing.T) {
 // Uses a spy to assert the pruning actually happens (not just that the gap-file
 // set is correct, which would pass even with pruning disabled).
 func TestDiscoverFilesOutsidePrograms_GitignoreTargetPrunedE2E(t *testing.T) {
-	files := map[string]string{
-		".gitignore":       "target/\n",
-		"src/index.ts":     "x",
-		"target/a.ts":      "x",
-		"target/deep/b.ts": "x",
-	}
-	dir := setupDiscoveryContentFixture(t, files)
+	dir, _ := setupDiscoveryTxtarFixture(t, "gitignore-target")
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
@@ -245,14 +230,7 @@ func TestDiscoverFilesOutsidePrograms_GitignoreTargetPrunedE2E(t *testing.T) {
 // build/ must still be pruned. Exercises the conversion → negPrefix → prune
 // chain for nested-gitignore negations end to end.
 func TestDiscoverFilesOutsidePrograms_NestedGitignoreNegationE2E(t *testing.T) {
-	files := map[string]string{
-		".gitignore":        "build/\n",
-		"sub/.gitignore":    "!build/\n",
-		"src/a.ts":          "x",
-		"build/top.ts":      "x",
-		"sub/build/keep.ts": "x",
-	}
-	dir := setupDiscoveryContentFixture(t, files)
+	dir, _ := setupDiscoveryTxtarFixture(t, "nested-gitignore")
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
@@ -301,35 +279,12 @@ func TestDiscoverFilesOutsidePrograms_PruningPreservesGapFiles(t *testing.T) {
 		{"sequential re-ignore", []string{"target/**/*", "!target/keep/**/*", "target/keep/sub/**/*"}},
 	}
 
-	// Layout mixes shallow (depth-1) and deep (depth-2+) files plus a .tsx and a
-	// non-matching .log, so single-star / extension-filter / pattern-match edges
-	// are exercised by the oracle.
-	layout := []string{
-		"src/a.ts",
-		"src/comp.tsx",
-		"target/shallow.ts",
-		"target/x.ts",
-		"target/keep/k.ts",
-		"target/other/o.ts",
-		"target/log/skip.log",
-		"sub/path/target/y.ts",
-		"build/shallow.ts",
-		"build/keep/bk.ts",
-		"build/other/bo.ts",
-		"dist/keep.ts",
-		"dist/other.ts",
-		"dist/sub/deep.ts", // bare-rooted "dist" witness: must not be pruned away
-		"tests/unit/u.ts",
-		"tests/e2e/e.ts",
-		"a/b/target/deep/d.ts",    // deep dir-only witness (pruned)
-		"a/b/other/o.ts",          // deep dir-only sibling witness (kept)
-		"target/save/s.ts",        // multi-negation second re-include
-		"target/keep/sub/deep.ts", // sequential re-ignore witness
-	}
-
 	for _, fx := range fixtures {
 		t.Run(fx.name, func(t *testing.T) {
-			configDir, paths := setupDiscoveryFixture(t, layout)
+			// The archive layout mixes shallow and deep files, .tsx, and a
+			// non-matching .log so each pruning pattern is checked against the
+			// linter's per-file decision over the same filesystem shape.
+			configDir, paths := setupDiscoveryTxtarFixture(t, "pruning-oracle")
 			config := RslintConfig{
 				{Ignores: fx.ignores},
 				{Files: filesPatterns, Rules: Rules{"test-rule": "error"}},
@@ -364,11 +319,7 @@ func TestDiscoverFilesOutsidePrograms_PruningPreservesGapFiles(t *testing.T) {
 // linter (it also excludes target/keep). Locks down the "per-entry config
 // cannot cause over-prune" invariant.
 func TestDiscoverFilesOutsidePrograms_PerEntryNegationDoesNotResurrect(t *testing.T) {
-	configDir, paths := setupDiscoveryFixture(t, []string{
-		"src/a.ts",
-		"target/x.ts",
-		"target/keep/k.ts",
-	})
+	configDir, paths := setupDiscoveryTxtarFixture(t, "per-entry-negation")
 	config := RslintConfig{
 		{Ignores: []string{"**/target/**/*"}},
 		{Files: []string{"**/*.ts"}, Ignores: []string{"!target/keep/**/*"}, Rules: Rules{"test-rule": "error"}},
@@ -388,12 +339,7 @@ func TestDiscoverFilesOutsidePrograms_PerEntryNegationDoesNotResurrect(t *testin
 
 // Pruning must produce identical gap files in parallel and single-threaded mode.
 func TestDiscoverFilesOutsidePrograms_PruneSingleThreadedEquivalence(t *testing.T) {
-	configDir, _ := setupDiscoveryFixture(t, []string{
-		"src/a.ts",
-		"target/x.ts",
-		"target/keep/k.ts",
-		"sub/path/target/y.ts",
-	})
+	configDir, _ := setupDiscoveryTxtarFixture(t, "single-threaded")
 	config := RslintConfig{
 		{Ignores: []string{"**/target/**/*", "!sub/path/target/**/*", "!target/keep/**/*"}},
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},

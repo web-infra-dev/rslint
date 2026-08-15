@@ -1233,6 +1233,7 @@ The current architecture already leaves room for:
 - **Go Unit Tests**: colocated `*_test.go` files under `internal/...`
 - **Rule Engine Tests**: `internal/linter` and `internal/config` have focused behavior tests
 - **Go Rule Testing Helpers**: `internal/rule_tester`
+- **Shared Go Test Infrastructure**: `internal/testutil`; package-specific helpers remain beside the owning tests
 - **JS/TS Integration Tests**: `packages/rslint/tests` and `packages/rslint-test-tools/tests`
 - **VS Code Extension Tests**: `packages/vscode-extension/__tests__`
 - **Rust / tsgo Tests**: `crates/tsgo-client/tests` and `cmd/tsgo/semantic_test.go`
@@ -1248,9 +1249,16 @@ Rules are tested in more than one style depending on where they live:
 
 ### Test Data Management
 
-- **Fixtures**: live across Go, JS, and Rust test directories
+- **Small Go Inputs**: remain inline or table-driven in the owning `*_test.go` file
+- **Filesystem Fixtures**: live under the nearest package's `testdata/` directory; related portable text trees may be grouped in `.txtar` archives
+- **Txtar Materialization**: `internal/testutil/txtarfs` validates portable relative paths and extracts each selected tree into a fresh `t.TempDir`; it intentionally does not model permissions, symlinks, or other OS metadata
+- **Imperative OS Scenarios**: permissions, symlinks, concurrency, and platform-specific behavior stay in Go so their setup and assertions remain explicit
 - **Snapshots**: used in several JS and Rust integration tests
 - **Virtual Configs / VFS Inputs**: used heavily for API, CLI, and type-checking scenarios
+
+Txtar fixtures are ordinary committed test inputs: they require no generator,
+golden-update mode, or separate build step, and run through the owning package's
+normal `go test` invocation.
 
 ### Continuous Integration
 
@@ -1488,7 +1496,6 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 ### Testing Strategy
 
 - [ ] Explain golden test implementation and maintenance
-- [ ] Document test data management and fixture organization
 - [ ] Detail integration test coverage and automation
 - [ ] Clarify performance regression testing approach
 
