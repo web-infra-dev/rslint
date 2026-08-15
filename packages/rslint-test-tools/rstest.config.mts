@@ -76,6 +76,7 @@ export default defineConfig({
     './tests/eslint/rules/dot-notation.test.ts',
     './tests/eslint/rules/no-case-declarations.test.ts',
     './tests/eslint/rules/no-console.test.ts',
+    './tests/eslint/rules/no-continue.test.ts',
     './tests/eslint/rules/no-dupe-args.test.ts',
     './tests/eslint/rules/no-dupe-class-members.test.ts',
     './tests/eslint/rules/no-dupe-keys.test.ts',

@@ -37,6 +37,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
+	"github.com/web-infra-dev/rslint/internal/rules/no_continue"
 	"github.com/web-infra-dev/rslint/internal/rules/no_control_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
@@ -198,6 +199,7 @@ func GetAllRules() []rule.Rule {
 		no_constant_binary_expression.NoConstantBinaryExpressionRule,
 		no_constant_condition.NoConstantConditionRule,
 		no_constructor_return.NoConstructorReturnRule,
+		no_continue.NoContinueRule,
 		no_control_regex.NoControlRegexRule,
 		no_debugger.NoDebuggerRule,
 		no_delete_var.NoDeleteVarRule,
