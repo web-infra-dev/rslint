@@ -171,3 +171,40 @@ func TestHasCommentInSpan(t *testing.T) {
 		t.Fatal("empty span must not contain comments")
 	}
 }
+
+func TestLastCommentInSpan(t *testing.T) {
+	comments := []*ast.CommentRange{
+		{TextRange: core.NewTextRange(2, 5)},
+		{TextRange: core.NewTextRange(7, 11)},
+		{TextRange: core.NewTextRange(13, 18)},
+		{TextRange: core.NewTextRange(20, 25)},
+	}
+
+	tests := []struct {
+		name       string
+		start, end int
+		wantPos    int
+	}{
+		{name: "last contained", start: 5, end: 20, wantPos: 13},
+		{name: "exact boundaries", start: 7, end: 11, wantPos: 7},
+		{name: "excludes crossing end", start: 5, end: 16, wantPos: 7},
+		{name: "excludes crossing start", start: 9, end: 13, wantPos: -1},
+		{name: "empty span", start: 7, end: 7, wantPos: -1},
+		{name: "after all comments", start: 26, end: 30, wantPos: -1},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := LastCommentInSpan(comments, test.start, test.end)
+			if test.wantPos < 0 {
+				if got != nil {
+					t.Fatalf("got comment at %d, want nil", got.Pos())
+				}
+				return
+			}
+			if got == nil || got.Pos() != test.wantPos {
+				t.Fatalf("got %#v, want comment at %d", got, test.wantPos)
+			}
+		})
+	}
+}

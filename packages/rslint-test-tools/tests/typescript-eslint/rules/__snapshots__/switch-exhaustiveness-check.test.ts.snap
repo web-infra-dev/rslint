@@ -486,7 +486,7 @@ switch (value) {
       ",
   "diagnostics": [
     {
-      "message": "Switch is not exhaustive. Cases not matched: 1 | true",
+      "message": "Switch is not exhaustive. Cases not matched: true | 1",
       "messageId": "switchIsNotExhaustive",
       "range": {
         "end": {
@@ -663,7 +663,7 @@ switch (day) {
       ",
   "diagnostics": [
     {
-      "message": "Switch is not exhaustive. Cases not matched: "Friday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"",
+      "message": "Switch is not exhaustive. Cases not matched: "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"",
       "messageId": "switchIsNotExhaustive",
       "range": {
         "end": {
@@ -778,7 +778,7 @@ function test(value: Union): number {
       ",
   "diagnostics": [
     {
-      "message": "Switch is not exhaustive. Cases not matched: 1 | true",
+      "message": "Switch is not exhaustive. Cases not matched: true | 1",
       "messageId": "switchIsNotExhaustive",
       "range": {
         "end": {
@@ -853,7 +853,7 @@ switch (day) {
       ",
   "diagnostics": [
     {
-      "message": "Switch is not exhaustive. Cases not matched: "Friday" | "Monday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"",
+      "message": "Switch is not exhaustive. Cases not matched: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"",
       "messageId": "switchIsNotExhaustive",
       "range": {
         "end": {
@@ -986,7 +986,7 @@ exports[`switch-exhaustiveness-check > invalid 28`] = `
   "code": "
 export enum Enum {
   'test-test' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -1022,7 +1022,7 @@ exports[`switch-exhaustiveness-check > invalid 29`] = `
   "code": "
 export enum Enum {
   '' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -1058,7 +1058,7 @@ exports[`switch-exhaustiveness-check > invalid 30`] = `
   "code": "
 export enum Enum {
   '9test' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -1796,18 +1796,18 @@ switch (literal) {
 exports[`switch-exhaustiveness-check > invalid 50`] = `
 {
   "code": "
-        export namespace A {
-          export enum B {
-            C,
-            D,
-          }
-        }
-        declare const foo: A.B;
-        switch (foo) {
-          case A.B.C: {
-            break;
-          }
-        }
+export namespace A {
+  export enum B {
+    C,
+    D,
+  }
+}
+declare const foo: A.B;
+switch (foo) {
+  case A.B.C: {
+    break;
+  }
+}
       ",
   "diagnostics": [
     {
@@ -1815,11 +1815,11 @@ exports[`switch-exhaustiveness-check > invalid 50`] = `
       "messageId": "switchIsNotExhaustive",
       "range": {
         "end": {
-          "column": 20,
+          "column": 12,
           "line": 9,
         },
         "start": {
-          "column": 17,
+          "column": 9,
           "line": 9,
         },
       },
@@ -1835,13 +1835,13 @@ exports[`switch-exhaustiveness-check > invalid 50`] = `
 exports[`switch-exhaustiveness-check > invalid 51`] = `
 {
   "code": "
-        import { A } from './switch-exhaustiveness-check';
-        declare const foo: A.B;
-        switch (foo) {
-          case A.B.C: {
-            break;
-          }
-        }
+import { A } from './switch-exhaustiveness-check';
+declare const foo: A.B;
+switch (foo) {
+  case A.B.C: {
+    break;
+  }
+}
       ",
   "diagnostics": [
     {
@@ -1849,11 +1849,11 @@ exports[`switch-exhaustiveness-check > invalid 51`] = `
       "messageId": "switchIsNotExhaustive",
       "range": {
         "end": {
-          "column": 20,
+          "column": 12,
           "line": 4,
         },
         "start": {
-          "column": 17,
+          "column": 9,
           "line": 4,
         },
       },

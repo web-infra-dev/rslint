@@ -1548,8 +1548,8 @@ declare const value: boolean | 1;
 switch (value) {
   case false:
     break;
-  case 1: { throw new Error('Not implemented yet: 1 case') }
   case true: { throw new Error('Not implemented yet: true case') }
+  case 1: { throw new Error('Not implemented yet: 1 case') }
 }
       `,
             },
@@ -1750,7 +1750,7 @@ switch (day) {
           column: 9,
           data: {
             missingBranches:
-              '"Friday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"',
+              '"Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"',
           },
           line: 14,
           messageId: 'switchIsNotExhaustive',
@@ -1775,12 +1775,12 @@ switch (day) {
     result = 1;
     break;
   }
+  case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
+  case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
+  case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
   case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
   case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
   case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
-  case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
-  case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
-  case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
 }
       `,
             },
@@ -1897,7 +1897,7 @@ function test(value: Union): number {
         {
           column: 11,
           data: {
-            missingBranches: '1 | true',
+            missingBranches: 'true | 1',
           },
           line: 9,
           messageId: 'switchIsNotExhaustive',
@@ -1915,8 +1915,8 @@ function test(value: Union): number {
   switch (value) {
     case 'a':
       return 1;
-    case 1: { throw new Error('Not implemented yet: 1 case') }
     case true: { throw new Error('Not implemented yet: true case') }
+    case 1: { throw new Error('Not implemented yet: 1 case') }
   }
 }
       `,
@@ -1985,7 +1985,7 @@ switch (day) {
           column: 9,
           data: {
             missingBranches:
-              '"Friday" | "Monday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"',
+              '"Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"',
           },
           line: 13,
           messageId: 'switchIsNotExhaustive',
@@ -2005,13 +2005,13 @@ type Day =
 const day = 'Monday' as Day;
 
 switch (day) {
-case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
 case "Monday": { throw new Error('Not implemented yet: "Monday" case') }
-case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
-case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
-case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
 case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
 case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
+case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
+case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
+case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
+case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
 }
       `,
             },
@@ -2137,7 +2137,7 @@ function test(value: T): number {
       code: `
 export enum Enum {
   'test-test' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -2154,7 +2154,7 @@ function test(arg: Enum): string {
               output: `
 export enum Enum {
   'test-test' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -2174,7 +2174,7 @@ function test(arg: Enum): string {
       code: `
 export enum Enum {
   '' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -2191,7 +2191,7 @@ function test(arg: Enum): string {
               output: `
 export enum Enum {
   '' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -2211,7 +2211,7 @@ function test(arg: Enum): string {
       code: `
 export enum Enum {
   '9test' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -2228,7 +2228,7 @@ function test(arg: Enum): string {
               output: `
 export enum Enum {
   '9test' = 'test-test',
-  'test' = 'test',
+  test = 'test',
 }
 
 function test(arg: Enum): string {
@@ -2908,22 +2908,22 @@ switch (literal) {
     },
     {
       code: `
-        export namespace A {
-          export enum B {
-            C,
-            D,
-          }
-        }
-        declare const foo: A.B;
-        switch (foo) {
-          case A.B.C: {
-            break;
-          }
-        }
+export namespace A {
+  export enum B {
+    C,
+    D,
+  }
+}
+declare const foo: A.B;
+switch (foo) {
+  case A.B.C: {
+    break;
+  }
+}
       `,
       errors: [
         {
-          column: 17,
+          column: 9,
           data: {
             missingBranches: 'A.B.D',
           },
@@ -2933,19 +2933,19 @@ switch (literal) {
             {
               messageId: 'addMissingCases',
               output: `
-        export namespace A {
-          export enum B {
-            C,
-            D,
-          }
-        }
-        declare const foo: A.B;
-        switch (foo) {
-          case A.B.C: {
-            break;
-          }
-          case A.B.D: { throw new Error('Not implemented yet: A.B.D case') }
-        }
+export namespace A {
+  export enum B {
+    C,
+    D,
+  }
+}
+declare const foo: A.B;
+switch (foo) {
+  case A.B.C: {
+    break;
+  }
+  case A.B.D: { throw new Error('Not implemented yet: A.B.D case') }
+}
       `,
             },
           ],
@@ -2954,17 +2954,17 @@ switch (literal) {
     },
     {
       code: `
-        import { A } from './switch-exhaustiveness-check';
-        declare const foo: A.B;
-        switch (foo) {
-          case A.B.C: {
-            break;
-          }
-        }
+import { A } from './switch-exhaustiveness-check';
+declare const foo: A.B;
+switch (foo) {
+  case A.B.C: {
+    break;
+  }
+}
       `,
       errors: [
         {
-          column: 17,
+          column: 9,
           data: {
             missingBranches: 'A.B.D',
           },
@@ -2974,14 +2974,14 @@ switch (literal) {
             {
               messageId: 'addMissingCases',
               output: `
-        import { A } from './switch-exhaustiveness-check';
-        declare const foo: A.B;
-        switch (foo) {
-          case A.B.C: {
-            break;
-          }
-          case A.B.D: { throw new Error('Not implemented yet: A.B.D case') }
-        }
+import { A } from './switch-exhaustiveness-check';
+declare const foo: A.B;
+switch (foo) {
+  case A.B.C: {
+    break;
+  }
+  case A.B.D: { throw new Error('Not implemented yet: A.B.D case') }
+}
       `,
             },
           ],

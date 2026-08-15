@@ -1,5 +1,6 @@
 # Custom Dictionary Words
 aavascript
+abcé
 accesskey
 accum
 acdfg
@@ -9,6 +10,7 @@ acking
 acks
 activedescendant
 addl
+affinely
 affordances
 afoob
 agen
@@ -82,6 +84,7 @@ categorisation
 Cbar
 cdylib
 centralising
+CESU
 CHARCLASS
 checkerpool
 classnames
@@ -239,6 +242,7 @@ hotpink
 HTTPSURL
 hujson
 humanfs
+iceisfun
 idlist
 iface
 imul
@@ -254,6 +258,7 @@ jakebailey
 jiti
 Jpan
 jsnum
+jsregexp
 jsonc
 jsonline
 jsonschema
@@ -520,6 +525,7 @@ spinbutton
 splitwords
 spreadassignment
 spreadelement
+stepful
 stdjson
 stdlib
 stmts
@@ -598,6 +604,7 @@ uninitialised
 unional
 uniseg
 unmarshals
+unmetered
 unmodeled
 unnegated
 unpadded

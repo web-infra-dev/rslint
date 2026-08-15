@@ -2,6 +2,7 @@ package rule
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -128,6 +129,51 @@ func TestSchemaConcurrentValidate(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestSchemaOptionsValidatorRunsAfterSchemaAndDefaults(t *testing.T) {
+	var calls int
+	schema := NewSchemaWithOptionsValidator([]byte(`{
+		"type": "array",
+		"items": [{
+			"type": "object",
+			"properties": { "value": { "type": "string", "default": "filled" } },
+			"additionalProperties": false
+		}],
+		"minItems": 1,
+		"maxItems": 1
+	}`), func(options []any) error {
+		calls++
+		got := options[0].(map[string]any)["value"]
+		if got != "filled" {
+			t.Fatalf("validator received value %#v, want defaulted value", got)
+		}
+		return nil
+	})
+
+	if err := schema.Validate([]any{map[string]any{}}); err != nil {
+		t.Fatalf("Validate failed: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("validator calls = %d, want 1", calls)
+	}
+	if err := schema.Validate([]any{map[string]any{"value": 1}}); err == nil {
+		t.Fatal("expected JSON Schema validation error")
+	}
+	if calls != 1 {
+		t.Fatalf("validator ran after invalid JSON shape; calls = %d", calls)
+	}
+}
+
+func TestSchemaOptionsValidatorErrorIsReturned(t *testing.T) {
+	want := errors.New("rule-specific validation failed")
+	schema := NewSchemaWithOptionsValidator(
+		[]byte(`{"type":"array","maxItems":0}`),
+		func([]any) error { return want },
+	)
+	if err := schema.Validate(nil); !errors.Is(err, want) {
+		t.Fatalf("Validate error = %v, want %v", err, want)
+	}
 }
 
 func TestSchemaIsolatesResourcesAcrossSchemas(t *testing.T) {
