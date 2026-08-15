@@ -12,6 +12,7 @@ This document summarizes how to work on rslint effectively and consistently.
 - `internal/rule/`: Rule descriptors/environment, context, diagnostics, disable manager, listeners.
 - `internal/plugins/typescript/`: `@typescript-eslint` rules under `rules/<rule>/`.
 - `internal/plugins/import/`: `eslint-plugin-import` registration.
+- `internal/testutil/`: Cross-package test infrastructure, including safe txtar fixture materialization.
 - `internal/utils/`: JSONC, overlay VFS, compiler construction, AST/type helpers.
 - `internal/lsp/`: Language Server integration. Also see `website/` and `packages/` for UI/tooling.
 
@@ -35,11 +36,14 @@ This document summarizes how to work on rslint effectively and consistently.
 - Go uses gofmt/goimports; keep functions focused and small.
 - TS/JS/MD/CSS use Prettier via `pnpm run format`.
 - Rules: `internal/plugins/typescript/rules/<rule>/`; tests: `<rule>_test.go`.
-- Prefer table-driven tests and existing helpers in `internal/utils`.
+- Prefer table-driven tests. Keep package-specific helpers beside their tests; put reusable test infrastructure in `internal/testutil`, not production utility packages.
 
 ## Testing Guidelines
 
 - Co-locate Go tests with implementation; name files `*_test.go` and functions `TestXxx`.
+- Keep small inputs inline. Put multi-file textual filesystem fixtures under the nearest package's `testdata/` directory, and group related layouts in `.txtar` when that makes the scenario easier to review.
+- Use `.txtar` only for portable regular text files. Construct symlinks, permissions, concurrency, and other OS behavior directly in Go tests.
+- Fixture helpers must reject missing or empty selections instead of allowing a test to pass without exercising a case.
 - Keep tests minimal and behavior-focused; avoid unrelated scenarios.
 - Run `pnpm run test:go` (Go) and `pnpm run test` (JS) before submitting.
 

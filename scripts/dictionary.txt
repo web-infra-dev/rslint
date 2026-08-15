@@ -580,6 +580,8 @@ tsoptions
 tsparser
 tspath
 tsutils
+txtar
+txtarfs
 typeparam
 typescriptutil
 unaliased
