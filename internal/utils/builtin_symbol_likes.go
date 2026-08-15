@@ -3,20 +3,8 @@ package utils
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 )
-
-func ComparePaths(a string, b string, program *program.Program) int {
-	return tspath.ComparePaths(a, b, tspath.ComparePathsOptions{
-		CurrentDirectory:          program.CurrentDirectory(),
-		UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames(),
-	})
-}
-
-func IsSourceFileDefaultLibrary(program *program.Program, file *ast.SourceFile) bool {
-	return program != nil && program.IsSourceFileDefaultLibrary(file)
-}
 
 func IsSymbolFromDefaultLibrary(
 	program *program.Program,
@@ -28,7 +16,7 @@ func IsSymbolFromDefaultLibrary(
 
 	for _, declaration := range symbol.Declarations {
 		sourceFile := ast.GetSourceFileOfNode(declaration)
-		if IsSourceFileDefaultLibrary(program, sourceFile) {
+		if program.IsSourceFileDefaultLibrary(sourceFile) {
 			return true
 		}
 	}
@@ -56,7 +44,7 @@ func addDefaultLibraryGlobalNames(dst map[string]bool, program *program.Program,
 	}
 
 	for _, sourceFile := range program.SourceFiles() {
-		if !IsSourceFileDefaultLibrary(program, sourceFile) {
+		if !program.IsSourceFileDefaultLibrary(sourceFile) {
 			continue
 		}
 		for _, symbol := range typeChecker.GetSymbolsInScope(sourceFile.AsNode(), flags) {

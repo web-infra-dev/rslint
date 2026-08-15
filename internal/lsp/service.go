@@ -1020,10 +1020,6 @@ func runLintWithProgramLoader(
 		hasTypeInfo,
 		fileConfigResolver,
 		rule.EditDemandAll,
-		// Normal diagnostics can receive reused SourceFiles from the Session even
-		// when the resident project Program store is unavailable. Fresh fallbacks are
-		// safe too: attached syntax data dies with their transient SourceFiles.
-		true,
 		ctx,
 	), nil
 }
@@ -1046,12 +1042,12 @@ var rulesSkippedInEditors = map[string]bool{
 // rulesServedToEditors drops the rules the language server never runs. The
 // input is a cached slice shared across files, so filtering builds a new one
 // and an unaffected configuration keeps the original.
-func rulesServedToEditors(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
-	skipped := func(r linter.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
+func rulesServedToEditors(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
+	skipped := func(r rule.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
 	if !slices.ContainsFunc(rules, skipped) {
 		return rules
 	}
-	served := make([]linter.ConfiguredRule, 0, len(rules))
+	served := make([]rule.ConfiguredRule, 0, len(rules))
 	for _, configured := range rules {
 		if !skipped(configured) {
 			served = append(served, configured)
@@ -1068,7 +1064,6 @@ func lintSingleFile(
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
 	editDemand rule.EditDemand,
-	cacheModuleSpecifiers bool,
 	ctx context.Context,
 ) lintPassResult {
 	if sourceFile == nil {
@@ -1104,13 +1099,13 @@ func lintSingleFile(
 	}
 
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:               sourceProgram,
-		File:                  sourceFile.FileName(),
-		Cwd:                   processCwd,
-		HasTypeInfo:           hasTypeInfo,
-		CacheModuleSpecifiers: cacheModuleSpecifiers,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return rulesServedToEditors(fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo))
+		Program:     sourceProgram,
+		File:        sourceFile.FileName(),
+		Cwd:         processCwd,
+		HasTypeInfo: hasTypeInfo,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			rules, _ := fileConfigResolver.EnabledRulesForFile(configFilePath)
+			return rulesServedToEditors(rules)
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: editDemand,
@@ -1331,9 +1326,6 @@ func (s *Server) runConfiguredLintForContent(
 	s.addEditorOverlayFile(files, filename, content)
 	overlayFS := utils.NewOverlayVFS(s.fs, files)
 
-	// This path builds a request-local Program over its own filesystem. It
-	// cannot hand the same SourceFiles to a later lint pass, so module syntax
-	// collection stays inside this pass's graph.
 	for _, tsConfigPath := range tsConfigPaths {
 		program, err := createStandaloneLintProgram(tsConfigPath, overlayFS)
 		if err != nil {
@@ -1348,7 +1340,6 @@ func (s *Server) runConfiguredLintForContent(
 				true,
 				resolver,
 				rule.EditDemandAutofix,
-				false,
 				ctx,
 			), nil
 		}
@@ -1366,7 +1357,6 @@ func (s *Server) runConfiguredLintForContent(
 		false,
 		resolver,
 		rule.EditDemandAutofix,
-		false,
 		ctx,
 	), nil
 }
@@ -1391,9 +1381,12 @@ func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {
 	return config.IsDefaultExcludedPath(filePath, cwd, useCaseSensitive)
 }
 
-func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []linter.ConfiguredRule {
-	return config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).
-		ActiveRulesForFileHasTypeInfo(filePath, hasTypeInfo)
+func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []rule.ConfiguredRule {
+	rules, _ := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).EnabledRulesForFile(filePath)
+	if !hasTypeInfo {
+		return rule.FilterNonTypeAwareRules(rules)
+	}
+	return rules
 }
 
 // Helper function to check if two ranges overlap

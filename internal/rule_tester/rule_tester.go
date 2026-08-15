@@ -210,11 +210,11 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 			SingleThreaded: true,
 			Scope:          linter.FileScope{Files: allowedFiles},
 			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{
 					{
 						Name: "test",
-						Environment: &linter.RuleEnvironment{
+						Environment: &rule.RuleEnvironment{
 							Settings:        settings,
 							LanguageOptions: languageOptions,
 							Globals:         globals,

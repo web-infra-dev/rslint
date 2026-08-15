@@ -199,13 +199,9 @@ func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
 	}
 }
 
-// TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative pins the
-// single most common coexistence combo: a TS preset (type-aware native rules) +
-// one community plugin, on a standalone script that is NOT in any
-// tsconfig.project (a "gap" file). The type-aware native rule is filtered out
-// (no type info available) while the community rule survives and still routes to
-// the worker (IsEslintPluginRule stays true). On a covered file both run.
-func TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative(t *testing.T) {
+// Config resolution retains native and community rules independently of source
+// capabilities. The linter plan owns type-aware eligibility.
+func TestGetEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
 	RegisterAllRules()
 	RegisterEslintPluginRules([]EslintPluginEntry{
 		{Prefix: "unicornGap", RuleNames: []string{"no-null"}},
@@ -221,16 +217,13 @@ func TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative(t *tes
 			Rules:   Rules{"unicornGap/no-null": "error"},
 		},
 	}
-	typeInfoFiles := map[string]struct{}{"/proj/covered.ts": {}}
-
-	// Gap file: not in typeInfoFiles → type-aware native rule filtered out.
-	gap := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "/proj/gap.ts", "/proj", true, typeInfoFiles)
+	gap, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/gap.ts", "/proj", true)
 	gapRouting := map[string]bool{}
 	for _, r := range gap {
 		gapRouting[r.Name] = r.IsEslintPluginRule
 	}
-	if _, hasNative := gapRouting["@typescript-eslint/require-await"]; hasNative {
-		t.Error("type-aware native rule must be dropped on a gap file (not in tsconfig.project)")
+	if _, hasNative := gapRouting["@typescript-eslint/require-await"]; !hasNative {
+		t.Error("config resolution must retain the type-aware native rule")
 	}
 	community, hasCommunity := gapRouting["unicornGap/no-null"]
 	if !hasCommunity {
@@ -240,8 +233,7 @@ func TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative(t *tes
 		t.Error("the surviving community rule must keep IsEslintPluginRule=true (routes to the worker)")
 	}
 
-	// Covered file: the type-aware native rule is kept alongside the community one.
-	covered := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "/proj/covered.ts", "/proj", true, typeInfoFiles)
+	covered, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/covered.ts", "/proj", true)
 	coveredNames := map[string]bool{}
 	for _, r := range covered {
 		coveredNames[r.Name] = true

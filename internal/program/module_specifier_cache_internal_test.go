@@ -1,4 +1,4 @@
-package rule
+package program_test
 
 import (
 	"runtime"
@@ -20,20 +20,19 @@ import (
 const specifierCacheImporter = "/specifier-cache-fixture/importer.ts"
 const specifierCacheTarget = "/specifier-cache-fixture/target.ts"
 
-var specifierCacheESM = ModuleSyntax{ESModule: true}
+const specifierCacheESM = lintprogram.ESModuleReferences
+
+func specifierCacheReferences(raw *compiler.Program, file *ast.SourceFile, kinds lintprogram.ModuleReferenceKinds) []lintprogram.ModuleReference {
+	return lintprogram.NewFromCompiler(raw).ModuleGraph().References(file, kinds)
+}
 
 // TestCachedModuleGraphReusesSourceFileCollection locks in the graph-to-cache
 // boundary: two runs holding the same unchanged SourceFile share collection.
 func TestCachedModuleGraphReusesSourceFileCollection(t *testing.T) {
 	rawProgram, _ := specifierCacheProgram(t, specifierCacheFiles(false))
 	file := specifierCacheFile(t, rawProgram)
-	firstProgram := lintprogram.NewFromCompiler(rawProgram)
-	secondProgram := lintprogram.NewFromCompiler(rawProgram)
-	EnableModuleSpecifierCaching(firstProgram)
-	EnableModuleSpecifierCaching(secondProgram)
-
-	first := ModuleGraphFor(firstProgram).specifiersOf(file, specifierCacheESM)
-	second := ModuleGraphFor(secondProgram).specifiersOf(file, specifierCacheESM)
+	first := specifierCacheReferences(rawProgram, file, specifierCacheESM)
+	second := specifierCacheReferences(rawProgram, file, specifierCacheESM)
 
 	if len(first) != 1 {
 		t.Fatalf("collected %d specifiers, want 1", len(first))
@@ -50,8 +49,8 @@ func TestSourceFileModuleSpecifierCacheSeparatesSyntaxes(t *testing.T) {
 	program, _ := specifierCacheProgram(t, specifierCacheFiles(true))
 	file := specifierCacheFile(t, program)
 
-	esmOnly := cachedModuleSpecifiers(file, specifierCacheESM)
-	withCommonJS := cachedModuleSpecifiers(file, ModuleSyntax{ESModule: true, CommonJS: true})
+	esmOnly := specifierCacheReferences(program, file, specifierCacheESM)
+	withCommonJS := specifierCacheReferences(program, file, lintprogram.ESModuleReferences|lintprogram.CommonJSReferences)
 
 	if len(esmOnly) != 1 {
 		t.Fatalf("collected %d ES module specifiers, want 1", len(esmOnly))
@@ -59,7 +58,7 @@ func TestSourceFileModuleSpecifierCacheSeparatesSyntaxes(t *testing.T) {
 	if len(withCommonJS) != 2 {
 		t.Fatalf("collected %d specifiers with commonjs, want 2", len(withCommonJS))
 	}
-	if reused := cachedModuleSpecifiers(file, specifierCacheESM); &reused[0] != &esmOnly[0] {
+	if reused := specifierCacheReferences(program, file, specifierCacheESM); &reused[0] != &esmOnly[0] {
 		t.Fatal("the commonjs request displaced the ES module answer")
 	}
 }
@@ -79,9 +78,9 @@ func TestSourceFileModuleSpecifierCacheSeparatesSourceFiles(t *testing.T) {
 	if original.Path() != edited.Path() {
 		t.Fatal("the fixture files disagree on their path; the test proves nothing")
 	}
-	syntax := ModuleSyntax{ESModule: true, CommonJS: true}
-	before := cachedModuleSpecifiers(original, syntax)
-	after := cachedModuleSpecifiers(edited, syntax)
+	syntax := lintprogram.ESModuleReferences | lintprogram.CommonJSReferences
+	before := specifierCacheReferences(originalProgram, original, syntax)
+	after := specifierCacheReferences(editedProgram, edited, syntax)
 
 	if len(before) != 1 {
 		t.Fatalf("collected %d specifiers before the edit, want 1", len(before))
@@ -89,7 +88,7 @@ func TestSourceFileModuleSpecifierCacheSeparatesSourceFiles(t *testing.T) {
 	if len(after) != 2 {
 		t.Fatalf("collected %d specifiers after the edit, want 2", len(after))
 	}
-	if reused := cachedModuleSpecifiers(original, syntax); &reused[0] != &before[0] {
+	if reused := specifierCacheReferences(originalProgram, original, syntax); &reused[0] != &before[0] {
 		t.Fatal("the other SourceFile displaced the original answer")
 	}
 }
@@ -101,13 +100,13 @@ func TestSourceFileModuleSpecifierCacheSeparatesSourceFiles(t *testing.T) {
 func TestSourceFileModuleSpecifierCachePublishesConcurrentCollections(t *testing.T) {
 	program, _ := specifierCacheProgram(t, specifierCacheFiles(true))
 	file := specifierCacheFile(t, program)
-	syntaxes := [...]ModuleSyntax{
+	syntaxes := [...]lintprogram.ModuleReferenceKinds{
 		specifierCacheESM,
-		{ESModule: true, CommonJS: true},
+		lintprogram.ESModuleReferences | lintprogram.CommonJSReferences,
 	}
 	type result struct {
 		syntaxIndex int
-		collected   []moduleSpecifier
+		collected   []lintprogram.ModuleReference
 	}
 	const callers = 64
 	start := make(chan struct{})
@@ -118,13 +117,13 @@ func TestSourceFileModuleSpecifierCachePublishesConcurrentCollections(t *testing
 			<-start
 			results <- result{
 				syntaxIndex: syntaxIndex,
-				collected:   cachedModuleSpecifiers(file, syntaxes[syntaxIndex]),
+				collected:   specifierCacheReferences(program, file, syntaxes[syntaxIndex]),
 			}
 		}()
 	}
 	close(start)
 
-	var published [len(syntaxes)][]moduleSpecifier
+	var published [len(syntaxes)][]lintprogram.ModuleReference
 	for range callers {
 		result := <-results
 		wantLength := result.syntaxIndex + 1
@@ -161,10 +160,10 @@ func TestSourceFileModuleSpecifierCacheReleasesReplacedAndRemovedFiles(t *testin
 		replaced = weak.Make(importer)
 		removed = weak.Make(target)
 
-		if collected := cachedModuleSpecifiers(importer, specifierCacheESM); len(collected) != 1 {
+		if collected := specifierCacheReferences(program, importer, specifierCacheESM); len(collected) != 1 {
 			t.Fatalf("collected %d importer specifiers, want 1", len(collected))
 		}
-		cachedModuleSpecifiers(target, specifierCacheESM)
+		specifierCacheReferences(program, target, specifierCacheESM)
 
 		files[specifierCacheImporter] = "export const used = 1;\n"
 		changed := tspath.ToPath(
@@ -233,10 +232,8 @@ func TestCachedModuleGraphResolvesPerProgram(t *testing.T) {
 	}
 	beforeProgram := lintprogram.NewFromCompiler(program)
 	afterProgram := lintprogram.NewFromCompiler(updated)
-	EnableModuleSpecifierCaching(beforeProgram)
-	EnableModuleSpecifierCaching(afterProgram)
-	before := ModuleGraphFor(beforeProgram).Edges(file, specifierCacheESM)
-	after := ModuleGraphFor(afterProgram).Edges(file, specifierCacheESM)
+	before := beforeProgram.ModuleGraph().References(file, specifierCacheESM)
+	after := afterProgram.ModuleGraph().References(file, specifierCacheESM)
 
 	if len(before) != 1 || len(after) != 1 {
 		t.Fatalf("resolved %d and %d edges, want 1 each", len(before), len(after))

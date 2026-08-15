@@ -56,7 +56,7 @@ var NoRestrictedPathsRule = rule.Rule{
 		// volume on macOS still gets a case-sensitive compare.
 		windows := runtime.GOOS == "windows"
 
-		currentFilename := import_utils.GetPhysicalFilename(ctx)
+		currentFilename := ctx.SourceFile.FileName()
 		matchingZones := make([]zone, 0, len(opts.zones))
 		for _, z := range opts.zones {
 			if isMatchingZone(z, basePath, currentFilename, windows) {
@@ -72,7 +72,7 @@ var NoRestrictedPathsRule = rule.Rule{
 		applicable := make([]int, 0, 4)
 
 		return import_utils.VisitModules(func(source *ast.StringLiteralLike, node *ast.Node) {
-			absoluteImportPath, ok := import_utils.Resolve(source, ctx)
+			absoluteImportPath, _, ok := ctx.Program().ResolveModule(ctx.SourceFile, source)
 			if !ok {
 				return
 			}

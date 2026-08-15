@@ -19,9 +19,8 @@ import (
 )
 
 var (
-	errNilProgram               = errors.New("linter: Program must not be nil")
-	errInvalidProgram           = errors.New("linter: Program must be created by internal/program")
-	errInvalidTypeCheckSkipMask = errors.New("linter: SkipTypeCheckPrograms must be parallel to Programs")
+	errNilProgram     = errors.New("linter: Program must not be nil")
+	errInvalidProgram = errors.New("linter: Program must be created by internal/program")
 )
 
 func validateProgram(sourceProgram *program.Program) error {
@@ -93,19 +92,14 @@ func isDirAllowed(fileName string, allowDirs []string) bool {
 // never reads it after a programLintPlan has frozen file identity, rules, and
 // checker eligibility.
 type programPlanOptions struct {
-	Program          *program.Program
-	Scope            FileScope
-	ExcludePaths     []string
-	FileFilter       FileFilter
-	TargetFiles      []string
-	HasTargetFiles   bool
-	SyntaxErrorFiles map[string]struct{}
-	GetRulesForFile  RuleHandler
-	// TypeInfoFiles is the set of files with reliable project type information.
-	// Rules that require type information are filtered for every other file,
-	// and remaining rules receive a nil TypeChecker. nil leaves eligibility to
-	// the Program's source capability alone.
-	TypeInfoFiles map[string]struct{}
+	Program         *program.Program
+	Scope           FileScope
+	ExcludePaths    []string
+	FileFilter      FileFilter
+	TargetFiles     []string
+	HasTargetFiles  bool
+	SkipSyntaxCheck bool
+	GetRulesForFile RuleHandler
 }
 
 // programRunOptions contains the run-scoped sinks and scheduling knobs that do
@@ -115,10 +109,6 @@ type programRunOptions struct {
 	CollectExecutedRules bool
 	SingleThreaded       bool
 	Timing               *TimingCollector
-	// CacheModuleSpecifiers lets module graphs sharing exact SourceFile objects
-	// reuse their syntax-only collection across Programs. Resolution remains
-	// bound to the current Program generation.
-	CacheModuleSpecifiers bool
 }
 
 // Keep checker-free lint shards large enough to amortize their goroutine,
@@ -204,17 +194,11 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		return result
 	}
 
-	// ModuleGraph is otherwise lazy and derived directly from Program. The LSP
-	// can opt this generation into SourceFile-owned syntax reuse before any rule
-	// asks for the graph; resolved edges remain Program-generation scoped.
-	if opts.CacheModuleSpecifiers {
-		rule.EnableModuleSpecifierCaching(sourceProgram)
-	}
 	// lintFile lints one file with its already-resolved rules and checker. Its
 	// comments, DisableManager, and rule contexts are per-file. The listener
 	// registry belongs to the calling checker-shard task and is empty on entry;
 	// reset clears all captured per-file state before the next serial file.
-	lintFile := func(filePlan *lintFilePlan, rules []ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
+	lintFile := func(filePlan *lintFilePlan, rules []rule.ConfiguredRule, chk *checker.Checker, registeredListeners *listenerRegistry) {
 		file := filePlan.file
 
 		// Per-rule durations for this file, parallel to rules. Listeners are
@@ -257,7 +241,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
 		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
-		var environment RuleEnvironment
+		var environment rule.RuleEnvironment
 		if filePlan.environment != nil {
 			environment = *filePlan.environment
 		}
@@ -410,7 +394,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	ctx := context.Background()
 	type lintFileTask struct {
 		plan  *lintFilePlan
-		rules []ConfiguredRule
+		rules []rule.ConfiguredRule
 	}
 	checkerGroups := make(map[*checker.Checker][]lintFileTask)
 	checkerFreeGeneration := true
@@ -418,7 +402,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		filePlan := &filesToLint[fileIndex]
 		file := filePlan.file
 		rules := filePlan.rules
-		if filePlan.checkerCapable {
+		if filePlan.hasTypeChecker {
 			checkerFreeGeneration = false
 		}
 		if opts.CollectExecutedRules && len(rules) > 0 {
@@ -434,7 +418,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			continue
 		}
 		task := lintFileTask{plan: filePlan, rules: rules}
-		if !filePlan.useTypeChecker {
+		if !filePlan.hasTypeChecker {
 			checkerGroups[nil] = append(checkerGroups[nil], task)
 			continue
 		}
@@ -460,8 +444,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 	for chk, tasks := range checkerGroups {
 		// A source generation with no checker capability has no checker-owned
 		// shard topology. Its files are independent, so split the nil-checker
-		// group. When policy merely withholds a checker from a capable Program,
-		// retain the existing single shard.
+		// group.
 		if chk == nil && checkerFreeGeneration && !opts.SingleThreaded && len(tasks) > 1 {
 			workerCount := checkerFreeLintWorkerCount(len(tasks), runtime.GOMAXPROCS(0))
 			if workerCount < 2 {
@@ -488,7 +471,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 // filterNativeRules removes Node-dispatched ESLint plugin placeholders from
 // the native pass without mutating the resolver's shared cached slice. The
 // prepared plan retains the original list for host-side plugin dispatch.
-func filterNativeRules(rules []ConfiguredRule) []ConfiguredRule {
+func filterNativeRules(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
 	firstPlugin := -1
 	for i, configuredRule := range rules {
 		if configuredRule.IsEslintPluginRule {
@@ -500,7 +483,7 @@ func filterNativeRules(rules []ConfiguredRule) []ConfiguredRule {
 		return rules
 	}
 
-	nativeRules := make([]ConfiguredRule, 0, len(rules)-1)
+	nativeRules := make([]rule.ConfiguredRule, 0, len(rules)-1)
 	nativeRules = append(nativeRules, rules[:firstPlugin]...)
 	for _, configuredRule := range rules[firstPlugin+1:] {
 		if !configuredRule.IsEslintPluginRule {
@@ -510,18 +493,9 @@ func filterNativeRules(rules []ConfiguredRule) []ConfiguredRule {
 	return nativeRules
 }
 
-func fileHasTypeInfo(fileName string, typeInfoFiles map[string]struct{}) bool {
-	if typeInfoFiles == nil {
-		return true
-	}
-	_, hasTypeInfo := typeInfoFiles[fileName]
-	return hasTypeInfo
-}
-
 func shouldSkipRulesForSyntax(opts programPlanOptions, file *ast.SourceFile, ctx context.Context) bool {
-	if opts.SyntaxErrorFiles != nil {
-		_, invalid := opts.SyntaxErrorFiles[file.FileName()]
-		return invalid
+	if opts.SkipSyntaxCheck {
+		return false
 	}
 	return len(opts.Program.SyntacticDiagnostics(ctx, file)) > 0
 }
@@ -547,9 +521,10 @@ func shouldSkipRulesForSyntax(opts programPlanOptions, file *ast.SourceFile, ctx
 // GetRulesForFile. CLI/API hosts use this to share one plan with optional
 // third-party plugin dispatch; other callers retain the direct path.
 //
-// Phase 2 — type-check (skipped when opts.TypeCheck is false): each
-// non-skipped program is handed to runTypeCheckAcrossPrograms, which
-// aggregates diagnostics through collectNoEmitDiagnostics — a helper that
+// Phase 2 — type-check (skipped when opts.TypeCheck is false): the linter asks
+// each Program whether it can supply program-wide diagnostics and schedules
+// only that capability. Capable Programs aggregate diagnostics through
+// collectNoEmitDiagnostics, a helper that
 // mirrors compiler.GetDiagnosticsOfAnyProgram(file=nil) but enforces
 // `tsc --noEmit` semantics regardless of whether the user's tsconfig
 // sets noEmit. Type-check is NOT constrained by Scope / PerProgramFilter
@@ -571,9 +546,6 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		if err := validatePrograms(opts.Programs); err != nil {
 			return nil, err
 		}
-	}
-	if opts.TypeCheck && opts.SkipTypeCheckPrograms != nil && len(opts.SkipTypeCheckPrograms) != len(opts.Programs) {
-		return nil, errInvalidTypeCheckSkipMask
 	}
 
 	executedRules := make(map[string]struct{})
@@ -629,7 +601,6 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	if opts.TypeCheck {
 		runTypeCheckAcrossPrograms(typeCheckRequest{
 			Programs:       opts.Programs,
-			Skip:           opts.SkipTypeCheckPrograms,
 			SingleThreaded: opts.SingleThreaded,
 			OnDiagnostic:   consumer.Report,
 		})
@@ -691,8 +662,8 @@ func filePassesLintProjection(opts programPlanOptions, file *ast.SourceFile, all
 }
 
 func collectExactFilesToLint(opts programPlanOptions) []*ast.SourceFile {
-	// CLI gap generations commonly target their complete universe in the same
-	// stable order. Preserve the Program-owned slice when exact selection makes
+	// Exact target plans commonly select a Program's complete universe in the
+	// same stable order. Preserve the Program-owned slice when selection makes
 	// no change, avoiding a map and pointer-slice allocation without inspecting
 	// how the Program was constructed.
 	files := opts.Program.SourceFiles()
@@ -755,24 +726,23 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	}
 	if !opts.HasTypeInfo {
 		base := getRulesForFile
-		getRulesForFile = func(file *ast.SourceFile) []ConfiguredRule {
-			return FilterNonTypeAwareRules(base(file))
+		getRulesForFile = func(file *ast.SourceFile) []rule.ConfiguredRule {
+			return rule.FilterNonTypeAwareRules(base(file))
 		}
 	}
 	plan, err := prepareProgramLintPlan(programPlanOptions{
-		Program:          opts.Program,
-		ExcludePaths:     opts.ExcludePaths,
-		TargetFiles:      []string{opts.File},
-		HasTargetFiles:   true,
-		GetRulesForFile:  getRulesForFile,
-		SyntaxErrorFiles: map[string]struct{}{},
+		Program:         opts.Program,
+		ExcludePaths:    opts.ExcludePaths,
+		TargetFiles:     []string{opts.File},
+		HasTargetFiles:  true,
+		SkipSyntaxCheck: true,
+		GetRulesForFile: getRulesForFile,
 	})
 	if err != nil {
 		panic(err)
 	}
 	runLintRulesInProgram(&plan, programRunOptions{
-		Cwd:                   opts.Cwd,
-		CacheModuleSpecifiers: opts.CacheModuleSpecifiers,
+		Cwd: opts.Cwd,
 		// A single file is a single shard — run it on the calling goroutine
 		// instead of scheduling a background task.
 		SingleThreaded: true,
@@ -808,8 +778,8 @@ func composeOwnedFilter(extra FileFilter, owned map[string]struct{}) FileFilter 
 	}
 }
 
-// buildOwnedFileSet returns a set of file names that this program directly owns
-// (listed in its tsconfig include/files patterns, or as gap file root files).
+// buildOwnedFileSet returns a set of file names that this Program directly owns
+// through its root-file contract.
 // Files in GetSourceFiles() but NOT in this set were pulled in through import
 // resolution or project references — they belong to other programs.
 // Returns nil for programs with no root files (should not happen in practice).

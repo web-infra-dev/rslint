@@ -26,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
+	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1218,21 +1219,19 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	activeConfig := append(append(rslintconfig.RslintConfig(nil), baseConfig...), *cliEntry)
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	buildContext := utils.NewProgramBuildContext(fs)
-	programSet, err := createProgramSetForConfig(dir, activeConfig, true, buildContext)
+	programSession := loader.NewSession(fs)
+	programSet, err := programSession.BuildProject(dir, activeConfig, true)
 	if err != nil {
-		t.Fatalf("createProgramSetForConfig: %v", err)
+		t.Fatalf("BuildProject: %v", err)
 	}
-	targetPlan, err := resolveLintTargetPlan(nil, targetConfig, dir, nil, fs, nil, []string{tspath.NormalizePath(dir)}, true)
+	targetPlan, err := rslintconfig.ResolveLintTargetPlan(nil, targetConfig, dir, nil, fs, nil, []string{tspath.NormalizePath(dir)}, true)
 	if err != nil {
-		t.Fatalf("resolveLintTargetPlan: %v", err)
+		t.Fatalf("ResolveLintTargetPlan: %v", err)
 	}
-	binding, err := bindLintTargetPlan(programSet, targetPlan, dir, buildContext, true)
+	binding, err := programSession.LoadAPI(programSet, targetPlan, dir, true)
 	if err != nil {
-		t.Fatalf("bindLintTargetPlan: %v", err)
+		t.Fatalf("LoadAPI: %v", err)
 	}
-	programs := binding.Programs
-	typeInfoFiles := binding.TypeInfoFiles
 	targetsByProgram := binding.TargetsByProgram
 	targetFiles := make([]string, 0, len(targetPlan.Targets))
 	for _, target := range targetPlan.Targets {
@@ -1244,14 +1243,13 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 
 	rslintconfig.RegisterAllRules()
 	var diagnostics []rule.RuleDiagnostic
-	lintPrograms, targetsByProgram, _ := combineLintPrograms(programs, nil, targetsByProgram, nil)
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       lintPrograms,
+		Programs:       binding.Programs,
 		SingleThreaded: true,
 		TargetFiles:    targetsByProgram,
-		TypeInfoFiles:  typeInfoFiles,
 		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
-			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(activeConfig, sf.FileName(), dir, false, typeInfoFiles)
+			rules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(activeConfig, sf.FileName(), dir, false)
+			return rules
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,

@@ -434,11 +434,15 @@ consume(outer);
 	if err != nil {
 		t.Fatalf("create JavaScript program: %v", err)
 	}
+	sourceProgram, err := lintprogram.NewFromBoundSources(program, program.SourceFiles())
+	if err != nil {
+		t.Fatalf("create source-only Program: %v", err)
+	}
 
 	ruleRan := false
 	var diagnostics []rule.RuleDiagnostic
 	linter.RunLinterInProgram(
-		program,
+		sourceProgram,
 		nil,
 		nil,
 		utils.ExcludePaths,
@@ -462,7 +466,6 @@ consume(outer);
 		func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		map[string]struct{}{filepath.Join(tmpDir, "project-only.ts"): {}},
 		nil,
 	)
 
@@ -717,14 +720,17 @@ consume(data);`,
 				if err != nil {
 					t.Fatalf("create program: %v", err)
 				}
-				typeInfoFiles := map[string]struct{}{filePath: {}}
+				sourceProgram := lintprogram.NewFromCompiler(program)
 				if !expectChecker {
-					typeInfoFiles = map[string]struct{}{filepath.Join(tmpDir, "project-only.ts"): {}}
+					sourceProgram, err = lintprogram.NewFromBoundSources(program, program.SourceFiles())
+					if err != nil {
+						t.Fatalf("create source-only Program: %v", err)
+					}
 				}
 				var diagnostics []rule.RuleDiagnostic
 				ruleRan := false
 				linter.RunLinterInProgram(
-					program,
+					sourceProgram,
 					nil,
 					nil,
 					utils.ExcludePaths,
@@ -748,7 +754,6 @@ consume(data);`,
 					func(diagnostic rule.RuleDiagnostic) {
 						diagnostics = append(diagnostics, diagnostic)
 					},
-					typeInfoFiles,
 					nil,
 				)
 				if !ruleRan {

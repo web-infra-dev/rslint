@@ -280,7 +280,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 
 	// Baseline: diagnostic count for lib.ts in single-program mode
 	singleDiags := 0
-	RunLinterInProgram(programLib, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(programLib, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
 			if d.FilePath == libPath {
@@ -425,7 +425,7 @@ func TestRunLinterInProgram_DirectCallNotFiltered(t *testing.T) {
 
 	// Direct RunLinterInProgram call (like LSP) — no ownedFiles filter applied
 	lintedFiles := make(map[string]int)
-	RunLinterInProgram(program, []string{libPath}, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, []string{libPath}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			lintedFiles[sf.FileName()]++
 			return noopRule()

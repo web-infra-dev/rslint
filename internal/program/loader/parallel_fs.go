@@ -1,9 +1,10 @@
-package utils
+package loader
 
 import (
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // parallelProgramFS coalesces Realpath queries that concurrent TypeScript
@@ -36,7 +37,7 @@ func newParallelProgramFS(fs vfs.FS) *parallelProgramFS {
 // that interface's methods, so this layer has to pass [BOMSource] through by
 // hand or every overlay identity below it becomes invisible.
 func (f *parallelProgramFS) SourceHasBOM(path string) bool {
-	return SourceHasBOM(f.FS, path)
+	return utils.SourceHasBOM(f.FS, path)
 }
 
 func (f *parallelProgramFS) Realpath(path string) string {

@@ -1,8 +1,9 @@
-package rule
+package program
 
 import (
+	"sync"
+
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // The key identifies syntax-only data stored by ts-go on each SourceFile. It
@@ -15,11 +16,9 @@ var moduleSpecifierCacheKey = ast.NewSourceFileDataKey[*sourceFileModuleSpecifie
 // for one immutable SourceFile. Its values may contain only scalar data and
 // nodes owned by that same SourceFile: Program state, resolved targets, checker
 // state, and other SourceFiles belong to shorter or independent lifetimes.
-// Collection stays in LazyMap rather than the SourceFile data cell's sync.Once:
-// a panicking collection is not published and can be retried, matching the
-// run-local graph's existing behavior.
 type sourceFileModuleSpecifierCache struct {
-	bySyntax utils.LazyMap[ModuleSyntax, []moduleSpecifier]
+	mu      sync.Mutex
+	byKinds map[ModuleReferenceKinds][]moduleSpecifier
 }
 
 func newSourceFileModuleSpecifierCache(*ast.SourceFile) *sourceFileModuleSpecifierCache {
@@ -29,9 +28,28 @@ func newSourceFileModuleSpecifierCache(*ast.SourceFile) *sourceFileModuleSpecifi
 // cachedModuleSpecifiers returns what file writes in these syntaxes. Programs
 // that reuse this exact SourceFile share the collection; distinct SourceFile
 // objects, including ones with the same path, own independent answers.
-func cachedModuleSpecifiers(file *ast.SourceFile, syntax ModuleSyntax) []moduleSpecifier {
+func cachedModuleSpecifiers(file *ast.SourceFile, kinds ModuleReferenceKinds) []moduleSpecifier {
 	cache := ast.GetOrComputeSourceFileData(file, moduleSpecifierCacheKey, newSourceFileModuleSpecifierCache)
-	return cache.bySyntax.Get(syntax, func() []moduleSpecifier {
-		return collectSpecifiers(file, syntax)
-	})
+	cache.mu.Lock()
+	specifiers, ok := cache.byKinds[kinds]
+	cache.mu.Unlock()
+	if ok {
+		return specifiers
+	}
+
+	// Collection is pure and intentionally happens outside the lock: unrelated
+	// files and syntax sets never serialize, and a panic publishes no partial
+	// value. A same-key race may duplicate one collection; the first completed
+	// immutable result wins.
+	specifiers = collectSpecifiers(file, kinds)
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if existing, ok := cache.byKinds[kinds]; ok {
+		return existing
+	}
+	if cache.byKinds == nil {
+		cache.byKinds = make(map[ModuleReferenceKinds][]moduleSpecifier)
+	}
+	cache.byKinds[kinds] = specifiers
+	return specifiers
 }

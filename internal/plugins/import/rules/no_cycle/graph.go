@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -14,13 +15,13 @@ import (
 // per-file entry point, and the message.
 
 // graphKey identifies one shape of the dependency graph. The references
-// themselves come from the shared module index, so only what turns a
+// themselves come from Program's generic module graph, so only what turns a
 // reference into a graph edge belongs here. maxDepth does not: it bounds the
 // search, not the graph, so configurations that differ only in maxDepth share
 // one graph.
 type graphKey struct {
 	settings           string
-	syntax             rule.ModuleSyntax
+	referenceKinds     program.ModuleReferenceKinds
 	ignoreExternal     bool
 	allowUnsafeDynamic bool
 }
@@ -30,7 +31,7 @@ type graphKey struct {
 // of the Program generation and is computed once per configuration-complete
 // cache key.
 type moduleNode struct {
-	refs []rule.ModuleEdge
+	refs []program.ModuleReference
 	// edge[i] is the node that reference i points at, or -1 when the
 	// reference is type-only, unresolved, or excluded by ignoreExternal.
 	edge []int32
@@ -60,11 +61,11 @@ type moduleGraph struct {
 
 // moduleGraphFor returns the Program generation's dependency graph for these
 // options, building it on the first file that asks for it.
-func moduleGraphFor(ctx rule.RuleContext, sourceGraph *rule.ModuleGraph, opts ruleOptions) *moduleGraph {
+func moduleGraphFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, opts ruleOptions) *moduleGraph {
 	settings := import_utils.SettingsFor(ctx)
 	key := graphKey{
 		settings:           settings.Key(),
-		syntax:             opts.syntax,
+		referenceKinds:     opts.referenceKinds,
 		ignoreExternal:     opts.ignoreExternal,
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
 	}
@@ -73,7 +74,7 @@ func moduleGraphFor(ctx rule.RuleContext, sourceGraph *rule.ModuleGraph, opts ru
 	})
 }
 
-func buildModuleGraph(ctx rule.RuleContext, sourceGraph *rule.ModuleGraph, settings *import_utils.ModuleSettings, opts ruleOptions) *moduleGraph {
+func buildModuleGraph(ctx rule.RuleContext, sourceGraph program.ModuleGraph, settings *import_utils.ModuleSettings, opts ruleOptions) *moduleGraph {
 	files := sourceGraph.Files()
 	graph := &moduleGraph{
 		nodes: make([]moduleNode, len(files)),
@@ -92,7 +93,7 @@ func buildModuleGraph(ctx rule.RuleContext, sourceGraph *rule.ModuleGraph, setti
 		if fileIsExcluded(settings, opts, file) {
 			continue
 		}
-		refs := sourceGraph.Edges(file, opts.syntax)
+		refs := sourceGraph.References(file, opts.referenceKinds)
 		if len(refs) == 0 {
 			continue
 		}
@@ -134,21 +135,21 @@ func fileIsExcluded(settings *import_utils.ModuleSettings, opts ruleOptions, fil
 // referenceIsTraversable reports whether an edge is one the rule follows: it
 // has to survive into the emitted JavaScript, name a file the runtime loaded,
 // and be neither ignored by `import/ignore` nor set aside by ignoreExternal.
-func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
-	if edge.TypeOnly || edge.Target == nil {
+func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, reference program.ModuleReference) bool {
+	if reference.TypeOnly || reference.Target == nil {
 		return false
 	}
-	if settings.IsIgnoredPath(edge.Target.FileName()) {
+	if settings.IsIgnoredPath(reference.Target.FileName()) {
 		return false
 	}
-	return !shouldIgnoreExternal(settings, opts, edge)
+	return !shouldIgnoreExternal(settings, opts, reference)
 }
 
-func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOptions, edge rule.ModuleEdge) bool {
+func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOptions, reference program.ModuleReference) bool {
 	if !opts.ignoreExternal {
 		return false
 	}
-	return settings.IsExternalPath(edge.Text(), edge.Path())
+	return settings.IsExternalPath(reference.Text(), reference.Path())
 }
 
 // withheldDynamicEdges applies allowUnsafeDynamicCyclicDependency: a file's

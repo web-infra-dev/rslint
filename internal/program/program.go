@@ -237,6 +237,14 @@ func (p *Program) CanProvideTypeChecker(file *ast.SourceFile) bool {
 	return p.IsValid() && p.types != nil && p.OwnsSourceFile(file)
 }
 
+// CanProvideProgramDiagnostics reports whether this source generation can run
+// a complete tsc-style no-emit diagnostic pass. Callers use this capability to
+// coordinate diagnostic ownership; it does not reveal how the Program was
+// constructed and does not grant per-file rule eligibility.
+func (p *Program) CanProvideProgramDiagnostics() bool {
+	return p.IsValid() && p.types != nil
+}
+
 // TypeCheckerForFile acquires a checker when the source generation can provide
 // one. The returned release function is always safe to call.
 func (p *Program) TypeCheckerForFile(ctx context.Context, file *ast.SourceFile) (*checker.Checker, func()) {
@@ -255,7 +263,6 @@ func (p *Program) TypeCheckerForFileExclusive(ctx context.Context, file *ast.Sou
 
 // NoEmitDiagnostics returns program-wide type diagnostics when this source
 // generation supports them. An unavailable capability produces no diagnostics.
-// Whether a Program participates in a run remains an explicit lint-plan policy.
 func (p *Program) NoEmitDiagnostics(ctx context.Context) []*ast.Diagnostic {
 	if !p.IsValid() || p.types == nil {
 		return nil

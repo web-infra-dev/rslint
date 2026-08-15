@@ -7,11 +7,12 @@ This document summarizes how to work on rslint effectively and consistently.
 - `architecture.md`: Current high-level architecture, major runtime flows, and subsystem relationships.
 - `cmd/rslint/`: CLI entry (default), IPC API (`--api`), LSP (`--lsp`).
 - `internal/config/`: Config types/loader, rule registry and registration.
+- `internal/program/`: Unified source Program, module resolution/graph, and generation-scoped derived caches.
 - `internal/linter/`: Linter engine, traversal, and fix application.
-- `internal/rule/`: Rule framework, diagnostics, disable manager, listeners.
+- `internal/rule/`: Rule descriptors/environment, context, diagnostics, disable manager, listeners.
 - `internal/plugins/typescript/`: `@typescript-eslint` rules under `rules/<rule>/`.
 - `internal/plugins/import/`: `eslint-plugin-import` registration.
-- `internal/utils/`: JSONC, overlay VFS, TS program creation, helpers.
+- `internal/utils/`: JSONC, overlay VFS, compiler construction, AST/type helpers.
 - `internal/lsp/`: Language Server integration. Also see `website/` and `packages/` for UI/tooling.
 
 ## Build, Test, and Development Commands

@@ -1,6 +1,7 @@
-package utils
+package loader
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -12,9 +13,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// ProgramBuildContext owns the services shared by every TypeScript Program
+// buildContext owns the services shared by every TypeScript Program
 // constructed during one CLI invocation or one API request. Its lifetime is
 // deliberately shorter than an LSP session: editor projects have their own
 // versioned file/config caches and must not inherit invocation snapshots.
@@ -30,22 +32,22 @@ import (
 // hatch. When set, the Program VFS is not wrapped by either metadata snapshots
 // or concurrent-query coalescing, and tsconfig extends parsing uses the upstream
 // no-cache path. ParseCache keeps its own independent escape hatch.
-type ProgramBuildContext struct {
+type buildContext struct {
 	fs                  vfs.FS
-	parseCache          *ParseCache
+	parseCache          *utils.ParseCache
 	metadataFS          *programMetadataFS
 	extendedConfigCache *programExtendedConfigCache
 	parallelFSOnce      sync.Once
 	parallelFS          atomic.Pointer[parallelProgramFS]
 }
 
-// NewProgramBuildContext creates a context for exactly one final VFS view.
+// newBuildContext creates a context for exactly one final VFS view.
 // Callers must apply overlays and canonical-path wrappers before constructing
 // the context so cached bytes can never bypass request-local file contents.
-func NewProgramBuildContext(fs vfs.FS) *ProgramBuildContext {
-	context := &ProgramBuildContext{
+func newBuildContext(fs vfs.FS) *buildContext {
+	context := &buildContext{
 		fs:         fs,
-		parseCache: NewParseCache(),
+		parseCache: utils.NewParseCache(),
 	}
 	if os.Getenv("RSLINT_DISABLE_PROGRAM_METADATA_CACHE") != "" {
 		return context
@@ -63,15 +65,15 @@ func NewProgramBuildContext(fs vfs.FS) *ProgramBuildContext {
 // FS returns the logical VFS view used by non-compiler consumers for this
 // invocation/request. Compiler hosts may use a context-owned derived view that
 // delegates to this one without changing its path or content semantics.
-func (c *ProgramBuildContext) FS() vfs.FS {
+func (c *buildContext) FS() vfs.FS {
 	return c.fs
 }
 
-// EnableConcurrentProgramQueries switches future compiler hosts in this
+// enableConcurrentProgramQueries switches future compiler hosts in this
 // context to one shared VFS view that coalesces their same-path Realpath
 // queries. It must be called only after choosing a genuinely parallel Program
 // build; FS and every non-Program consumer retain the original view.
-func (c *ProgramBuildContext) EnableConcurrentProgramQueries() {
+func (c *buildContext) enableConcurrentProgramQueries() {
 	if c.metadataFS == nil {
 		return
 	}
@@ -80,29 +82,29 @@ func (c *ProgramBuildContext) EnableConcurrentProgramQueries() {
 	})
 }
 
-func (c *ProgramBuildContext) compilerFS() vfs.FS {
+func (c *buildContext) compilerFS() vfs.FS {
 	if fs := c.parallelFS.Load(); fs != nil {
 		return fs
 	}
 	return c.fs
 }
 
-// NewCompilerHost returns a host wired to every cache owned by the context.
+// newCompilerHostWithCache returns a host wired to every cache owned by the context.
 // Project-reference configs are registered before ts-go reads them; extended
 // configs are registered by programExtendedConfigCache.
-func (c *ProgramBuildContext) NewCompilerHost(cwd string) compiler.CompilerHost {
+func (c *buildContext) newCompilerHostWithCache(cwd string) compiler.CompilerHost {
 	host := c.newCompilerHost(cwd)
-	return WithParseCache(host, c.parseCache)
+	return utils.WithParseCache(host, c.parseCache)
 }
 
-// NewTransientCompilerHost shares source snapshots with Program construction
-// without publishing standalone ASTs into the Program-owned parse cache.
-func (c *ProgramBuildContext) NewTransientCompilerHost(cwd string) compiler.CompilerHost {
+// newTransientCompilerHost shares source snapshots with Program construction
+// without publishing its bound ASTs into the project-owned parse cache.
+func (c *buildContext) newTransientCompilerHost(cwd string) compiler.CompilerHost {
 	host := c.newCompilerHost(cwd)
-	return WithSourceSnapshots(host, c.parseCache)
+	return utils.WithSourceSnapshots(host, c.parseCache)
 }
 
-func (c *ProgramBuildContext) newCompilerHost(cwd string) compiler.CompilerHost {
+func (c *buildContext) newCompilerHost(cwd string) compiler.CompilerHost {
 	host := compiler.NewCompilerHost(cwd, c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil)
 	if c.metadataFS != nil {
 		host = &programBuildCompilerHost{
@@ -113,34 +115,24 @@ func (c *ProgramBuildContext) newCompilerHost(cwd string) compiler.CompilerHost 
 	return host
 }
 
-// CreateProgram creates a tsconfig-backed Program and preserves the strict
-// syntactic-error behavior of CreateProgram.
-func (c *ProgramBuildContext) CreateProgram(singleThreaded bool, cwd string, tsconfigPath string) (*compiler.Program, error) {
-	host, config, err := c.parseConfig(cwd, tsconfigPath)
-	if err != nil {
-		return nil, err
-	}
-	return createProgramFromConfig(singleThreaded, config, host)
-}
-
-// CreateProgramLenient creates a tsconfig-backed Program and preserves the
+// createProjectProgram creates a tsconfig-backed Program and preserves the
 // lenient syntactic-error behavior used by the CLI and API.
-func (c *ProgramBuildContext) CreateProgramLenient(singleThreaded bool, cwd string, tsconfigPath string) (*compiler.Program, error) {
+func (c *buildContext) createProjectProgram(singleThreaded bool, cwd string, tsconfigPath string) (*compiler.Program, error) {
 	host, config, err := c.parseConfig(cwd, tsconfigPath)
 	if err != nil {
 		return nil, err
 	}
-	return createProgramFromConfigLenient(singleThreaded, config, host)
+	return utils.CreateProgramFromParsedConfigLenient(singleThreaded, config, host)
 }
 
-func (c *ProgramBuildContext) parseConfig(cwd string, tsconfigPath string) (compiler.CompilerHost, *tsoptions.ParsedCommandLine, error) {
+func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (compiler.CompilerHost, *tsoptions.ParsedCommandLine, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
 	if !c.compilerFS().FileExists(resolvedConfigPath) {
-		return nil, nil, configNotFoundError(resolvedConfigPath)
+		return nil, nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
 	}
 	c.registerTSConfig(resolvedConfigPath)
 
-	host := c.NewCompilerHost(cwd)
+	host := c.newCompilerHostWithCache(cwd)
 	config, _ := tsoptions.GetParsedCommandLineOfConfigFile(
 		tsconfigPath,
 		&core.CompilerOptions{},
@@ -151,36 +143,37 @@ func (c *ProgramBuildContext) parseConfig(cwd string, tsconfigPath string) (comp
 	return host, config, nil
 }
 
-// CreateProgramFromOptionsLenient creates a non-project fallback Program using
-// the same source/metadata view as the tsconfig-backed Programs.
-func (c *ProgramBuildContext) CreateProgramFromOptionsLenient(
+// createCompatibilityProgram creates a source-only compiler Program using the
+// same source/metadata view as configured projects. The loader adapts it to the
+// same rslint Program facade before returning a result.
+func (c *buildContext) createCompatibilityProgram(
 	singleThreaded bool,
 	cwd string,
 	compilerOptions *core.CompilerOptions,
 	rootFileNames []string,
 ) (*compiler.Program, error) {
-	return CreateProgramFromOptionsLenient(
+	return utils.CreateProgramFromOptionsLenient(
 		singleThreaded,
 		compilerOptions,
 		rootFileNames,
-		c.NewCompilerHost(cwd),
+		c.newCompilerHostWithCache(cwd),
 	)
 }
 
-// RetainOnlySourceFiles bounds the append-mostly parsed-AST cache to SourceFile
+// retainOnlySourceFiles bounds the append-mostly parsed-AST cache to SourceFile
 // objects still retained by the supplied Programs.
-func (c *ProgramBuildContext) RetainOnlySourceFiles(programs []*compiler.Program) {
+func (c *buildContext) retainOnlySourceFiles(programs []*compiler.Program) {
 	c.parseCache.RetainOnly(programs)
 }
 
-// InvalidateSourceSnapshots begins a fresh source generation before Programs
+// invalidateSourceSnapshots begins a fresh source generation before Programs
 // are rebuilt after a fix write. Metadata generations are independent because
 // CLI fixes never target package.json or tsconfig files.
-func (c *ProgramBuildContext) InvalidateSourceSnapshots() {
+func (c *buildContext) invalidateSourceSnapshots() {
 	c.parseCache.InvalidateSourceSnapshots()
 }
 
-func (c *ProgramBuildContext) registerTSConfig(fileName string) {
+func (c *buildContext) registerTSConfig(fileName string) {
 	if c.metadataFS != nil {
 		c.metadataFS.registerTSConfig(fileName)
 	}
@@ -188,7 +181,7 @@ func (c *ProgramBuildContext) registerTSConfig(fileName string) {
 
 // extendedConfigCacheInterface avoids converting a nil concrete pointer into a
 // non-nil interface when the diagnostic escape hatch disables metadata caches.
-func (c *ProgramBuildContext) extendedConfigCacheInterface() tsoptions.ExtendedConfigCache {
+func (c *buildContext) extendedConfigCacheInterface() tsoptions.ExtendedConfigCache {
 	if c.extendedConfigCache == nil {
 		return nil
 	}
@@ -199,7 +192,7 @@ func (c *ProgramBuildContext) extendedConfigCacheInterface() tsoptions.ExtendedC
 // upstream compiler host. All other CompilerHost behavior remains delegated.
 type programBuildCompilerHost struct {
 	compiler.CompilerHost
-	context *ProgramBuildContext
+	context *buildContext
 }
 
 func (h *programBuildCompilerHost) GetResolvedProjectReference(fileName string, path tspath.Path) *tsoptions.ParsedCommandLine {
@@ -330,7 +323,7 @@ func (f *programMetadataFS) ReadFile(fileName string) (string, bool) {
 // that interface's methods, so this layer has to pass [BOMSource] through by
 // hand or every overlay identity below it becomes invisible.
 func (f *programMetadataFS) SourceHasBOM(path string) bool {
-	return SourceHasBOM(f.FS, path)
+	return utils.SourceHasBOM(f.FS, path)
 }
 
 func mustProgramMetadataRead(value any) *programMetadataRead {

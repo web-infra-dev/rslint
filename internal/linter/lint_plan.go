@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -29,10 +30,9 @@ type programLintPlan struct {
 // slices would allow these decisions to drift by index across plan reuse.
 type lintFilePlan struct {
 	file           *ast.SourceFile
-	rules          []ConfiguredRule
-	environment    *RuleEnvironment
-	checkerCapable bool
-	useTypeChecker bool
+	rules          []rule.ConfiguredRule
+	environment    *rule.RuleEnvironment
+	hasTypeChecker bool
 }
 
 type lintPlanFileRef struct {
@@ -45,7 +45,7 @@ type lintPlanFileRef struct {
 // zero-rule files or per-Program execution metadata.
 type LintTarget struct {
 	File  *ast.SourceFile
-	Rules []ConfiguredRule
+	Rules []rule.ConfiguredRule
 }
 
 // PrepareLintPlan collects the Phase 1 target files and resolves their rules.
@@ -158,20 +158,19 @@ func resolveProgramLintPlanFile(opts programPlanOptions, plan *programLintPlan, 
 		return
 	}
 	rules := opts.GetRulesForFile(file)
-	// Rule eligibility is the intersection of source capability and explicit
-	// run policy. Neither side reveals or branches on a private Program adapter.
-	filePlan.checkerCapable = opts.Program.CanProvideTypeChecker(file)
-	filePlan.useTypeChecker = filePlan.checkerCapable &&
-		fileHasTypeInfo(file.FileName(), opts.TypeInfoFiles)
-	if filePlan.useTypeChecker {
+	// Program capability is the only checker gate at this boundary. Callers with
+	// a narrower request policy, such as LSP HasTypeInfo=false, filter the
+	// configured rule set before planning without inspecting Program adapters.
+	filePlan.hasTypeChecker = opts.Program.CanProvideTypeChecker(file)
+	if filePlan.hasTypeChecker {
 		filePlan.rules = rules
 	} else {
-		filePlan.rules = FilterNonTypeAwareRules(rules)
+		filePlan.rules = rule.FilterNonTypeAwareRules(rules)
 	}
 	filePlan.environment = firstNativeRuleEnvironment(filePlan.rules)
 }
 
-func firstNativeRuleEnvironment(rules []ConfiguredRule) *RuleEnvironment {
+func firstNativeRuleEnvironment(rules []rule.ConfiguredRule) *rule.RuleEnvironment {
 	for _, configuredRule := range rules {
 		if !configuredRule.IsEslintPluginRule && configuredRule.Environment != nil {
 			return configuredRule.Environment
@@ -201,11 +200,9 @@ func (p *LintPlan) Targets() []LintTarget {
 
 func programPlanOptionsFor(opts RunLinterOptions, programIndex int) programPlanOptions {
 	programOpts := programPlanOptions{
-		Program:          opts.Programs[programIndex],
-		ExcludePaths:     opts.ExcludePaths,
-		GetRulesForFile:  opts.GetRulesForFile,
-		SyntaxErrorFiles: opts.SyntaxErrorFiles,
-		TypeInfoFiles:    opts.TypeInfoFiles,
+		Program:         opts.Programs[programIndex],
+		ExcludePaths:    opts.ExcludePaths,
+		GetRulesForFile: opts.GetRulesForFile,
 	}
 
 	if programIndex < len(opts.PerProgramFilter) {

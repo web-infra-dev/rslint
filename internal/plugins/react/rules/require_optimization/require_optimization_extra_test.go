@@ -2512,8 +2512,8 @@ class Disabled extends React.Component {}
 
 // TestRequireOptimizationRule_NilTypeChecker verifies the rule operates
 // without panicking when the TypeChecker is unavailable. rslint schedules
-// rules without `RequiresTypeInfo: true` against "gap files" (files in the
-// program but not in `typeInfoFiles`) with a nil checker; the rule must
+// rules without `RequiresTypeInfo: true` against Programs without checker
+// capability with a nil checker; the rule must
 // degrade gracefully — the only TC-aware path (SFC classification via
 // `reactutil.IsStatelessReactComponentWithChecker`) falls back to a
 // local-block scan when `tc == nil`.

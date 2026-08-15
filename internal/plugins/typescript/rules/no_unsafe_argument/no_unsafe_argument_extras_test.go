@@ -52,11 +52,10 @@ func runNoUnsafeArgumentLenientProgram(
 
 	var diagnostics []rule.RuleDiagnostic
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:         []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-		SingleThreaded:   true,
-		Scope:            linter.FileScope{Files: []string{sourceFile.FileName()}},
-		ExcludePaths:     []string{},
-		SyntaxErrorFiles: map[string]struct{}{},
+		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
+		SingleThreaded: true,
+		Scope:          linter.FileScope{Files: []string{sourceFile.FileName()}},
+		ExcludePaths:   []string{},
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return []linter.ConfiguredRule{{
 				Name:             NoUnsafeArgumentRule.Name,

@@ -1,4 +1,4 @@
-package utils
+package loader
 
 import (
 	"os"
@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type programMetadataTestFS struct {
@@ -310,7 +311,7 @@ func writeProgramBuildFixture(t *testing.T, root string, files map[string]string
 	}
 }
 
-func TestProgramBuildContextSharesExtendedConfigWithoutFreezingConfigDir(t *testing.T) {
+func TestBuildContextSharesExtendedConfigWithoutFreezingConfigDir(t *testing.T) {
 	root := t.TempDir()
 	writeProgramBuildFixture(t, root, map[string]string{
 		"tsconfig.base.json": `{
@@ -327,7 +328,7 @@ func TestProgramBuildContextSharesExtendedConfigWithoutFreezingConfigDir(t *test
 		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		reads: make(map[string]int),
 	}
-	context := NewProgramBuildContext(baseFS)
+	context := newBuildContext(baseFS)
 	_, configA, err := context.parseConfig(root, filepath.Join(root, "packages/a/tsconfig.json"))
 	if err != nil {
 		t.Fatalf("parse config A: %v", err)
@@ -354,7 +355,7 @@ func TestProgramBuildContextSharesExtendedConfigWithoutFreezingConfigDir(t *test
 	}
 }
 
-func TestProgramBuildContextExtendedConfigCrossCycleDoesNotDeadlock(t *testing.T) {
+func TestBuildContextExtendedConfigCrossCycleDoesNotDeadlock(t *testing.T) {
 	root := t.TempDir()
 	writeProgramBuildFixture(t, root, map[string]string{
 		"root-a.json": `{"extends":"./a.json","files":[]}`,
@@ -363,9 +364,9 @@ func TestProgramBuildContextExtendedConfigCrossCycleDoesNotDeadlock(t *testing.T
 		"b.json":      `{"extends":"./a.json"}`,
 	})
 
-	context := NewProgramBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
 	parse := func(name string, done chan<- struct{}) {
-		host := context.NewCompilerHost(root)
+		host := context.newCompilerHostWithCache(root)
 		context.registerTSConfig(filepath.Join(root, name))
 		_, _ = tsoptions.GetParsedCommandLineOfConfigFile(
 			filepath.Join(root, name),
@@ -389,7 +390,7 @@ func TestProgramBuildContextExtendedConfigCrossCycleDoesNotDeadlock(t *testing.T
 	}
 }
 
-func TestProgramBuildContextRegistersAndSharesProjectReferenceReads(t *testing.T) {
+func TestBuildContextRegistersAndSharesProjectReferenceReads(t *testing.T) {
 	root := t.TempDir()
 	writeProgramBuildFixture(t, root, map[string]string{
 		"root-a.json": `{
@@ -410,11 +411,11 @@ func TestProgramBuildContextRegistersAndSharesProjectReferenceReads(t *testing.T
 		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		reads: make(map[string]int),
 	}
-	context := NewProgramBuildContext(baseFS)
-	if _, err := context.CreateProgramLenient(true, root, filepath.Join(root, "root-a.json")); err != nil {
+	context := newBuildContext(baseFS)
+	if _, err := context.createProjectProgram(true, root, filepath.Join(root, "root-a.json")); err != nil {
 		t.Fatalf("create root A Program: %v", err)
 	}
-	if _, err := context.CreateProgramLenient(true, root, filepath.Join(root, "root-b.json")); err != nil {
+	if _, err := context.createProjectProgram(true, root, filepath.Join(root, "root-b.json")); err != nil {
 		t.Fatalf("create root B Program: %v", err)
 	}
 
@@ -424,7 +425,7 @@ func TestProgramBuildContextRegistersAndSharesProjectReferenceReads(t *testing.T
 	}
 }
 
-func TestProgramBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.T) {
+func TestBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.T) {
 	root := t.TempDir()
 	writeProgramBuildFixture(t, root, map[string]string{
 		"base.json": `{"compilerOptions":{"strict":true}}`,
@@ -432,7 +433,7 @@ func TestProgramBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.
 		"b.json":    `{"extends":"./base.json","files":[]}`,
 	})
 
-	context := NewProgramBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
 	_, before, err := context.parseConfig(root, filepath.Join(root, "a.json"))
 	if err != nil {
 		t.Fatalf("parse config before write: %v", err)
@@ -454,15 +455,15 @@ func TestProgramBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.
 	}
 }
 
-func TestProgramBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
+func TestBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 	const path = "/repo/package.json"
 	base := newProgramMetadataTestFS(map[string]string{path: "first"})
-	first := NewProgramBuildContext(base)
+	first := newBuildContext(base)
 	if content, _ := first.FS().ReadFile(path); content != "first" {
 		t.Fatalf("first request read %q", content)
 	}
 	base.set(path, "second")
-	second := NewProgramBuildContext(base)
+	second := newBuildContext(base)
 	if content, _ := second.FS().ReadFile(path); content != "second" {
 		t.Fatalf("second request inherited stale metadata %q", content)
 	}
@@ -471,15 +472,15 @@ func TestProgramBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 	}
 
 	t.Setenv("RSLINT_DISABLE_PROGRAM_METADATA_CACHE", "1")
-	disabled := NewProgramBuildContext(base)
+	disabled := newBuildContext(base)
 	if disabled.FS() != vfs.FS(base) {
 		t.Fatal("escape hatch must preserve the exact caller VFS")
 	}
 	if disabled.metadataFS != nil || disabled.extendedConfigCache != nil {
 		t.Fatal("escape hatch left metadata caches enabled")
 	}
-	disabled.EnableConcurrentProgramQueries()
-	if hostFS := disabled.NewCompilerHost("/").FS(); hostFS != disabled.FS() {
+	disabled.enableConcurrentProgramQueries()
+	if hostFS := disabled.newCompilerHostWithCache("/").FS(); hostFS != disabled.FS() {
 		t.Fatal("escape hatch enabled the parallel Program VFS")
 	}
 
@@ -488,26 +489,26 @@ func TestProgramBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 		"base.json":     `{"compilerOptions":{"strict":true}}`,
 		"tsconfig.json": `{"extends":"./base.json","files":[]}`,
 	})
-	disabled = NewProgramBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
-	if _, err := disabled.CreateProgramLenient(true, root, filepath.Join(root, "tsconfig.json")); err != nil {
+	disabled = newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	if _, err := disabled.createProjectProgram(true, root, filepath.Join(root, "tsconfig.json")); err != nil {
 		t.Fatalf("escape hatch must preserve upstream extends parsing: %v", err)
 	}
 }
 
-func TestProgramBuildContextScopesParallelFSToCompilerHosts(t *testing.T) {
+func TestBuildContextScopesParallelFSToCompilerHosts(t *testing.T) {
 	base := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
-	serial := NewProgramBuildContext(base)
-	if hostFS := serial.NewCompilerHost("/").FS(); hostFS != serial.FS() {
+	serial := newBuildContext(base)
+	if hostFS := serial.newCompilerHostWithCache("/").FS(); hostFS != serial.FS() {
 		t.Fatal("serial compiler host did not retain the context VFS")
 	}
 
-	parallel := NewProgramBuildContext(base)
+	parallel := newBuildContext(base)
 	logicalFS := parallel.FS()
-	parallel.EnableConcurrentProgramQueries()
-	firstHostFS := parallel.NewCompilerHost("/").FS()
-	parallel.EnableConcurrentProgramQueries()
-	secondHostFS := parallel.NewCompilerHost("/").FS()
+	parallel.enableConcurrentProgramQueries()
+	firstHostFS := parallel.newCompilerHostWithCache("/").FS()
+	parallel.enableConcurrentProgramQueries()
+	secondHostFS := parallel.newCompilerHostWithCache("/").FS()
 	if parallel.FS() != logicalFS {
 		t.Fatal("parallel activation changed the context's non-Program VFS")
 	}
@@ -520,5 +521,31 @@ func TestProgramBuildContextScopesParallelFSToCompilerHosts(t *testing.T) {
 	}
 	if programFS.FS != logicalFS {
 		t.Fatal("parallel compiler VFS does not delegate to the context VFS")
+	}
+}
+
+func TestBuildContextPreservesBOMSourceThroughVFSWrappers(t *testing.T) {
+	t.Parallel()
+
+	directory := t.TempDir()
+	fileName := tspath.NormalizePath(filepath.Join(directory, "marked.ts"))
+	if err := os.WriteFile(fileName, []byte("\uFEFFlet a = 1;\n"), 0o644); err != nil {
+		t.Fatalf("write marked source: %v", err)
+	}
+	overlay := utils.NewOverlayVFS(osvfs.FS(), map[string]string{
+		fileName: "let a = 1;\n",
+	})
+	metadata := newProgramMetadataFS(overlay)
+	parallel := newParallelProgramFS(metadata)
+
+	for name, fsys := range map[string]interface {
+		SourceHasBOM(path string) bool
+	}{
+		"programMetadataFS": metadata,
+		"parallelProgramFS": parallel,
+	} {
+		if fsys.SourceHasBOM(fileName) {
+			t.Errorf("%s does not forward to the overlay beneath it", name)
+		}
 	}
 }
