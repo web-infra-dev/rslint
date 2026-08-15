@@ -456,13 +456,3 @@ func testCallbackInitializerFunction(initializer *ast.Node) *ast.Node {
 	}
 	return nil
 }
-
-// ResolveNamedFunctionCallback returns the function declaration node and name when
-// a Jest test call uses a named function reference as its callback (e.g. it('foo', getValue)).
-func ResolveNamedFunctionCallback(ctx rule.RuleContext, callExpr *ast.CallExpression) (*ast.Node, string) {
-	info := ResolveTestCallbackFunction(ctx, callExpr)
-	if info.FunctionNode != nil && info.FunctionNode.Kind == ast.KindFunctionDeclaration {
-		return info.FunctionNode, info.Name
-	}
-	return nil, info.Name
-}
