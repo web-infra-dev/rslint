@@ -258,52 +258,7 @@ func isEvaluatedDuringInitialization(ref *scope.Reference) bool {
 			!isInClassStaticInitializerRange(classDefinition, location)
 	}
 
-	for node := declaration.ID.Parent; node != nil; node = node.Parent {
-		switch node.Kind {
-		case ast.KindVariableDeclaration:
-			declarator := node.AsVariableDeclaration()
-			if declarator != nil && isInRange(declarator.Initializer, location) {
-				return true
-			}
-			// `for (var a in a)` / `for (var a of a)`: the right-hand side is
-			// evaluated before the binding is initialized.
-			if node.Parent != nil && node.Parent.Parent != nil {
-				loop := node.Parent.Parent
-				if loop.Kind == ast.KindForInStatement || loop.Kind == ast.KindForOfStatement {
-					if forInOrOf := loop.AsForInOrOfStatement(); forInOrOf != nil &&
-						isInRange(forInOrOf.Expression, location) {
-						return true
-					}
-				}
-			}
-			return false
-		case ast.KindBindingElement:
-			// ESTree's AssignmentPattern inside a destructuring pattern.
-			if element := node.AsBindingElement(); element != nil && isInRange(element.Initializer, location) {
-				return true
-			}
-		case ast.KindParameter:
-			// ESTree's AssignmentPattern in a parameter list.
-			if isInRange(node.Initializer(), location) {
-				return true
-			}
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-			ast.KindClassDeclaration, ast.KindClassExpression,
-			ast.KindArrowFunction, ast.KindCatchClause,
-			ast.KindImportDeclaration, ast.KindExportDeclaration,
-			// ESTree wraps every shorthand method and accessor body in a
-			// FunctionExpression, which the walk stops at. tsgo has no such
-			// wrapper — the member node *is* the function — so these kinds
-			// stand in for it. Without them the walk escapes the method and
-			// finds the enclosing `const x = { m(node) { node; } }`
-			// initializer, reporting every parameter read inside.
-			ast.KindMethodDeclaration, ast.KindConstructor,
-			ast.KindGetAccessor, ast.KindSetAccessor:
-			return false
-		}
-	}
-
-	return false
+	return scope.IsInsideOwnInitializer(declaration.ID, location)
 }
 
 func isInRange(node *ast.Node, location int) bool {
