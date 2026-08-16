@@ -77,6 +77,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_misleading_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
+	"github.com/web-infra-dev/rslint/internal/rules/no_negated_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_func"
@@ -240,6 +241,7 @@ func GetAllRules() []rule.Rule {
 		no_restricted_syntax.NoRestrictedSyntaxRule,
 		no_multi_assign.NoMultiAssignRule,
 		no_multi_str.NoMultiStrRule,
+		no_negated_condition.NoNegatedConditionRule,
 		no_nested_ternary.NoNestedTernaryRule,
 		no_nonoctal_decimal_escape.NoNonoctalDecimalEscapeRule,
 		no_octal.NoOctalRule,
