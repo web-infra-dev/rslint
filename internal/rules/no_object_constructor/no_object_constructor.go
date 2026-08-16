@@ -67,6 +67,13 @@ func buildSuggestion(ctx rule.RuleContext, node *ast.Node) rule.RuleSuggestion {
 		}
 	}
 
+	// NOTE: Unlike ESLint, utils.NeedsPrecedingSemicolon doesn't model
+	// TypeScript-only node kinds (type positions, ambient/overload function
+	// declarations, import-equals declarations), so it falls back to the
+	// conservative "needs a semicolon" answer there — e.g. after
+	// `type T = Foo` or `import Foo = Bar`. The extra `;` never changes
+	// behavior, only adds a redundant character; see the rule doc's
+	// "Differences from ESLint" section.
 	if utils.NeedsPrecedingSemicolon(sourceFile, node) {
 		return rule.RuleSuggestion{
 			Message:  useLiteralAfterSemicolonMessage("({})"),

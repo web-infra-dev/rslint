@@ -154,6 +154,25 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			// bare `new Object` (no parens) variant, which upstream's own
 			// regression test never exercises (it only covers `Object()`) ----
 			asiCase("\n++index\nnew Object\n", "new Object", true, false),
+
+			// ---- Contract: documented divergence — utils.NeedsPrecedingSemicolon
+			// doesn't model TypeScript-only node kinds (see its doc comment and
+			// the NOTE in no_object_constructor.go), so it falls back to the
+			// conservative "needs a semicolon" answer after a type alias. This
+			// mirrors the port-rule/no_array_constructor lock-in for the same
+			// shared-utility gap — upstream's own no-object-constructor test
+			// suite has no TypeScript-parser block to catch it, but the rule
+			// hits the identical code path since it shares the helper. ----
+			{
+				Code: "type T = Foo\nObject()",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferLiteral", Line: 2, Column: 1, EndLine: 2, EndColumn: 9,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "useLiteralAfterSemicolon",
+						Output:    "type T = Foo\n;({})",
+					}},
+				}},
+			},
 		},
 	)
 }

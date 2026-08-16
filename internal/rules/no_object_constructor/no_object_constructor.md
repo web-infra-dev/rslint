@@ -26,6 +26,10 @@ const isObject = (value) => value === Object(value);
 const createObject = (Object) => new Object();
 ```
 
+## Differences from ESLint
+
+- When the object constructor call is fixed onto a new line right after certain TypeScript-only constructs — a type alias (`type T = Foo`), an ambient or overload function declaration (`declare function foo()`), an import-equals declaration (`import Foo = Bar`), or an `as`/`satisfies` type cast — rslint's suggested fix inserts a leading `;` that ESLint omits (e.g. `type T = Foo\n;({})` instead of `type T = Foo\n({})`). The extra semicolon never changes the resulting code's behavior.
+
 ## Original Documentation
 
 - [ESLint: no-object-constructor](https://eslint.org/docs/latest/rules/no-object-constructor)
