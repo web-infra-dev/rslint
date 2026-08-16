@@ -652,6 +652,7 @@ xjavascript
 xlink
 xoff
 xtest
+Xopenport
 yutil
 zeebo
 zigbuild

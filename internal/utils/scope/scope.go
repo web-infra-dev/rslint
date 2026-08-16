@@ -5,10 +5,10 @@
 //
 // The model deliberately mirrors eslint-scope / typescript-eslint's
 // scope-manager rather than tsgo's binder: block scopes, catch scopes,
-// function-expression-name scopes, and class scopes are all materialized, and
-// `var` hoisting targets the nearest function/module/global scope. Concepts
-// rslint does not expose (for example `parserOptions.globalReturn`) remain
-// unmodeled.
+// function-expression-name scopes, class scopes, class static blocks, and
+// class field initializers are all materialized, and `var` hoisting targets
+// the nearest function/module/global scope. Concepts rslint does not expose
+// (for example `parserOptions.globalReturn`) remain unmodeled.
 package scope
 
 import (
@@ -56,14 +56,16 @@ type Variable struct {
 type Kind int
 
 const (
-	KindGlobal           Kind = iota
-	KindFunction              // function-like bodies & their parameters
-	KindFunctionExprName      // FunctionExpression's name binding
-	KindBlock                 // { ... } / for-init / switch case / enum body
-	KindCatch                 // catch clause
-	KindClass                 // class body: type parameters & inner class name
-	KindModule                // TS namespace
-	KindType                  // TS type alias / interface / function type: type parameters
+	KindGlobal                Kind = iota
+	KindFunction                   // function-like bodies & their parameters
+	KindFunctionExprName           // FunctionExpression's name binding
+	KindBlock                      // { ... } / for-init / switch case / enum body
+	KindCatch                      // catch clause
+	KindClass                      // class body: type parameters & inner class name
+	KindModule                     // TS namespace
+	KindType                       // TS type alias / interface / function type: type parameters
+	KindClassStaticBlock           // `static { ... }`
+	KindClassFieldInitializer      // the initializer expression of a class field
 )
 
 // Scope is one node of the scope tree.
@@ -76,6 +78,9 @@ type Scope struct {
 	Vars []*Variable
 	// ByName groups Vars by binding name, preserving declaration order.
 	ByName map[string][]*Variable
+	// References holds the identifier references that appear directly in this
+	// scope. Populated only when [Options.CollectReferences] is set.
+	References []*Reference
 
 	// GlobalAugmentation is true inside a `declare global { ... }` chain.
 	GlobalAugmentation bool
@@ -104,16 +109,49 @@ func (s *Scope) Declarations(name string) []*Variable {
 }
 
 // VariableScope returns the nearest ancestor (or self) that acts as a `var`
-// hoist target — eslint-scope's `Scope#variableScope`: function-like scopes,
-// module scopes, and the global scope.
+// hoist target — eslint-scope's `Scope#variableScope`, which also models an
+// execution context. Class static blocks and class field initializers are
+// variable scopes, matching eslint-scope's `class-static-block` and
+// `class-field-initializer` scope types.
 func (s *Scope) VariableScope() *Scope {
 	for current := s; current != nil; current = current.Parent {
 		switch current.Kind {
-		case KindFunction, KindModule, KindGlobal:
+		case KindFunction, KindModule, KindGlobal, KindClassStaticBlock, KindClassFieldInitializer:
 			return current
 		}
 	}
 	return nil
+}
+
+// Reference is one identifier that reads or writes a binding. Declaration
+// identifiers are not references — eslint-scope models them as references with
+// `init: true`, and every consumer of that flag skips them.
+type Reference struct {
+	// Identifier is the referencing identifier node.
+	Identifier *ast.Node
+	// From is the scope the reference is evaluated in.
+	From *Scope
+	// Declarations holds every declaration of the resolved binding, in
+	// declaration order; nil when the name resolves to nothing in this file.
+	Declarations []*Variable
+}
+
+// Resolved returns the first declaration of the binding this reference
+// resolves to — eslint-scope's `reference.resolved.defs[0]` — or nil when the
+// reference is unresolved.
+func (r *Reference) Resolved() *Variable {
+	if len(r.Declarations) == 0 {
+		return nil
+	}
+	return r.Declarations[0]
+}
+
+// Options selects optional analysis passes.
+type Options struct {
+	// CollectReferences populates [Scope.References] and [Manager.References].
+	// Rules that only inspect declarations leave it off so the extra
+	// identifier walk and resolution pass are skipped.
+	CollectReferences bool
 }
 
 // Manager owns a built scope tree.
@@ -125,12 +163,32 @@ type Manager struct {
 	// Scopes lists every scope in creation order, which is a pre-order walk of
 	// the scope tree.
 	Scopes []*Scope
+	// References lists every reference in the file, in the order the builder
+	// discovered them. Populated only when [Options.CollectReferences] is set.
+	References []*Reference
 }
 
 // Build analyzes `sf` and returns its scope tree.
-func Build(sf *ast.SourceFile) *Manager {
+func Build(sf *ast.SourceFile, opts Options) *Manager {
 	m := &Manager{SourceFile: sf}
-	b := &builder{manager: m}
+	b := &builder{manager: m, collectReferences: opts.CollectReferences}
 	m.Global = b.buildProgram(sf)
+	if opts.CollectReferences {
+		m.resolveReferences()
+	}
 	return m
+}
+
+// resolveReferences links each reference to the innermost enclosing scope that
+// declares its name.
+func (m *Manager) resolveReferences() {
+	for _, ref := range m.References {
+		name := ref.Identifier.Text()
+		for current := ref.From; current != nil; current = current.Parent {
+			if declarations := current.ByName[name]; len(declarations) > 0 {
+				ref.Declarations = declarations
+				break
+			}
+		}
+	}
 }

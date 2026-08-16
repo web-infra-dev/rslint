@@ -9,7 +9,8 @@ import (
 // declarations belonging to the scope, then a visiting pass that descends into
 // the children which open nested scopes.
 type builder struct {
-	manager *Manager
+	manager           *Manager
+	collectReferences bool
 }
 
 func (b *builder) push(kind Kind, block *ast.Node, parent *Scope) *Scope {
@@ -19,6 +20,21 @@ func (b *builder) push(kind Kind, block *ast.Node, parent *Scope) *Scope {
 	}
 	b.manager.Scopes = append(b.manager.Scopes, s)
 	return s
+}
+
+// reference records `id` as a read/write of whatever binding it resolves to.
+// Declaration names, member names, labels, and other non-reference identifier
+// positions are filtered out by isReferenceIdentifier.
+func (b *builder) reference(id *ast.Node, s *Scope) {
+	if !b.collectReferences || id == nil || s == nil {
+		return
+	}
+	if !isReferenceIdentifier(id) {
+		return
+	}
+	ref := &Reference{Identifier: id, From: s}
+	s.References = append(s.References, ref)
+	b.manager.References = append(b.manager.References, ref)
 }
 
 func (b *builder) buildProgram(sf *ast.SourceFile) *Scope {
@@ -106,9 +122,13 @@ func (b *builder) hoistStatement(stmt *ast.Node, s *Scope, blockScope bool) {
 	case ast.KindEnumDeclaration:
 		b.addNamedDecl(stmt, s, DefEnumName, true)
 	case ast.KindModuleDeclaration:
-		// Ambient `declare module 'str' { ... }` uses a string-literal name and
-		// doesn't bind a variable — addNamedDecl skips it automatically.
-		b.addNamedDecl(stmt, s, DefNamespaceName, true)
+		// `declare global { ... }` reopens the global scope rather than binding
+		// a namespace called `global`. Ambient `declare module 'str' { ... }`
+		// uses a string-literal name and doesn't bind a variable either —
+		// addNamedDecl skips that one automatically.
+		if !ast.IsGlobalScopeAugmentation(stmt) {
+			b.addNamedDecl(stmt, s, DefNamespaceName, true)
+		}
 	case ast.KindImportDeclaration:
 		if !blockScope {
 			b.collectImport(stmt, s)
@@ -363,9 +383,16 @@ func (b *builder) visitStatement(stmt *ast.Node, parent *Scope) {
 			b.visitExpression(ea.Expression, parent)
 		}
 	case ast.KindExportDeclaration:
-		// No new scopes.
-	case ast.KindImportDeclaration, ast.KindImportEqualsDeclaration:
-		// No new scopes.
+		b.visitExportDeclaration(stmt, parent)
+	case ast.KindImportDeclaration:
+		// Bindings only; nothing to reference and no new scopes.
+	case ast.KindImportEqualsDeclaration:
+		// `import Z = A.B.C` references the left-most name of the qualified
+		// module reference; `import Z = require('m')` references nothing.
+		if ied := stmt.AsImportEqualsDeclaration(); ied != nil && ied.ModuleReference != nil &&
+			ied.ModuleReference.Kind != ast.KindExternalModuleReference {
+			b.visitExpression(ied.ModuleReference, parent)
+		}
 	case ast.KindWithStatement:
 		ws := stmt.AsWithStatement()
 		if ws != nil {
@@ -378,6 +405,36 @@ func (b *builder) visitStatement(stmt *ast.Node, parent *Scope) {
 			b.visitStatement(child, parent)
 			return false
 		})
+	}
+}
+
+// visitExportDeclaration records the local name of each `export { local as
+// exported }` specifier as a reference. Re-exports (`export { x } from 'm'`)
+// name a binding in the other module, so they reference nothing here.
+func (b *builder) visitExportDeclaration(stmt *ast.Node, parent *Scope) {
+	decl := stmt.AsExportDeclaration()
+	if decl == nil || decl.ModuleSpecifier != nil || decl.ExportClause == nil {
+		return
+	}
+	if decl.ExportClause.Kind != ast.KindNamedExports {
+		return
+	}
+	named := decl.ExportClause.AsNamedExports()
+	if named == nil || named.Elements == nil {
+		return
+	}
+	for _, elem := range named.Elements.Nodes {
+		spec := elem.AsExportSpecifier()
+		if spec == nil {
+			continue
+		}
+		local := spec.PropertyName
+		if local == nil {
+			local = spec.Name()
+		}
+		if local != nil && local.Kind == ast.KindIdentifier {
+			b.reference(local, parent)
+		}
 	}
 }
 
@@ -407,7 +464,8 @@ func (b *builder) visitVarDeclList(declList *ast.Node, parent *Scope) {
 }
 
 // visitBindingPattern recurses into destructuring defaults that may contain
-// function / class expressions creating nested scopes.
+// function / class expressions creating nested scopes, and into computed
+// property keys of object patterns.
 func (b *builder) visitBindingPattern(pattern *ast.Node, parent *Scope) {
 	if pattern == nil {
 		return
@@ -416,6 +474,11 @@ func (b *builder) visitBindingPattern(pattern *ast.Node, parent *Scope) {
 		if child.Kind == ast.KindBindingElement {
 			be := child.AsBindingElement()
 			if be != nil {
+				if be.PropertyName != nil && be.PropertyName.Kind == ast.KindComputedPropertyName {
+					if cpn := be.PropertyName.AsComputedPropertyName(); cpn != nil {
+						b.visitExpression(cpn.Expression, parent)
+					}
+				}
 				if be.Initializer != nil {
 					b.visitExpression(be.Initializer, parent)
 				}
@@ -429,12 +492,16 @@ func (b *builder) visitBindingPattern(pattern *ast.Node, parent *Scope) {
 }
 
 // visitExpression walks an expression to discover nested function/class
-// expressions and other scope-creating constructs.
+// expressions and other scope-creating constructs, recording every identifier
+// that reads a binding along the way.
 func (b *builder) visitExpression(expr *ast.Node, parent *Scope) {
 	if expr == nil {
 		return
 	}
 	switch expr.Kind {
+	case ast.KindIdentifier:
+		b.reference(expr, parent)
+		return
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
 		b.visitFunctionLike(expr, parent)
 		return
@@ -447,6 +514,9 @@ func (b *builder) visitExpression(expr *ast.Node, parent *Scope) {
 		return
 	case ast.KindClassExpression:
 		b.visitClass(expr, parent, true)
+		return
+	case ast.KindMappedType:
+		b.visitMappedType(expr, parent)
 		return
 	}
 	if ast.IsFunctionTypeNode(expr) || ast.IsConstructorTypeNode(expr) ||
@@ -461,6 +531,34 @@ func (b *builder) visitExpression(expr *ast.Node, parent *Scope) {
 	}
 	expr.ForEachChild(func(child *ast.Node) bool {
 		b.visitExpression(child, parent)
+		return false
+	})
+}
+
+// visitMappedType creates a scope holding the `[K in T]` type parameter, so
+// that references to `K` in the template/value position resolve to it instead
+// of leaking outward.
+func (b *builder) visitMappedType(node *ast.Node, outer *Scope) {
+	mapped := node.AsMappedTypeNode()
+	if mapped == nil {
+		return
+	}
+	mappedScope := b.push(KindType, node, outer)
+	if mapped.TypeParameter != nil {
+		if tp := mapped.TypeParameter.AsTypeParameterDeclaration(); tp != nil &&
+			tp.Name() != nil && tp.Name().Kind == ast.KindIdentifier {
+			mappedScope.Add(&Variable{
+				Name:           tp.Name().Text(),
+				ID:             tp.Name(),
+				DefNode:        mapped.TypeParameter,
+				Parent:         mapped.TypeParameter.Parent,
+				Kind:           DefTypeParameter,
+				IsValueBinding: false,
+			})
+		}
+	}
+	node.ForEachChild(func(child *ast.Node) bool {
+		b.visitExpression(child, mappedScope)
 		return false
 	})
 }
@@ -612,8 +710,8 @@ func (b *builder) addParameters(node *ast.Node, s *Scope, recurseAnnotations boo
 func (b *builder) visitFunctionLike(node *ast.Node, outer *Scope) {
 	// Computed method/accessor name (`[expr]`) is evaluated in the enclosing
 	// scope (class body or object literal context). Walk it before pushing
-	// the function's own scope so that shadows inside the key expression
-	// check against the right scope.
+	// the function's own scope so that references inside the key expression
+	// resolve against the right scope.
 	if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
 		if cpn := name.AsComputedPropertyName(); cpn != nil && cpn.Expression != nil {
 			b.visitExpression(cpn.Expression, outer)
@@ -666,8 +764,8 @@ func (b *builder) visitFunctionLike(node *ast.Node, outer *Scope) {
 
 func (b *builder) visitClass(node *ast.Node, outer *Scope, isExpression bool) {
 	// Class-level decorators run BEFORE the class is defined — in the outer
-	// scope. Any shadows inside them (e.g. `@((t) => { const x = 1; })`) must
-	// be checked against outer bindings.
+	// scope. Any references inside them (e.g. `@((t) => { const x = 1; })`)
+	// must resolve against outer bindings.
 	for _, dec := range node.Decorators() {
 		b.visitExpression(dec, outer)
 	}
@@ -718,20 +816,25 @@ func (b *builder) visitClass(node *ast.Node, outer *Scope, isExpression bool) {
 			b.visitFunctionLike(member, classScope)
 		case ast.KindPropertyDeclaration:
 			// Properties don't go through visitFunctionLike — walk the
-			// computed key here.
+			// computed key and the type annotation here.
 			if memberName := member.Name(); memberName != nil && memberName.Kind == ast.KindComputedPropertyName {
 				if cpn := memberName.AsComputedPropertyName(); cpn != nil && cpn.Expression != nil {
 					b.visitExpression(cpn.Expression, classScope)
 				}
 			}
+			if memberType := member.Type(); memberType != nil {
+				b.visitExpression(memberType, classScope)
+			}
+			// A field initializer is its own execution context: eslint-scope
+			// materializes a `class-field-initializer` scope for it.
 			if init := member.Initializer(); init != nil {
-				b.visitExpression(init, classScope)
+				b.visitExpression(init, b.push(KindClassFieldInitializer, init, classScope))
 			}
 		case ast.KindClassStaticBlockDeclaration:
 			sb := member.AsClassStaticBlockDeclaration()
 			if sb != nil && sb.Body != nil && sb.Body.Kind == ast.KindBlock {
-				// Static block is its own function-like variable scope for var purposes.
-				staticScope := b.push(KindFunction, member, classScope)
+				// Static block is its own variable scope for `var` purposes.
+				staticScope := b.push(KindClassStaticBlock, member, classScope)
 				block := sb.Body.AsBlock()
 				if block != nil && block.Statements != nil {
 					b.hoistStatements(block.Statements.Nodes, staticScope)
@@ -915,8 +1018,12 @@ func (b *builder) visitForInOrOf(stmt *ast.Node, outer *Scope) {
 		return
 	}
 	body := b.forInitScope(stmt, fs.Initializer, outer)
+	// The iterated expression is evaluated while a `let`/`const` loop binding is
+	// still in its temporal dead zone, so it resolves against the loop scope —
+	// eslint-scope models this with a throwaway TDZ scope around the right-hand
+	// side. `var` loop bindings hoist out, leaving `body == outer`.
 	if fs.Expression != nil {
-		b.visitExpression(fs.Expression, outer)
+		b.visitExpression(fs.Expression, body)
 	}
 	if fs.Statement != nil {
 		b.visitStatement(fs.Statement, body)
@@ -942,6 +1049,9 @@ func (b *builder) visitCatch(node *ast.Node, outer *Scope) {
 					IsValueBinding: true,
 				})
 			})
+			// Destructuring defaults (`catch ({ message = x })`) are evaluated
+			// in the catch scope.
+			b.visitBindingPattern(vd.Name(), catchScope)
 		}
 	}
 	if cc.Block != nil && cc.Block.Kind == ast.KindBlock {

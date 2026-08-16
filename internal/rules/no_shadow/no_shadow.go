@@ -165,7 +165,7 @@ func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.Rule
 			return rule.RuleListeners{}
 		}
 
-		manager := scope.Build(ctx.SourceFile)
+		manager := scope.Build(ctx.SourceFile, scope.Options{})
 
 		c := &checker{
 			sourceFile:                          ctx.SourceFile,
