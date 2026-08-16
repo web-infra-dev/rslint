@@ -86,6 +86,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_nonoctal_decimal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
+	"github.com/web-infra-dev/rslint/internal/rules/no_object_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_param_reassign"
@@ -235,6 +236,7 @@ func GetAllRules() []rule.Rule {
 		no_new_func.NoNewFuncRule,
 		no_new_native_nonconstructor.NoNewNativeNonconstructorRule,
 		no_new_wrappers.NoNewWrappersRule,
+		no_object_constructor.NoObjectConstructorRule,
 		no_restricted_globals.NoRestrictedGlobalsRule,
 		no_restricted_imports.NoRestrictedImportsRule,
 		no_restricted_syntax.NoRestrictedSyntaxRule,

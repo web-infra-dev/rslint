@@ -347,24 +347,178 @@ func IsStartOfExpressionStatement(sourceFile *ast.SourceFile, node *ast.Node) bo
 	return false
 }
 
-// NeedsPrecedingSemicolon mirrors ESLint's common ASI check for fixes that
-// make an expression-starter token begin a statement on a new line.
+// needsPrecedingSemicolonExemptPunctuator reports whether kind is one of the
+// punctuators that can never expect a semicolon before an opening
+// parenthesis/bracket — inserting one there would count as an empty
+// statement (`:`, `;`, `{`, `=>`), or the punctuator itself already forces
+// ASI regardless of what follows (postfix `++`, `--`).
+func needsPrecedingSemicolonExemptPunctuator(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindColonToken, ast.KindSemicolonToken, ast.KindOpenBraceToken,
+		ast.KindEqualsGreaterThanToken, ast.KindPlusPlusToken, ast.KindMinusMinusToken:
+		return true
+	}
+	return false
+}
+
+// needsPrecedingSemicolonAfterCloseParen mirrors ESLint's ast-utils STATEMENTS
+// set: the header of these statements always requires a fresh Statement as
+// what follows (the body), so nothing there can extend the header into a call
+// — safe without an explicit semicolon. do-while is included even though its
+// parenthesized condition trails the body, since ASI always fires right after
+// it by grammar rule.
+func needsPrecedingSemicolonAfterCloseParen(prevNode *ast.Node) bool {
+	switch prevNode.Kind {
+	case ast.KindDoStatement, ast.KindForInStatement, ast.KindForOfStatement, ast.KindForStatement,
+		ast.KindIfStatement, ast.KindWhileStatement, ast.KindWithStatement:
+		return false
+	}
+	return true
+}
+
+// needsPrecedingSemicolonAfterCloseBrace mirrors ESLint's ast-utils check for
+// a closing `}`: only a brace ending an (anonymous) function-expression body,
+// a class expression, or an object literal is risky — each of those is a
+// value that a following `(` could attach to as a call, changing what the
+// code means. Every other `}` (block statement, function/class declaration
+// body, method body, import/export specifier list, ...) is safe.
+func needsPrecedingSemicolonAfterCloseBrace(prevNode *ast.Node) bool {
+	switch prevNode.Kind {
+	case ast.KindBlock:
+		return prevNode.Parent != nil && prevNode.Parent.Kind == ast.KindFunctionExpression
+	case ast.KindClassExpression, ast.KindObjectLiteralExpression:
+		return true
+	}
+	return false
+}
+
+// isNodeOrParentKind reports whether node itself, or its immediate parent, has
+// one of the given kinds. GetNodeAtPosition sometimes descends all the way to
+// a leaf child (whose parent is the construct of interest) and sometimes
+// stops at the construct itself — e.g. when a trailing leaf's range reaches
+// exactly to the end of its parent's range — so callers that care about a
+// specific enclosing construct must check both positions.
+func isNodeOrParentKind(node *ast.Node, kinds ...ast.Kind) bool {
+	for _, kind := range kinds {
+		if node.Kind == kind {
+			return true
+		}
+	}
+	if parent := node.Parent; parent != nil {
+		for _, kind := range kinds {
+			if parent.Kind == kind {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// needsPrecedingSemicolonAfterStringLiteral mirrors ESLint's DECLARATIONS
+// set: a module specifier string ending an import/export declaration can
+// never be continued by a punctuator, so it's safe without a semicolon.
+func needsPrecedingSemicolonAfterStringLiteral(prevNode *ast.Node) bool {
+	return !isNodeOrParentKind(prevNode, ast.KindExportDeclaration, ast.KindImportDeclaration)
+}
+
+// keywordStatementKind maps the reserved-word spelling of prevKind to the
+// node kind ESLint's NODE_TYPES_BY_KEYWORD associates with it. ok is false
+// for every other identifier/keyword.
+func keywordStatementKind(prevKind ast.Kind) (kind ast.Kind, ok bool) {
+	switch prevKind {
+	case ast.KindBreakKeyword:
+		return ast.KindBreakStatement, true
+	case ast.KindContinueKeyword:
+		return ast.KindContinueStatement, true
+	case ast.KindDebuggerKeyword:
+		return ast.KindDebuggerStatement, true
+	case ast.KindDoKeyword:
+		return ast.KindDoStatement, true
+	case ast.KindElseKeyword:
+		return ast.KindIfStatement, true
+	case ast.KindReturnKeyword:
+		return ast.KindReturnStatement, true
+	case ast.KindYieldKeyword:
+		return ast.KindYieldExpression, true
+	}
+	return ast.KindUnknown, false
+}
+
+// needsPrecedingSemicolonAfterIdentifierOrKeyword mirrors ESLint's
+// IDENTIFIER_OR_KEYWORD branch: an uninitialized variable-declarator name and
+// a break/continue label are always safe (nothing meaningful can attach to
+// them); a keyword whose associated statement/expression kind matches
+// prevNode (e.g. a bare `return` / `yield` / `debugger` / `do` / `else` /
+// `break` / `continue`, where ASI or the grammar already ends the construct
+// there) is also safe. Everything else — an ordinary identifier, or one of
+// these keyword spellings reused as a property/member name, whose prevNode is
+// therefore not the matching statement kind — defaults to needing one.
+func needsPrecedingSemicolonAfterIdentifierOrKeyword(prevKind ast.Kind, prevNode *ast.Node) bool {
+	declarator := prevNode
+	if prevNode.Kind != ast.KindVariableDeclaration && prevNode.Parent != nil {
+		declarator = prevNode.Parent
+	}
+	if declarator.Kind == ast.KindVariableDeclaration {
+		if vd := declarator.AsVariableDeclaration(); vd != nil && vd.Initializer == nil {
+			return false
+		}
+	}
+	if isNodeOrParentKind(prevNode, ast.KindBreakStatement, ast.KindContinueStatement) {
+		return false
+	}
+	if expected, ok := keywordStatementKind(prevKind); ok {
+		return prevNode.Kind != expected
+	}
+	return true
+}
+
+// NeedsPrecedingSemicolon mirrors ESLint's ast-utils `needsPrecedingSemicolon`:
+// whether a fix that makes an expression-starter token (an opening
+// parenthesis/bracket) begin a statement on a new line is safe without an
+// explicit leading `;`. A leading `(` can always continue certain preceding
+// constructs (e.g. a preceding function/class expression or object literal
+// becomes the callee of a new CallExpression) even across a line break, which
+// would silently change what the code means — this reports true whenever
+// that hazard exists.
+//
+// This omits ESLint's TypeScript-only exemptions (TSDeclareFunction,
+// TSImportEqualsDeclaration, ancestor type positions) and the uninitialized
+// class-field case: none of node's callers ever produce those shapes, and the
+// unhandled fallback (report true, prefer a semicolon) is always safe, only
+// ever adding a redundant character rather than producing wrong output.
 func NeedsPrecedingSemicolon(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	nodeStart := TrimNodeTextRange(sourceFile, node).Pos()
 
 	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
 	prevKind := ast.KindUnknown
+	prevStart := -1
 	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < nodeStart {
 		prevKind = scan.Token()
+		prevStart = scan.TokenStart()
 		scan.Scan()
 	}
 	if prevKind == ast.KindUnknown || scan.TokenStart() != nodeStart || !scan.HasPrecedingLineBreak() {
 		return false
 	}
+	if needsPrecedingSemicolonExemptPunctuator(prevKind) {
+		return false
+	}
+
+	prevNode := ast.GetNodeAtPosition(sourceFile, prevStart, false)
+	if prevNode == nil {
+		return true
+	}
 
 	switch prevKind {
-	case ast.KindSemicolonToken, ast.KindCloseBraceToken:
-		return false
+	case ast.KindCloseParenToken:
+		return needsPrecedingSemicolonAfterCloseParen(prevNode)
+	case ast.KindCloseBraceToken:
+		return needsPrecedingSemicolonAfterCloseBrace(prevNode)
+	case ast.KindStringLiteral:
+		return needsPrecedingSemicolonAfterStringLiteral(prevNode)
+	case ast.KindIdentifier, ast.KindBreakKeyword, ast.KindContinueKeyword, ast.KindDebuggerKeyword,
+		ast.KindDoKeyword, ast.KindElseKeyword, ast.KindReturnKeyword, ast.KindYieldKeyword:
+		return needsPrecedingSemicolonAfterIdentifierOrKeyword(prevKind, prevNode)
 	}
 	return true
 }
