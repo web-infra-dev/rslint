@@ -63,6 +63,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implicit_coercion"
+	"github.com/web-infra-dev/rslint/internal/rules/no_implicit_globals"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
@@ -223,6 +224,7 @@ func GetAllRules() []rule.Rule {
 		no_func_assign.NoFuncAssignRule,
 		no_global_assign.NoGlobalAssignRule,
 		no_implicit_coercion.NoImplicitCoercionRule,
+		no_implicit_globals.NoImplicitGlobalsRule,
 		no_implied_eval.NoImpliedEvalRule,
 		no_import_assign.NoImportAssignRule,
 		no_inner_declarations.NoInnerDeclarationsRule,
