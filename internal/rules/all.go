@@ -53,6 +53,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_function"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_static_block"
+	"github.com/web-infra-dev/rslint/internal/rules/no_eq_null"
 	"github.com/web-infra-dev/rslint/internal/rules/no_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extend_native"
@@ -213,6 +214,7 @@ func GetAllRules() []rule.Rule {
 		no_empty_function.NoEmptyFunctionRule,
 		no_empty_pattern.NoEmptyPatternRule,
 		no_empty_static_block.NoEmptyStaticBlockRule,
+		no_eq_null.NoEqNullRule,
 		no_eval.NoEvalRule,
 		no_ex_assign.NoExAssignRule,
 		no_extend_native.NoExtendNativeRule,
