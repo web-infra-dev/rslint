@@ -94,6 +94,7 @@ export default defineConfig({
     './tests/eslint/rules/no-iterator.test.ts',
     './tests/eslint/rules/getter-return.test.ts',
     './tests/eslint/rules/guard-for-in.test.ts',
+    './tests/eslint/rules/id-length.test.ts',
     './tests/eslint/rules/init-declarations.test.ts',
     './tests/eslint/rules/no-loss-of-precision.test.ts',
     './tests/eslint/rules/no-ex-assign.test.ts',
