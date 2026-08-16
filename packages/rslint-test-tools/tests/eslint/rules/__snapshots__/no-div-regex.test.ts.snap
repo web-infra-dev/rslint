@@ -1,0 +1,27 @@
+// Rstest Snapshot v1
+
+exports[`no-div-regex > invalid 1`] = `
+{
+  "code": "var f = function() { return /=foo/; };",
+  "diagnostics": [
+    {
+      "message": "A regular expression literal can be confused with '/='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-div-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
