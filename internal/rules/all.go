@@ -94,6 +94,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redeclare"
 	"github.com/web-infra-dev/rslint/internal/rules/no_regex_spaces"
+	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_exports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_globals"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_syntax"
@@ -235,6 +236,7 @@ func GetAllRules() []rule.Rule {
 		no_new_func.NoNewFuncRule,
 		no_new_native_nonconstructor.NoNewNativeNonconstructorRule,
 		no_new_wrappers.NoNewWrappersRule,
+		no_restricted_exports.NoRestrictedExportsRule,
 		no_restricted_globals.NoRestrictedGlobalsRule,
 		no_restricted_imports.NoRestrictedImportsRule,
 		no_restricted_syntax.NoRestrictedSyntaxRule,

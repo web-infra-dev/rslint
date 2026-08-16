@@ -1,0 +1,51 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "restrictedNamedExports": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "restrictedNamedExportsPattern": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "restrictedNamedExports": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(?!default$)"
+              },
+              "uniqueItems": true
+            },
+            "restrictedNamedExportsPattern": { "type": "string" },
+            "restrictDefaultExports": {
+              "type": "object",
+              "properties": {
+                "direct": { "type": "boolean" },
+                "named": { "type": "boolean" },
+                "defaultFrom": { "type": "boolean" },
+                "namedFrom": { "type": "boolean" },
+                "namespaceFrom": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
