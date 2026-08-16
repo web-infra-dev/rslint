@@ -107,6 +107,7 @@ export default defineConfig({
     './tests/eslint/rules/no-func-assign.test.ts',
     './tests/eslint/rules/no-global-assign.test.ts',
     './tests/eslint/rules/no-import-assign.test.ts',
+    './tests/eslint/rules/no-inline-comments.test.ts',
     './tests/eslint/rules/no-inner-declarations.test.ts',
     './tests/eslint/rules/no-irregular-whitespace.test.ts',
     './tests/eslint/rules/no-new.test.ts',
