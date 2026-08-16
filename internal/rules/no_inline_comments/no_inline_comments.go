@@ -5,9 +5,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_inline_comments.schema.json
@@ -27,7 +29,7 @@ var unexpectedInlineCommentMessage = rule.RuleMessage{
 var eslintDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`)
 
 type options struct {
-	ignorePattern *regexp.Regexp
+	ignorePattern *regexp2.Regexp
 }
 
 func parseOptions(raw []any) options {
@@ -37,7 +39,8 @@ func parseOptions(raw []any) options {
 	}
 	m, _ := raw[0].(map[string]any)
 	if pattern, ok := m["ignorePattern"].(string); ok && pattern != "" {
-		if re, err := regexp.Compile(pattern); err == nil {
+		// Mirrors upstream's `new RegExp(ignorePattern, "u")`.
+		if re, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
 			opts.ignorePattern = re
 		}
 	}
@@ -122,7 +125,7 @@ var NoInlineCommentsRule = rule.Rule{
 			value := commentInnerText(text, comment)
 
 			// Matches the ignore pattern.
-			if opts.ignorePattern != nil && opts.ignorePattern.MatchString(value) {
+			if utils.Regexp2MatchString(opts.ignorePattern, value) {
 				return
 			}
 

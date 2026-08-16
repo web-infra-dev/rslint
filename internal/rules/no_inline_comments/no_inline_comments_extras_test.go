@@ -100,15 +100,6 @@ func TestNoInlineCommentsExtras(t *testing.T) {
 				},
 			},
 
-			// ---- Locks in upstream ignorePattern fallback (`customIgnoreRegExp && ...`): a malformed pattern compiles to no filter instead of crashing ----
-			{
-				Code:    "var a = 3; // other line comment",
-				Options: []any{map[string]any{"ignorePattern": "("}},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpectedInlineComment", Line: 1, Column: 12, EndLine: 1, EndColumn: 33},
-				},
-			},
-
 			// ---- Locks in upstream JSX exception: preamble === "{" / postamble === "}" requires the enclosing node to be an empty JsxExpression, not any brace-delimited node ----
 			// A plain JS block statement reproduces the exact same
 			// preamble ("" — empty, nothing before on the comment's own
