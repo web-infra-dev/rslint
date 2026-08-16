@@ -106,7 +106,7 @@ function move(dir: Direction) {
 
 ### `defaultCaseCommentPattern`
 
-Regular expression for a trailing comment that stands in for a missing `default` clause. Defaults to `/^no default$/i`.
+Regular expression for a trailing comment that stands in for a missing `default` clause. Configured expressions use ECMAScript Unicode (`u`) semantics. The default is `/^no default$/iu`.
 
 ```json
 { "switch-exhaustiveness-check": ["error", { "defaultCaseCommentPattern": "^skip default" }] }
@@ -124,7 +124,12 @@ switch (value) {
 
 ## Differences from ESLint
 
-- When a switch is missing more than one case, the order of the types listed in the `missingBranches` message and the order the fixer inserts the corresponding `case` clauses follow rslint's internal type ordering rather than the union's declaration order. For example, `type Day = 'Monday' | 'Tuesday' | 'Wednesday'` reports missing cases as `"Monday" | "Tuesday" | "Wednesday"`, alphabetized, even when the type alias declares them in a different order.
+- Upstream reads TypeScript's internal `escapedName` and emits it as a bare expression for unique-symbol cases. That breaks identifiers beginning with `__` and qualified imports such as `ns.value`. rslint keeps the source-level name in diagnostics and asks the type checker for an accessible runtime expression in suggestions.
+- Upstream formats ordinary enum cases from the enum-literal type text and uses the enum type's bare symbol name for bracket notation. Either path can lose the value alias or namespace qualification that is bound at the switch. rslint resolves every enum member through the type checker, preserving references such as `A.B.z`, `A.B['x-y']`, or `Alias.z`. It then chooses dot or bracket notation from the configured TypeScript target; for example, the ESNext-valid member `Ϳ` is emitted as `E.Ϳ`, while ES5 uses `E['Ϳ']`.
+- If a missing enum or unique-symbol branch has no checker-proven runtime path—for example, it is visible only through a type-only import or declared only as a property in a type alias—upstream offers a suggestion that cannot be used as a runtime `case` expression. rslint keeps the diagnostic but suppresses that unsafe suggestion.
+- Upstream's bracket-member suggestion escapes quotes and line endings, but not backslashes, other control characters, or lone UTF-16 surrogates. rslint fully escapes the single-quoted property key so the generated case remains parseable and refers to the original enum member.
+- Configured regular expressions use ECMAScript syntax and Unicode 17 data pinned by rslint's standalone regexp engine, while upstream follows the syntax and Unicode version of the host JavaScript runtime.
+- For process safety, rslint rejects a configured pattern above 131,072 UTF-8 bytes, 1,024 nested groups, 4,096 total group openings, 128 Unicode property escapes, or 100,000 weighted matcher operations that consume no engine step. It also rejects patterns whose weighted lookaround executions and actual capture count could require more than 1,000,000 unmetered capture-slot operations. Each match is limited to 100,000 engine steps and a 10,000,000 capture-slot work envelope; the step limit is lowered for zero-step-, capture-, and lookaround-heavy patterns. Unmetered zero-step and lookaround work is also accumulated per file, and crossing a compile-time limit trips that file's matcher. After a pattern exhausts a budget, remaining candidate comments in the same file are treated as non-matches. Upstream delegates its resource limits to the host JavaScript runtime, so otherwise valid but resource-intensive patterns can behave differently.
 
 ## Original Documentation
 

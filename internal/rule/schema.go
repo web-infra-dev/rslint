@@ -33,7 +33,8 @@ import (
 // once also lets many rules share a single Schema value: [EmptyArraySchema]
 // is referenced by every no-options rule yet compiles a single time.
 type Schema struct {
-	rawJSON []byte
+	rawJSON          []byte
+	optionsValidator func([]any) error
 
 	once   sync.Once
 	schema *jsonschema.Schema
@@ -54,6 +55,19 @@ type Schema struct {
 // instead of constructing their own copy of the same schema.
 func NewSchema(rawJSON []byte) *Schema {
 	return &Schema{rawJSON: rawJSON}
+}
+
+// NewSchemaWithOptionsValidator returns a lazily compiled Schema with an
+// additional rule-specific validator. The callback runs only after JSON Schema
+// validation succeeds and receives the defaults-applied options value. It may
+// be called concurrently for different config values and must therefore be
+// concurrency-safe.
+//
+// Use this for option semantics that JSON Schema cannot express without
+// changing the rule's public upstream schema, such as compiling a RegExp with
+// field-specific flags.
+func NewSchemaWithOptionsValidator(rawJSON []byte, validator func([]any) error) *Schema {
+	return &Schema{rawJSON: rawJSON, optionsValidator: validator}
 }
 
 // EmptyArraySchema validates that a rule's resolved options array
@@ -138,6 +152,11 @@ func (s *Schema) validateWithDefaults(options []any) ([]any, error) {
 	applied, _ := applyDefaults(compiled, options, s.doc).([]any)
 	if err := compiled.Validate(applied); err != nil {
 		return applied, err
+	}
+	if s.optionsValidator != nil {
+		if err := s.optionsValidator(applied); err != nil {
+			return applied, err
+		}
 	}
 	return applied, nil
 }

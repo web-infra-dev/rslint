@@ -1412,8 +1412,8 @@ declare const value: boolean | 1;
 switch (value) {
   case false:
     break;
-  case 1: { throw new Error('Not implemented yet: 1 case') }
   case true: { throw new Error('Not implemented yet: true case') }
+  case 1: { throw new Error('Not implemented yet: 1 case') }
 }
 `,
 							},
@@ -1600,7 +1600,7 @@ switch (day) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "switchIsNotExhaustive",
-						Message:   `Switch is not exhaustive. Cases not matched: "Friday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"`,
+						Message:   `Switch is not exhaustive. Cases not matched: "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"`,
 						Line:      14,
 						Column:    9,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
@@ -1624,12 +1624,12 @@ switch (day) {
     result = 1;
     break;
   }
+  case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
+  case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
+  case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
   case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
   case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
   case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
-  case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
-  case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
-  case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
 }
 `,
 							},
@@ -1741,7 +1741,7 @@ function test(value: Union): number {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "switchIsNotExhaustive",
-						Message:   "Switch is not exhaustive. Cases not matched: 1 | true",
+						Message:   "Switch is not exhaustive. Cases not matched: true | 1",
 						Line:      9,
 						Column:    11,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
@@ -1758,8 +1758,8 @@ function test(value: Union): number {
   switch (value) {
     case 'a':
       return 1;
-    case 1: { throw new Error('Not implemented yet: 1 case') }
     case true: { throw new Error('Not implemented yet: true case') }
+    case 1: { throw new Error('Not implemented yet: 1 case') }
   }
 }
 `,
@@ -1824,7 +1824,7 @@ switch (day) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "switchIsNotExhaustive",
-						Message:   `Switch is not exhaustive. Cases not matched: "Friday" | "Monday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"`,
+						Message:   `Switch is not exhaustive. Cases not matched: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"`,
 						Line:      13,
 						Column:    9,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
@@ -1843,13 +1843,13 @@ type Day =
 const day = 'Monday' as Day;
 
 switch (day) {
-case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
 case "Monday": { throw new Error('Not implemented yet: "Monday" case') }
-case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
-case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
-case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
 case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
 case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
+case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
+case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
+case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
+case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
 }
 `,
 							},

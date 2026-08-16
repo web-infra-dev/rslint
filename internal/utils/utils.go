@@ -201,6 +201,30 @@ func HasCommentInSpan(sourceComments []*ast.CommentRange, start int, end int) bo
 	return idx < len(sourceComments) && sourceComments[idx].Pos() < end
 }
 
+// LastCommentInSpan returns the final comment fully contained in [start, end).
+// sourceComments must be sorted by position; ctx.Comments.All() provides that
+// canonical file-level list. Boundary-crossing comments are excluded so a
+// caller never observes text outside its requested syntax region.
+func LastCommentInSpan(sourceComments []*ast.CommentRange, start int, end int) *ast.CommentRange {
+	if start >= end {
+		return nil
+	}
+	index := sort.Search(len(sourceComments), func(i int) bool {
+		return sourceComments[i].Pos() >= end
+	})
+	for index > 0 {
+		index--
+		comment := sourceComments[index]
+		if comment.Pos() < start {
+			return nil
+		}
+		if comment.End() <= end {
+			return comment
+		}
+	}
+	return nil
+}
+
 func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
 	if IsTypeFlagSet(t, checker.TypeFlagsUnionOrIntersection) {
 		for _, subtype := range t.Types() {
