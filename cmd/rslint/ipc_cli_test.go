@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 )
 
@@ -545,4 +546,18 @@ func runCLIInitForTest(t *testing.T, payload any, wantShutdown bool) (int, strin
 		t.Fatalf("shutdown requests = %d, want %d", peerResult.shutdownRequests, wantShutdownRequests)
 	}
 	return code, peerResult.output
+}
+
+func TestWriteConfigDiscoveryFailures(t *testing.T) {
+	var output strings.Builder
+	writeConfigDiscoveryFailures(&output, []discovery.ConfigFailure{
+		{Path: "/repo/broken-a/rslint.config.mjs", Message: "unexpected token"},
+		{Path: "/repo/broken-b/rslint.config.ts", Message: "module not found"},
+	})
+
+	want := "Warning: skipping config /repo/broken-a/rslint.config.mjs: unexpected token\n" +
+		"Warning: skipping config /repo/broken-b/rslint.config.ts: module not found\n"
+	if got := output.String(); got != want {
+		t.Fatalf("config discovery warnings = %q, want %q", got, want)
+	}
 }

@@ -13,24 +13,28 @@ func TestResolveLanguageDefaults(t *testing.T) {
 		fileName               string
 		commonJS               bool
 		nonGlobalTopLevelScope bool
+		sourceType             string
 	}{
-		{fileName: "/repo/file.js", nonGlobalTopLevelScope: true},
-		{fileName: "/repo/file.mjs", nonGlobalTopLevelScope: true},
+		{fileName: "/repo/file.js", nonGlobalTopLevelScope: true, sourceType: "module"},
+		{fileName: "/repo/file.mjs", nonGlobalTopLevelScope: true, sourceType: "module"},
 		{fileName: "/repo/file.jsx"},
 		{fileName: "/repo/file.ts"},
 		{fileName: "/repo/file.cts"},
 		{fileName: "/repo/file.CJS"},
-		{fileName: "/repo/file.cjs.js", nonGlobalTopLevelScope: true},
-		{fileName: "/repo/dir.cjs/file.js", nonGlobalTopLevelScope: true},
-		{fileName: "/repo/file.cjs", commonJS: true, nonGlobalTopLevelScope: true},
-		{fileName: ".cjs", commonJS: true, nonGlobalTopLevelScope: true},
-		{fileName: `C:\repo\file.cjs`, commonJS: true, nonGlobalTopLevelScope: true},
+		{fileName: "/repo/file.cjs.js", nonGlobalTopLevelScope: true, sourceType: "module"},
+		{fileName: "/repo/dir.cjs/file.js", nonGlobalTopLevelScope: true, sourceType: "module"},
+		{fileName: "/repo/file.cjs", commonJS: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
+		{fileName: ".cjs", commonJS: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
+		{fileName: `C:\repo\file.cjs`, commonJS: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.fileName, func(t *testing.T) {
 			t.Parallel()
-			globalsInit, refsInit := ResolveLanguageDefaults(test.fileName)
+			globalsInit, refsInit, languageOptions := ResolveLanguageDefaults(test.fileName, LanguageOptions{})
+			if got := languageOptions.SourceType; got != test.sourceType {
+				t.Errorf("sourceType = %q, want %q", got, test.sourceType)
+			}
 
 			wantAccess := map[string]utils.GlobalAccess{}
 			if test.commonJS {
@@ -64,4 +68,11 @@ func TestResolveLanguageDefaults(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("authored sourceType overrides extension default", func(t *testing.T) {
+		_, _, languageOptions := ResolveLanguageDefaults("file.cjs", LanguageOptions{SourceType: "script"})
+		if got := languageOptions.EffectiveSourceType(); got != "script" {
+			t.Fatalf("effective sourceType = %q, want script", got)
+		}
+	})
 }

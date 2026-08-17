@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
@@ -35,13 +35,9 @@ type ValidTestCase struct {
 	// an unrecognized one fails the test. Inline `/* global */` comments in
 	// Code are picked up automatically by the linter and merged with this — no
 	// separate field needed for those.
-	Globals map[string]any `json:"globals"`
-	// SourceType simulates top-level `languageOptions.sourceType`
-	// ("module", "script", "commonjs"). Empty leaves RuleContext.SourceType
-	// unset so rules fall back to structural ESM detection.
-	SourceType string `json:"sourceType"`
-	TSConfig   string `json:"tsConfig"`
-	Tsx        bool   `json:"tsx"`
+	Globals  map[string]any `json:"globals"`
+	TSConfig string         `json:"tsConfig"`
+	Tsx      bool           `json:"tsx"`
 }
 
 type InvalidTestCaseError struct {
@@ -78,14 +74,10 @@ type InvalidTestCase struct {
 	// an unrecognized one fails the test. Inline `/* global */` comments in
 	// Code are picked up automatically by the linter and merged with this — no
 	// separate field needed for those.
-	Globals map[string]any `json:"globals"`
-	// SourceType simulates top-level `languageOptions.sourceType`
-	// ("module", "script", "commonjs"). Empty leaves RuleContext.SourceType
-	// unset so rules fall back to structural ESM detection.
-	SourceType string `json:"sourceType"`
-	TSConfig   string `json:"tsConfig"`
-	Options    any    `json:"options"`
-	Tsx        bool   `json:"tsx"`
+	Globals  map[string]any `json:"globals"`
+	TSConfig string         `json:"tsConfig"`
+	Options  any            `json:"options"`
+	Tsx      bool           `json:"tsx"`
 }
 
 // TestSuite represents a complete test suite that can be loaded from JSON
@@ -186,15 +178,23 @@ func resolveTestCaseGlobals(t *testing.T, rawGlobals map[string]any) map[string]
 	return globals
 }
 
+func resolveTestCaseLanguageOptions(t *testing.T, languageOptions rule.LanguageOptions) rule.LanguageOptions {
+	if languageOptions.SourceType != "" && !rule.IsValidSourceType(languageOptions.SourceType) {
+		t.Fatalf("test case sourceType %q is invalid; expected module, script, or commonjs", languageOptions.SourceType)
+	}
+	return languageOptions
+}
+
 func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
 	t.Parallel()
 
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, languageOptions rule.LanguageOptions, rawGlobals map[string]any, sourceType string, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, languageOptions rule.LanguageOptions, rawGlobals map[string]any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
 		options := ResolveTestCaseOptions(t, r, rawOptions)
 		globals := resolveTestCaseGlobals(t, rawGlobals)
+		languageOptions = resolveTestCaseLanguageOptions(t, languageOptions)
 
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
@@ -214,19 +214,20 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		allowedFiles := []string{sourceFile.FileName()}
 
 		_, err = linter.RunLinter(linter.RunLinterOptions{
-			Programs:       []*compiler.Program{program},
+			Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 			SingleThreaded: true,
 			Scope:          linter.FileScope{Files: allowedFiles},
 			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{
 					{
-						Name:            "test",
-						Settings:        settings,
-						LanguageOptions: languageOptions,
-						Globals:         globals,
-						SourceType:      sourceType,
-						Severity:        rule.SeverityError,
+						Name: "test",
+						Environment: &rule.RuleEnvironment{
+							Settings:        settings,
+							LanguageOptions: languageOptions,
+							Globals:         globals,
+						},
+						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return r.Run(ctx, options)
 						},
@@ -264,7 +265,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 				fileName = testCase.FileName
 			}
 
-			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.Settings, testCase.LanguageOptions, testCase.Globals, testCase.SourceType, testCase.TSConfig, fileName)
+			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.Settings, testCase.LanguageOptions, testCase.Globals, testCase.TSConfig, fileName)
 			if len(diagnostics) != 0 {
 				// TODO: pretty errors
 				t.Errorf("Expected valid test case not to contain errors. Code:\n%v", testCase.Code)
@@ -297,7 +298,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 			}
 
 			for i := range 10 {
-				diagnostics := runLinter(t, code, testCase.Options, testCase.Settings, testCase.LanguageOptions, testCase.Globals, testCase.SourceType, testCase.TSConfig, fileName)
+				diagnostics := runLinter(t, code, testCase.Options, testCase.Settings, testCase.LanguageOptions, testCase.Globals, testCase.TSConfig, fileName)
 				if i == 0 {
 					initialDiagnostics = diagnostics
 				}

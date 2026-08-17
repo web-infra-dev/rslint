@@ -12,7 +12,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 )
@@ -798,9 +797,8 @@ func IsRestParameterDeclaration(decl *ast.Declaration) bool {
 // GetDeclaration returns the first declaration of the symbol at `node`.
 //
 // Returns nil when `typeChecker` or `node` is nil. Rules with optional
-// type info (those that do not set `RequiresTypeInfo: true`) are scheduled
-// with a nil TypeChecker on "gap files" — files in the program but not in
-// `typeInfoFiles` (see internal/linter/linter.go). Rather than requiring
+// type info (those that do not set `RequiresTypeInfo: true`) may run in a
+// source generation that cannot provide a TypeChecker. Rather than requiring
 // every caller to nil-guard manually, this helper degrades gracefully:
 // no checker → no declaration → caller falls back to structural checks.
 // The `node == nil` guard mirrors the same convention already used by
@@ -898,7 +896,7 @@ func isUnsafeAssignmentWorker(
 		visited[t] = NewSetFromItems(receiver)
 	}
 
-	if checker.IsNonDeferredTypeReference(t) && checker.IsNonDeferredTypeReference(receiver) {
+	if IsTypeReference(t) && IsTypeReference(receiver) {
 		// TODO - figure out how to handle cases like this,
 		// where the types are assignable, but not the same type
 		/*
@@ -1077,16 +1075,14 @@ const (
 func DiscriminateAnyType(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
 	node *ast.Node,
 ) DiscriminatedAnyType {
-	return discriminateAnyTypeWorker(t, typeChecker, program, node, NewSetFromItems[*checker.Type]())
+	return discriminateAnyTypeWorker(t, typeChecker, node, NewSetFromItems[*checker.Type]())
 }
 
 func discriminateAnyTypeWorker(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
 	node *ast.Node,
 	// TODO(port): do we really need visited here?
 	visited *Set[*checker.Type],
@@ -1110,7 +1106,7 @@ func discriminateAnyTypeWorker(
 		if awaitedType == nil {
 			return false
 		}
-		awaitedAnyType := discriminateAnyTypeWorker(awaitedType, typeChecker, program, node, visited)
+		awaitedAnyType := discriminateAnyTypeWorker(awaitedType, typeChecker, node, visited)
 		return awaitedAnyType == DiscriminatedAnyTypeAny
 	})
 

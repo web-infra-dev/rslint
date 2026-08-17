@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_unused_vars.schema.json
@@ -29,10 +29,10 @@ type Config struct {
 	IgnoreUsingDeclarations        bool   `json:"ignoreUsingDeclarations"`
 	ReportUsedIgnorePattern        bool   `json:"reportUsedIgnorePattern"`
 
-	varsIgnoreRe              *regexp2.Regexp
-	argsIgnoreRe              *regexp2.Regexp
-	caughtErrorsIgnoreRe      *regexp2.Regexp
-	destructuredArrayIgnoreRe *regexp2.Regexp
+	varsIgnoreRe              *esregexp.RegExp
+	argsIgnoreRe              *esregexp.RegExp
+	caughtErrorsIgnoreRe      *esregexp.RegExp
+	destructuredArrayIgnoreRe *esregexp.RegExp
 }
 
 type variableType string
@@ -315,16 +315,16 @@ func parseOptionsFromMap(optsMap map[string]any, config *Config) {
 
 func compilePatterns(config Config) Config {
 	if config.VarsIgnorePattern != "" {
-		config.varsIgnoreRe, _ = utils.CompileRegexp2(config.VarsIgnorePattern, utils.JSUnicodeRegexOptions)
+		config.varsIgnoreRe, _ = esregexp.Compile(config.VarsIgnorePattern, "u")
 	}
 	if config.ArgsIgnorePattern != "" {
-		config.argsIgnoreRe, _ = utils.CompileRegexp2(config.ArgsIgnorePattern, utils.JSUnicodeRegexOptions)
+		config.argsIgnoreRe, _ = esregexp.Compile(config.ArgsIgnorePattern, "u")
 	}
 	if config.CaughtErrorsIgnorePattern != "" {
-		config.caughtErrorsIgnoreRe, _ = utils.CompileRegexp2(config.CaughtErrorsIgnorePattern, utils.JSUnicodeRegexOptions)
+		config.caughtErrorsIgnoreRe, _ = esregexp.Compile(config.CaughtErrorsIgnorePattern, "u")
 	}
 	if config.DestructuredArrayIgnorePattern != "" {
-		config.destructuredArrayIgnoreRe, _ = utils.CompileRegexp2(config.DestructuredArrayIgnorePattern, utils.JSUnicodeRegexOptions)
+		config.destructuredArrayIgnoreRe, _ = esregexp.Compile(config.DestructuredArrayIgnorePattern, "u")
 	}
 	return config
 }
@@ -961,7 +961,7 @@ func hasStaticInitBlock(classNode *ast.Node) bool {
 // reporting (when reportUsedIgnorePattern is true and the variable is used).
 // Returns: (shouldIgnore bool, matchesPattern bool, matched variable type)
 func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) (bool, bool, variableType) {
-	var re *regexp2.Regexp
+	var re *esregexp.RegExp
 	kind := variableTypeVariable
 	matched := false
 
@@ -970,7 +970,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, w
 	// args/caughtErrors is "none" together with reportUsedIgnorePattern.
 	if opts.destructuredArrayIgnoreRe != nil &&
 		(isDirectArrayDestructuredIdentifier(varInfo.Definition) || hasDirectArrayDestructuringWrite(writeRefs, sym)) &&
-		utils.Regexp2MatchString(opts.destructuredArrayIgnoreRe, varName) {
+		opts.destructuredArrayIgnoreRe.TestOrTimeout(varName) {
 		kind = variableTypeArrayDestructure
 		matched = true
 	} else if isParameterNode(varInfo.Definition) {
@@ -990,7 +990,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, w
 	}
 
 	if !matched {
-		matched = re != nil && utils.Regexp2MatchString(re, varName)
+		matched = re != nil && re.TestOrTimeout(varName)
 	}
 
 	if !matched {

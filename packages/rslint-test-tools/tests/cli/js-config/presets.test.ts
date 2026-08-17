@@ -2,6 +2,7 @@ import { describe, test, expect } from '@rstest/core';
 import { normalizeConfig } from '@rslint/core/config-loader';
 import {
   defineConfig,
+  globals,
   ts,
   js,
   reactPlugin,
@@ -16,6 +17,12 @@ describe('defineConfig and config presets', () => {
     ];
     const result = defineConfig(input);
     expect(result).toBe(input);
+  });
+
+  test('globals should be importable from the public root', () => {
+    expect(globals.node.process).toBe(false);
+    expect(globals.nodeBuiltin.process).toBe(false);
+    expect(Object.hasOwn(globals.nodeBuiltin, 'require')).toBe(false);
   });
 
   test('config presets should be importable', () => {
@@ -136,9 +143,11 @@ describe('defineConfig and config presets', () => {
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('rstest');
     expect(rec.rules).toEqual({
+      'rstest/expect-expect': 'warn',
       'rstest/no-commented-out-tests': 'warn',
       'rstest/no-conditional-expect': 'error',
       'rstest/no-disabled-tests': 'warn',
+      'rstest/no-focused-tests': 'error',
       'rstest/no-identical-title': 'error',
       'rstest/no-interpolation-in-snapshots': 'error',
       'rstest/no-mocks-import': 'error',

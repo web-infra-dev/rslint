@@ -1,4 +1,8 @@
-import { defineConfig } from '@rslib/core';
+import { defineConfig, type Rspack } from '@rslib/core';
+import {
+  bundleGlobalsTypesPlugin,
+  emitGlobalsAssetsPlugin,
+} from './plugins/globals';
 import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-types';
 
 /**
@@ -13,9 +17,13 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *    not share its `tsBuildInfoFile` with the tsgo `typecheck` over the same
  *    `src` — the two tools' incremental formats clash. Hence a tsconfig per
  *    consumer: `tsconfig.lib.json` (here), `tsconfig.worker.json` (below), and
- *    `tsconfig.build.json` (typecheck). `autoExternal` externalizes `dependencies`
- *    (`picomatch`) + `peerDependencies` (`jiti`); `tinyglobby` is a devDep so it
- *    bundles in. But `tinyglobby`'s `fdir` loads `picomatch` via `createRequire`,
+ *    `tsconfig.build.json` (typecheck). `output.autoExternal` externalizes
+ *    `dependencies` (`picomatch`) + `peerDependencies` (`jiti`); `tinyglobby` is
+ *    a devDep, so its code bundles in. The public `globals` catalog is also a
+ *    devDep, but a Rspack plugin emits one package-internal JSON asset per
+ *    environment so the root can load only selected maps. Consumers install
+ *    neither devDependency.
+ *    `tinyglobby`'s `fdir` loads `picomatch` via `createRequire`,
  *    which rspack can't statically follow — so `picomatch` can't be bundled away
  *    and stays a runtime dep. One `lib` block with all entries: the surface
  *    modules share a graph, so shared chunks between entries are fine here.
@@ -36,8 +44,8 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
 const librarySurface = {
   format: 'esm' as const,
   bundle: true,
-  autoExternal: true,
   output: {
+    autoExternal: true,
     target: 'node' as const,
     distPath: { root: './dist' },
   },
@@ -51,15 +59,21 @@ const librarySurface = {
       cli: './src/cli/cli.ts',
     },
   },
+  tools: {
+    rspack(config: Rspack.Configuration) {
+      config.plugins ??= [];
+      config.plugins.push(emitGlobalsAssetsPlugin());
+    },
+  },
   dts: { bundle: true },
-  plugins: [generateRuleOptionTypesPlugin()],
+  plugins: [bundleGlobalsTypesPlugin(), generateRuleOptionTypesPlugin()],
 };
 
 const workerBase = {
   format: 'esm' as const,
   bundle: true,
-  autoExternal: true,
   output: {
+    autoExternal: true,
     target: 'node' as const,
     distPath: { root: './dist/eslint-plugin' },
   },

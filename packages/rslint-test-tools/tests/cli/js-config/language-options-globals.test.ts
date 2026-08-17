@@ -1,4 +1,5 @@
 import { describe, test, expect } from '@rstest/core';
+import { globals } from '@rslint/core';
 import {
   runRslint,
   createTempDir,
@@ -35,6 +36,74 @@ async function lintWithGlobals(
     'rslint.config.mjs': config,
     'tsconfig.json': TS_CONFIG,
     'index.ts': code,
+  });
+  try {
+    const result = await runRslint(['--format', 'jsonline'], tempDir);
+    return result.stdout
+      .trim()
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => (JSON.parse(line) as Diagnostic).ruleName);
+  } finally {
+    await cleanupTempDir(tempDir);
+  }
+}
+
+async function lintUndefinedWithFlatGlobals({
+  configuredGlobals,
+  laterGlobals,
+  code = 'process.env.NODE_ENV;',
+  ecmaVersion,
+}: {
+  configuredGlobals?: Record<string, unknown>;
+  laterGlobals?: Record<string, unknown>;
+  code?: string;
+  ecmaVersion?: number;
+} = {}): Promise<string[]> {
+  const languageOptions = {
+    ...(configuredGlobals === undefined ? {} : { globals: configuredGlobals }),
+    ...(ecmaVersion === undefined ? {} : { ecmaVersion }),
+  };
+  const entries: Record<string, unknown>[] = [
+    {
+      files: ['**/*.js'],
+      rules: { 'no-undef': 'error' },
+      ...(Object.keys(languageOptions).length === 0 ? {} : { languageOptions }),
+    },
+  ];
+  if (laterGlobals) {
+    entries.push({ languageOptions: { globals: laterGlobals } });
+  }
+
+  const tempDir = await createTempDir({
+    'rslint.config.mjs': `export default ${JSON.stringify(entries)};`,
+    'index.js': code,
+  });
+  try {
+    const result = await runRslint(['--format', 'jsonline'], tempDir);
+    return result.stdout
+      .trim()
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => (JSON.parse(line) as Diagnostic).ruleName);
+  } finally {
+    await cleanupTempDir(tempDir);
+  }
+}
+
+async function lintWithImportedGlobals(): Promise<string[]> {
+  const tempDir = await createTempDir({
+    'rslint.config.mjs': `
+      import { globals } from '@rslint/core';
+      export default [
+        {
+          files: ['**/*.js'],
+          languageOptions: { globals: globals.node },
+          rules: { 'no-undef': 'error' },
+        },
+      ];
+    `,
+    'index.js': 'process.env.NODE_ENV;',
   });
   try {
     const result = await runRslint(['--format', 'jsonline'], tempDir);
@@ -86,6 +155,42 @@ describe('languageOptions.globals access levels', () => {
     expect(await lintWithGlobals('myGlobal = 1;', { myGlobal: false })).toEqual(
       ['no-global-assign'],
     );
+  });
+
+  test('built-in environment globals follow the same config-to-rule path', async () => {
+    expect(await lintWithGlobals('process = 1;', globals.node)).toEqual([
+      'no-global-assign',
+    ]);
+  });
+
+  test('a loaded config can import built-in globals from the public root', async () => {
+    expect(await lintWithImportedGlobals()).toEqual([]);
+  });
+
+  test('exporting the catalog does not enable a runtime environment by default', async () => {
+    expect(await lintUndefinedWithFlatGlobals()).toEqual(['no-undef']);
+  });
+
+  test('a later flat entry can turn off one bundled environment global', async () => {
+    expect(
+      await lintUndefinedWithFlatGlobals({ configuredGlobals: globals.node }),
+    ).toEqual([]);
+    expect(
+      await lintUndefinedWithFlatGlobals({
+        configuredGlobals: globals.node,
+        laterGlobals: { process: 'off' },
+      }),
+    ).toEqual(['no-undef']);
+  });
+
+  test('an explicit host map can declare a name beyond ecmaVersion', async () => {
+    expect(
+      await lintUndefinedWithFlatGlobals({
+        configuredGlobals: globals.browser,
+        code: 'Temporal.Now.instant();',
+        ecmaVersion: 2025,
+      }),
+    ).toEqual([]);
   });
 
   test('an inline comment overrides the config setting', async () => {

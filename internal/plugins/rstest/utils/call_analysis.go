@@ -86,6 +86,17 @@ func (analysis *RstestCallAnalysis) ParseTestCall(node *ast.Node) *ParsedRstestF
 	return parsed
 }
 
+// TestCallback returns the callback associated with a final Rstest test
+// registration. It reuses the analysis parser and the overload-aware callback
+// resolver without scanning the source file or retaining rule-specific state.
+func (analysis *RstestCallAnalysis) TestCallback(node *ast.Node) (*ast.Node, string) {
+	if analysis.ParseTestCall(node) == nil {
+		return nil, ""
+	}
+	info := resolveRstestTestCallback(analysis.ctx, node.AsCallExpression())
+	return info.functionNode, info.name
+}
+
 func (analysis *RstestCallAnalysis) IsExpectCall(node *ast.Node) bool {
 	// Test-context expect names are discovered while collecting callbacks, so
 	// callbacks must be complete before the candidate gate runs. Reordering

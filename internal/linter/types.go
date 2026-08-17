@@ -2,52 +2,16 @@ package linter
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-type ConfiguredRule struct {
-	Name     string
-	Settings map[string]interface{}
-	// LanguageOptions is normalized once from the effective per-file config and
-	// used to construct ctx.Globals. Its zero value selects latest.
-	LanguageOptions rule.LanguageOptions
-	// Globals is the config-declared `languageOptions.globals` for this file
-	// (name → access level). The linter merges this with inline `/* global */`
-	// comments and the selected language globals inside ctx.Globals.
-	// Inline globals and disable directives use candidate-gated lazy comment
-	// collection, so rules never parse either source themselves. Nil when the
-	// config declares none.
-	Globals map[string]utils.GlobalAccess
-	// SourceType is the authored `languageOptions.sourceType` for this file.
-	// Empty when unset. Forwarded to RuleContext.SourceType.
-	SourceType       string
-	Severity         rule.DiagnosticSeverity
-	RequiresTypeInfo bool
-	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
-	// worker (mounted via the config's object-form `plugins`) rather than natively
-	// in Go. The linter splits these out and dispatches them; its Run is a
-	// no-op placeholder.
-	IsEslintPluginRule bool
-	// Options is the raw user-configured rule options (ESLint's
-	// post-severity args). Consumed when dispatching plugin rules to the
-	// Node worker; native rules read options through Run's closure instead.
-	Options []any
-	Run     func(ctx rule.RuleContext) rule.RuleListeners
-}
+// Compatibility alias keeps linter-focused callers source-compatible while
+// ownership lives in internal/rule. New framework code should name
+// rule.ConfiguredRule directly.
+type ConfiguredRule = rule.ConfiguredRule
 
-func FilterNonTypeAwareRules(rules []ConfiguredRule) []ConfiguredRule {
-	filtered := make([]ConfiguredRule, 0, len(rules))
-	for _, r := range rules {
-		if !r.RequiresTypeInfo {
-			filtered = append(filtered, r)
-		}
-	}
-	return filtered
-}
-
-type RuleHandler = func(sourceFile *ast.SourceFile) []ConfiguredRule
+type RuleHandler = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule
 type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 
 // FileScope describes user-supplied "lint targets" (CLI args).
@@ -83,6 +47,8 @@ type LintResult struct {
 //
 // Zero-value semantics:
 //   - SingleThreaded=false                → use the default parallel work group
+//   - Programs entries                    → must be non-nil Programs created by
+//     internal/program whenever either lint or type-check consumes them
 //   - Scope.{Files,Dirs}=nil              → process all program files
 //   - ExcludePaths=nil                    → fall back to the linter default
 //     (substring match against utils.ExcludePaths). Pass an explicit empty
@@ -95,17 +61,10 @@ type LintResult struct {
 //     resolves rules through GetRulesForFile during the lint phase. Callers
 //     that need the same resolved targets before native execution may build a
 //     plan with PrepareLintPlan and pass it here.
-//   - SyntaxErrorFiles=nil                → RunLinter checks each lint target
-//     for syntax errors before resolving or running rules. A non-nil set means
-//     the caller already performed that check and names the invalid files.
-//   - TypeInfoFiles=nil                   → no gap-file distinction. A non-nil
-//     set filters RequiresTypeInfo rules and withholds the TypeChecker for files
-//     outside it. This field never restricts program-wide type-check.
+//   - Syntax and type capabilities         → derived from each Program. Syntax
+//     errors suppress rules for that file; source-only Programs filter rules
+//     requiring type information and never participate in type-check.
 //   - TypeCheck=false                     → skip the type-check phase
-//   - SkipTypeCheckPrograms=nil           → every program participates in
-//     type-check. When non-nil, must be parallel to Programs; entries set
-//     to true mark the corresponding program to be skipped (typically the
-//     non-project fallback Program with synthesized CompilerOptions).
 //   - Consumer=zero                        → diagnostics are dropped and no
 //     optional native edit artifacts are materialized
 //   - Timing=nil                          → per-rule timing collection is off
@@ -120,10 +79,13 @@ type LintResult struct {
 // out per program. Callers MUST make their handler safe for concurrent
 // calls (channel send, mutex-guarded slice append, sync.Map, etc.).
 type RunLinterOptions struct {
-	Programs       []*compiler.Program
+	// Programs contains immutable rslint source universes. Their construction
+	// strategy is encapsulated by Program and is not part of lint semantics.
+	Programs       []*program.Program
 	SingleThreaded bool
 	// Cwd is the working directory of the linting run, forwarded verbatim to
-	// every RuleContext. See RuleContext.Cwd for what rules may assume of it.
+	// every RuleContext. See RuleContext.ProcessCurrentDirectory for what rules
+	// may assume of it.
 	Cwd string
 
 	Scope            FileScope
@@ -142,16 +104,13 @@ type RunLinterOptions struct {
 	// resolved rules without collecting targets or calling GetRulesForFile again.
 	// The callback remains required to distinguish a lint pass from
 	// --type-check-only and to preserve the existing zero-value contract.
-	PreparedPlan     *LintPlan
-	TypeInfoFiles    map[string]struct{}
-	SyntaxErrorFiles map[string]struct{}
+	PreparedPlan *LintPlan
 	// Consumer owns diagnostic delivery and the optional edit artifacts needed
 	// by native Go consumers. It does not alter the separate eslint-plugin
 	// reverse-dispatch request.
 	Consumer rule.DiagnosticConsumer
 
-	TypeCheck             bool
-	SkipTypeCheckPrograms []bool
+	TypeCheck bool
 
 	Timing *TimingCollector
 }
@@ -159,7 +118,8 @@ type RunLinterOptions struct {
 // LintSingleFileOptions configures a single-file, single-program rule pass.
 // The caller must handle syntactic diagnostics before invoking it.
 type LintSingleFileOptions struct {
-	Program *compiler.Program
+	// Program is the exact rslint source generation containing File.
+	Program *program.Program
 	// File is the exact source-file name exposed by Program.
 	File string
 	// HasTypeInfo controls whether rules marked RequiresTypeInfo are eligible.

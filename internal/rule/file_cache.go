@@ -1,16 +1,24 @@
 package rule
 
-// FileCache holds values derived from one source file for the duration of that
-// file's lint pass. Rules on one file run serially, so the cache intentionally
-// does not synchronize access.
+// FileCache holds file-pass shared values for the duration of one source
+// file's lint. Rules on one file run serially, so the cache intentionally does
+// not synchronize access.
 type FileCache struct {
-	values map[any]any
+	values                  map[any]any
+	processCurrentDirectory string
 }
 
 // NewFileCache creates the cache that the linter shares with every rule on one
 // file. Rules should consume it through CachedByFile rather than retaining it.
 func NewFileCache() *FileCache {
 	return &FileCache{}
+}
+
+// NewFileCacheWithProcessCurrentDirectory creates the per-file shared state
+// used by the linter and records the process working directory once per file
+// instead of copying its string into every rule context.
+func NewFileCacheWithProcessCurrentDirectory(currentDirectory string) *FileCache {
+	return &FileCache{processCurrentDirectory: currentDirectory}
 }
 
 // WithFileCache returns a context attached to cache. This is a linter assembly
@@ -22,8 +30,7 @@ func (ctx RuleContext) WithFileCache(cache *FileCache) RuleContext {
 
 // CachedByFile returns the value stored for the current file under key,
 // calling build on the first request. A manually constructed RuleContext with
-// no file cache calls build every time, preserving standalone rule-test
-// behavior.
+// no file cache calls build every time, preserving direct rule-test behavior.
 //
 // Callers must use an unexported comparable key type so keys from different
 // packages cannot collide. Cached values must be derived from the current

@@ -255,9 +255,6 @@ func ValidateConfig(config RslintConfig) error {
 		if err := validateLanguageOptions(entry.LanguageOptions); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
-		if err := validateConfigSourceType(entry.LanguageOptions); err != nil {
-			return fmt.Errorf("config entry at index %d: %w", index, err)
-		}
 		if err := validateConfigRules(entry.Rules); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
@@ -267,6 +264,9 @@ func ValidateConfig(config RslintConfig) error {
 
 func validateLanguageOptions(languageOptions *LanguageOptions) error {
 	if err := validateConfigGlobals(languageOptions); err != nil {
+		return err
+	}
+	if err := validateConfigSourceType(languageOptions); err != nil {
 		return err
 	}
 	if languageOptions == nil || languageOptions.Raw == nil {
@@ -344,17 +344,13 @@ func validateConfigSourceType(languageOptions *LanguageOptions) error {
 		return nil
 	}
 	s, ok := value.(string)
-	if !ok || !isValidSourceType(s) {
+	if !ok || !rule.IsValidSourceType(s) {
 		return fmt.Errorf(
 			"key \"languageOptions.sourceType\": invalid value %v; expected \"module\", \"script\", or \"commonjs\"",
 			value,
 		)
 	}
 	return nil
-}
-
-func isValidSourceType(s string) bool {
-	return s == "module" || s == "script" || s == "commonjs"
 }
 
 func validateConfigRules(rules Rules) error {
@@ -1119,25 +1115,6 @@ func ExtractGlobals(langOpts *LanguageOptions) map[string]utils.GlobalAccess {
 	return globals
 }
 
-// ExtractSourceType reads the effective module kind from a merged
-// `languageOptions.sourceType`. Only the top-level field is accepted — the
-// same contract as the JS language plugin (no legacy
-// `parserOptions.sourceType`). Returns "" when unset, not a string, or not
-// one of "module" / "script" / "commonjs" — callers should fall back to
-// structural ESM detection. Values ValidateConfig rejects are dropped here
-// rather than guessed at, so a config that skipped validation behaves as if
-// it never mentioned sourceType.
-func ExtractSourceType(langOpts *LanguageOptions) string {
-	if langOpts == nil || langOpts.Raw == nil {
-		return ""
-	}
-	s, ok := langOpts.Raw["sourceType"].(string)
-	if !ok || !isValidSourceType(s) {
-		return ""
-	}
-	return s
-}
-
 // ExtractLanguageOptions normalizes the effective per-file language options
 // for native rules. The zero value deliberately represents ESLint flat-config
 // defaults, so a missing languageOptions object needs no allocation.
@@ -1150,6 +1127,9 @@ func ExtractLanguageOptions(langOpts *LanguageOptions) rule.LanguageOptions {
 		if version, ok := normalizeConfigECMAVersion(value); ok {
 			result.ECMAVersion = version
 		}
+	}
+	if sourceType, ok := langOpts.Raw["sourceType"].(string); ok && rule.IsValidSourceType(sourceType) {
+		result.SourceType = sourceType
 	}
 	return result
 }

@@ -29,9 +29,9 @@ Otherwise, this rule warns on `this` keywords. It also reports `this` at the top
 
 ## Differences from ESLint
 
-Top-level `this` is currently always reported. This rule does not yet consult
-`languageOptions.sourceType`, so setting it to `'script'` or `'commonjs'` does
-not change that behavior. The
+Top-level `this` is always reported, independently of
+`languageOptions.sourceType`; setting it to `'script'` or `'commonjs'` does not
+change that behavior. The
 `parserOptions.ecmaFeatures.globalReturn` option is also not supported.
 
 Examples of **incorrect** code for this rule:

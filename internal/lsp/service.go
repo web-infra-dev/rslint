@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -241,7 +242,7 @@ func fileURIFromPath(filePath string) lsproto.URI {
 
 // reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
 // The LSP reuses projects already loaded by project service and builds a
-// standalone Program for a declared custom project. Resolving
+// session-external ts-go Program for a declared custom project. Resolving
 // project paths here preserves declaration order and ensures type-aware rules
 // run only when the governing config's first containing project supplies type
 // information.
@@ -974,7 +975,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 // runLintWithProgramLoader resolves one document against two distinct
 // directories: configCwd is the config's own path space, which a nested JS
 // config moves to its own directory, while processCwd is the server's working
-// directory that rules see as RuleContext.Cwd.
+// directory that rules see through RuleContext.ProcessCurrentDirectory.
 func runLintWithProgramLoader(
 	uri lsproto.DocumentUri,
 	session *project.Session,
@@ -1041,12 +1042,12 @@ var rulesSkippedInEditors = map[string]bool{
 // rulesServedToEditors drops the rules the language server never runs. The
 // input is a cached slice shared across files, so filtering builds a new one
 // and an unaffected configuration keeps the original.
-func rulesServedToEditors(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
-	skipped := func(r linter.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
+func rulesServedToEditors(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
+	skipped := func(r rule.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
 	if !slices.ContainsFunc(rules, skipped) {
 		return rules
 	}
-	served := make([]linter.ConfiguredRule, 0, len(rules))
+	served := make([]rule.ConfiguredRule, 0, len(rules))
 	for _, configured := range rules {
 		if !skipped(configured) {
 			served = append(served, configured)
@@ -1068,7 +1069,8 @@ func lintSingleFile(
 	if sourceFile == nil {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}
 	}
-	if syntacticDiagnostics := program.GetSyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
+	sourceProgram := lintprogram.NewFromCompiler(program)
+	if syntacticDiagnostics := sourceProgram.SyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
 		diagnostics := make([]rule.RuleDiagnostic, 0, len(syntacticDiagnostics))
 		for _, diagnostic := range syntacticDiagnostics {
 			diagnostics = append(diagnostics, rule.RuleDiagnostic{
@@ -1097,12 +1099,13 @@ func lintSingleFile(
 	}
 
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:     program,
+		Program:     sourceProgram,
 		File:        sourceFile.FileName(),
 		Cwd:         processCwd,
 		HasTypeInfo: hasTypeInfo,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return rulesServedToEditors(fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo))
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			rules, _ := fileConfigResolver.EnabledRulesForFile(configFilePath)
+			return rulesServedToEditors(rules)
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: editDemand,
@@ -1138,7 +1141,7 @@ func selectLintProgram(
 	// Type information follows parserOptions.project declaration order, not the
 	// TypeScript session's default-project heuristic. Prefer an already-loaded
 	// containing project. Custom config names that the main project service has
-	// not loaded are supplied by rslint-owned standalone Programs.
+	// not loaded are supplied by rslint-owned session-external ts-go Programs.
 	loadedByConfig := make(map[string]*compiler.Program, len(loadedProjects))
 	for _, candidate := range loadedProjects {
 		if candidate == nil || candidate.GetProgram() == nil {
@@ -1378,9 +1381,12 @@ func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {
 	return config.IsDefaultExcludedPath(filePath, cwd, useCaseSensitive)
 }
 
-func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []linter.ConfiguredRule {
-	return config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).
-		ActiveRulesForFileHasTypeInfo(filePath, hasTypeInfo)
+func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []rule.ConfiguredRule {
+	rules, _ := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).EnabledRulesForFile(filePath)
+	if !hasTypeInfo {
+		return rule.FilterNonTypeAwareRules(rules)
+	}
+	return rules
 }
 
 // Helper function to check if two ranges overlap

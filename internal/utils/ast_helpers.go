@@ -35,6 +35,16 @@ func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
 	return current
 }
 
+// IsCommaOperator reports whether node is a BinaryExpression whose operator is
+// the comma token — tsgo's collapsed form of ESLint's SequenceExpression.
+func IsCommaOperator(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	bin := node.AsBinaryExpression()
+	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindCommaToken
+}
+
 // IsCallee checks if a node is the callee of a CallExpression or NewExpression,
 // skipping parentheses and TS type assertions between the node and the call.
 func IsCallee(node *ast.Node) bool {

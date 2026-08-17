@@ -520,7 +520,8 @@ function bar() {
       ",
   "diagnostics": [
     {
-      "message": "Unsafe return of a value of type \`\`any\`\`. \`this\` is typed as \`any\`.You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "message": "Unsafe return of a value of type \`\`any\`\`. \`this\` is typed as \`any\`.
+You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
       "messageId": "unsafeReturnThis",
       "range": {
         "end": {
@@ -535,7 +536,8 @@ function bar() {
       "ruleName": "@typescript-eslint/no-unsafe-return",
     },
     {
-      "message": "Unsafe return of a value of type \`\`any\`\`. \`this\` is typed as \`any\`.You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "message": "Unsafe return of a value of type \`\`any\`\`. \`this\` is typed as \`any\`.
+You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
       "messageId": "unsafeReturnThis",
       "range": {
         "end": {
@@ -1495,7 +1497,8 @@ const obj = {
       ",
   "diagnostics": [
     {
-      "message": "Unsafe return of a value of type \`\`any\`\`. \`this\` is typed as \`any\`.You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "message": "Unsafe return of a value of type \`\`any\`\`. \`this\` is typed as \`any\`.
+You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
       "messageId": "unsafeReturnThis",
       "range": {
         "end": {

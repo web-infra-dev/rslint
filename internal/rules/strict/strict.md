@@ -15,10 +15,10 @@ When the file is an ES module (detected via top-level `import` / `export`), the 
 
 ## Differences from ESLint
 
-This rule currently determines module status from top-level `import` / `export`
-syntax and does not yet consult `languageOptions.sourceType`. In particular,
-configuring `sourceType: 'module'` on a file without module syntax or
-`sourceType: 'commonjs'` does not change this rule's behavior. The
+This rule determines module status from top-level `import` / `export` syntax,
+independently of `languageOptions.sourceType`. In particular, configuring
+`sourceType: 'module'` on a file without module syntax or `sourceType:
+'commonjs'` does not change this rule's behavior. The
 `parserOptions.ecmaFeatures.impliedStrict` and `globalReturn` options are also
 not supported.
 
