@@ -113,6 +113,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unassigned_vars"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
+	"github.com/web-infra-dev/rslint/internal/rules/no_undefined"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
@@ -268,6 +269,7 @@ func GetAllRules() []rule.Rule {
 		no_unneeded_ternary.NoUnneededTernaryRule,
 		no_undef.NoUndefRule,
 		no_undef_init.NoUndefInitRule,
+		no_undefined.NoUndefinedRule,
 		no_unassigned_vars.NoUnassignedVarsRule,
 		prefer_const.PreferConstRule,
 		prefer_destructuring.PreferDestructuringRule,
