@@ -22,6 +22,8 @@ test('loads a value', async () => {
 
 The rule follows promises stored in local bindings, including statically mappable array and object destructuring, and requires every reachable path to consume them. `Promise.resolve` and `Promise.all` preserve assertion failure. `Promise.reject` does not adopt its argument, and `Promise.allSettled` converts assertion failure into a fulfilled result, so neither is a safe sink.
 
+A logical assignment stores the chain like a plain assignment does, and its right-hand side is only evaluated when the store happens, so `pending ||= load().then(...)` followed by `await pending` is consumed. In the other direction a promise is truthy and non-nullish, so a later `||=` or `??=` cannot replace the promise a binding already holds, while `&&=` always does and discards it.
+
 An awaited chain is safe only when its rejection can escape the test callback. An enclosing `catch` that may swallow the rejection, or a `finally` block that may `return`, `break`, or `continue`, does not count as safe consumption. A `catch` that always rethrows preserves the failure.
 
 Jest callbacks using `done` are not analyzed because the callback can coordinate promise completion explicitly. Named callbacks and promise-handler callbacks are analyzed when their relationship to a test is statically known.

@@ -26,6 +26,13 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", () => { const { pending } = { pending: promise.then(value => expect(value).toBe(1)) }; return pending; });`},
 			{Code: `test("case", () => { let pending; [pending] = [promise.then(value => expect(value).toBe(1))]; return pending; });`},
 			{Code: `test("case", () => { let pending; ({ pending } = { pending: promise.then(value => expect(value).toBe(1)) }); return pending; });`},
+			// A logical assignment stores the chain, only conditionally, so the
+			// binding is real and the value it may leave in place survives.
+			{Code: `test("case", async () => { let pending; pending ||= promise.then(value => expect(value).toBe(1)); await pending; });`},
+			{Code: `test("case", async () => { let pending; pending ??= promise.then(value => expect(value).toBe(1)); await pending; });`},
+			{Code: `test("case", async () => { let pending = other; pending &&= promise.then(value => expect(value).toBe(1)); await pending; });`},
+			{Code: `test("case", async () => { let pending; await (pending ||= promise.then(value => expect(value).toBe(1))); });`},
+			{Code: `test("case", async () => { let pending = promise.then(value => expect(value).toBe(1)); pending ||= other; await pending; });`},
 			{Code: `test("case", () => { const pending = promise.then(value => expect(value).toBe(1)); expect(pending).resolves.toBeUndefined(); });`},
 			{Code: `test("case", () => expect(promise.then(value => expect(value).toBe(1))).resolves.toBeUndefined());`},
 			{Code: `test("case", () => condition ? promise.then(value => expect(value).toBe(1)) : Promise.resolve());`},
@@ -128,6 +135,26 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			},
 			{
 				Code: `test("case", () => { let pending; ({ pending } = { pending: promise.then(value => expect(value).toBe(1)) }); log(pending); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				Code: `test("case", async () => { let pending; pending ||= promise.then(value => expect(value).toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			// A promise is truthy, so `&&=` always replaces the one p holds.
+			{
+				Code: `test("case", async () => { let pending = promise.then(value => expect(value).toBe(1)); pending &&= other; await pending; });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			// A compound arithmetic assignment does not store the promise.
+			{
+				Code: `test("case", async () => { let count = 0; count += promise.then(value => expect(value).toBe(1)); await count; });`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "expectInFloatingPromise",
 				}},

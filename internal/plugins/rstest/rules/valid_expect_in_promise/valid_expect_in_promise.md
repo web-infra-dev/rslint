@@ -35,6 +35,8 @@ Rstest does not support Jest-style `done` callbacks. A regular test callback's f
 
 The rule follows promises stored in local bindings, including statically mappable array and object destructuring, and requires every reachable path to consume them. `Promise.resolve` and `Promise.all` preserve assertion failure. `Promise.reject` and `Promise.allSettled` are not safe sinks.
 
+A logical assignment stores the chain like a plain assignment does, and its right-hand side is only evaluated when the store happens, so `pending ||= load().then(...)` followed by `await pending` is consumed. In the other direction a promise is truthy and non-nullish, so a later `||=` or `??=` cannot replace the promise a binding already holds, while `&&=` always does and discards it.
+
 An awaited chain is safe only when its rejection can escape the test callback. An enclosing `catch` that may swallow the rejection, or a `finally` block that may `return`, `break`, or `continue`, does not count as safe consumption. A `catch` that always rethrows preserves the failure.
 
 This rule has no options and does not provide an autofix.

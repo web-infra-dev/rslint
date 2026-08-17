@@ -15,6 +15,20 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       );`,
     },
     {
+      code: `test('case', async () => {
+        let pending;
+        pending ||= load().then(value => assert.equal(value, 1));
+        await pending;
+      });`,
+    },
+    {
+      code: `test('case', async () => {
+        let pending = load().then(value => expect(value).toBe(1));
+        pending ??= fallback;
+        await pending;
+      });`,
+    },
+    {
       code: `test('case', () => {
         try {
           return load().then(value => expect(value).toBe(1));
@@ -234,6 +248,21 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
         } finally {
           return;
         }
+      });`,
+      errors: [{ messageId: 'expectInFloatingPromise' }],
+    },
+    {
+      code: `test('case', async () => {
+        let pending;
+        pending ||= load().then(value => assert.equal(value, 1));
+      });`,
+      errors: [{ messageId: 'expectInFloatingPromise' }],
+    },
+    {
+      code: `test('case', async () => {
+        let pending = load().then(value => expect(value).toBe(1));
+        pending &&= fallback;
+        await pending;
       });`,
       errors: [{ messageId: 'expectInFloatingPromise' }],
     },

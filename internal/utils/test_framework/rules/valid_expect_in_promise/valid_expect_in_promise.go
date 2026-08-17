@@ -338,6 +338,11 @@ func (a *analyzer) resolveFunctionConsumption(
 				}
 				return
 			}
+			if isPreservingAssignmentTarget(node) {
+				// The store may not happen, so whatever the symbol already
+				// holds can survive this write.
+				return
+			}
 			builder.Emit(flowEvent{kind: flowOverwrite, symbol: symbol})
 		},
 		Statement: func(builder *cfg.Builder[flowEvent], node *ast.Node) {
@@ -354,7 +359,10 @@ func (a *analyzer) resolveFunctionConsumption(
 			group.safe = true
 			continue
 		}
-		if group.binding == nil {
+		// A binding and a direct consumption are two independent ways of being
+		// consumed: `await (pending ||= chain)` stores the chain and awaits the
+		// value the assignment produced.
+		if !group.safe {
 			group.safe = a.isDirectlyConsumed(group.root, function.function)
 		}
 	}
@@ -388,9 +396,16 @@ func (a *analyzer) bindingFor(group *chainGroup) *chainBinding {
 				symbol: a.symbolOf(name),
 			}
 		}
-		if ast.IsAssignmentExpression(parent, true) {
+		if ast.IsAssignmentExpression(parent, false) {
 			binary := parent.AsBinaryExpression()
-			if binary.OperatorToken.Kind != ast.KindEqualsToken ||
+			operator := binary.OperatorToken.Kind
+			// A compound arithmetic assignment produces something that is no
+			// longer this promise, so it binds nothing. A logical assignment
+			// does store the chain, only conditionally.
+			logical := ast.IsLogicalOrCoalescingAssignmentOperator(operator)
+			preserving := operator == ast.KindBarBarEqualsToken ||
+				operator == ast.KindQuestionQuestionEqualsToken
+			if (operator != ast.KindEqualsToken && !logical) ||
 				ast.SkipParentheses(binary.Right) != ast.SkipParentheses(current) {
 				return nil
 			}
@@ -400,9 +415,13 @@ func (a *analyzer) bindingFor(group *chainGroup) *chainBinding {
 			}
 			symbol := a.symbolOf(target)
 			return &chainBinding{
-				target:  target,
-				symbol:  symbol,
-				extends: promiseChainStartsWithSymbol(group.root, symbol, a),
+				target: target,
+				symbol: symbol,
+				// `p ||= chain` and `p ??= chain` leave a promise already held
+				// by p in place, so the bind must not kill it, the same way a
+				// chain that continues off p does not. `p &&= chain` overwrites
+				// that promise, so it kills like a plain assignment.
+				extends: preserving || promiseChainStartsWithSymbol(group.root, symbol, a),
 			}
 		}
 		return nil
@@ -537,6 +556,32 @@ func (a *analyzer) isSafeIdentifierUse(identifier, function *ast.Node) bool {
 	return false
 }
 
+// isPreservingAssignmentTarget reports whether node is the target of a `||=` or
+// `??=` assignment. A promise a candidate left there is truthy and non-nullish,
+// so neither operator ever replaces it. `&&=` does, and is not included.
+func isPreservingAssignmentTarget(node *ast.Node) bool {
+	current := node
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		if parent.Kind == ast.KindParenthesizedExpression {
+			current = parent
+			continue
+		}
+		if parent.Kind != ast.KindBinaryExpression {
+			return false
+		}
+		binary := parent.AsBinaryExpression()
+		if binary == nil {
+			return false
+		}
+		operator := binary.OperatorToken.Kind
+		return (operator == ast.KindBarBarEqualsToken ||
+			operator == ast.KindQuestionQuestionEqualsToken) &&
+			ast.SkipParentheses(binary.Left) == ast.SkipParentheses(current)
+	}
+	return false
+}
+
 func promiseValueFlowsThroughBinary(parent, current *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindBinaryExpression {
 		return false
@@ -553,7 +598,11 @@ func promiseValueFlowsThroughBinary(parent, current *ast.Node) bool {
 	case ast.KindCommaToken:
 		return binary.Right == current
 	default:
-		return false
+		// `await (p ||= chain)` consumes the chain the assignment stored, so
+		// the value carries on through the right-hand side of a logical
+		// assignment too.
+		return ast.IsLogicalOrCoalescingAssignmentOperator(binary.OperatorToken.Kind) &&
+			binary.Right == current
 	}
 }
 
