@@ -566,6 +566,7 @@ export default defineConfig({
     './tests/rstest/rules/no-identical-title.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
+    './tests/rstest/rules/prefer-called-exactly-once-with.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
     './tests/rstest/rules/valid-title.test.ts',
 
