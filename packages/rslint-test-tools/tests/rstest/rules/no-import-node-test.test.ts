@@ -6,8 +6,8 @@ ruleTester.run('no-import-node-test', {} as never, {
   valid: [
     { code: `import { test } from '@rstest/core'` },
     { code: `import { test } from 'vitest'` },
-    { code: `import { test } from 'node:test/reporters'` },
-    { code: `const t = require('node:test')` },
+    { code: `import { test } from 'node:testing'` },
+    { code: `const assert = require('node:assert')` },
   ],
   invalid: [
     {
@@ -16,7 +16,7 @@ ruleTester.run('no-import-node-test', {} as never, {
       errors: [
         {
           messageId: 'noImportNodeTest',
-          message: 'Do not import from `node:test` in Rstest test files',
+          message: 'Do not import the Node test runner in Rstest test files',
         },
       ],
     },
@@ -57,6 +57,16 @@ ruleTester.run('no-import-node-test', {} as never, {
     },
     {
       code: `import { test, mock } from 'node:test'`,
+      output: null,
+      errors: [{ messageId: 'noImportNodeTest' }],
+    },
+    {
+      code: `import { tap } from 'node:test/reporters'`,
+      output: null,
+      errors: [{ messageId: 'noImportNodeTest' }],
+    },
+    {
+      code: `const nodeTest = require('node:test')`,
       output: null,
       errors: [{ messageId: 'noImportNodeTest' }],
     },

@@ -17,8 +17,9 @@ func TestNoImportNodeTestRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `import { test } from '@rstest/core'`},
 			{Code: `import { test } from 'vitest'`},
-			{Code: `import { test } from 'node:test/reporters'`},
-			{Code: `const t = require('node:test')`},
+			{Code: `import { test } from 'node:testing'`},
+			{Code: `const assert = require('node:assert')`},
+			{Code: `const t = import('node:test')`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -26,7 +27,7 @@ func TestNoImportNodeTestRule(t *testing.T) {
 				Output: []string{`import { test } from '@rstest/core'`},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "noImportNodeTest",
-					Message:   "Do not import from `node:test` in Rstest test files",
+					Message:   "Do not import the Node test runner in Rstest test files",
 					Line:      1,
 					Column:    1,
 					EndLine:   1,
@@ -70,6 +71,22 @@ func TestNoImportNodeTestRule(t *testing.T) {
 			},
 			{
 				Code:   `import nodeTest, { test } from 'node:test'`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code:   `import { tap } from 'node:test/reporters'`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code:   `import { test } from 'node:test/reporters'`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code:   `const nodeTest = require('node:test')`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code:   `const { tap } = require('node:test/reporters')`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
 			},
 			{

@@ -1,12 +1,26 @@
 package no_import_node
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
-const replacementModule = "@rstest/core"
+const (
+	nodeTestModule     = "node:test"
+	replacementModule  = "@rstest/core"
+	nodeTestSubpathPfx = nodeTestModule + "/"
+)
+
+// isNodeTestModule reports whether a module specifier resolves to Node's test
+// runner: `node:test` itself, or one of its subpaths such as
+// `node:test/reporters`. Only the exact `node:test` specifier has a candidate
+// replacement in `@rstest/core`, but every form is reported.
+func isNodeTestModule(specifier string) bool {
+	return specifier == nodeTestModule || strings.HasPrefix(specifier, nodeTestSubpathPfx)
+}
 
 var safeImportedNames = map[string]bool{
 	"describe": true,
@@ -17,8 +31,13 @@ var safeImportedNames = map[string]bool{
 func noImportNodeTestMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "noImportNodeTest",
-		Description: "Do not import from `node:test` in Rstest test files",
+		Description: "Do not import the Node test runner in Rstest test files",
 	}
+}
+
+func isStringNode(node *ast.Node) bool {
+	return node.Kind == ast.KindStringLiteral ||
+		node.Kind == ast.KindNoSubstitutionTemplateLiteral
 }
 
 func canSafelyReplaceModule(declaration *ast.ImportDeclaration) bool {
@@ -75,11 +94,11 @@ var NoImportNodeTestRule = rule.Rule{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()
 				if declaration == nil || declaration.ModuleSpecifier == nil ||
-					declaration.ModuleSpecifier.Text() != "node:test" {
+					!isNodeTestModule(declaration.ModuleSpecifier.Text()) {
 					return
 				}
 				message := noImportNodeTestMessage()
-				if !canSafelyReplaceModule(declaration) {
+				if declaration.ModuleSpecifier.Text() != nodeTestModule || !canSafelyReplaceModule(declaration) {
 					ctx.ReportNode(node, message)
 					return
 				}
@@ -96,6 +115,24 @@ var NoImportNodeTestRule = rule.Rule{
 						replacement,
 					),
 				)
+			},
+			// `require('node:test')` is reported as well, but never fixed: the
+			// binding forms a require can take do not map onto a specifier
+			// rewrite the way a static import does.
+			ast.KindCallExpression: func(node *ast.Node) {
+				callee := node.AsCallExpression().Expression
+				if callee.Kind != ast.KindIdentifier || callee.AsIdentifier().Text != "require" {
+					return
+				}
+				arguments := node.Arguments()
+				if len(arguments) == 0 {
+					return
+				}
+				firstArg := arguments[0]
+				if firstArg == nil || !isStringNode(firstArg) || !isNodeTestModule(firstArg.Text()) {
+					return
+				}
+				ctx.ReportNode(firstArg, noImportNodeTestMessage())
 			},
 		}
 	},
