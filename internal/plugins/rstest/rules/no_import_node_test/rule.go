@@ -15,7 +15,7 @@ const (
 )
 
 // isNodeTestModule reports whether a module specifier resolves to Node's test
-// runner: `node:test` itself, or one of its subpaths such as
+// runner: `node:test` itself, or one of its sub-paths such as
 // `node:test/reporters`. Only the exact `node:test` specifier has a candidate
 // replacement in `@rstest/core`, but every form is reported.
 func isNodeTestModule(specifier string) bool {
