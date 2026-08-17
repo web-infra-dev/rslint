@@ -292,8 +292,8 @@ var ValidExpectRule = rule.Rule{
 					return
 				}
 
-				// Static members (expect.assertions(1), expect.any(...)) carry no
-				// assertion factory, so argument and await checks do not apply.
+				// Forms with no assertion factory carry no assertion, so argument
+				// and await checks do not apply.
 				if parsed.Head == nil || parsed.Head.Kind != ast.KindCallExpression {
 					return
 				}
