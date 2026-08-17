@@ -43,9 +43,10 @@ vitest behavior where it differs from jest:
   `tooManyArgs`.
 - **Chai property matchers are valid** without a call: `expect(value).to.be.ok`,
   `expect(spy).to.have.been.called`. They are not reported as `matcherNotCalled`.
-- **Static members carry no assertion**: `expect.assertions(1)`,
-  `expect.hasAssertions()` and asymmetric matchers such as `expect.any(Number)`
-  are not subject to argument or await checks.
+- **Forms with no assertion factory carry no assertion**: `expect.assertions(1)`,
+  `expect.hasAssertions()`, asymmetric matchers such as `expect.any(Number)` and
+  bare chains such as `expect.resolves.toBe(1)` or `expect.toResolve()` are not
+  subject to argument or await checks.
 
 `expect` is recognized from globals, `@rstest/core` imports and aliases,
 `require`, namespace access, `import.meta.rstest`, test-context `expect`
