@@ -145,8 +145,6 @@ func TestNoUseBeforeDefineExtras(t *testing.T) {
 			{Code: `const a = 1; export const q = a;`},
 
 			// ----- Type-only named exports -----
-			{Code: `let x = 1; export type { x };`},
-			{Code: `function f() {} export type { f };`},
 			{Code: `type T = number; export type { T };`},
 			{
 				Code:    `export type { x }; let x = 1;`,
@@ -220,6 +218,17 @@ declare global {
   }
 }
 `},
+
+			// ----- A string-literal enum member takes part in name resolution -----
+			// ----- but declares no identifier, so it is never a definition site -----
+			{Code: `enum E { b = a, "a" = 1 }`},
+			{Code: `enum E { "a" = 1, b = a } const a = 2;`},
+			{Code: `enum E { b = a, "a" = 1 } const a = 2;`},
+
+			// ----- A local type declaration does not bind the value space, so a -----
+			// ----- value read of a name it shares with a global is unaffected -----
+			{Code: `Map; interface Map<K, V> {}`},
+			{Code: `new Map(); interface Map<K, V> { extra(): void }`},
 		},
 
 		// =====================================================================
@@ -456,6 +465,28 @@ declare global {
 				},
 			},
 
+			// ----- A type-only export specifier only names the type space, so -----
+			// ----- it never reaches a value binding and is reported wherever -----
+			// ----- that binding sits -----
+			{
+				Code: `let x = 1; export type { x };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 26},
+				},
+			},
+			{
+				Code: `function f() {} export type { f };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 31},
+				},
+			},
+			{
+				Code: `let x = 1; export { type x };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 26},
+				},
+			},
+
 			// ----- Deeply nested: function inside arrow inside class method -----
 			{
 				Code: `
@@ -644,22 +675,11 @@ const a = 1;
 				},
 			},
 
-			// =========== Local declaration merged with a lib.d.ts global ===========
-			// A file-level declaration binds the name for the whole file, so the
-			// earlier use is reported even though the value itself comes from
-			// lib.d.ts. Matches ESLint, whose scope analysis merges the local
-			// declaration into the same variable as the predefined global.
-
+			// ----- An enum member reference that resolves past the enum body -----
 			{
-				Code: `Map; interface Map<K, V> {}`,
+				Code: `enum E { b = a } const a = 2;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noUseBeforeDefine", Line: 1, Column: 1},
-				},
-			},
-			{
-				Code: `new Map(); interface Map<K, V> { extra(): void }`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noUseBeforeDefine", Line: 1, Column: 5},
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 14},
 				},
 			},
 		},

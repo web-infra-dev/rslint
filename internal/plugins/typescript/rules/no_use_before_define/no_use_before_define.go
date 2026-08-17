@@ -129,6 +129,12 @@ func check(ctx rule.RuleContext, opts options, ref *scope.Reference) {
 	if declaration == nil {
 		return
 	}
+	// A binding declared without an identifier — a string-literal enum member,
+	// `enum E { "a" = 1 }` — takes part in name resolution but has no
+	// declaration site to compare positions against, so upstream skips it.
+	if declaration.Anonymous {
+		return
+	}
 	if isDefinedBeforeUse(declaration, ref) {
 		return
 	}
