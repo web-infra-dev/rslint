@@ -1,4 +1,4 @@
-package utils
+package ecmascript
 
 import (
 	"unicode/utf8"

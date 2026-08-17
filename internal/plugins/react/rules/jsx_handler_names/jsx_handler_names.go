@@ -2,7 +2,6 @@ package jsx_handler_names
 
 import (
 	_ "embed"
-	"regexp"
 	"strings"
 	"unicode"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed jsx_handler_names.schema.json
@@ -30,8 +30,8 @@ type options struct {
 	// nil when the corresponding prefix is disabled (`false`); upstream's
 	// `EVENT_HANDLER_REGEX` / `PROP_EVENT_HANDLER_REGEX` are also `null` in
 	// that case and serve as a sentinel "this side is disabled" gate.
-	eventHandlerRegex     *regexp.Regexp
-	propEventHandlerRegex *regexp.Regexp
+	eventHandlerRegex     *esregexp.RegExp
+	propEventHandlerRegex *esregexp.RegExp
 }
 
 func parseOptions(raw []any) options {
@@ -102,15 +102,15 @@ func parseOptions(raw []any) options {
 		if propPrefixDisabled {
 			propAlt = ""
 		}
-		if re, err := regexp.Compile(
-			`^((props\.` + propAlt + `)|((.*\.)?` + opts.eventHandlerPrefix + `))[0-9]*[A-Z].*$`,
+		if re, err := esregexp.Compile(
+			`^((props\.`+propAlt+`)|((.*\.)?`+opts.eventHandlerPrefix+`))[0-9]*[A-Z].*$`, "",
 		); err == nil {
 			opts.eventHandlerRegex = re
 		}
 	}
 	if !propPrefixDisabled {
-		if re, err := regexp.Compile(
-			`^(` + opts.eventHandlerPropPrefix + `[A-Z].*|ref)$`,
+		if re, err := esregexp.Compile(
+			`^(`+opts.eventHandlerPropPrefix+`[A-Z].*|ref)$`, "",
 		); err == nil {
 			opts.propEventHandlerRegex = re
 		}
@@ -333,8 +333,8 @@ var JsxHandlerNamesRule = rule.Rule{
 					propValue = stripThisOrBindBase(propValue)
 				}
 
-				propIsEventHandler := opts.propEventHandlerRegex != nil && opts.propEventHandlerRegex.MatchString(propKey)
-				propFnIsNamedCorrectly := opts.eventHandlerRegex != nil && opts.eventHandlerRegex.MatchString(propValue)
+				propIsEventHandler := opts.propEventHandlerRegex != nil && opts.propEventHandlerRegex.Test(propKey)
+				propFnIsNamedCorrectly := opts.eventHandlerRegex != nil && opts.eventHandlerRegex.Test(propValue)
 
 				switch {
 				case propIsEventHandler && opts.eventHandlerRegex != nil && !propFnIsNamedCorrectly:

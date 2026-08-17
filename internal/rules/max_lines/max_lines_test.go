@@ -139,7 +139,7 @@ func TestMaxLines(t *testing.T) {
 				Options: map[string]interface{}{"max": 1, "skipComments": true},
 			},
 			// BOM / NBSP on a line is "blank" per JS trim, unlike Go's
-			// strings.TrimSpace — uses utils.IsStrWhiteSpace for alignment.
+			// strings.TrimSpace — uses ecmascript.IsWhiteSpace for alignment.
 			{
 				Code:    "var x;\n\u00A0\u00A0\n\uFEFF\nvar y;",
 				Options: map[string]interface{}{"max": 2, "skipBlankLines": true},

@@ -32,30 +32,6 @@ func TestExtractRegexPatternAndFlags(t *testing.T) {
 	}
 }
 
-func TestIsValidRegexLiteral(t *testing.T) {
-	tests := []struct {
-		name    string
-		literal string
-		want    bool
-	}{
-		{name: "basic", literal: `/abc/g`, want: true},
-		{name: "unicode sets", literal: `/[[A--B]]/v`, want: true},
-		{name: "inline modifier", literal: `/(?i:foo)bar/`, want: true},
-		{name: "annex b decimal escape", literal: `/\78\126\5934/`, want: true},
-		{name: "invalid unicode property", literal: `/\p{NotAProperty}/u`, want: false},
-		{name: "invalid v set", literal: `/[[A&&&]]/v`, want: false},
-		{name: "invalid flag", literal: `/a/-`, want: false},
-		{name: "conflicting unicode flags", literal: `/a/uv`, want: false},
-		{name: "unterminated class", literal: `/[a/`, want: false},
-		{name: "not a literal", literal: `abc`, want: false},
-	}
-	for _, tt := range tests {
-		if got := IsValidRegexLiteral(tt.literal); got != tt.want {
-			t.Errorf("%s: IsValidRegexLiteral(%q) = %v, want %v", tt.name, tt.literal, got, tt.want)
-		}
-	}
-}
-
 func TestHasCommentInsideNode(t *testing.T) {
 	source := "const a = \"https://example.com/*x*/\";\n" +
 		"const b = /\\/\\//;\n" +
