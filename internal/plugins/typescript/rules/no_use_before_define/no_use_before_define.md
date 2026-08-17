@@ -67,6 +67,9 @@ core rule:
   annotation and a `typeof` query.
 - A reference from the parameter list of a function type (`type F = (x: Foo) => void`)
   is never reported here.
+- A reference that resolves to a string-literal enum member (`enum E { b = a, "a" = 1 }`)
+  is not reported here, because such a member declares no identifier. The core
+  rule measures it from the literal and reports it.
 
 ## Original Documentation
 

@@ -93,6 +93,9 @@ var NoUseBeforeDefineRule = rule.Rule{
 				continue
 			}
 			declaration := ref.Resolved()
+			// `Variable.ID` is upstream's `variable.defs[0].name`, which for a
+			// string-literal enum member is the literal — still a definition
+			// site to measure the reference against.
 			if ref.Identifier.End() < declaration.ID.End() ||
 				(isEvaluatedDuringInitialization(ref) && !isTypeReference(ref.Identifier)) {
 				ctx.ReportNode(ref.Identifier, rule.RuleMessage{
@@ -118,12 +121,6 @@ func shouldCheck(ref *scope.Reference, opts options) bool {
 
 	declaration := ref.Resolved()
 	if declaration == nil {
-		return false
-	}
-
-	// A binding with no identifier — a string-literal enum member — has no
-	// declaration site to point the reader at, so upstream leaves it alone.
-	if declaration.Anonymous {
 		return false
 	}
 
