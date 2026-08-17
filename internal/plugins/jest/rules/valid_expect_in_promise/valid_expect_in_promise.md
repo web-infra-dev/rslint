@@ -31,3 +31,8 @@ Jest callbacks using `done` are not analyzed because the callback can coordinate
 This implementation intentionally fixes upstream cases where unrelated assignments stop promise tracking, named callbacks are missed, nested handlers are missed, or `Promise.reject` / `Promise.allSettled` are incorrectly accepted.
 
 This rule has no options and does not provide an autofix.
+
+## Original Documentation
+
+- [eslint-plugin-jest: valid-expect-in-promise](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/valid-expect-in-promise.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/valid-expect-in-promise.ts)
