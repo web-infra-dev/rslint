@@ -71,6 +71,11 @@ type Variable struct {
 	IsValueBinding   bool // runtime value vs. type-only
 	IsTypeOnlyImport bool // ImportSpecifier with `type` modifier
 	DeclareModifier  bool // `declare` modifier (.d.ts handling)
+	// Anonymous marks a binding declared without an identifier — a
+	// string-literal enum member (`enum E { "A" = 1 }`). eslint-scope gives
+	// those a variable with an empty `identifiers` list, so they take part in
+	// name resolution but rules never report at their declaration site.
+	Anonymous bool
 
 	Scope *Scope
 }

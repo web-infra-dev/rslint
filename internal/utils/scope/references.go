@@ -110,16 +110,27 @@ func referenceSpaces(id *ast.Node) (value bool, isType bool) {
 		}
 	}
 
-	// `A.B.C` is a type node as a whole, never in its parts, so ask about the
-	// outermost qualified name rather than the identifier itself.
-	entity := id
-	for entity.Parent != nil && entity.Parent.Kind == ast.KindQualifiedName {
-		entity = entity.Parent
-	}
-	if ast.IsPartOfTypeNode(entity) {
+	if InTypePosition(id) {
 		return false, true
 	}
 	return true, false
+}
+
+// InTypePosition reports whether `id` names a type rather than a value.
+// eslint-scope marks every identifier its type visitor reaches as a type
+// reference; this is the same question asked of the tsgo AST.
+//
+// A dotted name is a type node as a whole, never in its parts, so the
+// outermost one carries the answer. A heritage clause spells its dotted name
+// with property accesses even in type position (`implements A.B.C`), so both
+// shapes have to be climbed.
+func InTypePosition(id *ast.Node) bool {
+	entity := id
+	for entity.Parent != nil &&
+		(entity.Parent.Kind == ast.KindQualifiedName || entity.Parent.Kind == ast.KindPropertyAccessExpression) {
+		entity = entity.Parent
+	}
+	return ast.IsPartOfTypeNode(entity)
 }
 
 // isImportTypeQualifier reports whether `id` is part of the qualifier of an

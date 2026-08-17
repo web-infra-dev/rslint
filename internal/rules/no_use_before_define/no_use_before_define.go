@@ -94,7 +94,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 			}
 			declaration := ref.Resolved()
 			if ref.Identifier.End() < declaration.ID.End() ||
-				(isEvaluatedDuringInitialization(ref) && !isTypeReferenceName(ref.Identifier)) {
+				(isEvaluatedDuringInitialization(ref) && !isTypeReference(ref.Identifier)) {
 				ctx.ReportNode(ref.Identifier, rule.RuleMessage{
 					Id:          "usedBeforeDefined",
 					Description: fmt.Sprintf("'%s' was used before it was defined.", ref.Identifier.Text()),
@@ -118,6 +118,12 @@ func shouldCheck(ref *scope.Reference, opts options) bool {
 
 	declaration := ref.Resolved()
 	if declaration == nil {
+		return false
+	}
+
+	// A binding with no identifier — a string-literal enum member — has no
+	// declaration site to point the reader at, so upstream leaves it alone.
+	if declaration.Anonymous {
 		return false
 	}
 
@@ -145,7 +151,7 @@ func shouldCheck(ref *scope.Reference, opts options) bool {
 	}
 
 	if opts.ignoreTypeReferences &&
-		(referenceContainsTypeQuery(identifier) || isTypeReferenceName(identifier)) {
+		(referenceContainsTypeQuery(identifier) || isTypeReference(identifier)) {
 		return false
 	}
 
@@ -161,7 +167,25 @@ func shouldCheck(ref *scope.Reference, opts options) bool {
 		return false
 	}
 
+	if isFromFunctionTypeScope(ref) {
+		return false
+	}
+
 	return true
+}
+
+// isFromFunctionTypeScope reports whether the reference is evaluated in the
+// scope a TS function type puts its type parameters and parameters in. Nothing
+// in such a signature runs, so upstream never reports a reference from one.
+func isFromFunctionTypeScope(ref *scope.Reference) bool {
+	from := ref.From
+	if from == nil || from.Kind != scope.KindFunction || from.Block == nil {
+		return false
+	}
+	block := from.Block
+	return ast.IsFunctionTypeNode(block) || ast.IsConstructorTypeNode(block) ||
+		ast.IsCallSignatureDeclaration(block) || ast.IsConstructSignatureDeclaration(block) ||
+		ast.IsMethodSignatureDeclaration(block)
 }
 
 func isFunctionNameDef(v *scope.Variable) bool {
@@ -327,11 +351,18 @@ func referenceContainsTypeQuery(node *ast.Node) bool {
 	return false
 }
 
-// isTypeReferenceName reports whether the identifier is the whole name of a
-// type reference (`let x: Foo`). A qualified name (`let x: A.Foo`) is not one:
-// there the identifier's parent is the qualified name.
-func isTypeReferenceName(node *ast.Node) bool {
-	return node.Parent != nil && node.Parent.Kind == ast.KindTypeReference
+// isTypeReference reports whether the identifier names a type — every type
+// position, plus `export = X`, which exports whichever space `X` lives in.
+// eslint-scope carries the answer on the reference; here it is read back off
+// the syntax, so that the option filters stay independent of how the scope
+// model resolves a name.
+func isTypeReference(node *ast.Node) bool {
+	if parent := node.Parent; parent != nil && parent.Kind == ast.KindExportAssignment {
+		if assignment := parent.AsExportAssignment(); assignment != nil && assignment.IsExportEquals {
+			return true
+		}
+	}
+	return scope.InTypePosition(node)
 }
 
 func leftMostQualifiedName(node *ast.Node) *ast.Node {

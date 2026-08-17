@@ -670,10 +670,10 @@ func (b *builder) addParameters(node *ast.Node, s *Scope, recurseAnnotations boo
 		if param == nil {
 			continue
 		}
-		// Skip `this` pseudo-parameter.
-		if pn := param.Name(); pn != nil && pn.Kind == ast.KindIdentifier && pn.Text() == "this" {
-			continue
-		}
+		// The `this` pseudo-parameter declares no binding, but its type
+		// annotation is a real type reference and still has to be walked.
+		pn := param.Name()
+		isThisParameter := pn != nil && pn.Kind == ast.KindIdentifier && pn.Text() == "this"
 		if recurseAnnotations {
 			// Parameter decorators (`@dec x: T`) run at class-definition time,
 			// in the enclosing class scope (s.Parent for methods). Fall back
@@ -693,13 +693,13 @@ func (b *builder) addParameters(node *ast.Node, s *Scope, recurseAnnotations boo
 				b.visitExpression(init, s)
 			}
 		}
-		if param.Name() == nil {
+		if isThisParameter || pn == nil {
 			continue
 		}
-		if recurseAnnotations && param.Name().Kind != ast.KindIdentifier {
-			b.visitBindingPattern(param.Name(), s)
+		if recurseAnnotations && pn.Kind != ast.KindIdentifier {
+			b.visitBindingPattern(pn, s)
 		}
-		utils.CollectBindingNames(param.Name(), func(id *ast.Node, name string) {
+		utils.CollectBindingNames(pn, func(id *ast.Node, name string) {
 			s.Add(&Variable{
 				Name:           name,
 				ID:             id,
@@ -892,14 +892,18 @@ func (b *builder) visitEnum(node *ast.Node, outer *Scope) {
 		if em == nil || em.Name() == nil {
 			continue
 		}
-		if em.Name().Kind == ast.KindIdentifier {
+		// TS resolves a string-literal member name to a real name, so `enum E {
+		// "a" = 1, b = a }` reads the member. The literal declares no
+		// identifier though, which keeps rules from reporting at it.
+		if name := em.Name(); name.Kind == ast.KindIdentifier || name.Kind == ast.KindStringLiteral {
 			enumScope.Add(&Variable{
-				Name:           em.Name().Text(),
-				ID:             em.Name(),
+				Name:           name.Text(),
+				ID:             name,
 				DefNode:        m,
 				Parent:         m.Parent,
 				Kind:           DefEnumMember,
 				IsValueBinding: true,
+				Anonymous:      name.Kind != ast.KindIdentifier,
 			})
 		}
 		if em.Initializer != nil {

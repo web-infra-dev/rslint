@@ -202,6 +202,9 @@ func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.Rule
 				continue
 			}
 			for _, v := range s.Vars {
+				if v.Anonymous {
+					continue
+				}
 				if opts.allow[v.Name] {
 					continue
 				}
@@ -231,6 +234,12 @@ func isDuplicatedClassNameInClassScope(v *scope.Variable) bool {
 // checkVariable tests whether `v` shadows a variable in some outer scope.
 func (c *checker) checkVariable(ctx rule.RuleContext, s *scope.Scope, v *scope.Variable, opts options) {
 	shadowed := findShadowed(v, s.Parent)
+	// An outer binding with no identifier — a string-literal enum member —
+	// answers the name lookup but has no declaration site to name in the
+	// report, so nothing is reported against it.
+	if shadowed != nil && shadowed.Anonymous {
+		return
+	}
 	shadowedDefaultTypeScriptGlobal := shadowed == nil && opts.builtinGlobals &&
 		c.includeDefaultTypeScriptTypeGlobals && rule.IsDefaultTypeScriptTypeGlobal(v.Name)
 	shadowedGlobal := shadowed == nil && opts.builtinGlobals &&
