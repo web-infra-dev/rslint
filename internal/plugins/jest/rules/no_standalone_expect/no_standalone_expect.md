@@ -54,6 +54,23 @@ expect.extend({});
 - First argument (optional): object with `additionalTestBlockFunctions`
   - `additionalTestBlockFunctions`: array of function names that should also be treated as test blocks (for example `each.test`).
 
+## Differences from ESLint
+
+rslint treats method, constructor, getter, and setter bodies as helper function
+scopes. An `expect` inside one of those bodies is therefore allowed, just like
+an assertion inside a function declaration or arrow-function helper. The
+upstream rule reports method and accessor bodies.
+
+rslint also balances the test scope opened by every recognized registration.
+As a result, a standalone assertion after a chained registration such as
+`test.only('case', () => {})` is still reported. The upstream rule can leave the
+registration scope open and miss that assertion.
+
+Known negated asymmetric matcher constructors, such as
+`expect.not.stringContaining('value')`, are treated as static value constructors
+and allowed outside a test block. The upstream rule reports this two-member
+static form.
+
 ## Original Documentation
 
 - [eslint-plugin-jest: no-standalone-expect](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-standalone-expect.md)
