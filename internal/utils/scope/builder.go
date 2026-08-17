@@ -33,7 +33,7 @@ func (b *builder) reference(id *ast.Node, s *Scope) {
 		return
 	}
 	value, isType := referenceSpaces(id)
-	ref := &Reference{Identifier: id, From: s, IsValueReference: value, IsTypeReference: isType}
+	ref := &Reference{Identifier: id, From: s, isValueReference: value, isTypeReference: isType}
 	s.References = append(s.References, ref)
 	b.manager.References = append(b.manager.References, ref)
 }

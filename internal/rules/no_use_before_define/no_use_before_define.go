@@ -94,7 +94,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 			}
 			declaration := ref.Resolved()
 			if ref.Identifier.End() < declaration.ID.End() ||
-				(ref.IsValueReference && isEvaluatedDuringInitialization(ref)) {
+				(isEvaluatedDuringInitialization(ref) && !isTypeReferenceName(ref.Identifier)) {
 				ctx.ReportNode(ref.Identifier, rule.RuleMessage{
 					Id:          "usedBeforeDefined",
 					Description: fmt.Sprintf("'%s' was used before it was defined.", ref.Identifier.Text()),
@@ -112,15 +112,13 @@ var NoUseBeforeDefineRule = rule.Rule{
 func shouldCheck(ref *scope.Reference, opts options) bool {
 	identifier := ref.Identifier
 
-	declaration := ref.Resolved()
-	if declaration == nil {
+	if opts.allowNamedExports && isExportSpecifierLocalName(identifier) {
 		return false
 	}
 
-	// A named export is settled before any other option is consulted:
-	// `allowNamedExports` is the only one that silences it.
-	if isExportSpecifierLocalName(identifier) {
-		return !opts.allowNamedExports
+	declaration := ref.Resolved()
+	if declaration == nil {
+		return false
 	}
 
 	if !opts.functions && isFunctionNameDef(declaration) {
@@ -147,7 +145,7 @@ func shouldCheck(ref *scope.Reference, opts options) bool {
 	}
 
 	if opts.ignoreTypeReferences &&
-		(referenceContainsTypeQuery(identifier) || ref.IsTypeReference) {
+		(referenceContainsTypeQuery(identifier) || isTypeReferenceName(identifier)) {
 		return false
 	}
 
@@ -327,6 +325,13 @@ func referenceContainsTypeQuery(node *ast.Node) bool {
 		}
 	}
 	return false
+}
+
+// isTypeReferenceName reports whether the identifier is the whole name of a
+// type reference (`let x: Foo`). A qualified name (`let x: A.Foo`) is not one:
+// there the identifier's parent is the qualified name.
+func isTypeReferenceName(node *ast.Node) bool {
+	return node.Parent != nil && node.Parent.Kind == ast.KindTypeReference
 }
 
 func leftMostQualifiedName(node *ast.Node) *ast.Node {

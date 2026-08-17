@@ -217,6 +217,13 @@ function f(X, a = X) {
 			// ---- Type parameters are `Type` definitions upstream, so
 			// `typedefs` exempts them ----
 			{Code: `type Q<T extends U, U = string> = T;`, Options: map[string]any{"typedefs": false, "ignoreTypeReferences": false}},
+
+			// ---- `enums` exempts a reference whatever execution context it
+			// sits in, unlike `classes` and `variables` ----
+			{Code: `const v = E.A; enum E { A }`, Options: map[string]any{"enums": false}},
+			// ---- A name this file never declares is never reported, not even
+			// as the local half of a named export ----
+			{Code: `export { nothing };`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: receiver / expression wrappers must not hide the
@@ -455,6 +462,24 @@ type Later = string;
 				Code:    `type Q<T extends U, U = string> = T;`,
 				Options: map[string]any{"typedefs": true, "ignoreTypeReferences": false},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 1, Column: 18}},
+			},
+
+			// ---- `ignoreTypeReferences` keys off the syntactic shape of the
+			// reference, so only a plain `T` type annotation is exempt: an
+			// `implements` clause and an `export =` operand are not ----
+			{
+				Code:   `class C implements Later {} interface Later {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 1, Column: 20}},
+			},
+			{
+				Code:   `export = X; const X = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 1, Column: 10}},
+			},
+			// ---- A type-level call signature is an ordinary reference site ----
+			{
+				Code:    `let f: (x: Later) => void; type Later = string;`,
+				Options: map[string]any{"ignoreTypeReferences": false},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 1, Column: 12}},
 			},
 
 			// ---- A class index signature's key type and result type are

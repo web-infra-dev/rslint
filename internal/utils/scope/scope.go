@@ -158,12 +158,12 @@ type Reference struct {
 	// declaration order; nil when the name resolves to nothing in this file.
 	Declarations []*Variable
 
-	// IsValueReference is true when the identifier can name a value — every
+	// isValueReference is true when the identifier can name a value — every
 	// expression position, plus `typeof X` and `export { x }`.
-	IsValueReference bool
-	// IsTypeReference is true when the identifier can name a type — every type
+	isValueReference bool
+	// isTypeReference is true when the identifier can name a type — every type
 	// position, plus `export { x }`, which exports whichever space `x` lives in.
-	IsTypeReference bool
+	isTypeReference bool
 }
 
 // Resolved returns the first declaration of the binding this reference
@@ -236,8 +236,8 @@ func (s *Scope) binds(ref *Reference, declarations []*Variable) bool {
 	// an expression's read of `X`, and `const X` never answers a type
 	// annotation naming `X`.
 	for _, declaration := range declarations {
-		if (ref.IsValueReference && declaration.Kind.declaresValue()) ||
-			(ref.IsTypeReference && declaration.Kind.declaresType()) {
+		if (ref.isValueReference && declaration.Kind.declaresValue()) ||
+			(ref.isTypeReference && declaration.Kind.declaresType()) {
 			return true
 		}
 	}
