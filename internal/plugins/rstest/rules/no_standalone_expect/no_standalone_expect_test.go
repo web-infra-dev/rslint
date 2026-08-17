@@ -222,6 +222,10 @@ describe("suite", () => {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedExpect"}},
 			},
 			{
+				Code:   `test("case", () => {}, expect(1).toBe(1));`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedExpect"}},
+			},
+			{
 				Code:   `test(expect(1).toBe(1), callback); function callback() {}`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedExpect"}},
 			},
