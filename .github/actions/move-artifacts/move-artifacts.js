@@ -71,83 +71,13 @@ async function moveArtifacts() {
       }
     }
 
-    // Find and move tsgo binaries to lib directory
-    const tsgoFiles = findBinaries('binaries', '-tsgo');
-    console.log(`Found ${tsgoFiles.length} tsgo binary files`);
-
-    for (const file of tsgoFiles) {
-      // Skip tsgo-built directories
-      if (file.includes('-tsgo-built')) {
-        continue;
-      }
-      console.log(`Processing ${file}`);
-      const isWindows = file.includes('win32');
-      const filename = path.basename(file);
-      const dirname = filename.replace(/-tsgo$/, '');
-      const targetDir = path.join('npm', 'tsgo', dirname, 'lib');
-
-      const targetFile = path.join(targetDir, isWindows ? 'tsgo.exe' : 'tsgo');
-
-      // Create target directory and copy file
-      fs.mkdirSync(targetDir, { recursive: true });
-      fs.copyFileSync(file, targetFile);
-      fs.chmodSync(targetFile, 0o755); // Make executable
-
-      console.log(`Copied ${file} to ${targetFile}`);
-    }
-
-    // Copy typescript-go built files (lib files) to tsgo platform packages
-    // Files are downloaded from platform-specific artifacts to binaries/{platform}-tsgo-built/
-    const tsgoPlatforms = [
-      'darwin-arm64',
-      'darwin-x64',
-      'linux-arm64',
-      'linux-x64',
-      'win32-arm64',
-      'win32-x64',
-    ];
-
-    for (const platform of tsgoPlatforms) {
-      const tsgoBuiltSource = path.join(
-        'binaries',
-        `${platform}-tsgo-built`,
-        'local',
-      );
-
-      if (!fs.existsSync(tsgoBuiltSource)) {
-        console.log(
-          `Warning: typescript-go built source not found at ${tsgoBuiltSource}`,
-        );
-        continue;
-      }
-
-      // Get all files from the built/local directory
-      const libFiles = fs.readdirSync(tsgoBuiltSource);
-      console.log(`Found ${libFiles.length} lib files for ${platform}`);
-
-      const targetLibDir = path.join('npm', 'tsgo', platform, 'lib');
-      fs.mkdirSync(targetLibDir, { recursive: true });
-
-      for (const file of libFiles) {
-        // Skip tsgo binary from typescript-go build, we use our own ./cmd/tsgo build
-        if (file === 'tsgo' || file === 'tsgo.exe') {
-          continue;
-        }
-        const srcFile = path.join(tsgoBuiltSource, file);
-        const destFile = path.join(targetLibDir, file);
-        const stat = fs.statSync(srcFile);
-        if (stat.isFile()) {
-          fs.copyFileSync(srcFile, destFile);
-        }
-      }
-      console.log(`Copied built files to ${targetLibDir}`);
-    }
-
     // Move napi `.node` parser binaries into the @rslint/native-{tuple}
     // subpackages (flat, alongside the Go binary). Artifacts are named
     // `rslint.{tuple}.node`; target is `npm/rslint/{tuple}/` (libc suffix kept
     // so gnu/musl stay separate). Not chmod'd — a `.node` is dlopen'd.
-    const nodeFiles = findBinaries('binaries', 'rslint.');
+    const nodeFiles = findBinaries('binaries', 'rslint.').filter((file) =>
+      file.endsWith('.node'),
+    );
     console.log(`Found ${nodeFiles.length} napi .node files`);
 
     for (const file of nodeFiles) {
@@ -161,6 +91,29 @@ async function moveArtifacts() {
       fs.copyFileSync(file, targetFile);
 
       console.log(`Copied ${file} to ${targetFile}`);
+    }
+
+    // Move the rule options JSON Schema dump (a single, platform-independent
+    // artifact named `rule-schemas`, uploaded once from the `build` job's
+    // linux-amd64 leg) to the fixed path
+    // the generate-rule-option-types rslib plugin reads — see
+    // packages/rslint/rslib.config.ts's onAfterBuild hook, which runs during
+    // publish-npm's `build:js` step.
+    const ruleSchemasSrc = path.join(
+      'binaries',
+      'rule-schemas',
+      'rule-schemas.json',
+    );
+    if (fs.existsSync(ruleSchemasSrc)) {
+      const ruleSchemasTarget = path.join(
+        'packages',
+        'rslint',
+        'rule-schemas.json',
+      );
+      fs.copyFileSync(ruleSchemasSrc, ruleSchemasTarget);
+      console.log(`Copied ${ruleSchemasSrc} to ${ruleSchemasTarget}`);
+    } else {
+      console.log(`Warning: rule schemas dump not found at ${ruleSchemasSrc}`);
     }
 
     console.log('Artifact move process completed successfully!');

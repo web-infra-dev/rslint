@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_curly_spacing.schema.json
@@ -243,10 +244,10 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	}
 
 	// secondPos: skip leading whitespace only.
-	res.secondPos = utils.SkipLeadingWhitespace(text, low, high)
+	res.secondPos = ecmascript.SkipLeadingWhitespace(text, low, high)
 
 	// penultimateEnd: skip trailing whitespace only.
-	res.penultimateEnd = utils.SkipTrailingWhitespace(text, low, high)
+	res.penultimateEnd = ecmascript.SkipTrailingWhitespace(text, low, high)
 
 	// nextRealStart: skip whitespace + leading-edge comments. The leading
 	// edge cannot contain string/template literals (those would BE the
@@ -254,13 +255,13 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	p := low
 	for p < high {
 		if text[p] < 0x80 {
-			if utils.IsTriviaWhitespaceByte(text[p]) {
+			if ecmascript.IsTriviaWhitespaceByte(text[p]) {
 				p++
 				continue
 			}
 		} else {
 			r, size := utf8.DecodeRuneInString(text[p:])
-			if size > 0 && r != utf8.RuneError && utils.IsTriviaWhitespaceRune(r) {
+			if size > 0 && r != utf8.RuneError && ecmascript.IsTriviaWhitespaceRune(r) {
 				p += size
 				continue
 			}
@@ -297,13 +298,13 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	p = high
 	for p > low {
 		if text[p-1] < 0x80 {
-			if utils.IsTriviaWhitespaceByte(text[p-1]) {
+			if ecmascript.IsTriviaWhitespaceByte(text[p-1]) {
 				p--
 				continue
 			}
 		} else {
 			r, size := utf8.DecodeLastRuneInString(text[:p])
-			if size > 0 && r != utf8.RuneError && utils.IsTriviaWhitespaceRune(r) {
+			if size > 0 && r != utf8.RuneError && ecmascript.IsTriviaWhitespaceRune(r) {
 				p -= size
 				continue
 			}
@@ -440,8 +441,8 @@ func BuildRule(name string) rule.Rule {
 
 				hasSpaceAfterOpen := scan.secondPos > innerLow
 				hasSpaceBeforeClose := scan.penultimateEnd < innerHigh
-				multilineAfterOpen := utils.ContainsLineTerminator(text, innerLow, scan.secondPos)
-				multilineBeforeClose := utils.ContainsLineTerminator(text, scan.penultimateEnd, innerHigh)
+				multilineAfterOpen := ecmascript.ContainsLineTerminator(text, innerLow, scan.secondPos)
+				multilineBeforeClose := ecmascript.ContainsLineTerminator(text, scan.penultimateEnd, innerHigh)
 
 				reportNoBeginningSpace := func() {
 					toLoc := scan.nextRealStart

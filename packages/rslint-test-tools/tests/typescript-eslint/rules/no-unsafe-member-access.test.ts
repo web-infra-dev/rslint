@@ -1,6 +1,5 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 
-
 import { getFixturesRootDir } from '../RuleTester';
 
 const ruleTester = new RuleTester({
@@ -67,6 +66,38 @@ class B implements F.S.T.A {}
     `
 interface B extends F.S.T.A {}
     `,
+    {
+      code: `
+function foo(x?: { a: number }) {
+  x?.a;
+}
+      `,
+      options: [{ allowOptionalChaining: true }],
+    },
+    {
+      code: `
+function foo(x?: { a: number }, y: string) {
+  x?.[y];
+}
+      `,
+      options: [{ allowOptionalChaining: true }],
+    },
+    {
+      code: `
+function foo(x: { a: number }, y: 'a') {
+  x?.[y];
+}
+      `,
+      options: [{ allowOptionalChaining: true }],
+    },
+    {
+      code: `
+function foo(x: { a: number }, y: NotKnown) {
+  x?.[y];
+}
+      `,
+      options: [{ allowOptionalChaining: true }],
+    },
   ],
   invalid: [
     {
@@ -78,11 +109,9 @@ function foo(x: any) {
       errors: [
         {
           column: 5,
-          data: {
-            property: '.a',
-            type: '`any`',
-          },
+          data: { property: '.a' },
           endColumn: 6,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeMemberExpression',
         },
@@ -97,11 +126,9 @@ function foo(x: any) {
       errors: [
         {
           column: 5,
-          data: {
-            property: '.a',
-            type: '`any`',
-          },
+          data: { property: '.a' },
           endColumn: 6,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeMemberExpression',
         },
@@ -116,11 +143,9 @@ function foo(x: { a: any }) {
       errors: [
         {
           column: 7,
-          data: {
-            property: '.b',
-            type: '`any`',
-          },
+          data: { property: '.b' },
           endColumn: 8,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeMemberExpression',
         },
@@ -135,11 +160,9 @@ function foo(x: any) {
       errors: [
         {
           column: 5,
-          data: {
-            property: "['a']",
-            type: '`any`',
-          },
+          data: { property: "['a']" },
           endColumn: 8,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeMemberExpression',
         },
@@ -154,11 +177,9 @@ function foo(x: any) {
       errors: [
         {
           column: 5,
-          data: {
-            property: "['a']",
-            type: '`any`',
-          },
+          data: { property: "['a']" },
           endColumn: 8,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeMemberExpression',
         },
@@ -173,13 +194,11 @@ value.property;
       errors: [
         {
           column: 7,
-          data: {
-            property: '.property',
-            type: '`error` typed',
-          },
+          data: { property: '.property' },
           endColumn: 15,
+          endLine: 4,
           line: 4,
-          messageId: 'unsafeMemberExpression',
+          messageId: 'errorMemberExpression',
         },
       ],
     },
@@ -192,11 +211,9 @@ function foo(x: { a: number }, y: any) {
       errors: [
         {
           column: 5,
-          data: {
-            property: '[y]',
-            type: '`any`',
-          },
+          data: { property: '[y]' },
           endColumn: 6,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeComputedMemberAccess',
         },
@@ -211,11 +228,9 @@ function foo(x?: { a: number }, y: any) {
       errors: [
         {
           column: 7,
-          data: {
-            property: '[y]',
-            type: '`any`',
-          },
+          data: { property: '[y]' },
           endColumn: 8,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeComputedMemberAccess',
         },
@@ -230,11 +245,9 @@ function foo(x: { a: number }, y: any) {
       errors: [
         {
           column: 6,
-          data: {
-            property: '[y += 1]',
-            type: '`any`',
-          },
+          data: { property: '[y += 1]' },
           endColumn: 12,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeComputedMemberAccess',
         },
@@ -249,11 +262,9 @@ function foo(x: { a: number }, y: any) {
       errors: [
         {
           column: 5,
-          data: {
-            property: '[1 as any]',
-            type: '`any`',
-          },
+          data: { property: '[1 as any]' },
           endColumn: 13,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeComputedMemberAccess',
         },
@@ -268,11 +279,9 @@ function foo(x: { a: number }, y: any) {
       errors: [
         {
           column: 5,
-          data: {
-            property: '[y()]',
-            type: '`any`',
-          },
+          data: { property: '[y()]' },
           endColumn: 8,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeComputedMemberAccess',
         },
@@ -287,11 +296,9 @@ function foo(x: string[], y: any) {
       errors: [
         {
           column: 5,
-          data: {
-            property: '[y]',
-            type: '`any`',
-          },
+          data: { property: '[y]' },
           endColumn: 6,
+          endLine: 3,
           line: 3,
           messageId: 'unsafeComputedMemberAccess',
         },
@@ -306,17 +313,14 @@ function foo(x: { a: number }, y: NotKnown) {
       errors: [
         {
           column: 5,
-          data: {
-            property: '[y]',
-            type: '`error` typed',
-          },
+          data: { property: '[y]' },
           endColumn: 6,
+          endLine: 3,
           line: 3,
-          messageId: 'unsafeComputedMemberAccess',
+          messageId: 'errorComputedMemberAccess',
         },
       ],
     },
-
     {
       code: noFormat`
 const methods = {
@@ -339,18 +343,21 @@ const methods = {
         {
           column: 17,
           endColumn: 24,
+          endLine: 4,
           line: 4,
           messageId: 'unsafeThisMemberExpression',
         },
         {
           column: 17,
           endColumn: 30,
+          endLine: 8,
           line: 8,
           messageId: 'unsafeThisMemberExpression',
         },
         {
           column: 19,
           endColumn: 26,
+          endLine: 14,
           line: 14,
           messageId: 'unsafeThisMemberExpression',
         },
@@ -362,28 +369,125 @@ class C {
   getObs$: any;
   getPopularDepartments(): void {
     this.getObs$.pipe().subscribe(res => {
-      log(res);
+      console.log(res);
     });
   }
 }
-// Modified from upstream: replaced console.log(res) with log(res)
-// because rslint doesn't have built-in global types like console
-function log(arg: unknown) {}
       `,
       errors: [
         {
           column: 18,
           endColumn: 22,
+          endLine: 5,
           line: 5,
           messageId: 'unsafeMemberExpression',
         },
         {
           column: 25,
           endColumn: 34,
+          endLine: 5,
           line: 5,
           messageId: 'unsafeMemberExpression',
         },
       ],
+    },
+    {
+      code: `
+let value: any;
+
+value?.middle.inner;
+      `,
+      errors: [
+        {
+          column: 15,
+          data: { property: '.inner' },
+          endColumn: 20,
+          endLine: 4,
+          line: 4,
+          messageId: 'unsafeMemberExpression',
+        },
+      ],
+      options: [{ allowOptionalChaining: true }],
+    },
+    {
+      code: `
+let value: any;
+
+value?.outer.middle.inner;
+      `,
+      errors: [
+        {
+          column: 14,
+          data: { property: '.middle' },
+          endColumn: 20,
+          endLine: 4,
+          line: 4,
+          messageId: 'unsafeMemberExpression',
+        },
+      ],
+      options: [{ allowOptionalChaining: true }],
+    },
+    {
+      code: `
+let value: any;
+
+value.outer?.middle.inner;
+      `,
+      errors: [
+        {
+          column: 7,
+          data: { property: '.outer' },
+          endColumn: 12,
+          endLine: 4,
+          line: 4,
+          messageId: 'unsafeMemberExpression',
+        },
+        {
+          column: 21,
+          data: { property: '.inner' },
+          endColumn: 26,
+          endLine: 4,
+          line: 4,
+          messageId: 'unsafeMemberExpression',
+        },
+      ],
+      options: [{ allowOptionalChaining: true }],
+    },
+    {
+      code: `
+let value: any;
+
+value.outer.middle?.inner;
+      `,
+      errors: [
+        {
+          column: 7,
+          data: { property: '.outer' },
+          endColumn: 12,
+          endLine: 4,
+          line: 4,
+          messageId: 'unsafeMemberExpression',
+        },
+      ],
+      options: [{ allowOptionalChaining: true }],
+    },
+    {
+      code: `
+function foo(x: { a: number }, y: NotKnown) {
+  x[y];
+}
+      `,
+      errors: [
+        {
+          column: 5,
+          data: { property: '[y]' },
+          endColumn: 6,
+          endLine: 3,
+          line: 3,
+          messageId: 'errorComputedMemberAccess',
+        },
+      ],
+      options: [{ allowOptionalChaining: true }],
     },
   ],
 });

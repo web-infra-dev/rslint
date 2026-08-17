@@ -28,10 +28,10 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -850,7 +850,7 @@ let visibleAgain: number;
 		t.Run(test.name, func(t *testing.T) {
 			var diagnostics []rule.RuleDiagnostic
 			_, err := linter.RunLinter(linter.RunLinterOptions{
-				Programs:       []*compiler.Program{program},
+				Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 				SingleThreaded: true,
 				TargetFiles:    [][]string{{sourceFile.FileName()}},
 				ExcludePaths:   []string{},

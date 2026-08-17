@@ -7,14 +7,15 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // TestExhaustiveDepsRule_NilTypeChecker verifies the rule operates
 // without panicking when the TypeChecker is unavailable. rslint
-// schedules rules without `RequiresTypeInfo: true` against "gap files"
-// (files in the program but not in `typeInfoFiles`) with a nil checker;
+// schedules rules without `RequiresTypeInfo: true` against Programs without
+// checker capability with a nil checker;
 // every code path that would normally consult TC must degrade
 // gracefully via the structural / name-walk fallback.
 //
@@ -78,10 +79,9 @@ function MyComponent({theme}) {
 
 	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     program,
 		Settings:    settings,
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithReporter("test/exhaustive-deps", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
+	}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/exhaustive-deps", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
 
 	defer func() {
 		if r := recover(); r != nil {

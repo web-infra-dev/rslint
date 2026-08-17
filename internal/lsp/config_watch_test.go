@@ -96,7 +96,7 @@ func TestReloadConfigAndRelint_RefreshesJSONFallbackWhenJSConfigsActive(t *testi
 	}
 }
 
-func TestReloadConfigAndRelint_ClearsTypeInfoFiles(t *testing.T) {
+func TestReloadConfigAndRelint_RecomputesTypeInfoCapability(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"
@@ -206,7 +206,7 @@ func TestHandleDidChangeWatchedFiles_DetectsConfigFiles(t *testing.T) {
 	}
 }
 
-func TestHandleDidChangeWatchedFiles_TsConfigChangeRebuildsTypeInfoFiles(t *testing.T) {
+func TestHandleDidChangeWatchedFiles_TsConfigChangeRecomputesTypeInfoCapability(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"

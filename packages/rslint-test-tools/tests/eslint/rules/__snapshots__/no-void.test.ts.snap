@@ -1,0 +1,157 @@
+// Rstest Snapshot v1
+
+exports[`no-void > invalid 1`] = `
+{
+  "code": "void 0",
+  "diagnostics": [
+    {
+      "message": "Expected 'undefined' and instead saw 'void'.",
+      "messageId": "noVoid",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-void",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-void > invalid 2`] = `
+{
+  "code": "void 0",
+  "diagnostics": [
+    {
+      "message": "Expected 'undefined' and instead saw 'void'.",
+      "messageId": "noVoid",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-void",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-void > invalid 3`] = `
+{
+  "code": "void 0",
+  "diagnostics": [
+    {
+      "message": "Expected 'undefined' and instead saw 'void'.",
+      "messageId": "noVoid",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-void",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-void > invalid 4`] = `
+{
+  "code": "void(0)",
+  "diagnostics": [
+    {
+      "message": "Expected 'undefined' and instead saw 'void'.",
+      "messageId": "noVoid",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-void",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-void > invalid 5`] = `
+{
+  "code": "var foo = void 0",
+  "diagnostics": [
+    {
+      "message": "Expected 'undefined' and instead saw 'void'.",
+      "messageId": "noVoid",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-void",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-void > invalid 6`] = `
+{
+  "code": "var foo = void 0",
+  "diagnostics": [
+    {
+      "message": "Expected 'undefined' and instead saw 'void'.",
+      "messageId": "noVoid",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-void",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

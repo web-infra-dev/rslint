@@ -236,7 +236,7 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 
 			// if `${object.name}.${property.name}` doesn't match any of
 			// the nativelyBoundMembers, then we fallback to type-level checks
-			return utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(object), supportedGlobalTypes...) && utils.IsAnyBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(property))
+			return utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(object), supportedGlobalTypes...) && utils.IsAnyBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(property))
 		}
 
 		checkIfMethodAndReport := func(node *ast.Node, symbol *ast.Symbol) bool {

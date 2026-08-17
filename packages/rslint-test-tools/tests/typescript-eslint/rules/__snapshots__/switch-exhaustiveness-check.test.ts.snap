@@ -1,0 +1,1867 @@
+// Rstest Snapshot v1
+
+exports[`switch-exhaustiveness-check > invalid 1`] = `
+{
+  "code": "
+declare const value: 'literal';
+switch (value) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "literal"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 2`] = `
+{
+  "code": "
+declare const value: 'literal' & { _brand: true };
+switch (value) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "literal"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 3`] = `
+{
+  "code": "
+declare const value: ('literal' & { _brand: true }) | 1;
+switch (value) {
+  case 'literal':
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: 1",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 4`] = `
+{
+  "code": "
+declare const value: '1' | '2' | number;
+switch (value) {
+  case '1':
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "2"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 5`] = `
+{
+  "code": "
+declare const value: '1' | '2' | number;
+switch (value) {
+  case '1':
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "2"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 6`] = `
+{
+  "code": "
+declare const value: (string & { foo: 'bar' }) | '1';
+switch (value) {
+  case '1':
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 7`] = `
+{
+  "code": "
+declare const value: (string & { foo: 'bar' }) | '1' | 1 | null | undefined;
+switch (value) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: undefined | null | "1" | 1",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 8`] = `
+{
+  "code": "
+declare const value: string | number;
+switch (value) {
+  case 1:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 9`] = `
+{
+  "code": "
+declare const value: number;
+declare const a: number;
+switch (value) {
+  case a:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 10`] = `
+{
+  "code": "
+declare const value: bigint;
+switch (value) {
+  case 10n:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 11`] = `
+{
+  "code": "
+declare const value: symbol;
+const a = Symbol('a');
+switch (value) {
+  case a:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 12`] = `
+{
+  "code": "
+const a = Symbol('aa');
+const b = Symbol('bb');
+declare const value: typeof a | typeof b | 1;
+switch (value) {
+  case 1:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: typeof a | typeof b",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 13`] = `
+{
+  "code": "
+const a = Symbol('a');
+declare const value: typeof a | string;
+switch (value) {
+  case a:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 14`] = `
+{
+  "code": "
+declare const value: boolean;
+switch (value) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: false | true",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 15`] = `
+{
+  "code": "
+declare const value: boolean | 1;
+switch (value) {
+  case false:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: 1 | true",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 16`] = `
+{
+  "code": "
+declare const value: boolean | number;
+switch (value) {
+  case 1:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: false | true",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 17`] = `
+{
+  "code": "
+declare const value: object;
+switch (value) {
+  case 1:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 18`] = `
+{
+  "code": "
+enum Aaa {
+  Foo,
+  Bar,
+}
+declare const value: Aaa | 1 | string;
+switch (value) {
+  case 1:
+    break;
+  case Aaa.Foo:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: Aaa.Bar",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 19`] = `
+{
+  "code": "
+type Day =
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sunday';
+
+const day = 'Monday' as Day;
+let result = 0;
+
+switch (day) {
+  case 'Monday': {
+    result = 1;
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "Friday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 14,
+        },
+        "start": {
+          "column": 9,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 20`] = `
+{
+  "code": "
+enum Enum {
+  A,
+  B,
+}
+
+function test(value: Enum): number {
+  switch (value) {
+    case Enum.A:
+      return 1;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: Enum.B",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 8,
+        },
+        "start": {
+          "column": 11,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 21`] = `
+{
+  "code": "
+type A = 'a';
+type B = 'b';
+type C = 'c';
+type Union = A | B | C;
+
+function test(value: Union): number {
+  switch (value) {
+    case 'a':
+      return 1;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "b" | "c"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 8,
+        },
+        "start": {
+          "column": 11,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 22`] = `
+{
+  "code": "
+const A = 'a';
+const B = 1;
+const C = true;
+
+type Union = typeof A | typeof B | typeof C;
+
+function test(value: Union): number {
+  switch (value) {
+    case 'a':
+      return 1;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: 1 | true",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 23`] = `
+{
+  "code": "
+type DiscriminatedUnion = { type: 'A'; a: 1 } | { type: 'B'; b: 2 };
+
+function test(value: DiscriminatedUnion): number {
+  switch (value.type) {
+    case 'A':
+      return 1;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "B"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 24`] = `
+{
+  "code": "
+type Day =
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sunday';
+
+const day = 'Monday' as Day;
+
+switch (day) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "Friday" | "Monday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 13,
+        },
+        "start": {
+          "column": 9,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 25`] = `
+{
+  "code": "
+const a = Symbol('a');
+const b = Symbol('b');
+const c = Symbol('c');
+
+type T = typeof a | typeof b | typeof c;
+
+function test(value: T): number {
+  switch (value) {
+    case a:
+      return 1;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: typeof b | typeof c",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 26`] = `
+{
+  "code": "
+type T = 1 | 2;
+
+function test(value: T): number {
+  switch (value) {
+    case 1:
+      return 1;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: 2",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 27`] = `
+{
+  "code": "
+type T = 1 | 2;
+
+function test(value: T): number {
+  switch (value) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: 1 | 2",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 28`] = `
+{
+  "code": "
+export enum Enum {
+  'test-test' = 'test-test',
+  'test' = 'test',
+}
+
+function test(arg: Enum): string {
+  switch (arg) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: (typeof Enum)["test-test"] | Enum.test",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 8,
+        },
+        "start": {
+          "column": 11,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 29`] = `
+{
+  "code": "
+export enum Enum {
+  '' = 'test-test',
+  'test' = 'test',
+}
+
+function test(arg: Enum): string {
+  switch (arg) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: (typeof Enum)[""] | Enum.test",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 8,
+        },
+        "start": {
+          "column": 11,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 30`] = `
+{
+  "code": "
+export enum Enum {
+  '9test' = 'test-test',
+  'test' = 'test',
+}
+
+function test(arg: Enum): string {
+  switch (arg) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: (typeof Enum)["9test"] | Enum.test",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 8,
+        },
+        "start": {
+          "column": 11,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 31`] = `
+{
+  "code": "
+const value: number = Math.floor(Math.random() * 3);
+switch (value) {
+  case 0:
+    return 0;
+  case 1:
+    return 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: default",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 32`] = `
+{
+  "code": "
+        enum Enum {
+          'a' = 1,
+          "'a' \`b\` \\"c\\"" = 2,
+        }
+
+        declare const a: Enum;
+
+        switch (a) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: Enum.a | (typeof Enum)["'a' \`b\` \\"c\\""]",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 17,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 33`] = `
+{
+  "code": "
+type MyUnion = 'foo' | 'bar' | 'baz';
+
+declare const myUnion: MyUnion;
+
+switch (myUnion) {
+  case 'foo':
+  case 'bar':
+  case 'baz': {
+    break;
+  }
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The switch statement is exhaustive, so the default case is unnecessary.",
+      "messageId": "dangerousDefaultCase",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 14,
+        },
+        "start": {
+          "column": 3,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 34`] = `
+{
+  "code": "
+enum MyEnum {
+  Foo = 'Foo',
+  Bar = 'Bar',
+  Baz = 'Baz',
+}
+
+declare const myEnum: MyEnum;
+
+switch (myEnum) {
+  case MyEnum.Foo:
+  case MyEnum.Bar:
+  case MyEnum.Baz: {
+    break;
+  }
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The switch statement is exhaustive, so the default case is unnecessary.",
+      "messageId": "dangerousDefaultCase",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 18,
+        },
+        "start": {
+          "column": 3,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 35`] = `
+{
+  "code": "
+enum MyEnum {
+  Foo,
+  Bar,
+  Baz,
+}
+
+declare const myEnum: MyEnum;
+
+switch (myEnum) {
+  case MyEnum.Foo:
+  case MyEnum.Bar:
+  case MyEnum.Baz: {
+    break;
+  }
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The switch statement is exhaustive, so the default case is unnecessary.",
+      "messageId": "dangerousDefaultCase",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 18,
+        },
+        "start": {
+          "column": 3,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 36`] = `
+{
+  "code": "
+declare const myBoolean: boolean;
+
+switch (myBoolean) {
+  case true:
+  case false: {
+    break;
+  }
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The switch statement is exhaustive, so the default case is unnecessary.",
+      "messageId": "dangerousDefaultCase",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 37`] = `
+{
+  "code": "
+declare const myValue: undefined;
+
+switch (myValue) {
+  case undefined: {
+    break;
+  }
+
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The switch statement is exhaustive, so the default case is unnecessary.",
+      "messageId": "dangerousDefaultCase",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 38`] = `
+{
+  "code": "
+declare const myValue: null;
+
+switch (myValue) {
+  case null: {
+    break;
+  }
+
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The switch statement is exhaustive, so the default case is unnecessary.",
+      "messageId": "dangerousDefaultCase",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 39`] = `
+{
+  "code": "
+declare const myValue: 'foo' | boolean | undefined | null;
+
+switch (myValue) {
+  case 'foo':
+  case true:
+  case false:
+  case undefined:
+  case null: {
+    break;
+  }
+
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The switch statement is exhaustive, so the default case is unnecessary.",
+      "messageId": "dangerousDefaultCase",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 40`] = `
+{
+  "code": "
+declare const literal: 'a' | 'b';
+
+switch (literal) {
+  case 'a':
+    break;
+  default:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "b"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 41`] = `
+{
+  "code": "
+declare const literal: 'a' | 'b';
+
+switch (literal) {
+  case 'a':
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "b"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 42`] = `
+{
+  "code": "
+declare const literal: 'a' | 'b';
+
+switch (literal) {
+  default:
+  case 'a':
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "b"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 43`] = `
+{
+  "code": "
+declare const literal: 'a' | 'b' | 'c';
+
+switch (literal) {
+  case 'a':
+    break;
+  default:
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "b" | "c"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 44`] = `
+{
+  "code": "
+enum MyEnum {
+  Foo = 'Foo',
+  Bar = 'Bar',
+  Baz = 'Baz',
+}
+
+declare const myEnum: MyEnum;
+
+switch (myEnum) {
+  case MyEnum.Foo:
+    break;
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: MyEnum.Bar | MyEnum.Baz",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 10,
+        },
+        "start": {
+          "column": 9,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 45`] = `
+{
+  "code": "
+declare const value: boolean;
+switch (value) {
+  default: {
+    break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: false | true",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 46`] = `
+{
+  "code": "
+function foo(x: string[]) {
+  switch (x[0]) {
+    case 'hi':
+      break;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: undefined",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 47`] = `
+{
+  "code": "
+declare const myValue: 'a' | 'b';
+switch (myValue) {
+  case 'a':
+    return 'a';
+  case 'b':
+    return 'b';
+  // no default
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The switch statement is exhaustive, so the default case is unnecessary.",
+      "messageId": "dangerousDefaultCase",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 48`] = `
+{
+  "code": "
+declare const literal: 'a' | 'b' | 'c';
+
+switch (literal) {
+  case 'a':
+    break;
+  // no default
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "b" | "c"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 49`] = `
+{
+  "code": "
+declare const literal: 'a' | 'b' | 'c';
+
+switch (literal) {
+  case 'a':
+    break;
+  // skip default
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: "b" | "c"",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 50`] = `
+{
+  "code": "
+        export namespace A {
+          export enum B {
+            C,
+            D,
+          }
+        }
+        declare const foo: A.B;
+        switch (foo) {
+          case A.B.C: {
+            break;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: A.B.D",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 9,
+        },
+        "start": {
+          "column": 17,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 51`] = `
+{
+  "code": "
+        import { A } from './switch-exhaustiveness-check';
+        declare const foo: A.B;
+        switch (foo) {
+          case A.B.C: {
+            break;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive. Cases not matched: A.B.D",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

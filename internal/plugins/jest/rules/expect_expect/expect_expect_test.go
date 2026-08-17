@@ -22,6 +22,8 @@ func TestExpectExpectRule(t *testing.T) {
 			{Code: `test("should pass", () => expect(true).toBeDefined())`},
 			{Code: `it("should pass", () => somePromise().then(() => expect(true).toBeDefined()))`},
 			{Code: `it("should pass", myTest); function myTest() { expect(true).toBeDefined() }`},
+			{Code: `function myTest() { expect(true).toBeDefined() } it("should pass", myTest);`},
+			{Code: `const myTest = () => expect(true).toBeDefined(); it("should pass", myTest);`},
 			{
 				Code: `
         it("first passes", sharedAssertion);
@@ -354,12 +356,6 @@ func TestExpectExpectRule(t *testing.T) {
         });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 3},
-				},
-			},
-			{
-				Code: `function myTest() { expect(true).toBeDefined() } it("should fail", myTest);`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAssertions", Line: 1, Column: 50, EndLine: 1, EndColumn: 52},
 				},
 			},
 			{

@@ -1,5 +1,4 @@
-import { defineConfig, globalIgnores, js, ts } from '@rslint/core';
-import globals from 'globals';
+import { defineConfig, globalIgnores, globals, js, ts } from '@rslint/core';
 
 export default defineConfig([
   globalIgnores([
@@ -41,7 +40,6 @@ export default defineConfig([
         project: [
           './packages/*/tsconfig.build.json',
           './packages/*/tsconfig.spec.json',
-          './packages/rslint/fixtures/tsconfig.json',
         ],
       },
     },
@@ -75,6 +73,7 @@ export default defineConfig([
       '@typescript-eslint/prefer-includes': 'error',
       '@typescript-eslint/prefer-regexp-exec': 'error',
       '@typescript-eslint/prefer-ts-expect-error': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': 'warn',
       'no-console': ['error', { allow: ['warn', 'error'] }],
     },
   },

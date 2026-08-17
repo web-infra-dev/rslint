@@ -18,7 +18,9 @@ if (!bumpType || !['major', 'minor', 'patch', 'canary'].includes(bumpType)) {
   process.exit(1);
 }
 
-console.log(chalk.blue(`🚀 Bumping all package versions: ${bumpType}`));
+console.log(
+  chalk.blue(`🚀 Bumping unified rslint package versions: ${bumpType}`),
+);
 
 /**
  * Bump semantic version
@@ -129,22 +131,21 @@ async function updateWorkspaceDependencies(packagePath, versionMap) {
 
 async function main() {
   try {
-    // Find all package.json files in the workspace
+    // Find packages on the unified rslint release line. tsgo-server has an
+    // independent version shared with crates/tsgo-client.
     const rootPackagePath = path.join(process.cwd(), 'package.json');
-    const workspacePackagePaths = await glob('packages/*/package.json', {
-      cwd: process.cwd(),
-    });
+    const workspacePackagePaths = (
+      await glob('packages/*/package.json', {
+        cwd: process.cwd(),
+      })
+    ).filter((packagePath) => packagePath !== 'packages/tsgo/package.json');
     const npmRslintPackagePaths = await glob('npm/rslint/*/package.json', {
-      cwd: process.cwd(),
-    });
-    const npmTsgoPackagePaths = await glob('npm/tsgo/*/package.json', {
       cwd: process.cwd(),
     });
     const allPackagePaths = [
       rootPackagePath,
       ...workspacePackagePaths.map((p) => path.join(process.cwd(), p)),
       ...npmRslintPackagePaths.map((p) => path.join(process.cwd(), p)),
-      ...npmTsgoPackagePaths.map((p) => path.join(process.cwd(), p)),
     ];
 
     console.log(
@@ -157,9 +158,7 @@ async function main() {
     console.log(
       chalk.gray(`  - NPM rslint packages: ${npmRslintPackagePaths.length}`),
     );
-    console.log(
-      chalk.gray(`  - NPM tsgo packages: ${npmTsgoPackagePaths.length}`),
-    );
+    console.log(chalk.gray('  - tsgo-server packages: excluded'));
 
     // Check current versions to find the highest one for unification
     const currentVersions = [];

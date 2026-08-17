@@ -38,9 +38,10 @@ if (foo) {
 ### `builtinGlobals` (default: `true`)
 
 When `true`, this rule reports redeclarations of ECMAScript built-in globals.
-Configured `languageOptions.globals` also participate as built-ins. Active
-`/* global */` directives participate as declarations in either mode; a final
-`:off` setting removes that inline global.
+Configured [`languageOptions.globals`](/config/language-options#languageoptionsglobals) also
+participate as built-ins. Select host environments with the `globals` catalog
+exported by `@rslint/core`. Active `/* global */` directives participate as
+declarations in either mode; a final `:off` setting removes that inline global.
 
 ```json
 { "no-redeclare": ["error", { "builtinGlobals": true }] }

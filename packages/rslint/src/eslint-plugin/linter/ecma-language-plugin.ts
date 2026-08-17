@@ -307,7 +307,7 @@ export function lintFile(
       // This mirrors ESLint flat-config's behavior — without step 1,
       // rules built on `ReferenceTracker.iterateGlobalReferences` see
       // an empty global scope and silently never fire.
-      seedEcmaGlobals(sm);
+      seedEcmaGlobals(sm, req.languageOptions?.ecmaVersion);
       seedGlobals(sm, globals);
       return sm;
     };

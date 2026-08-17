@@ -2,6 +2,8 @@
 aavascript
 accesskey
 accum
+acdfg
+acefg
 acked
 acking
 acks
@@ -20,6 +22,7 @@ analysed
 anee
 anyfunc
 anyof
+applescript
 apos
 argl
 Armn
@@ -29,6 +32,7 @@ arrayliteralexpression
 ascript
 assertee
 asynchrony
+atomtest
 autobinding
 autofixers
 autofocus
@@ -120,6 +124,7 @@ deboucne
 dedup
 dedupe
 dedups
+depguard
 deprec
 Deque
 describedby
@@ -139,6 +144,7 @@ DPUB
 dropeffect
 eacute
 embedfs
+embertest
 endline
 englishish
 enochian
@@ -150,7 +156,9 @@ escope
 ESLint
 esmodule
 espree
+esregexp
 estree
+eszett
 Ethi
 exclam
 execdir
@@ -219,6 +227,7 @@ gosec
 gotest
 graphlib
 Grek
+gruber
 Gujr
 guoyu
 handl
@@ -242,6 +251,7 @@ interrobang
 iovfs
 IPC
 isatty
+isglob
 isnan
 Isnt
 jakebailey
@@ -262,6 +272,7 @@ keyshortcuts
 keytar
 Khmr
 Knda
+koblas
 Kore
 labelledby
 Laoo
@@ -274,6 +285,7 @@ Lingui
 lingui
 lintable
 lintedfile
+lintprogram
 listitem
 llms
 lockdown
@@ -326,8 +338,10 @@ mynamespace
 módulo
 nanotime
 napi
+nashorn
 native
 nbsp
+ndefined
 neighbour
 neighbouring
 nend
@@ -410,10 +424,12 @@ promisify
 promisifying
 propertyassignment
 proptypes
+prototypejs
 psdifjo
 Ptrs
 pullquote
 punct
+qmark
 quasis
 quxx
 qwer
@@ -485,12 +501,14 @@ résumé
 saddr
 samp
 santhosh
+schlueter
 scopemanager
 sectionhead
 Seeked
 segs
 semacquire
 serde
+serviceworker
 setsize
 Setstate
 setstate
@@ -498,6 +516,7 @@ shadcn
 shadowable
 shouldnt
 SIGSEGV
+slashless
 smajobber
 somethingelse
 sonarjs
@@ -566,6 +585,8 @@ tsoptions
 tsparser
 tspath
 tsutils
+txtar
+txtarfs
 typeparam
 typescriptutil
 unaliased
@@ -585,6 +606,7 @@ unional
 uniseg
 unmarshals
 unmodeled
+unnegated
 unpadded
 unpark
 Unparseable
@@ -599,6 +621,7 @@ unshift
 unstarted
 unstrict
 unstub
+unsuggested
 untest
 unvalidated
 Unwatch
@@ -634,6 +657,7 @@ xjavascript
 xlink
 xoff
 xtest
+Xopenport
 yutil
 zeebo
 zigbuild

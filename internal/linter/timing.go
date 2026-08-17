@@ -3,6 +3,8 @@ package linter
 import (
 	"sync"
 	"time"
+
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // Rule implementation kinds reported in the timing table.
@@ -60,7 +62,7 @@ func (c *TimingCollector) countFile(name string, filePath string) bool {
 
 // addFile folds one file's per-rule durations (parallel to rules) into the
 // aggregate.
-func (c *TimingCollector) addFile(filePath string, rules []ConfiguredRule, durations []time.Duration) {
+func (c *TimingCollector) addFile(filePath string, rules []rule.ConfiguredRule, durations []time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i, configuredRule := range rules {

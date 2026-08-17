@@ -64,11 +64,11 @@ Three principles follow — internalize them before writing a single test case:
 
 ## Related Documents
 
-| Document                                 | Description                                                         |
-| ---------------------------------------- | ------------------------------------------------------------------- |
-| [AST_PATTERNS.md](AST_PATTERNS.md)       | AST traversal patterns, listeners, TypeChecker, reporting functions |
-| [UTILS_REFERENCE.md](UTILS_REFERENCE.md) | Utility functions in `internal/utils/`                              |
-| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands cheatsheet, file locations, naming conventions, checklist  |
+| Document                                 | Description                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| [AST_PATTERNS.md](AST_PATTERNS.md)       | AST traversal, Program/module services, TypeChecker, and reporting |
+| [UTILS_REFERENCE.md](UTILS_REFERENCE.md) | Utility functions in `internal/utils/`                             |
+| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands cheatsheet, file locations, naming conventions, checklist |
 
 ---
 
@@ -78,16 +78,20 @@ Before starting, familiarize yourself with these key source locations:
 
 ### Core Infrastructure
 
-| File/Directory                        | Description                                                                                                                                                |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `internal/rule/rule.go`               | **Core rule interface** - `Rule` and `RuleListeners`                                                                                                       |
-| `internal/rule/context.go`            | `RuleContext`, edit demand, and diagnostic reporting APIs                                                                                                  |
-| `internal/rule/diagnostic.go`         | `RuleMessage`, `RuleFix`, `RuleSuggestion`, and fix helpers                                                                                                |
-| `internal/rule/ref_store.go`          | Lazy per-file reference index exposed as `ctx.Refs`                                                                                                        |
-| `internal/rule/comment_store.go`      | Lazy canonical comment list exposed as `ctx.Comments`                                                                                                      |
-| `internal/rule/disable_manager.go`    | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                                                    |
-| `internal/config/config.go`           | Registration orchestration and config loading. Per-rule registration data lives in each group's `all.go` — see Phase 3 Step 4 for where to add a new rule. |
-| `internal/rule_tester/rule_tester.go` | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                                                    |
+| File/Directory                          | Description                                                                                                                                                |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal/rule/rule.go`                 | **Core rule interface** - `Rule` and `RuleListeners`                                                                                                       |
+| `internal/rule/configured.go`           | Enabled `ConfiguredRule` descriptors, shared `RuleEnvironment`, and type-aware filtering                                                                   |
+| `internal/rule/context.go`              | `RuleContext`, edit demand, and diagnostic reporting APIs                                                                                                  |
+| `internal/rule/diagnostic.go`           | `RuleMessage`, `RuleFix`, `RuleSuggestion`, and fix helpers                                                                                                |
+| `internal/rule/ref_store.go`            | Lazy per-file reference index exposed as `ctx.Refs`                                                                                                        |
+| `internal/rule/comment_store.go`        | Lazy canonical comment list exposed as `ctx.Comments`                                                                                                      |
+| `internal/rule/disable_manager.go`      | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                                                    |
+| `internal/program/program.go`           | Unified source-generation facade exposed through `ctx.Program()`                                                                                           |
+| `internal/program/module_graph.go`      | Generic module-reference syntax and resolution index exposed by `Program.ModuleGraph()`                                                                    |
+| `internal/program/module_resolution.go` | Program-owned module resolution for one source/specifier pair                                                                                              |
+| `internal/config/config.go`             | Registration orchestration and config loading. Per-rule registration data lives in each group's `all.go` — see Phase 3 Step 4 for where to add a new rule. |
+| `internal/rule_tester/rule_tester.go`   | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                                                    |
 
 ### AST & Type System
 
@@ -268,6 +272,23 @@ Before starting, familiarize yourself with these key source locations:
    1. **Rule documentation** (or [AST_PATTERNS.md](AST_PATTERNS.md) if the quirk is general, not rule-specific): note the divergence under "Differences from ESLint" / the relevant AST-shape section.
    2. **Test cases**: Lock the current behavior in with a test — typically the ESLint-fails-but-we-pass case stays on the `valid` side with a comment pointing at the underlying quirk, so the behavior can't flip silently.
 
+7. **Identify How the Rule Reads Patterns**:
+
+   If the rule accepts a regexp or a glob — in a rule option, or read out of the source under lint — find the library upstream reads it with. Check the rule's own imports and the plugin's `package.json`, and note the **major version**. Go's standard library and general-purpose glob packages answer differently, so the port has a matching package for each:
+
+   | Upstream reads the pattern with       | Use in the port                                             |
+   | ------------------------------------- | ----------------------------------------------------------- |
+   | a regexp literal or `new RegExp(...)` | `utils/ecmascript/regexp`, imported as `esregexp`           |
+   | `minimatch` at `^3.x`                 | `utils/minimatch3`                                          |
+   | `is-glob`                             | `utils/isglob`                                              |
+   | any other glob package                | **not supported — stop and report to the user (see below)** |
+
+   `depguard` denies `regexp2` and `doublestar` under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. Trimming, blankness, case comparison and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
+
+   The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks, because RE2 refuses syntax JavaScript accepts and the caller usually swallows the compile error.
+
+   **Only minimatch 3 and is-glob are ported. If the rule reads globs with anything else, stop and report that to the user before writing the port** — do not substitute `minimatch3` or `doublestar` and carry on, and do not port a new glob package on your own initiative. `minimatch@10` is the one to expect: ESLint moved to it for its own flat-config `files`/`ignores` and a plugin may follow, but only the 3.x reading is ported, because that is what the plugin ecosystem pins. `minimatch3` differs from 10 on POSIX character classes; `doublestar` differs on 13 of 37 sampled patterns, and not only on extended glob syntax — `src/**` matches `src` itself under doublestar but not under minimatch, and a leading `!` is a literal rather than a negation. Report which package and version the rule needs and which of its patterns would be misread; the user decides whether to port it, accept a documented divergence, or skip the rule.
+
 ---
 
 ## Phase 2: Implementation (Go)
@@ -325,7 +346,25 @@ grep -rn "^func [a-z]" internal/rules/
 
 If ≥1 rule in the same plugin already defines a near-equivalent helper, you MUST extract the shared helper to `internal/plugins/<plugin>/<plugin>util/` (or an existing shared package) BEFORE adding your new rule. No second copy. This is a hard rule — see _Helper Extraction_ below for the override criterion.
 
-**Check for reusable `internal/utils/` helpers** (SECOND): Before writing any helper function, grep `internal/utils/` for an existing one. Helpful prefixes to search:
+**Use Program capabilities for source-generation questions** (SECOND): before
+adding a helper for filesystem, package scope, source lookup, module resolution,
+or module references, inspect `internal/program/`. Rules receive the same
+backend-neutral facade through `ctx.Program()` in CLI, API, and LSP modes.
+
+- Resolve one specifier with `ctx.Program().ResolveModule(ctx.SourceFile, specifier)`.
+- Enumerate generic import/export/dynamic-import/require/AMD references with
+  `ctx.Program().ModuleGraph().References(file, kinds)`.
+- Cache a rule-specific, configuration-complete index with
+  `rule.CachedByProgram(ctx, key, build)`.
+- Keep rule semantics such as ignored paths, cycle depth, SCCs, and reporting
+  policy in the rule or its plugin helper. `Program.ModuleGraph` reports source
+  facts; it does not decide what a rule considers an edge.
+
+Never branch on how a Program was constructed, recover a raw compiler Program,
+add a parallel runtime/context field, or recreate module resolution under
+`internal/utils`.
+
+**Check for reusable `internal/utils/` helpers** (THIRD): Before writing any helper function, grep `internal/utils/` for an existing one. Helpful prefixes to search:
 
 - `IsSpecific*`, `IsArgument*` — well-known API-call recognition (`Object.defineProperty`-style, member-access patterns, nth-argument-of)
 - `GetStatic*`, `Normalize*` — property-name / literal-value normalization (e.g. `GetStaticPropertyName`, `NormalizeNumericLiteral`, `NormalizeBigIntLiteral`)
@@ -336,7 +375,7 @@ If ≥1 rule in the same plugin already defines a near-equivalent helper, you MU
 
 See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
 
-**Check for reusable shim utilities** (THIRD): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
+**Check for reusable shim utilities** (FOURTH): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
 
 - `shim/scanner/` — `SkipTrivia` (skip whitespace/comments to find next token position), `GetScannerForSourceFile`, `GetSourceTextOfNodeFromSourceFile` (raw source text — useful when an AST node's `.Text` field has been normalized at parse time)
 - `shim/ast/` — `GetThisContainer`, `IsFunctionLike`, `IsFunctionLikeDeclaration`, `SkipParentheses`, `IsOptionalChain`, and other AST utilities
@@ -384,7 +423,7 @@ var MyCoreRule = rule.Rule{
 - Each callback receives a `*ast.Node` and reports diagnostics through `RuleContext`; reports with optional edits use the deferred methods
 - Options parsing happens inside the `Run` function before returning listeners
 - Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
-- **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. This tells the linter to skip the rule on files without a type checker, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
+- **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. The planner admits it only when the unified Program can provide a checker for that file, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
 - **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
 
 **AST Shim API Warning**: In `github.com/microsoft/typescript-go/shim/ast`:
@@ -472,7 +511,10 @@ Before moving on, walk through each check. Each one targets a class of AST-shape
 
 ### Helper Extraction
 
-After Step 2 is done, review each helper for extraction to `internal/utils/`:
+After Step 2 is done, review each helper for extraction. Cross-file source and
+module infrastructure belongs to `internal/program`; plugin-specific shared
+semantics belong to `<plugin>util/`; only general AST/type helpers belong to
+`internal/utils/`.
 
 **Extract if all hold:**
 

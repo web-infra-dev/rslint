@@ -1,8 +1,6 @@
 package no_unsafe_argument
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -12,25 +10,25 @@ import (
 func buildUnsafeArgumentMessage(sender string, receiver string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeArgument",
-		Description: fmt.Sprintf("Unsafe argument of type %v assigned to a parameter of type %v.", sender, receiver),
+		Description: "Unsafe argument of type " + sender + " assigned to a parameter of type " + receiver + ".",
 	}
 }
 func buildUnsafeArraySpreadMessage(sender string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeArraySpread",
-		Description: fmt.Sprintf("Unsafe spread of an %v array type.", sender),
+		Description: "Unsafe spread of an " + sender + " array type.",
 	}
 }
 func buildUnsafeSpreadMessage(sender string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeSpread",
-		Description: fmt.Sprintf("Unsafe spread of an %v type.", sender),
+		Description: "Unsafe spread of an " + sender + " type.",
 	}
 }
 func buildUnsafeTupleSpreadMessage(sender string, receiver string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeTupleSpread",
-		Description: fmt.Sprintf("Unsafe spread of a tuple type. The argument is %v and is assigned to a parameter of type %v.", sender, receiver),
+		Description: "Unsafe spread of a tuple type. The argument is " + sender + " and is assigned to a parameter of type " + receiver + ".",
 	}
 }
 
@@ -52,16 +50,16 @@ type restType struct {
 func newFunctionSignature(
 	typeChecker *checker.Checker,
 	node *ast.Node,
-) *functionSignature {
+) (functionSignature, bool) {
 	signature := checker.Checker_getResolvedSignature(typeChecker, node, nil, checker.CheckModeNormal)
 	if signature == nil {
-		return nil
+		return functionSignature{}, false
 	}
 
-	paramTypes := []*checker.Type{}
-	var restT restType
-
 	parameters := checker.Signature_parameters(signature)
+	var paramTypes []*checker.Type
+	var restT restType
+	hasRestType := false
 
 	for i, param := range parameters {
 		t := typeChecker.GetTypeOfSymbolAtLocation(param, node)
@@ -89,25 +87,31 @@ func newFunctionSignature(
 						Kind:  restTypeKindOther,
 					}
 				}
+				hasRestType = true
 				break
 			}
 		}
 
+		if paramTypes == nil {
+			paramTypes = make([]*checker.Type, 0, len(parameters))
+		}
 		paramTypes = append(paramTypes, t)
 	}
 
-	return &functionSignature{
-		paramTypes: paramTypes,
-		restType:   &restT,
-	}
+	return functionSignature{
+		paramTypes:  paramTypes,
+		restType:    restT,
+		hasRestType: hasRestType,
+	}, true
 }
 
 type functionSignature struct {
 	hasConsumedArguments bool
 	parameterTypeIndex   int
 
-	paramTypes []*checker.Type
-	restType   *restType
+	paramTypes  []*checker.Type
+	restType    restType
+	hasRestType bool
 }
 
 func (s *functionSignature) consumeRemainingArguments() {
@@ -119,7 +123,7 @@ func (s *functionSignature) getNextParameterType() *checker.Type {
 	s.parameterTypeIndex += 1
 
 	if index >= len(s.paramTypes) || s.hasConsumedArguments {
-		if s.restType == nil {
+		if !s.hasRestType {
 			return nil
 		}
 
@@ -160,7 +164,7 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 				return "error typed"
 			}
 
-			return ctx.TypeChecker.TypeToString(t)
+			return "`" + ctx.TypeChecker.TypeToString(t) + "`"
 		}
 
 		describeTypeForSpread := func(t *checker.Type) string {
@@ -176,7 +180,7 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 				return "error typed"
 			}
 
-			return "of type " + ctx.TypeChecker.TypeToString(t)
+			return "of type `" + ctx.TypeChecker.TypeToString(t) + "`"
 		}
 
 		checkUnsafeArguments := func(
@@ -193,8 +197,8 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			signature := newFunctionSignature(ctx.TypeChecker, node)
-			if signature == nil {
+			signature, ok := newFunctionSignature(ctx.TypeChecker, node)
+			if !ok {
 				panic("Expected to a signature resolved")
 			}
 
@@ -257,15 +261,16 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 
-					argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+					reportNode := ast.SkipParentheses(argument)
+					argumentType := ctx.TypeChecker.GetTypeAtLocation(reportNode)
 					_, _, unsafe := utils.IsUnsafeAssignment(
 						argumentType,
 						parameterType,
 						ctx.TypeChecker,
-						argument,
+						reportNode,
 					)
 					if unsafe {
-						ctx.ReportNode(argument, buildUnsafeArgumentMessage(describeType(argumentType), describeType(parameterType)))
+						ctx.ReportNode(reportNode, buildUnsafeArgumentMessage(describeType(argumentType), describeType(parameterType)))
 					}
 				}
 			}

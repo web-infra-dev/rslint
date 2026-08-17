@@ -114,10 +114,7 @@ func appendRemoveNotModifierFix(
 			continue
 		}
 
-		index := slices.IndexFunc(jestFnCall.MemberEntries, func(entry utils.ParsedJestFnMemberEntry) bool {
-			return entry.Node == modEntry.Node
-		})
-		removeFixes, ok := utils.RemoveMemberAccessorFixes(ctx, jestFnCall.MemberEntries, index)
+		removeFixes, ok := utils.RemoveMemberAccessorFixes(ctx, &modEntry)
 		if !ok {
 			return nil, false
 		}

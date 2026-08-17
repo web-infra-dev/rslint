@@ -24,4 +24,5 @@ expect(files).toHaveLength(1);
 
 ## Original Documentation
 
-- [jest/prefer-to-have-length](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-to-have-length.md)
+- [eslint-plugin-jest: prefer-to-have-length](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-to-have-length.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-to-have-length.ts)

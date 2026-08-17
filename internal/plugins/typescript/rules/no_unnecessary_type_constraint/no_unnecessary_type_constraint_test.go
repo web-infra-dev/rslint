@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -64,18 +65,44 @@ function data<T extends TODO>() {}
 		// tsgo may or may not parse these into KindTypeParameter nodes depending on file
 		// extension / allowJs. The guard ensures that if it does, the rule stays silent (matching
 		// ESLint, which never sees JSDoc templates as TSTypeParameterDeclaration).
-		{Code: `
+		{
+			Code: `
 /** @template T */
 function data() {}
-    `},
-		{Code: `
+    `,
+			FileName: "repro.js",
+			TSConfig: "tsconfig.allowJs.json",
+		},
+		{
+			Code: `
 /** @template {any} T */
 function data() {}
-    `},
-		{Code: `
+    `,
+			FileName: "repro.js",
+			TSConfig: "tsconfig.allowJs.json",
+		},
+		{
+			Code: `
 /** @template {unknown} T, U */
 function data() {}
-    `},
+    `,
+			FileName: "repro.js",
+			TSConfig: "tsconfig.allowJs.json",
+		},
+		{
+			Code: `/** @template {unknown} T */
+class Box {}`,
+			FileName: "repro.js",
+			TSConfig: "tsconfig.allowJs.json",
+		},
+		{
+			Code: `/** @template {unknown} T */
+export function identity(value) {
+  return value;
+}`,
+			FileName: "repro.js",
+			TSConfig: "tsconfig.allowJs.json",
+		},
 		// ---- Mapped-type guard under modifiers / name remap ----
 		// Make sure the `KindMappedType` guard survives readonly / negative modifiers and
 		// `as` name-remap clauses — those wrap the type parameter differently but parent is
@@ -1694,7 +1721,7 @@ func lintNoUnnecessaryTypeConstraintWithDemand(
 ) []rule.RuleDiagnostic {
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:         program,
+		Program:         lintprogram.NewFromCompiler(program),
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noUnnecessaryTypeConstraintConfiguredRules,

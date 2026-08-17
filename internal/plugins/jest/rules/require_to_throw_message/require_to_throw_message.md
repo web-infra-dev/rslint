@@ -40,4 +40,5 @@ test('all the things', async () => {
 
 ## Original Documentation
 
-- [jest/require-to-throw-message](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/require-to-throw-message.md)
+- [eslint-plugin-jest: require-to-throw-message](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/require-to-throw-message.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/require-to-throw-message.ts)

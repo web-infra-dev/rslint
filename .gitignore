@@ -149,7 +149,7 @@ vite.config.ts.timestamp-*
 /bin/rslint
 npm/*/rslint
 npm/*/rslint.exe
-npm/tsgo/*/local
+npm/tsgo/*/lib
 
 # napi build artifacts, never committed: the platform loader + its types now
 # live in @rslint/core (src/eslint-plugin/native/), so build:js needs neither
@@ -163,6 +163,10 @@ crates/rslint-native/*.node
 npm/rslint/*/*.node
 npm/rslint/*/rslint
 npm/rslint/*/rslint.exe
+
+# rule options JSON Schema dump (tools/dump_rule_schemas), consumed by the
+# generate-rule-option-types rslib plugin at build:js time; never committed
+packages/rslint/rule-schemas.json
 
 .idea
 

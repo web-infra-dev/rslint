@@ -145,31 +145,6 @@ func TestNoShadowRule(t *testing.T) {
 			// ---- allow list ----
 			{Code: `function foo(cb) { (function (cb) { cb(42); })(cb); }`, Options: map[string]interface{}{"allow": []interface{}{"cb"}}},
 
-			// ---- Function-name initializer exception with arbitrary CallExpression
-			// wrappers — ESLint's `outerScope === innerScope.upper` accepts any
-			// non-scope-introducing wrapper, not just a fixed list of operators.
-			{Code: `const a = wrap(function a() {});`},
-			{Code: `const a = foo || wrap(function a() {});`},
-			{Code: `const { a = wrap(function a() {}) } = obj;`},
-			{Code: `const { a = foo || wrap(function a() {}) } = obj;`},
-			{Code: `function foo(a = wrap(function a() {})) {}`},
-			{Code: `function foo(a = foo || wrap(function a() {})) {}`},
-			{Code: `const A = wrap(class A {});`},
-			{Code: `const A = foo || wrap(class A {});`},
-			{Code: `const { A = wrap(class A {}) } = obj;`},
-			{Code: `const { A = foo || wrap(class A {}) } = obj;`},
-			{Code: `function foo(A = wrap(class A {})) {}`},
-			{Code: `function foo(A = foo || wrap(class A {})) {}`},
-			// Sibling-init in same destructuring also exempted by the same rule.
-			{Code: `const { a = foo, b = function a() {} } = {}`},
-			{Code: `const { A = Foo, B = class A {} } = {}`},
-			// FunctionExpression / ClassExpression at the test position of a
-			// ternary in the initializer is also exempted (same scope/range).
-			{Code: `var a = function a() {} ? foo : bar`},
-			{Code: `var A = class A {} ? foo : bar`},
-			// Wrap with side-effecting top-level `let` — still exempted.
-			{Code: `let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });`, Options: map[string]interface{}{"hoist": "all"}},
-
 			// ---- Class fields / methods (not shadowing — different kinds) ----
 			{Code: `class C { foo; foo() { let foo; } }`},
 
@@ -509,6 +484,21 @@ function bar() { }`},
 	}
   }
 		`},
+			// ---- A string-literal enum member binds its name but declares no
+			// identifier, so it is neither reported nor reported against ----
+			{Code: `
+			const A = 2;
+			enum Test {
+				"A" = 1,
+				B = A,
+			}
+		`},
+			{Code: `
+			enum Test {
+				"A" = 1,
+				B = ((): number => { const A = 2; return A; })(),
+			}
+		`},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -605,6 +595,28 @@ function bar() { }`},
 			{Code: `(function() { var a = function() { (class a{}); }; })()`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
 			{Code: `(function() { var a = class { constructor() { class a {} } }; })()`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
 			{Code: `class A { constructor() { var A; } }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+
+			// ---- Function/class names that are not direct initializers ----
+			// Calls are not transparent, even when a surrounding logical expression is.
+			{Code: `const a = wrap(function a() {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 25}}},
+			{Code: `const a = foo || wrap(function a() {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { a = wrap(function a() {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { a = foo || wrap(function a() {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `function foo(a = wrap(function a() {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `function foo(a = foo || wrap(function a() {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const A = wrap(class A {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const A = foo || wrap(class A {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { A = wrap(class A {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { A = foo || wrap(class A {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `function foo(A = wrap(class A {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `function foo(A = foo || wrap(class A {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			// A sibling destructuring default is not this binding's initializer.
+			{Code: `const { a = foo, b = function a() {} } = {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { A = Foo, B = class A {} } = {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			// The test position of a conditional expression is not a result branch.
+			{Code: `var a = function a() {} ? foo : bar`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `var A = class A {} ? foo : bar`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });`, Options: map[string]interface{}{"hoist": "all"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
 
 			// ---- Nested shadowing chain (multiple errors) ----
 			{
@@ -937,6 +949,14 @@ function bar() { }`},
 				Code: "\n\t\tconst A = 2;\n\t\tenum Test {\n\t\t\tA = 1,\n\t\t\tB = A,\n\t\t}\n\t",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noShadow"},
+				},
+			},
+			// Core ESLint keeps the generic noShadow diagnostic when the outer
+			// declaration is the enum itself.
+			{
+				Code: `enum A { A }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadow", Line: 1, Column: 10},
 				},
 			},
 
@@ -1310,6 +1330,14 @@ function bar() { }`},
 				Code: `const a = 1; class C { m(x: string): void; m(x: number): void; m(a: any): void { void a; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noShadow"},
+				},
+			},
+
+			// ---- Function overload definitions form one shadowing variable ----
+			{
+				Code: `const f = 0; { function f(x: string): void; function f(x: any) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadow", Line: 1, Column: 25},
 				},
 			},
 

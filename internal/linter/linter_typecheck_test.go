@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -28,7 +29,7 @@ func TestTypeCheck_ReportsSemanticErrors(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true, // typeCheck enabled
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -60,7 +61,7 @@ func TestTypeCheck_Disabled_NoSemanticErrors(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		false, // typeCheck disabled
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -80,7 +81,7 @@ func TestTypeCheck_RuleNameFormat(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -114,7 +115,7 @@ func TestTypeCheck_SeverityIsError(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -136,7 +137,7 @@ func TestTypeCheck_NoErrorsOnValidCode(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -159,7 +160,7 @@ func TestTypeCheck_CoexistsWithLintRules(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -196,7 +197,7 @@ func TestTypeCheck_NotConstrainedByAllowFiles(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -229,7 +230,7 @@ func TestTypeCheck_NotConstrainedByAllowDirs(t *testing.T) {
 
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, []string{srcDir}, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, []string{srcDir}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -320,7 +321,7 @@ const z: boolean = 'true';
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -346,7 +347,7 @@ func TestTypeCheck_MessageNotEmpty(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -368,7 +369,7 @@ func TestTypeCheck_MessageContainsAssignability(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -395,7 +396,7 @@ func TestTypeCheck_RangeIsValid(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -425,7 +426,7 @@ func TestTypeCheck_EmptyFile(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -445,7 +446,7 @@ func TestTypeCheck_OnlyComments(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -465,7 +466,7 @@ func TestTypeCheck_UndefinedVariable(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -494,7 +495,7 @@ x.foo;
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -522,7 +523,7 @@ func TestTypeCheck_MultipleFiles(t *testing.T) {
 	})
 
 	filesWithErrors := make(map[string]bool)
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) {
@@ -550,7 +551,7 @@ const x: Foo = { a: 'hello' };
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -580,6 +581,7 @@ const x: Foo = { a: 'hello' };
 
 func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "export const value = 1;"})
+	sourceProgram := lintprogram.NewFromCompiler(program)
 	sourceFile := program.GetSourceFile(paths["a.ts"])
 	if sourceFile == nil {
 		t.Fatal("expected a.ts source file")
@@ -605,7 +607,7 @@ func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.
 		"Source",
 		"Target",
 	))
-	if typeCheckDedupeKeyForDiagnostic(program, withChainA) == typeCheckDedupeKeyForDiagnostic(program, withChainB) {
+	if typeCheckDedupeKeyForDiagnostic(sourceProgram, withChainA) == typeCheckDedupeKeyForDiagnostic(sourceProgram, withChainB) {
 		t.Fatal("message-chain differences must remain distinct in the dedupe key")
 	}
 
@@ -623,7 +625,7 @@ func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.
 		"second",
 		"Target",
 	))
-	if typeCheckDedupeKeyForDiagnostic(program, withRelatedA) == typeCheckDedupeKeyForDiagnostic(program, withRelatedB) {
+	if typeCheckDedupeKeyForDiagnostic(sourceProgram, withRelatedA) == typeCheckDedupeKeyForDiagnostic(sourceProgram, withRelatedB) {
 		t.Fatal("related-information differences must remain distinct in the dedupe key")
 	}
 }
@@ -645,12 +647,13 @@ func TestTypeCheckDedupeSurvivorUsesProgramOrder(t *testing.T) {
 
 func TestTypeCheckFilesystemPathIDIsStableAcrossSymlinkAliases(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "export const value = 1;"})
+	sourceProgram := lintprogram.NewFromCompiler(program)
 	realPath := paths["a.ts"]
 	aliasPath := filepath.Join(filepath.Dir(realPath), "alias.ts")
 	if err := os.Symlink(realPath, aliasPath); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	if typeCheckFilesystemPathID(program, realPath) != typeCheckFilesystemPathID(program, aliasPath) {
+	if typeCheckFilesystemPathID(sourceProgram, realPath) != typeCheckFilesystemPathID(sourceProgram, aliasPath) {
 		t.Fatalf("expected real and alias paths to share a typecheck identity: real=%q alias=%q", realPath, aliasPath)
 	}
 }
@@ -684,7 +687,7 @@ func TestTypeCheckFilesystemPathIDPreservesDistinctCanonicalCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
 	}
-	if typeCheckFilesystemPathID(program, upper) == typeCheckFilesystemPathID(program, lower) {
+	if typeCheckFilesystemPathID(lintprogram.NewFromCompiler(program), upper) == typeCheckFilesystemPathID(lintprogram.NewFromCompiler(program), lower) {
 		t.Fatalf("distinct canonical paths must retain exact identity: upper=%q lower=%q", upper, lower)
 	}
 }
@@ -702,7 +705,7 @@ func TestTypeCheck_NodeModulesIncludedWhenInProgram(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, []string{"node_modules"},
+	runLinterInCompilerProgram(program, nil, nil, []string{"node_modules"},
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -738,7 +741,7 @@ const x: number = 'hello';
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -761,7 +764,7 @@ const x: number = 'hello';
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -784,7 +787,7 @@ const x: number = 42;
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -816,7 +819,7 @@ func TestTypeCheck_NoFixesOrSuggestions(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -844,7 +847,7 @@ func TestTypeCheck_LintedFileCount(t *testing.T) {
 		"c.ts": "const z = 1;",
 	})
 
-	count := RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	count := runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) {}, nil,
@@ -862,7 +865,7 @@ func TestTypeCheck_LintedFileCountWithAllowFiles(t *testing.T) {
 		"b.ts": "const y: string = 42;",
 	})
 
-	count := RunLinterInProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
+	count := runLinterInCompilerProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) {}, nil,
@@ -883,7 +886,7 @@ func TestTypeCheck_SourceFileMatchesDiagnosticOrigin(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -911,7 +914,7 @@ const x: string = value;
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -941,7 +944,7 @@ greet(123);
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -976,7 +979,7 @@ function getNum(): number {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1003,7 +1006,7 @@ func TestTypeCheck_TypeSafeCodeOnlyLintDiagnostics(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1081,7 +1084,7 @@ func TestTypeCheck_RangePointsToCorrectToken(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1116,7 +1119,7 @@ func TestTypeCheck_NoDuplicateDiagnostics(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1158,7 +1161,7 @@ func TestTypeCheck_AllowFilesEmptySliceBlocksLintOnly(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	count := RunLinterInProgram(program, []string{}, nil, utils.ExcludePaths,
+	count := runLinterInCompilerProgram(program, []string{}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1187,7 +1190,7 @@ func TestTypeCheck_TS2322_TypeAssignment(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1220,7 +1223,7 @@ const x: Foo = { a: 1 };
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1254,7 +1257,7 @@ const result: string = identity<number>(42);
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1284,7 +1287,7 @@ const c: Color = 'red';
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1313,7 +1316,7 @@ const x: [number, string] = [1, 2];
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1343,7 +1346,7 @@ const x: Foo = { a: 1, b: 2 };
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1376,7 +1379,7 @@ const x: number = 'hello';
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1403,7 +1406,7 @@ func TestTypeCheck_MessageIdEmpty(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -1432,7 +1435,7 @@ func TestTypeCheck_FileFilterSuppressesLintRulesOnly(t *testing.T) {
 	keptPath := paths["kept.ts"]
 
 	var diagnostics []rule.RuleDiagnostic
-	count := RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	count := runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,

@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed prefer_arrow_callback.schema.json
@@ -392,7 +393,7 @@ func findTokenRange(sf *ast.SourceFile, start, end int, kind ast.Kind) (core.Tex
 func previousTokenEndBefore(text string, pos int) int {
 	i := pos
 	for i > 0 {
-		i = utils.SkipTrailingWhitespace(text, 0, i)
+		i = ecmascript.SkipTrailingWhitespace(text, 0, i)
 		if i >= 2 && text[i-2:i] == "*/" {
 			if start := strings.LastIndex(text[:i-2], "/*"); start >= 0 {
 				i = start

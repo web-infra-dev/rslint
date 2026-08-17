@@ -41,4 +41,5 @@ test.each`
 
 ## Original Documentation
 
-- [jest/no-focused-tests](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-focused-tests.md)
+- [eslint-plugin-jest: no-focused-tests](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-focused-tests.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-focused-tests.ts)

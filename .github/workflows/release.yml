@@ -47,7 +47,7 @@ jobs:
   publish-npm:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
-    needs: [build, napi-build]
+    needs: [build, build-wasm, napi-build]
     runs-on: ubuntu-22.04
     environment: release
     permissions:
@@ -77,6 +77,7 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
+
       # Update npm to the latest version to enable OIDC
       - name: Update npm
         run: |
@@ -94,18 +95,23 @@ jobs:
         with:
           path: binaries
 
+      - name: Copy rslint WASM artifact
+        run: cp binaries/rslint-wasm/rslint.wasm packages/rslint-wasm/rslint.wasm
+
       - name: Move binaries
         uses: ./.github/actions/move-artifacts
-      # The per-platform .node parser binaries ship in the @rslint/native-{tuple}
-      # subpackages, populated from the napi-build artifacts by move-artifacts
-      # above. core's loader resolves them at runtime, so no napi build / Rust is
-      # needed here — build:js just bundles the worker (loader + types live in core).
-      - name: Build @rslint/core dist
-        run: pnpm --filter @rslint/core build:js
+
+      # The native binaries and WASM are downloaded above. The JavaScript
+      # package outputs are fast to build and remain part of the publish job.
+      - name: Build npm package JavaScript
+        run: |
+          pnpm --filter @rslint/core build:js
+          pnpm --filter @rslint/wasm build:js
+
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |
-          pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
+          pnpm --filter='!@rslint/tsgo-server' --filter='!@rslint/tsgo-server-*' -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions"
           version=$(jq -r .version package.json)
@@ -186,6 +192,33 @@ jobs:
             fi
           fi
 
+  build-wasm:
+    name: Build WASM
+    runs-on: rspack-ubuntu-22.04-large
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+          submodules: true
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.26.0
+          cache-name: release-wasm
+
+      - name: Build rslint WASM
+        run: GOOS=js GOARCH=wasm go build -o packages/rslint-wasm/rslint.wasm -ldflags="-s -w" ./cmd/rslint
+
+      - name: Upload rslint WASM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rslint-wasm
+          path: packages/rslint-wasm/rslint.wasm
+          if-no-files-found: error
+
   build:
     env:
       GOMAXPROCS: 8
@@ -251,35 +284,28 @@ jobs:
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
 
-      - name: Go Build tsgo
-        run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo ./cmd/tsgo
+      # Rule options JSON Schema dump for the generate-rule-option-types
+      # rslib plugin (see packages/rslint/rslib.config.ts), read by
+      # publish-npm once move-artifacts places it. The dump is
+      # platform-independent JSON, so it only needs to run once, on this
+      # matrix leg's host (ubuntu-22.04, not a cross-compile target) — no
+      # GOOS/GOARCH override, it runs natively rather than being cross-built.
+      - name: Dump rule schemas
+        if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
+        run: go run ./tools/dump_rule_schemas > rule-schemas.json
+
+      - name: Upload rule schemas
+        if: ${{ matrix.goos == 'linux' && matrix.goarch == 'amd64' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rule-schemas
+          path: rule-schemas.json
 
       - name: Upload rslint artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
           path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
-
-      - name: Upload tsgo artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo
-          path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo
-
-      - name: Build typescript-go
-        run: |
-          cd typescript-go
-          npm ci
-          npm run build
-          # Remove tsgo binary from typescript-go build, we use our own ./cmd/tsgo build
-          rm -f built/local/tsgo built/local/tsgo.exe
-
-      - name: Upload typescript-go built artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo-built
-          path: typescript-go/built
 
   # napi `.node` parser binaries, one per target → the @rslint/native-{tuple}
   # subpackages. Separate matrix from the Go build job (which is ubuntu-only):
