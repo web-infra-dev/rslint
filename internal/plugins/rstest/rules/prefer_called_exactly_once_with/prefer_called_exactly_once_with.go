@@ -3,6 +3,7 @@ package prefer_called_exactly_once_with
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -70,9 +71,8 @@ type mergeCandidate struct {
 	// position is the trimmed start offset of statement, used to order the
 	// pair and to bound the mock-reset search between them.
 	position int
-	// headText is the assertion factory call as written — expect(x),
-	// expect.soft(x), ctx.expect(x) — and is the pairing key.
-	headText string
+	// pairKey groups the assertions that may merge; see pairKey().
+	pairKey string
 	// targetText is the first factory argument as written. It only identifies
 	// the mock for the reset barrier and never pairs assertions.
 	targetText string
@@ -111,24 +111,33 @@ func nodeText(sourceFile *ast.SourceFile, node *ast.Node) (string, bool) {
 }
 
 // assertionRootCall returns the call ParseExpectCall must be handed for an
-// expression statement. Method-style assertions are already that call, while a
-// Chai property assertion such as expect(x).to.have.been.calledOnce ends on a
-// member access whose chain is rooted in the expect(x) call.
-func assertionRootCall(expression *ast.Node) *ast.Node {
+// expression statement, and whether the statement awaits it. Method-style
+// assertions are already that call, while a Chai property assertion such as
+// expect(x).to.have.been.calledOnce ends on a member access whose chain is
+// rooted in the expect(x) call.
+//
+// A promise modifier makes the assertion awaitable, and such an assertion is
+// normally awaited, so a rule that stopped at the await would only ever see
+// the form that is already wrong. Upstream stops there.
+func assertionRootCall(expression *ast.Node) (*ast.Node, bool) {
 	node := ast.SkipParentheses(expression)
+	awaited := false
 	for node != nil {
 		switch node.Kind {
 		case ast.KindCallExpression:
-			return node
+			return node, awaited
+		case ast.KindAwaitExpression:
+			awaited = true
+			node = ast.SkipParentheses(node.AsAwaitExpression().Expression)
 		case ast.KindPropertyAccessExpression:
 			node = ast.SkipParentheses(node.AsPropertyAccessExpression().Expression)
 		case ast.KindElementAccessExpression:
 			node = ast.SkipParentheses(node.AsElementAccessExpression().Expression)
 		default:
-			return nil
+			return nil, false
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func mergeCandidateForStatement(
@@ -143,7 +152,7 @@ func mergeCandidateForStatement(
 	if expressionStatement == nil {
 		return nil
 	}
-	rootCall := assertionRootCall(expressionStatement.Expression)
+	rootCall, awaited := assertionRootCall(expressionStatement.Expression)
 	if rootCall == nil {
 		return nil
 	}
@@ -151,12 +160,11 @@ func mergeCandidateForStatement(
 	if parsed == nil {
 		return nil
 	}
-	// Any modifier — not, resolves, rejects — changes what the assertion says
-	// about the target, so two assertions that disagree on modifiers do not
-	// state the same thing and must not be merged. Requiring none on both
-	// sides is what the upstream rule achieves implicitly by keying the pair on
-	// the text up to the matcher, which includes the modifier.
-	if len(parsed.Modifiers) > 0 {
+	// `not` never merges, even on both assertions: "not called once" and "not
+	// called with these arguments" is `¬once ∧ ¬with`, while the combined
+	// matcher negated is `¬(once ∧ with)`. Upstream drops `not` chains for the
+	// same reason.
+	if slices.Contains(parsed.Modifiers, "not") {
 		return nil
 	}
 	if parsed.Head == nil || parsed.Head.Kind != ast.KindCallExpression {
@@ -183,9 +191,33 @@ func mergeCandidateForStatement(
 
 	candidate.statement = statement
 	candidate.position = internalUtils.TrimNodeTextRange(sourceFile, statement).Pos()
-	candidate.headText = headText
+	candidate.pairKey = pairKey(headText, parsed.Modifiers, awaited)
 	candidate.targetText = targetText
 	return candidate
+}
+
+// pairKey composes what has to match before two assertions can be treated as
+// two halves of one claim: they must assert on the same value, in the same
+// way, in the same execution context. The fix keeps one statement and deletes
+// the other, so anything that differs here would be silently dropped — an
+// `await` most of all, whose loss turns a working assertion into a floating
+// promise whose failure escapes as an unhandled rejection.
+//
+// Upstream gets the first two from the text preceding the matcher, and misses
+// the third because it never looks through an await. That text also carries
+// Chai's language chains, which assert nothing, so it would keep
+// `expect(x).to.have.been.calledOnce` from pairing with
+// `expect(x).calledWith('a')`. Composing the key from the parse instead keeps
+// what changes meaning and drops the sugar.
+//
+// The separator cannot occur in source text, so no factory text can collide
+// with a modified chain.
+func pairKey(headText string, modifiers []string, awaited bool) string {
+	key := headText + "\x00" + strings.Join(modifiers, ".")
+	if awaited {
+		return key + "\x00await"
+	}
+	return key
 }
 
 // chainAssertions picks the matchers this rule acts on out of an assertion
@@ -426,8 +458,8 @@ func checkBlock(
 	// diagnostic list reads down the file and never depends on map iteration
 	// order. Each entry is keyed by the statement that carries its report.
 	var pending []pendingReport
-	var heads []string
-	byHead := map[string][]*mergeCandidate{}
+	var pairKeys []string
+	byPairKey := map[string][]*mergeCandidate{}
 	for _, statement := range statements {
 		candidate := mergeCandidateForStatement(analysis, ctx.SourceFile, statement)
 		if candidate == nil {
@@ -442,16 +474,16 @@ func checkBlock(
 			})
 			continue
 		}
-		if _, seen := byHead[candidate.headText]; !seen {
-			heads = append(heads, candidate.headText)
+		if _, seen := byPairKey[candidate.pairKey]; !seen {
+			pairKeys = append(pairKeys, candidate.pairKey)
 		}
-		byHead[candidate.headText] = append(byHead[candidate.headText], candidate)
+		byPairKey[candidate.pairKey] = append(byPairKey[candidate.pairKey], candidate)
 	}
 
-	for _, head := range heads {
+	for _, pairKey := range pairKeys {
 		// A third assertion on the same target makes the merge ambiguous, so
 		// upstream reports only an exact pair and this rule follows.
-		candidates := byHead[head]
+		candidates := byPairKey[pairKey]
 		if len(candidates) != 2 {
 			continue
 		}

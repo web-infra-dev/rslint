@@ -29,6 +29,9 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
       code: `import { expect } from 'vitest'; expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('a')`,
     },
     { code: `expect(x).to.have.been.calledOnceWith('a')` },
+    {
+      code: `async function f() { await expect(x).resolves.toHaveBeenCalledOnce(); expect(x).resolves.toHaveBeenCalledWith('a'); }`,
+    },
   ],
   invalid: [
     {
@@ -77,6 +80,16 @@ expect(x).to.have.been.calledWith('a');`,
     {
       code: `expect(x).to.have.been.calledOnce.and.to.be.ok;
 expect(x).to.have.been.calledWith('a');`,
+      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+    },
+    {
+      code: `async function f() {
+  await expect(x).resolves.toHaveBeenCalledOnce();
+  await expect(x).resolves.toHaveBeenCalledWith('a');
+}`,
+      output: `async function f() {
+  await expect(x).resolves.toHaveBeenCalledExactlyOnceWith('a');
+}`,
       errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
     },
   ],

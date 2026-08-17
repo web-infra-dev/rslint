@@ -20,10 +20,20 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			{Code: `expect(x).toHaveBeenCalledWith('hoge'); expect(x).toHaveBeenCalledWith('foo');`},
 			{Code: `expect(x).toHaveBeenCalledOnce(); expect(x).not.toHaveBeenCalledWith('hoge');`},
 			{Code: `expect(x).not.toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge');`},
-			// resolves / rejects change what the assertion says about the
-			// target, so the two statements are not two halves of one claim.
+			// Both negated is still not mergeable: `¬once ∧ ¬with` is not
+			// `¬(once ∧ with)`.
+			{Code: `expect(x).not.toHaveBeenCalledOnce(); expect(x).not.toHaveBeenCalledWith('hoge');`},
+			// A modifier changes what the assertion says about the target, so
+			// two assertions that disagree on modifiers are not two halves of
+			// one claim.
 			{Code: `expect(x).resolves.toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge');`},
 			{Code: `expect(x).toHaveBeenCalledOnce(); expect(x).rejects.toHaveBeenCalledWith('hoge');`},
+			{Code: `expect(x).resolves.toHaveBeenCalledOnce(); expect(x).rejects.toHaveBeenCalledWith('hoge');`},
+			// Awaiting one half and not the other is not a pair: dropping the
+			// awaited statement would leave a floating promise whose failure
+			// escapes as an unhandled rejection.
+			{Code: `async function f() { await expect(x).resolves.toHaveBeenCalledOnce(); expect(x).resolves.toHaveBeenCalledWith('a'); }`},
+			{Code: `async function f() { expect(x).resolves.toHaveBeenCalledOnce(); await expect(x).resolves.toHaveBeenCalledWith('a'); }`},
 			{Code: `expect(x).toHaveBeenCalledOnce(); x.mockRestore(); expect(x).toHaveBeenCalledWith('hoge');`},
 			{Code: `expect(x).toHaveBeenCalledOnce(); x.mockReset(); expect(x).toHaveBeenCalledWith('hoge');`},
 			{Code: `expect(x).toHaveBeenCalledOnce(); x.mockClear(); expect(x).toHaveBeenCalledWith('hoge');`},
@@ -139,6 +149,32 @@ expect(bbb).toHaveBeenCalledExactlyOnceWith('b');
 expect(x).toHaveBeenCalledWith('a');`,
 				Output: []string{` // keep me
 expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			// Matching promise modifiers on both halves do merge: the awaited
+			// value and the conjunction are unchanged.
+			{
+				Code: `expect(x).resolves.toHaveBeenCalledOnce();
+expect(x).resolves.toHaveBeenCalledWith('a');`,
+				Output: []string{`expect(x).resolves.toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			{
+				Code: `expect(x).rejects.toHaveBeenCalledWith('a');
+expect(x).rejects.toHaveBeenCalledOnce();`,
+				Output: []string{`expect(x).rejects.toHaveBeenCalledExactlyOnceWith('a');
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			// Awaited on both halves: the merge keeps the await.
+			{
+				Code: `async function f() {
+  await expect(x).resolves.toHaveBeenCalledOnce();
+  await expect(x).resolves.toHaveBeenCalledWith('a');
+}`,
+				Output: []string{`async function f() {
+  await expect(x).resolves.toHaveBeenCalledExactlyOnceWith('a');
+}`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
 			},
 			// Chai-style spellings merge into calledOnceWith.

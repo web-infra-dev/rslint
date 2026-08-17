@@ -50,7 +50,9 @@ expect(handler).to.have.been.calledWith('ready');
 
 The rule does not merge two assertions when:
 
-- they carry a modifier — `not`, `resolves`, or `rejects` — because the modifier changes what each assertion claims about the target;
+- either carries `not`, because "not called once" and "not called with these arguments" is `¬ once ∧ ¬ with`, while the combined matcher negated is `¬(once ∧ with)`;
+- they carry different modifiers, because each then claims something about a different value; matching `resolves` or `rejects` on both halves does merge, awaited or not;
+- one is awaited and the other is not, because dropping the awaited statement would leave a floating promise whose failure escapes as an unhandled rejection;
 - `mockClear`, `mockReset`, or `mockRestore` resets the target between them, at any nesting depth, because each assertion then describes a different call history;
 - more than two of these assertions share one target, because which pair to merge is ambiguous.
 
