@@ -48,6 +48,7 @@ type rstestResolvedAPI struct {
 	parameterizedKind RstestParameterizedKind
 	skipped           bool
 	todo              bool
+	focusEntries      []ParsedRstestFnMemberEntry
 }
 
 type rstestAPIProfile uint8
@@ -138,7 +139,7 @@ func parseRstestFnCall(
 	if root.Kind == ast.KindIdentifier {
 		localName = root.AsIdentifier().Text
 	}
-	return &ParsedRstestFnCall{
+	parsed := &ParsedRstestFnCall{
 		ParsedCall: testFramework.ParsedCall{
 			Name:          resolved.name,
 			LocalName:     localName,
@@ -161,6 +162,10 @@ func parseRstestFnCall(
 		Skipped:           resolved.skipped,
 		Todo:              resolved.todo,
 	}
+	if len(resolved.focusEntries) > 0 {
+		parsed.focus = &rstestFocus{entries: resolved.focusEntries}
+	}
+	return parsed
 }
 
 func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool) {
@@ -602,6 +607,11 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 		resolved.parameterizedKind = RstestParameterizedEach
 	case "for":
 		resolved.parameterizedKind = RstestParameterizedFor
+	case "only":
+		resolved.focusEntries = append(resolved.focusEntries, ParsedRstestFnMemberEntry{
+			Name: part.name,
+			Node: part.node,
+		})
 	case "skip":
 		resolved.skipped = true
 	case "todo":

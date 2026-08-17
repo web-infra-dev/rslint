@@ -1,12 +1,15 @@
-// Package minimatch ports minimatch 3.1.5 and the brace-expansion 1.1.16 it
+// Package minimatch3 ports minimatch 3.1.5 and the brace-expansion 1.1.16 it
 // pulls in, the glob matcher an ESLint plugin compares paths with. It covers
 // the extended glob syntax — `!(a)`, `@(a|b)`, `+(a)`, `?(a)`, `*(a)` — that
 // the general-purpose Go glob libraries leave out, so a rule ported from an
 // ESLint plugin can accept the same patterns its upstream does.
 //
-// Plugins are what this is for, so 3.x is the version to answer like. ESLint
-// itself moved on to minimatch 10 for the paths it matches on its own behalf,
-// which reads a handful of patterns differently.
+// The major version is in the name because a single ESLint run reads globs by
+// two of them. A plugin declares its own dependency and the ecosystem sits on
+// 3.x — eslint-plugin-import and eslint-plugin-react both pin `^3.1.2` — while
+// ESLint matches its own flat config `files` and `ignores` with minimatch 10.
+// The two disagree on more than the version bump suggests, so a port that did
+// not say which one it answers like would be read as either.
 //
 // Patterns compile to regexp2 rather than the standard library's regexp,
 // because a negated list needs the lookahead RE2 has no syntax for.
@@ -32,15 +35,15 @@
 // later minimatch stopped rewriting by default too.
 //
 // See the LICENSE file in this directory for the upstream copyright notices.
-package minimatch
+package minimatch3
 
 import (
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/dlclark/regexp2"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // Options mirrors the minimatch options a caller can pass. The zero value is
@@ -152,7 +155,7 @@ func New(pattern string, options Options) *Matcher {
 		return m
 	}
 
-	m.pattern = trimECMA(pattern)
+	m.pattern = ecmascript.StringTrim(pattern)
 	m.make()
 	return m
 }
@@ -178,36 +181,6 @@ func overMaxPatternLength(pattern string) bool {
 		}
 	}
 	return false
-}
-
-// trimECMA trims the pattern the way String.prototype.trim does. Go's
-// strings.TrimSpace reads a different set of characters as blank: it trims
-// U+0085, which JavaScript keeps, and keeps U+FEFF, which JavaScript trims.
-func trimECMA(pattern string) string {
-	return strings.TrimFunc(pattern, isStrWhiteSpace)
-}
-
-// isStrWhiteSpace reports whether a character is one JavaScript trims from the
-// edge of a string: a WhiteSpace or a LineTerminator.
-//
-// The rest of the repository spells this utils.IsStrWhiteSpace. Reaching for
-// it would put the whole compiler on this package's import list, where a port
-// of an npm package with its own LICENSE has no business, so the dozen lines
-// live here instead.
-//
-// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-WhiteSpace
-// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-LineTerminator
-func isStrWhiteSpace(r rune) bool {
-	switch r {
-	// LineTerminator
-	case '\n', '\r', 0x2028, 0x2029:
-		return true
-	// WhiteSpace
-	case '\t', '\v', '\f', 0xFEFF:
-		return true
-	}
-	// WhiteSpace, which covers the ordinary space and U+00A0
-	return unicode.Is(unicode.Zs, r)
 }
 
 // Match reports whether path matches pattern. Compile the pattern with New
@@ -544,7 +517,7 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			hasMagic = true
 			inClass = false
 			if m.options.NoCase {
-				re = re[:reClassStart+1] + caseCloseClass(re[reClassStart+1:])
+				re = re[:reClassStart+1] + esregexp.CaseCloseClass(re[reClassStart+1:], false)
 			}
 			re += string(c)
 
@@ -558,8 +531,10 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			}
 			// A character class is widened as a whole once it closes, so only
 			// a literal standing on its own is widened here.
+			// minimatch builds `new RegExp(re, "i")`, with no `u`, so the
+			// comparison is the one that never crosses into ASCII.
 			if m.options.NoCase && !inClass {
-				if class, widened := caseClass(c); widened {
+				if class, widened := esregexp.CaseClass(c, false); widened {
 					re += class
 					continue
 				}

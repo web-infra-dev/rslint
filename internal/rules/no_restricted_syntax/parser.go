@@ -3,10 +3,9 @@ package no_restricted_syntax
 import (
 	"errors"
 	"fmt"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"strconv"
 	"strings"
-
-	"github.com/dlclark/regexp2"
 )
 
 // parseSelector parses an ESLint selector string into a selector tree.
@@ -339,7 +338,7 @@ func (p *parser) parseAttrValue() (attrValue, error) {
 		if err != nil {
 			return attrValue{}, err
 		}
-		compiled, compileErr := regexp2.Compile(pat, regexpFlags(flags))
+		compiled, compileErr := esregexp.Compile(pat, flags)
 		if compileErr != nil {
 			return attrValue{}, fmt.Errorf("invalid regular expression: %w", compileErr)
 		}

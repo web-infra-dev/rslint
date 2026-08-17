@@ -1,10 +1,12 @@
-package minimatch
+package minimatch3
 
 import (
 	"errors"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // Placeholders standing in for the characters a pattern escaped with a
@@ -199,7 +201,7 @@ func expandSequence(n []string, alpha bool) []string {
 				member = ""
 			}
 		} else {
-			member = sequenceString(i)
+			member = ecmascript.NumberToString(i)
 			if padded {
 				if need := width - len(member); need > 0 {
 					if i < 0 {
@@ -221,39 +223,6 @@ func expandSequence(n []string, alpha bool) []string {
 		i = next
 	}
 	return members
-}
-
-// sequenceString writes a member of a numeric sequence the way JavaScript
-// writes a number: the shortest run of digits that reads back as the same
-// value, with no sign on a zero, and in exponential notation once the decimal
-// point sits past the twenty-first place.
-func sequenceString(value float64) string {
-	switch {
-	case value == 0:
-		return "0"
-	case math.IsInf(value, 1):
-		return "Infinity"
-	case math.IsInf(value, -1):
-		return "-Infinity"
-	}
-
-	sign := ""
-	digits := strconv.FormatFloat(value, 'f', -1, 64)
-	if strings.HasPrefix(digits, "-") {
-		sign, digits = "-", digits[1:]
-	}
-	if len(digits) <= 21 {
-		return sign + digits
-	}
-
-	// A sequence counts in whole numbers, so the digits hold no decimal point
-	// and the exponent is however many of them follow the first.
-	exponent := strconv.Itoa(len(digits) - 1)
-	significant := strings.TrimRight(digits, "0")
-	if len(significant) == 1 {
-		return sign + significant + "e+" + exponent
-	}
-	return sign + significant[:1] + "." + significant[1:] + "e+" + exponent
 }
 
 // sequenceValue reads a sequence endpoint as a number, falling back to the
@@ -301,9 +270,6 @@ func isAlphaSequence(body string) bool {
 	return len(parts) == 2 || isInteger(parts[2])
 }
 
-// lineTerminators are the characters a JavaScript `.` refuses to match.
-const lineTerminators = "\n\r\u2028\u2029"
-
 // hasCommaBeforeBrace reports whether post carries a comma that a later `}` on
 // the same line closes, which means the brace set continues past the `}`
 // already consumed. Upstream spells this `,(?!,).*\}`, whose `.` stops where a
@@ -317,7 +283,7 @@ func hasCommaBeforeBrace(post string) bool {
 		if strings.HasPrefix(rest, ",") {
 			continue
 		}
-		if end := strings.IndexAny(rest, lineTerminators); end >= 0 {
+		if end := strings.IndexAny(rest, ecmascript.LineTerminators); end >= 0 {
 			rest = rest[:end]
 		}
 		if strings.IndexByte(rest, '}') >= 0 {
