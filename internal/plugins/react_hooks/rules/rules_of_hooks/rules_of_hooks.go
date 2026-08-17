@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // The schema declares `additionalHooks` exactly as upstream does. Since
@@ -53,7 +54,7 @@ var (
 // `useInsertionEffect`) or matches the user-configured `additionalEffectHooks`
 // regex from settings. Specific to rules-of-hooks (the additional-effect-hooks
 // gate is exclusive to this rule), so it's not promoted to the shared util.
-func isEffectCalleeName(node *ast.Node, additional *regexp.Regexp) bool {
+func isEffectCalleeName(node *ast.Node, additional *esregexp.RegExp) bool {
 	n := stripReactNamespace(node)
 	if n == nil || n.Kind != ast.KindIdentifier {
 		return false
@@ -64,7 +65,7 @@ func isEffectCalleeName(node *ast.Node, additional *regexp.Regexp) bool {
 		return true
 	}
 	if additional != nil {
-		return additional.MatchString(name)
+		return additional.Test(name)
 	}
 	return false
 }
@@ -536,7 +537,7 @@ func isReferenceIdentifier(id *ast.Node) bool {
 // `useEffectEvent` binding is allowed inside `useEffect(...)` /
 // `useLayoutEffect(...)` / `useInsertionEffect(...)` / configured effect
 // hooks / nested `useEffectEvent(...)` callbacks.
-func isInsideEffectArgument(idNode *ast.Node, additional *regexp.Regexp) bool {
+func isInsideEffectArgument(idNode *ast.Node, additional *esregexp.RegExp) bool {
 	cur := idNode
 	for cur != nil && cur.Parent != nil {
 		p := cur.Parent
@@ -555,7 +556,7 @@ func isInsideEffectArgument(idNode *ast.Node, additional *regexp.Regexp) bool {
 }
 
 // getAdditionalEffectHooks delegates to the shared settings reader.
-func getAdditionalEffectHooks(settings map[string]interface{}) *regexp.Regexp {
+func getAdditionalEffectHooks(settings map[string]interface{}) *esregexp.RegExp {
 	return react_hooksutil.AdditionalHooksFromSettings(settings, "additionalEffectHooks")
 }
 
@@ -563,7 +564,7 @@ func getAdditionalEffectHooks(settings map[string]interface{}) *regexp.Regexp {
 // rule-level `additionalHooks` option takes precedence, with
 // `settings['react-hooks'].additionalEffectHooks` as the fallback —
 // mirroring upstream's create() since facebook/react#37085.
-func parseAdditionalHooks(options []any, settings map[string]interface{}) *regexp.Regexp {
+func parseAdditionalHooks(options []any, settings map[string]interface{}) *esregexp.RegExp {
 	re := getAdditionalEffectHooks(settings)
 	if len(options) == 0 {
 		return re
@@ -574,7 +575,7 @@ func parseAdditionalHooks(options []any, settings map[string]interface{}) *regex
 	// it fails to compile; absent or empty keeps the settings-derived value.
 	if raw, _ := optsMap["additionalHooks"].(string); raw != "" {
 		re = nil
-		if compiled, err := regexp.Compile(raw); err == nil {
+		if compiled, err := esregexp.Compile(raw, ""); err == nil {
 			re = compiled
 		}
 	}

@@ -65,7 +65,7 @@ const v: number = bad;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -109,7 +109,7 @@ export const x: T = {} as T;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -150,7 +150,7 @@ export const x: T = {} as T;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -205,7 +205,7 @@ func TestTypeCheck_DedupsAcrossPrograms(t *testing.T) {
 
 	var ts2322 int
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{progA, progB},
+		Programs:        wrapTestPrograms(progA, progB),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -226,8 +226,8 @@ func TestTypeCheck_DedupsAcrossPrograms(t *testing.T) {
 	}
 }
 
-// (5) SkipTypeCheckPrograms entry true skips that program's type-check phase.
-func TestTypeCheck_SkipTypeCheckProgramsHonored(t *testing.T) {
+// (5) Source-only Programs expose no type-check phase.
+func TestTypeCheck_SourceOnlyProgramSkipped(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
 		"a.ts": `const x: number = 'oops';
@@ -235,14 +235,17 @@ func TestTypeCheck_SkipTypeCheckProgramsHonored(t *testing.T) {
 		"tsconfig.json": `{"include":["a.ts"]}`,
 	})
 	program := createProgramFromTsconfigDir(t, dir)
+	file := program.GetSourceFile(program.CommandLine().FileNames()[0])
+	if file == nil {
+		t.Fatal("fixture Program did not contain a.ts")
+	}
+	sourceOnly := mustSourceOnlyTestProgram(t, program, []*ast.SourceFile{file})
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:              []*compiler.Program{program},
-		SingleThreaded:        true,
-		GetRulesForFile:       func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:             true,
-		SkipTypeCheckPrograms: []bool{true},
+		Programs:       testPrograms(sourceOnly),
+		SingleThreaded: true,
+		TypeCheck:      true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -253,7 +256,7 @@ func TestTypeCheck_SkipTypeCheckProgramsHonored(t *testing.T) {
 
 	for _, d := range diags {
 		if strings.HasPrefix(d.RuleName, "TypeScript(") {
-			t.Fatalf("did not expect any TS diagnostic when program is in skip mask, got: %s", d.RuleName)
+			t.Fatalf("did not expect any TS diagnostic for source-only Program, got: %s", d.RuleName)
 		}
 	}
 }
@@ -274,7 +277,7 @@ const x: number = 1;
 
 	var found bool
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,

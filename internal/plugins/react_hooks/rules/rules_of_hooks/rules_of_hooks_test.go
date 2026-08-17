@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -61,10 +62,9 @@ function MyComponent({ theme }: { theme: string }) {
 	diagnosticCount := 0
 	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     program,
 		Settings:    nil,
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
+	}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
 		diagnosticCount++
 	})
 

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -20,7 +19,7 @@ import (
 //      Phase 2 diagnostics. This locks the contract documented in
 //      website/docs/en/guide/type-checking.md (type-check mirrors
 //      `tsgo --noEmit`, ignoring rslint-side filters).
-//   4. SkipTypeCheckPrograms continues to gate Phase 2 per-program.
+//   4. Source-only Programs expose no Phase 2 capability.
 
 // triggerOnIdentifierRule reports a warning on every identifier — used to
 // confirm rules really would have fired if Phase 1 had run.
@@ -60,7 +59,7 @@ func TestTypeCheckOnly_NoLintDiagnostics(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil, // <-- type-check-only path
@@ -86,7 +85,7 @@ func TestTypeCheckOnly_StillReportsTSErrors(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
@@ -122,7 +121,7 @@ func TestTypeCheckOnly_LintedFileCountIsZero(t *testing.T) {
 	})
 
 	result, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
@@ -145,7 +144,7 @@ func TestTypeCheckOnly_ExecutedRulesIsEmpty(t *testing.T) {
 	})
 
 	result, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,
@@ -175,7 +174,7 @@ func TestTypeCheckOnly_BaselineLintWouldFire(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return triggerOnIdentifierRule() },
@@ -207,7 +206,7 @@ func TestTypeCheckOnly_PerProgramFilterIgnoredByTypeCheck(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:         []*compiler.Program{program},
+		Programs:         wrapTestPrograms(program),
 		SingleThreaded:   true,
 		ExcludePaths:     utils.ExcludePaths,
 		PerProgramFilter: []FileFilter{rejectAll},
@@ -226,22 +225,24 @@ func TestTypeCheckOnly_PerProgramFilterIgnoredByTypeCheck(t *testing.T) {
 	}
 }
 
-// TestTypeCheckOnly_RespectsSkipMask verifies SkipTypeCheckPrograms still
-// gates Phase 2 even when Phase 1 is skipped (i.e. gap fallback programs
-// remain excluded from type-check, as committed in type-checking.md).
-func TestTypeCheckOnly_RespectsSkipMask(t *testing.T) {
-	program, _ := createTestProgramWithFiles(t, map[string]string{
+// TestTypeCheckOnly_SkipsSourceOnlyProgram verifies that source-only Programs
+// remain excluded from type-check when Phase 1 is skipped.
+func TestTypeCheckOnly_SkipsSourceOnlyProgram(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x: number = 'hello';",
 	})
+	file := program.GetSourceFile(paths["a.ts"])
+	if file == nil {
+		t.Fatal("fixture Program did not contain a.ts")
+	}
+	sourceOnly := mustSourceOnlyTestProgram(t, program, []*ast.SourceFile{file})
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:              []*compiler.Program{program},
-		SingleThreaded:        true,
-		ExcludePaths:          utils.ExcludePaths,
-		GetRulesForFile:       nil,
-		TypeCheck:             true,
-		SkipTypeCheckPrograms: []bool{true}, // skip the only program
+		Programs:       testPrograms(sourceOnly),
+		SingleThreaded: true,
+		ExcludePaths:   utils.ExcludePaths,
+		TypeCheck:      true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -251,7 +252,7 @@ func TestTypeCheckOnly_RespectsSkipMask(t *testing.T) {
 	}
 	tsDiags, _ := classifyDiagnostics(diags)
 	if len(tsDiags) != 0 {
-		t.Errorf("expected 0 TS diagnostics with SkipTypeCheckPrograms[0]=true, got %d: %+v", len(tsDiags), tsDiags)
+		t.Errorf("expected 0 TS diagnostics for a source-only Program, got %d: %+v", len(tsDiags), tsDiags)
 	}
 }
 
@@ -265,7 +266,7 @@ func TestTypeCheckOnly_TypeCheckFalseProducesNothing(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		ExcludePaths:    utils.ExcludePaths,
 		GetRulesForFile: nil,

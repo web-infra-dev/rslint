@@ -526,7 +526,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ctx.Program().Options()
 		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.NoImplicitThis,

@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed max_lines_per_function.schema.json
@@ -87,7 +88,7 @@ var MaxLinesPerFunctionRule = rule.Rule{
 // Synthetic or otherwise unusual ranges retain the established line-map path.
 func isSingleLineRange(text string, startPos, endPos int) bool {
 	return startPos >= 0 && endPos >= startPos && endPos <= len(text) &&
-		!utils.ContainsLineTerminator(text, startPos, endPos)
+		!ecmascript.ContainsLineTerminator(text, startPos, endPos)
 }
 
 type maxLinesPerFunctionOptions struct {
@@ -322,7 +323,7 @@ func (s *lineState) lineIsCounted(line int) bool {
 	if len(s.fullLineComment) > 0 && s.fullLineComment[line] {
 		return false
 	}
-	return !s.skipBlankLines || !utils.IsECMABlankLine(s.lineContent(line))
+	return !s.skipBlankLines || !ecmascript.IsBlank(s.lineContent(line))
 }
 
 // lineContent returns the content of the i-th 0-indexed line, without its
@@ -351,7 +352,7 @@ func (s *lineState) commentCoversWholeLine(cmt *ast.CommentRange, startLine, end
 	startOK := startLine < lineIndex
 	if !startOK && startLine == lineIndex {
 		col := cmt.Pos() - int(s.lineStarts[lineIndex])
-		if col >= 0 && col <= len(line) && utils.IsECMABlankLine(line[:col]) {
+		if col >= 0 && col <= len(line) && ecmascript.IsBlank(line[:col]) {
 			startOK = true
 		}
 	}
@@ -364,7 +365,7 @@ func (s *lineState) commentCoversWholeLine(cmt *ast.CommentRange, startLine, end
 	}
 	if endLine == lineIndex {
 		col := cmt.End() - int(s.lineStarts[lineIndex])
-		if col >= 0 && col <= len(line) && utils.IsECMABlankLine(line[col:]) {
+		if col >= 0 && col <= len(line) && ecmascript.IsBlank(line[col:]) {
 			return true
 		}
 	}
