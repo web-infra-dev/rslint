@@ -2,10 +2,94 @@ package ecmascript
 
 import (
 	"slices"
+	"strings"
 	"sync"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/microsoft/typescript-go/shim/stringutil"
 )
+
+// StringToUppercase ports String.prototype.toUpperCase, which maps every
+// character of s to its full uppercase — the one Unicode's Default Case
+// Conversion gives it, rather than the single-character mapping unicode.ToUpper
+// stops at. `ß` becoming `SS` is the familiar case of the difference; `ﬁ`
+// becoming `FI`, and `ΐ` becoming three characters, are the same rule.
+//
+// A lone surrogate is carried across untouched, as are bytes that are not
+// UTF-8, which is what happens to any character with no uppercase anyway.
+//
+// https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.touppercase
+func StringToUppercase(s string) string {
+	return unicode17Remap(stringutil.ToUpperJS(s), unicode17ToUpper)
+}
+
+// StringToLowercase ports String.prototype.toLowerCase, the other half of what
+// [StringToUppercase] describes. Only one character lowercases to more than one
+// — U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE keeps its dot as a combining
+// mark — but the mapping still reads its surroundings once: a capital sigma
+// lowercases to U+03C2 ς rather than U+03C3 σ when it ends a word.
+//
+// https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.tolowercase
+func StringToLowercase(s string) string {
+	return unicode17Remap(stringutil.ToLowerJS(s), unicode17ToLower)
+}
+
+// StringToLocaleUppercase ports String.prototype.toLocaleUpperCase.
+//
+// The locale-sensitive mapping departs from the plain one for three languages
+// — Turkish, Azeri and Lithuanian — and only ever for the host's own locale,
+// which a linter has no business reading: the same source has to draw the same
+// diagnostics on every machine it runs on. So this answers with the mapping
+// [StringToUppercase] gives, which is what the locale-sensitive one comes to
+// everywhere else.
+//
+// https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.tolocaleuppercase
+func StringToLocaleUppercase(s string) string {
+	return StringToUppercase(s)
+}
+
+// StringToLocaleLowercase ports String.prototype.toLocaleLowerCase, and reads
+// its locale the way [StringToLocaleUppercase] describes.
+//
+// https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.tolocalelowercase
+func StringToLocaleLowercase(s string) string {
+	return StringToLowercase(s)
+}
+
+// unicode17Remap carries a mapped string the rest of the way to the edition of
+// Unicode Node reads; see unicode17.go. The characters the delta names have no
+// case mapping in the edition the caser was generated from, so it hands them
+// back as they came in and a second pass can finish the job.
+func unicode17Remap(mapped string, delta func(rune) (rune, bool)) string {
+	// Every character the delta names lies outside ASCII, which is what most
+	// strings hold nothing but.
+	if !stringutil.ContainsNonASCII(mapped) {
+		return mapped
+	}
+	// Only the characters the delta names are rewritten. Everything else is
+	// spliced across as the bytes it already was, so a lone surrogate — which
+	// the caser carries in an encoding of its own — comes through unharmed.
+	var out strings.Builder
+	spliced := 0
+	for i, r := range mapped {
+		remapped, ok := delta(r)
+		if !ok {
+			continue
+		}
+		if spliced == 0 {
+			out.Grow(len(mapped))
+		}
+		out.WriteString(mapped[spliced:i])
+		out.WriteRune(remapped)
+		spliced = i + utf8.RuneLen(r)
+	}
+	if spliced == 0 {
+		return mapped
+	}
+	out.WriteString(mapped[spliced:])
+	return out.String()
+}
 
 // Canonicalize maps a character to the one JavaScript compares it as when case
 // does not matter. Which reading applies turns on whether the regexp carries

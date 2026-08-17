@@ -38,6 +38,7 @@ autofixers
 autofocus
 auvred
 axobject
+Azeri
 backgrounded
 backlink
 backpressure
@@ -77,6 +78,7 @@ cand
 canonicalise
 canonicalised
 canonicalises
+caser
 catchable
 categorisation
 Cbar
@@ -148,6 +150,7 @@ embertest
 endline
 englishish
 enochian
+Erfe
 errchkjson
 errgroup
 errrr
@@ -206,6 +209,7 @@ fsys
 fullwidth
 funcs
 funcw
+Garay
 gcflags
 GDSFP
 Geor

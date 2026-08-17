@@ -111,3 +111,81 @@ func TestCaseEquivalenceGroupsAgree(t *testing.T) {
 		}
 	}
 }
+
+// Every expectation here is what Node 26 answers for the same call. The cases
+// are the ones where the answer is more than a character-by-character walk of
+// Go's own tables: a character whose case runs to several characters, the
+// Final_Sigma context, and the characters Node knows a case for and Go does
+// not.
+func TestStringToUppercase(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "", want: ""},
+		{name: "ascii", in: "aBcD", want: "ABCD"},
+		{name: "ascii untouched", in: "42!", want: "42!"},
+		{name: "eszett grows", in: "ß", want: "SS"},
+		{name: "ligature grows", in: "ﬁ", want: "FI"},
+		{name: "grows onto a combining mark", in: "ǰ", want: "J̌"},
+		{name: "greek with iota subscript", in: "ᾀ", want: "ἈΙ"},
+		{name: "title case", in: "ǅ", want: "Ǆ"},
+		{name: "dotted capital i stands still", in: "İ", want: "İ"},
+		{name: "unicode 16 pair", in: "ƛ", want: "Ƛ"},
+		{name: "garay", in: "\U00010D70", want: "\U00010D50"},
+		{name: "beria erfe", in: "\U00016EBB", want: "\U00016EA0"},
+		{name: "in a longer string", in: "aß\U00010D70z", want: "ASS\U00010D50Z"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := StringToUppercase(test.in); got != test.want {
+				t.Errorf("StringToUppercase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			}
+			if got := StringToLocaleUppercase(test.in); got != test.want {
+				t.Errorf("StringToLocaleUppercase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			}
+		})
+	}
+}
+
+func TestStringToLowercase(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "", want: ""},
+		{name: "ascii", in: "ABCdef", want: "abcdef"},
+		{name: "ascii untouched", in: "42!", want: "42!"},
+		{name: "dotted capital i keeps its dot", in: "İ", want: "i̇"},
+		{name: "title case", in: "ǅ", want: "ǆ"},
+		{name: "unicode 16 pair", in: "Ƛ", want: "ƛ"},
+		{name: "garay", in: "\U00010D50", want: "\U00010D70"},
+		// A sigma is final when a cased character comes before it and none
+		// comes after.
+		{name: "sigma alone", in: "Σ", want: "σ"},
+		{name: "sigma ends the word", in: "ΑΣ", want: "ας"},
+		{name: "sigma starts the word", in: "ΣΑ", want: "σα"},
+		{name: "sigma inside the word", in: "ΑΣΒ", want: "ασβ"},
+		{name: "punctuation ends the word", in: "ΑΣ,Α", want: "ας,α"},
+		// An apostrophe or an accent is ignored by the condition rather than
+		// counted as the end of the word.
+		{name: "apostrophe does not end the word", in: "ΑΣ'Β", want: "ασ'β"},
+		{name: "apostrophe at the end", in: "ΑΣ'", want: "ας'"},
+		{name: "accent before the sigma", in: "ΆΣ", want: "άς"},
+		{name: "accent after the sigma", in: "ΑΣ́", want: "ας́"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := StringToLowercase(test.in); got != test.want {
+				t.Errorf("StringToLowercase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			}
+			if got := StringToLocaleLowercase(test.in); got != test.want {
+				t.Errorf("StringToLocaleLowercase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			}
+		})
+	}
+}
