@@ -261,6 +261,9 @@ func (a *analyzer) resolveFunction(node *ast.Node) *ast.Node {
 		return declaration
 	case ast.KindVariableDeclaration:
 		initializer := declaration.AsVariableDeclaration().Initializer
+		if initializer == nil {
+			return nil
+		}
 		initializer = ast.SkipParentheses(initializer)
 		if ast.IsFunctionExpressionOrArrowFunction(initializer) {
 			return initializer

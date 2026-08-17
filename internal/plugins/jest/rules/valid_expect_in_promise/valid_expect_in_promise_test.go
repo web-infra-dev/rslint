@@ -45,6 +45,9 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `function handler() { queue.then(handler); } test("case", () => promise.then(handler));`},
 			{Code: `function first() { queue.then(second); } function second() { queue.then(first); } test("case", () => promise.then(first));`},
 			{Code: `function handler(value) { expect(value).toBe(1); return queue.then(handler); } test("case", () => promise.then(handler));`},
+			{Code: `let handler; test("case", () => promise.then(handler));`},
+			{Code: `declare const handler: () => void; test("case", () => promise.then(handler));`},
+			{Code: `let handler: (value: unknown) => void; beforeEach(() => { handler = value => expect(value).toBe(1); }); test("case", () => promise.then(handler));`},
 			{Code: `test("done", done => { test("nested", () => {}); promise.then(value => { expect(value).toBe(1); done(); }); });`},
 		},
 		[]rule_tester.InvalidTestCase{
