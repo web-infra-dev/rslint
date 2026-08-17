@@ -94,7 +94,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 			}
 			declaration := ref.Resolved()
 			if ref.Identifier.End() < declaration.ID.End() ||
-				(isEvaluatedDuringInitialization(ref) && !isTypeReferenceName(ref.Identifier)) {
+				(ref.IsValueReference && isEvaluatedDuringInitialization(ref)) {
 				ctx.ReportNode(ref.Identifier, rule.RuleMessage{
 					Id:          "usedBeforeDefined",
 					Description: fmt.Sprintf("'%s' was used before it was defined.", ref.Identifier.Text()),
@@ -112,13 +112,15 @@ var NoUseBeforeDefineRule = rule.Rule{
 func shouldCheck(ref *scope.Reference, opts options) bool {
 	identifier := ref.Identifier
 
-	if opts.allowNamedExports && isExportSpecifierLocalName(identifier) {
-		return false
-	}
-
 	declaration := ref.Resolved()
 	if declaration == nil {
 		return false
+	}
+
+	// A named export is settled before any other option is consulted:
+	// `allowNamedExports` is the only one that silences it.
+	if isExportSpecifierLocalName(identifier) {
+		return !opts.allowNamedExports
 	}
 
 	if !opts.functions && isFunctionNameDef(declaration) {
@@ -137,12 +139,15 @@ func shouldCheck(ref *scope.Reference, opts options) bool {
 		return false
 	}
 
-	if !opts.typedefs && declaration.Kind == scope.DefType {
+	// Type parameters are `Type` definitions upstream, so `typedefs` covers
+	// them alongside interfaces and type aliases.
+	if !opts.typedefs &&
+		(declaration.Kind == scope.DefType || declaration.Kind == scope.DefTypeParameter) {
 		return false
 	}
 
 	if opts.ignoreTypeReferences &&
-		(referenceContainsTypeQuery(identifier) || isTypeReferenceName(identifier)) {
+		(referenceContainsTypeQuery(identifier) || ref.IsTypeReference) {
 		return false
 	}
 
@@ -322,13 +327,6 @@ func referenceContainsTypeQuery(node *ast.Node) bool {
 		}
 	}
 	return false
-}
-
-// isTypeReferenceName reports whether the identifier is the whole name of a
-// type reference (`let x: Foo`). A qualified name (`let x: A.Foo`) is not one:
-// there the identifier's parent is the qualified name.
-func isTypeReferenceName(node *ast.Node) bool {
-	return node.Parent != nil && node.Parent.Kind == ast.KindTypeReference
 }
 
 func leftMostQualifiedName(node *ast.Node) *ast.Node {

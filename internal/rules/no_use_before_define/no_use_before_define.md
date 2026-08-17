@@ -175,8 +175,8 @@ enum Level {
 
 ### `typedefs`
 
-Whether references to TypeScript `type` aliases and `interface` declarations are
-checked. Default: `true`.
+Whether references to TypeScript `type` aliases, `interface` declarations, and
+generic type parameters are checked. Default: `true`.
 
 Examples of **correct** code with `{ "typedefs": false }`:
 

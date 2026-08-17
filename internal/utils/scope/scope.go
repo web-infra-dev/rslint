@@ -20,7 +20,7 @@ import (
 type DefKind int
 
 const (
-	DefVariable       DefKind = iota // var/let/const binding, binding element, enum member
+	DefVariable       DefKind = iota // var/let/const binding, binding element
 	DefParameter                     // function parameter
 	DefFunctionName                  // FunctionDeclaration name (outer scope)
 	DefFnExprName                    // FunctionExpression name (inner scope only)
@@ -30,9 +30,32 @@ const (
 	DefCatch                         // Catch parameter
 	DefType                          // Interface, type alias
 	DefEnumName                      // Enum declaration
+	DefEnumMember                    // Member of an enum declaration
 	DefNamespaceName                 // Module/namespace declaration
 	DefTypeParameter                 // Generic type parameter
 )
+
+// declaresValue reports whether the binding exists in value space — whether an
+// expression can read it. Mirrors eslint-scope's `Definition#isVariableDefinition`.
+func (k DefKind) declaresValue() bool {
+	switch k {
+	case DefType, DefTypeParameter:
+		return false
+	}
+	return true
+}
+
+// declaresType reports whether the binding exists in type space — whether a
+// type annotation can name it. Mirrors eslint-scope's
+// `Definition#isTypeDefinition`.
+func (k DefKind) declaresType() bool {
+	switch k {
+	case DefClassName, DefClassInnerName, DefImport, DefType,
+		DefEnumName, DefEnumMember, DefNamespaceName, DefTypeParameter:
+		return true
+	}
+	return false
+}
 
 // Variable is a single declaration site. eslint-scope merges every declaration
 // of a name within one scope into a single `Variable` carrying several `defs`;
@@ -134,6 +157,13 @@ type Reference struct {
 	// Declarations holds every declaration of the resolved binding, in
 	// declaration order; nil when the name resolves to nothing in this file.
 	Declarations []*Variable
+
+	// IsValueReference is true when the identifier can name a value — every
+	// expression position, plus `typeof X` and `export { x }`.
+	IsValueReference bool
+	// IsTypeReference is true when the identifier can name a type — every type
+	// position, plus `export { x }`, which exports whichever space `x` lives in.
+	IsTypeReference bool
 }
 
 // Resolved returns the first declaration of the binding this reference
@@ -180,15 +210,56 @@ func Build(sf *ast.SourceFile, opts Options) *Manager {
 }
 
 // resolveReferences links each reference to the innermost enclosing scope that
-// declares its name.
+// declares its name in a way the reference can bind to.
 func (m *Manager) resolveReferences() {
 	for _, ref := range m.References {
 		name := ref.Identifier.Text()
 		for current := ref.From; current != nil; current = current.Parent {
-			if declarations := current.ByName[name]; len(declarations) > 0 {
-				ref.Declarations = declarations
-				break
+			declarations := current.ByName[name]
+			if len(declarations) == 0 || !current.binds(ref, declarations) {
+				continue
 			}
+			ref.Declarations = declarations
+			break
 		}
 	}
+}
+
+// binds reports whether `declarations` — every declaration of the reference's
+// name in this scope — can resolve `ref`. When it can't, the reference carries
+// on to the enclosing scope, as eslint-scope's `delegateToUpperScope` does.
+func (s *Scope) binds(ref *Reference, declarations []*Variable) bool {
+	if !s.bindsBeforeBody(ref, declarations) {
+		return false
+	}
+	// A name lives in value space, type space, or both: `type X` never answers
+	// an expression's read of `X`, and `const X` never answers a type
+	// annotation naming `X`.
+	for _, declaration := range declarations {
+		if (ref.IsValueReference && declaration.Kind.declaresValue()) ||
+			(ref.IsTypeReference && declaration.Kind.declaresType()) {
+			return true
+		}
+	}
+	return false
+}
+
+// bindsBeforeBody reports whether a reference in a parameter default can see
+// these declarations. A default is evaluated before the function body's
+// lexical environment exists, so `function f(a = x) { const x = 2; }` reads the
+// outer `x` — eslint-scope's `FunctionScope#isValidResolution`.
+func (s *Scope) bindsBeforeBody(ref *Reference, declarations []*Variable) bool {
+	if s.Kind != KindFunction || s.Block == nil {
+		return true
+	}
+	body := s.Block.Body()
+	if body == nil || ref.Identifier.Pos() >= body.Pos() {
+		return true
+	}
+	for _, declaration := range declarations {
+		if declaration.ID.Pos() < body.Pos() {
+			return true
+		}
+	}
+	return false
 }

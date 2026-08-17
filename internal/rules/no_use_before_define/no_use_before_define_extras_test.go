@@ -172,6 +172,51 @@ export class MyControl {}
 			// so a later binding with the same name is irrelevant ----
 			{Code: `<div />; let div;`, Tsx: true},
 			{Code: `<a:b />; let a;`, Tsx: true},
+
+			// ---- Type space and value space are resolved separately: a name
+			// only answers a reference that reads the space it declares ----
+			{Code: `
+const X = 1;
+function f() {
+  X;
+  type X = string;
+}
+`},
+			{Code: `
+type X = string;
+function f() {
+  let y: X;
+  const X = 1;
+}
+`, Options: map[string]any{"ignoreTypeReferences": false}},
+
+			// ---- A parameter default is evaluated before the function body's
+			// lexical environment exists, so it reads the outer binding ----
+			{Code: `
+const X = 0;
+
+function f(a = X) {
+  const X = 1;
+}
+`},
+			{Code: `
+const X = 0;
+
+const f = (a = X) => {
+  const X = 1;
+};
+`},
+			// A body binding that also has a parameter declaration stays visible
+			// to the defaults — only body-only names are hidden.
+			{Code: `
+function f(X, a = X) {
+  var X = 1;
+}
+`},
+
+			// ---- Type parameters are `Type` definitions upstream, so
+			// `typedefs` exempts them ----
+			{Code: `type Q<T extends U, U = string> = T;`, Options: map[string]any{"typedefs": false, "ignoreTypeReferences": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: receiver / expression wrappers must not hide the
@@ -386,6 +431,57 @@ const Widget = () => null;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "usedBeforeDefined", Message: "'Widget' was used before it was defined.", Line: 3, Column: 10, EndLine: 3, EndColumn: 16},
 				},
+			},
+
+			// ---- A type parameter's constraint and default are references in
+			// the scope that declares the parameter ----
+			{
+				Code: `
+class C<T extends Later> {}
+type Later = string;
+`,
+				Options: map[string]any{"ignoreTypeReferences": false},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 2, Column: 19}},
+			},
+			{
+				Code: `
+function f<T = Later>() {}
+type Later = string;
+`,
+				Options: map[string]any{"ignoreTypeReferences": false},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 2, Column: 16}},
+			},
+			{
+				Code:    `type Q<T extends U, U = string> = T;`,
+				Options: map[string]any{"typedefs": true, "ignoreTypeReferences": false},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 1, Column: 18}},
+			},
+
+			// ---- A class index signature's key type and result type are
+			// references too ----
+			{
+				Code: `
+class C {
+  [key: string]: Later;
+}
+
+type Later = string;
+`,
+				Options: map[string]any{"ignoreTypeReferences": false},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 3, Column: 18}},
+			},
+
+			// ---- Enum members are `TSEnumMemberName` definitions upstream, so
+			// neither `variables` nor `enums` exempts them ----
+			{
+				Code: `
+enum E {
+  A = ((): number => B)(),
+  B = 1,
+}
+`,
+				Options: map[string]any{"variables": false},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 3, Column: 22}},
 			},
 		},
 	)

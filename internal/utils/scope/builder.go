@@ -32,7 +32,8 @@ func (b *builder) reference(id *ast.Node, s *Scope) {
 	if !isReferenceIdentifier(id) {
 		return
 	}
-	ref := &Reference{Identifier: id, From: s}
+	value, isType := referenceSpaces(id)
+	ref := &Reference{Identifier: id, From: s, IsValueReference: value, IsTypeReference: isType}
 	s.References = append(s.References, ref)
 	b.manager.References = append(b.manager.References, ref)
 }
@@ -628,13 +629,17 @@ func (b *builder) visitFunctionType(node *ast.Node, outer *Scope) {
 	b.addTypeParameters(node, s)
 	b.addParameters(node, s, false)
 	node.ForEachChild(func(child *ast.Node) bool {
-		b.visitExpression(child, s)
+		if child.Kind != ast.KindTypeParameter {
+			b.visitExpression(child, s)
+		}
 		return false
 	})
 }
 
 // addTypeParameters records `function f<T>` / `class C<T>` / `type X<T>`
-// generic names into `s`. Each type parameter is a type-only binding.
+// generic names into `s`. Each type parameter is a type-only binding. The
+// constraint and default of every parameter are evaluated in `s` too, so that
+// `<T extends U, U = V>` sees its siblings.
 func (b *builder) addTypeParameters(node *ast.Node, s *Scope) {
 	for _, tp := range node.TypeParameters() {
 		if tp == nil {
@@ -652,6 +657,8 @@ func (b *builder) addTypeParameters(node *ast.Node, s *Scope) {
 			Kind:           DefTypeParameter,
 			IsValueBinding: false,
 		})
+		b.visitExpression(tpDecl.Constraint, s)
+		b.visitExpression(tpDecl.DefaultType, s)
 	}
 }
 
@@ -830,6 +837,15 @@ func (b *builder) visitClass(node *ast.Node, outer *Scope, isExpression bool) {
 			if init := member.Initializer(); init != nil {
 				b.visitExpression(init, b.push(KindClassFieldInitializer, init, classScope))
 			}
+		case ast.KindIndexSignature:
+			// `[key: string]: T` — the key type and the result type are both
+			// evaluated in the class scope. The key itself binds nothing.
+			for _, param := range member.Parameters() {
+				if paramDecl := param.AsParameterDeclaration(); paramDecl != nil {
+					b.visitExpression(paramDecl.Type, classScope)
+				}
+			}
+			b.visitExpression(member.Type(), classScope)
 		case ast.KindClassStaticBlockDeclaration:
 			sb := member.AsClassStaticBlockDeclaration()
 			if sb != nil && sb.Body != nil && sb.Body.Kind == ast.KindBlock {
@@ -853,7 +869,9 @@ func (b *builder) visitTypeDecl(node *ast.Node, outer *Scope) {
 	// Recurse into type body / heritage / members to discover FunctionType
 	// and similar type-level scopes.
 	node.ForEachChild(func(child *ast.Node) bool {
-		b.visitExpression(child, typeScope)
+		if child.Kind != ast.KindTypeParameter {
+			b.visitExpression(child, typeScope)
+		}
 		return false
 	})
 }
@@ -880,7 +898,7 @@ func (b *builder) visitEnum(node *ast.Node, outer *Scope) {
 				ID:             em.Name(),
 				DefNode:        m,
 				Parent:         m.Parent,
-				Kind:           DefVariable,
+				Kind:           DefEnumMember,
 				IsValueBinding: true,
 			})
 		}

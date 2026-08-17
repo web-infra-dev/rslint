@@ -85,6 +85,43 @@ func isReferenceIdentifier(id *ast.Node) bool {
 	return !ast.IsDeclarationName(id)
 }
 
+// referenceSpaces reports which binding spaces `id` can resolve to. Most
+// identifiers name either a value or a type depending on where they sit; the
+// export forms name whichever space the exported binding happens to live in.
+func referenceSpaces(id *ast.Node) (value bool, isType bool) {
+	parent := id.Parent
+	switch parent.Kind {
+	case ast.KindExportSpecifier:
+		// `export type { T }` and `export { type T }` export types only.
+		if spec := parent.AsExportSpecifier(); spec != nil && spec.IsTypeOnly {
+			return false, true
+		}
+		if named := parent.Parent; named != nil && named.Parent != nil {
+			if decl := named.Parent.AsExportDeclaration(); decl != nil && decl.IsTypeOnly {
+				return false, true
+			}
+		}
+		return true, true
+	case ast.KindExportAssignment:
+		// `export = X` exports a value or a type; `export default X` is an
+		// expression and names a value.
+		if assignment := parent.AsExportAssignment(); assignment != nil && assignment.IsExportEquals {
+			return true, true
+		}
+	}
+
+	// `A.B.C` is a type node as a whole, never in its parts, so ask about the
+	// outermost qualified name rather than the identifier itself.
+	entity := id
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindQualifiedName {
+		entity = entity.Parent
+	}
+	if ast.IsPartOfTypeNode(entity) {
+		return false, true
+	}
+	return true, false
+}
+
 // isImportTypeQualifier reports whether `id` is part of the qualifier of an
 // `import(...)` type — the `a` or `b` in `typeof import('m').a.b`.
 func isImportTypeQualifier(id *ast.Node) bool {
