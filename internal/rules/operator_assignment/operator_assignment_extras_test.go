@@ -112,6 +112,30 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 1}},
 			},
 
+			// ---- Dimension 4: the assertions on the two occurrences must match
+			// for a fix to be offered. The fix deletes the right-hand
+			// occurrence, so an `as` / `!` that only the deleted text carries
+			// would be lost — `x *= 2` would type-check `x` against its
+			// declared type again (TS2362 / TS18048). Report only ----
+			{
+				Code:   `declare let x: string | number; x = (x as number) * 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 33}},
+			},
+			{
+				Code:   `declare let x: number | undefined; x = x! + 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 36}},
+			},
+			// ---- ... including when the mismatch is nested in the receiver of
+			// a member access rather than at the top level ----
+			{
+				Code:   `declare const obj: any; obj.x = (obj as any).x * 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 25}},
+			},
+			{
+				Code:   `declare const obj: any; (obj as any).x = obj.x * 2;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 25}},
+			},
+
 			// ---- Dimension 4: optional chain propagated through a non-optional
 			// continuation (`a?.b.c`) — the `.c` access is not itself optional but
 			// IsOptionalChain still reports true for it, so canBeFixed rejects it
@@ -245,6 +269,59 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 				Options: []any{"never"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
 			},
+			// ---- Locks in "never" fixer: a right side whose leftmost operand is
+			// a bare `as` / `satisfies` is parenthesized as a whole. The root
+			// operator (`*`) binds tighter than the one being written (`+`), but
+			// `x = x + a as number * b` re-parses as `((x + a) as number) * b`,
+			// which computes something else entirely ----
+			{
+				Code:    `x += a as number * b`,
+				Output:  []string{`x = x + (a as number * b)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `x += a satisfies number * b`,
+				Output:  []string{`x = x + (a satisfies number * b)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			// ---- ... but parentheses already in the source stop the walk, so
+			// the equivalent explicit grouping needs no second pair ----
+			{
+				Code:    `x += (a as number) * b`,
+				Output:  []string{`x = x + (a as number) * b`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+
+			// ---- Locks in "never" fixer: `<<` immediately followed by `(` is
+			// re-scanned as the start of a type argument list, so parenthesizing
+			// a right side that contains another `<` would emit unparsable
+			// source (`x = x << (foo<T>)` is TS1005). Report only ----
+			{
+				Code:    `type T = number; declare const foo: any; x <<= foo<T>;`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 42}},
+			},
+			{
+				Code:    `type T = number; declare const foo: any; x <<= foo<T>()!;`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 42}},
+			},
+			{
+				Code:    `type T = number; declare const y: any; x <<= y as Array<T>;`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 40}},
+			},
+			// ---- ... while a `<<` right side with no `<` in it is still fixed ----
+			{
+				Code:    `foo <<= bar | 1`,
+				Output:  []string{`foo = foo << (bar | 1)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+
 			// ---- Locks in "never" fixer precedence branch: right-associative `**` still gets conservative parens at equal precedence (matches ESLint's uniform `<=` comparison, which doesn't special-case associativity) ----
 			{
 				Code:    `foo **= bar ** baz`,

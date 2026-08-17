@@ -2,6 +2,7 @@ package operator_assignment
 
 import (
 	_ "embed"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -77,10 +78,10 @@ func isLiteralPropertyKey(node *ast.Node) bool {
 // canBeFixed reports whether node can be safely rewritten between `x = x op y`
 // and `x op= y` without changing how many times a getter/setter or a computed
 // key's `toString()` runs. Parentheses and TS-only wrappers (`as`,
-// `satisfies`, `!`) are transparent — they have no runtime effect, so the
-// fixer's raw source-text slicing preserves them verbatim regardless of this
-// check's outcome. Any node that is part of an optional chain is rejected
-// outright: ESLint's own canBeFixed checks the raw ESTree node type, and an
+// `satisfies`, `!`) are transparent here — they have no runtime effect, and
+// whether the fix may drop one is decided separately, by the structural
+// comparison in reportReplaced. Any node that is part of an optional chain is
+// rejected outright: ESLint's own canBeFixed checks the raw ESTree node type, and an
 // optional chain is always wrapped in a ChainExpression there, which matches
 // neither of its two accepted shapes.
 func canBeFixed(node *ast.Node) bool {
@@ -173,7 +174,16 @@ func reportReplaced(
 	replacementOperator string,
 ) {
 	msg := replacedMessage(replacementOperator)
-	if !canBeFixed(left) || !canBeFixed(rhsExpr.Left) {
+	// The fix deletes the right-hand occurrence of the reference and keeps the
+	// assignment target verbatim, so the two must be interchangeable at the
+	// type level, not just at runtime. IsSameReference sees through `as`, `!`
+	// and `satisfies` (they have no runtime effect), which is what makes
+	// `x = (x as number) * 2` reportable — but dropping that `as number` would
+	// leave `x *= 2` type-checking against the declared type of `x` again.
+	// AreNodesStructurallyEqual keeps parentheses transparent while comparing
+	// TS wrappers as-is, so a fix is offered only when the deleted text carries
+	// exactly the assertions the surviving target already has.
+	if !canBeFixed(left) || !utils.AreNodesStructurallyEqual(left, rhsExpr.Left) {
 		ctx.ReportNode(node, msg)
 		return
 	}
@@ -195,6 +205,51 @@ func reportReplaced(
 
 		return []rule.RuleFix{rule.RuleFixReplace(sourceFile, node, replacement)}
 	})
+}
+
+// rightNeedsParens reports whether the right side of a compound assignment has
+// to be parenthesized once the expanded `x op ` prefix is written in front of
+// it, given the ESLint precedence of the plain operator being written.
+func rightNeedsParens(right *ast.Node, newOperatorPrecedence int) bool {
+	// A lower- (or equal-) precedence right side needs parentheses to preserve
+	// grouping (e.g. `foo *= bar + 1` -> `foo * (bar + 1)`). TS-only right
+	// sides (`y!`, `y as T`, `y satisfies T`, `<T>y`) are unknown to ESLint's
+	// precedence table and land here too, so they get parenthesized just as
+	// upstream does with @typescript-eslint/parser.
+	// An already-parenthesized right side reports the maximum precedence here,
+	// so this branch is never hit for it — the existing parentheses are
+	// instead preserved verbatim by the caller's plain-slice branch.
+	if utils.EslintLikePrecedence(right) <= newOperatorPrecedence {
+		return true
+	}
+	return startsWithBareTypeOperator(right)
+}
+
+// startsWithBareTypeOperator reports whether the leftmost operand of expr is an
+// unparenthesized `as` / `satisfies` expression.
+//
+// TypeScript parses `a as number * b` as `(a as number) * b`, since the type
+// after `as` stops at `number` — a shape plain JavaScript can never produce,
+// because a lower-precedence operand cannot sit unparenthesized under a
+// higher-precedence one. Looking at the root operator alone (`*`, which binds
+// tighter than `+`) would therefore call the right side paren-free, and writing
+// `x = x + a as number * b` re-parses as `((x + a) as number) * b` — different
+// grouping, different result. Parenthesizing the whole right side keeps it.
+func startsWithBareTypeOperator(expr *ast.Node) bool {
+	for expr != nil {
+		switch expr.Kind {
+		case ast.KindAsExpression, ast.KindSatisfiesExpression:
+			return true
+		case ast.KindBinaryExpression:
+			// Parentheses interrupt the walk: a ParenthesizedExpression is not
+			// a BinaryExpression, so `(a as number) * b` stops here and is
+			// correctly reported as needing no extra parentheses.
+			expr = expr.AsBinaryExpression().Left
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // checkNever implements the "never" mode: any of the 12 shorthand compound
@@ -229,24 +284,22 @@ func checkNever(ctx rule.RuleContext, node *ast.Node) {
 		leftText := text[nodeRange.Pos():opRange.Pos()]
 		plainOperatorText := scanner.TokenToString(plainOperatorKind)
 
-		rightPrecedence := utils.EslintLikePrecedence(binExpr.Right)
 		newOperatorPrecedence := utils.EslintLikeBinaryOperatorPrecedence(plainOperatorKind)
 
 		var rightText string
-		if rightPrecedence <= newOperatorPrecedence {
-			// A lower- (or equal-) precedence right side needs parentheses to
-			// preserve grouping (e.g. `foo *= bar + 1` -> `foo * (bar + 1)`).
-			// TS-only right sides (`y!`, `y as T`, `y satisfies T`, `<T>y`) are
-			// unknown to ESLint's precedence table and land here too, so they
-			// get parenthesized just as upstream does with
-			// @typescript-eslint/parser.
-			// An already-parenthesized right side reports the maximum
-			// precedence here, so this branch is never hit for it — the
-			// existing parentheses are instead preserved verbatim by the
-			// plain-slice branch below.
+		if rightNeedsParens(binExpr.Right, newOperatorPrecedence) {
 			rightRange := utils.TrimNodeTextRange(sourceFile, binExpr.Right)
+			inner := text[rightRange.Pos():rightRange.End()]
+			if plainOperatorKind == ast.KindLessThanLessThanToken && strings.ContainsRune(inner, '<') {
+				// `<<` directly followed by `(` is re-scanned as the `<` that
+				// opens a type argument list, so a parenthesized right side
+				// containing another `<` can turn `x = x << (foo<T>)` into a
+				// parse error. There is no spelling of the parentheses that is
+				// reliably immune, so report without fixing instead.
+				return nil
+			}
 			between := text[opRange.End():rightRange.Pos()]
-			rightText = between + "(" + text[rightRange.Pos():rightRange.End()] + ")"
+			rightText = between + "(" + inner + ")"
 		} else {
 			rest := text[opRange.End():node.End()]
 			prefix := ""
