@@ -119,6 +119,7 @@ export default defineConfig({
     './tests/eslint/rules/no-self-assign.test.ts',
     './tests/eslint/rules/no-undef.test.ts',
     './tests/eslint/rules/no-undef-init.test.ts',
+    './tests/eslint/rules/no-undefined.test.ts',
     './tests/eslint/rules/no-unassigned-vars.test.ts',
     './tests/eslint/rules/no-unused-vars.test.ts',
     './tests/eslint/rules/no-unused-private-class-members.test.ts',
@@ -565,6 +566,7 @@ export default defineConfig({
     './tests/rstest/rules/no-identical-title.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
+    './tests/rstest/rules/valid-expect.test.ts',
     './tests/rstest/rules/valid-title.test.ts',
 
     // eslint-plugin-promise

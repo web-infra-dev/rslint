@@ -272,10 +272,11 @@ function f() {
 			{Code: `function f(this: number) { return this; }`},
 
 			// ---- TS resolves a string-literal member name to a real name, so
-			// the reference reads the member — which has no identifier to
-			// report at ----
-			{Code: "enum E {\n  A = ((): number => B)(),\n  \"B\" = 1,\n}", Options: map[string]any{"variables": false}},
-			{Code: "enum E {\n  A = B,\n  \"B\" = 2,\n}\nconst B = 1;"},
+			// the reference reads the member; the literal is the member's
+			// definition site ----
+			{Code: "enum E {\n  \"B\" = 2,\n  A = B,\n}"},
+			{Code: "enum E {\n  \"B\" = 2,\n  A = B,\n}\nconst B = 1;"},
+			{Code: `enum E { "a" = a }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: receiver / expression wrappers must not hide the
@@ -541,6 +542,33 @@ enum E {
 `,
 				Options: map[string]any{"variables": false},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 3, Column: 22}},
+			},
+
+			// ---- A string-literal member name is a definition site like any
+			// other, so a sibling reading it earlier is reported ----
+			{
+				Code: `
+enum E {
+  A = ((): number => B)(),
+  "B" = 1,
+}
+`,
+				Options: map[string]any{"variables": false},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 3, Column: 22}},
+			},
+			{
+				Code: `
+enum E {
+  A = B,
+  "B" = 2,
+}
+const B = 1;
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 3, Column: 7}},
+			},
+			{
+				Code:   `enum E { b = a, "a" = 1 }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 1, Column: 14}},
 			},
 
 			// ---- A heritage clause spells its dotted name with property
