@@ -4,13 +4,12 @@ import (
 	_ "embed"
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_warning_comments.schema.json
@@ -26,7 +25,7 @@ var NoWarningCommentsRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		escapedDecoration := escapeRegExp(strings.Join(opts.Decoration, ""))
-		warningRegExps := make([]*regexp2.Regexp, len(opts.Terms))
+		warningRegExps := make([]*esregexp.RegExp, len(opts.Terms))
 		for i, term := range opts.Terms {
 			warningRegExps[i] = convertToRegExp(term, opts.Location, escapedDecoration)
 		}
@@ -104,8 +103,8 @@ func escapeRegExp(s string) string {
 // `/\w$/u` term probes, which decide whether a word boundary is required on
 // that side of the term.
 var (
-	termStartsWithWordChar = regexp2.MustCompile(`^\w`, utils.JSUnicodeRegexOptions)
-	termEndsWithWordChar   = regexp2.MustCompile(`\w$`, utils.JSUnicodeRegexOptions)
+	termStartsWithWordChar = esregexp.MustCompile(`^\w`, "u")
+	termEndsWithWordChar   = esregexp.MustCompile(`\w$`, "u")
 )
 
 // convertToRegExp ports the upstream rule's convertToRegExp 1:1: build a
@@ -113,23 +112,25 @@ var (
 // configured location. See the source comment in ESLint's
 // lib/rules/no-warning-comments.js for the rationale behind each prefix /
 // suffix case. A term that cannot be compiled yields a nil regexp, which
-// utils.Regexp2MatchString treats as never matching.
-func convertToRegExp(term, location, escapedDecoration string) *regexp2.Regexp {
+// never matches.
+func convertToRegExp(term, location, escapedDecoration string) *esregexp.RegExp {
 	escaped := escapeRegExp(term)
 
 	var prefix string
 	if location == "start" {
 		prefix = `^[\s` + escapedDecoration + `]*`
-	} else if utils.Regexp2MatchString(termStartsWithWordChar, term) {
+	} else if termStartsWithWordChar.Test(term) {
 		prefix = `\b`
 	}
 
 	suffix := ""
-	if utils.Regexp2MatchString(termEndsWithWordChar, term) {
+	if termEndsWithWordChar.Test(term) {
 		suffix = `\b`
 	}
 
-	re, err := utils.CompileRegexp2(prefix+escaped+suffix, utils.JSUnicodeRegexOptions|regexp2.IgnoreCase)
+	// Case-insensitive with Unicode case folding, as upstream compiles it —
+	// which is also what puts U+017F and U+212A inside a word boundary.
+	re, err := esregexp.Compile(prefix+escaped+suffix, "iu")
 	if err != nil {
 		return nil
 	}
@@ -140,12 +141,12 @@ func convertToRegExp(term, location, escapedDecoration string) *regexp2.Regexp {
 // directive comment that mentions this rule's own name is exempt from
 // matching, so a comment documenting `no-warning-comments` configuration
 // doesn't accidentally trip its own configured terms.
-var selfConfigRegex = regexp2.MustCompile(`\bno-warning-comments\b`, utils.JSUnicodeRegexOptions)
+var selfConfigRegex = esregexp.MustCompile(`\bno-warning-comments\b`, "u")
 
 // eslintDirectivePattern ports astUtils.ESLINT_DIRECTIVE_PATTERN, used to
 // recognize block-comment directives (`/*eslint ...*/`, `/*global ...*/`,
 // `/*exported ...*/`) by their leading text.
-var eslintDirectivePattern = regexp2.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`, utils.JSUnicodeRegexOptions)
+var eslintDirectivePattern = esregexp.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`, "u")
 
 // isDirectiveComment ports astUtils.isDirectiveComment: a Line comment is a
 // directive if its trimmed text starts with "eslint-"; a Block comment is a
@@ -155,7 +156,7 @@ func isDirectiveComment(kind ast.Kind, trimmedValue string) bool {
 	case ast.KindSingleLineCommentTrivia:
 		return strings.HasPrefix(trimmedValue, "eslint-")
 	case ast.KindMultiLineCommentTrivia:
-		return utils.Regexp2MatchString(eslintDirectivePattern, trimmedValue)
+		return eslintDirectivePattern.Test(trimmedValue)
 	default:
 		return false
 	}
@@ -174,63 +175,15 @@ func commentValue(text string, comment *ast.CommentRange) string {
 	}
 }
 
-// jsTrim trims ECMAScript WhiteSpace/LineTerminator runes from both ends,
-// matching JS `String.prototype.trim()` exactly (Go's strings.TrimSpace
-// diverges on U+0085 NEL and doesn't need to agree here).
-func jsTrim(s string) string {
-	start := utils.SkipLeadingWhitespace(s, 0, len(s))
-	end := utils.SkipTrailingWhitespace(s, start, len(s))
-	return s[start:end]
-}
-
-// jsSplitOnWhitespace splits s on runs of ECMAScript WhiteSpace/LineTerminator
-// runes, discarding empty leading/trailing pieces — matching JS
-// `comment.trim().split(/\s+/u)` (JS regex `\s` uses that same WhiteSpace
-// production, not a broader Unicode property). strings.Fields can't be reused
-// here: Go's unicode.IsSpace disagrees with JS `\s` on exactly two runes — it
-// treats U+0085 NEL as whitespace (JS doesn't) and does not treat U+FEFF BOM
-// as whitespace (JS does).
-func jsSplitOnWhitespace(s string) []string {
-	var words []string
-	i := 0
-	for i < len(s) {
-		i = utils.SkipLeadingWhitespace(s, i, len(s))
-		if i >= len(s) {
-			break
-		}
-		start := i
-		for i < len(s) {
-			if s[i] < 0x80 {
-				if utils.IsTriviaWhitespaceByte(s[i]) {
-					break
-				}
-				i++
-				continue
-			}
-			r, size := utf8.DecodeRuneInString(s[i:])
-			if size == 0 {
-				i++
-				continue
-			}
-			if utils.IsTriviaWhitespaceRune(r) {
-				break
-			}
-			i += size
-		}
-		words = append(words, s[start:i])
-	}
-	return words
-}
-
-func checkComment(ctx rule.RuleContext, text string, comment *ast.CommentRange, terms []string, warningRegExps []*regexp2.Regexp) {
+func checkComment(ctx rule.RuleContext, text string, comment *ast.CommentRange, terms []string, warningRegExps []*esregexp.RegExp) {
 	value := commentValue(text, comment)
 
-	if isDirectiveComment(comment.Kind, jsTrim(value)) && utils.Regexp2MatchString(selfConfigRegex, value) {
+	if isDirectiveComment(comment.Kind, ecmascript.StringTrim(value)) && selfConfigRegex.Test(value) {
 		return
 	}
 
 	for i, re := range warningRegExps {
-		if utils.Regexp2MatchString(re, value) {
+		if re.Test(value) {
 			reportMatch(ctx, comment, terms[i], value)
 		}
 	}
@@ -246,7 +199,12 @@ func truncateForDisplay(comment string) string {
 	truncated := false
 	first := true
 
-	for _, word := range jsSplitOnWhitespace(comment) {
+	// Splitting on runs of ECMAScript WhiteSpace/LineTerminator, and dropping
+	// the empty leading/trailing pieces, is what `comment.trim().split(/\s+/u)`
+	// comes to: JS regex `\s` is that same WhiteSpace production. strings.Fields
+	// can't stand in for it — Go's unicode.IsSpace counts U+0085 NEL, which JS
+	// does not, and skips U+FEFF BOM, which JS counts.
+	for _, word := range strings.FieldsFunc(comment, ecmascript.IsWhiteSpace) {
 		var candidate string
 		if first {
 			candidate = word
