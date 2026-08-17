@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed sort_keys.schema.json
@@ -90,8 +92,11 @@ func keyReportNode(nameNode *ast.Node) *ast.Node {
 func isValidOrder(prevName, thisName string, opts Options) bool {
 	a, b := prevName, thisName
 	if !opts.CaseSensitive {
-		a = strings.ToLower(a)
-		b = strings.ToLower(b)
+		// Upstream lowercases with String.prototype.toLowerCase, whose full
+		// case conversion differs from Go's simple one; see
+		// [ecmascript.StringToLowerCase].
+		a = ecmascript.StringToLowerCase(a)
+		b = ecmascript.StringToLowerCase(b)
 	}
 	var cmp int
 	if opts.Natural {
@@ -125,22 +130,31 @@ func buildMessage(opts Options, thisName, prevName string) rule.RuleMessage {
 
 // containsBlankLine reports whether s (a run of source text between two
 // adjacent tokens, with any comment spans already excluded by the caller)
-// contains a blank line: two or more newlines separated only by
-// non-newline whitespace.
+// contains a blank line: two or more line terminators separated only by
+// whitespace. Upstream asks the same question of the line numbers its parser
+// hands it, and that parser counts a line by every ECMAScript line terminator —
+// a lone carriage return and the two Unicode separators among them — so the
+// scan here reads the same set rather than `\n` alone.
 func containsBlankLine(s string) bool {
-	newlines := 0
-	for _, r := range s {
-		switch r {
-		case '\n':
-			newlines++
-			if newlines >= 2 {
+	terminators := 0
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch {
+		case ecmascript.IsLineTerminator(r):
+			// A carriage return and the line feed behind it end one line.
+			if r == '\r' && i+size < len(s) && s[i+size] == '\n' {
+				size++
+			}
+			terminators++
+			if terminators >= 2 {
 				return true
 			}
-		case '\r', ' ', '\t', '\v', '\f':
-			// Whitespace: neither counts as a newline nor breaks a run.
+		case ecmascript.IsWhiteSpace(r):
+			// Whitespace: neither ends a line nor breaks a run of them.
 		default:
-			newlines = 0
+			terminators = 0
 		}
+		i += size
 	}
 	return false
 }

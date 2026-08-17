@@ -56,7 +56,23 @@ func TestSortKeysExtras(t *testing.T) {
 			{
 				Code:    "var obj = { b: 1, a: 2 };",
 				Options: []any{"asc", map[string]any{"minKeys": 3}},
-			}},
+			},
+			// ---- Blank line built from carriage returns alone is a group boundary ----
+			{
+				Code:    "var obj = {\r    b: 1,\r\r    a: 2\r};",
+				Options: []any{"asc", map[string]any{"allowLineSeparatedGroups": true}},
+			},
+			// ---- Blank line built from U+2028 line separators is a group boundary ----
+			{
+				Code:    "var obj = {\u2028    b: 1,\u2028\u2028    a: 2\u2028};",
+				Options: []any{"asc", map[string]any{"allowLineSeparatedGroups": true}},
+			},
+			// ---- Blank line built from U+2029 paragraph separators is a group boundary ----
+			{
+				Code:    "var obj = {\u2029    b: 1,\u2029\u2029    a: 2\u2029};",
+				Options: []any{"asc", map[string]any{"allowLineSeparatedGroups": true}},
+			},
+		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 1: async method ----
 			{
@@ -194,6 +210,44 @@ func TestSortKeysExtras(t *testing.T) {
 				Options: []any{"asc", map[string]any{}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. 'a' should be before 'c'.", Line: 1, Column: 19, EndLine: 1, EndColumn: 20},
+				},
+			},
+			// ---- A carriage return and the line feed behind it end one line, so these properties are one group ----
+			{
+				Code:    "var obj = {\r\n    b: 1,\r\n    a: 2\r\n};",
+				Options: []any{"asc", map[string]any{"allowLineSeparatedGroups": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. 'a' should be before 'b'.", Line: 3, Column: 5, EndLine: 3, EndColumn: 6},
+				},
+			},
+			// ---- Case-insensitive order lowercases the way JavaScript does: `İ` carries a combining dot above, which sorts after a bare `i` ----
+			{
+				Code:    "var obj = { 'İ': 1, i: 2 };",
+				Options: []any{"asc", map[string]any{"caseSensitive": false}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in insensitive ascending order. 'i' should be before 'İ'.", Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
+				},
+			},
+			// ---- Case-insensitive order lowercases a sigma that ends a word to its final form, which sorts before a plain sigma ----
+			{
+				Code:    "var obj = { 'ασ': 1, 'ΑΣ': 2 };",
+				Options: []any{"asc", map[string]any{"caseSensitive": false}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in insensitive ascending order. 'ΑΣ' should be before 'ασ'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
+				},
+			},
+			// ---- A numeric key is named the way JavaScript writes the number, which stays exponential below 1e-6 ----
+			{
+				Code: "var obj = { 1e-7: 1, '1a': 2 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '1a' should be before '1e-7'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
+				},
+			},
+			// ---- A numeric key past the twenty-first place is named in exponential notation too ----
+			{
+				Code: "var obj = { 1e21: 1, '1a': 2 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '1a' should be before '1e+21'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
 				},
 			},
 		},
