@@ -294,23 +294,25 @@ var ValidExpectRule = rule.Rule{
 
 				// Static members (expect.assertions(1), expect.any(...)) carry no
 				// assertion factory, so argument and await checks do not apply.
-				if parsed.Head != nil && parsed.Head.Kind == ast.KindCallExpression {
-					args := parsed.Head.AsCallExpression().Arguments.Nodes
-					if len(args) < opts.MinArgs {
+				if parsed.Head == nil || parsed.Head.Kind != ast.KindCallExpression {
+					return
+				}
+
+				args := parsed.Head.AsCallExpression().Arguments.Nodes
+				if len(args) < opts.MinArgs {
+					ctx.ReportRange(
+						expectFactoryOpenParenRange(ctx.SourceFile, parsed.Head),
+						buildErrorNotEnoughArgsMessage(opts.MinArgs),
+					)
+				}
+				if len(args) > opts.MaxArgs {
+					// vitest allowance: a lone message string/template, or the
+					// options object of poll/element, is not an excess argument.
+					if len(args) != opts.MaxArgs+1 || !isAllowedExtraExpectArg(args[opts.MaxArgs], parsed.Entry) {
 						ctx.ReportRange(
-							expectFactoryOpenParenRange(ctx.SourceFile, parsed.Head),
-							buildErrorNotEnoughArgsMessage(opts.MinArgs),
+							tooManyArgsRange(ctx.SourceFile, args, opts.MaxArgs),
+							buildErrorTooManyArgsMessage(opts.MaxArgs),
 						)
-					}
-					if len(args) > opts.MaxArgs {
-						// vitest allowance: a lone message string/template, or the
-						// options object of poll/element, is not an excess argument.
-						if len(args) != opts.MaxArgs+1 || !isAllowedExtraExpectArg(args[opts.MaxArgs], parsed.Entry) {
-							ctx.ReportRange(
-								tooManyArgsRange(ctx.SourceFile, args, opts.MaxArgs),
-								buildErrorTooManyArgsMessage(opts.MaxArgs),
-							)
-						}
 					}
 				}
 

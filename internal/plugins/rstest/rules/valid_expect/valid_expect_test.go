@@ -25,6 +25,8 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `expect.assertions(1);`},
 			{Code: `expect.any(Number);`},
 			{Code: `expect.stringContaining("x");`},
+			{Code: `expect.resolves.toBe(1);`},
+			{Code: `test("t", () => { expect.toResolve(); });`},
 
 			// vitest maxArgs allowance: message second argument and poll/element
 			// options are not excess arguments.
