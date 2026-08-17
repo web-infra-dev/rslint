@@ -80,13 +80,13 @@ func TestValidExpectRule(t *testing.T) {
 			{
 				Code: `expect().toBe(1);`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "notEnoughArgs"},
+					{MessageId: "notEnoughArgs", Column: 7, EndColumn: 8},
 				},
 			},
 			{
 				Code: `expect(1, 2, 3).toBe(1);`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs"},
+					{MessageId: "tooManyArgs", Column: 11, EndColumn: 14},
 				},
 			},
 			{
