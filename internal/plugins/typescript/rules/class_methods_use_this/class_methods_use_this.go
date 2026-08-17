@@ -280,9 +280,14 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// for head-loc; both need rewriting for class-field initializers,
 		// including those wrapped in one or more ParenthesizedExpressions
 		// (tsgo preserves what ESTree elides).
+		// An auto-accessor is ESTree's AccessorProperty, which neither
+		// getFunctionNameWithKind nor getFunctionHeadLoc has a case for, so its
+		// initializer is named and located as a plain function even though the
+		// member itself is still what decides whether to report.
 		var name string
 		var loc core.TextRange
 		if field := classFieldOfFunctionLike(node); field != nil &&
+			!ast.HasSyntacticModifier(field, ast.ModifierFlagsAccessor) &&
 			(node.Kind == ast.KindArrowFunction || node.Kind == ast.KindFunctionExpression) {
 			name = classFieldFunctionDisplayName(field, node)
 			if node.Parent != nil && node.Parent.Kind == ast.KindPropertyDeclaration {

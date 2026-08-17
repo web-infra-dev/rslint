@@ -249,6 +249,108 @@ func TestMaxStatementsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'foo'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 25}},
 			},
 
+			// ---- Dimension 4: ESTree has no node for parentheses, so a parenthesized
+			// initializer still has the property as its parent and keeps the member's
+			// head range. tsgo interposes a ParenthesizedExpression, so the owner has
+			// to be resolved across it ----
+			{
+				Code:    "class C { f = (() => { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code:    "class C { f = ((() => { a; b; })); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 17}},
+			},
+			{
+				Code:    "const o = { f: (() => { a; b; }) };",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 13, EndLine: 1, EndColumn: 17}},
+			},
+			{
+				Code:    "class C { f = (function () { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 25}},
+			},
+			// ---- Dimension 3: getOpeningParenOfParams() ends a single-parameter arrow's
+			// head at the token before the parameter — the wrapping `(` when the arrow is
+			// parenless, its own `(` when it isn't ----
+			{
+				Code:    "class C { f = (x => { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:    "class C { f = ((x) => { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code:    "const o = { f: (x => { a; b; }) };",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 13, EndLine: 1, EndColumn: 16}},
+			},
+			// ---- Dimension 3: decorators and parentheses compose — the head still starts
+			// at the decorated member ----
+			{
+				Code:    "class C { @dec(1) f = (() => { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 24}},
+			},
+			{
+				Code:    "class C { @dec(1) f = (function () { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 33}},
+			},
+			// ---- Dimension 4: only parentheses are transparent — an `as` expression is a
+			// real ESTree node, so the arrow is no longer the property's value ----
+			{
+				Code:    "class C { f = (() => { a; b; }) as any; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 19, EndLine: 1, EndColumn: 21}},
+			},
+
+			// ---- Dimension 4: an auto-accessor is ESTree's AccessorProperty, a node kind
+			// getFunctionHeadLoc() has no case for, so its initializer is reported as a
+			// plain function rather than as the member. tsgo models it as a
+			// PropertyDeclaration carrying the `accessor` modifier ----
+			{
+				Code:    "class C { accessor f = () => { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 27, EndLine: 1, EndColumn: 29}},
+			},
+			{
+				Code:    "class C { accessor f = function () { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Function", 2, 1), Line: 1, Column: 24, EndLine: 1, EndColumn: 33}},
+			},
+			{
+				Code:    "class C { accessor f = (() => { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 28, EndLine: 1, EndColumn: 30}},
+			},
+			{
+				Code:    "class C { accessor f = (function () { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Function", 2, 1), Line: 1, Column: 25, EndLine: 1, EndColumn: 34}},
+			},
+			{
+				Code:    "class C { accessor f = x => { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 26, EndLine: 1, EndColumn: 28}},
+			},
+			{
+				Code:    "class C { static accessor f = () => { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 34, EndLine: 1, EndColumn: 36}},
+			},
+			{
+				Code:    "class C { accessor #f = () => { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 28, EndLine: 1, EndColumn: 30}},
+			},
+
 			// ---- Real-user: eslint/eslint#12950 — ignoreTopLevelFunctions only exempts a
 			// file with exactly one top-level function; a sibling IIFE keeps `foo` from
 			// being exempted even though the option is enabled ----

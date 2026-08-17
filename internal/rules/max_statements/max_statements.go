@@ -215,10 +215,15 @@ func functionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange 
 	switch {
 	case isClassMember(node):
 	case node.Kind == ast.KindArrowFunction || node.Kind == ast.KindFunctionExpression:
-		if node.Parent == nil || node.Parent.Kind != ast.KindPropertyDeclaration {
+		// The field owning a parenthesized initializer sits above the
+		// ParenthesizedExpression tsgo interposes; an auto-accessor never owns
+		// the report range in the first place, so it keeps the shared helper's.
+		owner := ast.WalkUpParenthesizedExpressions(node.Parent)
+		if owner == nil || owner.Kind != ast.KindPropertyDeclaration ||
+			ast.HasSyntacticModifier(owner, ast.ModifierFlagsAccessor) {
 			return loc
 		}
-		member = node.Parent
+		member = owner
 	default:
 		return loc
 	}

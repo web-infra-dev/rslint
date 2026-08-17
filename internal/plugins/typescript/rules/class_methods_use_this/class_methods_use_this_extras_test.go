@@ -511,6 +511,41 @@ class C implements I {
 				},
 			},
 
+			// ---- Dimension 4: auto-accessor initializers are AccessorProperty values,
+			// which getFunctionNameWithKind reads no key from — the member's own
+			// `#`/`static` modifiers stay out of the name, and only a named function
+			// expression contributes one ----
+			{
+				Code: `class C { accessor f = function foo() {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class function 'foo'.",
+						Line:      1, Column: 24, EndLine: 1, EndColumn: 36,
+					},
+				},
+			},
+			{
+				Code: `class C { accessor #f = function () {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class function.",
+						Line:      1, Column: 25, EndLine: 1, EndColumn: 34,
+					},
+				},
+			},
+			{
+				Code: `class C { accessor f = (() => {}) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class arrow function.",
+						Line:      1, Column: 28, EndLine: 1, EndColumn: 30,
+					},
+				},
+			},
+
 			// ---- Dimension 4: ComputedPropertyName key with non-static expression ----
 			// Reports as "method" (no name) — confirms the empty-name branch of
 			// classFieldFunctionDisplayName / GetFunctionNameWithKind.
