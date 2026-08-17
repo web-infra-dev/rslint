@@ -48,7 +48,7 @@ describe('built-in globals catalog', () => {
       expect(globals[name]).toEqual(upstreamGlobals[name]);
     }
     for (const [name, globalSet] of Object.entries(RSLINT_GLOBAL_SETS)) {
-      expect(Reflect.get(globals, name)).toBe(globalSet);
+      expect(Reflect.get(globals, name)).toEqual(globalSet);
     }
   });
 

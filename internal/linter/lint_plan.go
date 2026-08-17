@@ -5,8 +5,9 @@ import (
 	"runtime"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -20,9 +21,18 @@ type LintPlan struct {
 }
 
 type programLintPlan struct {
-	program *compiler.Program
-	files   []*ast.SourceFile
-	rules   [][]ConfiguredRule
+	program *program.Program
+	files   []lintFilePlan
+}
+
+// lintFilePlan freezes one AST generation, its resolved rules, shared rule
+// environment, and checker policy as a coherent execution unit. Parallel
+// slices would allow these decisions to drift by index across plan reuse.
+type lintFilePlan struct {
+	file           *ast.SourceFile
+	rules          []rule.ConfiguredRule
+	environment    *rule.RuleEnvironment
+	hasTypeChecker bool
 }
 
 type lintPlanFileRef struct {
@@ -35,28 +45,38 @@ type lintPlanFileRef struct {
 // zero-rule files or per-Program execution metadata.
 type LintTarget struct {
 	File  *ast.SourceFile
-	Rules []ConfiguredRule
+	Rules []rule.ConfiguredRule
 }
 
 // PrepareLintPlan collects the Phase 1 target files and resolves their rules.
 // Rule resolution uses at most GOMAXPROCS workers unless SingleThreaded is set.
 // GetRulesForFile must therefore support concurrent calls whenever the caller
 // requests normal parallel execution, matching Consumer.Report's run-scoped
-// concurrency requirement.
-func PrepareLintPlan(opts RunLinterOptions) *LintPlan {
+// concurrency requirement. Source-universe validation happens once in the
+// internal/program constructor, before the Program can reach this planner.
+func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 	if opts.GetRulesForFile == nil {
-		return nil
+		return &LintPlan{}, nil
+	}
+	// Validate the complete ordered input before target projection invokes a
+	// caller-supplied FileFilter for any earlier Program.
+	if err := validatePrograms(opts.Programs); err != nil {
+		return nil, err
 	}
 	if opts.ExcludePaths == nil {
 		opts.ExcludePaths = utils.ExcludePaths
 	}
 
 	plan := &LintPlan{programs: make([]programLintPlan, len(opts.Programs))}
-	programOpts := make([]runProgramOptions, len(opts.Programs))
+	programOpts := make([]programPlanOptions, len(opts.Programs))
 	totalFiles := 0
 	for programIndex := range opts.Programs {
-		programOpts[programIndex] = runProgramOptionsFor(opts, programIndex, nil)
-		plan.programs[programIndex] = newProgramLintPlan(programOpts[programIndex])
+		programOpts[programIndex] = programPlanOptionsFor(opts, programIndex)
+		programPlan, err := newProgramLintPlan(programOpts[programIndex])
+		if err != nil {
+			return nil, err
+		}
+		plan.programs[programIndex] = programPlan
 		totalFiles += len(plan.programs[programIndex].files)
 	}
 
@@ -81,7 +101,7 @@ func PrepareLintPlan(opts RunLinterOptions) *LintPlan {
 		for _, ref := range refs {
 			resolve(ref, ctx)
 		}
-		return plan
+		return plan, nil
 	}
 
 	chunkSize := (len(refs) + workerCount - 1) / workerCount
@@ -101,37 +121,62 @@ func PrepareLintPlan(opts RunLinterOptions) *LintPlan {
 		})
 	}
 	work.RunAndWait()
-	return plan
+	return plan, nil
 }
 
-func newProgramLintPlan(opts runProgramOptions) programLintPlan {
+func newProgramLintPlan(opts programPlanOptions) (programLintPlan, error) {
+	if err := validateProgram(opts.Program); err != nil {
+		return programLintPlan{}, err
+	}
 	files := collectFilesToLint(opts)
+	filePlans := make([]lintFilePlan, len(files))
+	for index, file := range files {
+		filePlans[index].file = file
+	}
 	return programLintPlan{
 		program: opts.Program,
-		files:   files,
-		rules:   make([][]ConfiguredRule, len(files)),
-	}
+		files:   filePlans,
+	}, nil
 }
 
-func prepareProgramLintPlan(opts runProgramOptions) programLintPlan {
-	plan := newProgramLintPlan(opts)
+func prepareProgramLintPlan(opts programPlanOptions) (programLintPlan, error) {
+	plan, err := newProgramLintPlan(opts)
+	if err != nil {
+		return programLintPlan{}, err
+	}
 	ctx := context.Background()
 	for fileIndex := range plan.files {
 		resolveProgramLintPlanFile(opts, &plan, fileIndex, ctx)
 	}
-	return plan
+	return plan, nil
 }
 
-func resolveProgramLintPlanFile(opts runProgramOptions, plan *programLintPlan, fileIndex int, ctx context.Context) {
-	file := plan.files[fileIndex]
+func resolveProgramLintPlanFile(opts programPlanOptions, plan *programLintPlan, fileIndex int, ctx context.Context) {
+	filePlan := &plan.files[fileIndex]
+	file := filePlan.file
 	if shouldSkipRulesForSyntax(opts, file, ctx) {
 		return
 	}
-	plan.rules[fileIndex] = filterRulesForTypeInfo(
-		opts.GetRulesForFile(file),
-		file.FileName(),
-		opts.TypeInfoFiles,
-	)
+	rules := opts.GetRulesForFile(file)
+	// Program capability is the only checker gate at this boundary. Callers with
+	// a narrower request policy, such as LSP HasTypeInfo=false, filter the
+	// configured rule set before planning without inspecting Program adapters.
+	filePlan.hasTypeChecker = opts.Program.CanProvideTypeChecker(file)
+	if filePlan.hasTypeChecker {
+		filePlan.rules = rules
+	} else {
+		filePlan.rules = rule.FilterNonTypeAwareRules(rules)
+	}
+	filePlan.environment = firstNativeRuleEnvironment(filePlan.rules)
+}
+
+func firstNativeRuleEnvironment(rules []rule.ConfiguredRule) *rule.RuleEnvironment {
+	for _, configuredRule := range rules {
+		if !configuredRule.IsEslintPluginRule && configuredRule.Environment != nil {
+			return configuredRule.Environment
+		}
+	}
+	return nil
 }
 
 // Targets returns the plan's plugin-facing projection in stable Program/file
@@ -142,32 +187,22 @@ func (p *LintPlan) Targets() []LintTarget {
 	}
 	var targets []LintTarget
 	for _, programPlan := range p.programs {
-		for fileIndex, file := range programPlan.files {
-			rules := programPlan.rules[fileIndex]
+		for _, filePlan := range programPlan.files {
+			rules := filePlan.rules
 			if len(rules) == 0 {
 				continue
 			}
-			targets = append(targets, LintTarget{File: file, Rules: rules})
+			targets = append(targets, LintTarget{File: filePlan.file, Rules: rules})
 		}
 	}
 	return targets
 }
 
-func runProgramOptionsFor(opts RunLinterOptions, programIndex int, prepared *programLintPlan) runProgramOptions {
-	programOpts := runProgramOptions{
-		Program:              opts.Programs[programIndex],
-		Cwd:                  opts.Cwd,
-		ExcludePaths:         opts.ExcludePaths,
-		GetRulesForFile:      opts.GetRulesForFile,
-		CollectExecutedRules: true,
-		SyntaxErrorFiles:     opts.SyntaxErrorFiles,
-		SingleThreaded:       opts.SingleThreaded,
-		TypeInfoFiles:        opts.TypeInfoFiles,
-		Timing:               opts.Timing,
-		PreparedPlan:         prepared,
-	}
-	if prepared != nil {
-		return programOpts
+func programPlanOptionsFor(opts RunLinterOptions, programIndex int) programPlanOptions {
+	programOpts := programPlanOptions{
+		Program:         opts.Programs[programIndex],
+		ExcludePaths:    opts.ExcludePaths,
+		GetRulesForFile: opts.GetRulesForFile,
 	}
 
 	if programIndex < len(opts.PerProgramFilter) {

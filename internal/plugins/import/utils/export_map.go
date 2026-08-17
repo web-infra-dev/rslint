@@ -2,7 +2,7 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -98,10 +98,10 @@ func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 // The map is read-only and may be shared with every other file of the run that
 // imports the same module; so may any ExportMeta.Namespace reached through it.
 func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, bool) {
-	if ctx.SourceFile == nil {
+	if !ctx.Program().IsValid() || ctx.SourceFile == nil {
 		return nil, false
 	}
-	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.Program))
+	return getExportMap(ctx.SourceFile, moduleSpecifier, newExportBuilder(IndexFor(ctx), ctx.Program()))
 }
 
 // exportBuilder carries one query's traversal state over the per-file export
@@ -116,13 +116,14 @@ func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, 
 // query that built them.
 type exportBuilder struct {
 	index *ModuleIndex
-	// prog is the Program every file this builder reaches belongs to. It is
+	// sourceProgram is the source environment every file this builder reaches
+	// belongs to. It is
 	// held here, on a value that lasts one query, rather than on the index,
-	// which lasts as long as the Program cache entry and must not keep its
+	// which can last as long as the Program cache entry and must not keep a
 	// Program alive.
-	prog     *compiler.Program
-	building map[*ast.SourceFile]*ExportMap
-	seen     map[exportKey]bool
+	sourceProgram *program.Program
+	building      map[*ast.SourceFile]*ExportMap
+	seen          map[exportKey]bool
 	// onStack holds the files whose maps are still being filled, so that
 	// reaching one again is recognized as a cycle rather than as reuse.
 	onStack map[*ast.SourceFile]bool
@@ -134,31 +135,31 @@ type exportBuilder struct {
 	sawCycle bool
 }
 
-func newExportBuilder(index *ModuleIndex, program *compiler.Program) *exportBuilder {
+func newExportBuilder(index *ModuleIndex, sourceProgram *program.Program) *exportBuilder {
 	return &exportBuilder{
-		index:    index,
-		prog:     program,
-		building: make(map[*ast.SourceFile]*ExportMap),
-		seen:     make(map[exportKey]bool),
-		onStack:  make(map[*ast.SourceFile]bool),
-		unstable: make(map[*ast.SourceFile]bool),
+		index:         index,
+		sourceProgram: sourceProgram,
+		building:      make(map[*ast.SourceFile]*ExportMap),
+		seen:          make(map[exportKey]bool),
+		onStack:       make(map[*ast.SourceFile]bool),
+		unstable:      make(map[*ast.SourceFile]bool),
 	}
 }
 
-func (builder *exportBuilder) program() *compiler.Program {
+func (builder *exportBuilder) program() *program.Program {
 	if builder == nil {
 		return nil
 	}
-	return builder.prog
+	return builder.sourceProgram
 }
 
 func getExportMap(origin *ast.SourceFile, moduleSpecifier *ast.Node, builder *exportBuilder) (*ExportMap, bool) {
-	program := builder.program()
-	if program == nil || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+	sourceProgram := builder.program()
+	if !sourceProgram.IsValid() || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return nil, false
 	}
 
-	link := resolveExportLink(program, origin, builder.index.settings, moduleSpecifier)
+	link := resolveExportLink(sourceProgram, origin, builder.index.settings, moduleSpecifier)
 	if !link.Resolved {
 		return nil, false
 	}

@@ -114,20 +114,8 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 				}),
 			},
 
-			// ---- Differences from ESLint: extended glob syntax is matched literally, so a
-			// `!(...)` target selects no file and leaves the zone inactive ----
-			{
-				Code:     `import b from "../server/b"`,
-				FileName: "restricted-paths/client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./restricted-paths/!(server)/**/*",
-					"from":   "./restricted-paths/server",
-				}),
-			},
-
-			// ---- Differences from ESLint: the `?` opening a `?(...)` list is matched
-			// literally too, so it cannot act as a base wildcard and pull in a directory
-			// that merely ends in `(server)` ----
+			// ---- A `?(...)` list matches what it names, so it does not reach a
+			// directory that merely ends in `(server)` ----
 			{
 				Code:     `import a from "../x(server)/a"`,
 				FileName: "restricted-paths/client/a.ts",
@@ -184,6 +172,19 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 			// inspects a module specifier string literal and the linted file's path.
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- An extended glob list in a `target` selects the zone the way
+			// upstream's Minimatch does: `!(server)` names every directory but
+			// that one, so `client` is inside the zone ----
+			{
+				Code:     `import b from "../server/b"`,
+				FileName: "restricted-paths/client/a.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/!(server)/**/*",
+					"from":   "./restricted-paths/server",
+				}),
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 15)},
+			},
+
 			// ---- Options: the bare single-object shape a CLI config passes ----
 			{
 				Code:     `import b from "../server/b"`,

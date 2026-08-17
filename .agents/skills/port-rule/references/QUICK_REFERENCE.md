@@ -44,6 +44,8 @@ A quick reference for common commands, file locations, and checklists when porti
 | References to one declared symbol              | `ctx.Refs.References(decl.Symbol())`                                    | Full-file AST walk with one `GetSymbolAtLocation` call per identifier        |
 | Identifier → symbol, including globals/`.d.ts` | `ctx.Refs.Resolve(node)`                                                | A hand-rolled "try `ctx.Refs`, fall back to the checker" wrapper             |
 | Every comment in the file                      | `ctx.Comments.All()`                                                    | Calling `ForEachComment` on `ctx.SourceFile.AsNode()`                        |
+| Resolve a module/source target                 | `ctx.Program().ResolveModule(...)`                                      | A resolver helper in `internal/utils` or a raw compiler Program              |
+| Enumerate generic module references            | `ctx.Program().ModuleGraph().References(...)`                           | A second graph/runtime stored in `RuleContext`                               |
 
 Deferred edit builders may return nil and run synchronously only when their
 artifact category is requested and the diagnostic is not suppressed. Detection,
@@ -100,6 +102,9 @@ import (
     // Core rule interface
     "github.com/web-infra-dev/rslint/internal/rule"
 
+    // Unified source/module facade (only when naming Program module types)
+    "github.com/web-infra-dev/rslint/internal/program"
+
     // AST and type system (from typescript-go submodule)
     "github.com/microsoft/typescript-go/shim/ast"
     "github.com/microsoft/typescript-go/shim/checker"
@@ -107,6 +112,18 @@ import (
 
     // Utility functions
     "github.com/web-infra-dev/rslint/internal/utils"
+
+    // JavaScript semantics — trim/blank/case/number, never strings.TrimSpace
+    "github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+
+    // A JavaScript RegExp — never the standard library's regexp, which is RE2
+    esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+
+    // Globs the way a plugin reads them (minimatch 3.x); minimatch 10 is NOT ported
+    "github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+
+    // "Is this a glob or a plain path?" (is-glob 4.0.3)
+    "github.com/web-infra-dev/rslint/internal/utils/isglob"
 
     // Test framework
     "github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -128,6 +145,10 @@ import (
 - [ ] Autofixes/suggestions use deferred report builders and have `Test<Rule>EditDemand` in the existing extras test file
 - [ ] ESLint `variable.references` usage maps to `ctx.Refs` with a binder symbol
 - [ ] Whole-file comment scans use `ctx.Comments.All()`
+- [ ] Cross-file source/module queries use `ctx.Program()` without backend-kind branches
+- [ ] Regexps go through `esregexp`, globs through `minimatch3`/`isglob`, and JS string/number semantics through `ecmascript` — no `strings.TrimSpace`, stdlib `regexp`, or `doublestar` on a value that came from JavaScript
+- [ ] Grep the change for `"regexp"` and account for every hit: a stdlib pattern is allowed only when it is written here, RE2 and JavaScript read it the same way, and no user input reaches it — otherwise it takes `esregexp`
+- [ ] If the upstream rule reads globs with anything but minimatch 3 or is-glob — `minimatch@10` included — it was reported to the user rather than silently ported onto `minimatch3`/`doublestar` or hand-rolled
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
 - [ ] Spell check passes (`pnpm -w run check-spell`)

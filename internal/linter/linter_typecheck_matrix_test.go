@@ -42,7 +42,7 @@ func runProgramTypeCheck(t *testing.T, program *compiler.Program) []rule.RuleDia
 	t.Helper()
 	var out []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -287,7 +287,7 @@ export type T = typeof M;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{progA, progB},
+		Programs:        wrapTestPrograms(progA, progB),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -330,7 +330,7 @@ export type T = typeof M;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{progA, progB},
+		Programs:        wrapTestPrograms(progA, progB),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -444,8 +444,8 @@ export type T = typeof M;
 	assertExactDiagCount(t, diags, 1)
 }
 
-// === TypeInfoFiles is lint-phase only ===
-func TestMatrix_TypeInfoFilesDoesNotRestrictTypeCheck(t *testing.T) {
+// === Source-only Programs do not alter compiler-capable diagnostics ===
+func TestMatrix_SourceOnlyProgramDoesNotRestrictTypeCheck(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
 		"a.ts":          "const x: number = 'oops';\n",
@@ -453,42 +453,29 @@ func TestMatrix_TypeInfoFilesDoesNotRestrictTypeCheck(t *testing.T) {
 	})
 	program := createProgramFromTsconfigDir(t, dir)
 
-	collect := func(infoFiles map[string]struct{}) []rule.RuleDiagnostic {
-		var out []rule.RuleDiagnostic
-		_, err := RunLinter(RunLinterOptions{
-			Programs:        []*compiler.Program{program},
-			SingleThreaded:  true,
-			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-			TypeCheck:       true,
-			TypeInfoFiles:   infoFiles,
-			Consumer: rule.DiagnosticConsumer{
-				Report: func(d rule.RuleDiagnostic) {
-					if strings.HasPrefix(d.RuleName, "TypeScript(") {
-						out = append(out, d)
-					}
-				},
-			},
-		})
-		if err != nil {
-			t.Fatalf("RunLinter: %v", err)
-		}
-		return out
+	file := program.GetSourceFile(program.CommandLine().FileNames()[0])
+	if file == nil {
+		t.Fatal("fixture Program did not contain a.ts")
 	}
-
-	// Baseline: no gate → 1 TS2322.
-	baseline := collect(nil)
-	assertOneDiag(t, baseline, "TS2322", "a.ts", 1, 7)
-	assertExactDiagCount(t, baseline, 1)
-
-	// Excluding a.ts from lint type-info does not narrow program-wide type-check.
-	gated := collect(map[string]struct{}{"/some/other/file.ts": {}})
-	assertOneDiag(t, gated, "TS2322", "a.ts", 1, 7)
-	assertExactDiagCount(t, gated, 1)
-
-	// Gate that includes a.ts → still 1 (the gate is a positive set).
-	included := collect(map[string]struct{}{program.GetSourceFile(filepath.Join(dir, "a.ts")).FileName(): {}})
-	assertOneDiag(t, included, "TS2322", "a.ts", 1, 7)
-	assertExactDiagCount(t, included, 1)
+	sourceOnly := mustSourceOnlyTestProgram(t, program, []*ast.SourceFile{file})
+	var diagnostics []rule.RuleDiagnostic
+	_, err := RunLinter(RunLinterOptions{
+		Programs:       append(wrapTestPrograms(program), sourceOnly),
+		SingleThreaded: true,
+		TypeCheck:      true,
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				if strings.HasPrefix(d.RuleName, "TypeScript(") {
+					diagnostics = append(diagnostics, d)
+				}
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	assertOneDiag(t, diagnostics, "TS2322", "a.ts", 1, 7)
+	assertExactDiagCount(t, diagnostics, 1)
 }
 
 // === Dedup with strict-only diagnostics across programs ===
@@ -517,7 +504,7 @@ func TestMatrix_StrictOnlyDiagAcrossPrograms_KeptExactlyOnce(t *testing.T) {
 
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{strict, loose},
+		Programs:        wrapTestPrograms(strict, loose),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -561,7 +548,7 @@ func TestMatrix_TypeCheckFalse_NoPhaseTwo(t *testing.T) {
 	// TypeCheck=false → 0.
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{build()},
+		Programs:        wrapTestPrograms(build()),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       false,

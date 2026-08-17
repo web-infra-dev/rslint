@@ -484,6 +484,21 @@ function bar() { }`},
 	}
   }
 		`},
+			// ---- A string-literal enum member binds its name but declares no
+			// identifier, so it is neither reported nor reported against ----
+			{Code: `
+			const A = 2;
+			enum Test {
+				"A" = 1,
+				B = A,
+			}
+		`},
+			{Code: `
+			enum Test {
+				"A" = 1,
+				B = ((): number => { const A = 2; return A; })(),
+			}
+		`},
 		},
 
 		[]rule_tester.InvalidTestCase{

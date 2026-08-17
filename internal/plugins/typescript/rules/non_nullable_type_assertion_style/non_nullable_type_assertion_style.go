@@ -195,7 +195,7 @@ func (s *nonNullableTypeAssertionStyleState) checkAssertion(node *ast.Node) {
 }
 
 func runNonNullableTypeAssertionStyle(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-	compilerOptions := ctx.Program.Options()
+	compilerOptions := ctx.Program().Options()
 	if !compilerOptions.GetStrictOptionValue(compilerOptions.StrictNullChecks) {
 		// Use the compiler's effective value: TypeScript 6 enables strictness by
 		// default when neither strict nor strictNullChecks is specified, while an

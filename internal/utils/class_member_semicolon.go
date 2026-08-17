@@ -1,6 +1,9 @@
 package utils
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import (
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+)
 
 // ClassMemberLeadingSemicolonOptions controls how
 // NeedsClassMemberLeadingSemicolon treats class fields without initializers.
@@ -86,6 +89,6 @@ func canClassMemberTokenContinueExpression(token SourceToken) bool {
 
 func classPropertyEndsWithSemicolon(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	text := sourceFile.Text()
-	end := SkipTrailingWhitespace(text, node.Pos(), node.End())
+	end := ecmascript.SkipTrailingWhitespace(text, node.Pos(), node.End())
 	return end > node.Pos() && end <= len(text) && text[end-1] == ';'
 }

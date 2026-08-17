@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed param_names.schema.json
@@ -94,11 +94,11 @@ var ParamNamesRule = rule.Rule{
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work
 		// identically to the original rule (Go's standard `regexp` / RE2 does not).
-		resolveRe, err := utils.CompileRegexp2(opts.ResolvePattern, utils.JSUnicodeRegexOptions)
+		resolveRe, err := esregexp.Compile(opts.ResolvePattern, "u")
 		if err != nil {
 			return rule.RuleListeners{}
 		}
-		rejectRe, err := utils.CompileRegexp2(opts.RejectPattern, utils.JSUnicodeRegexOptions)
+		rejectRe, err := esregexp.Compile(opts.RejectPattern, "u")
 		if err != nil {
 			return rule.RuleListeners{}
 		}
@@ -130,11 +130,11 @@ var ParamNamesRule = rule.Rule{
 					return
 				}
 
-				if resolveName := paramName(params[0]); resolveName != "" && !utils.Regexp2MatchString(resolveRe, resolveName) {
+				if resolveName := paramName(params[0]); resolveName != "" && !resolveRe.TestOrTimeout(resolveName) {
 					ctx.ReportNode(params[0], buildResolveParamNamesMessage(opts.ResolvePattern))
 				}
 				if len(params) >= 2 {
-					if rejectName := paramName(params[1]); rejectName != "" && !utils.Regexp2MatchString(rejectRe, rejectName) {
+					if rejectName := paramName(params[1]); rejectName != "" && !rejectRe.TestOrTimeout(rejectName) {
 						ctx.ReportNode(params[1], buildRejectParamNamesMessage(opts.RejectPattern))
 					}
 				}

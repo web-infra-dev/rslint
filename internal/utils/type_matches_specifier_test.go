@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"gotest.tools/v3/assert"
 )
 
@@ -105,7 +106,7 @@ func TestTypeMatchesSomeSpecifierFromPackage(t *testing.T) {
 			From:    TypeOrValueSpecifierFromPackage,
 			Name:    NameList{"Demo"},
 			Package: packageName,
-		}}, nil, program)
+		}}, nil, lintprogram.NewFromCompiler(program))
 	}
 
 	// The package name becomes an unanchored JavaScript pattern, so any substring
@@ -159,7 +160,7 @@ func TestTypeMatchesSomeSpecifierFromLinkedWorkspacePackage(t *testing.T) {
 			From:    TypeOrValueSpecifierFromPackage,
 			Name:    NameList{"Demo"},
 			Package: packageName,
-		}}, nil, program)
+		}}, nil, lintprogram.NewFromCompiler(program))
 	}
 
 	assert.Equal(t, matches("demo-pkg"), true)
@@ -191,7 +192,7 @@ func TestTypeMatchesSomeSpecifierFromNestedPackageJson(t *testing.T) {
 			From:    TypeOrValueSpecifierFromPackage,
 			Name:    NameList{"Demo"},
 			Package: packageName,
-		}}, nil, program)
+		}}, nil, lintprogram.NewFromCompiler(program))
 	}
 
 	assert.Equal(t, matches("demo-pkg"), true)
@@ -221,7 +222,7 @@ func TestTypeMatchesSomeSpecifierFromDeclareModuleNamespace(t *testing.T) {
 			From:    TypeOrValueSpecifierFromPackage,
 			Name:    NameList{"Demo"},
 			Package: packageName,
-		}}, nil, program)
+		}}, nil, lintprogram.NewFromCompiler(program))
 	}
 
 	// `declare module` names are compared exactly, unlike declaration file paths.
@@ -253,7 +254,7 @@ func TestTypeMatchesSomeSpecifierFromPackageIgnoresLocalTypes(t *testing.T) {
 		From:    TypeOrValueSpecifierFromPackage,
 		Name:    NameList{"Demo"},
 		Package: "demo-pkg",
-	}}, nil, program), false)
+	}}, nil, lintprogram.NewFromCompiler(program)), false)
 }
 
 func TestTypeMatchesSomeSpecifierExpandsIntersections(t *testing.T) {
@@ -273,7 +274,7 @@ func TestTypeMatchesSomeSpecifierExpandsIntersections(t *testing.T) {
 	assert.Equal(t, TypeMatchesSomeSpecifier(intersection, []TypeOrValueSpecifier{{
 		From: TypeOrValueSpecifierFromLib,
 		Name: NameList{"Error"},
-	}}, nil, program), true)
+	}}, nil, lintprogram.NewFromCompiler(program)), true)
 }
 
 func TestTypeMatchesSomeSpecifierUsesResolutionPackageID(t *testing.T) {
@@ -319,14 +320,14 @@ func TestTypeMatchesSomeSpecifierUsesResolutionPackageID(t *testing.T) {
 				From:    TypeOrValueSpecifierFromPackage,
 				Name:    NameList{"Demo"},
 				Package: "demo-pkg",
-			}}, nil, program), test.wantMatch)
+			}}, nil, lintprogram.NewFromCompiler(program)), test.wantMatch)
 
 			valueNode := firstVariableInitializer(t, program, filePath)
 			assert.Equal(t, ValueMatchesSomeSpecifier(valueNode, []TypeOrValueSpecifier{{
 				From:    TypeOrValueSpecifierFromPackage,
 				Name:    NameList{"demoValue"},
 				Package: "demo-pkg",
-			}}, program, c.GetTypeAtLocation(valueNode)), test.wantMatch)
+			}}, lintprogram.NewFromCompiler(program), c.GetTypeAtLocation(valueNode)), test.wantMatch)
 		})
 	}
 }
@@ -364,7 +365,7 @@ func TestTypeMatchesSomeSpecifierChecksWholeIntersectionBeforeConstituents(t *te
 			assert.Equal(t, TypeMatchesSomeSpecifier(intersection, []TypeOrValueSpecifier{{
 				From: TypeOrValueSpecifierFromFile,
 				Name: NameList{"SafePromise"},
-			}}, nil, program), test.want)
+			}}, nil, lintprogram.NewFromCompiler(program)), test.want)
 		})
 	}
 }
@@ -392,8 +393,8 @@ func TestTypeMatchesSomeSpecifierDistinguishesOmittedAndEmptyFilePath(t *testing
 
 	assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{
 		decode(map[string]any{"from": "file", "name": "Demo"}),
-	}, nil, program), true)
+	}, nil, lintprogram.NewFromCompiler(program)), true)
 	assert.Equal(t, TypeMatchesSomeSpecifier(demo, []TypeOrValueSpecifier{
 		decode(map[string]any{"from": "file", "name": "Demo", "path": ""}),
-	}, nil, program), false)
+	}, nil, lintprogram.NewFromCompiler(program)), false)
 }

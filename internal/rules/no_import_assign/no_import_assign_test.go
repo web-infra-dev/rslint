@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -612,7 +613,7 @@ func lintNoImportAssignForComparison(
 
 	var diagnostics []noImportAssignDiagnosticFingerprint
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:      program,
+		Program:      lintprogram.NewFromCompiler(program),
 		File:         sourceFile.FileName(),
 		HasTypeInfo:  true,
 		ExcludePaths: []string{},

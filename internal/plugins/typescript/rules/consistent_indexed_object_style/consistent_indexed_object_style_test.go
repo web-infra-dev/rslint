@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -386,10 +387,11 @@ type Reported = { [key: string]: unknown };`
 	if err != nil {
 		t.Fatal(err)
 	}
+	sourceProgram := lintprogram.NewFromCompiler(program)
 
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:      program,
+		Program:      sourceProgram,
 		File:         sourceFile.FileName(),
 		ExcludePaths: []string{},
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
@@ -453,12 +455,13 @@ type Suggest = Record<Key, unknown>;
 			if err != nil {
 				t.Fatal(err)
 			}
+			sourceProgram := lintprogram.NewFromCompiler(program)
 
 			run := func(demand rule.EditDemand) []rule.RuleDiagnostic {
 				t.Helper()
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      program,
+					Program:      sourceProgram,
 					File:         sourceFile.FileName(),
 					ExcludePaths: []string{},
 					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

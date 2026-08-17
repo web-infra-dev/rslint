@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`no-ternary > invalid 1`] = `
+{
+  "code": "var foo = true ? thing : stuff;",
+  "diagnostics": [
+    {
+      "message": "Ternary operator used.",
+      "messageId": "noTernaryOperator",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-ternary > invalid 2`] = `
+{
+  "code": "true ? thing() : stuff();",
+  "diagnostics": [
+    {
+      "message": "Ternary operator used.",
+      "messageId": "noTernaryOperator",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-ternary > invalid 3`] = `
+{
+  "code": "function foo(bar) { return bar ? baz : qux; }",
+  "diagnostics": [
+    {
+      "message": "Ternary operator used.",
+      "messageId": "noTernaryOperator",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
