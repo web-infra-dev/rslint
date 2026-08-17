@@ -82,9 +82,6 @@ test.each` + "`" + `
 				Code:    `test("outer", () => { t("inner"); expect(1).toBe(1); });`,
 				Options: []any{map[string]any{"additionalTestBlockFunctions": []any{"t"}}},
 			},
-			// The fallback range covers the arguments of a registration that has
-			// no callback, which is where upstream also allows an assertion.
-			{Code: `test.todo(expect(1).toBe(1));`},
 			// Same asymmetry in the arrow branch: an arrow passed to a call opens
 			// no scope, so its exit must not close the enclosing arrow's.
 			{Code: `const outer = () => foo(() => {}) || expect(1).toBe(1);`},
@@ -211,6 +208,26 @@ describe("suite", () => {
 			{
 				Code:    `each([[1, 2]]).test("case", (actual, expected) => { expect(actual).toBe(expected); });`,
 				Options: []any{map[string]any{"additionalTestBlockFunctions": []any{"each"}}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedExpect"}},
+			},
+			// A registration's arguments are evaluated as the file is collected,
+			// so an assertion among them never runs as part of the case, whether
+			// or not the registration also takes an inline callback.
+			{
+				Code:   `test.todo(expect(1).toBe(1));`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedExpect"}},
+			},
+			{
+				Code:   `test("case", { timeout: expect(1).toBe(1) }, () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedExpect"}},
+			},
+			{
+				Code:   `test(expect(1).toBe(1), callback); function callback() {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedExpect"}},
+			},
+			{
+				Code:    `t(expect(1).toBe(1));`,
+				Options: []any{map[string]any{"additionalTestBlockFunctions": []any{"t"}}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedExpect"}},
 			},
 		},

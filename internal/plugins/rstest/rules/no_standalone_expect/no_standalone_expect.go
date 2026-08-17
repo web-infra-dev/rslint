@@ -34,6 +34,10 @@ var NoStandaloneExpectRule = shared.NewRule(shared.Config{
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return shared.Runtime{
+			// Rstest evaluates a registration's name, options and any other
+			// argument as it collects the file, so only the callback body runs as
+			// the test case.
+			ArgumentsOutsideTestScope: true,
 			IsTestCall: func(node *ast.Node) bool {
 				parsed := analysis.ParseFnCall(node)
 				return parsed != nil && parsed.Kind == rstestUtils.RstestFnTypeTest

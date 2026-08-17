@@ -135,5 +135,15 @@ ruleTester.run('no-standalone-expect', {} as never, {
       `,
       errors: [{ messageId: 'unexpectedExpect', line: 3, column: 11 }],
     },
+    {
+      code: `
+        test.todo(expect(1).toBe(1));
+        test('case', { timeout: expect(1).toBe(1) }, () => {});
+      `,
+      errors: [
+        { messageId: 'unexpectedExpect', line: 2, column: 19 },
+        { messageId: 'unexpectedExpect', line: 3, column: 33 },
+      ],
+    },
   ],
 });

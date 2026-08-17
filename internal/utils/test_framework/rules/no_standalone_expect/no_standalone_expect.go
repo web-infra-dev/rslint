@@ -8,12 +8,18 @@
 //
 // That substitution introduces a failure mode upstream does not have: a range
 // may be unavailable. Every scope the exit handler pops must therefore be
-// pushed on enter under the *same* predicate, with the node's own range as the
-// fallback when the preferred range cannot be derived. Guarding the push with
-// an extra condition instead makes a nested registration without an inline
-// callback — `test.todo("x")`, `test("x", cb)`, a custom block function — pop
-// the enclosing test's scope, and every assertion after it in that body is
-// reported as standalone.
+// pushed on enter under the *same* predicate, falling back to a range derived
+// from the node itself when the preferred one cannot be found. Guarding the
+// push with an extra condition instead makes a nested registration without an
+// inline callback — `test.todo("x")`, `test("x", cb)`, a custom block
+// function — pop the enclosing test's scope, and every assertion after it in
+// that body is reported as standalone.
+//
+// Keeping the stack balanced and choosing what the fallback scope covers are
+// separate decisions: an entry whose range is empty still balances the stack
+// while containing no assertion. Runtime.ArgumentsOutsideTestScope picks
+// between the two, because the frameworks want different answers for an
+// assertion handed to a registration as an argument.
 //
 // Known deliberate divergence from upstream: method, constructor and accessor
 // bodies count as `function` scopes, so an assertion inside a class method is
@@ -59,6 +65,17 @@ type Runtime struct {
 	// ClassifyExpectCall decides whether a CallExpression is an assertion, and
 	// whether that assertion actually asserts.
 	ClassifyExpectCall func(*ast.Node) ExpectCallKind
+	// ArgumentsOutsideTestScope reports whether the arguments of a registration
+	// sit outside the test case it registers. They are evaluated while the file
+	// is collected rather than while the case runs, so an assertion among them
+	// never runs as part of a test. Upstream eslint-plugin-jest allows it — its
+	// kind stack covers the whole call subtree — and the jest binding follows
+	// that contract; the rstest binding reports it.
+	//
+	// The flag only reaches a registration with no inline callback. Whenever one
+	// is found the scope is its body either way, so an assertion in the name or
+	// the options object is already outside it.
+	ArgumentsOutsideTestScope bool
 	// Skip turns the rule into a no-op for this file.
 	Skip bool
 }
@@ -260,9 +277,14 @@ func NewRule(config Config) rule.Rule {
 						if !ok {
 							// A registration with no inline callback still has to
 							// push, or the exit handler pops somebody else's scope.
-							// Its own range covers the arguments, which is where an
-							// assertion handed to it would sit.
-							start, end = node.Pos(), node.End()
+							// What that scope covers is the policy choice: the whole
+							// call takes its arguments in, an empty range leaves an
+							// assertion among them with no test block around it.
+							if runtime.ArgumentsOutsideTestScope {
+								start, end = node.Pos(), node.Pos()
+							} else {
+								start, end = node.Pos(), node.End()
+							}
 						}
 						pushScope(blockTypeTest, start, end)
 					}
