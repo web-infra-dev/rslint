@@ -15,11 +15,11 @@
 // function — pop the enclosing test's scope, and every assertion after it in
 // that body is reported as standalone.
 //
-// Keeping the stack balanced and choosing what the fallback scope covers are
-// separate decisions: an entry whose range is empty still balances the stack
-// while containing no assertion. Runtime.ArgumentsOutsideTestScope picks
-// between the two, because the frameworks want different answers for an
-// assertion handed to a registration as an argument.
+// Keeping the stack balanced and choosing what a scope covers are separate
+// decisions: an entry whose range is empty still balances the stack while
+// containing no assertion. Runtime.ArgumentsOutsideTestScope uses that to give
+// the frameworks different answers for an assertion handed to a registration
+// as an argument.
 //
 // Known deliberate divergence from upstream: method, constructor and accessor
 // bodies count as `function` scopes, so an assertion inside a class method is
@@ -72,9 +72,10 @@ type Runtime struct {
 	// kind stack covers the whole call subtree — and the jest binding follows
 	// that contract; the rstest binding reports it.
 	//
-	// The flag only reaches a registration with no inline callback. Whenever one
-	// is found the scope is its body either way, so an assertion in the name or
-	// the options object is already outside it.
+	// It picks the scope range, not just the fallback one: keeping the arguments
+	// inside the case means the scope spans the whole call, while putting them
+	// outside narrows it to the callback body, or to an empty range when the
+	// registration has no callback at all.
 	ArgumentsOutsideTestScope bool
 	// Skip turns the rule into a no-op for this file.
 	Skip bool
@@ -273,17 +274,20 @@ func NewRule(config Config) rule.Rule {
 					}
 
 					if isTestBlockCall(node) {
-						start, end, ok := getTestScopeRange(node)
-						if !ok {
-							// A registration with no inline callback still has to
-							// push, or the exit handler pops somebody else's scope.
-							// What that scope covers is the policy choice: the whole
-							// call takes its arguments in, an empty range leaves an
-							// assertion among them with no test block around it.
-							if runtime.ArgumentsOutsideTestScope {
-								start, end = node.Pos(), node.Pos()
+						// The scope spans the whole call unless the framework
+						// evaluates a registration's arguments outside the case it
+						// registers: narrowing it to the callback body leaves the
+						// name and the options object out of the test block. A
+						// registration with no inline callback still has to push
+						// either way, or the exit handler pops somebody else's
+						// scope; an empty range balances the stack while containing
+						// no assertion.
+						start, end := node.Pos(), node.End()
+						if runtime.ArgumentsOutsideTestScope {
+							if bodyStart, bodyEnd, ok := getTestScopeRange(node); ok {
+								start, end = bodyStart, bodyEnd
 							} else {
-								start, end = node.Pos(), node.End()
+								end = node.Pos()
 							}
 						}
 						pushScope(blockTypeTest, start, end)
