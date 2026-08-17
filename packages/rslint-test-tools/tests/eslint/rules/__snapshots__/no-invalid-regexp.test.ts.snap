@@ -239,7 +239,7 @@ exports[`no-invalid-regexp > invalid 10`] = `
   "code": "RegExp('[');",
   "diagnostics": [
     {
-      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "message": "Invalid regular expression: /[/: unsupported regexp syntax: [ that no ] closes.",
       "messageId": "regexMessage",
       "range": {
         "end": {
@@ -291,7 +291,7 @@ exports[`no-invalid-regexp > invalid 12`] = `
   "code": "new RegExp('[', flags);",
   "diagnostics": [
     {
-      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "message": "Invalid regular expression: /[/: unsupported regexp syntax: [ that no ] closes.",
       "messageId": "regexMessage",
       "range": {
         "end": {
@@ -473,7 +473,7 @@ exports[`no-invalid-regexp > invalid 19`] = `
   "code": "foo(new RegExp('['));",
   "diagnostics": [
     {
-      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "message": "Invalid regular expression: /[/: unsupported regexp syntax: [ that no ] closes.",
       "messageId": "regexMessage",
       "range": {
         "end": {
@@ -499,7 +499,7 @@ exports[`no-invalid-regexp > invalid 20`] = `
   "code": "[RegExp('[')];",
   "diagnostics": [
     {
-      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "message": "Invalid regular expression: /[/: unsupported regexp syntax: [ that no ] closes.",
       "messageId": "regexMessage",
       "range": {
         "end": {
@@ -551,7 +551,7 @@ exports[`no-invalid-regexp > invalid 22`] = `
   "code": "class C { m() { new RegExp('['); } }",
   "diagnostics": [
     {
-      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "message": "Invalid regular expression: /[/: unsupported regexp syntax: [ that no ] closes.",
       "messageId": "regexMessage",
       "range": {
         "end": {
@@ -577,7 +577,7 @@ exports[`no-invalid-regexp > invalid 23`] = `
   "code": "function f(x = new RegExp('[')) {}",
   "diagnostics": [
     {
-      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "message": "Invalid regular expression: /[/: unsupported regexp syntax: [ that no ] closes.",
       "messageId": "regexMessage",
       "range": {
         "end": {
