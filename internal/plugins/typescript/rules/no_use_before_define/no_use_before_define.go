@@ -28,7 +28,8 @@ var schemaJSON []byte
 //     class definition" folding;
 //   - `ignoreTypeReferences` covers every type position, not just a bare type
 //     annotation;
-//   - a reference from a function-type parameter list is never reported;
+//   - a reference from a function/constructor type or call/construct/method
+//     signature is never reported;
 //   - the options are consulted as an ordered chain in which a function
 //     declaration short-circuits the rest.
 
@@ -113,6 +114,7 @@ var NoUseBeforeDefineRule = rule.CreateRule(rule.Rule{
 
 func check(ctx rule.RuleContext, opts options, ref *scope.Reference) {
 	declaration := ref.Resolved()
+	definitionIdentifier := ref.ResolvedIdentifier()
 
 	// A named export gets its own option and a plain positional check — none
 	// of the option chain below applies to it.
@@ -120,22 +122,20 @@ func check(ctx rule.RuleContext, opts options, ref *scope.Reference) {
 		if opts.allowNamedExports {
 			return
 		}
-		if declaration == nil || !isDefinedBeforeUse(declaration, ref) {
+		if declaration == nil || definitionIdentifier == nil ||
+			!isDefinedBeforeUse(declaration, definitionIdentifier, ref) {
 			report(ctx, ref.Identifier)
 		}
 		return
 	}
 
-	if declaration == nil {
+	// Definitions without identifiers — string-literal enum members, for
+	// example — still participate in resolution. Upstream skips the binding
+	// only when none of its merged definitions supplies an identifier.
+	if declaration == nil || definitionIdentifier == nil {
 		return
 	}
-	// A binding declared without an identifier — a string-literal enum member,
-	// `enum E { "a" = 1 }` — takes part in name resolution but has no
-	// declaration site to compare positions against, so upstream skips it.
-	if declaration.Anonymous {
-		return
-	}
-	if isDefinedBeforeUse(declaration, ref) {
+	if isDefinedBeforeUse(declaration, definitionIdentifier, ref) {
 		return
 	}
 	if !isForbidden(opts, declaration, ref) {
@@ -156,24 +156,24 @@ func check(ctx rule.RuleContext, opts options, ref *scope.Reference) {
 // isDefinedBeforeUse reports whether the declaration is already in place when
 // the reference runs: it ends at or before the reference, and the reference is
 // not a value read from inside the declaration's own initializer.
-func isDefinedBeforeUse(declaration *scope.Variable, ref *scope.Reference) bool {
-	if declaration.ID.End() > ref.Identifier.End() {
+func isDefinedBeforeUse(declaration *scope.Variable, definitionIdentifier *ast.Node, ref *scope.Reference) bool {
+	if definitionIdentifier.End() > ref.Identifier.End() {
 		return false
 	}
 	// A value read from inside the declaration's own initializer runs before
 	// the binding is set up, even though it sits after the name.
-	return !isValueReference(ref.Identifier) || !isInInitializer(declaration, ref)
+	return !ref.IsValueReference() || !isInInitializer(declaration, definitionIdentifier, ref)
 }
 
 // isInInitializer applies upstream's `variable.scope !== reference.from`
 // precondition before the positional walk: a reference that crosses a scope
 // boundary is never treated as part of the declaration's initialization, even
 // when it sits inside the initializer's source range.
-func isInInitializer(declaration *scope.Variable, ref *scope.Reference) bool {
+func isInInitializer(declaration *scope.Variable, definitionIdentifier *ast.Node, ref *scope.Reference) bool {
 	if declaration.Scope != ref.From {
 		return false
 	}
-	return scope.IsInsideOwnInitializer(declaration.ID, ref.Identifier.End())
+	return scope.IsInsideOwnInitializer(definitionIdentifier, ref.Identifier.End())
 }
 
 // isForbidden decides whether a use-before-define should be reported, based on
@@ -185,7 +185,7 @@ func isInInitializer(declaration *scope.Variable, ref *scope.Reference) bool {
 // reference from a different variable scope; a same-scope reference is a
 // temporal dead zone error and is always reported.
 func isForbidden(opts options, declaration *scope.Variable, ref *scope.Reference) bool {
-	if opts.ignoreTypeReferences && isTypeReference(ref.Identifier) {
+	if opts.ignoreTypeReferences && isTypeReference(ref) {
 		return false
 	}
 
@@ -232,66 +232,17 @@ func isNamedExport(node *ast.Node) bool {
 }
 
 // isFunctionTypeScope reports whether a scope is one of scope-manager's
-// `functionType` scopes: the parameter list of a function type, constructor
-// type, call/construct signature, method signature, or a body-less function
-// declaration.
+// `functionType` scopes: a function/constructor type or call/construct/method
+// signature.
 func isFunctionTypeScope(s *scope.Scope) bool {
-	if s == nil || s.Kind != scope.KindFunction || s.Block == nil {
-		return false
-	}
-	block := s.Block
-	if ast.IsFunctionTypeNode(block) || ast.IsConstructorTypeNode(block) ||
-		ast.IsCallSignatureDeclaration(block) || ast.IsConstructSignatureDeclaration(block) ||
-		ast.IsMethodSignatureDeclaration(block) {
-		return true
-	}
-	return ast.IsFunctionLikeDeclaration(block) && block.Body() == nil
+	return s != nil && s.Kind == scope.KindFunctionType
 }
 
-// isValueReference reports whether the identifier is read at runtime, as
-// opposed to naming a type. Only value reads can observe a binding mid-
-// initialization.
-func isValueReference(node *ast.Node) bool {
-	return !isTypeReference(node)
-}
-
-// isTypeReference reports whether the identifier sits in a type-only context —
-// scope-manager's `Reference#isTypeReference`, which is broader than the plain
-// type-annotation check the ESLint core rule uses.
-//
-// Composes tsgo helpers that mirror the TypeScript compiler:
-//   - IsPartOfTypeNode: covers TypeReference, QualifiedName chains in type
-//     nodes, and ExpressionWithTypeArguments in every heritage clause except
-//     a class's own `extends` (evaluated as a value at runtime).
-//   - IsPartOfTypeQuery: covers identifiers inside `typeof T`.
-//
-// IsPartOfTypeNode only walks up through the RIGHT side of property access
-// chains, so the leftmost identifier of a qualified heritage target (e.g. the
-// `ns` in `extends ns.B`) is not caught. The final block handles that by
-// walking up through PropertyAccessExpression to its enclosing
-// ExpressionWithTypeArguments and reusing
-// IsExpressionWithTypeArgumentsInClassExtendsClause to exclude class extends.
-func isTypeReference(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
-		return true
-	}
-	// `export = X` and `export default X` can export a type, so scope-manager
-	// flags the exported name as a type reference too (alongside being a value
-	// reference). `export const q = X` is not one.
-	if node.Parent.Kind == ast.KindExportAssignment &&
-		node.Parent.AsExportAssignment().Expression == node {
-		return true
-	}
-	current := node.Parent
-	for current != nil && current.Kind == ast.KindPropertyAccessExpression {
-		current = current.Parent
-	}
-	return current != nil &&
-		ast.IsExpressionWithTypeArguments(current) &&
-		!ast.IsExpressionWithTypeArgumentsInClassExtendsClause(current)
+// isTypeReference mirrors upstream's effective predicate. Most type-space
+// information comes directly from the shared Reference; a type query is the
+// one syntax form upstream additionally recognizes from the reference's AST.
+func isTypeReference(ref *scope.Reference) bool {
+	return ref != nil && (ref.IsTypeReference() || ast.IsPartOfTypeQuery(ref.Identifier))
 }
 
 // isClassRefInClassDecorator reports whether a reference to a class binding

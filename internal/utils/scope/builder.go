@@ -71,16 +71,10 @@ func (b *builder) addNamedDecl(stmt *ast.Node, s *Scope, kind DefKind, isValue b
 	if n == nil || n.Kind != ast.KindIdentifier {
 		return
 	}
-	isAmbient := ast.HasSyntacticModifier(stmt, ast.ModifierFlagsAmbient)
-	// Body-less FunctionDeclarations come in two flavors: overload signatures
-	// (no `declare`, there will be a later implementation) and ambient
-	// declarations (`declare function foo(): void`). typescript-eslint's scope
-	// manager merges all signatures under one Variable, so we only need to
-	// register a single binding: skip overload signatures, but keep ambient
-	// declarations so that inner scopes detect them as shadowed.
-	if kind == DefFunctionName && stmt.Body() == nil && !isAmbient {
-		return
-	}
+	// NodeFlagsAmbient also covers declarations nested in `declare namespace`
+	// and declarations parsed from a .d.ts file, where no local `declare`
+	// modifier is present.
+	isAmbient := ast.HasSyntacticModifier(stmt, ast.ModifierFlagsAmbient) || utils.IsInAmbientContext(stmt)
 	s.Add(&Variable{
 		Name:            n.Text(),
 		ID:              n,
@@ -625,11 +619,24 @@ func collectInferTypes(node *ast.Node, s *Scope) {
 // signatures. Parameters introduce bindings that may trigger (or be filtered
 // out by) rule-specific type-parameter exceptions.
 func (b *builder) visitFunctionType(node *ast.Node, outer *Scope) {
-	s := b.push(KindFunction, node, outer)
+	// A method signature's computed key is evaluated in the enclosing scope.
+	// Only its type parameters, parameters, and return type belong to the
+	// function-type scope.
+	var computedName *ast.Node
+	if ast.IsMethodSignatureDeclaration(node) {
+		if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+			computedName = name
+			if cpn := name.AsComputedPropertyName(); cpn != nil {
+				b.visitExpression(cpn.Expression, outer)
+			}
+		}
+	}
+
+	s := b.push(KindFunctionType, node, outer)
 	b.addTypeParameters(node, s)
 	b.addParameters(node, s, false)
 	node.ForEachChild(func(child *ast.Node) bool {
-		if child.Kind != ast.KindTypeParameter {
+		if child.Kind != ast.KindTypeParameter && child != computedName {
 			b.visitExpression(child, s)
 		}
 		return false
