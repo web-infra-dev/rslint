@@ -66,10 +66,13 @@ As a result, a standalone assertion after a chained registration such as
 `test.only('case', () => {})` is still reported. The upstream rule can leave the
 registration scope open and miss that assertion.
 
-Known negated asymmetric matcher constructors, such as
-`expect.not.stringContaining('value')`, are treated as static value constructors
-and allowed outside a test block. The upstream rule reports this two-member
-static form.
+Every `expect.<modifier>.<matcher>()` chain is treated as a static value
+constructor and allowed outside a test block. That covers the asymmetric matcher
+constructors jest supports, such as `expect.not.stringContaining('value')`, but
+also chains that assert rather than build a value, such as
+`expect.resolves.toBe(1)` and `expect.rejects.toThrow()`. The upstream rule
+allows a one-member chain only and reports all of these. `expect.assertions()`
+and `expect.hasAssertions()` are reported here as well.
 
 ## Original Documentation
 
