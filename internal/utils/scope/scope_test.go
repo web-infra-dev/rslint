@@ -310,3 +310,106 @@ func TestBuildGlobalAugmentationBindsNothing(t *testing.T) {
 		t.Errorf("got %v, want [global->?]", got)
 	}
 }
+
+func findReference(t *testing.T, m *Manager, name string) *Reference {
+	t.Helper()
+	for _, ref := range m.References {
+		if ref.Identifier.Text() == name {
+			return ref
+		}
+	}
+	t.Fatalf("reference %q not found", name)
+	return nil
+}
+
+func TestBuildKeepsTheFirstFunctionOverloadAsTheBindingAnchor(t *testing.T) {
+	m := buildWithReferences(t, `function f(x: string): void; f(); function f(x: any) {}`)
+	declarations := m.Global.Declarations("f")
+	if len(declarations) != 2 {
+		t.Fatalf("got %d f definitions, want the overload and implementation", len(declarations))
+	}
+	if declarations[0].DefNode.Body() != nil {
+		t.Fatal("the first overload signature should be the binding anchor")
+	}
+
+	ref := findReference(t, m, "f")
+	if ref.Resolved() != declarations[0] {
+		t.Fatal("the call should resolve to the overload binding")
+	}
+	if got := ref.ResolvedIdentifier(); got != declarations[0].ID {
+		t.Fatalf("resolved identifier = %p, want first overload identifier %p", got, declarations[0].ID)
+	}
+}
+
+func TestBuildMarksBodylessFunctionsInAmbientContexts(t *testing.T) {
+	m := build(t, `declare namespace N { function f(): void }`)
+	for _, s := range m.Scopes {
+		if declarations := s.Declarations("f"); len(declarations) > 0 {
+			if !declarations[0].DeclareModifier {
+				t.Fatal("function nested in a declare namespace should be ambient")
+			}
+			return
+		}
+	}
+	t.Fatal("ambient function declaration not found")
+}
+
+func TestBuildKeepsReferenceSpacesIndependent(t *testing.T) {
+	t.Run("type query is a value reference", func(t *testing.T) {
+		ref := findReference(t, buildWithReferences(t, `const x = 1 as typeof x;`), "x")
+		if !ref.IsValueReference() {
+			t.Fatal("typeof query must retain its value-space reference")
+		}
+	})
+
+	t.Run("default export identifier is dual", func(t *testing.T) {
+		for _, source := range []string{
+			`export default T; type T = number;`,
+			`export default ((T)); type T = number;`,
+		} {
+			ref := findReference(t, buildWithReferences(t, source), "T")
+			if !ref.IsValueReference() || !ref.IsTypeReference() {
+				t.Fatalf("%s: export default identifier spaces = value:%v type:%v, want both", source, ref.IsValueReference(), ref.IsTypeReference())
+			}
+			if ref.Resolved() == nil || ref.Resolved().Kind != DefType {
+				t.Fatalf("%s: dual default-export reference should resolve to a type-only binding", source)
+			}
+		}
+	})
+
+	t.Run("type predicate parameter is a value reference", func(t *testing.T) {
+		ref := findReference(t, buildWithReferences(t, `function f(): x is string { return true; } const x = 1;`), "x")
+		if !ref.IsValueReference() || ref.IsTypeReference() {
+			t.Fatalf("type predicate spaces = value:%v type:%v, want value-only", ref.IsValueReference(), ref.IsTypeReference())
+		}
+		if ref.Resolved() == nil || ref.Resolved().Kind != DefVariable {
+			t.Fatal("type predicate parameter should resolve to the value binding")
+		}
+	})
+}
+
+func TestBuildFunctionTypeScopeKeepsComputedMethodKeyOutside(t *testing.T) {
+	m := buildWithReferences(t, `interface I { [key](arg: Later): Result } declare const key: unique symbol; interface Later {} interface Result {}`)
+	key := findReference(t, m, "key")
+	if key.From == nil || key.From.Kind == KindFunctionType {
+		t.Fatal("computed method key must be evaluated outside the function-type scope")
+	}
+	for _, name := range []string{"Later", "Result"} {
+		ref := findReference(t, m, name)
+		if ref.From == nil || ref.From.Kind != KindFunctionType {
+			t.Fatalf("%s reference scope = %v, want KindFunctionType", name, ref.From)
+		}
+	}
+}
+
+func TestResolvedIdentifierSkipsAnonymousMergedDefinitions(t *testing.T) {
+	m := buildWithReferences(t, `enum E { b = a, "a" = 1, a = 2 }`)
+	ref := findReference(t, m, "a")
+	if ref.Resolved() == nil || !ref.Resolved().Anonymous {
+		t.Fatal("the first resolved definition should remain the string-literal member")
+	}
+	identifier := ref.ResolvedIdentifier()
+	if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.Text() != "a" {
+		t.Fatalf("resolved identifier = %#v, want the later named enum member", identifier)
+	}
+}

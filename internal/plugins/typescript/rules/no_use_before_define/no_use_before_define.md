@@ -63,10 +63,10 @@ core rule:
   still reports them.
 - `ignoreTypeReferences` covers every type position here — including
   `implements` clauses, qualified type names, and the exported name of
-  `export = X` / `export default X`. The core rule only exempts a bare type
-  annotation and a `typeof` query.
-- A reference from the parameter list of a function type (`type F = (x: Foo) => void`)
-  is never reported here.
+  `export = X` / `export default X`. The core rule only exempts direct type
+  references and `typeof` queries.
+- References from a function/constructor type or call/construct/method signature
+  are never reported here, including its parameter and return types.
 - A reference that resolves to a string-literal enum member (`enum E { b = a, "a" = 1 }`)
   is not reported here, because such a member declares no identifier. The core
   rule measures it from the literal and reports it.
