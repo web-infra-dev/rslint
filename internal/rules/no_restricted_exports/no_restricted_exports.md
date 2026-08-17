@@ -228,7 +228,9 @@ export function foo() {}
 export * from "some_module"; // allowed, although this declaration exports "foo" from my_module
 ```
 
-This rule inspects named export declarations purely syntactically, matching ESLint's behavior: named exports of TypeScript-only declarations (`interface`, `type`, `enum`) are not checked, but `export type { name }` re-export specifiers are checked the same as value exports.
+This rule inspects named export declarations purely syntactically, matching ESLint's behavior: named exports of TypeScript-only declarations (`interface`, `type`, `enum`) are not checked, but `export type { name }` re-export specifiers are checked the same as value exports. A named export of a function declaration with no body is treated the same way, so overload signatures, `export declare function`, and the function declarations of a `.d.ts` are left to the implementation signature that carries the body.
+
+`export default interface Foo {}` is a default export, and so is governed by `restrictDefaultExports.direct` rather than by `restrictedNamedExports`.
 
 ## Original Documentation
 

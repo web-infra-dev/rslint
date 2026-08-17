@@ -41,6 +41,19 @@ func TestNoRestrictedExportsExtras(t *testing.T) {
 			// panic and must not report. ----
 			{Code: `class Example {}
 export class extends Example {}`, Options: []any{map[string]any{"restrictedNamedExports": []any{"Example"}}}},
+
+			// ---- Dimension 1: a function declaration with no body is a
+			// TSDeclareFunction upstream, a type the declaration.type switch
+			// does not match — an overload signature, a `declare function` and
+			// every function in a `.d.ts` alike go unchecked, on both the set
+			// and the pattern arm ----
+			{Code: `export declare function bar(): void;`, Options: []any{map[string]any{"restrictedNamedExports": []any{"bar"}}}},
+			{Code: `export function foo();`, Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}}},
+			{Code: `export declare function fooBar(): void;`, Options: []any{map[string]any{"restrictedNamedExportsPattern": "Bar$"}}},
+
+			// ---- Dimension 1: `export default interface Foo {}` is a default
+			// export, so the named restriction never reaches its name ----
+			{Code: `export default interface Foo {}`, Options: []any{map[string]any{"restrictedNamedExports": []any{"Foo"}}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: TS type-expression wrappers on the exported
@@ -170,6 +183,50 @@ export class extends Example {}`, Options: []any{map[string]any{"restrictedNamed
 				Options: []any{map[string]any{"restrictedNamedExports": []any{"b"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedNamed", Message: namedMsg("b"), Line: 1, Column: 22, EndLine: 1, EndColumn: 23},
+				},
+			},
+
+			// ---- Dimension 1: only the implementation of an overload set
+			// carries a body, so one report lands on the implementation's name
+			// rather than one per signature on the same exported name ----
+			{
+				Code: `export function foo(a: string): void;
+export function foo(a: number): void;
+export function foo(a: any) {}`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 3, Column: 17, EndLine: 3, EndColumn: 20},
+				},
+			},
+
+			// ---- Dimension 1: a class keeps its ClassDeclaration type when
+			// declared, so the bodiless-function skip must not reach it ----
+			{
+				Code:    `export declare class Foo {}`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"Foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("Foo"), Line: 1, Column: 22, EndLine: 1, EndColumn: 25},
+				},
+			},
+
+			// ---- Dimension 1: an interface is the third declaration kind
+			// TypeScript lets carry the default modifier ----
+			{
+				Code:    `export default interface Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
+				},
+			},
+
+			// ---- Dimension 1: the default path reports what is declared
+			// without looking inside it, so a bodiless declaration is reported
+			// there even though the named path skips one ----
+			{
+				Code:    `export default function foo(): void;`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 1, EndColumn: 37},
 				},
 			},
 
