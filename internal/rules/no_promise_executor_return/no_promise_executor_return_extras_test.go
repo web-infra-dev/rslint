@@ -133,6 +133,39 @@ new Promise(r => 1)`,
 				Code: `declare const Promise: any;
 new Promise(r => 1)`,
 			},
+			// Locks in upstream isPromiseExecutor() arm 5: at file scope ESLint holds
+			// the source declarations and the configured global in one variable, so an
+			// `interface` definition clears the global reference too.
+			{
+				Code: `interface Promise {}
+new Promise(r => 1)`,
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: same for a type alias.
+			{
+				Code: `type Promise = any;
+new Promise(r => 1)`,
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a type-only import binds the
+			// name, so the callee is no longer the global.
+			{
+				Code: `import type { Promise } from "x";
+new Promise(r => 1)`,
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a `var` in an enclosing
+			// namespace body shadows the global.
+			{
+				Code: `namespace N { var Promise: any; new Promise(r => 1); }`,
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: so does a class declared in
+			// that namespace body.
+			{
+				Code: `namespace N { class Promise {} new Promise(r => 1); }`,
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a namespace body binding is
+			// visible from a function nested inside it.
+			{
+				Code: `namespace N { var Promise: any; function g() { new Promise(r => 1); } }`,
+			},
 			// Locks in upstream onCodePathStart() arm 3: parentheses around `void` do not
 			// defeat the allowVoid exemption.
 			{
@@ -437,18 +470,30 @@ new Promise(r => 1)`,
 					},
 				},
 			},
-			// Locks in upstream isPromiseExecutor() arm 5: a type-only declaration does NOT
-			// shadow the global value, so the rule still reports.
+			// Locks in upstream isPromiseExecutor() arm 5: inside a namespace a
+			// type-only declaration leaves the reference global, unlike at file scope.
 			{
-				Code: `interface Promise {}
-new Promise(r => 1)`,
+				Code: `namespace N { interface Promise {} new Promise(r => 1); }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "returnsValue",
-						Line:      2, Column: 18, EndLine: 2, EndColumn: 19,
+						Line:      1, Column: 53, EndLine: 1, EndColumn: 54,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-							{MessageId: "wrapBraces", Output: `interface Promise {}
-new Promise(r => {1})`},
+							{MessageId: "wrapBraces", Output: `namespace N { interface Promise {} new Promise(r => {1}); }`},
+						},
+					},
+				},
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a namespace that declares
+			// no `Promise` of its own still reaches the global.
+			{
+				Code: `namespace N { new Promise(r => 1); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "returnsValue",
+						Line:      1, Column: 32, EndLine: 1, EndColumn: 33,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "wrapBraces", Output: `namespace N { new Promise(r => {1}); }`},
 						},
 					},
 				},

@@ -15,6 +15,11 @@ var schemaJSON []byte
 
 const promiseName = "Promise"
 
+// promiseMeaning is the set of declaration spaces an ESLint value reference
+// searches. A `Promise` binding in any of them — including an empty
+// `namespace Promise {}` or a type-only import alias — makes the callee local.
+const promiseMeaning = ast.SymbolFlagsValue | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+
 // returnKeywordLength is the width of the `return` keyword. A ReturnStatement
 // always starts with that keyword, so its end position is the statement start
 // plus this length — no token scan needed.
@@ -53,33 +58,16 @@ func parseOptions(rawOptions []any) options {
 	return opts
 }
 
-// isPromiseExecutor reports whether fn is the first argument of a
-// `new Promise(...)` expression whose callee is the global `Promise`.
-func isPromiseExecutor(fn *ast.Node) bool {
-	// ESTree drops parentheses, so `new Promise((function () {}))` still has the
-	// function itself as arguments[0]. Compare against the outermost wrapper
-	// instead, which is the node tsgo stores in the argument list.
-	argument := utils.OutermostParenthesizedExpression(fn)
-	parent := argument.Parent
-	if parent == nil || parent.Kind != ast.KindNewExpression {
-		return false
+// sourceMayUsePromise reports whether the file spells `Promise` anywhere. The
+// rule only fires inside a `new Promise(...)` executor, so a file whose parsed
+// identifier table lacks that name can skip every listener. Stay conservative
+// for direct callers that do not provide parser metadata.
+func sourceMayUsePromise(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
 	}
-
-	newExpression := parent.AsNewExpression()
-	if newExpression.Arguments == nil || len(newExpression.Arguments.Nodes) == 0 ||
-		newExpression.Arguments.Nodes[0] != argument {
-		return false
-	}
-
-	callee := ast.SkipParentheses(newExpression.Expression)
-	if callee == nil || callee.Kind != ast.KindIdentifier ||
-		callee.AsIdentifier().Text != promiseName {
-		return false
-	}
-
-	// Upstream requires sourceCode.isGlobalReference(callee): the name must
-	// still resolve to the configured global rather than a source declaration.
-	return !utils.IsShadowed(callee, promiseName)
+	_, ok := sourceFile.Identifiers[promiseName]
+	return ok
 }
 
 // isVoidExpression mirrors upstream expressionIsVoid. tsgo gives `void x` its
@@ -151,6 +139,35 @@ type noPromiseExecutorReturnState struct {
 	opts options
 }
 
+// isPromiseExecutor reports whether fn is the first argument of a
+// `new Promise(...)` expression whose callee is the global `Promise`.
+func (state *noPromiseExecutorReturnState) isPromiseExecutor(fn *ast.Node) bool {
+	// ESTree drops parentheses, so `new Promise((function () {}))` still has the
+	// function itself as arguments[0]. Compare against the outermost wrapper
+	// instead, which is the node tsgo stores in the argument list.
+	argument := utils.OutermostParenthesizedExpression(fn)
+	parent := argument.Parent
+	if parent == nil || parent.Kind != ast.KindNewExpression {
+		return false
+	}
+
+	newExpression := parent.AsNewExpression()
+	if newExpression.Arguments == nil || len(newExpression.Arguments.Nodes) == 0 ||
+		newExpression.Arguments.Nodes[0] != argument {
+		return false
+	}
+
+	callee := ast.SkipParentheses(newExpression.Expression)
+	if callee == nil || callee.Kind != ast.KindIdentifier ||
+		callee.AsIdentifier().Text != promiseName {
+		return false
+	}
+
+	// Upstream requires sourceCode.isGlobalReference(callee): the name must
+	// still resolve to the configured global rather than a source declaration.
+	return state.ctx.Refs.IsGlobalNameReference(callee, promiseName, promiseMeaning)
+}
+
 // checkConciseArrowBody reports `new Promise(r => value)`, whose body is an
 // implicit return.
 func (state *noPromiseExecutorReturnState) checkConciseArrowBody(node *ast.Node) {
@@ -159,7 +176,7 @@ func (state *noPromiseExecutorReturnState) checkConciseArrowBody(node *ast.Node)
 	if body == nil || body.Kind == ast.KindBlock || arrow.EqualsGreaterThanToken == nil {
 		return
 	}
-	if !isPromiseExecutor(node) {
+	if !state.isPromiseExecutor(node) {
 		return
 	}
 
@@ -199,7 +216,7 @@ func (state *noPromiseExecutorReturnState) checkReturnStatement(node *ast.Node) 
 
 	executor := enclosingFunction(node)
 	if executor == nil || !ast.IsFunctionExpressionOrArrowFunction(executor) ||
-		!isPromiseExecutor(executor) {
+		!state.isPromiseExecutor(executor) {
 		return
 	}
 
@@ -228,6 +245,9 @@ var NoPromiseExecutorReturnRule = rule.Rule{
 	Name:   "no-promise-executor-return",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+		if !sourceMayUsePromise(ctx.SourceFile) {
+			return nil
+		}
 		// `new Promise(...)` can only be the built-in executor call when the
 		// global exists; `/* globals Promise:off */` removes it.
 		if !ctx.Globals.Access(promiseName).IsDeclared() {

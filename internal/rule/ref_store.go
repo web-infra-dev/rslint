@@ -275,6 +275,27 @@ func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name strin
 	return meaning&ast.SymbolFlagsValue != 0 && s.HasImplicitWrapperBinding(name)
 }
 
+// IsGlobalNameReference reports whether name at location refers to an
+// environment global rather than to a declaration in this file, mirroring
+// ESLint's sourceCode.isGlobalReference for the given declaration spaces.
+//
+// A global script file needs its own answer: ESLint keeps that file's top-level
+// declarations and the configured globals in one global-scope variable, so any
+// definition of the name there — a type-only `interface` or `type` included —
+// clears the global reference. Inner scopes hold separate variables, and a
+// value reference only resolves to one declared in a requested space, so a
+// type-only declaration inside a namespace or function leaves it global.
+func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meaning ast.SymbolFlags) bool {
+	if s == nil || location == nil || name == "" {
+		return false
+	}
+	if s.sourceFile != nil && ast.IsGlobalSourceFile(s.sourceFile.AsNode()) &&
+		s.sourceFile.Locals[name] != nil {
+		return false
+	}
+	return !s.IsNameDefinedInFileWithMeaning(location, name, meaning)
+}
+
 // HasNonGlobalTopLevelScope reports whether the resolved language defaults
 // place source declarations in a scope outside the global scope.
 // This supplements parser module classification for scope-oriented rules.
