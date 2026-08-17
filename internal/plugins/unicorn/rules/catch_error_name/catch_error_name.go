@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -65,9 +66,14 @@ func upperFirst(value string) string {
 	if value == "" {
 		return value
 	}
-	runes := []rune(value)
-	runes[0] = []rune(strings.ToUpper(string(runes[0])))[0]
-	return string(runes)
+	first, size := utf8.DecodeRuneInString(value)
+	// Upstream uppercases `charAt(0)`, a single UTF-16 code unit. For an
+	// astral character that unit is only the high surrogate and has no case
+	// mapping, so the string stays unchanged.
+	if first > 0xffff {
+		return value
+	}
+	return strings.ToUpper(string(first)) + value[size:]
 }
 
 func (o options) allows(name string) bool {
@@ -153,7 +159,51 @@ func handlerBody(identifier *ast.Node) *ast.Node {
 	return parent.Body()
 }
 
-func bodyHasNameConflict(ctx rule.RuleContext, body *ast.Node, originalSymbol *ast.Symbol, candidate string) bool {
+func isLexicalScope(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if ast.IsFunctionLikeDeclaration(node) {
+		return true
+	}
+	switch node.Kind {
+	case ast.KindSourceFile, ast.KindBlock, ast.KindCatchClause, ast.KindCaseBlock,
+		ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement:
+		return true
+	default:
+		return false
+	}
+}
+
+func nearestLexicalScope(node *ast.Node) *ast.Node {
+	return ast.FindAncestor(node.Parent, isLexicalScope)
+}
+
+func relevantScopes(identifier *ast.Node, references []*ast.Node, body *ast.Node) map[*ast.Node]bool {
+	result := map[*ast.Node]bool{}
+	declaration := bindingDeclaration(identifier)
+	var boundary *ast.Node
+	if declaration != nil {
+		boundary = declaration.Parent
+	}
+	if boundary != nil {
+		result[boundary] = true
+	}
+	if body != nil {
+		result[body] = true
+	}
+	for _, reference := range references {
+		for current := nearestLexicalScope(reference); current != nil; current = nearestLexicalScope(current) {
+			result[current] = true
+			if current == boundary || current == body {
+				break
+			}
+		}
+	}
+	return result
+}
+
+func bodyHasNameConflict(ctx rule.RuleContext, body *ast.Node, scopes map[*ast.Node]bool, originalSymbol *ast.Symbol, candidate string) bool {
 	conflict := false
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
@@ -161,10 +211,12 @@ func bodyHasNameConflict(ctx rule.RuleContext, body *ast.Node, originalSymbol *a
 			return
 		}
 		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == candidate {
-			if symbol := utils.BindingNameSymbol(node); symbol != nil {
-				conflict = symbol != originalSymbol
-			} else if !utils.IsNonReferenceIdentifier(node) {
-				conflict = ctx.Refs.Resolve(node) != originalSymbol
+			if scopes[nearestLexicalScope(node)] {
+				if symbol := utils.BindingNameSymbol(node); symbol != nil {
+					conflict = symbol != originalSymbol
+				} else if !utils.IsNonReferenceIdentifier(node) {
+					conflict = ctx.Refs.Resolve(node) != originalSymbol
+				}
 			}
 			if conflict {
 				return
@@ -189,6 +241,7 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 	}
 	originalSymbol := bindingDeclaration(identifier).Symbol()
 	body := handlerBody(identifier)
+	scopes := relevantScopes(identifier, references, body)
 	for {
 		available := !utils.IsShadowed(identifier, candidate)
 		if available {
@@ -199,7 +252,7 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 				}
 			}
 		}
-		if available && bodyHasNameConflict(ctx, body, originalSymbol, candidate) {
+		if available && bodyHasNameConflict(ctx, body, scopes, originalSymbol, candidate) {
 			available = false
 		}
 		if available {

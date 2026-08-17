@@ -43,6 +43,14 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("try {} catch (err) { error(err) }", "try {} catch (error_) { error(error_) }", "err", "error_"),
 			// Locks in declarations inside a Promise rejection handler.
 			invalid("promise.catch(bad => { const error = 1; use(error) })", "promise.catch(error_ => { const error = 1; use(error) })", "bad", "error_"),
+			// Nested scopes without references to the renamed parameter do not collide.
+			invalid("try {} catch (bad) { function f() { const error = 1 } }", "try {} catch (error) { function f() { const error = 1 } }", "bad", "error"),
+			invalid("try {} catch (bad) { { const error = 1 } }", "try {} catch (error) { { const error = 1 } }", "bad", "error"),
+			// A nested scope that references the renamed parameter still participates.
+			invalid("try {} catch (bad) { function f() { error(bad) } }", "try {} catch (error_) { function f() { error(error_) } }", "bad", "error_"),
+			// Upstream upperFirst() operates on one UTF-16 code unit, so an astral
+			// initial character is not uppercased for the descriptive-name suffix.
+			invalid("try {} catch (descriptive𐐀) {}", "try {} catch (𐐨) {}", "descriptive𐐀", "𐐨", map[string]any{"name": "𐐨"}),
 		},
 	)
 }
