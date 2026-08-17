@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -105,13 +106,38 @@ func (o options) isRestrictedName(name string) bool {
 // reserved word and cannot be an identifier), so only the restrictedNamed
 // path applies.
 func (o options) checkNamed(ctx rule.RuleContext, nameNode *ast.Node) {
+	o.checkNamedRange(ctx, nameNode, utils.TrimNodeTextRange(ctx.SourceFile, nameNode))
+}
+
+// checkNamedRange is checkNamed for a name whose reported range is wider than
+// the name node itself.
+func (o options) checkNamedRange(ctx rule.RuleContext, nameNode *ast.Node, reportRange core.TextRange) {
 	name, ok := utils.GetStaticPropertyName(nameNode)
 	if !ok {
 		return
 	}
 	if o.isRestrictedName(name) {
-		ctx.ReportNode(nameNode, restrictedNamedMessage(name))
+		ctx.ReportRange(reportRange, restrictedNamedMessage(name))
 	}
+}
+
+// declaredNameRange is the range upstream reports for the declared name of a
+// variable. TSESTree hangs a declarator's definite-assignment token and type
+// annotation off the Identifier and folds both into its range, so
+// `export const foo: number = 1` is reported over `foo: number`; in tsgo they
+// sit on the VariableDeclaration beside the name instead. A binding pattern
+// carries the annotation itself and upstream reports the bound identifiers
+// inside it, which have none, so only an identifier name widens.
+func declaredNameRange(sourceFile *ast.SourceFile, decl *ast.VariableDeclaration) core.TextRange {
+	nameRange := utils.TrimNodeTextRange(sourceFile, decl.Name())
+	end := nameRange.End()
+	if decl.ExclamationToken != nil {
+		end = max(end, decl.ExclamationToken.End())
+	}
+	if decl.Type != nil {
+		end = max(end, utils.TrimNodeTextRange(sourceFile, decl.Type).End())
+	}
+	return nameRange.WithEnd(end)
 }
 
 // checkExportAllName handles the exported alias of `export * as name from
@@ -297,8 +323,13 @@ var NoRestrictedExportsRule = rule.Rule{
 					if !ast.IsVariableDeclaration(decl) {
 						continue
 					}
-					name := decl.AsVariableDeclaration().Name()
+					varDecl := decl.AsVariableDeclaration()
+					name := varDecl.Name()
 					if name == nil {
+						continue
+					}
+					if ast.IsIdentifier(name) {
+						opts.checkNamedRange(ctx, name, declaredNameRange(ctx.SourceFile, varDecl))
 						continue
 					}
 					utils.CollectBindingNames(name, func(ident *ast.Node, _ string) {

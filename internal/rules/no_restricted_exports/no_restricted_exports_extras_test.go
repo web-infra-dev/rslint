@@ -230,6 +230,67 @@ export function foo(a: any) {}`,
 				},
 			},
 
+			// ---- Position assertions: TSESTree folds a declarator's type
+			// annotation, and its definite-assignment token, into the range of
+			// the Identifier upstream reports on, so the reported range runs
+			// past the name to the end of the annotation ----
+			{
+				Code:    `export const foo: number = 1;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 14, EndLine: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code:    `export declare const foo: (a: number) => void;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 22, EndLine: 1, EndColumn: 46},
+				},
+			},
+			{
+				Code:    `export let foo!: number;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 12, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code: `export const foo: {
+  a: number;
+} = { a: 1 };`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 14, EndLine: 3, EndColumn: 2},
+				},
+			},
+			{
+				Code:    `export const foo: number = 1, bar: string = '';`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo", "bar"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 14, EndLine: 1, EndColumn: 25},
+					{MessageId: "restrictedNamed", Message: namedMsg("bar"), Line: 1, Column: 31, EndLine: 1, EndColumn: 42},
+				},
+			},
+
+			// ---- Position assertions: a binding pattern carries the
+			// annotation itself and upstream reports the bound identifiers
+			// inside it, which carry none, so the range stays on the name ----
+			{
+				Code:    `export const { foo }: { foo: number } = { foo: 1 };`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 16, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    `export const [foo]: number[] = [1];`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 15, EndLine: 1, EndColumn: 18},
+				},
+			},
+
 			// ---- Position assertions: full range on the default-direct
 			// declaration container, multi-line ----
 			{
