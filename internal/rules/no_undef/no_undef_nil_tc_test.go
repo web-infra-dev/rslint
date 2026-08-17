@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -88,7 +89,6 @@ undeclaredName123;
 			var reported []string
 			ctx := (rule.RuleContext{
 				SourceFile:  sourceFile,
-				Program:     program,
 				TypeChecker: tc,
 				Refs:        rule.NewRefStore(sourceFile, program.Options(), tc, rule.RefStoreInit{}),
 				Globals: rule.NewGlobals(rule.LanguageOptions{}, rule.GlobalsInit{}, map[string]utils.GlobalAccess{
@@ -96,7 +96,7 @@ undeclaredName123;
 					"myOffGlobal":        utils.GlobalAccessOff,
 					"myOffLocal":         utils.GlobalAccessOff,
 				}, nil, nil),
-			}).WithReporter("test/no-undef", rule.SeverityError, func(d rule.RuleDiagnostic) {
+			}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/no-undef", rule.SeverityError, func(d rule.RuleDiagnostic) {
 				reported = append(reported, d.Message.Description)
 			})
 

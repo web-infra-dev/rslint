@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines_per_function"
@@ -36,6 +37,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
+	"github.com/web-infra-dev/rslint/internal/rules/no_continue"
 	"github.com/web-infra-dev/rslint/internal/rules/no_control_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
@@ -87,6 +89,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_param_reassign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_plusplus"
 	"github.com/web-infra-dev/rslint/internal/rules/no_proto"
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redeclare"
@@ -104,6 +107,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_shadow_restricted_names"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
+	"github.com/web-infra-dev/rslint/internal/rules/no_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unassigned_vars"
@@ -175,6 +179,7 @@ func GetAllRules() []rule.Rule {
 		for_direction.ForDirectionRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
+		init_declarations.InitDeclarationsRule,
 		max_depth.MaxDepthRule,
 		max_lines.MaxLinesRule,
 		max_lines_per_function.MaxLinesPerFunctionRule,
@@ -194,6 +199,7 @@ func GetAllRules() []rule.Rule {
 		no_constant_binary_expression.NoConstantBinaryExpressionRule,
 		no_constant_condition.NoConstantConditionRule,
 		no_constructor_return.NoConstructorReturnRule,
+		no_continue.NoContinueRule,
 		no_control_regex.NoControlRegexRule,
 		no_debugger.NoDebuggerRule,
 		no_delete_var.NoDeleteVarRule,
@@ -239,6 +245,7 @@ func GetAllRules() []rule.Rule {
 		no_octal.NoOctalRule,
 		no_octal_escape.NoOctalEscapeRule,
 		no_param_reassign.NoParamReassignRule,
+		no_plusplus.NoPlusplusRule,
 		no_proto.NoProtoRule,
 		no_redeclare.NoRedeclareRule,
 		radix.RadixRule,
@@ -252,6 +259,7 @@ func GetAllRules() []rule.Rule {
 		no_shadow_restricted_names.NoShadowRestrictedNamesRule,
 		strict.StrictRule,
 		no_template_curly_in_string.NoTemplateCurlyInStringRule,
+		no_ternary.NoTernaryRule,
 		no_useless_computed_key.NoUselessComputedKeyRule,
 		no_useless_concat.NoUselessConcatRule,
 		no_sparse_arrays.NoSparseArraysRule,

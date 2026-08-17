@@ -285,6 +285,7 @@ Lingui
 lingui
 lintable
 lintedfile
+lintprogram
 listitem
 llms
 lockdown
@@ -583,6 +584,8 @@ tsoptions
 tsparser
 tspath
 tsutils
+txtar
+txtarfs
 typeparam
 typescriptutil
 unaliased

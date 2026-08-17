@@ -153,6 +153,12 @@ that the rule framework already shares or can skip:
   counts (see AST_PATTERNS.md).
 - **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
   `ctx.SourceFile.AsNode()` once per rule.
+- **Cross-file source and module questions**: use the unified
+  `ctx.Program()` facade. Resolve one specifier with `Program.ResolveModule`;
+  enumerate generic module references with `Program.ModuleGraph().References`;
+  share configuration-complete rule indexes with `rule.CachedByProgram`.
+  Never add a backend-kind branch, raw compiler Program, parallel source
+  runtime, or module-resolution helper under `internal/utils`.
 
 See [AST_PATTERNS.md](references/AST_PATTERNS.md) for the APIs, boundaries, and
 worked examples.

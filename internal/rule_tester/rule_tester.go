@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
@@ -206,18 +206,20 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		allowedFiles := []string{sourceFile.FileName()}
 
 		_, err = linter.RunLinter(linter.RunLinterOptions{
-			Programs:       []*compiler.Program{program},
+			Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 			SingleThreaded: true,
 			Scope:          linter.FileScope{Files: allowedFiles},
 			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{
 					{
-						Name:            "test",
-						Settings:        settings,
-						LanguageOptions: languageOptions,
-						Globals:         globals,
-						Severity:        rule.SeverityError,
+						Name: "test",
+						Environment: &rule.RuleEnvironment{
+							Settings:        settings,
+							LanguageOptions: languageOptions,
+							Globals:         globals,
+						},
+						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return r.Run(ctx, options)
 						},

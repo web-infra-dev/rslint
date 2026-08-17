@@ -1,67 +1,27 @@
 package linter
 
 import (
-	"github.com/microsoft/typescript-go/shim/compiler"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// runLinterPositional is a backwards-compatible positional wrapper around
-// RunLinter for in-package tests written before the Options refactor. New
-// code should construct RunLinterOptions directly; the old positional call
-// sites in *_test.go are mechanically renamed from `RunLinter(` to
-// `runLinterPositional(`.
-func runLinterPositional(
-	programs []*compiler.Program,
-	singleThreaded bool,
-	allowFiles []string,
-	allowDirs []string,
-	excludedPaths []string,
-	getRulesForFile RuleHandler,
-	typeCheck bool,
-	onDiagnostic DiagnosticHandler,
-	typeInfoFiles map[string]struct{},
-	fileFilters []func(string) bool,
-) (*LintResult, error) {
-	var ff []FileFilter
-	if fileFilters != nil {
-		ff = make([]FileFilter, len(fileFilters))
-		for i, f := range fileFilters {
-			ff[i] = f
-		}
-	}
-	return RunLinter(RunLinterOptions{
-		Programs:         programs,
-		SingleThreaded:   singleThreaded,
-		Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
-		ExcludePaths:     excludedPaths,
-		PerProgramFilter: ff,
-		GetRulesForFile:  getRulesForFile,
-		TypeInfoFiles:    typeInfoFiles,
-		TypeCheck:        typeCheck,
-		Consumer: rule.DiagnosticConsumer{
-			Demand: rule.EditDemandAll,
-			Report: onDiagnostic,
-		},
-	})
-}
-
-// RunLinterInProgram is a backwards-compatible test adapter for the
-// now-internal runLintRulesInProgram. New code should use RunLinter or
-// LintSingleFile.
+// RunLinterInProgram is a compatibility adapter for cross-package rule tests.
+// It deliberately accepts only rslint's unified Program; raw ts-go assembly
+// belongs in the test that creates the source generation, just as it does at
+// CLI/API/LSP boundaries. New tests should prefer RunLinter or LintSingleFile.
 //
 // When typeCheck is true the adapter routes through RunLinter (single
 // program) so callers retain the program-level tsc-aligned semantics;
 // otherwise it bypasses Phase 2 entirely. lintedFileCount preserves the
 // historical return value of files actually visited by lint rules.
 func RunLinterInProgram(
-	program *compiler.Program,
+	sourceProgram *lintprogram.Program,
 	allowFiles []string,
 	allowDirs []string,
 	skipFiles []string,
 	getRulesForFile RuleHandler,
 	typeCheck bool,
 	onDiagnostic DiagnosticHandler,
-	typeInfoFiles map[string]struct{},
 	fileFilter func(string) bool,
 ) int32 {
 	excludes := skipFiles
@@ -75,48 +35,42 @@ func RunLinterInProgram(
 	if onDiagnostic == nil {
 		onDiagnostic = func(rule.RuleDiagnostic) {}
 	}
-	// Preserve the adapter's historical lenient behavior so rule tests can
-	// exercise parser-recovered ASTs. Production callers supply the actual set.
-	syntaxErrorFiles := map[string]struct{}{}
-	if typeCheck {
-		// Route through RunLinter so the new program-level type-check phase
-		// runs. The returned LintResult.LintedFileCount equals what
-		// runLintRulesInProgram would have returned for this single program.
-		res, _ := RunLinter(RunLinterOptions{
-			Programs:         []*compiler.Program{program},
-			SingleThreaded:   true,
-			Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
-			ExcludePaths:     excludes,
-			GetRulesForFile:  getRulesForFile,
-			TypeInfoFiles:    typeInfoFiles,
-			SyntaxErrorFiles: syntaxErrorFiles,
-			TypeCheck:        true,
-			Consumer: rule.DiagnosticConsumer{
-				Demand: rule.EditDemandAll,
-				Report: onDiagnostic,
-			},
-			PerProgramFilter: func() []FileFilter {
-				if ff == nil {
-					return nil
-				}
-				return []FileFilter{ff}
-			}(),
-		})
-		if res == nil {
-			return 0
-		}
-		return res.LintedFileCount
+	programs := []*lintprogram.Program{sourceProgram}
+	var filters []FileFilter
+	if ff != nil {
+		filters = []FileFilter{ff}
 	}
-	return runLintRulesInProgram(runProgramOptions{
-		Program:          program,
+	runOpts := RunLinterOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
 		Scope:            FileScope{Files: allowFiles, Dirs: allowDirs},
 		ExcludePaths:     excludes,
-		FileFilter:       ff,
 		GetRulesForFile:  getRulesForFile,
-		TypeInfoFiles:    typeInfoFiles,
-		SyntaxErrorFiles: syntaxErrorFiles,
-	}, rule.DiagnosticConsumer{
-		Demand: rule.EditDemandAll,
-		Report: onDiagnostic,
-	}).lintedFileCount
+		PerProgramFilter: filters,
+		TypeCheck:        typeCheck,
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: onDiagnostic,
+		},
+	}
+	// Preserve this legacy test adapter's parser-recovery behavior without
+	// exposing a syntax-override map in the production API.
+	planOpts := programPlanOptions{
+		Program:         sourceProgram,
+		Scope:           runOpts.Scope,
+		ExcludePaths:    excludes,
+		FileFilter:      ff,
+		GetRulesForFile: getRulesForFile,
+		SkipSyntaxCheck: true,
+	}
+	plan, err := prepareProgramLintPlan(planOpts)
+	if err != nil {
+		panic(err)
+	}
+	runOpts.PreparedPlan = &LintPlan{programs: []programLintPlan{plan}}
+	res, err := RunLinter(runOpts)
+	if err != nil || res == nil {
+		return 0
+	}
+	return res.LintedFileCount
 }

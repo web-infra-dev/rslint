@@ -52,8 +52,8 @@ var NoDangerWithChildrenRule = rule.Rule{
 			if ident == nil || ident.Kind != ast.KindIdentifier {
 				return nil
 			}
-			// TypeChecker is nil for gap files (files in the program but not
-			// in typeInfoFiles). Without it we cannot resolve an identifier to
+			// TypeChecker is nil when this Program cannot provide semantic
+			// services. Without it we cannot resolve an identifier to
 			// its declaration — skip spread/identifier lookups and fall back to
 			// structural checks only, rather than panic in GetDeclaration.
 			if ctx.TypeChecker == nil {

@@ -474,8 +474,8 @@ isAnyBuiltin := utils.IsAnyBuiltinSymbolLike(program, typeChecker, t)
 // Check if a symbol is from the default library
 isFromLib := utils.IsSymbolFromDefaultLibrary(program, symbol)
 
-// Check if a source file is the default library
-isLibFile := utils.IsSourceFileDefaultLibrary(program, sourceFile)
+// Source-generation questions live on Program, not in internal/utils
+isLibFile := program.IsSourceFileDefaultLibrary(sourceFile)
 ```
 
 ---
