@@ -130,11 +130,11 @@ var ParamNamesRule = rule.Rule{
 					return
 				}
 
-				if resolveName := paramName(params[0]); resolveName != "" && !resolveRe.Test(resolveName) {
+				if resolveName := paramName(params[0]); resolveName != "" && !resolveRe.TestOrTimeout(resolveName) {
 					ctx.ReportNode(params[0], buildResolveParamNamesMessage(opts.ResolvePattern))
 				}
 				if len(params) >= 2 {
-					if rejectName := paramName(params[1]); rejectName != "" && !rejectRe.Test(rejectName) {
+					if rejectName := paramName(params[1]); rejectName != "" && !rejectRe.TestOrTimeout(rejectName) {
 						ctx.ReportNode(params[1], buildRejectParamNamesMessage(opts.RejectPattern))
 					}
 				}

@@ -296,7 +296,7 @@ func typeDeclaredInDeclarationFile(
 			continue
 		}
 		for _, name := range program.PackageNamesForSourceFile(file) {
-			if matcher.Test(name) {
+			if matcher.TestOrTimeout(name) {
 				return true
 			}
 		}

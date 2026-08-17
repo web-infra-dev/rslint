@@ -515,7 +515,7 @@ var ValidTitleRule = rule.Rule{
 				}
 
 				me := matcherFor(fnKey, co.mustMatch)
-				if me.re != nil && !me.re.Test(title) {
+				if me.re != nil && !me.re.TestOrTimeout(title) {
 					buildMustMatchReport(ctx, arg, unprefixedName, me)
 				}
 			},

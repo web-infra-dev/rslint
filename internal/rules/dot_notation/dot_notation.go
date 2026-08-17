@@ -306,9 +306,7 @@ var DotNotationRule = rule.Rule{
 				return
 			}
 			if allowRE != nil {
-				if matched, err := allowRE.TestOrError(value); err != nil || matched {
-					// Fail open when the match runs into the bound: skip
-					// reporting rather than risk a false positive.
+				if allowRE.TestOrTimeout(value) {
 					return
 				}
 			}

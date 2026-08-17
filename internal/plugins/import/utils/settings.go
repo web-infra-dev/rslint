@@ -83,7 +83,7 @@ func (compiled *ModuleSettings) IsIgnoredPath(fileName string) bool {
 		return false
 	}
 	for _, expression := range compiled.ignore {
-		if expression.Test(fileName) {
+		if expression.TestOrTimeout(fileName) {
 			return true
 		}
 	}

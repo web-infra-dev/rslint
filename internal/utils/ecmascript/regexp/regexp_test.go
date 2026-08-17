@@ -2,7 +2,9 @@ package regexp
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"time"
 )
 
 // Every expectation below is what `new RegExp(source, flags).test(subject)`
@@ -150,6 +152,63 @@ func TestTest(t *testing.T) {
 		// ---- `\d` and `\w` stay ASCII, as they do without `u` ----
 		{name: "digit vs arabic-indic", source: `^\d$`, subject: "\u0660"},
 		{name: "word vs e-acute", source: `^\w$`, subject: "\u00e9"},
+		// Under `u` and `i` together `\w` gains the two characters that fold
+		// into it, the same two a word boundary gains.
+		{name: "iu word vs kelvin sign", source: `^\w$`, flags: "iu", subject: "\u212a", want: true},
+		{name: "iu word vs long s", source: `^\w$`, flags: "iu", subject: "\u017f", want: true},
+		{name: "iu non-word vs kelvin sign", source: `^\W$`, flags: "iu", subject: "\u212a"},
+		{name: "iu word class vs kelvin sign", source: `^[\w]$`, flags: "iu", subject: "\u212a", want: true},
+		{name: "iu non-word class vs long s", source: `^[\W]$`, flags: "iu", subject: "\u017f"},
+		{name: "iu non-word class vs a space", source: `^[\W]$`, flags: "iu", subject: " ", want: true},
+		{name: "iu word class beside a literal", source: `^[\wx]$`, flags: "iu", subject: "\u212a", want: true},
+		{name: "i word vs kelvin sign", source: `^\w$`, flags: "i", subject: "\u212a"},
+		{name: "u word vs kelvin sign", source: `^\w$`, flags: "u", subject: "\u212a"},
+
+		// ---- an escape is read whole, and only then widened ----
+		{name: "i control escape", source: `^\cA$`, flags: "i", subject: "\x01", want: true},
+		{name: "i control escape is not its letter", source: `^\cA$`, flags: "i", subject: "a"},
+		{name: "i control escape in class", source: `^[\cA]$`, flags: "i", subject: "\x01", want: true},
+		{name: "i control escape on a lowercase letter", source: `^\ca$`, flags: "i", subject: "\x01", want: true},
+		// A class is the one place Annex B lets a digit or an underscore name
+		// the control character.
+		{name: "control escape on a digit in class", source: `^[\c1]$`, subject: "\x11", want: true},
+
+		// ---- Annex B's legacy octal escapes, which `u` has no room for ----
+		{name: "legacy octal of two digits", source: `^\07$`, subject: "\a", want: true},
+		{name: "legacy octal of three", source: `^\077$`, subject: "?", want: true},
+		{name: "legacy octal stops at three", source: `^\0777$`, subject: "?7", want: true},
+		{name: "legacy octal past the third", source: `^\47$`, subject: "'", want: true},
+		{name: "legacy octal in class", source: `^[\07]$`, subject: "\a", want: true},
+		{name: "nul then a digit", source: `^\08$`, subject: "\x008", want: true},
+		// A number no group answers to is an octal escape rather than a
+		// backreference.
+		{name: "octal where no group answers", source: `^\1$`, subject: "\x01", want: true},
+		{name: "octal in class where a group does", source: `^(a)[\1]$`, subject: "a\x01", want: true},
+
+		// ---- without `u`, an escape no hex digits complete is its letter ----
+		{name: "i incomplete hex escape", source: `^\x$`, flags: "i", subject: "X", want: true},
+		{name: "i incomplete unicode escape", source: `^\u$`, flags: "i", subject: "U", want: true},
+		{name: "i incomplete hex escape in class", source: `^[\x]$`, flags: "i", subject: "X", want: true},
+		{name: "i hex escape on no hex digits", source: `^\xZZ$`, flags: "i", subject: "XZZ", want: true},
+
+		// ---- inside a class `\b` is a backspace and `\B` is a letter ----
+		{name: "i negated boundary in class", source: `^[\B]$`, flags: "i", subject: "b", want: true},
+		{name: "backspace in class", source: `^[\b]$`, subject: "\b", want: true},
+		{name: "backspace bounds a range", source: `^[\b-\r]$`, subject: "\n", want: true},
+
+		// ---- a set escape bounds no range, so the `-` beside it is a `-` ----
+		{name: "i set then dash", source: `^[\d-A]$`, flags: "i", subject: "a", want: true},
+		{name: "i set then dash takes the dash", source: `^[\d-A]$`, flags: "i", subject: "-", want: true},
+		{name: "i set then dash takes the set", source: `^[\d-A]$`, flags: "i", subject: "5", want: true},
+		{name: "i dash then set", source: `^[A-\d]$`, flags: "i", subject: "a", want: true},
+		{name: "i word set then dash", source: `^[\w-A]$`, flags: "i", subject: "a", want: true},
+		{name: "i range is still a range", source: `^[A-C]$`, flags: "i", subject: "b", want: true},
+
+		// ---- what a quantifier may follow ----
+		{name: "quantified lookahead without u", source: `^(?=a)*a$`, subject: "a", want: true},
+		{name: "brace that no bound closes", source: "^{", subject: "{", want: true},
+		{name: "quantified escaped anchor", source: `^\^?a$`, subject: "a", want: true},
+		{name: "anchor in a class", source: "^[$^]$", subject: "^", want: true},
 	}
 
 	for _, test := range tests {
@@ -185,6 +244,30 @@ func TestCompileRejects(t *testing.T) {
 		{name: "modifier on both sides", source: "(?i-i:a)", is: ErrUnsupportedSyntax},
 		{name: "modifier group naming none", source: "(?-:a)", is: ErrUnsupportedSyntax},
 		{name: "modifier group naming a flag it cannot turn", source: "(?u:a)", is: ErrUnsupportedSyntax},
+
+		// A quantifier has to have something to repeat, which has to be judged
+		// before an assertion is lowered into syntax regexp2 reads otherwise.
+		{name: "quantified start anchor", source: "^*", is: ErrUnsupportedSyntax},
+		{name: "quantified end anchor", source: "$+", is: ErrUnsupportedSyntax},
+		{name: "quantified boundary", source: `\b{1}`, is: ErrUnsupportedSyntax},
+		{name: "quantified negated boundary", source: `\B?`, is: ErrUnsupportedSyntax},
+		{name: "quantified anchor after an identity escape", source: `\p^?`, is: ErrUnsupportedSyntax},
+		{name: "quantified lookbehind", source: `(?<=a)*`, is: ErrUnsupportedSyntax},
+		{name: "quantified lookahead under u", source: `(?=a)*`, flags: "u", is: ErrUnsupportedSyntax},
+
+		// `u` takes back what Annex B allows.
+		{name: "u incomplete hex escape", source: `\x`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u incomplete unicode escape", source: `\u12`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u unicode escape naming no character", source: `\u{110000}`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u legacy octal", source: `\07`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u backreference no group answers", source: `\1`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u control escape naming nothing", source: `\c`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u identity escape", source: `\a`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u set at the end of a range", source: `[\d-A]`, flags: "u", is: ErrUnsupportedSyntax},
+
+		{name: "range running backwards", source: "[b-a]", is: ErrUnsupportedSyntax},
+		{name: "class that no bracket closes", source: "[abc", is: ErrUnsupportedSyntax},
+		{name: "backslash at the end", source: `a\`, is: ErrUnsupportedSyntax},
 	}
 
 	for _, test := range tests {
@@ -224,6 +307,23 @@ func TestMatchingIsBounded(t *testing.T) {
 		if got := re.Unwrap().MatchTimeout; got != MatchTimeout {
 			t.Errorf("%q compiled with MatchTimeout %s, want %s", source, got, MatchTimeout)
 		}
+	}
+}
+
+// TestOrTimeoutFailsOpen covers the answer a caller wants where a no is what
+// produces a report. The bound is pulled in rather than waited out, so the
+// pathological pattern stops at the first check rather than costing a core for
+// a second.
+func TestTestOrTimeoutFailsOpen(t *testing.T) {
+	re := MustCompile(`^(?:(a+)+b|a+)$`, "")
+	re.Unwrap().MatchTimeout = time.Nanosecond
+	subject := strings.Repeat("a", 200)
+
+	if re.Test(subject) {
+		t.Fatal("the match settled inside the bound, so there is nothing to fail open on")
+	}
+	if !re.TestOrTimeout(subject) {
+		t.Error("TestOrTimeout read a bound match as no match, which is what turns a skipped report into a false positive")
 	}
 }
 

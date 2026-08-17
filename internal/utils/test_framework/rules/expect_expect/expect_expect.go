@@ -146,7 +146,7 @@ func matchesAssertName(name string, compiled []*esregexp.RegExp) bool {
 		return false
 	}
 	for _, re := range compiled {
-		if re != nil && re.Test(name) {
+		if re != nil && re.TestOrTimeout(name) {
 			return true
 		}
 	}

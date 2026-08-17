@@ -297,9 +297,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			// patterns behave identically, ES-only features like lookbehind
 			// are not supported).
 			if allowRE != nil {
-				// Fail open when the match runs into the bound: skip
-				// reporting rather than risk a false positive.
-				if matched, err := allowRE.TestOrError(propName); err != nil || matched {
+				if allowRE.TestOrTimeout(propName) {
 					return
 				}
 			}

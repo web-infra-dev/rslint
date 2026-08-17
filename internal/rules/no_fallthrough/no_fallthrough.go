@@ -332,5 +332,5 @@ func hasFallthroughComment(sourceText string, start, end int, pattern *esregexp.
 	if start < 0 || end > len(sourceText) || start >= end {
 		return false
 	}
-	return pattern.Test(sourceText[start:end])
+	return pattern.TestOrTimeout(sourceText[start:end])
 }

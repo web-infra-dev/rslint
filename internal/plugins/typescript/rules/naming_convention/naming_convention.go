@@ -1029,8 +1029,8 @@ func validate(name string, sel normalizedSelector, idMods modifierKind, idSelect
 
 	// 7. Validate custom regex (against processed name, after stripping underscores and affixes)
 	if sel.custom != nil {
-		matches := sel.custom.regex.Test(processedName)
-		if sel.custom.match != matches {
+		matches, err := sel.custom.regex.TestOrError(processedName)
+		if err == nil && sel.custom.match != matches {
 			msg := satisfyCustomMessage(typeName, name, sel.custom.match, sel.custom.regex.Source())
 			return validationResult{valid: false, message: &msg}
 		}
@@ -2388,8 +2388,8 @@ func validateIdentifier(
 		// Check filter match — if filter doesn't match the name, skip this
 		// selector entirely so the next one in specificity order can match.
 		if sel.filter != nil {
-			matches := sel.filter.regex.Test(id.name)
-			if sel.filter.match != matches {
+			matches, err := sel.filter.regex.TestOrError(id.name)
+			if err != nil || sel.filter.match != matches {
 				continue
 			}
 		}

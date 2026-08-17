@@ -47,7 +47,7 @@ var NoVarRequiresRule = rule.CreateRule(rule.Rule{
 
 		isImportPathAllowed := func(importPath string) bool {
 			for _, pattern := range allowPatterns {
-				if pattern.Test(importPath) {
+				if pattern.TestOrTimeout(importPath) {
 					return true
 				}
 			}

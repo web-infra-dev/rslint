@@ -372,7 +372,7 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 	}
 
 	// Check description format against raw (untrimmed) description
-	if config.descriptionRegex != nil && !config.descriptionRegex.Test(rawDescription) {
+	if config.descriptionRegex != nil && !config.descriptionRegex.TestOrTimeout(rawDescription) {
 		ctx.ReportRange(
 			commentRange,
 			rule.RuleMessage{

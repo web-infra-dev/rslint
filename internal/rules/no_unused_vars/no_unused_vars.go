@@ -970,7 +970,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, w
 	// args/caughtErrors is "none" together with reportUsedIgnorePattern.
 	if opts.destructuredArrayIgnoreRe != nil &&
 		(isDirectArrayDestructuredIdentifier(varInfo.Definition) || hasDirectArrayDestructuringWrite(writeRefs, sym)) &&
-		opts.destructuredArrayIgnoreRe.Test(varName) {
+		opts.destructuredArrayIgnoreRe.TestOrTimeout(varName) {
 		kind = variableTypeArrayDestructure
 		matched = true
 	} else if isParameterNode(varInfo.Definition) {
@@ -990,7 +990,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, w
 	}
 
 	if !matched {
-		matched = re != nil && re.Test(varName)
+		matched = re != nil && re.TestOrTimeout(varName)
 	}
 
 	if !matched {

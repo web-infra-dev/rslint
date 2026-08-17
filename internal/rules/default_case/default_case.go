@@ -71,7 +71,7 @@ var DefaultCaseRule = rule.Rule{
 						commentText = strings.TrimSpace(commentText[2 : len(commentText)-2])
 					}
 
-					if opts.commentPattern.Test(commentText) {
+					if opts.commentPattern.TestOrTimeout(commentText) {
 						return
 					}
 				}

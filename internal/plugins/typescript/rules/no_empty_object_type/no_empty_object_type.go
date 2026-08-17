@@ -192,7 +192,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				if allowWithNameTester != nil {
-					if id := nameNode.AsIdentifier(); id != nil && allowWithNameTester.Test(id.Text) {
+					if id := nameNode.AsIdentifier(); id != nil && allowWithNameTester.TestOrTimeout(id.Text) {
 						return
 					}
 				}
@@ -272,7 +272,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					if typeAlias != nil {
 						aliasName := typeAlias.Name()
 						if aliasName != nil {
-							if id := aliasName.AsIdentifier(); id != nil && allowWithNameTester.Test(id.Text) {
+							if id := aliasName.AsIdentifier(); id != nil && allowWithNameTester.TestOrTimeout(id.Text) {
 								return
 							}
 						}

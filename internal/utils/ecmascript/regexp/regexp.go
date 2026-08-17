@@ -187,11 +187,19 @@ func (r *RegExp) Test(s string) bool {
 	return err == nil && matched
 }
 
+// TestOrTimeout is Test for a caller whose no answer is what produces a
+// report: an allow-pattern, an ignore-pattern, a pattern a name is required to
+// match. Reading a bound match as no match would turn a skipped report into a
+// false positive there, so a match that overruns MatchTimeout counts as a
+// match and the report is skipped.
+func (r *RegExp) TestOrTimeout(s string) bool {
+	matched, err := r.TestOrError(s)
+	return matched || err != nil
+}
+
 // TestOrError is Test for a caller that has to tell "no match" apart from "the
-// match ran into MatchTimeout". The distinction matters where a report is
-// guarded by an allow-pattern: reading a bound match as no-match would turn a
-// skipped report into a false positive, so such a caller wants to fail open
-// rather than take the bare answer.
+// match ran into MatchTimeout", and that has somewhere other than a match to
+// send the second answer.
 func (r *RegExp) TestOrError(s string) (bool, error) {
 	if r == nil || r.re == nil {
 		return false, nil

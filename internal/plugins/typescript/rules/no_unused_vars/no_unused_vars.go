@@ -1023,13 +1023,13 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, w
 		re = opts.varsIgnoreRe
 	}
 
-	matched := re.Test(varName)
+	matched := re.TestOrTimeout(varName)
 
 	// destructuredArrayIgnorePattern applies to array-destructured elements,
 	// checking both the declaration site AND assignment sites (e.g., `let _x; [_x] = arr`).
 	if !matched && opts.destructuredArrayIgnoreRe != nil {
 		if isDestructuredArrayElement(varInfo.Definition) || hasArrayDestructuringWrite(writeRefs) {
-			matched = opts.destructuredArrayIgnoreRe.Test(varName)
+			matched = opts.destructuredArrayIgnoreRe.TestOrTimeout(varName)
 		}
 	}
 

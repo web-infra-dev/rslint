@@ -218,7 +218,7 @@ func isIgnoredPropertyAssignment(opts Options, name string) bool {
 		return true
 	}
 	for _, re := range opts.IgnorePropertyModificationsForRegex {
-		if re.Test(name) {
+		if re.TestOrTimeout(name) {
 			return true
 		}
 	}

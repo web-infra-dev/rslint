@@ -622,7 +622,7 @@ var FilenameCaseRule = rule.Rule{
 			return nil
 		}
 		for _, re := range opts.ignores {
-			if re.Test(basename) {
+			if re.TestOrTimeout(basename) {
 				return nil
 			}
 		}

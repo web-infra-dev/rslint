@@ -596,7 +596,7 @@ func validateMembers(members []*ast.Node, opts ruleOptions, report func(*ast.Nod
 		if !ok || name == "" {
 			continue
 		}
-		if !opts.rule.Test(name) {
+		if !opts.rule.TestOrTimeout(name) {
 			report(m, name)
 		}
 	}
@@ -665,7 +665,7 @@ func validateObjectLiteralProps(obj *ast.Node, opts ruleOptions, report func(*as
 		if !ok || name == "" {
 			continue
 		}
-		if !opts.rule.Test(name) {
+		if !opts.rule.TestOrTimeout(name) {
 			report(prop, name)
 		}
 	}

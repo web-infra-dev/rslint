@@ -254,7 +254,7 @@ func shouldIgnoreMethodName(o *options, nameNode *ast.Node) bool {
 	if !ok {
 		return false
 	}
-	return o.methodsIgnorePattern.Test(name)
+	return o.methodsIgnorePattern.TestOrTimeout(name)
 }
 
 // isArgumentsIdentifier reports whether the node is an Identifier whose

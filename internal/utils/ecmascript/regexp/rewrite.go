@@ -2,7 +2,6 @@ package regexp
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -35,15 +34,9 @@ const (
 
 // wordCharacters is the set ECMAScript builds `\w` and a word boundary out of.
 // It is ASCII whatever the flags say, where .NET — and so regexp2 — reaches
-// for a Unicode word set, which is why a boundary has to be spelled out.
-//
-// Under `u` and `i` together the set gains the two characters that fold into
-// it: U+017F LATIN SMALL LETTER LONG S onto `s`, U+212A KELVIN SIGN onto `k`.
+// for a Unicode word set, which is why both have to be spelled out.
 func wordCharacters(options rewriteOptions) string {
-	if options.ignoreCase && options.unicode {
-		return `[A-Za-z0-9_\u017f\u212a]`
-	}
-	return `[A-Za-z0-9_]`
+	return writeClass(wordClassAtoms(options), false, rewriteOptions{})
 }
 
 // wordBoundary writes out `\b`, or `\B` when negated, as the pair of
@@ -55,20 +48,6 @@ func wordBoundary(negated bool, options rewriteOptions) string {
 		return `(?:(?<=` + word + `)(?=` + word + `)|(?<!` + word + `)(?!` + word + `))`
 	}
 	return `(?:(?<!` + word + `)(?=` + word + `)|(?<=` + word + `)(?!` + word + `))`
-}
-
-// hasControlLetter reports whether rest opens with the character a `\c` needs
-// to be a control escape. A character class takes a digit or an underscore as
-// well as a letter, which is the one place the two productions differ.
-func hasControlLetter(rest string, inClass bool) bool {
-	if rest == "" {
-		return false
-	}
-	c := rest[0]
-	if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' {
-		return true
-	}
-	return inClass && (c >= '0' && c <= '9' || c == '_')
 }
 
 // literalRune writes r so that regexp2 reads it as the character itself,
@@ -96,6 +75,24 @@ type rewriteOptions struct {
 	unicode    bool
 }
 
+// groupKind tells the groups whose closing parenthesis a quantifier may follow
+// apart from the ones it may not.
+type groupKind uint8
+
+const (
+	groupPlain groupKind = iota
+	groupLookahead
+	groupLookbehind
+)
+
+// openGroup is one `(` the walk has not yet seen the `)` of. options is what to
+// restore as it closes; only a modifier group makes an entry differ from the
+// one below.
+type openGroup struct {
+	options rewriteOptions
+	kind    groupKind
+}
+
 // rewrite translates a JavaScript regexp source into one regexp2 reads the
 // same way. It walks the source rather than running a regexp over it, because
 // what a character means depends on whether it is escaped and whether it sits
@@ -111,19 +108,22 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 	out.Grow(len(source))
 
 	exact := true
-	inClass := false
-	classBodyStart := 0
 	// current is what the flags say here, which a modifier group changes for
-	// the span of one group. groups holds what to restore as each open `(`
-	// closes; only a modifier group makes an entry differ from the one below.
+	// the span of one group.
 	current := options
-	groups := []rewriteOptions{}
+	groups := []openGroup{}
+	// How a `\1` and a `\k` read is settled by the pattern as a whole, so the
+	// groups are counted before the walk rather than as it goes.
+	groupCount, named := countGroups(source)
+	context := func() escapeContext {
+		return escapeContext{unicode: current.unicode, groups: groupCount, named: named}
+	}
 
 	for i := 0; i < len(source); {
 		r, size := utf8.DecodeRuneInString(source[i:])
 
-		switch {
-		case r == '\\':
+		switch r {
+		case '\\':
 			// `\k<name>` names a group. The name is not text to be matched,
 			// so widening the letters in it would rewrite the reference.
 			if name, nameSize, ok := namedBackreference(source[i:]); ok {
@@ -134,85 +134,83 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				i += nameSize
 				continue
 			}
-			next, nextSize, ok := decodeEscape(source, i+size, current.unicode)
-			if !ok {
-				// A trailing backslash, which regexp2 can judge for itself.
-				out.WriteString(source[i:])
-				i = len(source)
-				continue
+			escape, err := decodeEscape(source, i+size, context())
+			if err != nil {
+				return "", false, err
 			}
-			end := i + size + nextSize
-			if current.ignoreCase && isBackreference(source[i+size:i+size+nextSize]) {
-				exact = false
-			}
-			// A property escape names a set out of Unicode's tables, which a
-			// widened pattern has no way to name back.
-			if current.ignoreCase && current.unicode && isPropertyEscape(source[i+size:i+size+nextSize]) {
-				exact = false
-			}
-			// An escape that names one character is widened like a literal;
-			// one that names a set — `\d`, `\w`, `\s` — is left alone.
-			if current.ignoreCase && !inClass && next != utf8.RuneError {
-				if class, widened := CaseClass(next, current.unicode); widened {
-					out.WriteString(class)
-					i = end
-					continue
+			end := i + size + escape.width
+
+			switch escape.kind {
+			case escapeRune:
+				// An escape that resolves to a character is written as that
+				// character. Passed through as written, one .NET reads
+				// differently — `\A`, `\a`, `\e` — would keep its .NET meaning,
+				// and one .NET does not know at all would refuse to compile.
+				if current.ignoreCase {
+					if class, widened := CaseClass(escape.r, current.unicode); widened {
+						out.WriteString(class)
+						i = end
+						continue
+					}
+				}
+				out.WriteString(literalRune(escape.r))
+
+			case escapeBackreference:
+				if current.ignoreCase {
+					exact = false
+				}
+				out.WriteString(source[i:end])
+
+			case escapeAssertion:
+				// A pattern cannot repeat a position, and lowering the
+				// assertion first would leave regexp2 reading syntax
+				// JavaScript rejects as something it accepts.
+				if quantifierWidth(source[end:]) > 0 {
+					return "", false, errNothingToRepeat(source[end:])
+				}
+				out.WriteString(wordBoundary(escape.negated, current))
+
+			case escapeSet:
+				switch {
+				// `\d` and `\s` regexp2 already reads as ECMAScript does, and
+				// `\w` too until `u` and `i` together widen the set past ASCII.
+				case escape.set == setWord && current.ignoreCase && current.unicode:
+					out.WriteString(writeClass(wordClassAtoms(current), false, rewriteOptions{}))
+				case escape.set == setNonWord && current.ignoreCase && current.unicode:
+					out.WriteString(writeClass(wordClassAtoms(current), true, rewriteOptions{}))
+				default:
+					// A property escape names a set out of Unicode's tables,
+					// which a widened pattern has no way to name back.
+					if escape.set == setProperty && current.ignoreCase {
+						exact = false
+					}
+					out.WriteString(source[i:end])
 				}
 			}
-			// Annex B: a `\c` that no control letter follows is not an escape
-			// at all, and the backslash and the `c` each stand for themselves.
-			// .NET refuses the same text outright, which would drop whatever
-			// option carried it.
-			if nextSize == 1 && source[i+size] == 'c' && !hasControlLetter(source[end:], inClass) {
-				out.WriteString(literalRune('\\'))
-				out.WriteString("c")
-				i = end
-				continue
-			}
-			// `\b` and `\B` are boundaries, and only out here — inside a class
-			// a `\b` is a backspace, which regexp2 already reads that way.
-			if !inClass && nextSize == 1 && (source[i+size] == 'b' || source[i+size] == 'B') {
-				out.WriteString(wordBoundary(source[i+size] == 'B', current))
-				i = end
-				continue
-			}
-			// An escape that resolves to a character is written as that
-			// character. Passed through as written, one .NET reads differently
-			// — `\A`, `\a`, `\e` — would keep its .NET meaning, and one .NET
-			// does not know at all would refuse to compile.
-			if next != utf8.RuneError {
-				out.WriteString(literalRune(next))
-				i = end
-				continue
-			}
-			out.WriteString(source[i:end])
 			i = end
 			continue
 
-		case inClass:
-			if r == ']' {
-				body := out.String()[classBodyStart:]
-				if current.ignoreCase {
-					rest := CaseCloseClass(body, current.unicode)
-					trimmed := out.String()[:classBodyStart]
-					out.Reset()
-					out.WriteString(trimmed)
-					out.WriteString(rest)
-				}
-				out.WriteByte(']')
-				inClass = false
-				i += size
-				continue
+		case '[':
+			body, negated, width, err := readClass(source[i:])
+			if err != nil {
+				return "", false, err
 			}
-			out.WriteRune(r)
-			i += size
+			atoms, classExact, err := classAtoms(body, current, context())
+			if err != nil {
+				return "", false, err
+			}
+			if !classExact {
+				exact = false
+			}
+			out.WriteString(writeClass(atoms, negated, current))
+			i += width
 			continue
 
-		case r == '(':
+		case '(':
 			// `(?<name>` opens a named group. Same as `\k<name>`: the name is
 			// not text, so it goes through untouched.
 			if opener, openerSize, ok := namedGroupOpener(source[i:]); ok {
-				groups = append(groups, current)
+				groups = append(groups, openGroup{options: current})
 				out.WriteString(opener)
 				i += openerSize
 				continue
@@ -221,7 +219,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			// answers to the flags as they stand here, so the group opens as a
 			// plain one and the walk goes on under what it says.
 			if inside, openerSize, ok := modifierGroup(source[i:], current); ok {
-				groups = append(groups, current)
+				groups = append(groups, openGroup{options: current})
 				current = inside
 				if options.ignoreCase && !inside.ignoreCase {
 					// A pattern that falls back hands ignoring case to regexp2
@@ -237,44 +235,25 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			if err := checkGroupConstruct(source[i:]); err != nil {
 				return "", false, err
 			}
-			groups = append(groups, current)
+			groups = append(groups, openGroup{options: current, kind: groupKindOf(source[i:])})
 			out.WriteByte('(')
 			i += size
 			continue
 
-		case r == ')':
+		case ')':
 			if last := len(groups) - 1; last >= 0 {
-				current = groups[last]
+				group := groups[last]
 				groups = groups[:last]
+				current = group.options
+				if err := checkGroupQuantifier(group.kind, source[i+size:], options); err != nil {
+					return "", false, err
+				}
 			}
 			out.WriteByte(')')
 			i += size
 			continue
 
-		case r == '[':
-			// `[]` never matches and `[^]` matches anything: syntax only
-			// JavaScript reads, and regexp2 would take the brackets literally.
-			if strings.HasPrefix(source[i:], "[]") {
-				out.WriteString(neverMatches)
-				i += 2
-				continue
-			}
-			if strings.HasPrefix(source[i:], "[^]") {
-				out.WriteString(anyCharacter)
-				i += 3
-				continue
-			}
-			out.WriteByte('[')
-			inClass = true
-			i += size
-			if i < len(source) && source[i] == '^' {
-				out.WriteByte('^')
-				i++
-			}
-			classBodyStart = out.Len()
-			continue
-
-		case r == '.':
+		case '.':
 			if current.dotAll {
 				out.WriteString(anyCharacter)
 			} else {
@@ -283,7 +262,10 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			i += size
 			continue
 
-		case r == '^':
+		case '^':
+			if quantifierWidth(source[i+size:]) > 0 {
+				return "", false, errNothingToRepeat(source[i+size:])
+			}
 			if current.multiline {
 				out.WriteString(lineStart)
 			} else {
@@ -292,7 +274,10 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			i += size
 			continue
 
-		case r == '$':
+		case '$':
+			if quantifierWidth(source[i+size:]) > 0 {
+				return "", false, errNothingToRepeat(source[i+size:])
+			}
 			if current.multiline {
 				out.WriteString(lineEnd)
 			} else {
@@ -317,82 +302,79 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 	return out.String(), exact, nil
 }
 
-// decodeEscape reads the body of a backslash escape starting at i, returning
-// the character it names and how many bytes it spans. The rune is
-// utf8.RuneError for an escape that names a set or a group rather than one
-// character, which the caller leaves alone.
-func decodeEscape(source string, i int, unicode bool) (rune, int, bool) {
-	if i >= len(source) {
-		return 0, 0, false
-	}
-	r, size := utf8.DecodeRuneInString(source[i:])
-
-	switch r {
-	case 'u':
-		// `\uXXXX`, or `\u{X...}` under the `u` flag.
-		if unicode && strings.HasPrefix(source[i+size:], "{") {
-			end := strings.IndexByte(source[i+size:], '}')
-			if end < 0 {
-				return utf8.RuneError, size, true
-			}
-			value, err := strconv.ParseUint(source[i+size+1:i+size+end], 16, 32)
-			if err != nil {
-				return utf8.RuneError, size + end + 1, true
-			}
-			return rune(value), size + end + 1, true
-		}
-		return decodeFixedHex(source, i, size, 4)
-	case 'x':
-		return decodeFixedHex(source, i, size, 2)
-	case 'n':
-		return '\n', size, true
-	case 'r':
-		return '\r', size, true
-	case 't':
-		return '\t', size, true
-	case 'f':
-		return '\f', size, true
-	case 'v':
-		return '\v', size, true
-	case '0':
-		return 0, size, true
-	case 'd', 'D', 'w', 'W', 's', 'S', 'b', 'B', 'k', 'c':
-		// Names a set, a boundary or a group rather than a character.
-		return utf8.RuneError, size, true
-	case 'p', 'P':
-		// A property class, but only under `u`. Without it JavaScript reads
-		// `\p` as the letter, where .NET reads a property either way.
-		if unicode {
-			// The name belongs to the escape: `\p{Script=Greek}`. Taking it
-			// along keeps the walk from reading the letters in it as text and
-			// widening them under `i`.
-			if strings.HasPrefix(source[i+size:], "{") {
-				if end := strings.IndexByte(source[i+size:], '}'); end >= 0 {
-					return utf8.RuneError, size + end + 1, true
-				}
-			}
-			return utf8.RuneError, size, true
-		}
-		return r, size, true
-	}
-	if r >= '1' && r <= '9' {
-		// A backreference.
-		return utf8.RuneError, size, true
-	}
-	// Any other escape stands for the character itself.
-	return r, size, true
+func errNothingToRepeat(quantifier string) error {
+	return fmt.Errorf("%w: %s repeats an assertion", ErrUnsupportedSyntax, quantifier[:quantifierWidth(quantifier)])
 }
 
-func decodeFixedHex(source string, i int, size int, digits int) (rune, int, bool) {
-	start := i + size
-	if start+digits > len(source) {
-		return utf8.RuneError, size, true
+// quantifierWidth reports how many bytes of source a quantifier spans, or none
+// where no quantifier opens it. A `{` that no bound closes is a `{` standing
+// for itself, which Annex B allows and which repeats nothing.
+func quantifierWidth(source string) int {
+	width := 0
+	switch {
+	case source == "":
+		return 0
+	case source[0] == '*', source[0] == '+', source[0] == '?':
+		width = 1
+	case source[0] == '{':
+		if width = boundedQuantifierWidth(source); width == 0 {
+			return 0
+		}
+	default:
+		return 0
 	}
-	value, err := strconv.ParseUint(source[start:start+digits], 16, 32)
-	if err != nil {
-		return utf8.RuneError, size, true
+	// A lazy quantifier is still a quantifier.
+	if width < len(source) && source[width] == '?' {
+		width++
 	}
-	return rune(value), size + digits, true
+	return width
+}
+
+// boundedQuantifierWidth reads `{m}`, `{m,}` or `{m,n}`.
+func boundedQuantifierWidth(source string) int {
+	i := len("{")
+	digits := i
+	for isDecimalDigit(source, i) {
+		i++
+	}
+	if i == digits {
+		return 0
+	}
+	if i < len(source) && source[i] == ',' {
+		i++
+		for isDecimalDigit(source, i) {
+			i++
+		}
+	}
+	if i < len(source) && source[i] == '}' {
+		return i + 1
+	}
+	return 0
+}
+
+// groupKindOf reads whether a group is a lookaround, which is what decides
+// whether a quantifier may follow its close.
+func groupKindOf(source string) groupKind {
+	switch {
+	case strings.HasPrefix(source, "(?="), strings.HasPrefix(source, "(?!"):
+		return groupLookahead
+	case strings.HasPrefix(source, "(?<="), strings.HasPrefix(source, "(?<!"):
+		return groupLookbehind
+	}
+	return groupPlain
+}
+
+// checkGroupQuantifier rejects a quantifier repeating a group that matches no
+// characters. Annex B keeps one exception: without `u`, a lookahead may be
+// quantified, and matches its body once or not at all. A lookbehind never may.
+func checkGroupQuantifier(kind groupKind, rest string, options rewriteOptions) error {
+	if kind == groupPlain || quantifierWidth(rest) == 0 {
+		return nil
+	}
+	if kind == groupLookahead && !options.unicode {
+		return nil
+	}
+	return errNothingToRepeat(rest)
 }
 
 // namedGroupOpener matches `(?<name>` at the start of source, returning it
@@ -425,21 +407,6 @@ func namedBackreference(source string) (string, int, bool) {
 	}
 	width := len(`\k<`) + end + 1
 	return source[:width], width, true
-}
-
-// isBackreference reports whether an escape body names an earlier group, which
-// is the one thing a widened pattern cannot reproduce under `i`.
-func isBackreference(body string) bool {
-	if body == "" {
-		return false
-	}
-	return (body[0] >= '1' && body[0] <= '9') || body[0] == 'k'
-}
-
-// isPropertyEscape reports whether an escape body is a `\p{…}` or `\P{…}`,
-// which names a set Unicode draws rather than characters the pattern spells.
-func isPropertyEscape(body string) bool {
-	return body != "" && (body[0] == 'p' || body[0] == 'P')
 }
 
 // modifierGroup reads a `(?flags:` or `(?flags-flags:` opener — the syntax

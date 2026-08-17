@@ -44,7 +44,6 @@ The following ECMAScript regex features are not yet fully supported in pattern v
 - Unicode property long names (`\p{Letter}`) and `Script=` syntax (`\p{Script=Latin}`)
 - `v`-flag set notation (`[A--B]`, `[A&&B]`, `[A--[0-9]]`)
 - Surrogate pair named capture groups (`(?<\ud835\udc9c>.)`)
-- Invalid escape detection in unicode mode (`\a` with `u` flag)
 - `v`-flag specific parsing (`[[]` with `v` flag)
 - Duplicate named capture groups outside alternatives (`(?<k>a)(?<k>b)`)
 

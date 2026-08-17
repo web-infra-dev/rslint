@@ -246,7 +246,7 @@ func getCommentDefaultCase(
 		text = strings.TrimSpace(text[2 : len(text)-2])
 	}
 
-	if commentPattern.Test(text) {
+	if commentPattern.TestOrTimeout(text) {
 		return lastComment
 	}
 	return nil

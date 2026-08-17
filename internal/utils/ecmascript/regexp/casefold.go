@@ -1,9 +1,7 @@
 package regexp
 
 import (
-	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
@@ -47,28 +45,16 @@ func CaseClass(r rune, unicode bool) (string, bool) {
 // how JavaScript reads one too: `[^a]` asks whether any member compares equal
 // to the character at hand, and answers no to `A`.
 func CaseCloseClass(body string, unicode bool) string {
-	singles, ranges := classMembers(body, unicode)
-	covers := func(r rune) bool {
-		return slices.Contains(singles, r) || slices.ContainsFunc(ranges, func(bounds [2]rune) bool {
-			return r >= bounds[0] && r <= bounds[1]
-		})
-	}
-
-	var extras strings.Builder
-	for _, members := range ecmascript.CaseEquivalenceGroups(unicode) {
-		if !slices.ContainsFunc(members, covers) {
-			continue
-		}
-		for _, member := range members {
-			if !covers(member) {
-				extras.WriteString(EscapeClassRune(member))
-			}
-		}
-	}
-	if extras.Len() == 0 {
+	options := rewriteOptions{ignoreCase: true, unicode: unicode}
+	atoms, _, err := classAtoms(body, options, escapeContext{unicode: unicode})
+	if err != nil {
 		return body
 	}
-	return escapeTrailingDash(body) + extras.String()
+	extras := caseExtras(atoms, unicode)
+	if extras == "" {
+		return body
+	}
+	return escapeTrailingDash(body) + extras
 }
 
 // EscapeClassRune escapes a character that would carry a meaning of its own
@@ -95,51 +81,4 @@ func escapeTrailingDash(body string) string {
 		return body
 	}
 	return body[:len(body)-1] + `\-`
-}
-
-// classMembers reads back the characters a character class covers, so that
-// widening it can tell what it already has. It understands the shapes a class
-// body takes: a leading `^`, backslash escapes, `-` ranges, and plain
-// characters.
-//
-// An escape is decoded to the character it names, so that `[\u0041-\u005A]`
-// is read as the range `A` to `Z` it is. One naming a set rather than a
-// character — `\d`, `\w`, `\s` — decodes to utf8.RuneError, which has no
-// case-equivalent and so widens nothing.
-func classMembers(body string, unicode bool) ([]rune, [][2]rune) {
-	body = strings.TrimPrefix(body, "^")
-
-	type member struct {
-		r    rune
-		dash bool
-	}
-	members := []member{}
-	for i := 0; i < len(body); {
-		r, size := utf8.DecodeRuneInString(body[i:])
-		if r == '\\' && i+size < len(body) {
-			escaped, escapedSize, ok := decodeEscape(body, i+size, unicode)
-			if !ok {
-				break
-			}
-			members = append(members, member{r: escaped})
-			i += size + escapedSize
-			continue
-		}
-		members = append(members, member{r: r, dash: r == '-'})
-		i += size
-	}
-
-	singles := []rune{}
-	ranges := [][2]rune{}
-	for i := 0; i < len(members); i++ {
-		// A `-` that follows a range rather than separating one, as the second
-		// one in `[a-c-e]` does, stands for itself.
-		if i+2 < len(members) && members[i+1].dash {
-			ranges = append(ranges, [2]rune{members[i].r, members[i+2].r})
-			i += 2
-			continue
-		}
-		singles = append(singles, members[i].r)
-	}
-	return singles, ranges
 }
