@@ -52,6 +52,7 @@ func TestValidExpectRule(t *testing.T) {
 			// the await/return check must look past them to match upstream.
 			{Code: `test("t", async () => { await (expect(p).resolves.toBe(1)); });`},
 			{Code: `test("t", () => { return (expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", () => { return (condition ? expect(p).resolves.toBe(1) : expect(q).toBe(1)); });`},
 			{Code: `test("t", async () => { await ((expect(p).resolves.to.be.true)); });`},
 			{Code: `test("t", async () => { await Promise.all([(expect(p).resolves.toBe(1)), expect(q).resolves.toBe(2)]); });`},
 			{Code: `test("t", async () => { await (expect(p).resolves.toBe(1)).then(() => {}); });`},

@@ -94,7 +94,8 @@ func isAcceptableReturnNode(node *ast.Node, allowReturn bool) bool {
 		return true
 	}
 	if node.Kind == ast.KindConditionalExpression {
-		return isAcceptableReturnNode(node.Parent, allowReturn)
+		outer := internalUtils.OutermostParenthesizedExpression(node)
+		return isAcceptableReturnNode(outer.Parent, allowReturn)
 	}
 
 	return node.Kind == ast.KindArrowFunction || node.Kind == ast.KindAwaitExpression
