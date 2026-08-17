@@ -195,15 +195,24 @@ func RunTSESLint(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		// any, so that both the reported text and the ignore-list value
 		// account for the sign. Matches upstream: `raw` and `value` are
 		// computed once, up front, and reused by every check below.
+		// The reported text concatenates the operator with the literal's
+		// own raw text, so parentheses and whitespace between the two
+		// (`-(1)`, `- 1`) still report as `-1`, while the reported range
+		// still spans the whole unary expression.
 		fullNumberNode := node
 		fullNumberRange := nodeRange
+		fullRaw := ownRaw
 		isNegative := false
 		if unary, op := findUnaryParent(node); unary != nil {
 			fullNumberNode = unary
 			fullNumberRange = utils.TrimNodeTextRange(ctx.SourceFile, unary)
 			isNegative = op == ast.KindMinusToken
+			if isNegative {
+				fullRaw = "-" + ownRaw
+			} else {
+				fullRaw = "+" + ownRaw
+			}
 		}
-		fullRaw := ctx.SourceFile.Text()[fullNumberRange.Pos():fullNumberRange.End()]
 
 		parent := skipParensUp(fullNumberNode.Parent)
 		if parent == nil {

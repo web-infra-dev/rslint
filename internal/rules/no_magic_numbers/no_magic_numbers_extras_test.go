@@ -62,6 +62,32 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 			Code:   `function f() { return -(1); }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic"}},
 		},
+		// The reported text is the operator plus the literal's own raw
+		// text; the reported range still covers the parentheses.
+		{
+			Code:   `f(-(1));`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -1.", Line: 1, Column: 3, EndColumn: 7}},
+		},
+		{
+			Code:   `f(-((1)));`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -1.", Line: 1, Column: 3, EndColumn: 9}},
+		},
+		{
+			Code:   `f(+(1));`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: +1.", Line: 1, Column: 3, EndColumn: 7}},
+		},
+		{
+			Code:   `f(- 1);`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -1.", Line: 1, Column: 3, EndColumn: 6}},
+		},
+		{
+			Code:   `f(-(0x1F));`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -0x1F.", Line: 1, Column: 3, EndColumn: 10}},
+		},
+		{
+			Code:   `f(-(1_000));`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -1_000.", Line: 1, Column: 3, EndColumn: 11}},
+		},
 		{
 			Code:   `a = (1);`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}},
@@ -78,7 +104,7 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 			Code: `f(/* leading trivia */ 42, /* unary */ -(7), /* bigint */ 9n);`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 24},
-				{MessageId: "noMagic", Message: "No magic number: -(7).", Line: 1, Column: 40},
+				{MessageId: "noMagic", Message: "No magic number: -7.", Line: 1, Column: 40},
 				{MessageId: "noMagic", Message: "No magic number: 9n.", Line: 1, Column: 59},
 			},
 		},

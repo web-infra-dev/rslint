@@ -787,7 +787,7 @@ type Foo = {
 			Code: `f(/* leading trivia */ 42, /* unary */ -(7), /* bigint */ 9n);`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 24},
-				{MessageId: "noMagic", Message: "No magic number: -(7).", Line: 1, Column: 40},
+				{MessageId: "noMagic", Message: "No magic number: -7.", Line: 1, Column: 40},
 				{MessageId: "noMagic", Message: "No magic number: 9n.", Line: 1, Column: 59},
 			},
 		},
