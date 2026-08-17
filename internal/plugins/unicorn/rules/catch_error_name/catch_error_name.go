@@ -187,6 +187,35 @@ func bodyHasExternalReference(ctx rule.RuleContext, body *ast.Node, originalSymb
 	return conflict
 }
 
+func statementsHaveTypeDeclaration(statements []*ast.Node, name string) bool {
+	for _, statement := range statements {
+		if statement == nil || (statement.Kind != ast.KindTypeAliasDeclaration && statement.Kind != ast.KindInterfaceDeclaration) {
+			continue
+		}
+		if declarationName := statement.Name(); declarationName != nil && declarationName.Text() == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTypeDeclarationInScope(node *ast.Node, name string) bool {
+	for current := node; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindBlock:
+			block := current.AsBlock()
+			if block != nil && block.Statements != nil && statementsHaveTypeDeclaration(block.Statements.Nodes, name) {
+				return true
+			}
+		case ast.KindSourceFile:
+			sourceFile := current.AsSourceFile()
+			return sourceFile != nil && sourceFile.Statements != nil &&
+				statementsHaveTypeDeclaration(sourceFile.Statements.Nodes, name)
+		}
+	}
+	return false
+}
+
 func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast.Node, expected string) string {
 	candidate := expected
 	if !isValidVariableName(candidate) {
@@ -198,13 +227,15 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 	originalSymbol := bindingDeclaration(identifier).Symbol()
 	body := handlerBody(identifier)
 	for {
-		available := !ctx.Globals.Access(candidate).IsDeclared() && !utils.IsShadowed(identifier, candidate)
-		if available && candidate == "arguments" && ast.FindAncestor(identifier.Parent, ast.IsFunctionLikeDeclaration) != nil {
+		available := !ctx.Globals.Access(candidate).IsDeclared() &&
+			!utils.IsShadowed(identifier, candidate) &&
+			!hasTypeDeclarationInScope(identifier, candidate)
+		if available && candidate == "arguments" {
 			available = false
 		}
 		if available {
 			for _, reference := range references {
-				if utils.IsShadowed(reference, candidate) {
+				if utils.IsShadowed(reference, candidate) || hasTypeDeclarationInScope(reference, candidate) {
 					available = false
 					break
 				}
@@ -214,10 +245,12 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 			available = false
 		}
 		// NOTE: Unlike ESLint, avoid a known unsafe fix when an unused handler
-		// parameter would be renamed to a direct lexical declaration in its body.
-		if available && len(references) == 0 && body != nil && body.Kind == ast.KindBlock &&
-			utils.HasShadowingDeclaration(body, candidate) {
-			available = false
+		// parameter would collide with a declaration in its body.
+		if available && len(references) == 0 && body != nil && body.Kind == ast.KindBlock {
+			block := body.AsBlock()
+			available = !utils.HasShadowingDeclaration(body, candidate) &&
+				!utils.HasHoistedVarDeclaration(body, candidate) &&
+				(block == nil || block.Statements == nil || !statementsHaveTypeDeclaration(block.Statements.Nodes, candidate))
 		}
 		if available {
 			return candidate

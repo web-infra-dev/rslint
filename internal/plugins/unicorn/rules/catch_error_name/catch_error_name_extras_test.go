@@ -50,10 +50,14 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("try {} catch (bad) { { const error = 1 } }", "try {} catch (error) { { const error = 1 } }", "bad", "error"),
 			// A nested scope that references the renamed parameter still participates.
 			invalid("try {} catch (bad) { function f() { error(bad) } }", "try {} catch (error_) { function f() { error(error_) } }", "bad", "error_"),
-			// Property keys, class fields, and type-only declarations are not value bindings.
+			// Property keys and class fields are not bindings in the handler scope.
 			invalid("try {} catch (err) { log({error: err}) }", "try {} catch (error) { log({error: error}) }", "err", "error"),
 			invalid("try {} catch (err) { use(err); class A { error = 1 } }", "try {} catch (error) { use(error); class A { error = 1 } }", "err", "error"),
-			invalid("try {} catch (err) { use(err); type error = string }", "try {} catch (error) { use(error); type error = string }", "err", "error"),
+			// Type and interface declarations participate in TypeScript-ESLint's scope.
+			invalid("try {} catch (err) { use(err); type error = string }", "try {} catch (error_) { use(error_); type error = string }", "err", "error_"),
+			invalid("try {} catch (err) { use(err); interface error {} }", "try {} catch (error_) { use(error_); interface error {} }", "err", "error_"),
+			invalid("type error = string; try {} catch (bad) { use(bad) }", "type error = string; try {} catch (error_) { use(error_) }", "bad", "error_"),
+			invalid("interface error {}; try {} catch (bad) { use(bad) }", "interface error {}; try {} catch (error_) { use(error_) }", "bad", "error_"),
 			// External references in descendant scopes remain collision candidates.
 			invalid("try {} catch (bad) { use(bad); function f() { return error } }", "try {} catch (error_) { use(error_); function f() { return error } }", "bad", "error_"),
 			invalid("promise.catch(bad => { use(bad); function f() { return error } })", "promise.catch(error_ => { use(error_); function f() { return error } })", "bad", "error_"),
@@ -61,6 +65,10 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("try {} catch (bad) { use(bad) }", "try {} catch (await_) { use(await_) }", "bad", "await_", map[string]any{"name": "await"}),
 			invalid("try {} catch (bad) { use(bad) }", "try {} catch (undefined_) { use(undefined_) }", "bad", "undefined_", map[string]any{"name": "undefined"}),
 			invalid("promise.catch(function (bad) { use(bad) })", "promise.catch(function (arguments_) { use(arguments_) })", "bad", "arguments_", map[string]any{"name": "arguments"}),
+			invalid("try {} catch (bad) { use(bad) }", "try {} catch (arguments_) { use(arguments_) }", "bad", "arguments_", map[string]any{"name": "arguments"}),
+			// `var` declarations nested in a rejection handler still hoist to its scope.
+			invalid("promise.catch(bad => { if (x) { var error = 1 } })", "promise.catch(error_ => { if (x) { var error = 1 } })", "bad", "error_"),
+			invalid("promise.catch(function (bad) { if (x) { var error = 1 } })", "promise.catch(function (error_) { if (x) { var error = 1 } })", "bad", "error_"),
 			// Upstream upperFirst() operates on one UTF-16 code unit, so an astral
 			// initial character is not uppercased for the descriptive-name suffix.
 			invalid("try {} catch (descriptive𐐀) {}", "try {} catch (𐐨) {}", "descriptive𐐀", "𐐨", map[string]any{"name": "𐐨"}),
