@@ -15,8 +15,9 @@ func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	// .cjs/.cts files with no import/export at all: TS forces their
 	// ExternalModuleIndicator so they get their own (non-global) top-level
 	// scope, but they're still CommonJS — sloppy mode by default — not real ES
-	// modules, so exclude those two extensions explicitly.
-	if ast.IsExternalModule(sourceFile) && !isForcedCommonJSExtension(sourceFile.FileName()) {
+	// modules. Such a file is strict only once it uses module syntax itself.
+	if ast.IsExternalModule(sourceFile) &&
+		(HasModuleSyntax(sourceFile) || !IsCommonJSFileExtension(sourceFile.FileName())) {
 		return true
 	}
 
@@ -49,11 +50,24 @@ func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	return false
 }
 
-// isForcedCommonJSExtension reports whether fileName's extension is one TS
-// forces module-ness on for scoping purposes regardless of content, while the
-// file itself stays CommonJS (sloppy mode) rather than becoming a real ES
-// module: .cjs and .cts. .mjs/.mts are excluded — those are genuine ESM.
-func isForcedCommonJSExtension(fileName string) bool {
+// HasModuleSyntax reports whether sourceFile is an external module because of
+// what it contains — an import/export statement, `import.meta`, or a JSX tag
+// under the JSX module detection — rather than because TypeScript forced an
+// ExternalModuleIndicator on it for its file extension alone. TS marks the
+// forced case by pointing the indicator at the source file itself, so an
+// extension-driven module is exactly the one whose indicator is that sentinel.
+func HasModuleSyntax(sourceFile *ast.SourceFile) bool {
+	indicator := sourceFile.ExternalModuleIndicator
+	return indicator != nil && indicator != sourceFile.AsNode()
+}
+
+// IsCommonJSFileExtension reports whether fileName's extension makes the file
+// CommonJS rather than an ES module: .cjs and .cts. Both still get their own
+// (non-global) top-level scope — .cjs from ESLint's default language selection,
+// .cts from TypeScript forcing an ExternalModuleIndicator — so callers deriving
+// module-ness from scoping need this to tell the two apart. .mjs/.mts are
+// excluded: those are genuine ESM.
+func IsCommonJSFileExtension(fileName string) bool {
 	switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
 	case tspath.ExtensionCjs, tspath.ExtensionCts:
 		return true

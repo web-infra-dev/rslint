@@ -12,10 +12,18 @@ import (
 // parseAndFindNode parses code and finds the first node matching the given kind.
 func parseAndFindNode(t *testing.T, code string, kind ast.Kind) (*ast.Node, *ast.SourceFile) {
 	t.Helper()
+	return parseFileAndFindNode(t, code, kind, "file.ts", "tsconfig.json")
+}
+
+// parseFileAndFindNode is parseAndFindNode with the file name and tsconfig
+// chosen by the caller, for the extensions whose module-ness TypeScript decides
+// from the name rather than the content.
+func parseFileAndFindNode(t *testing.T, code string, kind ast.Kind, fileName string, tsconfigPath string) (*ast.Node, *ast.SourceFile) {
+	t.Helper()
 	rootDir := fixtures.GetRootDir()
-	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
+	filePath := tspath.ResolvePath(rootDir.Dir, fileName)
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
-	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
+	program, err := CreateProgram(true, fs, rootDir.Dir, tsconfigPath, CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program for code: "+code)
 	sourceFile := program.GetSourceFile(filePath)
 
@@ -130,6 +138,68 @@ func TestIsInStrictMode(t *testing.T) {
 			node, sourceFile := parseAndFindNode(t, tt.code, tt.kind)
 			result := IsInStrictMode(node, sourceFile)
 			assert.Equal(t, result, tt.expected, "IsInStrictMode mismatch for: %s", tt.code)
+		})
+	}
+}
+
+// TestIsInStrictModeByFileExtension covers the extensions TypeScript hands an
+// ExternalModuleIndicator on the strength of the name alone. .cjs/.cts get one
+// so they receive their own top-level scope, but they stay CommonJS — sloppy
+// mode — until they use module syntax themselves; .mjs/.mts are genuine ESM
+// either way.
+func TestIsInStrictModeByFileExtension(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		code     string
+		fileName string
+		tsconfig string
+		expected bool
+	}{
+		{
+			name:     "cts without module syntax",
+			code:     `if (true) function f() {}`,
+			fileName: "commonjs.cts",
+			tsconfig: "tsconfig.json",
+			expected: false,
+		},
+		{
+			name:     "cts with export",
+			code:     `export {}; if (true) function f() {}`,
+			fileName: "module.cts",
+			tsconfig: "tsconfig.json",
+			expected: true,
+		},
+		{
+			name:     "mts without module syntax",
+			code:     `if (true) function f() {}`,
+			fileName: "module.mts",
+			tsconfig: "tsconfig.json",
+			expected: true,
+		},
+		{
+			name:     "cjs without module syntax",
+			code:     `if (true) function f() {}`,
+			fileName: "commonjs.cjs",
+			tsconfig: "tsconfig.allow-js.json",
+			expected: false,
+		},
+		{
+			name:     "mjs without module syntax",
+			code:     `if (true) function f() {}`,
+			fileName: "module.mjs",
+			tsconfig: "tsconfig.allow-js.json",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			node, sourceFile := parseFileAndFindNode(t, tt.code, ast.KindFunctionDeclaration, tt.fileName, tt.tsconfig)
+			result := IsInStrictMode(node, sourceFile)
+			assert.Equal(t, result, tt.expected, "IsInStrictMode mismatch for: %s", tt.fileName)
 		})
 	}
 }

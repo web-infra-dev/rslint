@@ -2,8 +2,6 @@ package no_implicit_globals
 
 import (
 	_ "embed"
-	"regexp"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -62,11 +60,12 @@ var globalVariableLeakMessage = rule.RuleMessage{
 // NOTE: Unlike ESLint, rslint does not expose languageOptions.sourceType or
 // parserOptions.ecmaFeatures.globalReturn (see PORT_RULE.md's framework-gap
 // list). "Is this the global scope" is instead derived from the file's actual
-// module-ness: ast.IsExternalModule (real import/export syntax) combined with
-// the resolved language defaults for the file extension (ctx.Refs
-// .HasNonGlobalTopLevelScope, which covers .cjs's CommonJS wrapper and
-// .js/.mjs's default module treatment) — the same combination no_redeclare
-// already uses for its own "is this the Program's global scope" check.
+// module-ness: ast.IsExternalModule (module syntax, or an extension TypeScript
+// forces module-ness on) combined with the resolved language defaults for the
+// file extension (ctx.Refs.HasNonGlobalTopLevelScope, which covers .cjs's
+// CommonJS wrapper and .js/.mjs's default module treatment) — the same
+// combination no_redeclare already uses for its own "is this the Program's
+// global scope" check.
 var NoImplicitGlobalsRule = rule.Rule{
 	Name:   "no-implicit-globals",
 	Schema: rule.NewSchema(schemaJSON),
@@ -76,30 +75,39 @@ var NoImplicitGlobalsRule = rule.Rule{
 		}
 		opts := parseOptions(rawOptions)
 
+		hasNonGlobalTopLevelScope := ast.IsExternalModule(ctx.SourceFile) ||
+			(ctx.Refs != nil && ctx.Refs.HasNonGlobalTopLevelScope())
+
+		// ESLint records an implicit global only for a write in sloppy-mode
+		// code, so top-level strictness decides whether a leak is reportable.
+		// It comes from the same module-ness the declaration checks use, minus
+		// CommonJS: a .cjs/.cts file has its own top-level scope without being
+		// an ES module, so its top level stays sloppy until it uses module
+		// syntax itself.
+		strictTopLevel := hasNonGlobalTopLevelScope &&
+			(utils.HasModuleSyntax(ctx.SourceFile) || !utils.IsCommonJSFileExtension(ctx.SourceFile.FileName()))
+
 		listeners := rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				checkImplicitGlobalWrite(ctx, node)
+				checkImplicitGlobalWrite(ctx, node, strictTopLevel)
 			},
 		}
 
-		hasNonGlobalTopLevelScope := ast.IsExternalModule(ctx.SourceFile) ||
-			(ctx.Refs != nil && ctx.Refs.HasNonGlobalTopLevelScope())
 		if hasNonGlobalTopLevelScope {
 			return listeners
 		}
 
 		sourceFileNode := ctx.SourceFile.AsNode()
-		exported := parseExportedNames(ctx)
 
 		listeners[ast.KindVariableDeclarationList] = func(node *ast.Node) {
-			checkVariableDeclarationList(ctx, node, sourceFileNode, opts, exported)
+			checkVariableDeclarationList(ctx, node, sourceFileNode, opts)
 		}
 		listeners[ast.KindFunctionDeclaration] = func(node *ast.Node) {
-			checkFunctionDeclaration(ctx, node, sourceFileNode, exported)
+			checkFunctionDeclaration(ctx, node, sourceFileNode)
 		}
 		if opts.lexicalBindings {
 			listeners[ast.KindClassDeclaration] = func(node *ast.Node) {
-				checkClassDeclaration(ctx, node, sourceFileNode, exported)
+				checkClassDeclaration(ctx, node, sourceFileNode)
 			}
 		}
 
@@ -112,8 +120,8 @@ var NoImplicitGlobalsRule = rule.Rule{
 // reports at declNode — the shared position for every name bound by one
 // declarator, matching ESLint's own def.node quirk for destructured bindings
 // (see no_implicit_globals_extras_test.go for the locked-in shape).
-func reportDeclaration(ctx rule.RuleContext, declNode *ast.Node, name string, kind string, lexical bool, exported map[string]bool) {
-	if exported[name] {
+func reportDeclaration(ctx rule.RuleContext, declNode *ast.Node, name string, kind string, lexical bool) {
+	if ctx.Exported.Has(name) {
 		return
 	}
 	switch ctx.Globals.Access(name) {
@@ -130,7 +138,7 @@ func reportDeclaration(ctx rule.RuleContext, declNode *ast.Node, name string, ki
 	}
 }
 
-func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node, opts options, exported map[string]bool) {
+func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node, opts options) {
 	if node.Flags&ast.NodeFlagsAmbient != 0 {
 		// `declare var x;` (bare or inside `declare global { ... }`) produces
 		// no runtime binding at all, so it can't leak or shadow anything —
@@ -172,7 +180,7 @@ func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, sourceFi
 			continue
 		}
 		utils.CollectBindingNames(decl.Name(), func(_ *ast.Node, name string) {
-			reportDeclaration(ctx, declarator, name, kind, lexical, exported)
+			reportDeclaration(ctx, declarator, name, kind, lexical)
 		})
 	}
 }
@@ -190,7 +198,7 @@ func lexicalDeclarationKind(flags ast.NodeFlags) (kind string, ok bool) {
 	}
 }
 
-func checkFunctionDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node, exported map[string]bool) {
+func checkFunctionDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node) {
 	fn := node.AsFunctionDeclaration()
 	if fn == nil || node.Body() == nil {
 		// Bodyless overload/ambient signatures are a TypeScript-only shape
@@ -204,10 +212,10 @@ func checkFunctionDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNo
 	if ast.GetEnclosingBlockScopeContainer(node) != sourceFileNode {
 		return
 	}
-	reportDeclaration(ctx, node, nameNode.Text(), "function", false, exported)
+	reportDeclaration(ctx, node, nameNode.Text(), "function", false)
 }
 
-func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node, exported map[string]bool) {
+func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node) {
 	if node.Flags&ast.NodeFlagsAmbient != 0 {
 		// `declare class Foo {}` produces no runtime binding, unlike a
 		// bodyless function declaration a class always has a body — an
@@ -225,7 +233,7 @@ func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode 
 	if ast.GetEnclosingBlockScopeContainer(node) != sourceFileNode {
 		return
 	}
-	reportDeclaration(ctx, node, nameNode.Text(), "class", true, exported)
+	reportDeclaration(ctx, node, nameNode.Text(), "class", true)
 }
 
 // checkImplicitGlobalWrite handles the two reference-driven diagnostics that
@@ -236,7 +244,12 @@ func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode 
 // assignment or bare for-in/for-of loop variable — the same shape ESLint's
 // own reference.isWrite() && !reference.isRead() filter selects, which
 // excludes compound assignments (foo += 1) and update expressions (foo++).
-func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node) {
+//
+// The two diagnostics differ on `/* exported */`: upstream skips an exported
+// variable before reaching its reference loop, so the readonly assignment goes
+// unreported, while the leak is collected from the global scope's implicit
+// variables, which the directive never touches.
+func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLevel bool) {
 	root := findPureAssignmentRoot(node)
 	if root == nil {
 		return
@@ -247,11 +260,14 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node) {
 	name := node.Text()
 	switch ctx.Globals.Access(name) {
 	case utils.GlobalAccessReadonly:
+		if ctx.Exported.Has(name) {
+			return
+		}
 		ctx.ReportNode(root, assignmentToReadonlyGlobalMessage)
 	case utils.GlobalAccessWritable:
 		// Writable globals may be freely assigned.
 	default:
-		if !utils.IsInStrictMode(node, ctx.SourceFile) {
+		if !strictTopLevel && !utils.IsInStrictMode(node, ctx.SourceFile) {
 			ctx.ReportNode(root, globalVariableLeakMessage)
 		}
 	}
@@ -324,75 +340,4 @@ func findPureAssignmentRoot(node *ast.Node) *ast.Node {
 		}
 	}
 	return nil
-}
-
-var exportedDirectiveJustificationPattern = regexp.MustCompile(`\s-{2,}\s`)
-
-// parseExportedNames collects every name listed by a `/* exported name1,
-// name2 */` directive comment, mirroring @eslint/plugin-kit's parseListConfig:
-// comma-separated entries, each trimmed and unwrapped of one matching layer of
-// quotes. A name in this set is intentionally global (assigned to elsewhere,
-// e.g. by a bundler) and is exempt from the declaration-in-global-scope
-// diagnostics — but not from the readonly-global or leak diagnostics, which
-// upstream keeps unconditional (see reportDeclaration's caller).
-func parseExportedNames(ctx rule.RuleContext) map[string]bool {
-	text := ctx.SourceFile.Text()
-	if !strings.Contains(text, "exported") {
-		return nil
-	}
-
-	var names map[string]bool
-	for _, comment := range ctx.Comments.All() {
-		if comment.Kind != ast.KindMultiLineCommentTrivia {
-			continue
-		}
-		start, end := comment.Pos()+2, comment.End()
-		if end-start >= 2 && text[end-2:end] == "*/" {
-			end -= 2
-		}
-		if start < 0 || end > len(text) || start > end {
-			continue
-		}
-		content := strings.TrimSpace(text[start:end])
-		rest, ok := strings.CutPrefix(content, "exported")
-		if !ok {
-			continue
-		}
-		if rest != "" && !isDirectiveSeparator(rest[0]) {
-			continue
-		}
-		if loc := exportedDirectiveJustificationPattern.FindStringIndex(rest); loc != nil {
-			rest = rest[:loc[0]]
-		}
-		for _, part := range strings.Split(rest, ",") {
-			name := stripMatchingQuotes(strings.TrimSpace(part))
-			if name == "" {
-				continue
-			}
-			if names == nil {
-				names = make(map[string]bool)
-			}
-			names[name] = true
-		}
-	}
-	return names
-}
-
-func isDirectiveSeparator(b byte) bool {
-	switch b {
-	case ' ', '\t', '\n', '\r', '\v', '\f':
-		return true
-	default:
-		return false
-	}
-}
-
-func stripMatchingQuotes(s string) string {
-	if len(s) >= 2 {
-		first, last := s[0], s[len(s)-1]
-		if (first == '\'' || first == '"') && first == last {
-			return s[1 : len(s)-1]
-		}
-	}
-	return s
 }

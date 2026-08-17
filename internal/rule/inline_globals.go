@@ -1,8 +1,6 @@
 package rule
 
 import (
-	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -13,7 +11,7 @@ import (
 // inlineGlobalsKeywords lists the directive keywords that introduce a
 // `/* global */` comment. "globals" is checked before "global" since it is
 // the longer prefix.
-var inlineGlobalsKeywords = [...]string{"globals", "global"}
+var inlineGlobalsKeywords = []string{"globals", "global"}
 
 // InlineGlobal describes one name declared by `/* global */` comments.
 // Access is the name's final inline setting after all comments are applied.
@@ -47,7 +45,7 @@ type inlineGlobalName struct {
 // leaving the name's earlier inline setting — or the config or built-in
 // setting — in place.
 func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map[string]utils.GlobalAccess, []InlineGlobal) {
-	if sourceFile == nil || sourceFile.Text() == "" || !mayContainInlineGlobalDirective(sourceFile.Text()) {
+	if sourceFile == nil || sourceFile.Text() == "" || !mayContainDirective(sourceFile.Text(), inlineGlobalsKeywords) {
 		return nil, nil
 	}
 
@@ -115,34 +113,6 @@ func ParseInlineGlobals(sourceFile *ast.SourceFile, comments *CommentStore) (map
 	return values, globals
 }
 
-func mayContainInlineGlobalDirective(text string) bool {
-	for searchStart := 0; searchStart < len(text); {
-		markerOffset := strings.Index(text[searchStart:], "/*")
-		if markerOffset < 0 {
-			return false
-		}
-
-		contentStart := searchStart + markerOffset + len("/*")
-		contentStart, _ = trimECMAScriptWhitespaceRange(text, contentStart, len(text))
-		for _, keyword := range inlineGlobalsKeywords {
-			if !strings.HasPrefix(text[contentStart:], keyword) {
-				continue
-			}
-			restStart := contentStart + len(keyword)
-			if restStart == len(text) || strings.HasPrefix(text[restStart:], "*/") {
-				return true
-			}
-			r, _ := utf8.DecodeRuneInString(text[restStart:])
-			if isECMAScriptWhitespace(r) {
-				return true
-			}
-		}
-
-		searchStart = contentStart
-	}
-	return false
-}
-
 func parseInlineGlobalComment(text string, comment *ast.CommentRange) []inlineGlobalName {
 	if comment == nil || comment.Kind != ast.KindMultiLineCommentTrivia {
 		return nil
@@ -162,7 +132,7 @@ func parseInlineGlobalComment(text string, comment *ast.CommentRange) []inlineGl
 		return nil
 	}
 
-	restStart, ok := matchInlineGlobalsDirectiveRange(text, contentStart, contentEnd)
+	restStart, ok := matchDirectiveLabelRange(text, contentStart, contentEnd, inlineGlobalsKeywords)
 	if !ok {
 		return nil
 	}
@@ -178,29 +148,12 @@ func parseInlineGlobalComment(text string, comment *ast.CommentRange) []inlineGl
 // whitespace or end-of-string.
 func matchInlineGlobalsDirective(content string) (string, bool) {
 	start, end := trimECMAScriptWhitespaceRange(content, 0, len(content))
-	restStart, ok := matchInlineGlobalsDirectiveRange(content, start, end)
+	restStart, ok := matchDirectiveLabelRange(content, start, end, inlineGlobalsKeywords)
 	if !ok {
 		return "", false
 	}
 	restStart, end = trimECMAScriptWhitespaceRange(content, restStart, end)
 	return content[restStart:end], true
-}
-
-func matchInlineGlobalsDirectiveRange(text string, start int, end int) (int, bool) {
-	for _, keyword := range inlineGlobalsKeywords {
-		if !strings.HasPrefix(text[start:end], keyword) {
-			continue
-		}
-		restStart := start + len(keyword)
-		if restStart == end {
-			return restStart, true
-		}
-		r, _ := utf8.DecodeRuneInString(text[restStart:end])
-		if isECMAScriptWhitespace(r) {
-			return restStart, true
-		}
-	}
-	return 0, false
 }
 
 // parseGlobalNameList parses ESLint's comma-and/or-whitespace separated
@@ -307,62 +260,4 @@ func normalizeGlobalConfigRunes(text string, start int, end int) []globalConfigR
 		index = whitespaceEnd
 	}
 	return normalized
-}
-
-func findDirectiveJustification(text string, start int, end int) int {
-	for index := start; index < end; {
-		r, size := utf8.DecodeRuneInString(text[index:end])
-		if !isECMAScriptWhitespace(r) {
-			index += size
-			continue
-		}
-
-		hyphenStart := index + size
-		afterHyphens := hyphenStart
-		for afterHyphens < end && text[afterHyphens] == '-' {
-			afterHyphens++
-		}
-		if afterHyphens-hyphenStart >= 2 && afterHyphens < end {
-			next, _ := utf8.DecodeRuneInString(text[afterHyphens:end])
-			if isECMAScriptWhitespace(next) {
-				return index
-			}
-		}
-		index += size
-	}
-	return -1
-}
-
-func trimECMAScriptWhitespaceRange(text string, start int, end int) (int, int) {
-	for start < end {
-		r, size := utf8.DecodeRuneInString(text[start:end])
-		if !isECMAScriptWhitespace(r) {
-			break
-		}
-		start += size
-	}
-	for end > start {
-		r, size := utf8.DecodeLastRuneInString(text[start:end])
-		if !isECMAScriptWhitespace(r) {
-			break
-		}
-		end -= size
-	}
-	return start, end
-}
-
-// ECMAScript's \s set is Unicode Zs plus ASCII spacing/line terminators,
-// U+2028/U+2029, and BOM. unicode.IsSpace is not exact: it includes U+0085 and
-// excludes BOM. TypeScript's internal stringutil helper also accepts U+0085
-// and U+200B, so it cannot model ESLint's JavaScript regexp semantics here.
-func isECMAScriptWhitespace(r rune) bool {
-	if unicode.Is(unicode.Zs, r) {
-		return true
-	}
-	switch r {
-	case '\t', '\v', '\f', '\n', '\r', '\u2028', '\u2029', '\uFEFF':
-		return true
-	default:
-		return false
-	}
 }

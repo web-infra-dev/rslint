@@ -76,6 +76,27 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// ---- Options contract: an empty options object fills the schema
 			// default (lexicalBindings: false), same as omitting options entirely ----
 			{Code: `const foo = 1;`, Options: []any{map[string]any{}}},
+
+			// ---- Leak strictness follows the same module-ness the declaration
+			// checks use, so every extension answers it the one way ----
+
+			// A .js file is a module under ESLint's default language selection
+			// even with no import/export syntax of its own, so its top level is
+			// strict and cannot leak.
+			{Code: `foo = 1;`, FileName: "js/default-module-leak.js", TSConfig: "tsconfig.allow-js.json"},
+			// A .cts becomes strict once it really is an ES module, even though
+			// its extension alone would leave it CommonJS.
+			{Code: `export {}; foo = 1;`, FileName: "cts/module-leak.cts"},
+
+			// ---- `/* exported */` exempts the read-only global assignment ----
+			//
+			// Upstream skips an exported variable before reaching the reference
+			// loop that reports assignmentToReadonlyGlobal.
+			{Code: "/* exported Array */\nArray = 1;"},
+			// The directive is read from the shared inline-directive view, so it
+			// still applies where this rule's declaration checks are switched
+			// off — a module file keeps its readonly-global protection.
+			{Code: "/* exported Array */\nexport {};\nArray = 1;"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: receiver wrappers on the leak/readonly identifier ----
@@ -244,6 +265,30 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// expression, not a declaration) so the only diagnostic is the leak.
 			{
 				Code:   `(function calc(items) { total = 0; for (const item of items) { total += item; } return total; })();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+
+			// ---- Leak strictness: CommonJS keeps its own top-level scope
+			// without becoming a module, so its top level stays sloppy ----
+
+			{
+				Code:     `foo = 1;`,
+				FileName: "cjs/commonjs-leak.cjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:     `foo = 1;`,
+				FileName: "cts/commonjs-leak.cts",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+
+			// ---- `/* exported */` does not exempt a leak ----
+			//
+			// Upstream collects leaks from the global scope's implicit
+			// variables, a separate pass the directive never reaches.
+			{
+				Code:   "/* exported foo */\nfoo = 1;",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 		},
