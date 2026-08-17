@@ -517,3 +517,44 @@ export interface Constructable {
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
 }
+
+// TestNoUnusedVarsExportedDirective covers the `/* exported */` comment, which
+// marks a global-scope binding used for a separately loaded file's sake. The
+// TypeScript scope manager puts type-only declarations in the same global scope
+// as value ones, so the directive reaches every declaration form a script-mode
+// file can bind at its top level.
+func TestNoUnusedVarsExportedDirective(t *testing.T) {
+	validTestCases := []rule_tester.ValidTestCase{
+		{Code: `/* exported publicValue */ var publicValue = 1;`},
+		{Code: `/* exported publicFn */ function publicFn() {}`},
+		{Code: `/* exported PublicClass */ class PublicClass {}`},
+		{Code: `/* exported PublicInterface */ interface PublicInterface { a: string }`},
+		{Code: `/* exported PublicType */ type PublicType = string;`},
+		{Code: `/* exported PublicEnum */ enum PublicEnum { A }`},
+		{Code: `/* exported PublicNS */ namespace PublicNS { export const a = 1; }`},
+		{Code: `/* exported ambient */ declare var ambient: number;`},
+		// A `var` reaches the global scope from inside a block.
+		{Code: `/* exported hoisted */ { var hoisted = 1; }`},
+	}
+
+	invalidTestCases := []rule_tester.InvalidTestCase{
+		// A parameter, a block binding, and anything at all in a module are out
+		// of the global scope the directive resolves against.
+		{
+			Code: `/* exported param */ function outer(param: number) {}
+outer(1);`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 37}},
+		},
+		{
+			Code: `/* exported blockScoped */ { let blockScoped = 1; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 34}},
+		},
+		{
+			Code: `/* exported moduleValue */ var moduleValue = 1;
+export {};`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 32}},
+		},
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
+}
