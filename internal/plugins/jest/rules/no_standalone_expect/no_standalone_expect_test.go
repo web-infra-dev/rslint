@@ -79,9 +79,13 @@ func TestNoStandaloneExpectRule(t *testing.T) {
 					map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"t"}},
 				},
 			},
-			// The fallback range covers the arguments of a registration that has
-			// no callback, which is where upstream also allows an assertion.
+			// A registration's arguments belong to the test block it opens, which
+			// is where upstream also allows an assertion.
 			{Code: `test.todo(expect(1).toBe(1));`},
+			{Code: `test('case', expect(1).toBe(1), () => {});`},
+			{Code: `test('case', { timeout: expect(1).toBe(1) }, () => {});`},
+			{Code: `test('case', () => {}, expect(1).toBe(1));`},
+			{Code: `describe('d', () => { test('case', expect(1).toBe(1), () => {}); });`},
 			// Same asymmetry in the arrow branch: an arrow passed to a call opens
 			// no scope, so its exit must not close the enclosing arrow's.
 			{Code: `const outer = () => foo(() => {}) || expect(1).toBe(1);`},
