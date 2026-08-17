@@ -27,6 +27,15 @@ func TestNumberToString(t *testing.T) {
 		// Past 2^53 the shortest run of digits that reads back the same is
 		// shorter than the whole number.
 		{name: "past 2^53", value: 9223372036854774096, want: "9223372036854774000"},
+		{name: "fraction", value: 1.5, want: "1.5"},
+		{name: "fraction with several digits", value: 123.456, want: "123.456"},
+		{name: "below one", value: 0.5, want: "0.5"},
+		// The decimal point sits in the sixth place behind the digits here and
+		// the seventh one below, which is where JavaScript switches.
+		{name: "last fixed fraction", value: 1e-6, want: "0.000001"},
+		{name: "first small exponential", value: 1e-7, want: "1e-7"},
+		{name: "first small exponential negative", value: -1e-7, want: "-1e-7"},
+		{name: "small with several digits", value: 1.25e-7, want: "1.25e-7"},
 		{name: "not a number", value: math.NaN(), want: "NaN"},
 		{name: "infinity", value: math.Inf(1), want: "Infinity"},
 		{name: "negative infinity", value: math.Inf(-1), want: "-Infinity"},
