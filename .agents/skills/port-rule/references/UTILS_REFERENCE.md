@@ -441,6 +441,36 @@ See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_
 
 ---
 
+## `internal/utils/scope/` - ESLint Scope Model
+
+An AST-derived reconstruction of ESLint's lexical scope tree — rslint's stand-in for `sourceCode.getScope()` / eslint-scope. Use it only when a rule's semantics are stated in terms of **scopes** (which scope owns a binding, what an inner scope shadows, whether two positions share a variable scope). For "which symbol is this identifier" and "where else is this symbol used", reach for `ctx.Refs` above instead — it is backed by the binder and understands globals, ambient, and cross-file declarations, which this package deliberately does not.
+
+```go
+manager := scope.Build(ctx.SourceFile)
+
+for _, s := range manager.Scopes { // creation order == pre-order walk of the tree
+    for _, v := range s.Vars {     // declaration order within the scope
+        // v.Name, v.ID (identifier node), v.DefNode, v.Kind (scope.Def*)
+    }
+}
+
+// Resolve a name outward, the way ESLint's scope chain does.
+for s := start; s != nil; s = s.Parent {
+    if declarations := s.Declarations(name); len(declarations) > 0 { /* ... */ }
+}
+```
+
+- Scope kinds (`scope.Kind*`): `Global`, `Function`, `FunctionExprName`, `Block`, `Catch`, `Class`, `Module`, `Type`. ESLint's module scope is collapsed into `Global`.
+- `Scope.VariableScope()` is eslint-scope's `Scope#variableScope`: the nearest enclosing function / namespace / global scope, i.e. the `var` hoist target.
+- Definition kinds (`scope.Def*`) map to eslint-scope's `Definition#type`, including the TypeScript ones (`DefType`, `DefEnumName`, `DefNamespaceName`, `DefTypeParameter`, `DefImport`).
+- eslint-scope merges all same-name declarations in a scope into one `Variable` with several `defs`; here each declaration is its own `scope.Variable` and `Scope.Declarations(name)` is the merged view, in source order — so `Declarations(name)[0]` is `defs[0]`.
+- `Scope.GlobalAugmentation` marks scopes inside `declare global { ... }`; bindings there are conceptually global.
+- Concepts rslint does not expose (`parserOptions.globalReturn`, `ecmaVersion`-dependent function-in-block hoisting) are unmodeled.
+
+`internal/rules/no_shadow` is the reference consumer.
+
+---
+
 ## `internal/utils/builtin_symbol_likes.go` - Builtin Symbol Checking
 
 ### Builtin Type Checking

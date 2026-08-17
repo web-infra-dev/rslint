@@ -1,8 +1,6 @@
 package prefer_to_have_been_called
 
 import (
-	"slices"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -91,17 +89,7 @@ var PreferToHaveBeenCalledRule = rule.Rule{
 				fixes = append(fixes, callFix)
 
 				if notModifier != nil {
-					notIndex := slices.IndexFunc(
-						jestFnCall.MemberEntries,
-						func(entry jestUtils.ParsedJestFnMemberEntry) bool {
-							return entry.Node == notModifier.Node
-						},
-					)
-					removeNotFixes, ok := jestUtils.RemoveMemberAccessorFixes(
-						ctx,
-						jestFnCall.MemberEntries,
-						notIndex,
-					)
+					removeNotFixes, ok := jestUtils.RemoveMemberAccessorFixes(ctx, notModifier)
 					if !ok {
 						reportWithoutFix()
 						return
