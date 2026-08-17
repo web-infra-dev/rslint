@@ -18,7 +18,7 @@ func build(t *testing.T, source string) *Manager {
 		FileName: "/test.ts",
 		Path:     "/test.ts",
 	}, source, core.ScriptKindTS)
-	return Build(sourceFile)
+	return Build(sourceFile, Options{})
 }
 
 // lookup finds the innermost scope declaring `name` starting from the scope
@@ -173,5 +173,140 @@ func TestBuildEmptySourceFileHasOnlyTheGlobalScope(t *testing.T) {
 	}
 	if m.Global.VariableScope() != m.Global {
 		t.Error("the global scope is its own variable scope")
+	}
+}
+
+func buildWithReferences(t *testing.T, source string) *Manager {
+	t.Helper()
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.tsx",
+		Path:     "/test.tsx",
+	}, source, core.ScriptKindTSX)
+	return Build(sourceFile, Options{CollectReferences: true})
+}
+
+// referencedNames lists every reference in source order as
+// "name->resolvedDeclarationKind", using "?" when the name resolves to nothing
+// in this file.
+func referencedNames(m *Manager) []string {
+	out := make([]string, 0, len(m.References))
+	for _, ref := range m.References {
+		name := ref.Identifier.Text()
+		if resolved := ref.Resolved(); resolved != nil {
+			out = append(out, name+"->declared")
+		} else {
+			out = append(out, name+"->?")
+		}
+	}
+	return out
+}
+
+func assertReferences(t *testing.T, source string, want ...string) {
+	t.Helper()
+	got := referencedNames(buildWithReferences(t, source))
+	if len(got) != len(want) {
+		t.Fatalf("%s\n got %v\nwant %v", source, got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("%s\n got %v\nwant %v", source, got, want)
+			return
+		}
+	}
+}
+
+func TestBuildCollectsReferencesOnlyWhenAsked(t *testing.T) {
+	if refs := build(t, `var a = 1; a;`).References; len(refs) != 0 {
+		t.Errorf("references collected without Options.CollectReferences: %d", len(refs))
+	}
+	if refs := buildWithReferences(t, `var a = 1; a;`).References; len(refs) != 1 {
+		t.Errorf("got %d references, want 1", len(refs))
+	}
+}
+
+func TestBuildReferenceIdentifierPositions(t *testing.T) {
+	// Declaration names are not references; eslint-scope models them as
+	// `init: true` references that every consumer filters out.
+	assertReferences(t, `var a = b;`, "b->?")
+	// Only the object of a member access, never the member name.
+	assertReferences(t, `a.b.c;`, "a->?")
+	assertReferences(t, `a[b];`, "a->?", "b->?")
+	// Object literal keys are not bindings, but shorthand values are.
+	assertReferences(t, `({ a: 1 });`)
+	assertReferences(t, `({ a });`, "a->?")
+	assertReferences(t, `({ [a]: 1 });`, "a->?")
+	// Labels are not bindings.
+	assertReferences(t, `outer: while (x) { break outer; }`, "x->?")
+	// Import specifiers declare; export specifiers reference their local name.
+	assertReferences(t, `import { a as b } from './m';`)
+	assertReferences(t, `const a = 1; export { a as b };`, "a->declared")
+	// Type positions reference too.
+	assertReferences(t, `let x: Foo;`, "Foo->?")
+	assertReferences(t, `let x: typeof Foo.Bar;`, "Foo->?")
+	// ...but an `import(...)` type names another module's exports.
+	assertReferences(t, `type T = typeof import('./m').a.b;`)
+	// JSX: a lower-case tag is an intrinsic element, not a binding.
+	assertReferences(t, `<div />;`)
+	assertReferences(t, `<App />;`, "App->?")
+	assertReferences(t, `<ns.Widget />;`, "ns->?")
+}
+
+func TestBuildResolvesReferencesThroughTheScopeChain(t *testing.T) {
+	m := buildWithReferences(t, `
+const outer = 1;
+function f(param) {
+  return outer + param + missing;
+}
+`)
+	if len(m.References) != 3 {
+		t.Fatalf("got %d references, want 3", len(m.References))
+	}
+	outer, param, missing := m.References[0], m.References[1], m.References[2]
+
+	if got := outer.Resolved(); got == nil || got.Kind != DefVariable || got.Scope != m.Global {
+		t.Errorf("`outer` should resolve to the global const, got %+v", got)
+	}
+	if got := param.Resolved(); got == nil || got.Kind != DefParameter {
+		t.Errorf("`param` should resolve to the parameter, got %+v", got)
+	}
+	if missing.Resolved() != nil {
+		t.Error("`missing` is declared nowhere in this file and must stay unresolved")
+	}
+	// Every reference in the body is evaluated in the function scope.
+	if outer.From != param.From || outer.From.Kind != KindFunction {
+		t.Errorf("references should come from the function scope, got %d", outer.From.Kind)
+	}
+}
+
+func TestBuildClassInitializerScopes(t *testing.T) {
+	m := buildWithReferences(t, `class C { field = 1; static staticField = 2; static { let inBlock; } }`)
+	assertKinds(t, m, []Kind{
+		KindGlobal, KindClass,
+		KindClassFieldInitializer, KindClassFieldInitializer, KindClassStaticBlock,
+	})
+
+	// Both field initializers and static blocks are execution contexts, so they
+	// are variable scopes in their own right.
+	for _, i := range []int{2, 3, 4} {
+		if m.Scopes[i].VariableScope() != m.Scopes[i] {
+			t.Errorf("scope %d should be its own variable scope", i)
+		}
+	}
+	// The class scope is not — `var` inside it hoists to the file scope.
+	if m.Scopes[1].VariableScope() != m.Global {
+		t.Error("a class scope is not a variable scope")
+	}
+	assertDeclares(t, m.Scopes[4], "inBlock", DefVariable)
+}
+
+func TestBuildGlobalAugmentationBindsNothing(t *testing.T) {
+	// `declare global { ... }` reopens the global scope; it does not declare a
+	// namespace named `global`.
+	m := buildWithReferences(t, `global.foo = true; declare global { var injected: string; }`)
+	if len(m.Global.Declarations("global")) != 0 {
+		t.Error("`declare global` must not bind the name `global`")
+	}
+	if got := referencedNames(m); len(got) != 1 || got[0] != "global->?" {
+		t.Errorf("got %v, want [global->?]", got)
 	}
 }

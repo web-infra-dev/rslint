@@ -122,6 +122,7 @@ export default defineConfig({
     './tests/eslint/rules/no-unassigned-vars.test.ts',
     './tests/eslint/rules/no-unused-vars.test.ts',
     './tests/eslint/rules/no-unused-private-class-members.test.ts',
+    './tests/eslint/rules/no-use-before-define.test.ts',
     './tests/eslint/rules/no-var.test.ts',
     './tests/eslint/rules/one-var.test.ts',
     './tests/eslint/rules/prefer-arrow-callback.test.ts',
