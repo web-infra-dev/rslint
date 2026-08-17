@@ -4,10 +4,10 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_restricted_exports.schema.json
@@ -25,7 +25,7 @@ type restrictDefaultExportsOptions struct {
 
 type options struct {
 	restrictedNames        map[string]bool
-	restrictedNamesPattern *regexp2.Regexp
+	restrictedNamesPattern *esregexp.RegExp
 	restrictDefaultExports *restrictDefaultExportsOptions
 }
 
@@ -49,7 +49,7 @@ func parseOptions(optionsList []any) options {
 	}
 
 	if pattern, ok := optsMap["restrictedNamedExportsPattern"].(string); ok && pattern != "" {
-		if re, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+		if re, err := esregexp.Compile(pattern, "u"); err == nil {
 			out.restrictedNamesPattern = re
 		}
 	}
@@ -94,8 +94,7 @@ var restrictedDefaultMessage = rule.RuleMessage{
 // The pattern never applies to "default" — restrictDefaultExports is the
 // dedicated mechanism for that name.
 func (o options) isRestrictedName(name string) bool {
-	if o.restrictedNamesPattern != nil && name != "default" &&
-		utils.Regexp2MatchString(o.restrictedNamesPattern, name) {
+	if name != "default" && o.restrictedNamesPattern.Test(name) {
 		return true
 	}
 	return o.restrictedNames[name]
@@ -180,10 +179,13 @@ func checkNamedExportsClause(ctx rule.RuleContext, opts options, namedExports *a
 	}
 }
 
-// checkDefaultExportedDeclaration handles `export default function foo() {}`
-// and `export default class Foo {}` — declaration forms of a default export,
-// represented as a FunctionDeclaration/ClassDeclaration carrying both the
-// export and default modifiers rather than as an ExportAssignment.
+// checkDefaultExportedDeclaration handles `export default function foo() {}`,
+// `export default class Foo {}` and `export default interface Foo {}` — the
+// declaration forms of a default export, represented as a Function/Class/
+// InterfaceDeclaration carrying both the export and default modifiers rather
+// than as an ExportAssignment. Upstream reports an ExportDefaultDeclaration
+// for what it declares without looking inside, so a bodiless declaration such
+// as `export default function foo(): void;` is reported like any other.
 func checkDefaultExportedDeclaration(ctx rule.RuleContext, opts options, node *ast.Node) {
 	if opts.restrictDefaultExports != nil && opts.restrictDefaultExports.direct {
 		ctx.ReportNode(node, restrictedDefaultMessage)
@@ -195,7 +197,16 @@ func checkDefaultExportedDeclaration(ctx rule.RuleContext, opts options, node *a
 // TypeScript's forgiving parser can produce a nameless declaration here for
 // invalid input (e.g. `export class extends Base {}`); guard against that
 // rather than reporting on a missing name.
+//
+// A function declaration with no body — an overload signature, a `declare
+// function`, or any function in a `.d.ts` — is a TSDeclareFunction upstream,
+// a type the declaration.type switch does not match, so it goes unchecked. A
+// class keeps its ClassDeclaration type whether or not it is declared, so
+// `export declare class Foo {}` stays checked.
 func checkNamedExportedDeclaration(ctx rule.RuleContext, opts options, node *ast.Node) {
+	if node.Kind == ast.KindFunctionDeclaration && node.AsFunctionDeclaration().Body == nil {
+		return
+	}
 	name := node.Name()
 	if name == nil {
 		return
@@ -222,6 +233,20 @@ var NoRestrictedExportsRule = rule.Rule{
 				return
 			}
 			checkNamedExportedDeclaration(ctx, opts, node)
+		}
+
+		// An interface is the one declaration kind besides a function and a
+		// class that TypeScript lets carry the default modifier, and the only
+		// one reachable here: `export default enum`, `export default type` and
+		// `export default namespace` are all parse errors. Its named form
+		// (`export interface Foo {}`) is a TS-only declaration type upstream
+		// leaves unchecked, so only the default modifier reports.
+		checkDefaultInterfaceDeclaration := func(node *ast.Node) {
+			flags := node.ModifierFlags()
+			if flags&ast.ModifierFlagsExport == 0 || flags&ast.ModifierFlagsDefault == 0 {
+				return
+			}
+			checkDefaultExportedDeclaration(ctx, opts, node)
 		}
 
 		return rule.RuleListeners{
@@ -257,6 +282,8 @@ var NoRestrictedExportsRule = rule.Rule{
 			ast.KindFunctionDeclaration: checkFunctionOrClassDeclaration,
 			// `export class Foo {}` / `export default class Foo {}`.
 			ast.KindClassDeclaration: checkFunctionOrClassDeclaration,
+			// `export default interface Foo {}`.
+			ast.KindInterfaceDeclaration: checkDefaultInterfaceDeclaration,
 			// `export var/let/const a = 1, { b } = obj, [c] = arr;`.
 			ast.KindVariableStatement: func(node *ast.Node) {
 				if node.ModifierFlags()&ast.ModifierFlagsExport == 0 {
