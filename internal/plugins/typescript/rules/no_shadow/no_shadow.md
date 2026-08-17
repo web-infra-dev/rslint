@@ -75,7 +75,7 @@ type Func = (test: string) => typeof test;
 
 Same semantics and defaults as the ESLint core rule.
 When `builtinGlobals` is enabled, names from
-[`languageOptions.globals`](/config/#languageoptionsglobals) participate too;
+[`languageOptions.globals`](/config/language-options#languageoptionsglobals) participate too;
 the `globals` catalog exported by `@rslint/core` provides runtime environment
 maps.
 

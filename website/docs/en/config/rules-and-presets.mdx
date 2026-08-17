@@ -1,11 +1,12 @@
 import PresetTable, {
   PresetImportSnippet,
 } from '@/theme/components/PresetTable.tsx';
-import PluginPrefixTable from '@/theme/components/PluginPrefixTable.tsx';
 
 # Rules & Presets
 
-## Available Presets
+Presets provide ready-to-use groups of rules. Add them directly to the flat config array, then use a later [`rules`](/config/rules) entry for project-specific overrides.
+
+## Available presets
 
 <PresetTable />
 
@@ -13,7 +14,7 @@ Import presets from `@rslint/core`:
 
 <PresetImportSnippet />
 
-### Choosing a TypeScript preset
+## Choosing a TypeScript preset
 
 The `ts.configs.*` presets mirror typescript-eslint's own layering. Pick one baseline:
 
@@ -36,55 +37,4 @@ export default defineConfig([
 
 Every `ts.configs.*` preset declares the `@typescript-eslint` plugin and enables `parserOptions.projectService`, so the type-checked variants run as-is.
 
-## rules
-
-- **Type:** `Record<string, RuleSeverity | [RuleSeverity, ...options]>`
-
-Configure individual rules with a severity level and optional options.
-
-**Severity levels:**
-
-| Value     | Description                                 |
-| --------- | ------------------------------------------- |
-| `"error"` | Reports as error, causes non-zero exit code |
-| `"warn"`  | Reports as warning                          |
-| `"off"`   | Disables the rule                           |
-
-**String format** (severity only):
-
-```ts
-rules: {
-  '@typescript-eslint/no-explicit-any': 'error',
-  '@typescript-eslint/require-await': 'off',
-}
-```
-
-**Array format** (severity + options):
-
-```ts
-rules: {
-  '@typescript-eslint/array-type': ['warn', { default: 'array-simple' }],
-  '@typescript-eslint/no-unused-vars': ['error', {
-    argsIgnorePattern: '^_',
-    varsIgnorePattern: '^_',
-  }],
-}
-```
-
-## plugins
-
-- **Type:** `string[] | Record<string, ESLintPlugin>`
-
-In **array form**, the names of the built-in (native) plugins to enable. Available plugins:
-
-<PluginPrefixTable />
-
-In **object form** (`{ prefix: pluginObject }`), community ESLint plugins are mounted by prefix — see [ESLint plugin compatibility](/guide/eslint-plugins). A single entry uses one form.
-
-ESLint core rules (e.g. `no-unused-vars`, `prefer-const`, `no-var`) have no prefix and do not belong to any plugin — they can be enabled directly in `rules` without listing anything in `plugins`.
-
-:::tip
-When using JS/TS config with presets (e.g., `ts.configs.recommended`), plugins are declared within the preset — you don't need to specify them separately.
-:::
-
-For a full list of available rules and their options, see the [Rules](/rules/) reference.
+To configure a rule manually, see [`rules`](/config/rules). To enable rules outside a preset, see [`plugins`](/config/plugins). The complete [Rules](/rules/) reference documents rule-specific options.
