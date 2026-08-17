@@ -564,6 +564,7 @@ export default defineConfig({
     './tests/rstest/rules/no-disabled-tests.test.ts',
     './tests/rstest/rules/no-focused-tests.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
+    './tests/rstest/rules/no-import-node-test.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
