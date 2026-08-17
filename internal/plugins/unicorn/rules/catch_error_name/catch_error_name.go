@@ -12,6 +12,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const messageID = "catch-error-name"
@@ -24,7 +26,7 @@ var reservedWords = map[string]bool{
 	"in": true, "instanceof": true, "new": true, "null": true, "return": true,
 	"super": true, "switch": true, "this": true, "throw": true, "true": true,
 	"try": true, "typeof": true, "var": true, "void": true, "while": true,
-	"with": true, "as": true, "implements": true, "interface": true, "let": true,
+	"with": true, "as": true, "await": true, "implements": true, "interface": true, "let": true,
 	"package": true, "private": true, "protected": true, "public": true, "static": true,
 	"yield": true, "any": true, "boolean": true, "constructor": true, "declare": true,
 	"get": true, "module": true, "require": true, "number": true, "set": true,
@@ -33,6 +35,8 @@ var reservedWords = map[string]bool{
 
 //go:embed catch_error_name.schema.json
 var schemaJSON []byte
+
+var upperCaser = cases.Upper(language.Und)
 
 type options struct {
 	name   string
@@ -73,7 +77,7 @@ func upperFirst(value string) string {
 	if first > 0xffff {
 		return value
 	}
-	return strings.ToUpper(string(first)) + value[size:]
+	return upperCaser.String(string(first)) + value[size:]
 }
 
 func (o options) allows(name string) bool {
@@ -159,65 +163,17 @@ func handlerBody(identifier *ast.Node) *ast.Node {
 	return parent.Body()
 }
 
-func isLexicalScope(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	if ast.IsFunctionLikeDeclaration(node) {
-		return true
-	}
-	switch node.Kind {
-	case ast.KindSourceFile, ast.KindBlock, ast.KindCatchClause, ast.KindCaseBlock,
-		ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement:
-		return true
-	default:
-		return false
-	}
-}
-
-func nearestLexicalScope(node *ast.Node) *ast.Node {
-	return ast.FindAncestor(node.Parent, isLexicalScope)
-}
-
-func relevantScopes(identifier *ast.Node, references []*ast.Node, body *ast.Node) map[*ast.Node]bool {
-	result := map[*ast.Node]bool{}
-	declaration := bindingDeclaration(identifier)
-	var boundary *ast.Node
-	if declaration != nil {
-		boundary = declaration.Parent
-	}
-	if boundary != nil {
-		result[boundary] = true
-	}
-	if body != nil {
-		result[body] = true
-	}
-	for _, reference := range references {
-		for current := nearestLexicalScope(reference); current != nil; current = nearestLexicalScope(current) {
-			result[current] = true
-			if current == boundary || current == body {
-				break
-			}
-		}
-	}
-	return result
-}
-
-func bodyHasNameConflict(ctx rule.RuleContext, body *ast.Node, scopes map[*ast.Node]bool, originalSymbol *ast.Symbol, candidate string) bool {
+func bodyHasExternalReference(ctx rule.RuleContext, body *ast.Node, originalSymbol *ast.Symbol, candidate string) bool {
 	conflict := false
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
 		if node == nil || conflict {
 			return
 		}
-		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == candidate {
-			if scopes[nearestLexicalScope(node)] {
-				if symbol := utils.BindingNameSymbol(node); symbol != nil {
-					conflict = symbol != originalSymbol
-				} else if !utils.IsNonReferenceIdentifier(node) {
-					conflict = ctx.Refs.Resolve(node) != originalSymbol
-				}
-			}
+		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == candidate &&
+			!utils.IsNonReferenceIdentifier(node) {
+			symbol := ctx.Refs.Resolve(node)
+			conflict = symbol != originalSymbol && !utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
 			if conflict {
 				return
 			}
@@ -241,9 +197,11 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 	}
 	originalSymbol := bindingDeclaration(identifier).Symbol()
 	body := handlerBody(identifier)
-	scopes := relevantScopes(identifier, references, body)
 	for {
-		available := !utils.IsShadowed(identifier, candidate)
+		available := !ctx.Globals.Access(candidate).IsDeclared() && !utils.IsShadowed(identifier, candidate)
+		if available && candidate == "arguments" && ast.FindAncestor(identifier.Parent, ast.IsFunctionLikeDeclaration) != nil {
+			available = false
+		}
 		if available {
 			for _, reference := range references {
 				if utils.IsShadowed(reference, candidate) {
@@ -252,7 +210,13 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 				}
 			}
 		}
-		if available && bodyHasNameConflict(ctx, body, scopes, originalSymbol, candidate) {
+		if available && bodyHasExternalReference(ctx, body, originalSymbol, candidate) {
+			available = false
+		}
+		// NOTE: Unlike ESLint, avoid a known unsafe fix when an unused handler
+		// parameter would be renamed to a direct lexical declaration in its body.
+		if available && len(references) == 0 && body != nil && body.Kind == ast.KindBlock &&
+			utils.HasShadowingDeclaration(body, candidate) {
 			available = false
 		}
 		if available {

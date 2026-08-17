@@ -32,6 +32,13 @@ try {} catch (fsError) {}
 - `name` (`string`, default: `"error"`) sets the expected name.
 - `ignore` (`string[]`, default: `[]`) contains JavaScript regular-expression patterns to ignore.
 
+## Differences from ESLint
+
+When an unused handler parameter would be renamed to the same name as a direct
+lexical declaration in the handler body, rslint appends an underscore. ESLint
+currently emits a fix that creates a duplicate binding and invalid syntax in
+this case.
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: catch-error-name](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v73.0.0/docs/rules/catch-error-name.md)
