@@ -264,16 +264,16 @@ func declarationTextRange(sourceFile *ast.SourceFile, decl *ast.Node) core.TextR
 // when its header declares with `let`, `const` or `using`.
 func referenceScopeNode(ref *ast.Node) *ast.Node {
 	scopeNode := ast.GetEnclosingBlockScopeContainer(ref)
-	for scopeNode != nil && isScopelessLoop(scopeNode) {
+	for scopeNode != nil && isLoopWithoutOwnScope(scopeNode) {
 		scopeNode = ast.GetEnclosingBlockScopeContainer(scopeNode)
 	}
 	return scopeNode
 }
 
-// isScopelessLoop reports whether node is a loop statement eslint-scope
+// isLoopWithoutOwnScope reports whether node is a loop statement eslint-scope
 // gives no scope of its own, which is any whose header declares nothing or
 // declares with `var`.
-func isScopelessLoop(node *ast.Node) bool {
+func isLoopWithoutOwnScope(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement:
 	default:
