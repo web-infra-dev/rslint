@@ -132,6 +132,14 @@ func TestIdLengthExtras(t *testing.T) {
 			// ---- Real-user: short loop counters exempted via the
 			// documented `exceptions` escape hatch ----
 			{Code: `for (let i = 0; i < items.length; i++) { use(items[i]); }`, Options: map[string]any{"exceptions": []any{"i"}}},
+
+			// ---- exceptionPatterns is compiled as `new RegExp(pattern, "u")`,
+			// so a pattern spelling syntax only JavaScript has still exempts
+			// what it matches: lookahead, lookbehind and a `\p{...}` property
+			// escape (none of which Go's RE2 can compile at all) ----
+			{Code: `var x = 1;`, Options: map[string]any{"exceptionPatterns": []any{"(?=x)"}}},
+			{Code: `var x = 1;`, Options: map[string]any{"exceptionPatterns": []any{"(?<=^)x"}}},
+			{Code: `var e = 1;`, Options: map[string]any{"exceptionPatterns": []any{"^\\p{Ll}$"}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: (X).y parenthesized receiver — both the
@@ -308,6 +316,17 @@ func TestIdLengthExtras(t *testing.T) {
 					{MessageId: "tooShort", Message: "Identifier name 'y' is too short (< 2).", Line: 1, Column: 11},
 				},
 			},
+
+			// ---- A backreference — also RE2-incompatible — exempts the
+			// identifier it matches and leaves the rest reported ----
+			{
+				Code:    `var xx = 1; var ab = 2;`,
+				Options: map[string]any{"min": 3, "exceptionPatterns": []any{`^(.)\1$`}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'ab' is too short (< 3).", Line: 1, Column: 17},
+				},
+			},
+
 			// ---- Real-user: event-handler callback parameter named `e`,
 			// one of the most commonly reported id-length false positives ----
 			{

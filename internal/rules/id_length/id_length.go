@@ -3,13 +3,13 @@ package id_length
 import (
 	_ "embed"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed id_length.schema.json
@@ -170,7 +170,7 @@ type idLengthOptions struct {
 	hasMax            bool
 	properties        bool
 	exceptions        map[string]bool
-	exceptionPatterns []*regexp.Regexp
+	exceptionPatterns []*esregexp.RegExp
 }
 
 const defaultMin = 2
@@ -208,7 +208,12 @@ func parseOptions(options []any) idLengthOptions {
 			if !ok {
 				continue
 			}
-			if re, err := regexp.Compile(s); err == nil {
+			// Upstream compiles each pattern as `new RegExp(pattern, "u")`, so
+			// lookaround, backreferences and `\p{...}` all behave as they do
+			// there (Go's RE2 supports none of them). An unparsable pattern is
+			// rejected up front by the schema's `format: "regex"`, so the
+			// compile-error branch here is only defensive.
+			if re, err := esregexp.Compile(s, "u"); err == nil {
 				opts.exceptionPatterns = append(opts.exceptionPatterns, re)
 			}
 		}
@@ -221,7 +226,7 @@ func (o idLengthOptions) matchesException(name string) bool {
 		return true
 	}
 	for _, re := range o.exceptionPatterns {
-		if re.MatchString(name) {
+		if re.Test(name) {
 			return true
 		}
 	}
