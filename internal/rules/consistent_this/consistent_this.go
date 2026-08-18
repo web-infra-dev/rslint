@@ -258,16 +258,59 @@ func declarationTextRange(sourceFile *ast.SourceFile, decl *ast.Node) core.TextR
 
 // referenceScopeNode is the scope a reference belongs to, standing in for
 // upstream's `reference.from`. It is the nearest enclosing block-scope
-// container, except that a loop whose header declares no block-scoped
-// binding is walked past: tsgo counts every `for`/`for-in`/`for-of`
-// statement as a container, while eslint-scope opens a scope for one only
-// when its header declares with `let`, `const` or `using`.
+// container, with three corrections where tsgo's containers and
+// eslint-scope's scopes disagree: a loop whose header declares no
+// block-scoped binding is walked past, an object-literal member is walked
+// past for a reference in its computed key, and a `with` body — no container
+// of tsgo's at all — is a scope of its own.
 func referenceScopeNode(ref *ast.Node) *ast.Node {
 	scopeNode := ast.GetEnclosingBlockScopeContainer(ref)
-	for scopeNode != nil && isLoopWithoutOwnScope(scopeNode) {
+	for scopeNode != nil && (isLoopWithoutOwnScope(scopeNode) || isComputedKeyOfObjectLiteralMember(scopeNode, ref)) {
 		scopeNode = ast.GetEnclosingBlockScopeContainer(scopeNode)
 	}
+	if withStatement := enclosingWithStatement(ref, scopeNode); withStatement != nil {
+		return withStatement
+	}
 	return scopeNode
+}
+
+// isComputedKeyOfObjectLiteralMember reports whether ref sits in the computed
+// key of node, an object-literal method or accessor. tsgo counts such a key
+// as part of the member that it names, while eslint-scope evaluates it in the
+// scope the object literal itself is written in — the member's own scope
+// holds only its body. A class member's computed key is left alone: it does
+// belong to a scope of its own, the class scope, which is likewise never the
+// enclosing function's.
+func isComputedKeyOfObjectLiteralMember(node *ast.Node, ref *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+	default:
+		return false
+	}
+	if node.Parent == nil || node.Parent.Kind != ast.KindObjectLiteralExpression {
+		return false
+	}
+	name := node.Name()
+	if name == nil || name.Kind != ast.KindComputedPropertyName {
+		return false
+	}
+	return name.Pos() <= ref.Pos() && ref.End() <= name.End()
+}
+
+// enclosingWithStatement returns the innermost `with` statement whose body
+// holds ref, looking no further out than stopNode. eslint-scope opens a scope
+// for a `with` body, which tsgo counts as no container at all, so without
+// this a reference written directly under one — `with (obj) self = this` —
+// would be attributed to the enclosing function. The object expression is
+// evaluated in that enclosing scope and so is deliberately not matched.
+func enclosingWithStatement(ref *ast.Node, stopNode *ast.Node) *ast.Node {
+	for node := ref; node != nil && node != stopNode; node = node.Parent {
+		parent := node.Parent
+		if parent != nil && parent.Kind == ast.KindWithStatement && parent.AsWithStatement().Statement == node {
+			return parent
+		}
+	}
+	return nil
 }
 
 // isLoopWithoutOwnScope reports whether node is a loop statement eslint-scope

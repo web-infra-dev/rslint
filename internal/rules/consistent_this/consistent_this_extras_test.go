@@ -119,6 +119,20 @@ func TestConsistentThisExtras(t *testing.T) {
 			{Code: "function f() { var self; for (var i = 0; ;) self = this; }", Options: []any{"self"}},
 			{Code: "function f() { var self; for (var x of (self = this, [])) {} }", Options: []any{"self"}},
 			{Code: "function f() { var self; for (var k in (self = this, {})) {} }", Options: []any{"self"}},
+
+			// ---- A computed key of an object-literal member is evaluated in
+			// the scope enclosing the object literal, not in the member's own
+			// scope, so an assignment written there counts as the enclosing
+			// function's ----
+			{Code: "function f() { var self; ({ [self = this]() {} }); }", Options: []any{"self"}},
+			{Code: "function f() { var self; ({ get [self = this]() { return 1; } }); }", Options: []any{"self"}},
+			{Code: "function f() { var self; ({ set [self = this](v) {} }); }", Options: []any{"self"}},
+			{Code: "function f() { var self; ({ [self = this]: 1 }); }", Options: []any{"self"}},
+
+			// ---- A `with` statement's object expression is evaluated in the
+			// enclosing scope, so an assignment written there counts as the
+			// enclosing function's ----
+			{Code: "function f() { var self; with (self = this) { } }", Options: []any{"self"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Options contract: the schema declares no JSON Schema
@@ -286,6 +300,42 @@ func TestConsistentThisExtras(t *testing.T) {
 			// enclosing function's ----
 			{
 				Code:    "function f() { var self; for (let i = 0; ;) self = this; }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+
+			// ---- A `with` statement body is a scope of its own, so an
+			// assignment written inside it does not count as the enclosing
+			// function's ----
+			{
+				Code:    "function f() { var self; with (obj) self = this; }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    "function f() { var self; with (obj) { self = this; } }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    "function f() { var self; with (obj) for (;;) { self = this; break; } }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+
+			// ---- A computed key of a class member is evaluated in the class
+			// scope, not the enclosing function's, so an assignment written
+			// there does not count as the enclosing function's ----
+			{
+				Code:    "function f() { var self; class C { [self = this]() {} } }",
 				Options: []any{"self"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
