@@ -11,7 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
-// StringToUppercase ports String.prototype.toUpperCase, which maps every
+// StringToUpperCase ports String.prototype.toUpperCase, which maps every
 // character of s to its full uppercase — the one Unicode's Default Case
 // Conversion gives it, rather than the single-character mapping unicode.ToUpper
 // stops at. `ß` becoming `SS` is the familiar case of the difference; `ﬁ`
@@ -28,7 +28,7 @@ import (
 // UTF-8, which is what happens to any character with no uppercase anyway.
 //
 // https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.touppercase
-func StringToUppercase(s string) string {
+func StringToUpperCase(s string) string {
 	if mapped, ok := asciiCase(s, 'a', 'z', 'A'-'a'); ok {
 		return mapped
 	}
@@ -36,8 +36,8 @@ func StringToUppercase(s string) string {
 	return unicode17Uppercase(cases.Upper(language.Und).String(s))
 }
 
-// StringToLowercase ports String.prototype.toLowerCase, the other half of what
-// [StringToUppercase] describes. Only one character lowercases to more than one
+// StringToLowerCase ports String.prototype.toLowerCase, the other half of what
+// [StringToUpperCase] describes. Only one character lowercases to more than one
 // — U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE keeps its dot as a combining
 // mark — so the single-character mapping carries the rest, and the one place
 // the answer turns on a character's surroundings is written out below: a
@@ -45,7 +45,7 @@ func StringToUppercase(s string) string {
 // word.
 //
 // https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.tolowercase
-func StringToLowercase(s string) string {
+func StringToLowerCase(s string) string {
 	if mapped, ok := asciiCase(s, 'A', 'Z', 'a'-'A'); ok {
 		return mapped
 	}
@@ -83,26 +83,26 @@ func StringToLowercase(s string) string {
 	return out.String()
 }
 
-// StringToLocaleUppercase ports String.prototype.toLocaleUpperCase.
+// StringToLocaleUpperCase ports String.prototype.toLocaleUpperCase.
 //
 // The locale-sensitive mapping departs from the plain one for three languages
 // — Turkish, Azeri and Lithuanian — and only ever for the host's own locale,
 // which a linter has no business reading: the same source has to draw the same
 // diagnostics on every machine it runs on. So this answers with the mapping
-// [StringToUppercase] gives, which is what the locale-sensitive one comes to
+// [StringToUpperCase] gives, which is what the locale-sensitive one comes to
 // everywhere else.
 //
 // https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.tolocaleuppercase
-func StringToLocaleUppercase(s string) string {
-	return StringToUppercase(s)
+func StringToLocaleUpperCase(s string) string {
+	return StringToUpperCase(s)
 }
 
-// StringToLocaleLowercase ports String.prototype.toLocaleLowerCase, and reads
-// its locale the way [StringToLocaleUppercase] describes.
+// StringToLocaleLowerCase ports String.prototype.toLocaleLowerCase, and reads
+// its locale the way [StringToLocaleUpperCase] describes.
 //
 // https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.tolocalelowercase
-func StringToLocaleLowercase(s string) string {
-	return StringToLowercase(s)
+func StringToLocaleLowerCase(s string) string {
+	return StringToLowerCase(s)
 }
 
 // asciiCase maps the letters of s between lo and hi by delta, reporting false

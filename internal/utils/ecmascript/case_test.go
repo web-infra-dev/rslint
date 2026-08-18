@@ -11,7 +11,7 @@ import (
 // Go's own tables: a character whose case runs to several characters, the
 // Final_Sigma context, and the characters Node knows a case for and Go does
 // not.
-func TestStringToUppercase(t *testing.T) {
+func TestStringToUpperCase(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
@@ -34,17 +34,17 @@ func TestStringToUppercase(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := StringToUppercase(test.in); got != test.want {
-				t.Errorf("StringToUppercase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			if got := StringToUpperCase(test.in); got != test.want {
+				t.Errorf("StringToUpperCase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
 			}
-			if got := StringToLocaleUppercase(test.in); got != test.want {
-				t.Errorf("StringToLocaleUppercase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			if got := StringToLocaleUpperCase(test.in); got != test.want {
+				t.Errorf("StringToLocaleUpperCase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
 			}
 		})
 	}
 }
 
-func TestStringToLowercase(t *testing.T) {
+func TestStringToLowerCase(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
@@ -87,11 +87,11 @@ func TestStringToLowercase(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := StringToLowercase(test.in); got != test.want {
-				t.Errorf("StringToLowercase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			if got := StringToLowerCase(test.in); got != test.want {
+				t.Errorf("StringToLowerCase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
 			}
-			if got := StringToLocaleLowercase(test.in); got != test.want {
-				t.Errorf("StringToLocaleLowercase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			if got := StringToLocaleLowerCase(test.in); got != test.want {
+				t.Errorf("StringToLocaleLowerCase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
 			}
 		})
 	}
@@ -104,16 +104,16 @@ func TestStringToLowercase(t *testing.T) {
 func TestUnicode17Mappings(t *testing.T) {
 	for _, pair := range unicode17Pairs(t) {
 		lower, upper := string(pair[0]), string(pair[1])
-		if got := StringToUppercase(lower); got != upper {
-			t.Errorf("StringToUppercase(%U) = %U, want %U", pair[0], []rune(got), pair[1])
+		if got := StringToUpperCase(lower); got != upper {
+			t.Errorf("StringToUpperCase(%U) = %U, want %U", pair[0], []rune(got), pair[1])
 		}
-		if got := StringToLowercase(upper); got != lower {
-			t.Errorf("StringToLowercase(%U) = %U, want %U", pair[1], []rune(got), pair[0])
+		if got := StringToLowerCase(upper); got != lower {
+			t.Errorf("StringToLowerCase(%U) = %U, want %U", pair[1], []rune(got), pair[0])
 		}
 		// In a longer string too, so the splice that carries the rest of it
 		// across is exercised as well.
-		if got := StringToUppercase("a" + lower + "ß"); got != "A"+upper+"SS" {
-			t.Errorf("StringToUppercase(a%Uß) = %q, want %q", pair[0], got, "A"+upper+"SS")
+		if got := StringToUpperCase("a" + lower + "ß"); got != "A"+upper+"SS" {
+			t.Errorf("StringToUpperCase(a%Uß) = %q, want %q", pair[0], got, "A"+upper+"SS")
 		}
 	}
 }
@@ -126,12 +126,12 @@ func TestUnicode17Cased(t *testing.T) {
 	for _, pair := range unicode17Pairs(t) {
 		for _, r := range pair {
 			before := string(r) + "Σ"
-			if got := StringToLowercase(before); got != StringToLowercase(string(r))+"ς" {
-				t.Errorf("StringToLowercase(%UΣ) = %U, want a final sigma", r, []rune(got))
+			if got := StringToLowerCase(before); got != StringToLowerCase(string(r))+"ς" {
+				t.Errorf("StringToLowerCase(%UΣ) = %U, want a final sigma", r, []rune(got))
 			}
 			after := "ΑΣ" + string(r)
-			if got := StringToLowercase(after); got != "ασ"+StringToLowercase(string(r)) {
-				t.Errorf("StringToLowercase(ΑΣ%U) = %U, want a plain sigma", r, []rune(got))
+			if got := StringToLowerCase(after); got != "ασ"+StringToLowerCase(string(r)) {
+				t.Errorf("StringToLowerCase(ΑΣ%U) = %U, want a plain sigma", r, []rune(got))
 			}
 		}
 	}
