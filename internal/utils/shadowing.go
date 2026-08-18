@@ -190,16 +190,80 @@ func isDirectParameterOf(fn *ast.Node, child *ast.Node) bool {
 // TypeScript's own resolver deliberately hides them there, so rules that model
 // scope-manager variables need this on top of a resolver-based lookup.
 func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
+	prevChild := node
+	inParameterDecorator := false
+	crossedScope := false
 	for current := node.Parent; current != nil; current = current.Parent {
-		if !ast.IsFunctionLikeDeclaration(current) &&
-			current.Kind != ast.KindClassDeclaration && current.Kind != ast.KindClassExpression {
-			continue
+		if current.Kind == ast.KindParameter {
+			inParameterDecorator = prevChild.Kind == ast.KindDecorator
 		}
-		for _, typeParameter := range current.TypeParameters() {
-			if typeParameter != nil && typeParameter.Name() != nil && typeParameter.Name().Text() == name {
+		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
+		if (isFunctionLike || ast.IsClassLike(current)) &&
+			!escapesThroughParameterDecorator(current, prevChild, inParameterDecorator, crossedScope) {
+			for _, typeParameter := range current.TypeParameters() {
+				if typeParameter != nil && typeParameter.Name() != nil && typeParameter.Name().Text() == name {
+					return true
+				}
+			}
+		}
+		if isFunctionLike || ast.IsClassLike(current) {
+			crossedScope = true
+		}
+		prevChild = current
+	}
+	return false
+}
+
+// escapesThroughParameterDecorator reports whether a reference that reached fn
+// through prevChild is out of fn's own scope because it sits in a function or
+// class nested inside one of fn's parameter decorators. scope-manager attaches
+// such a scope to the enclosing class rather than to the decorated function, so
+// none of fn's bindings — parameters, type parameters, body declarations —
+// reach the reference. A reference sitting directly in the decorator, with no
+// scope in between, still acquires fn's scope.
+func escapesThroughParameterDecorator(fn *ast.Node, prevChild *ast.Node, inParameterDecorator bool, crossedScope bool) bool {
+	return inParameterDecorator && crossedScope &&
+		ast.IsFunctionLikeDeclaration(fn) && isDirectParameterOf(fn, prevChild)
+}
+
+// IsShadowedFromParameterInitializer reports whether name is declared by the
+// body of a function whose parameter list lexically contains node.
+//
+// It exists because IsShadowed answers with runtime lexical semantics, where
+// the parameter environment is a *parent* of the body's variable environment,
+// so a body declaration doesn't shadow a default value. scope-manager instead
+// keeps parameter initializers and body declarations in one function scope, so
+// `getVariableByName` finds the body's binding from a default value. Rules that
+// model scope-manager variables need this on top of IsShadowed.
+//
+// Only the declarations scope-manager puts in that function scope count: vars
+// hoisted from any depth, plus lexical declarations at the top level of the
+// body. A `let` in a nested block stays in that block's scope.
+//
+// A parameter decorator counts the same way while the reference sits directly
+// in it, but scope-manager attaches any scope created *inside* a parameter
+// decorator to the enclosing class rather than to the decorated function, so
+// once an arrow, function, or class body intervenes the decorated function's
+// scope is out of the chain entirely.
+func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
+	prevChild := node
+	inParameterDecorator := false
+	crossedScope := false
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindParameter {
+			inParameterDecorator = prevChild.Kind == ast.KindDecorator
+		}
+		if ast.IsFunctionLikeDeclaration(current) && isDirectParameterOf(current, prevChild) &&
+			!escapesThroughParameterDecorator(current, prevChild, inParameterDecorator, crossedScope) {
+			if body := current.Body(); body != nil &&
+				(HasShadowingDeclaration(body, name) || HasHoistedVarDeclaration(body, name)) {
 				return true
 			}
 		}
+		if ast.IsFunctionLikeDeclaration(current) || ast.IsClassLike(current) {
+			crossedScope = true
+		}
+		prevChild = current
 	}
 	return false
 }
@@ -207,12 +271,17 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 // IsShadowed checks whether the given identifier name is shadowed by a local
 // declaration at the usage site. It walks from node up to the SourceFile,
 // checking every scope boundary for variable/function/class/enum/import
-// declarations, function parameters, catch variables, and hoisted var
-// declarations.
+// declarations, namespace bodies, function parameters, catch variables, and
+// hoisted var declarations.
 func IsShadowed(node *ast.Node, name string) bool {
 	prevChild := node
+	inParameterDecorator := false
+	crossedScope := false
 	current := node.Parent
 	for current != nil {
+		if current.Kind == ast.KindParameter {
+			inParameterDecorator = prevChild.Kind == ast.KindDecorator
+		}
 		switch current.Kind {
 		case ast.KindSourceFile:
 			sf := current.AsSourceFile()
@@ -228,6 +297,22 @@ func IsShadowed(node *ast.Node, name string) bool {
 
 		case ast.KindBlock:
 			if HasShadowingDeclaration(current, name) {
+				return true
+			}
+
+		// A `namespace X {}` / `module X {}` body is a scope of its own: its
+		// declarations — including `import X = ...` and `var`, which hoist to
+		// the module block rather than out of it — shadow the outer binding
+		// for the whole block, while the block itself still nests lexically
+		// inside its parent scope.
+		case ast.KindModuleBlock:
+			moduleBlock := current.AsModuleBlock()
+			if moduleBlock != nil && moduleBlock.Statements != nil {
+				if HasLocalDeclarationInStatements(moduleBlock.Statements.Nodes, name) {
+					return true
+				}
+			}
+			if HasHoistedVarDeclaration(current, name) {
 				return true
 			}
 
@@ -275,6 +360,9 @@ func IsShadowed(node *ast.Node, name string) bool {
 
 		default:
 			if ast.IsFunctionLikeDeclaration(current) {
+				if escapesThroughParameterDecorator(current, prevChild, inParameterDecorator, crossedScope) {
+					break
+				}
 				if HasShadowingParameter(current, name) {
 					return true
 				}
@@ -294,6 +382,9 @@ func IsShadowed(node *ast.Node, name string) bool {
 					}
 				}
 			}
+		}
+		if ast.IsFunctionLikeDeclaration(current) || ast.IsClassLike(current) {
+			crossedScope = true
 		}
 		prevChild = current
 		current = current.Parent

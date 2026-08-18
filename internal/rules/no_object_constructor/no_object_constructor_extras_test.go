@@ -81,6 +81,22 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			{Code: `class C<Object> { static m() { Object(); } }`},
 			{Code: `class C<Object> { static p = Object(); }`},
 
+			// ---- Dimension 2: scoping — scope-manager puts a function's
+			// parameter initializers in the same scope as its body
+			// declarations, so a body binding shadows the call in a default
+			// value ----
+			{Code: `function f(x = new Object()) { var Object; }`},
+			{Code: `class C { m(x = new Object()) { var Object; } }`},
+			// A parameter decorator is not an initializer, but scope-manager
+			// still resolves a reference directly inside one against the
+			// decorated function's own scope.
+			{Code: `class C { m(@dec(new Object()) x: number) { var Object; } }`},
+			{Code: `class C { m(@dec(new Object()) x: number, Object: any) { } }`},
+			// The enclosing class stays in the chain, so its name and type
+			// parameters shadow a call nested inside a parameter decorator.
+			{Code: `class Object { m(@dec(() => new Object()) x: number) { } }`},
+			{Code: `class C<Object> { m(@dec(() => new Object()) x: number) { } }`},
+
 			// ---- Dimension 2: scoping — declarations in a namespace body ----
 			{Code: `namespace N { const Object = f; Object(); }`},
 			{Code: `namespace N { function Object() {} Object(); }`},
@@ -205,6 +221,27 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useLiteral", Output: `namespace N { const Object = f; } ({});`}},
 				}},
 			},
+			// ---- Dimension 2: scoping — scope-manager attaches a scope
+			// created inside a parameter decorator to the enclosing class,
+			// not to the decorated function, so neither the function's body
+			// bindings nor its parameters and type parameters reach the
+			// call ----
+			asiCase(`class C { m(@dec(() => new Object()) x: number) { var Object; } }`, "new Object()", false, false),
+			// A class property initializer is not an expression statement, so
+			// the replacement needs no wrapping parentheses.
+			{
+				Code: `class C { m(@dec(class { p = new Object(); }) x: number) { var Object; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferLiteral", Line: 1, Column: 30, EndLine: 1, EndColumn: 42,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "useLiteral",
+						Output:    `class C { m(@dec(class { p = {}; }) x: number) { var Object; } }`,
+					}},
+				}},
+			},
+			asiCase(`class C { m(@dec(() => new Object()) x: number, Object: any) { } }`, "new Object()", false, false),
+			asiCase(`class C { m<Object>(@dec(() => new Object()) x: number) { } }`, "new Object()", false, false),
+
 			// A type parameter is only in scope inside its own declaration.
 			{
 				Code: `declare function f<Object>(): void; Object();`,

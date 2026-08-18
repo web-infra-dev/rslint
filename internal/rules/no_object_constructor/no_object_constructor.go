@@ -119,8 +119,12 @@ var NoObjectConstructorRule = rule.Rule{
 				return
 			}
 			// scope-manager keeps class type parameters visible inside static
-			// members, where TypeScript's resolver hides them.
-			if utils.HasEnclosingTypeParameter(callee, "Object") {
+			// members, where TypeScript's resolver hides them, and keeps a
+			// function's parameter initializers in the same scope as its body
+			// declarations, where both TypeScript's resolver and IsShadowed
+			// follow runtime lexical semantics instead.
+			if utils.HasEnclosingTypeParameter(callee, "Object") ||
+				utils.IsShadowedFromParameterInitializer(callee, "Object") {
 				return
 			}
 			// scope-manager also creates an `Object` variable for TypeScript
