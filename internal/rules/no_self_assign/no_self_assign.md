@@ -47,6 +47,10 @@ a[0] = a[0];
 this.x = this.x;
 ```
 
+## Differences from ESLint
+
+- A TypeScript non-null assertion (`!`) has no runtime effect, so it is treated the same as a bare reference. For example, `a!.b = a.b;` is flagged as a self-assignment.
+
 ## Original Documentation
 
 - [ESLint: no-self-assign](https://eslint.org/docs/latest/rules/no-self-assign)
