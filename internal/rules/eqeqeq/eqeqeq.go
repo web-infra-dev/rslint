@@ -37,11 +37,6 @@ func looseEquivalent(kind ast.Kind) string {
 	}
 }
 
-// isLooseEquality checks if the operator is == or !=.
-func isLooseEquality(kind ast.Kind) bool {
-	return kind == ast.KindEqualsEqualsToken || kind == ast.KindExclamationEqualsToken
-}
-
 // isStrictEquality checks if the operator is === or !==.
 func isStrictEquality(kind ast.Kind) bool {
 	return kind == ast.KindEqualsEqualsEqualsToken || kind == ast.KindExclamationEqualsEqualsToken
@@ -186,7 +181,7 @@ var EqeqeqRule = rule.Rule{
 func handleAlwaysMode(ctx rule.RuleContext, binary *ast.BinaryExpression, opKind ast.Kind, left, right *ast.Node, nullOption string) {
 	isNullCheck := utils.IsNullLiteral(left) || utils.IsNullLiteral(right)
 
-	if isLooseEquality(opKind) {
+	if utils.IsLooseEqualityOperator(opKind) {
 		if nullOption == "always" || !isNullCheck {
 			reportEqeqeq(ctx, binary.OperatorToken, left, right, strictEquivalent(opKind))
 		}
@@ -201,7 +196,7 @@ func handleAlwaysMode(ctx rule.RuleContext, binary *ast.BinaryExpression, opKind
 // 2. Comparing two literals of the same type
 // 3. Comparing against null
 func handleSmartMode(ctx rule.RuleContext, binary *ast.BinaryExpression, opKind ast.Kind, left, right *ast.Node) {
-	if !isLooseEquality(opKind) {
+	if !utils.IsLooseEqualityOperator(opKind) {
 		return
 	}
 

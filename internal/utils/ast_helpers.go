@@ -45,6 +45,12 @@ func IsCommaOperator(node *ast.Node) bool {
 	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindCommaToken
 }
 
+// IsLooseEqualityOperator reports whether kind is the == or != token, as
+// opposed to their strict (===, !==) counterparts.
+func IsLooseEqualityOperator(kind ast.Kind) bool {
+	return kind == ast.KindEqualsEqualsToken || kind == ast.KindExclamationEqualsToken
+}
+
 // IsCallee checks if a node is the callee of a CallExpression or NewExpression,
 // skipping parentheses and TS type assertions between the node and the call.
 func IsCallee(node *ast.Node) bool {
