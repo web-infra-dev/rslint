@@ -546,6 +546,73 @@ class C implements I {
 				},
 			},
 
+			// ---- Dimension 4: getOpeningParenOfParams ends the head loc ----
+			// A single-parameter arrow takes the token right before the parameter,
+			// so a type parameter constraint's `(` never ends the range, while a
+			// wrapping `(` does and `async` leaves the parameter as the boundary.
+			// Every other arrow takes the first `(` of the node, which a constraint
+			// can own.
+			{
+				Code: `class C { f = <T extends (string | number)>(x: T) => { a; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'f'.",
+						Line:      1, Column: 11, EndLine: 1, EndColumn: 44,
+					},
+				},
+			},
+			{
+				Code: `class C { f = <T extends (string | number)>() => { a; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'f'.",
+						Line:      1, Column: 11, EndLine: 1, EndColumn: 26,
+					},
+				},
+			},
+			{
+				Code: `class C { f = <T extends (string | number)>(x: T, y: T) => { a; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'f'.",
+						Line:      1, Column: 11, EndLine: 1, EndColumn: 26,
+					},
+				},
+			},
+			{
+				Code: `class C { f = (x => { a; }) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'f'.",
+						Line:      1, Column: 11, EndLine: 1, EndColumn: 15,
+					},
+				},
+			},
+			{
+				Code: `class C { f = ((x) => { a; }) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'f'.",
+						Line:      1, Column: 11, EndLine: 1, EndColumn: 16,
+					},
+				},
+			},
+			{
+				Code: `class C { f = async x => { a; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class async method 'f'.",
+						Line:      1, Column: 11, EndLine: 1, EndColumn: 21,
+					},
+				},
+			},
+
 			// ---- Dimension 4: ComputedPropertyName key with non-static expression ----
 			// Reports as "method" (no name) — confirms the empty-name branch of
 			// classFieldFunctionDisplayName / GetFunctionNameWithKind.

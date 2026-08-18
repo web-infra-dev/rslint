@@ -762,13 +762,16 @@ func holdsFunctionValue(parent *ast.Node) bool {
 }
 
 // openingParenOfParamsPos mirrors ESLint's astUtils.getOpeningParenOfParams for
-// arrow functions: normally the `(` that opens the parameter list, but for a
-// single-parameter arrow it is whatever token precedes that parameter — which
-// for the parenless form `x => …` is the parameter itself, or the wrapping `(`
-// when the arrow is parenthesized.
+// arrow functions: the first `(` of the arrow, except that a single-parameter
+// arrow takes the token immediately before that parameter instead — the `(`
+// that opens the list, or, for the parenless `x => …` form, whatever precedes
+// the arrow, so a wrapping `(` still counts while `async` leaves the parameter
+// itself as the boundary.
 func openingParenOfParamsPos(sourceFile *ast.SourceFile, node *ast.Node) int {
 	af := node.AsArrowFunction()
 	if af.Parameters == nil || len(af.Parameters.Nodes) != 1 {
+		// A type parameter constraint can hold the first `(`, as upstream's
+		// unfiltered token scan does too.
 		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
 			return parenPos
 		}
@@ -776,15 +779,9 @@ func openingParenOfParamsPos(sourceFile *ast.SourceFile, node *ast.Node) int {
 	}
 
 	paramStart := TrimNodeTextRange(sourceFile, af.Parameters.Nodes[0]).Pos()
-	if parenPos := findOpenParenPosFrom(sourceFile, node.Pos(), paramStart); parenPos >= 0 {
-		return parenPos
-	}
-	// Parenless: the preceding token sits outside the arrow only when the
-	// parameter is the arrow's first token — `async x => …` keeps `async`
-	// there, so the parameter itself stays the boundary.
-	if paramStart == TrimNodeTextRange(sourceFile, node).Pos() &&
-		node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
-		return TrimNodeTextRange(sourceFile, node.Parent).Pos()
+	if before, ok := TokenBeforePosition(sourceFile, paramStart); ok &&
+		before.Kind == ast.KindOpenParenToken {
+		return before.Start
 	}
 	return paramStart
 }
