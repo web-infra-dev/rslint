@@ -93,12 +93,21 @@ var NoImportNodeTestRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()
+				// The parser accepts an arbitrary expression as the module
+				// specifier and only rejects non-literals in a later grammar
+				// check, so recoverable-but-invalid source such as
+				// `import x from a.b` reaches this listener. `Text()` panics on
+				// those kinds, so the specifier has to be narrowed first.
 				if declaration == nil || declaration.ModuleSpecifier == nil ||
-					!isNodeTestModule(declaration.ModuleSpecifier.Text()) {
+					!isStringNode(declaration.ModuleSpecifier) {
+					return
+				}
+				specifier := declaration.ModuleSpecifier.Text()
+				if !isNodeTestModule(specifier) {
 					return
 				}
 				message := noImportNodeTestMessage()
-				if declaration.ModuleSpecifier.Text() != nodeTestModule || !canSafelyReplaceModule(declaration) {
+				if specifier != nodeTestModule || !canSafelyReplaceModule(declaration) {
 					ctx.ReportNode(node, message)
 					return
 				}
