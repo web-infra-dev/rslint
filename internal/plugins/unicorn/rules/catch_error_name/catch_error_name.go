@@ -201,10 +201,29 @@ func statementsHaveTypeDeclaration(statements []*ast.Node, name string) bool {
 
 func hasTypeDeclarationInScope(node *ast.Node, name string) bool {
 	for current := node; current != nil; current = current.Parent {
+		if ast.IsFunctionLikeDeclaration(current) ||
+			current.Kind == ast.KindClassDeclaration || current.Kind == ast.KindClassExpression {
+			for _, typeParameter := range current.TypeParameters() {
+				if typeParameterName := typeParameter.Name(); typeParameterName != nil && typeParameterName.Text() == name {
+					return true
+				}
+			}
+		}
 		switch current.Kind {
 		case ast.KindBlock:
 			block := current.AsBlock()
 			if block != nil && block.Statements != nil && statementsHaveTypeDeclaration(block.Statements.Nodes, name) {
+				return true
+			}
+		case ast.KindModuleBlock:
+			moduleBlock := current.AsModuleBlock()
+			if moduleBlock != nil && moduleBlock.Statements != nil &&
+				statementsHaveTypeDeclaration(moduleBlock.Statements.Nodes, name) {
+				return true
+			}
+		case ast.KindCaseClause, ast.KindDefaultClause:
+			clause := current.AsCaseOrDefaultClause()
+			if clause != nil && clause.Statements != nil && statementsHaveTypeDeclaration(clause.Statements.Nodes, name) {
 				return true
 			}
 		case ast.KindSourceFile:

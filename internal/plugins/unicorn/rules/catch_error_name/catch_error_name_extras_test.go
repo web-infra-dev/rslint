@@ -58,6 +58,11 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("try {} catch (err) { use(err); interface error {} }", "try {} catch (error_) { use(error_); interface error {} }", "err", "error_"),
 			invalid("type error = string; try {} catch (bad) { use(bad) }", "type error = string; try {} catch (error_) { use(error_) }", "bad", "error_"),
 			invalid("interface error {}; try {} catch (bad) { use(bad) }", "interface error {}; try {} catch (error_) { use(error_) }", "bad", "error_"),
+			invalid("namespace N { type error = string; try {} catch (bad) { use(bad) } }", "namespace N { type error = string; try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			invalid("namespace N { interface error {}; try {} catch (bad) { use(bad) } }", "namespace N { interface error {}; try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			invalid("namespace N { type error = string; try {} catch (bad) {} }", "namespace N { type error = string; try {} catch (error_) {} }", "bad", "error_"),
+			invalid("switch (x) { case 1: type error = string; try {} catch (bad) { use(bad) } }", "switch (x) { case 1: type error = string; try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			invalid("function f<error>() { try {} catch (bad) { use(bad) } }", "function f<error>() { try {} catch (error_) { use(error_) } }", "bad", "error_"),
 			// External references in descendant scopes remain collision candidates.
 			invalid("try {} catch (bad) { use(bad); function f() { return error } }", "try {} catch (error_) { use(error_); function f() { return error } }", "bad", "error_"),
 			invalid("promise.catch(bad => { use(bad); function f() { return error } })", "promise.catch(error_ => { use(error_); function f() { return error } })", "bad", "error_"),
