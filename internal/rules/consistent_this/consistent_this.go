@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -67,11 +68,15 @@ var ConsistentThisRule = rule.Rule{
 		aliases := parseOptions(options)
 		var diagnostics []diagnostic
 
-		report := func(node *ast.Node, msg rule.RuleMessage) {
+		reportRange := func(textRange core.TextRange, msg rule.RuleMessage) {
 			diagnostics = append(diagnostics, diagnostic{
-				textRange: utils.TrimNodeTextRange(ctx.SourceFile, node),
+				textRange: textRange,
 				message:   msg,
 			})
+		}
+
+		report := func(node *ast.Node, msg rule.RuleMessage) {
+			reportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), msg)
 		}
 
 		// checkAssignment mirrors upstream's checkAssignment: node is the
@@ -118,8 +123,16 @@ var ConsistentThisRule = rule.Rule{
 				return
 			}
 			sym := locals[alias]
-			if sym == nil || sym.Flags&ast.SymbolFlagsValue == 0 {
+			if sym == nil || sym.Flags&aliasSymbolFlags == 0 {
 				return
+			}
+			// The two halves of an exported declaration each hold one of the
+			// things this check needs — the local the declarations, the export
+			// symbol the references — and eslint-scope has a single variable
+			// for both. The export symbol carries the declarations too, so it
+			// is the identity to go on with.
+			if sym.ExportSymbol != nil {
+				sym = sym.ExportSymbol
 			}
 
 			for _, decl := range sym.Declarations {
@@ -130,7 +143,7 @@ var ConsistentThisRule = rule.Rule{
 
 			if ctx.Refs != nil {
 				for _, ref := range ctx.Refs.References(sym) {
-					if ast.GetEnclosingBlockScopeContainer(ref) != scopeNode {
+					if referenceScopeNode(ref) != scopeNode {
 						continue
 					}
 					if isSimpleThisAssignment(ref) {
@@ -140,7 +153,7 @@ var ConsistentThisRule = rule.Rule{
 			}
 
 			for _, decl := range sym.Declarations {
-				report(decl, aliasNotAssignedToThisMessage(alias))
+				reportRange(declarationTextRange(ctx.SourceFile, decl), aliasNotAssignedToThisMessage(alias))
 			}
 		}
 
@@ -213,6 +226,64 @@ var ConsistentThisRule = rule.Rule{
 
 		return listeners
 	},
+}
+
+// aliasSymbolFlags are the symbol flags a designated alias's binding can
+// carry in a scope's locals. A plain declaration carries SymbolFlagsValue,
+// but in a module the binder splits an exported one in two: the export
+// symbol keeps the real flags while the local left behind carries only
+// SymbolFlagsExportValue, and an import binding carries only
+// SymbolFlagsAlias. All three are variables of the scope as eslint-scope
+// sees it; a type-only declaration, which carries none of them, is not.
+const aliasSymbolFlags = ast.SymbolFlagsValue | ast.SymbolFlagsExportValue | ast.SymbolFlagsAlias
+
+// declarationTextRange is the range upstream reports a declaration at.
+// ESTree wraps an exported declaration in an ExportNamedDeclaration /
+// ExportDefaultDeclaration whose inner declaration begins past the `export`
+// and `default` keywords, while tsgo keeps both as modifiers of the
+// declaration itself, so they are skipped here. Every other modifier
+// (`declare`, `abstract`, ...) is part of ESTree's node and is kept.
+func declarationTextRange(sourceFile *ast.SourceFile, decl *ast.Node) core.TextRange {
+	pos := decl.Pos()
+	if modifiers := decl.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind != ast.KindExportKeyword && modifier.Kind != ast.KindDefaultKeyword {
+				break
+			}
+			pos = modifier.End()
+		}
+	}
+	return scanner.GetRangeOfTokenAtPosition(sourceFile, pos).WithEnd(decl.End())
+}
+
+// referenceScopeNode is the scope a reference belongs to, standing in for
+// upstream's `reference.from`. It is the nearest enclosing block-scope
+// container, except that a loop whose header declares no block-scoped
+// binding is walked past: tsgo counts every `for`/`for-in`/`for-of`
+// statement as a container, while eslint-scope opens a scope for one only
+// when its header declares with `let`, `const` or `using`.
+func referenceScopeNode(ref *ast.Node) *ast.Node {
+	scopeNode := ast.GetEnclosingBlockScopeContainer(ref)
+	for scopeNode != nil && isScopelessLoop(scopeNode) {
+		scopeNode = ast.GetEnclosingBlockScopeContainer(scopeNode)
+	}
+	return scopeNode
+}
+
+// isScopelessLoop reports whether node is a loop statement eslint-scope
+// gives no scope of its own, which is any whose header declares nothing or
+// declares with `var`.
+func isScopelessLoop(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement:
+	default:
+		return false
+	}
+	initializer := node.Initializer()
+	if initializer == nil || initializer.Kind != ast.KindVariableDeclarationList {
+		return true
+	}
+	return initializer.Flags&ast.NodeFlagsBlockScoped == 0
 }
 
 // declarationHasInitializer reports whether decl — one of a symbol's

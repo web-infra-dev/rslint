@@ -103,6 +103,22 @@ func TestConsistentThisExtras(t *testing.T) {
 			// wrapping a valid `alias = this` assignment does not interfere
 			// with the assignment's own operator/parent check ----
 			{Code: "let that; (that = this, 1);"},
+
+			// ---- An exported declaration is still a local binding of the
+			// module scope, so the initialized / later-assigned arms of
+			// checkWasAssigned() apply to it unchanged ----
+			{Code: "export var that = this;"},
+			{Code: "export var that;\nthat = this;"},
+
+			// ---- eslint-scope opens a `for` scope only when the header
+			// declares block-scoped bindings, so an assignment written in a
+			// header that declares nothing (or declares with `var`) still
+			// belongs to the enclosing scope ----
+			{Code: "var self; for (self = this;;) { break; }", Options: []any{"self"}},
+			{Code: "function f() { var self; for (self = this;;) { break; } }", Options: []any{"self"}},
+			{Code: "function f() { var self; for (var i = 0; ;) self = this; }", Options: []any{"self"}},
+			{Code: "function f() { var self; for (var x of (self = this, [])) {} }", Options: []any{"self"}},
+			{Code: "function f() { var self; for (var k in (self = this, {})) {} }", Options: []any{"self"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Options contract: the schema declares no JSON Schema
@@ -262,6 +278,70 @@ func TestConsistentThisExtras(t *testing.T) {
 				Options: []any{"self"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+
+			// ---- A `for` header that declares block-scoped bindings IS its
+			// own scope, so an assignment written there does not count as the
+			// enclosing function's ----
+			{
+				Code:    "function f() { var self; for (let i = 0; ;) self = this; }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+
+			// ---- An alias declared with `export` or bound by an `import` is
+			// a local of the module scope just like a plain declaration, and
+			// is reported at the same position ESLint gives the declaration
+			// its export wrapper holds ----
+			{
+				Code: "export var that;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 12, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: "export let that;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 12, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: "export function that() {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code: "export class that {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 21},
+				},
+			},
+			{
+				Code: "export default function that() {}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 16, EndLine: 1, EndColumn: 34},
+				},
+			},
+			{
+				Code: "import that from './x';",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 12},
+				},
+			},
+			{
+				Code: "import {a as that} from './x';",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 9, EndLine: 1, EndColumn: 18},
+				},
+			},
+			{
+				Code: "import * as that from './x';",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 17},
 				},
 			},
 		},
