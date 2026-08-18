@@ -35,6 +35,21 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", async () => { let pending = other; pending &&= promise.then(value => expect(value).toBe(1)); await pending; });`},
 			{Code: `test("case", async () => { let pending; await (pending ||= promise.then(value => expect(value).toBe(1))); });`},
 			{Code: `test("case", async () => { let pending = promise.then(value => expect(value).toBe(1)); pending ||= other; await pending; });`},
+			// Every operator that carries the chain into the binding binds it,
+			// the same way the value walks up to a direct await.
+			{Code: `test("case", async () => { let pending = fallback || promise.then(value => expect(value).toBe(1)); await pending; });`},
+			{Code: `test("case", async () => { let pending = fallback ?? promise.then(value => expect(value).toBe(1)); await pending; });`},
+			{Code: `test("case", async () => { let pending = ready && promise.then(value => expect(value).toBe(1)); await pending; });`},
+			{Code: `test("case", async () => { let pending = condition ? promise.then(value => expect(value).toBe(1)) : other; await pending; });`},
+			{Code: `test("case", async () => { let pending = (setup(), promise.then(value => expect(value).toBe(1))); await pending; });`},
+			{Code: `test("case", async () => { let pending = other; pending = pending || promise.then(value => expect(value).toBe(1)); await pending; });`},
+			// The longhand of a preserving logical assignment keeps the promise
+			// the binding already holds, because a promise is truthy.
+			{Code: `test("case", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = pending || other; await pending; });`},
+			// An array in a binding is consumed element-wise.
+			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await Promise.all(pending); });`},
+			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; for await (const settled of pending) {} });`},
+			{Code: `test("case", async () => { for await (const settled of [promise.then(value => expect(value).toBe(1))]) {} });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } catch (error) { throw error; } });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); if (!ready) { throw new Error("no"); } await pending; });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { setup(); await pending; } catch (error) { throw error; } });`},
@@ -197,6 +212,52 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			},
 			{
 				Code: `test("case", async () => { let pending; pending ||= promise.then(value => expect(value).toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Line:      1,
+					Column:    41,
+					EndColumn: 97,
+				}},
+			},
+			// A chain stored by a logical assignment floats from the
+			// assignment, and one handed to another call from its statement.
+			{
+				Code: `test("case", async () => { obj.pending ||= promise.then(value => expect(value).toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Line:      1,
+					Column:    28,
+					EndColumn: 88,
+				}},
+			},
+			{
+				Code: `test("case", () => { list.push(promise.then(value => expect(value).toBe(1))); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Line:      1,
+					Column:    22,
+					EndColumn: 78,
+				}},
+			},
+			{
+				Code: `test("case", () => { helper(promise.then(value => expect(value).toBe(1))); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Line:      1,
+					Column:    22,
+					EndColumn: 75,
+				}},
+			},
+			// Awaiting an array does not await its elements.
+			{
+				Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await pending; });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			// `p = p && other` always replaces the promise p holds.
+			{
+				Code: `test("case", async () => { let pending = promise.then(value => expect(value).toBe(1)); pending = pending && other; await pending; });`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "expectInFloatingPromise",
 				}},

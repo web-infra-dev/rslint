@@ -23,6 +23,31 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
     },
     {
       code: `test('case', async () => {
+        let pending = fallback || load().then(value => assert.equal(value, 1));
+        await pending;
+      });`,
+    },
+    {
+      code: `test('case', async () => {
+        let pending = condition ? load().then(value => assert.equal(value, 1)) : other;
+        await pending;
+      });`,
+    },
+    {
+      code: `test('case', async () => {
+        const pending = [load().then(value => assert.equal(value, 1))];
+        await Promise.all(pending);
+      });`,
+    },
+    {
+      code: `test('case', async () => {
+        const pending = [load().then(value => assert.equal(value, 1))];
+        for await (const settled of pending) {
+        }
+      });`,
+    },
+    {
+      code: `test('case', async () => {
         let pending = load().then(value => expect(value).toBe(1));
         pending ??= fallback;
         await pending;
@@ -134,6 +159,27 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
     },
   ],
   invalid: [
+    {
+      code: `test('case', () => {
+        list.push(load().then(value => assert.equal(value, 1)));
+      });`,
+      errors: [{ messageId: 'expectInFloatingPromise' }],
+    },
+    {
+      code: `test('case', async () => {
+        const pending = [load().then(value => assert.equal(value, 1))];
+        await pending;
+      });`,
+      errors: [{ messageId: 'expectInFloatingPromise' }],
+    },
+    {
+      code: `test('case', async () => {
+        let pending = load().then(value => assert.equal(value, 1));
+        pending = pending && fallback;
+        await pending;
+      });`,
+      errors: [{ messageId: 'expectInFloatingPromise' }],
+    },
     {
       code: `function leaf(value) {
         assert.equal(value, 1);

@@ -49,6 +49,9 @@ type chainBinding struct {
 	target  *ast.Node
 	symbol  *ast.Symbol
 	extends bool
+	// aggregate marks a binding that holds the chain inside an array literal,
+	// so only an element-wise consumption of the binding consumes the chain.
+	aggregate bool
 }
 
 type flowEventKind uint8
@@ -65,6 +68,10 @@ type flowEvent struct {
 	symbol    *ast.Symbol
 	candidate *chainGroup
 	extends   bool
+	// aggregate marks a consumption that awaits the elements of an iterable
+	// rather than the value itself, such as `Promise.all(list)` or
+	// `for await (const value of list)`.
+	aggregate bool
 }
 
 type analyzer struct {
@@ -231,14 +238,27 @@ func promiseReportNode(root, function *ast.Node) *ast.Node {
 			current = parent
 		case ast.KindExpressionStatement, ast.KindVariableDeclaration:
 			return parent
+		case ast.KindCallExpression,
+			ast.KindPropertyAccessExpression,
+			ast.KindElementAccessExpression:
+			// A chain handed to another call belongs to the statement that call
+			// sits in, so `list.push(chain);` is reported at the statement.
+			current = parent
 		default:
-			if ast.IsAssignmentExpression(parent, true) {
-				return parent
+			if ast.IsAssignmentExpression(parent, false) {
+				operator := parent.AsBinaryExpression().OperatorToken.Kind
+				// A logical assignment stores the chain, so the assignment is
+				// the place it floats from. A compound arithmetic assignment
+				// stores something else and leaves the chain itself floating.
+				if operator == ast.KindEqualsToken ||
+					ast.IsLogicalOrCoalescingAssignmentOperator(operator) {
+					return parent
+				}
 			}
 			return current
 		}
 	}
-	return root
+	return current
 }
 
 func (a *analyzer) resolveFunction(node *ast.Node) *ast.Node {
@@ -315,11 +335,16 @@ func (a *analyzer) resolveFunctionConsumption(
 			}
 		},
 		Read: func(builder *cfg.Builder[flowEvent], node *ast.Node) {
-			if !a.isSafeIdentifierUse(node, function.function) {
+			safe, aggregate := a.isSafeIdentifierUse(node, function.function)
+			if !safe {
 				return
 			}
 			if symbol := a.symbolOf(node); symbol != nil {
-				builder.Emit(flowEvent{kind: flowConsume, symbol: symbol})
+				builder.Emit(flowEvent{
+					kind:      flowConsume,
+					symbol:    symbol,
+					aggregate: aggregate,
+				})
 			}
 		},
 		Write: func(builder *cfg.Builder[flowEvent], node *ast.Node) {
@@ -338,9 +363,9 @@ func (a *analyzer) resolveFunctionConsumption(
 				}
 				return
 			}
-			if isPreservingAssignmentTarget(node) {
-				// The store may not happen, so whatever the symbol already
-				// holds can survive this write.
+			if a.writePreservesPreviousValue(node) {
+				// The store may not happen, or may store what the symbol
+				// already holds, so an earlier candidate can survive it.
 				return
 			}
 			builder.Emit(flowEvent{kind: flowOverwrite, symbol: symbol})
@@ -376,6 +401,7 @@ func (a *analyzer) bindingFor(group *chainGroup) *chainBinding {
 		}
 	}
 	current := group.root
+	aggregate := false
 	for current != nil && current.Parent != nil {
 		parent := current.Parent
 		if parent.Kind == ast.KindParenthesizedExpression {
@@ -392,8 +418,9 @@ func (a *analyzer) bindingFor(group *chainGroup) *chainBinding {
 				return nil
 			}
 			return &chainBinding{
-				target: name,
-				symbol: a.symbolOf(name),
+				target:    name,
+				symbol:    a.symbolOf(name),
+				aggregate: aggregate,
 			}
 		}
 		if ast.IsAssignmentExpression(parent, false) {
@@ -421,8 +448,36 @@ func (a *analyzer) bindingFor(group *chainGroup) *chainBinding {
 				// by p in place, so the bind must not kill it, the same way a
 				// chain that continues off p does not. `p &&= chain` overwrites
 				// that promise, so it kills like a plain assignment.
-				extends: preserving || promiseChainStartsWithSymbol(group.root, symbol, a),
+				extends: preserving ||
+					promiseChainStartsWithSymbol(group.root, symbol, a) ||
+					a.assignmentPreservesSymbol(binary.Right, symbol),
+				aggregate: aggregate,
 			}
+		}
+		if parent.Kind == ast.KindArrayLiteralExpression {
+			// `const list = [chain]` stores the chain in list, but only an
+			// element-wise consumption of list reaches it.
+			aggregate = true
+			current = parent
+			continue
+		}
+		if parent.Kind == ast.KindConditionalExpression {
+			conditional := parent.AsConditionalExpression()
+			if conditional == nil ||
+				(conditional.WhenTrue != current && conditional.WhenFalse != current) {
+				return nil
+			}
+			current = parent
+			continue
+		}
+		// `let p = fallback || chain` stores the chain in p on exactly the
+		// paths where the chain is evaluated, so the value reaches the binding
+		// the same way isDirectlyConsumed carries it up to an await. An
+		// assignment parent is left to the branch above.
+		if !ast.IsAssignmentExpression(parent, false) &&
+			promiseValueFlowsThroughBinary(parent, current) {
+			current = parent
+			continue
 		}
 		return nil
 	}
@@ -477,7 +532,8 @@ func (a *analyzer) isDirectlyConsumed(root, function *ast.Node) bool {
 		case ast.KindArrowFunction:
 			return parent.AsArrowFunction().Body == current
 		case ast.KindArrayLiteralExpression:
-			if safePromiseAggregatorForExpression(parent, current, function) {
+			if safePromiseAggregatorForExpression(parent, current, function) ||
+				forAwaitConsumesExpression(parent, function) {
 				return true
 			}
 			return false
@@ -510,9 +566,14 @@ func (a *analyzer) isDirectlyConsumed(root, function *ast.Node) bool {
 	return false
 }
 
-func (a *analyzer) isSafeIdentifierUse(identifier, function *ast.Node) bool {
+// isSafeIdentifierUse reports whether this use of an identifier consumes the
+// value it holds, and whether it does so element-wise. An element-wise
+// consumption reaches the promises inside an array the identifier holds rather
+// than the array itself, so it consumes exactly the bindings a plain await does
+// not.
+func (a *analyzer) isSafeIdentifierUse(identifier, function *ast.Node) (bool, bool) {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier {
-		return false
+		return false, false
 	}
 	current := identifier
 	for current.Parent != nil {
@@ -521,45 +582,52 @@ func (a *analyzer) isSafeIdentifierUse(identifier, function *ast.Node) bool {
 		case ast.KindParenthesizedExpression:
 			current = parent
 		case ast.KindAwaitExpression:
-			return testFramework.AbruptCompletionPropagatesFailure(parent, function)
+			return testFramework.AbruptCompletionPropagatesFailure(parent, function), false
 		case ast.KindReturnStatement:
-			return testFramework.AbruptCompletionPropagatesFailure(parent, function)
+			return testFramework.AbruptCompletionPropagatesFailure(parent, function), false
+		case ast.KindForOfStatement:
+			return forAwaitConsumesExpression(current, function), true
 		case ast.KindArrayLiteralExpression:
 			if safePromiseAggregatorForExpression(parent, current, function) {
-				return true
+				return true, false
 			}
-			return false
+			return false, false
 		case ast.KindCallExpression:
 			if a.isAsyncAssertionSink(parent, identifier) ||
 				safePromiseWrapperForExpression(parent, current, function) {
-				return true
+				return true, false
 			}
-			return false
+			if safePromiseAggregatorForValue(parent, current, function) {
+				return true, true
+			}
+			return false, false
 		case ast.KindConditionalExpression:
 			conditional := parent.AsConditionalExpression()
 			if conditional == nil ||
 				(conditional.WhenTrue != current && conditional.WhenFalse != current) {
-				return false
+				return false, false
 			}
 			current = parent
 		case ast.KindBinaryExpression:
 			if !promiseValueFlowsThroughBinary(parent, current) {
-				return false
+				return false, false
 			}
 			current = parent
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 			current = parent
 		default:
-			return false
+			return false, false
 		}
 	}
-	return false
+	return false, false
 }
 
-// isPreservingAssignmentTarget reports whether node is the target of a `||=` or
-// `??=` assignment. A promise a candidate left there is truthy and non-nullish,
-// so neither operator ever replaces it. `&&=` does, and is not included.
-func isPreservingAssignmentTarget(node *ast.Node) bool {
+// writePreservesPreviousValue reports whether an assignment to node can leave
+// the value node already holds in place. A promise a candidate left there is
+// truthy and non-nullish, so `p ||= chain` and `p ??= chain` never replace it,
+// and neither does the longhand `p = p || chain`. `p &&= chain` and
+// `p = p && chain` always do, and are not included.
+func (a *analyzer) writePreservesPreviousValue(node *ast.Node) bool {
 	current := node
 	for current != nil && current.Parent != nil {
 		parent := current.Parent
@@ -567,17 +635,76 @@ func isPreservingAssignmentTarget(node *ast.Node) bool {
 			current = parent
 			continue
 		}
-		if parent.Kind != ast.KindBinaryExpression {
+		if !ast.IsAssignmentExpression(parent, false) {
 			return false
 		}
 		binary := parent.AsBinaryExpression()
+		if binary == nil ||
+			ast.SkipParentheses(binary.Left) != ast.SkipParentheses(current) {
+			return false
+		}
+		switch binary.OperatorToken.Kind {
+		case ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			return true
+		case ast.KindEqualsToken:
+			return a.assignmentPreservesSymbol(binary.Right, a.symbolOf(node))
+		}
+		return false
+	}
+	return false
+}
+
+// assignmentPreservesSymbol reports whether value, assigned to symbol, can
+// evaluate to the value symbol already holds. `p = p || chain` keeps a promise
+// p holds, because a promise is truthy, so the write must not kill an earlier
+// candidate for p.
+func (a *analyzer) assignmentPreservesSymbol(value *ast.Node, symbol *ast.Symbol) bool {
+	value = ast.SkipParentheses(value)
+	if value == nil || symbol == nil {
+		return false
+	}
+	switch value.Kind {
+	case ast.KindIdentifier:
+		return a.symbolOf(value) == symbol
+	case ast.KindConditionalExpression:
+		conditional := value.AsConditionalExpression()
+		return conditional != nil &&
+			(a.assignmentPreservesSymbol(conditional.WhenTrue, symbol) ||
+				a.assignmentPreservesSymbol(conditional.WhenFalse, symbol))
+	case ast.KindBinaryExpression:
+		binary := value.AsBinaryExpression()
 		if binary == nil {
 			return false
 		}
-		operator := binary.OperatorToken.Kind
-		return (operator == ast.KindBarBarEqualsToken ||
-			operator == ast.KindQuestionQuestionEqualsToken) &&
-			ast.SkipParentheses(binary.Left) == ast.SkipParentheses(current)
+		switch binary.OperatorToken.Kind {
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			return a.assignmentPreservesSymbol(binary.Left, symbol) ||
+				a.assignmentPreservesSymbol(binary.Right, symbol)
+		case ast.KindAmpersandAmpersandToken, ast.KindCommaToken:
+			return a.assignmentPreservesSymbol(binary.Right, symbol)
+		}
+	}
+	return false
+}
+
+// forAwaitConsumesExpression reports whether node is the iterable of a
+// `for await` loop, which awaits every element and lets a rejection leave the
+// loop the way an await does.
+func forAwaitConsumesExpression(node, function *ast.Node) bool {
+	current := node
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		if parent.Kind == ast.KindParenthesizedExpression {
+			current = parent
+			continue
+		}
+		if parent.Kind != ast.KindForOfStatement {
+			return false
+		}
+		statement := parent.AsForInOrOfStatement()
+		return statement != nil && statement.AwaitModifier != nil &&
+			statement.Expression == current &&
+			testFramework.AbruptCompletionPropagatesFailure(parent, function)
 	}
 	return false
 }
@@ -632,6 +759,23 @@ func safePromiseAggregatorForExpression(arrayNode, value, function *ast.Node) bo
 	}
 	name := testFramework.CalleeChainName(call.Expression)
 	if name != "Promise.all" {
+		return false
+	}
+	return expressionIsAwaitedOrReturned(callNode, function)
+}
+
+// safePromiseAggregatorForValue reports whether callNode is an awaited or
+// returned `Promise.all(value)`. Unlike safePromiseAggregatorForExpression the
+// argument is not an array literal, so this only reaches promises held inside
+// whatever value holds.
+func safePromiseAggregatorForValue(callNode, value, function *ast.Node) bool {
+	if callNode == nil || callNode.Kind != ast.KindCallExpression {
+		return false
+	}
+	call := callNode.AsCallExpression()
+	if call.Arguments == nil || len(call.Arguments.Nodes) != 1 ||
+		ast.SkipParentheses(call.Arguments.Nodes[0]) != ast.SkipParentheses(value) ||
+		testFramework.CalleeChainName(call.Expression) != "Promise.all" {
 		return false
 	}
 	return expressionIsAwaitedOrReturned(callNode, function)
@@ -762,7 +906,19 @@ func (a *analyzer) runDataflow(graph *cfg.Graph[flowEvent]) {
 			case flowFailureExit:
 				current = state{}
 			case flowConsume:
-				delete(current, event.symbol)
+				// An element-wise consumption reaches a chain held in an array
+				// and nothing else; every other consumption is the reverse.
+				candidates := current[event.symbol]
+				for candidate := range candidates {
+					if candidate.binding != nil &&
+						candidate.binding.aggregate != event.aggregate {
+						continue
+					}
+					delete(candidates, candidate)
+				}
+				if len(candidates) == 0 {
+					delete(current, event.symbol)
+				}
 			case flowOverwrite:
 				for candidate := range current[event.symbol] {
 					candidate.safe = false
@@ -842,16 +998,13 @@ func (a *analyzer) propagateAndReport() {
 		functionQueue = append(functionQueue, group.function)
 	}
 
-	reported := map[*ast.Node]bool{}
+	// Every floating chain is reported once. Two chains handed to the same call
+	// share a report node and are two separate floating promises.
 	for index := len(a.ordered) - 1; index >= 0; index-- {
 		group := a.ordered[index]
 		if !group.hasAssertion || group.safe {
 			continue
 		}
-		if reported[group.reportNode] {
-			continue
-		}
-		reported[group.reportNode] = true
 		a.ctx.ReportNode(group.reportNode, a.message)
 	}
 }
