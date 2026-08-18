@@ -3,6 +3,7 @@ package catch_error_name
 import (
 	_ "embed"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -30,7 +31,7 @@ var reservedWords = map[string]bool{
 	"package": true, "private": true, "protected": true, "public": true, "static": true,
 	"yield": true, "any": true, "boolean": true, "constructor": true, "declare": true,
 	"get": true, "module": true, "require": true, "number": true, "set": true,
-	"string": true, "symbol": true, "type": true, "from": true, "of": true,
+	"string": true, "symbol": true, "type": true, "from": true, "of": true, "eval": true,
 }
 
 //go:embed catch_error_name.schema.json
@@ -54,16 +55,57 @@ func parseOptions(raw []any) options {
 	}
 	if patterns, ok := values["ignore"].([]any); ok {
 		for _, value := range patterns {
-			pattern, ok := value.(string)
-			if !ok {
-				continue
+			pattern, regexOptions, hasPattern := "", utils.JSUnicodeRegexOptions, false
+			switch value := value.(type) {
+			case string:
+				pattern, hasPattern = value, true
+			case map[string]any:
+				pattern, hasPattern = value["source"].(string)
+				flags, _ := value["flags"].(string)
+				regexOptions = utils.JSRegexOptions
+				if strings.Contains(flags, "i") {
+					regexOptions |= regexp2.IgnoreCase
+				}
+				if strings.Contains(flags, "m") {
+					regexOptions |= regexp2.Multiline
+				}
+				if strings.Contains(flags, "s") {
+					regexOptions |= regexp2.Singleline
+				}
+				if strings.ContainsAny(flags, "uv") {
+					regexOptions |= regexp2.Unicode
+				}
 			}
-			if re, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
-				result.ignore = append(result.ignore, re)
+			if hasPattern {
+				if re, err := utils.CompileRegexp2(pattern, regexOptions); err == nil {
+					result.ignore = append(result.ignore, re)
+				}
 			}
 		}
 	}
 	return result
+}
+
+func jsxNamespaceReferences(body *ast.Node, name string) []*ast.Node {
+	var references []*ast.Node
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		if node.Kind == ast.KindJsxNamespacedName {
+			namespacedName := node.AsJsxNamespacedName()
+			if namespacedName != nil && namespacedName.Namespace != nil && namespacedName.Namespace.Text() == name {
+				references = append(references, namespacedName.Namespace)
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	walk(body)
+	return references
 }
 
 func upperFirst(value string) string {
@@ -220,7 +262,8 @@ func hasTypeDeclarationInScope(node *ast.Node, name string) bool {
 			moduleBlock := current.AsModuleBlock()
 			if moduleBlock != nil && moduleBlock.Statements != nil &&
 				(utils.HasLocalDeclarationInStatements(moduleBlock.Statements.Nodes, name) ||
-					statementsHaveTypeDeclaration(moduleBlock.Statements.Nodes, name)) {
+					statementsHaveTypeDeclaration(moduleBlock.Statements.Nodes, name) ||
+					utils.HasHoistedVarDeclaration(current, name)) {
 				return true
 			}
 		case ast.KindCaseClause, ast.KindDefaultClause:
@@ -353,7 +396,9 @@ var CatchErrorNameRule = rule.Rule{
 				if declaration == nil || ctx.Refs == nil || declaration.Symbol() == nil {
 					return
 				}
-				references := ctx.Refs.References(declaration.Symbol())
+				references := append([]*ast.Node(nil), ctx.Refs.References(declaration.Symbol())...)
+				references = append(references, jsxNamespaceReferences(handlerBody(identifier), originalName)...)
+				sort.Slice(references, func(i, j int) bool { return references[i].Pos() < references[j].Pos() })
 				if originalName == "_" && len(references) == 0 {
 					return
 				}

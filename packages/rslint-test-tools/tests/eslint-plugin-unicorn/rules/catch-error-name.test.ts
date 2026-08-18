@@ -27,6 +27,10 @@ ruleTester.run('catch-error-name', null as never, {
       code: 'try {} catch (skipThisNameCheck) {}',
       options: [{ ignore: ['^skip'] }],
     },
+    {
+      code: 'try {} catch (Bad) {}',
+      options: [{ ignore: [/^bad$/i] }],
+    },
   ],
   invalid: [
     {
