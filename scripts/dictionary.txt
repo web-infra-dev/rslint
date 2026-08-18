@@ -9,6 +9,7 @@ acking
 acks
 activedescendant
 addl
+aeiou
 affordances
 afoob
 agen
@@ -69,6 +70,7 @@ brefs
 Buttom
 butwhy
 cachedvfs
+caféx
 callbackify
 callees
 callsite
@@ -288,6 +290,7 @@ lintable
 lintedfile
 lintprogram
 listitem
+litera
 llms
 lockdown
 lockdowns
@@ -586,6 +589,7 @@ tsoptions
 tsparser
 tspath
 tsutils
+tttodo
 txtar
 txtarfs
 typeparam
