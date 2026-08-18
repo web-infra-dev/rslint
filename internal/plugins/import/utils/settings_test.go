@@ -50,6 +50,13 @@ func TestModuleSettingsIsExternalPath(t *testing.T) {
 			resolvedPath: "/repo/vendor/pkg/index.ts",
 			want:         true,
 		},
+		{
+			name:         "explicit empty folder list disables the default",
+			settings:     map[string]interface{}{"import/external-module-folders": []interface{}{}},
+			specifier:    "external-package",
+			resolvedPath: "/repo/node_modules/external-package/index.d.ts",
+			want:         false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -106,6 +113,48 @@ func TestModuleSettingsIsIgnoredPath(t *testing.T) {
 			got := import_utils.CompileModuleSettings(tc.settings).IsIgnoredPath(tc.fileName)
 			if got != tc.want {
 				t.Fatalf("IsIgnoredPath() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestModuleSettingsIsInternalSpecifier(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		settings  map[string]interface{}
+		specifier string
+		want      bool
+	}{
+		{
+			name:      "matching regexp",
+			settings:  map[string]interface{}{"import/internal-regex": `^@app(?:/|$)`},
+			specifier: "@app/components/button",
+			want:      true,
+		},
+		{
+			name:      "non-matching regexp",
+			settings:  map[string]interface{}{"import/internal-regex": `^@app(?:/|$)`},
+			specifier: "@application/button",
+		},
+		{
+			name:      "invalid regexp is ignored",
+			settings:  map[string]interface{}{"import/internal-regex": `[`},
+			specifier: "anything",
+		},
+		{
+			name:      "missing regexp",
+			specifier: "@app/button",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			compiled := import_utils.CompileModuleSettings(test.settings)
+			if got := compiled.IsInternalSpecifier(test.specifier); got != test.want {
+				t.Fatalf("IsInternalSpecifier(%q) = %v, want %v", test.specifier, got, test.want)
 			}
 		})
 	}

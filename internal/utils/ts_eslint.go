@@ -1818,6 +1818,9 @@ func IsIntegerElementAccess(node *ast.Node) bool {
 
 // AccessExpressionObject returns the object expression of an access expression.
 func AccessExpressionObject(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		return node.AsPropertyAccessExpression().Expression
@@ -1825,6 +1828,41 @@ func AccessExpressionObject(node *ast.Node) *ast.Node {
 		return node.AsElementAccessExpression().Expression
 	}
 	return nil
+}
+
+// AccessExpressionProperty returns the property name of a property access or
+// the argument expression of an element access. It preserves the raw AST
+// shape so callers can distinguish `object[name]` from `object["name"]`.
+// ast.GetElementOrPropertyAccessName is intentionally narrower: it drops
+// computed Identifier arguments, which ESTree exposes as Identifier keys.
+func AccessExpressionProperty(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		return node.AsPropertyAccessExpression().Name()
+	case ast.KindElementAccessExpression:
+		return node.AsElementAccessExpression().ArgumentExpression
+	}
+	return nil
+}
+
+// ESTreePropertyKey returns a property-name node in the shape ESTree exposes.
+// tsgo wraps every computed key in ComputedPropertyName, while ESTree stores
+// the expression itself as `key` and records separately whether it was computed.
+func ESTreePropertyKey(name *ast.Node) *ast.Node {
+	if name == nil {
+		return nil
+	}
+	if name.Kind != ast.KindComputedPropertyName {
+		return name
+	}
+	expression := name.AsComputedPropertyName().Expression
+	if expression == nil {
+		return nil
+	}
+	return ast.SkipParentheses(expression)
 }
 
 // CollectBindingNames recursively extracts all identifier names from a binding

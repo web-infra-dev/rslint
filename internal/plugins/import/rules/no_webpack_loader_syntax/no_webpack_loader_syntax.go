@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	importutil "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -38,19 +39,11 @@ var NoWebpackLoaderSyntax = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				callExpression := node.AsCallExpression()
-				expr := callExpression.Expression
-				if expr.Kind != ast.KindIdentifier || expr.AsIdentifier().Text != "require" {
+				call := importutil.GetRequireCallWithStringLiteralArgument(node)
+				if call == nil {
 					return
 				}
-				// ensure there is at least one argument
-				if len(callExpression.Arguments.Nodes) == 0 {
-					return
-				}
-				arg := callExpression.Arguments.Nodes[0]
-				if arg.Kind != ast.KindStringLiteral {
-					return
-				}
+				arg := ast.SkipParentheses(call.Arguments.Nodes[0])
 				modulePath := arg.AsStringLiteral().Text
 				if hasWebpackLoaderSyntax(modulePath) {
 					// report at the string literal argument location for accuracy
