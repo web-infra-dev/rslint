@@ -3,7 +3,6 @@ package max_lines_per_function
 import (
 	_ "embed"
 	"fmt"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -125,7 +124,7 @@ func parseOptions(options []any) maxLinesPerFunctionOptions {
 // 'foo'", "arrow function" → "Arrow function").
 func upperCaseFirst(s string) string {
 	for i, r := range s {
-		return string(unicode.ToUpper(r)) + s[i+len(string(r)):]
+		return ecmascript.StringToUpperCase(string(r)) + s[i+len(string(r)):]
 	}
 	return s
 }

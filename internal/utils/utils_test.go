@@ -503,9 +503,16 @@ func TestIsConstructorName(t *testing.T) {
 
 		// ── Non-ASCII digits are NOT stripped as prefix (matches ESLint's
 		// `[0-9]` which only accepts ASCII 0–9). An Arabic-Indic digit at
-		// the start is the first non-prefix rune and `unicode.IsUpper`
-		// returns false for it → not a constructor.
-		{"٠Foo", false},
+		// the start is the first non-prefix rune, and it is its own
+		// uppercase, so ESLint calls the name a constructor.
+		{"٠Foo", true},
+		// A character with no case of its own answers the same way.
+		{"中Foo", true},
+		// A capital Unicode 16 added: its own uppercase, so a constructor,
+		// which the toolchain's own tables cannot see yet.
+		{"\uA7DCFoo", true},
+		// Its lowercase is not.
+		{"\u019BFoo", false},
 	}
 	for _, tt := range tests {
 		got := IsConstructorName(tt.name)

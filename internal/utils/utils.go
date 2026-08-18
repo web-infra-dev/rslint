@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
@@ -313,14 +314,21 @@ func Flatten[T any](array [][]T) []T {
 // `object-shorthand` rules, including Unicode identifier characters
 // (e.g. `Π`). ESLint's regex `/[^_$0-9]/u` pairs an ASCII-only digit range
 // with a Unicode-aware `toUpperCase()` check — we mirror that: the digit
-// prefix is strictly ASCII while the case test is `unicode.IsUpper`.
+// prefix is strictly ASCII while the case test is `c === c.toUpperCase()`,
+// which a character with no case of its own passes.
 func IsConstructorName(name string) bool {
-	for _, r := range name {
+	for i, r := range name {
 		if r == '_' || r == '$' || (r >= '0' && r <= '9') {
 			continue
 		}
-		// First non-prefix rune: constructor iff uppercase.
-		return unicode.IsUpper(r)
+		// First non-prefix rune: constructor iff it is its own uppercase.
+		// ESLint indexes one UTF-16 code unit, and a lone surrogate is its own
+		// uppercase, so a character outside the BMP counts as one.
+		if r > 0xFFFF {
+			return true
+		}
+		first := name[i : i+utf8.RuneLen(r)]
+		return ecmascript.StringToUpperCase(first) == first
 	}
 	return false
 }

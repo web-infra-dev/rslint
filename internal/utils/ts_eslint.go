@@ -7,13 +7,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 type ConstraintTypeInfo struct {
@@ -498,11 +498,12 @@ func IsES5Constructor(node *ast.Node) bool {
 // `_` and `$` do not. A character outside the BMP is read as a lone surrogate,
 // which is its own lowercase form, so `𐐀` does not qualify.
 func StartsWithUpperCase(s string) bool {
-	r, _ := utf8.DecodeRuneInString(s)
+	r, size := utf8.DecodeRuneInString(s)
 	if r > 0xFFFF {
 		return false
 	}
-	return unicode.ToLower(r) != r
+	first := s[:size]
+	return ecmascript.StringToLocaleLowerCase(first) != first
 }
 
 // GetFunctionNameWithKindCore mirrors ESLint core's astUtils.getFunctionNameWithKind.

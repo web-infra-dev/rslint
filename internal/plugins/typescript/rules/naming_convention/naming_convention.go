@@ -7,13 +7,13 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -439,20 +439,36 @@ func firstRune(name string) rune {
 }
 
 func isUppercaseRune(r rune) bool {
-	return r == unicode.ToUpper(r) && r != unicode.ToLower(r)
+	// Upstream reads one UTF-16 code unit, and a lone surrogate has no case,
+	// so a character outside the BMP counts as neither upper nor lower case.
+	if r > 0xFFFF {
+		return false
+	}
+	c := string(r)
+	return ecmascript.StringToUpperCase(c) == c && ecmascript.StringToLowerCase(c) != c
 }
 
 // Matches JS `name[0] === name[0].toUpperCase()`: returns true for uppercase
-// letters AND for characters with no case distinction (e.g. `$`, digits).
+// letters AND for characters with no case distinction (e.g. `$`, digits) —
+// a character outside the BMP among them, since upstream indexes one UTF-16
+// code unit and a lone surrogate is its own uppercase.
 func firstIsUpper(name string) bool {
 	r := firstRune(name)
-	return r == unicode.ToUpper(r)
+	if r > 0xFFFF {
+		return true
+	}
+	c := string(r)
+	return ecmascript.StringToUpperCase(c) == c
 }
 
 // Matches JS `name[0] === name[0].toLowerCase()`: symmetric to firstIsUpper.
 func firstIsLower(name string) bool {
 	r := firstRune(name)
-	return r == unicode.ToLower(r)
+	if r > 0xFFFF {
+		return true
+	}
+	c := string(r)
+	return ecmascript.StringToLowerCase(c) == c
 }
 
 func checkPascalCase(name string) bool {

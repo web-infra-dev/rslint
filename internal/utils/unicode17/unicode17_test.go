@@ -61,6 +61,11 @@ func TestRangeTablesAreWellFormed(t *testing.T) {
 		"casedRemoved":         casedRemoved,
 		"caseIgnorableAdded":   caseIgnorableAdded,
 		"caseIgnorableRemoved": caseIgnorableRemoved,
+		"upperAdded":           upperAdded,
+		"lowerAdded":           lowerAdded,
+		"lowerRemoved":         lowerRemoved,
+		"letterAdded":          letterAdded,
+		"markAdded":            markAdded,
 	}
 	for name, table := range tables {
 		t.Run(name, func(t *testing.T) {
@@ -112,4 +117,59 @@ func mappings() [][2]rune {
 		}
 	}
 	return pairs
+}
+
+// TestAddedCharactersAreStillUnknown covers every character the tables add: the
+// toolchain has to still be answering no for it, or the entry has outlived the
+// edition it was written for.
+func TestAddedCharactersAreStillUnknown(t *testing.T) {
+	tables := []struct {
+		name  string
+		table *unicode.RangeTable
+		known func(rune) bool
+	}{
+		{"casedAdded", casedAdded, casedByToolchain},
+		{"upperAdded", upperAdded, func(r rune) bool { return unicode.Is(unicode.Lu, r) }},
+		{"lowerAdded", lowerAdded, func(r rune) bool { return unicode.Is(unicode.Ll, r) }},
+		{"letterAdded", letterAdded, unicode.IsLetter},
+		{"markAdded", markAdded, func(r rune) bool { return unicode.Is(unicode.M, r) }},
+	}
+	for _, table := range tables {
+		t.Run(table.name, func(t *testing.T) {
+			for _, r := range runesOf(table.table) {
+				if table.known(r) {
+					t.Errorf("the standard library already knows %U on Unicode %s", r, unicode.Version)
+				}
+			}
+		})
+	}
+}
+
+// TestCasedLettersAreLetters covers the seam between the tables: a character
+// one of them makes an uppercase or lowercase letter has to be a letter in the
+// one that answers for the category as a whole.
+func TestCasedLettersAreLetters(t *testing.T) {
+	for _, table := range []*unicode.RangeTable{upperAdded, lowerAdded} {
+		for _, r := range runesOf(table) {
+			if !IsLetter(r) {
+				t.Errorf("%U is a cased letter but letterAdded does not name it", r)
+			}
+		}
+	}
+}
+
+// runesOf walks out every character a table names.
+func runesOf(table *unicode.RangeTable) []rune {
+	var runes []rune
+	for _, r := range table.R16 {
+		for c := rune(r.Lo); c <= rune(r.Hi); c += rune(r.Stride) {
+			runes = append(runes, c)
+		}
+	}
+	for _, r := range table.R32 {
+		for c := rune(r.Lo); c <= rune(r.Hi); c += rune(r.Stride) {
+			runes = append(runes, c)
+		}
+	}
+	return runes
 }
