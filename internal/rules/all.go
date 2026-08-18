@@ -42,6 +42,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_control_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
+	"github.com/web-infra-dev/rslint/internal/rules/no_div_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_class_members"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_else_if"
@@ -208,6 +209,7 @@ func GetAllRules() []rule.Rule {
 		no_control_regex.NoControlRegexRule,
 		no_debugger.NoDebuggerRule,
 		no_delete_var.NoDeleteVarRule,
+		no_div_regex.NoDivRegexRule,
 		no_dupe_args.NoDupeArgsRule,
 		no_dupe_class_members.NoDupeClassMembersRule,
 		no_dupe_keys.NoDupeKeysRule,
