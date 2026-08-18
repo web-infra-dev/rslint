@@ -24,6 +24,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines_per_function"
 	"github.com/web-infra-dev/rslint/internal/rules/max_nested_callbacks"
 	"github.com/web-infra-dev/rslint/internal/rules/max_params"
+	"github.com/web-infra-dev/rslint/internal/rules/max_statements"
 	"github.com/web-infra-dev/rslint/internal/rules/no_alert"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
@@ -95,6 +96,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_param_reassign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_plusplus"
+	"github.com/web-infra-dev/rslint/internal/rules/no_promise_executor_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_proto"
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redeclare"
@@ -144,9 +146,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_void"
+	"github.com/web-infra-dev/rslint/internal/rules/no_warning_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
 	"github.com/web-infra-dev/rslint/internal/rules/one_var"
+	"github.com/web-infra-dev/rslint/internal/rules/operator_assignment"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_arrow_callback"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_destructuring"
@@ -193,6 +197,7 @@ func GetAllRules() []rule.Rule {
 		max_lines_per_function.MaxLinesPerFunctionRule,
 		max_nested_callbacks.MaxNestedCallbacksRule,
 		max_params.MaxParamsRule,
+		max_statements.MaxStatementsRule,
 		no_alert.NoAlertRule,
 		no_async_promise_executor.NoAsyncPromiseExecutorRule,
 		no_await_in_loop.NoAwaitInLoopRule,
@@ -258,6 +263,7 @@ func GetAllRules() []rule.Rule {
 		no_octal_escape.NoOctalEscapeRule,
 		no_param_reassign.NoParamReassignRule,
 		no_plusplus.NoPlusplusRule,
+		no_promise_executor_return.NoPromiseExecutorReturnRule,
 		no_proto.NoProtoRule,
 		no_redeclare.NoRedeclareRule,
 		radix.RadixRule,
@@ -293,6 +299,7 @@ func GetAllRules() []rule.Rule {
 		no_this_before_super.NoThisBeforeSuperRule,
 		no_var.NoVarRule,
 		no_void.NoVoidRule,
+		no_warning_comments.NoWarningCommentsRule,
 		no_with.NoWithRule,
 		prefer_rest_params.PreferRestParamsRule,
 		prefer_spread.PreferSpreadRule,
@@ -338,5 +345,6 @@ func GetAllRules() []rule.Rule {
 		symbol_description.SymbolDescriptionRule,
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
 		unicode_bom.UnicodeBomRule,
+		operator_assignment.OperatorAssignmentRule,
 	}
 }
