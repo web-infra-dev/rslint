@@ -193,7 +193,9 @@ func GetForStatementHeadLoc(
  * - `export default function() {}` → `function`
  */
 func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
-	parent := node.Parent
+	// ESTree exposes no node for parentheses, so a parenthesized function
+	// value still has the property that holds it as its parent.
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
 
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
@@ -214,24 +216,16 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 		return start
 
 	case ast.KindArrowFunction:
-		if parent != nil && (parent.Kind == ast.KindPropertyDeclaration || parent.Kind == ast.KindPropertyAssignment) {
+		if holdsFunctionValue(parent) {
 			start := nodeStartSkippingDecorators(sourceFile, parent)
-			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
-				return start.WithEnd(parenPos)
-			}
-			af := node.AsArrowFunction()
-			if af.Parameters != nil && len(af.Parameters.Nodes) > 0 {
-				paramStart := scanner.GetRangeOfTokenAtPosition(sourceFile, af.Parameters.Nodes[0].Pos())
-				return start.WithEnd(paramStart.Pos())
-			}
-			return start.WithEnd(af.EqualsGreaterThanToken.Pos())
+			return start.WithEnd(openingParenOfParamsPos(sourceFile, node))
 		}
 		af := node.AsArrowFunction()
 		arrowRange := scanner.GetRangeOfTokenAtPosition(sourceFile, af.EqualsGreaterThanToken.Pos())
 		return core.NewTextRange(arrowRange.Pos(), arrowRange.End())
 
 	case ast.KindFunctionExpression:
-		if parent != nil && (parent.Kind == ast.KindPropertyAssignment || parent.Kind == ast.KindPropertyDeclaration) {
+		if holdsFunctionValue(parent) {
 			start := nodeStartSkippingDecorators(sourceFile, parent)
 			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
 				return start.WithEnd(parenPos)
@@ -416,7 +410,8 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 	// private-key live on the surrounding PropertyDeclaration. Mirrors ESLint
 	// v9's `parent.type === "PropertyDefinition" && parent.value === node`
 	// branch in `astUtils.getFunctionNameWithKind`.
-	if parent != nil && parent.Kind == ast.KindPropertyDeclaration {
+	if parent != nil && parent.Kind == ast.KindPropertyDeclaration &&
+		!ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
 		if grandparent := parent.Parent; grandparent != nil &&
 			(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression) {
 			switch node.Kind {
@@ -464,7 +459,20 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 		tokens = append(tokens, "function")
 	}
 
-	if name := getFunctionDisplayName(node); name != "" {
+	// Upstream reads the key of a `Property` / `MethodDefinition` /
+	// `PropertyDefinition` parent, but has no `AccessorProperty` case, so an
+	// auto-accessor's initializer is named only by whatever name it carries
+	// itself.
+	name := ""
+	if parent != nil && parent.Kind == ast.KindPropertyDeclaration &&
+		ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
+		if n := node.Name(); n != nil && n.Kind == ast.KindIdentifier {
+			name = n.AsIdentifier().Text
+		}
+	} else {
+		name = getFunctionDisplayName(node)
+	}
+	if name != "" {
 		tokens = append(tokens, fmt.Sprintf("'%s'", name))
 	}
 
@@ -732,6 +740,50 @@ func nodeStartSkippingDecorators(sourceFile *ast.SourceFile, node *ast.Node) cor
 	}
 	tokenAfter := scanner.GetRangeOfTokenAtPosition(sourceFile, lastDecoratorEnd)
 	return core.NewTextRange(tokenAfter.Pos(), fallback.End())
+}
+
+// holdsFunctionValue reports whether parent is the ESTree `Property` /
+// `PropertyDefinition` that holds the function as its value, i.e. one of the
+// node kinds upstream's getFunctionHeadLoc reports from the member's own start
+// rather than from the function. An auto-accessor is excluded: upstream models
+// it as `AccessorProperty`, a kind getFunctionHeadLoc has no case for, so its
+// initializer is reported as a plain function.
+func holdsFunctionValue(parent *ast.Node) bool {
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindPropertyAssignment:
+		return true
+	case ast.KindPropertyDeclaration:
+		return !ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor)
+	}
+	return false
+}
+
+// openingParenOfParamsPos mirrors ESLint's astUtils.getOpeningParenOfParams for
+// arrow functions: the first `(` of the arrow, except that a single-parameter
+// arrow takes the token immediately before that parameter instead — the `(`
+// that opens the list, or, for the parenless `x => …` form, whatever precedes
+// the arrow, so a wrapping `(` still counts while `async` leaves the parameter
+// itself as the boundary.
+func openingParenOfParamsPos(sourceFile *ast.SourceFile, node *ast.Node) int {
+	af := node.AsArrowFunction()
+	if af.Parameters == nil || len(af.Parameters.Nodes) != 1 {
+		// A type parameter constraint can hold the first `(`, as upstream's
+		// unfiltered token scan does too.
+		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+			return parenPos
+		}
+		return af.EqualsGreaterThanToken.Pos()
+	}
+
+	paramStart := TrimNodeTextRange(sourceFile, af.Parameters.Nodes[0]).Pos()
+	if before, ok := TokenBeforePosition(sourceFile, paramStart); ok &&
+		before.Kind == ast.KindOpenParenToken {
+		return before.Start
+	}
+	return paramStart
 }
 
 // findOpenParenPos finds the position of the first '(' token in a function node.
