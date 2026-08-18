@@ -1,5 +1,5 @@
 // Package unicode17 carries the case data Unicode 16.0 and 17.0 added on top
-// of the edition the Go toolchain ships, so that a port of a JavaScript string
+// of the edition the Go toolchain ships, so that a port of a JavaScript
 // operation answers the way Node does rather than the way Go's tables do.
 //
 // Go 1.26's unicode tables are derived from Unicode 15.0, as are the tables

@@ -8,7 +8,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/unicode17"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 // StringToUppercase ports String.prototype.toUpperCase, which maps every

@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/unicode17"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 // Every expectation here is what `new RegExp("^"+x+"$", flags).test(y)` answers

@@ -6,7 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/unicode17"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 // Canonicalize maps a character to the one JavaScript compares it as when case

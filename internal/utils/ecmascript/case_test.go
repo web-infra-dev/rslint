@@ -3,7 +3,7 @@ package ecmascript
 import (
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/unicode17"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 // Every expectation here is what Node 26 answers for the same call. The cases
