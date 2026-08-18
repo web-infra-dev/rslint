@@ -20,15 +20,7 @@ test.concurrent('renders', ({ expect }) => {
 });
 ```
 
-An explicit inner `sequential` or `concurrent` registration overrides the mode inherited from an enclosing describe block. The mode may be declared either by a chained modifier or by the options object of a `(name, options, fn)` registration, which the runtime merges into the same options the modifiers write to:
-
-```typescript
-test('renders', { concurrent: true }, () => {
-  expect(render()).toMatchSnapshot();
-});
-```
-
-`concurrent: false` and `sequential: true` opt back out of a mode the chain or an enclosing describe block would otherwise supply. An options object whose value cannot be read statically — a shorthand property, a variable, or a spread — declares nothing, and the mode falls back to the chain.
+An explicit inner `sequential` or `concurrent` registration overrides the mode inherited from an enclosing describe block. The mode is read only from the chained modifiers: Rstest takes just `timeout`, `retry`, `repeats` and `meta` out of the options object of a `(name, options, fn)` registration, so `concurrent` and `sequential` written there have no effect at runtime and none here either.
 
 The rule recognizes Rstest aliases, named callbacks, `.each`, `.for`, `import.meta.rstest`, and `@rstest/playwright` registrations.
 

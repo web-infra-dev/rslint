@@ -28,10 +28,7 @@ ruleTester.run(
         code: `function helper() { expect(1).toMatchSnapshot() } test.concurrent('x', () => helper())`,
       },
       {
-        code: `test('x', { concurrent: true }, ({ expect }) => expect(1).toMatchSnapshot())`,
-      },
-      {
-        code: `describe.concurrent('s', () => it('x', { concurrent: false }, () => expect(1).toMatchSnapshot()))`,
+        code: `test('x', { concurrent: true }, () => expect(1).toMatchSnapshot())`,
       },
       {
         code: `describe('s', () => { function cb() { expect(1).toMatchSnapshot() } }); test.concurrent('x', cb)`,
@@ -59,11 +56,7 @@ ruleTester.run(
         errors: [{ messageId: 'requireLocalTestContext' }],
       },
       {
-        code: `test('x', { concurrent: true }, () => expect(1).toMatchSnapshot())`,
-        errors: [{ messageId: 'requireLocalTestContext' }],
-      },
-      {
-        code: `describe('s', { concurrent: true }, () => it('x', () => expect(1).toMatchSnapshot()))`,
+        code: `test.concurrent('x', { concurrent: false }, () => expect(1).toMatchSnapshot())`,
         errors: [{ messageId: 'requireLocalTestContext' }],
       },
       {

@@ -140,17 +140,6 @@ func parseRstestFnCall(
 	if root.Kind == ast.KindIdentifier {
 		localName = root.AsIdentifier().Text
 	}
-	// The chain is not the only place a mode is declared: the `(name, options,
-	// fn)` shape carries the same `concurrent` / `sequential` keys the runtime
-	// merges, and an options object is more specific than the chain it is
-	// written on.
-	executionMode := resolved.executionMode
-	if resolved.kind != RstestFnTypeHook {
-		if optionsMode := rstestOptionsExecutionMode(call); optionsMode != RstestExecutionDefault {
-			executionMode = optionsMode
-		}
-	}
-
 	parsed := &ParsedRstestFnCall{
 		ParsedCall: testFramework.ParsedCall{
 			Name:          resolved.name,
@@ -171,7 +160,7 @@ func parseRstestFnCall(
 			},
 		},
 		ParameterizedKind: resolved.parameterizedKind,
-		ExecutionMode:     executionMode,
+		ExecutionMode:     resolved.executionMode,
 		Skipped:           resolved.skipped,
 		Todo:              resolved.todo,
 	}
@@ -639,98 +628,6 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 		resolved.todo = true
 	}
 	return true
-}
-
-// rstestOptionsExecutionMode reads the execution mode from the options object
-// of a `(name, options, fn)` registration. The runtime merges that object into
-// the same option bag the chained modifiers write to, so `test('x', {
-// concurrent: true }, fn)` runs concurrently exactly as `test.concurrent` does,
-// and an explicit `concurrent: false` opts back out of a mode the chain or an
-// enclosing describe would otherwise supply.
-//
-// Only statically known booleans are read. A shorthand property, a computed
-// key, or a spread leaves the merged value unknowable, and a spread also
-// invalidates whatever the keys before it said, so the object stops declaring
-// anything rather than guessing a mode that would be reported on.
-func rstestOptionsExecutionMode(call *ast.CallExpression) RstestExecutionMode {
-	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) < 2 {
-		return RstestExecutionDefault
-	}
-	options := ast.SkipParentheses(call.Arguments.Nodes[1])
-	if options == nil || options.Kind != ast.KindObjectLiteralExpression {
-		return RstestExecutionDefault
-	}
-	literal := options.AsObjectLiteralExpression()
-	if literal == nil || literal.Properties == nil {
-		return RstestExecutionDefault
-	}
-
-	mode := RstestExecutionDefault
-	for _, property := range literal.Properties.Nodes {
-		if property == nil {
-			continue
-		}
-		if property.Kind == ast.KindSpreadAssignment {
-			mode = RstestExecutionDefault
-			continue
-		}
-		if property.Kind != ast.KindPropertyAssignment {
-			continue
-		}
-		assignment := property.AsPropertyAssignment()
-		if assignment == nil {
-			continue
-		}
-		value, known := staticBooleanValue(assignment.Initializer)
-		if !known {
-			continue
-		}
-		switch rstestOptionsPropertyName(property.Name()) {
-		case "concurrent":
-			// Concurrent has priority over sequential however the two arrive,
-			// matching the runtime merge applied to the chain. The loop still
-			// runs to the end so a later spread can withdraw this conclusion.
-			if value {
-				mode = RstestExecutionConcurrent
-			} else {
-				mode = RstestExecutionSequential
-			}
-		case "sequential":
-			if value && mode != RstestExecutionConcurrent {
-				mode = RstestExecutionSequential
-			}
-			// `sequential: false` declares nothing on its own: it leaves the
-			// mode to the chain or to the enclosing describe.
-		}
-	}
-	return mode
-}
-
-func rstestOptionsPropertyName(name *ast.Node) string {
-	if name == nil {
-		return ""
-	}
-	if value, ok := internalUtils.GetStaticStringLiteralValue(name); ok {
-		return value
-	}
-	if name.Kind == ast.KindIdentifier {
-		return name.AsIdentifier().Text
-	}
-	return ""
-}
-
-func staticBooleanValue(node *ast.Node) (bool, bool) {
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return false, false
-	}
-	switch node.Kind {
-	case ast.KindTrueKeyword:
-		return true, true
-	case ast.KindFalseKeyword:
-		return false, true
-	}
-	return false, false
 }
 
 func profileImportModule(profile rstestAPIProfile) string {
