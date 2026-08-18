@@ -69,7 +69,7 @@ func sourceMayUseRegExp(ctx rule.RuleContext) bool {
 	// With type information, an alias can arrive through an import or ambient
 	// declaration without any RegExp-related identifier in this source file.
 	// Keep the broad listeners in that case so those aliases remain observable.
-	if ctx.TypeChecker != nil && ctx.Program != nil {
+	if ctx.TypeChecker != nil && ctx.Program() != nil {
 		return true
 	}
 
@@ -367,7 +367,7 @@ func classifyBuiltinRegExpConstructorType(
 	callee *ast.Node,
 	cache *regExpCalleeCache,
 ) (isConstructor bool, conclusive bool) {
-	if ctx.TypeChecker == nil || ctx.Program == nil || callee == nil {
+	if ctx.TypeChecker == nil || ctx.Program() == nil || callee == nil {
 		return false, false
 	}
 	t := ctx.TypeChecker.GetTypeAtLocation(callee)
@@ -383,7 +383,7 @@ func classifyBuiltinRegExpConstructorType(
 	if result, ok := cache.types[t]; ok {
 		return result, true
 	}
-	result := utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "RegExpConstructor")
+	result := utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, t, "RegExpConstructor")
 	if cache.types == nil {
 		cache.types = make(map[*checker.Type]bool)
 	}

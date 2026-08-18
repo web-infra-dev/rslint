@@ -82,11 +82,7 @@ var NoFocusedTestsRule = rule.Rule{
 					})
 					if idx >= 0 {
 						entry := jestFnCall.MemberEntries[idx]
-						removalFixes, ok := jestUtils.RemoveMemberAccessorFixes(
-							ctx,
-							jestFnCall.MemberEntries,
-							idx,
-						)
+						removalFixes, ok := jestUtils.RemoveMemberAccessorFixes(ctx, &entry)
 						if !ok {
 							ctx.ReportNode(entry.Node, buildErrorFocusedTestMessage())
 							return

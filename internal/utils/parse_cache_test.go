@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/binder"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -282,6 +283,33 @@ func TestCachingHost_SourceSnapshotSharedAcrossParseOptions(t *testing.T) {
 	if got := fs.readCount(fileName); got != 1 {
 		t.Fatalf("source text must be shared across parse options, reads = %d, want 1", got)
 	}
+}
+
+func TestSourceSnapshotHostSharesTextWithoutSharingAST(t *testing.T) {
+	fileName := "/virtual/standalone.ts"
+	fs := newMemoryReadFS(map[string]string{fileName: "export const value = 1;\n"})
+	host := WithSourceSnapshots(CreateCompilerHost("/virtual", fs), &ParseCache{})
+	opts := testParseOpts(fileName, ast.ExternalModuleIndicatorOptions{})
+
+	first := host.GetSourceFile(opts)
+	if first == nil {
+		t.Fatal("first standalone parse returned nil")
+	}
+	binder.BindSourceFile(first)
+	second := host.GetSourceFile(opts)
+	if second == nil {
+		t.Fatal("second standalone parse returned nil")
+	}
+	if first == second {
+		t.Fatal("standalone parses must not publish ASTs into the shared Program cache")
+	}
+	if second.IsBound() {
+		t.Fatal("binding one standalone AST must not mutate a later parse")
+	}
+	if got := fs.readCount(fileName); got != 1 {
+		t.Fatalf("standalone parses must still share source text, reads = %d, want 1", got)
+	}
+	assertParseEquivalent(t, first, second)
 }
 
 func TestCachingHost_SourceSnapshotReadOnceAcrossPrograms(t *testing.T) {

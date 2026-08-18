@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1623,7 +1624,7 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 		t.Helper()
 		var diags []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program: program,
+			Program: lintprogram.NewFromCompiler(program),
 			File:    file,
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return lspActiveRulesForFile(cfg, sourceFile.FileName(), dir, false, true)

@@ -336,26 +336,7 @@ func UnwrapTypeAssertions(node *ast.Node) *ast.Node {
 }
 
 func GetAccessorReceiverAndParent(entry *ParsedJestFnMemberEntry) (*ast.Node, *ast.Node) {
-	if entry == nil || entry.Node == nil {
-		return nil, nil
-	}
-
-	parent := entry.Node.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
-	if parent == nil {
-		return nil, nil
-	}
-
-	switch parent.Kind {
-	case ast.KindPropertyAccessExpression:
-		return parent.AsPropertyAccessExpression().Expression, parent
-	case ast.KindElementAccessExpression:
-		return parent.AsElementAccessExpression().Expression, parent
-	default:
-		return nil, nil
-	}
+	return testFramework.AccessorReceiverAndParent(entry)
 }
 
 func IsNamedMember(node *ast.Node, name string) bool {
@@ -455,14 +436,4 @@ func testCallbackInitializerFunction(initializer *ast.Node) *ast.Node {
 		return init
 	}
 	return nil
-}
-
-// ResolveNamedFunctionCallback returns the function declaration node and name when
-// a Jest test call uses a named function reference as its callback (e.g. it('foo', getValue)).
-func ResolveNamedFunctionCallback(ctx rule.RuleContext, callExpr *ast.CallExpression) (*ast.Node, string) {
-	info := ResolveTestCallbackFunction(ctx, callExpr)
-	if info.FunctionNode != nil && info.FunctionNode.Kind == ast.KindFunctionDeclaration {
-		return info.FunctionNode, info.Name
-	}
-	return nil, info.Name
 }

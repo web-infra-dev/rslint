@@ -1,0 +1,28 @@
+[
+  {
+    "type": "file",
+    "name": "index",
+    "label": "Overview"
+  },
+  {
+    "type": "dir",
+    "name": "configuration",
+    "label": "Configuration API",
+    "collapsed": false
+  },
+  {
+    "type": "dir",
+    "name": "presets",
+    "label": "Presets",
+    "collapsed": false
+  },
+  {
+    "type": "section-header",
+    "label": "JavaScript API"
+  },
+  {
+    "type": "file",
+    "name": "rslint",
+    "label": "Rslint"
+  }
+]

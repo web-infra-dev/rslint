@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxFactory": "preact.h",
+    "jsxFragmentFactory": "preact.Fragment",
+    "target": "esnext",
+    "module": "commonjs",
+    "strict": true,
+    "types": []
+  }
+}

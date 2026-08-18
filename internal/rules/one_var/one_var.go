@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed one_var.schema.json
@@ -540,7 +541,7 @@ func fixSplit(view eslintVarDeclView, declList *ast.Node, kind string, sf *ast.S
 				core.NewTextRange(commaStart, commaEnd),
 				"; "+exportPrefix+kind+" ",
 			))
-		case utils.ContainsLineTerminator(between, 0, len(between)) ||
+		case ecmascript.ContainsLineTerminator(between, 0, len(between)) ||
 			strings.Contains(between, "//") ||
 			strings.Contains(between, "/*"):
 			// Line break or comment between `,` and the next declarator —

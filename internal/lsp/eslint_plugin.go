@@ -135,11 +135,11 @@ func eslintPluginRuleSet(entries []config.EslintPluginEntry) map[string]struct{}
 	return rules
 }
 
-func (s *Server) pluginRulesForCurrentGeneration(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
+func (s *Server) pluginRulesForCurrentGeneration(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
 	if s.eslintPluginRules == nil {
 		return rules
 	}
-	filtered := make([]linter.ConfiguredRule, 0, len(rules))
+	filtered := make([]rule.ConfiguredRule, 0, len(rules))
 	for _, configuredRule := range rules {
 		if !configuredRule.IsEslintPluginRule {
 			filtered = append(filtered, configuredRule)

@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -100,7 +100,7 @@ func matchesAllowedTypeOrBaseType(
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	allow []utils.TypeOrValueSpecifier,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	if utils.TypeMatchesSomeSpecifier(t, allow, nil, program) {
 		return true
@@ -125,7 +125,7 @@ func matchesAllowedBaseType(
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	allow []utils.TypeOrValueSpecifier,
-	program *compiler.Program,
+	program *program.Program,
 	seen map[*checker.Type]struct{},
 ) bool {
 	if _, ok := seen[t]; ok {
@@ -145,7 +145,7 @@ func matchesAllowedBaseType(
 
 type templateExpressionTypeChecker struct {
 	typeChecker *checker.Checker
-	program     *compiler.Program
+	program     *program.Program
 	options     RestrictTemplateExpressionsOptions
 }
 
@@ -224,7 +224,7 @@ var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		typeChecker := templateExpressionTypeChecker{
 			typeChecker: ctx.TypeChecker,
-			program:     ctx.Program,
+			program:     ctx.Program(),
 			options:     parseOptions(options),
 		}
 
