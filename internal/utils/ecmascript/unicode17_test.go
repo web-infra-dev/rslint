@@ -1,85 +1,17 @@
 package ecmascript
 
 import (
-	"slices"
-	"strconv"
-	"strings"
 	"testing"
-	"unicode"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript/unicode17"
 )
 
-// TestUnicode17DeltaStillNeeded is the marker on unicode17.go: it fails once
-// the toolchain's own tables cover what the delta stands in for, which is the
-// moment the file should be deleted rather than maintained.
-func TestUnicode17DeltaStillNeeded(t *testing.T) {
-	major, _, _ := strings.Cut(unicode.Version, ".")
-	edition, err := strconv.Atoi(major)
-	if err != nil {
-		t.Fatalf("cannot read the edition out of unicode.Version %q", unicode.Version)
-	}
-	if edition >= 17 {
-		t.Fatalf("the standard library is on Unicode %s, so unicode17.go is obsolete: "+
-			"delete it and unicode17_test.go, then drop the unicode17ToUpper call in "+
-			"Canonicalize, the unicode17Remap calls in StringToUppercase and "+
-			"StringToLowercase, and the unicode17CaseAdditions loop in caseTables",
-			unicode.Version)
-	}
-
-	for _, pair := range unicode17Delta() {
-		if upper := unicode.ToUpper(pair[0]); upper != pair[0] {
-			t.Errorf("unicode.ToUpper(%U) = %U on Unicode %s, so the delta no longer "+
-				"has to carry this pair", pair[0], upper, unicode.Version)
-		}
-		if lower := unicode.ToLower(pair[1]); lower != pair[1] {
-			t.Errorf("unicode.ToLower(%U) = %U on Unicode %s, so the delta no longer "+
-				"has to carry this pair", pair[1], lower, unicode.Version)
-		}
-	}
-}
-
-// TestUnicode17Canonicalize covers what the delta is for: JavaScript compares
-// each of these pairs equal under a regexp's `iu` flags, and Go's own tables
-// would compare them unequal. The `i` flag on its own canonicalizes one UTF-16
-// code unit at a time, so it joins the pairs inside the basic plane and leaves
-// the two supplementary-plane scripts apart — which is checked too, because the
-// delta must not reach further than JavaScript does.
-func TestUnicode17Canonicalize(t *testing.T) {
-	for _, pair := range unicode17Delta() {
-		lower, upper := pair[0], pair[1]
-		group := []rune{min(lower, upper), max(lower, upper)}
-		joinsWithoutU := lower <= 0xFFFF
-
-		if got := Canonicalize(lower, true); got != group[0] {
-			t.Errorf("Canonicalize(%U, true) = %U, want %U", lower, got, group[0])
-		}
-		if got := Canonicalize(upper, true); got != group[0] {
-			t.Errorf("Canonicalize(%U, true) = %U, want %U", upper, got, group[0])
-		}
-		if got := CaseEquivalents(lower, true); !slices.Equal(got, group) {
-			t.Errorf("CaseEquivalents(%U, true) = %U, want %U", lower, got, group)
-		}
-
-		wantCanonical, wantEquivalents := lower, []rune(nil)
-		if joinsWithoutU {
-			wantCanonical, wantEquivalents = upper, group
-		}
-		if got := Canonicalize(lower, false); got != wantCanonical {
-			t.Errorf("Canonicalize(%U, false) = %U, want %U", lower, got, wantCanonical)
-		}
-		if got := Canonicalize(upper, false); got != upper {
-			t.Errorf("Canonicalize(%U, false) = %U, want it to stand for itself", upper, got)
-		}
-		if got := CaseEquivalents(lower, false); !slices.Equal(got, wantEquivalents) {
-			t.Errorf("CaseEquivalents(%U, false) = %U, want %U", lower, got, wantEquivalents)
-		}
-	}
-}
-
-// TestUnicode17Mappings covers the other side of the delta: the caser the
-// string functions are built on is an older edition too, so both directions
-// have to reach past it.
+// TestUnicode17Mappings walks every character the delta names, which is what
+// case_test.go's table can only sample. Both directions have to reach past the
+// caser, since it is built on an older edition of Unicode than JavaScript
+// reads.
 func TestUnicode17Mappings(t *testing.T) {
-	for _, pair := range unicode17Delta() {
+	for _, pair := range unicode17Pairs(t) {
 		lower, upper := string(pair[0]), string(pair[1])
 		if got := StringToUppercase(lower); got != upper {
 			t.Errorf("StringToUppercase(%U) = %U, want %U", pair[0], []rune(got), pair[1])
@@ -95,14 +27,38 @@ func TestUnicode17Mappings(t *testing.T) {
 	}
 }
 
-// unicode17Delta flattens the two shapes the delta is written in into the
-// {lower, upper} pairs every test here wants.
-func unicode17Delta() [][2]rune {
-	pairs := append([][2]rune(nil), unicode17CasePairs[:]...)
-	for _, run := range unicode17CaseRuns {
-		for lower := run.lower; lower <= run.lastLower; lower++ {
-			pairs = append(pairs, [2]rune{lower, lower + run.toUpper})
+// TestUnicode17Cased walks the same characters through the Final_Sigma
+// condition, where what matters is not their mapping but that they are cased at
+// all: a capital sigma is final when a cased character comes before it and none
+// comes after.
+func TestUnicode17Cased(t *testing.T) {
+	for _, pair := range unicode17Pairs(t) {
+		for _, r := range pair {
+			before := string(r) + "Σ"
+			if got := StringToLowercase(before); got != StringToLowercase(string(r))+"ς" {
+				t.Errorf("StringToLowercase(%UΣ) = %U, want a final sigma", r, []rune(got))
+			}
+			after := "ΑΣ" + string(r)
+			if got := StringToLowercase(after); got != "ασ"+StringToLowercase(string(r)) {
+				t.Errorf("StringToLowercase(ΑΣ%U) = %U, want a plain sigma", r, []rune(got))
+			}
 		}
+	}
+}
+
+// unicode17Pairs reads the delta's mapping data back out as the {lower, upper}
+// pairs the tests here want. Only the lower half of a pair has an uppercase the
+// delta knows, so the walk names each pair once.
+func unicode17Pairs(t *testing.T) [][2]rune {
+	t.Helper()
+	var pairs [][2]rune
+	for _, r := range unicode17.CaseAdditions() {
+		if upper, ok := unicode17.ToUpper(r); ok {
+			pairs = append(pairs, [2]rune{r, upper})
+		}
+	}
+	if len(pairs) == 0 {
+		t.Fatal("the delta names no case mapping at all")
 	}
 	return pairs
 }

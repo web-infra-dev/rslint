@@ -79,6 +79,7 @@ canonicalise
 canonicalised
 canonicalises
 caser
+caseless
 catchable
 categorisation
 Cbar
@@ -363,6 +364,7 @@ nomatch
 nonconstructor
 noninteractive
 nonoctal
+nonspacing
 noopener
 noopenernoreferrer
 noreferrer

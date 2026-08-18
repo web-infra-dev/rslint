@@ -21,7 +21,6 @@ replace (
 	github.com/microsoft/typescript-go/shim/parser => ./shim/parser
 	github.com/microsoft/typescript-go/shim/project => ./shim/project
 	github.com/microsoft/typescript-go/shim/scanner => ./shim/scanner
-	github.com/microsoft/typescript-go/shim/stringutil => ./shim/stringutil
 	github.com/microsoft/typescript-go/shim/transformers/jsxtransforms => ./shim/transformers/jsxtransforms
 	github.com/microsoft/typescript-go/shim/tsoptions => ./shim/tsoptions
 	github.com/microsoft/typescript-go/shim/tspath => ./shim/tspath
@@ -52,7 +51,6 @@ require (
 	github.com/microsoft/typescript-go/shim/parser v0.0.0-00010101000000-000000000000
 	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/microsoft/typescript-go/shim/scanner v0.0.0
-	github.com/microsoft/typescript-go/shim/stringutil v0.0.0
 	github.com/microsoft/typescript-go/shim/transformers/jsxtransforms v0.0.0
 	github.com/microsoft/typescript-go/shim/tsoptions v0.0.0
 	github.com/microsoft/typescript-go/shim/tspath v0.0.0

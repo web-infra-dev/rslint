@@ -1,17 +1,17 @@
 // Package ecmascript holds the pieces of JavaScript's own semantics that a
 // port has to reproduce exactly, where Go's standard library answers a nearby
 // but different question. Trimming a string, deciding what counts as blank,
-// comparing two characters without regard to case, writing a number back out —
-// each of those is specified by ECMAScript, and each of them differs from the
-// Go equivalent in ways a rule ported from ESLint can observe.
+// mapping a string's case, writing a number back out — each of those is
+// specified by ECMAScript, and each of them differs from the Go equivalent in
+// ways a rule ported from ESLint can observe.
 //
 // A helper standing in for something JavaScript exposes carries that thing's
 // name with its receiver in front — [StringTrim] for String.prototype.trim,
 // [NumberToString] for Number::toString — so that a reader checking the port
 // against the language has one name to look for. Everything else names what
-// ECMAScript names it: a grammar production ([IsWhiteSpace]), an abstract
-// operation ([Canonicalize]), or, where the language spells out no name at
-// all, the question being asked ([IsBlank]).
+// ECMAScript names it: a grammar production ([IsWhiteSpace],
+// [IsLineTerminator]), or, where the language spells out no name at all, the
+// question being asked ([IsBlank]).
 //
 // Everything here is a pure function of its arguments. Only
 // [IsValidRegexLiteral] reaches past the standard library, for the scanner that

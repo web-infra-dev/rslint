@@ -57,7 +57,6 @@ func main() {
 		"jsonrpc",
 		"parser",
 		"scanner",
-		"stringutil",
 		"tsoptions",
 		"tspath",
 		"transformers/jsxtransforms",
