@@ -19,40 +19,75 @@ var schemaJSON []byte
 // compound-assignment token (`+=`), and whether it is commutative. Logical
 // assignment (`&&=`, `||=`, `??=`) and plain `=` are intentionally absent.
 type shorthandOperator struct {
-	plain       ast.Kind
-	compound    ast.Kind
-	commutative bool
+	plain                 ast.Kind
+	compound              ast.Kind
+	commutative           bool
+	plainText             string
+	compoundText          string
+	replacedDescription   string
+	unexpectedDescription string
 }
 
 var shorthandOperators = []shorthandOperator{
-	{ast.KindPlusToken, ast.KindPlusEqualsToken, false},
-	{ast.KindMinusToken, ast.KindMinusEqualsToken, false},
-	{ast.KindAsteriskToken, ast.KindAsteriskEqualsToken, true},
-	{ast.KindSlashToken, ast.KindSlashEqualsToken, false},
-	{ast.KindPercentToken, ast.KindPercentEqualsToken, false},
-	{ast.KindAsteriskAsteriskToken, ast.KindAsteriskAsteriskEqualsToken, false},
-	{ast.KindLessThanLessThanToken, ast.KindLessThanLessThanEqualsToken, false},
-	{ast.KindGreaterThanGreaterThanToken, ast.KindGreaterThanGreaterThanEqualsToken, false},
-	{ast.KindGreaterThanGreaterThanGreaterThanToken, ast.KindGreaterThanGreaterThanGreaterThanEqualsToken, false},
-	{ast.KindAmpersandToken, ast.KindAmpersandEqualsToken, true},
-	{ast.KindCaretToken, ast.KindCaretEqualsToken, true},
-	{ast.KindBarToken, ast.KindBarEqualsToken, true},
+	{plain: ast.KindPlusToken, compound: ast.KindPlusEqualsToken},
+	{plain: ast.KindMinusToken, compound: ast.KindMinusEqualsToken},
+	{plain: ast.KindAsteriskToken, compound: ast.KindAsteriskEqualsToken, commutative: true},
+	{plain: ast.KindSlashToken, compound: ast.KindSlashEqualsToken},
+	{plain: ast.KindPercentToken, compound: ast.KindPercentEqualsToken},
+	{plain: ast.KindAsteriskAsteriskToken, compound: ast.KindAsteriskAsteriskEqualsToken},
+	{plain: ast.KindLessThanLessThanToken, compound: ast.KindLessThanLessThanEqualsToken},
+	{plain: ast.KindGreaterThanGreaterThanToken, compound: ast.KindGreaterThanGreaterThanEqualsToken},
+	{plain: ast.KindGreaterThanGreaterThanGreaterThanToken, compound: ast.KindGreaterThanGreaterThanGreaterThanEqualsToken},
+	{plain: ast.KindAmpersandToken, compound: ast.KindAmpersandEqualsToken, commutative: true},
+	{plain: ast.KindCaretToken, compound: ast.KindCaretEqualsToken, commutative: true},
+	{plain: ast.KindBarToken, compound: ast.KindBarEqualsToken, commutative: true},
 }
 
-// shorthandOperatorsByPlain and shorthandOperatorsByCompound index
-// shorthandOperators by each of its two token forms, so checkAlways (which
-// starts from a plain operator) and checkNever (which starts from a compound
-// operator) both read from the single source of truth above.
 var (
-	shorthandOperatorsByPlain    = map[ast.Kind]shorthandOperator{}
-	shorthandOperatorsByCompound = map[ast.Kind]shorthandOperator{}
+	shorthandOperatorsByPlain    [ast.KindCaretToken - ast.KindPlusToken + 1]*shorthandOperator
+	shorthandOperatorsByCompound [ast.KindCaretEqualsToken - ast.KindPlusEqualsToken + 1]*shorthandOperator
 )
 
 func init() {
-	for _, op := range shorthandOperators {
-		shorthandOperatorsByPlain[op.plain] = op
-		shorthandOperatorsByCompound[op.compound] = op
+	for i := range shorthandOperators {
+		op := &shorthandOperators[i]
+		shorthandOperatorsByPlain[op.plain-ast.KindPlusToken] = op
+		shorthandOperatorsByCompound[op.compound-ast.KindPlusEqualsToken] = op
+		op.plainText = scanner.TokenToString(op.plain)
+		op.compoundText = scanner.TokenToString(op.compound)
+		op.replacedDescription = "Assignment (=) can be replaced with operator assignment (" + op.compoundText + ")."
+		op.unexpectedDescription = "Unexpected operator assignment (" + op.compoundText + ") shorthand."
 	}
+}
+
+func (op *shorthandOperator) replacedMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "replaced",
+		Description: op.replacedDescription,
+		Data:        map[string]string{"operator": op.compoundText},
+	}
+}
+
+func (op *shorthandOperator) unexpectedMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "unexpected",
+		Description: op.unexpectedDescription,
+		Data:        map[string]string{"operator": op.compoundText},
+	}
+}
+
+func shorthandOperatorByPlain(kind ast.Kind) *shorthandOperator {
+	if kind < ast.KindPlusToken || kind > ast.KindCaretToken {
+		return nil
+	}
+	return shorthandOperatorsByPlain[kind-ast.KindPlusToken]
+}
+
+func shorthandOperatorByCompound(kind ast.Kind) *shorthandOperator {
+	if kind < ast.KindPlusEqualsToken || kind > ast.KindCaretEqualsToken {
+		return nil
+	}
+	return shorthandOperatorsByCompound[kind-ast.KindPlusEqualsToken]
 }
 
 // isLiteralPropertyKey reports whether node is a literal usable as a computed
@@ -79,7 +114,7 @@ func isLiteralPropertyKey(node *ast.Node) bool {
 // and `x op= y` without changing how many times a getter/setter or a computed
 // key's `toString()` runs. Parentheses and TS-only wrappers (`as`,
 // `satisfies`, `!`) are transparent here — they have no runtime effect, and
-// whether the fix may drop one is decided separately, by the structural
+// whether the fix may drop one is decided separately, by the assertion-syntax
 // comparison in reportReplaced. Any node that is part of an optional chain is
 // rejected outright: ESLint's own canBeFixed checks the raw ESTree node type, and an
 // optional chain is always wrapped in a ChainExpression there, which matches
@@ -113,25 +148,86 @@ func canBeFixed(node *ast.Node) bool {
 	return false
 }
 
-func replacedMessage(operator string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "replaced",
-		Description: "Assignment (=) can be replaced with operator assignment (" + operator + ").",
-		Data:        map[string]string{"operator": operator},
+// hasSameTypeSyntax takes an allocation-free fast path for the common case
+// where both assertions repeat the same source text. The token fallback keeps
+// equivalent trivia and outer type parentheses transparent.
+func hasSameTypeSyntax(sourceFile *ast.SourceFile, left, right *ast.Node) bool {
+	left = ast.SkipParentheses(left)
+	right = ast.SkipParentheses(right)
+	if left == nil || right == nil || left.Kind != right.Kind {
+		return false
 	}
+	if scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, left, false) ==
+		scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, right, false) {
+		return true
+	}
+	return utils.HasSameTokens(sourceFile, left, right)
 }
 
-func unexpectedMessage(operator string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "unexpected",
-		Description: "Unexpected operator assignment (" + operator + ") shorthand.",
-		Data:        map[string]string{"operator": operator},
+// hasSameAssertionStructure reports whether two already-matched references
+// carry the same TypeScript-only wrappers. Parentheses are transparent, but
+// `as`, `satisfies`, angle-bracket assertions, and non-null assertions must
+// match at every reference component that the fixer may delete.
+//
+// Type nodes are compared by tokens rather than generic AST child traversal.
+// Some type syntax stores meaning in scalar fields that ForEachChild omits —
+// notably TypeOperatorNode.Operator (`keyof` versus `readonly`) and
+// ImportTypeNode.IsTypeOf. Token comparison keeps those distinctions while
+// ignoring comments and whitespace.
+//
+// The caller must first establish utils.IsSameReference(left, right, true), so
+// base identifier/property/literal equality does not need to be repeated here.
+func hasSameAssertionStructure(sourceFile *ast.SourceFile, left, right *ast.Node) bool {
+	left = ast.SkipParentheses(left)
+	right = ast.SkipParentheses(right)
+	if left == nil || right == nil || left.Kind != right.Kind {
+		return false
+	}
+	if ast.IsOptionalChain(left) != ast.IsOptionalChain(right) {
+		return false
+	}
+
+	switch left.Kind {
+	case ast.KindAsExpression:
+		leftAs := left.AsAsExpression()
+		rightAs := right.AsAsExpression()
+		return hasSameTypeSyntax(sourceFile, leftAs.Type, rightAs.Type) &&
+			hasSameAssertionStructure(sourceFile, leftAs.Expression, rightAs.Expression)
+	case ast.KindSatisfiesExpression:
+		leftSatisfies := left.AsSatisfiesExpression()
+		rightSatisfies := right.AsSatisfiesExpression()
+		return hasSameTypeSyntax(sourceFile, leftSatisfies.Type, rightSatisfies.Type) &&
+			hasSameAssertionStructure(sourceFile, leftSatisfies.Expression, rightSatisfies.Expression)
+	case ast.KindTypeAssertionExpression:
+		leftAssertion := left.AsTypeAssertion()
+		rightAssertion := right.AsTypeAssertion()
+		return hasSameTypeSyntax(sourceFile, leftAssertion.Type, rightAssertion.Type) &&
+			hasSameAssertionStructure(sourceFile, leftAssertion.Expression, rightAssertion.Expression)
+	case ast.KindNonNullExpression:
+		return hasSameAssertionStructure(
+			sourceFile,
+			left.AsNonNullExpression().Expression,
+			right.AsNonNullExpression().Expression,
+		)
+	case ast.KindPropertyAccessExpression:
+		return hasSameAssertionStructure(
+			sourceFile,
+			left.AsPropertyAccessExpression().Expression,
+			right.AsPropertyAccessExpression().Expression,
+		)
+	case ast.KindElementAccessExpression:
+		leftAccess := left.AsElementAccessExpression()
+		rightAccess := right.AsElementAccessExpression()
+		return hasSameAssertionStructure(sourceFile, leftAccess.Expression, rightAccess.Expression) &&
+			hasSameAssertionStructure(sourceFile, leftAccess.ArgumentExpression, rightAccess.ArgumentExpression)
+	default:
+		return true
 	}
 }
 
 // checkAlways implements the default "always" mode: `x = x op y` should be
 // written as `x op= y` where possible.
-func checkAlways(ctx rule.RuleContext, node *ast.Node) {
+func checkAlways(ctx *rule.RuleContext, node *ast.Node) {
 	binExpr := node.AsBinaryExpression()
 	if binExpr.OperatorToken.Kind != ast.KindEqualsToken {
 		return
@@ -143,53 +239,45 @@ func checkAlways(ctx rule.RuleContext, node *ast.Node) {
 	}
 	rhsExpr := rhs.AsBinaryExpression()
 	operatorKind := rhsExpr.OperatorToken.Kind
-	op, ok := shorthandOperatorsByPlain[operatorKind]
-	if !ok {
+	op := shorthandOperatorByPlain(operatorKind)
+	if op == nil {
 		return
 	}
 	commutative := op.commutative
 
 	left := binExpr.Left
-	replacementOperator := scanner.TokenToString(operatorKind) + "="
 
 	if utils.IsSameReference(left, rhsExpr.Left, true) {
-		reportReplaced(ctx, node, binExpr, left, rhs, rhsExpr, replacementOperator)
+		reportReplaced(ctx, node, binExpr, left, rhs, rhsExpr, op)
 		return
 	}
 	if commutative && utils.IsSameReference(left, rhsExpr.Right, true) {
 		// This case can't be fixed safely: if `a` and `b` both have custom
 		// valueOf() behavior, fixing `a = b * a` to `a *= b` would change the
 		// order the valueOf() functions run in.
-		ctx.ReportNode(node, replacedMessage(replacementOperator))
+		ctx.ReportNode(node, op.replacedMessage())
 	}
 }
 
 func reportReplaced(
-	ctx rule.RuleContext,
+	ctx *rule.RuleContext,
 	node *ast.Node,
 	binExpr *ast.BinaryExpression,
 	left *ast.Node,
 	rhs *ast.Node,
 	rhsExpr *ast.BinaryExpression,
-	replacementOperator string,
+	op *shorthandOperator,
 ) {
-	msg := replacedMessage(replacementOperator)
-	// The fix deletes the right-hand occurrence of the reference and keeps the
-	// assignment target verbatim, so the two must be interchangeable at the
-	// type level, not just at runtime. IsSameReference sees through `as`, `!`
-	// and `satisfies` (they have no runtime effect), which is what makes
-	// `x = (x as number) * 2` reportable — but dropping that `as number` would
-	// leave `x *= 2` type-checking against the declared type of `x` again.
-	// AreNodesStructurallyEqual keeps parentheses transparent while comparing
-	// TS wrappers as-is, so a fix is offered only when the deleted text carries
-	// exactly the assertions the surviving target already has.
-	if !canBeFixed(left) || !utils.AreNodesStructurallyEqual(left, rhsExpr.Left) {
-		ctx.ReportNode(node, msg)
-		return
-	}
-
-	ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
+	ctx.ReportNodeWithDeferredFixes(node, op.replacedMessage(), func() []rule.RuleFix {
 		sourceFile := ctx.SourceFile
+		// The fix deletes the right-hand occurrence of the reference and keeps
+		// the assignment target verbatim, so the two must be interchangeable at
+		// the type level, not just at runtime. Keep this edit-only work deferred:
+		// diagnostics-only consumers do not need to know whether a fix is safe.
+		if !canBeFixed(left) || !hasSameAssertionStructure(sourceFile, left, rhsExpr.Left) {
+			return nil
+		}
+
 		eqRange := utils.TrimNodeTextRange(sourceFile, binExpr.OperatorToken)
 		opRange := utils.TrimNodeTextRange(sourceFile, rhsExpr.OperatorToken)
 
@@ -201,7 +289,7 @@ func reportReplaced(
 		nodeRange := utils.TrimNodeTextRange(sourceFile, node)
 		leftText := text[nodeRange.Pos():eqRange.Pos()]
 		rightText := text[opRange.End():rhs.End()]
-		replacement := leftText + replacementOperator + rightText
+		replacement := leftText + op.compoundText + rightText
 
 		return []rule.RuleFix{rule.RuleFixReplace(sourceFile, node, replacement)}
 	})
@@ -284,24 +372,20 @@ func hasTypeArgumentList(node *ast.Node) bool {
 
 // checkNever implements the "never" mode: any of the 12 shorthand compound
 // assignment operators should be written as `x = x op y` instead.
-func checkNever(ctx rule.RuleContext, node *ast.Node) {
+func checkNever(ctx *rule.RuleContext, node *ast.Node) {
 	binExpr := node.AsBinaryExpression()
-	op, ok := shorthandOperatorsByCompound[binExpr.OperatorToken.Kind]
-	if !ok {
+	op := shorthandOperatorByCompound(binExpr.OperatorToken.Kind)
+	if op == nil {
 		return
 	}
 	plainOperatorKind := op.plain
 
-	operatorText := scanner.TokenToString(binExpr.OperatorToken.Kind)
-	msg := unexpectedMessage(operatorText)
+	ctx.ReportNodeWithDeferredFixes(node, op.unexpectedMessage(), func() []rule.RuleFix {
+		left := binExpr.Left
+		if !canBeFixed(left) {
+			return nil
+		}
 
-	left := binExpr.Left
-	if !canBeFixed(left) {
-		ctx.ReportNode(node, msg)
-		return
-	}
-
-	ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
 		sourceFile := ctx.SourceFile
 		nodeRange := utils.TrimNodeTextRange(sourceFile, node)
 		opRange := utils.TrimNodeTextRange(sourceFile, binExpr.OperatorToken)
@@ -312,7 +396,7 @@ func checkNever(ctx rule.RuleContext, node *ast.Node) {
 
 		text := sourceFile.Text()
 		leftText := text[nodeRange.Pos():opRange.Pos()]
-		plainOperatorText := scanner.TokenToString(plainOperatorKind)
+		plainOperatorText := op.plainText
 
 		newOperatorPrecedence := utils.EslintLikeBinaryOperatorPrecedence(plainOperatorKind)
 
@@ -368,13 +452,16 @@ var OperatorAssignmentRule = rule.Rule{
 			}
 		}
 
+		if never {
+			return rule.RuleListeners{
+				ast.KindBinaryExpression: func(node *ast.Node) {
+					checkNever(&ctx, node)
+				},
+			}
+		}
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if never {
-					checkNever(ctx, node)
-				} else {
-					checkAlways(ctx, node)
-				}
+				checkAlways(&ctx, node)
 			},
 		}
 	},

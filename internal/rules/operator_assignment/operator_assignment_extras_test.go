@@ -126,6 +126,35 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 				Code:   `declare let x: number | undefined; x = x! + 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 1, Column: 36}},
 			},
+			// TypeOperator stores `keyof` / `readonly` outside ForEachChild.
+			// Treating those types as structurally equal would drop the RHS
+			// assertion and turn valid source into a TS2469 error. Report only.
+			{
+				Code: `declare let box: any, y: any;
+(box as { value: keyof number[] }).value = (box as { value: readonly number[] }).value + y;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 2, Column: 1}},
+			},
+			// ImportType similarly stores its leading `typeof` in a scalar field.
+			{
+				Code: `declare let box: any, y: any;
+(box as { value: typeof import("pkg") }).value = (box as { value: import("pkg") }).value + y;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 2, Column: 1}},
+			},
+			// Assertion wrappers on a static computed key are part of the deleted
+			// reference too and therefore must also match.
+			{
+				Code: `declare let box: any, y: any;
+box[0 as keyof number[]] = box[0 as readonly number[]] + y;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 2, Column: 1}},
+			},
+			// Matching assertion tokens remain fixable; trivia is irrelevant.
+			{
+				Code: `declare let box: any, y: any;
+(box as { value: keyof /* lhs */ number[] }).value = (box as { value: keyof number[] }).value + y;`,
+				Output: []string{`declare let box: any, y: any;
+(box as { value: keyof /* lhs */ number[] }).value += y;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 2, Column: 1}},
+			},
 			// ---- ... including when the mismatch is nested in the receiver of
 			// a member access rather than at the top level ----
 			{
