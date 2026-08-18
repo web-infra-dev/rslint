@@ -176,6 +176,7 @@ fieldset
 figcaption
 fileless
 finalizer
+fixability
 fixall
 flaggable
 flowto
@@ -344,6 +345,7 @@ napi
 nashorn
 native
 nbsp
+ndefined
 neighbour
 neighbouring
 nend
@@ -621,6 +623,7 @@ unrepresentable
 unrooted
 unshadowed
 unshift
+unspaced
 unstarted
 unstrict
 unstub

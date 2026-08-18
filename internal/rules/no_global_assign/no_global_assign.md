@@ -29,7 +29,7 @@ function foo(Array) {
 }
 ```
 
-Globals declared through [`languageOptions.globals`](/config/#languageoptionsglobals) or a `/* global */` comment carry their own access level: a `readonly` name is reported like a built-in, and a `writable` name may be reassigned — including a built-in whose declaration lifts the default. The environment maps exported as `globals` from `@rslint/core` use `false` for read-only names and `true` for writable names, so they feed the same access checks directly.
+Globals declared through [`languageOptions.globals`](/config/language-options#languageoptionsglobals) or a `/* global */` comment carry their own access level: a `readonly` name is reported like a built-in, and a `writable` name may be reassigned — including a built-in whose declaration lifts the default. The environment maps exported as `globals` from `@rslint/core` use `false` for read-only names and `true` for writable names, so they feed the same access checks directly.
 
 Examples of **incorrect** code with `globals: { BUILD_ID: 'readonly' }`:
 

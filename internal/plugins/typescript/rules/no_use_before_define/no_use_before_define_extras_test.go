@@ -1,3 +1,8 @@
+// TestNoUseBeforeDefineExtras locks in branches and edge shapes that the
+// upstream test suite doesn't exercise — class definitions, scoping, nesting,
+// and the tsgo AST quirks that diverge from ESTree — so future refactors can't
+// silently regress them. The migrated upstream cases live in
+// no_use_before_define_upstream_test.go.
 package no_use_before_define
 
 import (
@@ -7,9 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// TestEdgeCases covers missing scenarios from the ESLint/typescript-eslint test suites
-// and systematically enumerates edge cases across class definitions, scoping, and nesting.
-func TestEdgeCases(t *testing.T) {
+func TestNoUseBeforeDefineExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUseBeforeDefineRule,
 
 		// =====================================================================
@@ -128,12 +131,21 @@ func TestEdgeCases(t *testing.T) {
 				Options: map[string]interface{}{"allowNamedExports": true},
 			},
 
+			// ----- A parameter property read through `this` is a property
+			// access, not a reference to the constructor parameter binding -----
+			{Code: `class C { field = this.value; constructor(private value: number) {} }`},
+
+			// ----- `export = X` / `export default X` may export a type, so the
+			// ----- exported name is a type reference and the default
+			// ----- ignoreTypeReferences exempts it -----
+			{Code: `export default a; const a = 1;`, Options: map[string]interface{}{"allowNamedExports": true}},
+			{Code: `export default a; const a = 1;`},
+			{Code: `export = foobar; declare function foobar(): void;`},
+			// A value read in an exported initializer is not a type reference.
+			{Code: `const a = 1; export const q = a;`},
+
 			// ----- Type-only named exports -----
-			{Code: `let x = 1; export type { x };`},
-			{Code: `function f() {} export type { f };`},
 			{Code: `type T = number; export type { T };`},
-			// The local value does not shadow the real global type target.
-			{Code: `export type { HTMLElement }; let HTMLElement = 1;`},
 			{
 				Code:    `export type { x }; let x = 1;`,
 				Options: map[string]interface{}{"allowNamedExports": true},
@@ -206,6 +218,17 @@ declare global {
   }
 }
 `},
+
+			// ----- A string-literal enum member takes part in name resolution -----
+			// ----- but declares no identifier, so it is never a definition site -----
+			{Code: `enum E { b = a, "a" = 1 }`},
+			{Code: `enum E { "a" = 1, b = a } const a = 2;`},
+			{Code: `enum E { b = a, "a" = 1 } const a = 2;`},
+
+			// ----- A local type declaration does not bind the value space, so a -----
+			// ----- value read of a name it shares with a global is unaffected -----
+			{Code: `Map; interface Map<K, V> {}`},
+			{Code: `new Map(); interface Map<K, V> { extra(): void }`},
 		},
 
 		// =====================================================================
@@ -245,13 +268,13 @@ declare global {
 					{MessageId: "noUseBeforeDefine", Line: 1, Column: 20},
 				},
 			},
-			// Qualified-name heritage: both `ns` and `B` resolve to later declarations.
+			// Qualified-name heritage: only the left-most name is a reference —
+			// `B` names a member of the namespace, not a binding in this scope.
 			{
 				Code:    `interface A extends ns.B {} namespace ns { export interface B {} }`,
 				Options: map[string]interface{}{"ignoreTypeReferences": false},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noUseBeforeDefine", Line: 1, Column: 21},
-					{MessageId: "noUseBeforeDefine", Line: 1, Column: 24},
 				},
 			},
 
@@ -270,14 +293,6 @@ declare global {
 					{MessageId: "noUseBeforeDefine", Line: 1, Column: 26},
 				},
 			},
-			// ----- Field initializer before constructor parameter property assignment -----
-			{
-				Code: `class C { field = this.value; constructor(private value: number) {} }`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noUseBeforeDefine", Line: 1, Column: 24},
-				},
-			},
-
 			// ----- Static block referencing variable declared after -----
 			{
 				Code: `class C { static { a; } } let a: any;`,
@@ -349,12 +364,21 @@ declare global {
 				},
 			},
 
-			// ----- export default still reports with allowNamedExports -----
+			// ----- `export = X` / `export default X` can export a type, so the
+			// ----- exported name counts as a type reference and is only
+			// ----- reported once ignoreTypeReferences is off -----
 			{
 				Code:    `export default a; const a = 1;`,
-				Options: map[string]interface{}{"allowNamedExports": true},
+				Options: map[string]interface{}{"ignoreTypeReferences": false},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noUseBeforeDefine"},
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 16},
+				},
+			},
+			{
+				Code:    `export = foobar; declare function foobar(): void;`,
+				Options: map[string]interface{}{"ignoreTypeReferences": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 10},
 				},
 			},
 
@@ -402,6 +426,14 @@ declare global {
 
 			// ----- Type-only named exports before define (typescript-eslint -----
 			// ----- reports these even with the default ignoreTypeReferences) -----
+			// A local binding that shares a name with a global type is no
+			// exception: the export specifier resolves to the local one.
+			{
+				Code: `export type { HTMLElement }; let HTMLElement = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 15},
+				},
+			},
 			{
 				Code: `export type { x }; let x = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -430,6 +462,28 @@ declare global {
 				Code: `export type { T }; type T = number;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noUseBeforeDefine", Line: 1, Column: 15},
+				},
+			},
+
+			// ----- A type-only export specifier only names the type space, so -----
+			// ----- it never reaches a value binding and is reported wherever -----
+			// ----- that binding sits -----
+			{
+				Code: `let x = 1; export type { x };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 26},
+				},
+			},
+			{
+				Code: `function f() {} export type { f };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 31},
+				},
+			},
+			{
+				Code: `let x = 1; export { type x };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 26},
 				},
 			},
 
@@ -621,22 +675,11 @@ const a = 1;
 				},
 			},
 
-			// =========== Local declaration merged with a lib.d.ts global ===========
-			// A file-level declaration binds the name for the whole file, so the
-			// earlier use is reported even though the value itself comes from
-			// lib.d.ts. Matches ESLint, whose scope analysis merges the local
-			// declaration into the same variable as the predefined global.
-
+			// ----- An enum member reference that resolves past the enum body -----
 			{
-				Code: `Map; interface Map<K, V> {}`,
+				Code: `enum E { b = a } const a = 2;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noUseBeforeDefine", Line: 1, Column: 1},
-				},
-			},
-			{
-				Code: `new Map(); interface Map<K, V> { extra(): void }`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noUseBeforeDefine", Line: 1, Column: 5},
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 14},
 				},
 			},
 		},

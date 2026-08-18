@@ -1,0 +1,328 @@
+import { RuleTester } from '../rule-tester';
+
+const ruleTester = new RuleTester();
+
+// Mirrors the upstream operator-assignment valid/invalid semantic set (Layer
+// 1). It verifies rule registration + wire protocol + ESLint-compatible
+// diagnostic shape; the exhaustive edge-shape / branch lock-in coverage lives
+// in the Go suite (operator_assignment_extras_test.go).
+ruleTester.run('operator-assignment', {
+  valid: [
+    'x = y',
+    'x = y + x',
+    'x += x + y',
+    'x = (x + y) - z',
+    'x -= y',
+    'x = y - x',
+    'x *= x',
+    'x = y * z',
+    'x = (x * y) * z',
+    'x = y / x',
+    'x /= y',
+    'x %= y',
+    'x <<= y',
+    'x >>= x >> y',
+    'x >>>= y',
+    'x &= y',
+    'x **= y',
+    'x ^= y ^ z',
+    'x |= x | y',
+    'x = x && y',
+    'x = x || y',
+    'x = x < y',
+    'x = x > y',
+    'x = x <= y',
+    'x = x >= y',
+    'x = x instanceof y',
+    'x = x in y',
+    'x = x == y',
+    'x = x != y',
+    'x = x === y',
+    'x = x !== y',
+    "x[y] = x['y'] + z",
+    "x.y = x['y'] / z",
+    'x.y = z + x.y',
+    'x[fn()] = x[fn()] + y',
+    { code: 'x += x + y', options: ['always'] as any },
+    { code: 'x = x + y', options: ['never'] as any },
+    { code: 'x = x ** y', options: ['never'] as any },
+    'x = y ** x',
+    'x = x * y + z',
+    { code: 'this.x = this.y + z', options: ['always'] as any },
+    { code: 'this.x = foo.x + y', options: ['always'] as any },
+    { code: 'this.x = foo.this.x + y', options: ['always'] as any },
+    'const foo = 0; class C { foo = foo + 1; }',
+    // does not check logical operators
+    { code: 'x = x && y', options: ['always'] as any },
+    { code: 'x = x || y', options: ['always'] as any },
+    { code: 'x = x ?? y', options: ['always'] as any },
+    { code: 'x &&= y', options: ['never'] as any },
+    { code: 'x ||= y', options: ['never'] as any },
+    { code: 'x ??= y', options: ['never'] as any },
+  ],
+  invalid: [
+    { code: 'x = x + y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x - y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x * y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = y * x', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = (y * z) * x', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x / y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x % y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x << y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x >> y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x >>> y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x & y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x ^ y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x = x | y', errors: [{ messageId: 'replaced' }] },
+    { code: 'x[0] = x[0] - y', errors: [{ messageId: 'replaced' }] },
+    {
+      code: "x.y[z['a']][0].b = x.y[z['a']][0].b * 2",
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x = x + y',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x = (x + y)',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x = x + (y)',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x += (y)',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'x += y',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    { code: 'foo.bar = foo.bar + baz', errors: [{ messageId: 'replaced' }] },
+    {
+      code: 'foo.bar += baz',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'this.foo = this.foo + bar',
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'this.foo += bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo.bar.baz = foo.bar.baz + qux',
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'foo.bar.baz += qux',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'this.foo.bar = this.foo.bar + baz',
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'this.foo.bar += baz',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo[bar] = foo[bar] + baz',
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'this[foo] = this[foo] + bar',
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'foo[bar] >>>= baz',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'this[foo] >>>= bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    { code: 'foo[5] = foo[5] / baz', errors: [{ messageId: 'replaced' }] },
+    { code: 'this[5] = this[5] / foo', errors: [{ messageId: 'replaced' }] },
+    {
+      code: '/*1*/x/*2*/./*3*/y/*4*/= x.y +/*5*/z/*6*/./*7*/w/*8*/;',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x // 1\n . // 2\n y // 3\n = x.y + //4\n z //5\n . //6\n w;',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x = /*1*/ x + y',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x = //1\n x + y',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x.y = x/*1*/.y + z',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x.y = x. //1\n y + z',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x = x /*1*/ + y',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: 'x = x //1\n + y',
+      options: ['always'] as any,
+      errors: [{ messageId: 'replaced' }],
+    },
+    {
+      code: '/*1*/x +=/*2*/y/*3*/;',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'x +=//1\n y',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: '(/*1*/x += y)',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'x/*1*/+=  y',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'x //1\n +=  y',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: '(/*1*/x) +=  y',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'x/*1*/.y +=  z',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'x.//1\n y +=  z',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: '(foo.bar) ^= ((((((((((((((((baz))))))))))))))))',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    { code: 'foo = foo ** bar', errors: [{ messageId: 'replaced' }] },
+    {
+      code: 'foo **= bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo *= bar + 1',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo -= bar - baz',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo += bar + baz',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo += bar = 1',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo *= (bar + 1)',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo+=-bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo/=bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo/=/**/bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo/=//\nbar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo/=/^bar$/',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo+=+bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo+= +bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo+=/**/+bar',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'foo+=+bar===baz',
+      options: ['never'] as any,
+      errors: [{ messageId: 'unexpected' }],
+    },
+    // Optional chaining
+    {
+      code: '(obj?.a).b = (obj?.a).b + y',
+      errors: [{ messageId: 'replaced' }],
+    },
+    { code: 'obj.a = obj?.a + b', errors: [{ messageId: 'replaced' }] },
+  ],
+});
