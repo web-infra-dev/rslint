@@ -153,6 +153,7 @@ describe('defineConfig and config presets', () => {
       'rstest/no-mocks-import': 'error',
       'rstest/no-standalone-expect': 'error',
       'rstest/valid-expect': 'error',
+      'rstest/valid-expect-in-promise': 'error',
       'rstest/valid-title': 'error',
     });
   });
