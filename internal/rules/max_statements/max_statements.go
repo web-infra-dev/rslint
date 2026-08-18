@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -35,13 +36,14 @@ var MaxStatementsRule = rule.Rule{
 			count int
 		}
 		var topLevelFunctions []topLevelEntry
+		headLocator := functionHeadLocator{sourceFile: ctx.SourceFile}
 
 		report := func(node *ast.Node, count int) {
 			if count <= opts.max {
 				return
 			}
 			name := utils.UpperCaseFirstASCII(utils.GetFunctionNameWithKindCore(node))
-			ctx.ReportRange(functionHeadLoc(ctx.SourceFile, node), rule.RuleMessage{
+			ctx.ReportRange(headLocator.loc(node), rule.RuleMessage{
 				Id: "exceed",
 				Description: fmt.Sprintf(
 					"%s has too many statements (%d). Maximum allowed is %d.",
@@ -204,12 +206,26 @@ func hasDecorator(node *ast.Node) bool {
 	return false
 }
 
-// functionHeadLoc mirrors core ESLint's getFunctionHeadLoc, which starts a
-// class member's report at the member's own start — decorators included. The
+// functionHeadLocator mirrors core ESLint's getFunctionHeadLoc, which starts
+// a class member's report at the member's own start — decorators included. The
 // shared helper follows typescript-eslint's variant, which deliberately skips
-// them, so restore the member start for decorated members.
-func functionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
-	loc := utils.GetFunctionHeadLoc(sourceFile, node)
+// them, so the locator restores the member start for decorated members.
+type functionHeadLocator struct {
+	sourceFile *ast.SourceFile
+	tokens     *scanner.Scanner
+}
+
+func (l *functionHeadLocator) loc(node *ast.Node) core.TextRange {
+	// GetFunctionHeadLoc has to reproduce SourceCode.getTokenBefore() for a
+	// single-parameter field arrow. Its general implementation scans from the
+	// start of the source file, which becomes quadratic when this rule reports
+	// many such fields in one file. The owning field gives us a narrow, local
+	// token boundary while preserving the same core-ESLint range.
+	if loc, ok := l.singleParameterFieldArrowHeadLoc(node); ok {
+		return loc
+	}
+
+	loc := utils.GetFunctionHeadLoc(l.sourceFile, node)
 
 	member := node
 	switch {
@@ -231,7 +247,71 @@ func functionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange 
 	if !hasDecorator(member) {
 		return loc
 	}
-	return core.NewTextRange(utils.TrimNodeTextRange(sourceFile, member).Pos(), loc.End())
+	return core.NewTextRange(utils.TrimNodeTextRange(l.sourceFile, member).Pos(), loc.End())
+}
+
+// singleParameterFieldArrowHeadLoc returns core ESLint's report range for an
+// arrow held directly by an object property or ordinary class field. Only
+// ParenthesizedExpression wrappers are transparent; an auto-accessor or any
+// other expression wrapper deliberately falls back to GetFunctionHeadLoc.
+func (l *functionHeadLocator) singleParameterFieldArrowHeadLoc(node *ast.Node) (core.TextRange, bool) {
+	if node.Kind != ast.KindArrowFunction {
+		return core.TextRange{}, false
+	}
+	arrow := node.AsArrowFunction()
+	if arrow.Parameters == nil || len(arrow.Parameters.Nodes) != 1 {
+		return core.TextRange{}, false
+	}
+
+	owner := ast.WalkUpParenthesizedExpressions(node.Parent)
+	if owner == nil {
+		return core.TextRange{}, false
+	}
+	switch owner.Kind {
+	case ast.KindPropertyAssignment:
+	case ast.KindPropertyDeclaration:
+		if ast.HasSyntacticModifier(owner, ast.ModifierFlagsAccessor) {
+			return core.TextRange{}, false
+		}
+	default:
+		return core.TextRange{}, false
+	}
+
+	parameterStart := utils.TrimNodeTextRange(l.sourceFile, arrow.Parameters.Nodes[0]).Pos()
+	scanStart := utils.TrimNodeTextRange(l.sourceFile, node).Pos()
+	if parent := node.Parent; parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		// A parenless arrow can itself be wrapped: `field = (value => {})`.
+		// ESLint sees no wrapper node, so that `(` is the token before `value`.
+		scanStart = utils.TrimNodeTextRange(l.sourceFile, parent).Pos()
+	}
+
+	end := parameterStart
+	var previousKind ast.Kind
+	previousStart := 0
+	foundPrevious := false
+	if l.tokens == nil {
+		l.tokens = scanner.NewScanner()
+	}
+	// Reuse one scanner per file: constructing one for every report would trade
+	// the quadratic scan for avoidable per-diagnostic allocations.
+	l.tokens.SetText(l.sourceFile.Text())
+	l.tokens.SetLanguageVariant(l.sourceFile.LanguageVariant)
+	l.tokens.ResetTokenState(scanStart)
+	l.tokens.Scan()
+	tokens := l.tokens
+	for tokens.Token() != ast.KindEndOfFile && tokens.TokenStart() < parameterStart {
+		if tokens.TokenEnd() <= parameterStart {
+			previousKind = tokens.Token()
+			previousStart = tokens.TokenStart()
+			foundPrevious = true
+		}
+		tokens.Scan()
+	}
+	if foundPrevious && previousKind == ast.KindOpenParenToken {
+		end = previousStart
+	}
+
+	return core.NewTextRange(utils.TrimNodeTextRange(l.sourceFile, owner).Pos(), end), true
 }
 
 type ruleOptions struct {

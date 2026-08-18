@@ -61,6 +61,10 @@ func TestMaxStatementsExtras(t *testing.T) {
 			// so the lone implementation is still "the" top-level function and is
 			// exempted by the topLevelFunctions.length === 1 check, despite exceeding max.
 			{Code: "function foo(x: number): void;\nfunction foo(x: string): void;\nfunction foo(x: any) { 1; 2; 3; 4; 5; }", Options: optionsWithTopLevel(1, true)},
+
+			// The report starts on the field, even when tsgo preserves an outer
+			// ParenthesizedExpression, so disabling that field's line suppresses it.
+			{Code: "class C {\n  // eslint-disable-next-line test\n  f =\n    (x => { a; b; });\n}", Options: option(1)},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: object literal method, string-literal key ----
@@ -282,6 +286,11 @@ func TestMaxStatementsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
 			},
 			{
+				Code:    "class C { f = x => { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
+			},
+			{
 				Code:    "class C { f = ((x) => { a; b; }); }",
 				Options: option(1),
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 16}},
@@ -290,6 +299,26 @@ func TestMaxStatementsExtras(t *testing.T) {
 				Code:    "const o = { f: (x => { a; b; }) };",
 				Options: option(1),
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 13, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code:    "class C { f = (/* c */ x => { a; b; }); }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:    "class C { @dec f = x => { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 20}},
+			},
+			{
+				Code:    "class C { f = <T extends (string | number)>(x: T) => { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 44}},
+			},
+			{
+				Code:    "class C { f = async x => { a; b; }; }",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Async method 'f'", 2, 1), Line: 1, Column: 11, EndLine: 1, EndColumn: 21}},
 			},
 			// ---- Dimension 3: decorators and parentheses compose — the head still starts
 			// at the decorated member ----
@@ -349,6 +378,11 @@ func TestMaxStatementsExtras(t *testing.T) {
 				Code:    "class C { accessor #f = () => { a; b; }; }",
 				Options: option(1),
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 1, Column: 28, EndLine: 1, EndColumn: 30}},
+			},
+			{
+				Code:    "class C {\n  // eslint-disable-next-line test\n  accessor f =\n    x => { a; b; };\n}",
+				Options: option(1),
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Message: exceedMessage("Arrow function", 2, 1), Line: 4, Column: 7, EndLine: 4, EndColumn: 9}},
 			},
 
 			// ---- Real-user: eslint/eslint#12950 — ignoreTopLevelFunctions only exempts a
