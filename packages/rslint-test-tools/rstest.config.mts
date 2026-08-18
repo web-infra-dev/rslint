@@ -143,6 +143,7 @@ export default defineConfig({
     './tests/eslint/rules/no-useless-assignment.test.ts',
     './tests/eslint/rules/no-useless-computed-key.test.ts',
     './tests/eslint/rules/no-useless-concat.test.ts',
+    './tests/eslint/rules/no-warning-comments.test.ts',
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
