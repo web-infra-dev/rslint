@@ -95,6 +95,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_param_reassign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_plusplus"
+	"github.com/web-infra-dev/rslint/internal/rules/no_promise_executor_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_proto"
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redeclare"
@@ -144,6 +145,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_void"
+	"github.com/web-infra-dev/rslint/internal/rules/no_warning_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
 	"github.com/web-infra-dev/rslint/internal/rules/one_var"
@@ -259,6 +261,7 @@ func GetAllRules() []rule.Rule {
 		no_octal_escape.NoOctalEscapeRule,
 		no_param_reassign.NoParamReassignRule,
 		no_plusplus.NoPlusplusRule,
+		no_promise_executor_return.NoPromiseExecutorReturnRule,
 		no_proto.NoProtoRule,
 		no_redeclare.NoRedeclareRule,
 		radix.RadixRule,
@@ -294,6 +297,7 @@ func GetAllRules() []rule.Rule {
 		no_this_before_super.NoThisBeforeSuperRule,
 		no_var.NoVarRule,
 		no_void.NoVoidRule,
+		no_warning_comments.NoWarningCommentsRule,
 		no_with.NoWithRule,
 		prefer_rest_params.PreferRestParamsRule,
 		prefer_spread.PreferSpreadRule,
