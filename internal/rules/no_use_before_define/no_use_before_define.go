@@ -93,6 +93,9 @@ var NoUseBeforeDefineRule = rule.Rule{
 				continue
 			}
 			declaration := ref.Resolved()
+			// `Variable.ID` is upstream's `variable.defs[0].name`, which for a
+			// string-literal enum member is the literal — still a definition
+			// site to measure the reference against.
 			if ref.Identifier.End() < declaration.ID.End() ||
 				(isEvaluatedDuringInitialization(ref) && !isTypeReference(ref.Identifier)) {
 				ctx.ReportNode(ref.Identifier, rule.RuleMessage{
@@ -118,12 +121,6 @@ func shouldCheck(ref *scope.Reference, opts options) bool {
 
 	declaration := ref.Resolved()
 	if declaration == nil {
-		return false
-	}
-
-	// A binding with no identifier — a string-literal enum member — has no
-	// declaration site to point the reader at, so upstream leaves it alone.
-	if declaration.Anonymous {
 		return false
 	}
 
@@ -167,25 +164,7 @@ func shouldCheck(ref *scope.Reference, opts options) bool {
 		return false
 	}
 
-	if isFromFunctionTypeScope(ref) {
-		return false
-	}
-
 	return true
-}
-
-// isFromFunctionTypeScope reports whether the reference is evaluated in the
-// scope a TS function type puts its type parameters and parameters in. Nothing
-// in such a signature runs, so upstream never reports a reference from one.
-func isFromFunctionTypeScope(ref *scope.Reference) bool {
-	from := ref.From
-	if from == nil || from.Kind != scope.KindFunction || from.Block == nil {
-		return false
-	}
-	block := from.Block
-	return ast.IsFunctionTypeNode(block) || ast.IsConstructorTypeNode(block) ||
-		ast.IsCallSignatureDeclaration(block) || ast.IsConstructSignatureDeclaration(block) ||
-		ast.IsMethodSignatureDeclaration(block)
 }
 
 func isFunctionNameDef(v *scope.Variable) bool {
@@ -258,52 +237,7 @@ func isEvaluatedDuringInitialization(ref *scope.Reference) bool {
 			!isInClassStaticInitializerRange(classDefinition, location)
 	}
 
-	for node := declaration.ID.Parent; node != nil; node = node.Parent {
-		switch node.Kind {
-		case ast.KindVariableDeclaration:
-			declarator := node.AsVariableDeclaration()
-			if declarator != nil && isInRange(declarator.Initializer, location) {
-				return true
-			}
-			// `for (var a in a)` / `for (var a of a)`: the right-hand side is
-			// evaluated before the binding is initialized.
-			if node.Parent != nil && node.Parent.Parent != nil {
-				loop := node.Parent.Parent
-				if loop.Kind == ast.KindForInStatement || loop.Kind == ast.KindForOfStatement {
-					if forInOrOf := loop.AsForInOrOfStatement(); forInOrOf != nil &&
-						isInRange(forInOrOf.Expression, location) {
-						return true
-					}
-				}
-			}
-			return false
-		case ast.KindBindingElement:
-			// ESTree's AssignmentPattern inside a destructuring pattern.
-			if element := node.AsBindingElement(); element != nil && isInRange(element.Initializer, location) {
-				return true
-			}
-		case ast.KindParameter:
-			// ESTree's AssignmentPattern in a parameter list.
-			if isInRange(node.Initializer(), location) {
-				return true
-			}
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-			ast.KindClassDeclaration, ast.KindClassExpression,
-			ast.KindArrowFunction, ast.KindCatchClause,
-			ast.KindImportDeclaration, ast.KindExportDeclaration,
-			// ESTree wraps every shorthand method and accessor body in a
-			// FunctionExpression, which the walk stops at. tsgo has no such
-			// wrapper — the member node *is* the function — so these kinds
-			// stand in for it. Without them the walk escapes the method and
-			// finds the enclosing `const x = { m(node) { node; } }`
-			// initializer, reporting every parameter read inside.
-			ast.KindMethodDeclaration, ast.KindConstructor,
-			ast.KindGetAccessor, ast.KindSetAccessor:
-			return false
-		}
-	}
-
-	return false
+	return scope.IsInsideOwnInitializer(declaration.ID, location)
 }
 
 func isInRange(node *ast.Node, location int) bool {
@@ -351,18 +285,11 @@ func referenceContainsTypeQuery(node *ast.Node) bool {
 	return false
 }
 
-// isTypeReference reports whether the identifier names a type — every type
-// position, plus `export = X`, which exports whichever space `X` lives in.
-// eslint-scope carries the answer on the reference; here it is read back off
-// the syntax, so that the option filters stay independent of how the scope
-// model resolves a name.
+// isTypeReference mirrors ESLint core's deliberately narrow syntax check: only
+// an identifier directly inside a TSTypeReference is covered here. Type queries
+// are handled separately by referenceContainsTypeQuery.
 func isTypeReference(node *ast.Node) bool {
-	if parent := node.Parent; parent != nil && parent.Kind == ast.KindExportAssignment {
-		if assignment := parent.AsExportAssignment(); assignment != nil && assignment.IsExportEquals {
-			return true
-		}
-	}
-	return scope.InTypePosition(node)
+	return node != nil && node.Parent != nil && node.Parent.Kind == ast.KindTypeReference
 }
 
 func leftMostQualifiedName(node *ast.Node) *ast.Node {

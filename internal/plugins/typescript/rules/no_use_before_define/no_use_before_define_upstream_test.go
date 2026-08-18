@@ -1,3 +1,7 @@
+// TestNoUseBeforeDefineUpstream migrates the full valid/invalid suite from
+// upstream packages/eslint-plugin/tests/rules/no-use-before-define.test.ts 1:1.
+// rslint-specific lock-in cases live in
+// no_use_before_define_extras_test.go.
 package no_use_before_define
 
 import (
@@ -7,7 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoUseBeforeDefineRule(t *testing.T) {
+func TestNoUseBeforeDefineUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUseBeforeDefineRule, []rule_tester.ValidTestCase{
 		// Type declarations before use
 		{

@@ -216,7 +216,7 @@ func eachSelfAssignment(left *ast.Node, right *ast.Node, props bool, report func
 	// Unlike destructuring patterns above, member expressions are compared as a whole
 	// reference chain using utils.IsSameReference, matching ESLint's isSameReference approach.
 	case props && ast.IsAccessExpression(left) && ast.IsAccessExpression(right):
-		if utils.IsSameReference(left, right) {
+		if utils.IsSameReference(left, right, false) {
 			report(right)
 		}
 

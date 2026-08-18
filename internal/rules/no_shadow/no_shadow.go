@@ -205,6 +205,9 @@ func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.Rule
 				if v.Anonymous {
 					continue
 				}
+				if isLaterFunctionDefinition(v) {
+					continue
+				}
 				if opts.allow[v.Name] {
 					continue
 				}
@@ -223,6 +226,24 @@ func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.Rule
 
 		return rule.RuleListeners{}
 	}
+}
+
+// isLaterFunctionDefinition suppresses the additional definitions in a
+// same-scope function overload/redeclaration group. Scope-manager exposes the
+// group as one Variable, which no-shadow checks once at its first definition.
+func isLaterFunctionDefinition(v *scope.Variable) bool {
+	if v == nil || v.Kind != scope.DefFunctionName || v.Scope == nil {
+		return false
+	}
+	for _, definition := range v.Scope.Declarations(v.Name) {
+		if definition == v {
+			return false
+		}
+		if definition.Kind == scope.DefFunctionName {
+			return true
+		}
+	}
+	return false
 }
 
 // isDuplicatedClassNameInClassScope suppresses the inner class-name binding

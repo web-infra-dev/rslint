@@ -45,7 +45,7 @@ catalog:
   espree: ^11.2.0
   esquery: ^1.7.0
   # Public API data shipped by @rslint/core; review the catalog diff before updating.
-  globals: 17.9.0
+  globals: 17.11.0
   '@codspeed/tinybench-plugin': ^5.7.1
   '@rstest/core': ^0.11.3
   tinybench: ^6.1.1

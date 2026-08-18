@@ -1,10 +1,12 @@
-# Ignoring Files
-
-## ignores
+# ignores
 
 - **Type:** `string[]`
 
-Glob patterns for files to exclude. An entry containing **only** `ignores` and an optional `name` acts as a global ignore: matching files are removed from the lint target set. An entry-level ignore prevents that entry's `files` selector, rules, and options from contributing. It cannot remove a path selected by the default extension baseline or another entry, so such a path may still receive configuration or a zero-rule syntax pass.
+Glob patterns for files to exclude. The behavior depends on whether `ignores` appears in a global ignore entry or alongside other configuration fields.
+
+## Global and entry-level ignores
+
+An entry containing **only** `ignores` acts as a global ignore: matching files are removed from the lint target set. An entry-level ignore prevents that entry's `files` selector, rules, and options from contributing. It cannot remove a path selected by the default extension baseline or another entry, so such a path may still receive configuration or a zero-rule syntax pass.
 
 ```ts
 // Global ignore entry
@@ -20,7 +22,7 @@ Glob patterns for files to exclude. An entry containing **only** `ignores` and a
 }
 ```
 
-### The `globalIgnores` helper
+## The `globalIgnores` helper
 
 Writing an entry with only `ignores` is common enough that `@rslint/core` exports a `globalIgnores` helper, mirroring ESLint v10. It returns a config entry containing just the given patterns, so the global-ignore intent is explicit:
 
@@ -43,7 +45,7 @@ This is exactly equivalent to writing the entry by hand:
 
 `globalIgnores` throws a `TypeError` if it receives a non-array or an empty array.
 
-### Pattern types in global ignores
+## Pattern types in global ignores
 
 Global ignore patterns affect both file matching and directory traversal (including config discovery in monorepos):
 
@@ -81,12 +83,12 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 ```ts
 // ✅ dir/**/* allows traversal — negation works
 {
-  ignores: ['build/**/*', '!build/test.js'];
+  ignores: ['build/**/*', '!build/test.js'],
 }
 
 // ❌ dir/** blocks traversal — negation has no effect
 {
-  ignores: ['build/**', '!build/test.js'];
+  ignores: ['build/**', '!build/test.js'],
 }
 ```
 

@@ -70,7 +70,7 @@ type Variable struct {
 
 	IsValueBinding   bool // runtime value vs. type-only
 	IsTypeOnlyImport bool // ImportSpecifier with `type` modifier
-	DeclareModifier  bool // `declare` modifier (.d.ts handling)
+	DeclareModifier  bool // declaration is in an ambient context (`declare` / .d.ts)
 	// Anonymous marks a binding declared without an identifier — a
 	// string-literal enum member (`enum E { "A" = 1 }`). eslint-scope gives
 	// those a variable with an empty `identifiers` list, so they take part in
@@ -86,12 +86,13 @@ type Kind int
 const (
 	KindGlobal                Kind = iota
 	KindFunction                   // function-like bodies & their parameters
+	KindFunctionType               // TS function/constructor types and call/construct/method signatures
 	KindFunctionExprName           // FunctionExpression's name binding
 	KindBlock                      // { ... } / for-init / switch case / enum body
 	KindCatch                      // catch clause
 	KindClass                      // class body: type parameters & inner class name
 	KindModule                     // TS namespace
-	KindType                       // TS type alias / interface / function type: type parameters
+	KindType                       // TS type alias / interface: type parameters
 	KindClassStaticBlock           // `static { ... }`
 	KindClassFieldInitializer      // the initializer expression of a class field
 )
@@ -144,7 +145,7 @@ func (s *Scope) Declarations(name string) []*Variable {
 func (s *Scope) VariableScope() *Scope {
 	for current := s; current != nil; current = current.Parent {
 		switch current.Kind {
-		case KindFunction, KindModule, KindGlobal, KindClassStaticBlock, KindClassFieldInitializer:
+		case KindFunction, KindFunctionType, KindModule, KindGlobal, KindClassStaticBlock, KindClassFieldInitializer:
 			return current
 		}
 	}
@@ -179,6 +180,36 @@ func (r *Reference) Resolved() *Variable {
 		return nil
 	}
 	return r.Declarations[0]
+}
+
+// ResolvedIdentifier returns the first declaration identifier of the binding
+// this reference resolves to — eslint-scope's
+// reference.resolved.identifiers[0]. A binding may have definitions without
+// identifiers (for example a string-literal enum member), so this can differ
+// from [Reference.Resolved] and can be nil even when Resolved is not.
+func (r *Reference) ResolvedIdentifier() *ast.Node {
+	if r == nil {
+		return nil
+	}
+	for _, declaration := range r.Declarations {
+		if declaration != nil && !declaration.Anonymous && declaration.ID != nil &&
+			declaration.ID.Kind == ast.KindIdentifier {
+			return declaration.ID
+		}
+	}
+	return nil
+}
+
+// IsValueReference reports whether the identifier can resolve in value space.
+// Value and type references are independent: a reference may be both.
+func (r *Reference) IsValueReference() bool {
+	return r != nil && r.isValueReference
+}
+
+// IsTypeReference reports whether the identifier can resolve in type space.
+// Value and type references are independent: a reference may be both.
+func (r *Reference) IsTypeReference() bool {
+	return r != nil && r.isTypeReference
 }
 
 // Options selects optional analysis passes.
