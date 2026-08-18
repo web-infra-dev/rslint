@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -295,10 +296,10 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
 			},
 
-			// ---- Locks in "never" fixer: `<<` immediately followed by `(` is
-			// re-scanned as the start of a type argument list, so parenthesizing
-			// a right side that contains another `<` would emit unparsable
-			// source (`x = x << (foo<T>)` is TS1005). Report only ----
+			// ---- Locks in "never" fixer: `x << (` is re-scanned as `x <`
+			// opening a type argument list, and a right side spelling its own
+			// `<...>` closes that reading, so parenthesizing it would emit
+			// unparsable source (`x = x << (foo<T>)` is TS1005). Report only ----
 			{
 				Code:    `type T = number; declare const foo: any; x <<= foo<T>;`,
 				Options: []any{"never"},
@@ -314,12 +315,76 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 				Options: []any{"never"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 40}},
 			},
-			// ---- ... while a `<<` right side with no `<` in it is still fixed ----
+			{
+				Code:    `declare const y: any; x <<= y satisfies Record<string, number>;`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 23}},
+			},
+			{
+				Code:    `declare const y: any; x <<= <X>(v: X) => v;`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 23}},
+			},
+			// ---- ... while angle brackets that are not type syntax leave the
+			// mis-scan nothing to close on, so those right sides are still fixed,
+			// matching ESLint 10.8.1 + @typescript-eslint/parser ----
 			{
 				Code:    `foo <<= bar | 1`,
 				Output:  []string{`foo = foo << (bar | 1)`},
 				Options: []any{"never"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `foo <<= bar < baz`,
+				Output:  []string{`foo = foo << (bar < baz)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `foo <<= bar > baz`,
+				Output:  []string{`foo = foo << (bar > baz)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    "foo <<= bar | '<b>'",
+				Output:  []string{"foo = foo << (bar | '<b>')"},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    "foo <<= bar | `a<b>`",
+				Output:  []string{"foo = foo << (bar | `a<b>`)"},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `foo <<= bar /* < > */ | 1`,
+				Output:  []string{`foo = foo << (bar /* < > */ | 1)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			// ---- ... including TS-only right sides whose types carry no angle
+			// brackets of their own ----
+			{
+				Code:    `declare const y: number; x <<= y as number;`,
+				Output:  []string{`declare const y: number; x = x << (y as number);`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 26}},
+			},
+			{
+				Code:    `declare const y: any; x <<= y as 'p<q';`,
+				Output:  []string{`declare const y: any; x = x << (y as 'p<q');`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 23}},
+			},
+			// ---- ... and every other operator is untouched by the guard: only
+			// `<<` mis-scans, `>>` and friends parenthesize generics normally ----
+			{
+				Code:    `type T = number; declare const foo: any; x >>= foo<T>;`,
+				Output:  []string{`type T = number; declare const foo: any; x = x >> (foo<T>);`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 42}},
 			},
 
 			// ---- Locks in "never" fixer precedence branch: right-associative `**` still gets conservative parens at equal precedence (matches ESLint's uniform `<=` comparison, which doesn't special-case associativity) ----
@@ -367,7 +432,7 @@ func TestOperatorAssignmentEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			ExcludePaths: []string{},
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

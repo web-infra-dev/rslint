@@ -2,7 +2,6 @@ package operator_assignment
 
 import (
 	_ "embed"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -252,6 +251,36 @@ func startsWithBareTypeOperator(expr *ast.Node) bool {
 	return false
 }
 
+// spellsTypeAngleBrackets reports whether expr writes a TypeScript type
+// argument list (`foo<T>`, `f<T>()`, `x as Array<T>`) or type parameter list
+// (`<X>(v: X) => X`) anywhere inside it. Angle brackets that belong to a value
+// expression — `a < b`, a JSX element, a `<` inside a string or comment — are
+// not type syntax and are not reported here.
+func spellsTypeAngleBrackets(expr *ast.Node) bool {
+	if expr == nil {
+		return false
+	}
+	if hasTypeArgumentList(expr) {
+		return true
+	}
+	if funcLike := expr.FunctionLikeData(); funcLike != nil && funcLike.TypeParameters != nil {
+		return true
+	}
+	return expr.ForEachChild(spellsTypeAngleBrackets)
+}
+
+// hasTypeArgumentList reports whether node is one of the shapes that can carry
+// an explicit `<...>` type argument list, and does carry one.
+func hasTypeArgumentList(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression,
+		ast.KindExpressionWithTypeArguments, ast.KindTypeReference, ast.KindTypeQuery,
+		ast.KindImportType, ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement:
+		return node.TypeArgumentList() != nil
+	}
+	return false
+}
+
 // checkNever implements the "never" mode: any of the 12 shorthand compound
 // assignment operators should be written as `x = x op y` instead.
 func checkNever(ctx rule.RuleContext, node *ast.Node) {
@@ -288,17 +317,19 @@ func checkNever(ctx rule.RuleContext, node *ast.Node) {
 
 		var rightText string
 		if rightNeedsParens(binExpr.Right, newOperatorPrecedence) {
-			rightRange := utils.TrimNodeTextRange(sourceFile, binExpr.Right)
-			inner := text[rightRange.Pos():rightRange.End()]
-			if plainOperatorKind == ast.KindLessThanLessThanToken && strings.ContainsRune(inner, '<') {
-				// `<<` directly followed by `(` is re-scanned as the `<` that
-				// opens a type argument list, so a parenthesized right side
-				// containing another `<` can turn `x = x << (foo<T>)` into a
-				// parse error. There is no spelling of the parentheses that is
-				// reliably immune, so report without fixing instead.
+			if plainOperatorKind == ast.KindLessThanLessThanToken && spellsTypeAngleBrackets(binExpr.Right) {
+				// TypeScript re-scans `x << (` as `x <` opening a type argument
+				// list, and a right side that spells its own `<...>` supplies
+				// the `>` that makes the parser commit to that reading:
+				// `x = x << (foo<T>)` is TS1005 instead of a shift. Angle
+				// brackets elsewhere — comparisons, strings, comments — leave no
+				// `>` for the mis-scan to close on, so only type syntax is
+				// suppressed, and it is reported without a fix.
 				return nil
 			}
+			rightRange := utils.TrimNodeTextRange(sourceFile, binExpr.Right)
 			between := text[opRange.End():rightRange.Pos()]
+			inner := text[rightRange.Pos():rightRange.End()]
 			rightText = between + "(" + inner + ")"
 		} else {
 			rest := text[opRange.End():node.End()]
