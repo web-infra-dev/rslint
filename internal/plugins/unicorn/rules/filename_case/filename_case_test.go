@@ -900,7 +900,7 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `[unclosed`),
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
-					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: error parsing regexp: unterminated [] set in `[unclosed`",
+					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: unsupported regexp syntax: [ that no ] closes",
 				}},
 			},
 			// Locks in: even when the file's basename would otherwise have
@@ -913,7 +913,7 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `[unclosed`, `FOOBAR\.js`),
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
-					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: error parsing regexp: unterminated [] set in `[unclosed`",
+					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: unsupported regexp syntax: [ that no ] closes",
 				}},
 			},
 			// Locks in: multiple invalid patterns produce one diagnostic per
@@ -925,7 +925,7 @@ func TestFilenameCase(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "invalidIgnorePattern",
-						Message:   "Invalid regular expression in `ignore` option: `[unclosed`: error parsing regexp: unterminated [] set in `[unclosed`",
+						Message:   "Invalid regular expression in `ignore` option: `[unclosed`: unsupported regexp syntax: [ that no ] closes",
 					},
 					{
 						MessageId: "invalidIgnorePattern",
@@ -944,7 +944,7 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `[unclosed`),
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
-					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: error parsing regexp: unterminated [] set in `[unclosed`",
+					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: unsupported regexp syntax: [ that no ] closes",
 				}},
 			},
 			// Locks in: a malformed ignore pattern still fires on a file
@@ -957,7 +957,7 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("pascalCase"), `[unclosed`),
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
-					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: error parsing regexp: unterminated [] set in `[unclosed`",
+					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: unsupported regexp syntax: [ that no ] closes",
 				}},
 			},
 			// Locks in: invalid ignore + `cases` (multi-style) option ─
@@ -982,7 +982,7 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `foo\`),
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
-					Message:   "Invalid regular expression in `ignore` option: `foo\\`: error parsing regexp: illegal \\ at end of pattern in `foo\\`",
+					Message:   "Invalid regular expression in `ignore` option: `foo\\`: unsupported regexp syntax: \\ at the end of the pattern",
 				}},
 			},
 			// Locks in: bare-quantifier pattern — yet another distinct
@@ -1030,7 +1030,7 @@ func TestFilenameCase(t *testing.T) {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
-					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: error parsing regexp: unterminated [] set in `[unclosed`",
+					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: unsupported regexp syntax: [ that no ] closes",
 				}},
 			},
 			// Locks in `englishishJoin` 4-item oxford comma + `or` end-to-end:

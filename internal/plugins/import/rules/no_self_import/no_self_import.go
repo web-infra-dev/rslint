@@ -22,9 +22,9 @@ var NoSelfImportRule = rule.Rule{
 
 // https://github.com/import-js/eslint-plugin-import/blob/01c9eb04331d2efa8d63f2d7f4bfec3bc44c94f3/src/rules/no-self-import.js#L12-L22
 func isImportingSelf(ctx rule.RuleContext, source *ast.StringLiteralLike, node *ast.ImportSpecifierNode) {
-	filePath := utils.GetPhysicalFilename(ctx)
+	filePath := ctx.SourceFile.FileName()
 
-	if resolvedPath, ok := utils.Resolve(source, ctx); ok {
+	if resolvedPath, _, ok := ctx.Program().ResolveModule(ctx.SourceFile, source); ok {
 		if /** filePath != "<text>" && */ filePath == resolvedPath {
 			ctx.ReportNode(node, rule.RuleMessage{
 				Id:          "import/no-self-import",

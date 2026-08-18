@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 var replaceUsagesWithConstraintMessage = rule.RuleMessage{
@@ -93,7 +94,7 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, descriptor string) {
 			counts = countTypeParameterUsage(
 				ctx.TypeChecker,
 				node,
-				ctx.Program != nil && needsLegacyObjectSpreadRecovery(ctx.Program.Options()),
+				ctx.Program() != nil && needsLegacyObjectSpreadRecovery(ctx.Program().Options()),
 			)
 		}
 		useCount := counts[nameNode]
@@ -2145,7 +2146,7 @@ func removeTypeParameterFix(sourceFile *ast.SourceFile, container *ast.Node, typ
 	if index == 0 {
 		commaEnd := findTokenEnd(sourceFile, paramRange.End(), ast.KindCommaToken)
 		nextParamStart := utils.TrimNodeTextRange(sourceFile, typeParams[1]).Pos()
-		nextStart := utils.SkipLeadingWhitespace(sourceFile.Text(), commaEnd, nextParamStart)
+		nextStart := ecmascript.SkipLeadingWhitespace(sourceFile.Text(), commaEnd, nextParamStart)
 		return rule.RuleFixRemoveRange(core.NewTextRange(paramRange.Pos(), nextStart))
 	}
 

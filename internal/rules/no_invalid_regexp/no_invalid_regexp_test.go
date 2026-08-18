@@ -28,7 +28,14 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			{Code: `new RegExp('\\\\d+')`},     // escaped digits
 			{Code: `new RegExp('[abc]')`},      // character class
 			{Code: `new RegExp('(?:a)')`},      // non-capturing group
+			{Code: `new RegExp('(?i:a)')`},     // modifier group
+			{Code: `new RegExp('(?i-m:a)')`},   // modifier group turning one on and one off
+			{Code: `new RegExp('(?-ims:a)')`},  // modifier group turning three off
 			{Code: `RegExp('a{1,2}')`},         // quantifier
+			// Annex B lets a lookahead be quantified, and a `{` that no bound
+			// closes stands for itself.
+			{Code: `RegExp('(?=a)*')`},
+			{Code: `RegExp('^{')`},
 			{Code: `new RegExp('.', 'v')`},     // v flag alone is valid
 			{Code: `new RegExp('.', 'u')`},     // u flag alone is valid
 			// No arguments
@@ -456,15 +463,40 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
-			// === Skipped: regexp2 engine limitations (FN — invalid in ESLint but regexp2 misses) ===
 			// Invalid escape in unicode mode
 			{
 				Code: `new RegExp('\\a', 'u');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
+			// A quantifier repeating an assertion. Without `u` a `\p` is a `p`,
+			// which leaves the `^` an anchor with a `?` after it.
+			{
+				Code: `new RegExp('\\p^?');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "regexMessage", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `new RegExp('^*');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "regexMessage", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `new RegExp('\\b{1}');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "regexMessage", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `new RegExp('(?=a)*', 'u');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "regexMessage", Line: 1, Column: 1},
+				},
+			},
+			// === Skipped: regexp2 engine limitations (FN — invalid in ESLint but regexp2 misses) ===
 			// v-flag specific parsing
 			{
 				Code: `new RegExp('[[]', 'v');`,
@@ -491,35 +523,30 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// Inline modifier validation
 			{
 				Code: `new RegExp('(?ii:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('(?-ii:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('(?i-i:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('(?-:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('(?-u:foo)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},

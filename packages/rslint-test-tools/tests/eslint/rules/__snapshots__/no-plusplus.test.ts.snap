@@ -1,0 +1,313 @@
+// Rstest Snapshot v1
+
+exports[`no-plusplus > invalid 1`] = `
+{
+  "code": "var foo = 0; foo++;",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 2`] = `
+{
+  "code": "var foo = 0; foo--;",
+  "diagnostics": [
+    {
+      "message": "Unary operator '--' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 3`] = `
+{
+  "code": "for (i = 0; i < l; i++) { console.log(i); }",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 4`] = `
+{
+  "code": "for (i = 0; i < l; foo, i++) { console.log(i); }",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 5`] = `
+{
+  "code": "var foo = 0; foo++;",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 6`] = `
+{
+  "code": "for (i = 0; i < l; i++) { v++; }",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 7`] = `
+{
+  "code": "for (i++;;);",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 8`] = `
+{
+  "code": "for (;--i;);",
+  "diagnostics": [
+    {
+      "message": "Unary operator '--' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 9`] = `
+{
+  "code": "for (;;) ++i;",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 10`] = `
+{
+  "code": "for (;; i = j++);",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 11`] = `
+{
+  "code": "for (;; i++, f(--j));",
+  "diagnostics": [
+    {
+      "message": "Unary operator '--' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-plusplus > invalid 12`] = `
+{
+  "code": "for (;; foo + (i++, bar));",
+  "diagnostics": [
+    {
+      "message": "Unary operator '++' used.",
+      "messageId": "unexpectedUnaryOp",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-plusplus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

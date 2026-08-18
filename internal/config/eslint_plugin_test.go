@@ -7,7 +7,33 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+func preserveGlobalRuleRegistryEntries(t *testing.T, names ...string) {
+	t.Helper()
+
+	type savedRule struct {
+		value  rule.Rule
+		exists bool
+	}
+	saved := make(map[string]savedRule, len(names))
+	for _, name := range names {
+		value, exists := GlobalRuleRegistry.GetRule(name)
+		saved[name] = savedRule{value: value, exists: exists}
+	}
+
+	t.Cleanup(func() {
+		for name, entry := range saved {
+			if entry.exists {
+				GlobalRuleRegistry.rules[name] = entry.value
+			} else {
+				delete(GlobalRuleRegistry.rules, name)
+			}
+		}
+	})
+}
+
 func TestRegisterEslintPluginRules_RegistersPlaceholders(t *testing.T) {
+	preserveGlobalRuleRegistryEntries(t, "testplugA/no-foo", "testplugA/no-bar")
+
 	RegisterEslintPluginRules([]EslintPluginEntry{
 		{Prefix: "testplugA", RuleNames: []string{"no-foo", "no-bar"}},
 	})
@@ -28,6 +54,8 @@ func TestRegisterEslintPluginRules_RegistersPlaceholders(t *testing.T) {
 }
 
 func TestRegisterEslintPluginRules_NativeWins(t *testing.T) {
+	preserveGlobalRuleRegistryEntries(t, "testplugB/native-rule")
+
 	// Pre-register a native rule (IsEslintPluginRule=false), then try to
 	// mount a plugin rule of the same fully-qualified name.
 	GlobalRuleRegistry.Register("testplugB/native-rule", rule.Rule{
@@ -115,6 +143,8 @@ func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 }
 
 func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
+	preserveGlobalRuleRegistryEntries(t, "testplugC/no-null")
+
 	RegisterEslintPluginRules([]EslintPluginEntry{
 		{Prefix: "testplugC", RuleNames: []string{"no-null"}},
 	})
@@ -161,6 +191,8 @@ func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
 // rules, each carrying the correct IsEslintPluginRule routing flag (native runs
 // in Go, community routes to the worker).
 func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
+	preserveGlobalRuleRegistryEntries(t, "testplugSplit/no-foo")
+
 	RegisterAllRules()
 	RegisterEslintPluginRules([]EslintPluginEntry{
 		{Prefix: "testplugSplit", RuleNames: []string{"no-foo"}},
@@ -199,13 +231,11 @@ func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
 	}
 }
 
-// TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative pins the
-// single most common coexistence combo: a TS preset (type-aware native rules) +
-// one community plugin, on a standalone script that is NOT in any
-// tsconfig.project (a "gap" file). The type-aware native rule is filtered out
-// (no type info available) while the community rule survives and still routes to
-// the worker (IsEslintPluginRule stays true). On a covered file both run.
-func TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative(t *testing.T) {
+// Config resolution retains native and community rules independently of source
+// capabilities. The linter plan owns type-aware eligibility.
+func TestGetEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
+	preserveGlobalRuleRegistryEntries(t, "unicornGap/no-null")
+
 	RegisterAllRules()
 	RegisterEslintPluginRules([]EslintPluginEntry{
 		{Prefix: "unicornGap", RuleNames: []string{"no-null"}},
@@ -221,16 +251,13 @@ func TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative(t *tes
 			Rules:   Rules{"unicornGap/no-null": "error"},
 		},
 	}
-	typeInfoFiles := map[string]struct{}{"/proj/covered.ts": {}}
-
-	// Gap file: not in typeInfoFiles → type-aware native rule filtered out.
-	gap := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "/proj/gap.ts", "/proj", true, typeInfoFiles)
+	gap, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/gap.ts", "/proj", true)
 	gapRouting := map[string]bool{}
 	for _, r := range gap {
 		gapRouting[r.Name] = r.IsEslintPluginRule
 	}
-	if _, hasNative := gapRouting["@typescript-eslint/require-await"]; hasNative {
-		t.Error("type-aware native rule must be dropped on a gap file (not in tsconfig.project)")
+	if _, hasNative := gapRouting["@typescript-eslint/require-await"]; !hasNative {
+		t.Error("config resolution must retain the type-aware native rule")
 	}
 	community, hasCommunity := gapRouting["unicornGap/no-null"]
 	if !hasCommunity {
@@ -240,8 +267,7 @@ func TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative(t *tes
 		t.Error("the surviving community rule must keep IsEslintPluginRule=true (routes to the worker)")
 	}
 
-	// Covered file: the type-aware native rule is kept alongside the community one.
-	covered := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "/proj/covered.ts", "/proj", true, typeInfoFiles)
+	covered, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/covered.ts", "/proj", true)
 	coveredNames := map[string]bool{}
 	for _, r := range covered {
 		coveredNames[r.Name] = true

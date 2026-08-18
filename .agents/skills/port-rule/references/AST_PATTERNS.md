@@ -306,6 +306,42 @@ if node.Kind == ast.KindPropertyAccessExpression {
 
 ---
 
+## Using Program for Source and Module Services
+
+`ctx.Program()` is the single source-generation authority in a linter-created
+context. The same facade works in CLI, API, and LSP modes; a rule must not ask
+which private adapter constructed it. Filesystem/options/package/source lookup,
+module resolution, and generic module references all derive from this object.
+
+```go
+sourceProgram := ctx.Program()
+if !sourceProgram.IsValid() || ctx.SourceFile == nil {
+    return rule.RuleListeners{}
+}
+
+resolvedPath, target, ok := sourceProgram.ResolveModule(ctx.SourceFile, specifier)
+references := sourceProgram.ModuleGraph().References(
+    ctx.SourceFile,
+    program.ESModuleReferences|program.CommonJSReferences,
+)
+```
+
+`ok` can be true with `target == nil`: TypeScript may resolve a path outside the
+Program's materialized source universe. Use `resolvedPath` for path-only rules;
+require a non-nil target before reading another file's AST.
+
+`Program.ModuleGraph` deliberately exposes source facts, not one rule's
+dependency semantics. Filtering type-only/external/ignored references,
+constructing SCCs, applying depth limits, and choosing report locations remain
+local to the rule. Configuration-complete derived indexes can be shared with
+`rule.CachedByProgram`; do not put them into `RuleContext` or `Program` fields.
+
+`TypeChecker` is separate because it is a per-file execution capability. Never
+infer its availability from `Program`, and never introduce backend-kind checks
+or raw compiler Program access.
+
+---
+
 ## Using TypeChecker
 
 For rules that need type information, access `TypeChecker` via `RuleContext`.
@@ -357,7 +393,7 @@ var MyCoreRule = rule.Rule{
 }
 ```
 
-> **Why the distinction?** The linter uses `RequiresTypeInfo` to filter rules via `FilterNonTypeAwareRules` (see `internal/linter/linter.go`). Setting it on a core ESLint rule would prevent it from running on JS files entirely, which breaks `eslint:recommended` behavior.
+> **Why the distinction?** The planner uses `RequiresTypeInfo` to filter rules via `FilterNonTypeAwareRules` (see `internal/rule/configured.go`) when a Program cannot provide a checker for that file. Setting it on a core ESLint rule would prevent it from running on JS files entirely, which breaks `eslint:recommended` behavior.
 
 ### Common TypeChecker Methods
 
@@ -463,7 +499,8 @@ file) just as well as it finds references to a local variable.
 
 ### Availability
 
-`ctx.Refs` is nil when no program is available. Core ESLint rules must guard:
+Manually assembled test contexts may leave `ctx.Refs` nil. Core ESLint rules
+that directly accept such contexts must guard:
 
 ```go
 if ctx.Refs == nil {
@@ -471,7 +508,9 @@ if ctx.Refs == nil {
 }
 ```
 
-For `RequiresTypeInfo: true` rules, a program always exists, so `ctx.Refs` is guaranteed non-nil. `Resolve`'s checker fallback additionally needs `ctx.TypeChecker` non-nil; when it's nil, `Resolve` stays binder-only.
+Linter-created contexts always carry a valid Program and RefStore. For
+`RequiresTypeInfo: true` rules, `ctx.TypeChecker` is additionally non-nil;
+`Resolve` otherwise stays binder-only when no checker is granted.
 
 ### Example (from no-var)
 

@@ -124,6 +124,7 @@ deboucne
 dedup
 dedupe
 dedups
+depguard
 deprec
 Deque
 describedby
@@ -155,7 +156,9 @@ escope
 ESLint
 esmodule
 espree
+esregexp
 estree
+eszett
 Ethi
 exclam
 execdir
@@ -249,6 +252,7 @@ interrobang
 iovfs
 IPC
 isatty
+isglob
 isnan
 Isnt
 jakebailey
@@ -282,6 +286,7 @@ Lingui
 lingui
 lintable
 lintedfile
+lintprogram
 listitem
 llms
 lockdown
@@ -337,6 +342,7 @@ napi
 nashorn
 native
 nbsp
+ndefined
 neighbour
 neighbouring
 nend
@@ -580,6 +586,8 @@ tsoptions
 tsparser
 tspath
 tsutils
+txtar
+txtarfs
 typeparam
 typescriptutil
 unaliased
@@ -615,6 +623,7 @@ unspaced
 unstarted
 unstrict
 unstub
+unsuggested
 untest
 unvalidated
 Unwatch
@@ -650,6 +659,7 @@ xjavascript
 xlink
 xoff
 xtest
+Xopenport
 yutil
 zeebo
 zigbuild
