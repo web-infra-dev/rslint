@@ -88,8 +88,11 @@ linters:
             - '**/internal/plugins/**'
           allow:
             # depguard matches an import by prefix, and the deny below would
-            # otherwise take this with it.
+            # otherwise take these with it. A UTF-16 code unit is what
+            # JavaScript indexes a string by, so utf16 is as much a rule's
+            # business as utf8 is.
             - 'unicode/utf8'
+            - 'unicode/utf16'
           deny:
             - pkg: 'unicode'
               desc: 'A character a rule reads is read the way JavaScript reads it, not the way Go does. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript" for case and whitespace, "github.com/web-infra-dev/rslint/internal/utils/unicode17" for a general category, and "github.com/microsoft/typescript-go/shim/scanner" for an identifier.'
