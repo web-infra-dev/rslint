@@ -44,7 +44,7 @@ func skipRstestHorizontalWhitespace(text string, offset int) int {
 			break
 		}
 		char, size := utf8.DecodeRuneInString(text[offset:])
-		if !ecmascript.IsWhiteSpace(char) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(char) {
 			break
 		}
 		offset += size
@@ -280,7 +280,7 @@ func containsExactlyOneLineTerminator(text string) bool {
 		}
 
 		r, size := utf8.DecodeRuneInString(text[offset:])
-		if r == utf8.RuneError && size == 1 || !ecmascript.IsWhiteSpace(r) {
+		if r == utf8.RuneError && size == 1 || !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			return false
 		}
 		offset += size

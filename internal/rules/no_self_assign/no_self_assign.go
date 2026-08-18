@@ -86,7 +86,7 @@ func removeWhitespace(text string) string {
 			continue
 		}
 		r, size := utf8.DecodeRuneInString(text[i:])
-		if ecmascript.IsWhiteSpace(r) {
+		if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			firstWhitespace = i
 			break
 		}
@@ -108,7 +108,7 @@ func removeWhitespace(text string) string {
 			continue
 		}
 		r, size := utf8.DecodeRuneInString(text[i:])
-		if !ecmascript.IsWhiteSpace(r) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			// Copy the original bytes so malformed UTF-8 is preserved instead of
 			// being rewritten as the replacement rune.
 			result.WriteString(text[i : i+size])

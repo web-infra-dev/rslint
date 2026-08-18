@@ -133,7 +133,7 @@ result := utils.NaturalCompare("item2", "item10") // -1
 ```go
 // Whitespace, trimming, and every other question ECMAScript specifies live in
 // utils/ecmascript — see the JavaScript Semantics section below.
-isWhite := ecmascript.IsWhiteSpace(r)
+isWhite := ecmascript.IsWhiteSpaceOrLineTerminator(r)
 ```
 
 ---
@@ -690,7 +690,7 @@ A ported rule is handed values that were written for JavaScript: a string to tri
 import "github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 ```
 
-A helper standing in for something JavaScript exposes carries that name with its receiver in front (`StringTrim` for `String.prototype.trim`, `StringToUpperCase` for `String.prototype.toUpperCase`, `NumberToString` for `Number::toString`). Everything else is named the way ECMAScript names it — a grammar production (`IsWhiteSpace`, `IsLineTerminator`) — or, where the language spells out no name, the question being asked (`IsBlank`).
+A helper standing in for something JavaScript exposes carries that name with its receiver in front (`StringTrim` for `String.prototype.trim`, `StringToUpperCase` for `String.prototype.toUpperCase`, `NumberToString` for `Number::toString`). Everything else is named the way ECMAScript names it — a grammar production (`IsWhiteSpace`, `IsLineTerminator`), the two of them together (`IsWhiteSpaceOrLineTerminator`) — or, where the language spells out no name, the question being asked (`IsBlank`).
 
 ```go
 // String.prototype.trim(). NOT strings.TrimSpace, which disagrees in BOTH
@@ -701,12 +701,15 @@ trimmed := ecmascript.StringTrim(title)
 // `s.trim() === ""`
 blank := ecmascript.IsBlank(line)
 
-// ECMAScript WhiteSpace + LineTerminator. NOT unicode.IsSpace.
-white := ecmascript.IsWhiteSpace(r)
+// Everything `\s` matches and `trim()` strips: ECMAScript WhiteSpace plus
+// LineTerminator. NOT unicode.IsSpace.
+white := ecmascript.IsWhiteSpaceOrLineTerminator(r)
 
-// LineTerminator: \n \r U+2028 U+2029. Go has no notion of the last two.
-ecmascript.IsLineTerminator(r)
-ecmascript.LineTerminators // the four, as a string
+// The two productions on their own, for a rule that reads them apart — JSX
+// text, say, where a line break and a space are not the same thing.
+ecmascript.IsWhiteSpace(r)     // tab, vertical tab, form feed, U+FEFF, Zs
+ecmascript.IsLineTerminator(r) // \n \r U+2028 U+2029; Go knows only the first two
+ecmascript.LineTerminators     // the four, as a string
 
 // String.prototype.toUpperCase / toLowerCase. NOT strings.ToUpper or
 // unicode.ToUpper, which map one character to one character on Go's edition of

@@ -127,14 +127,15 @@ func parseOptions(raw []any) options {
 
 // stripWhitespace removes every character that JS's `\s` regex matches,
 // mirroring upstream's `propValue.replace(/\s*/g, ”)`. That set is JS
-// WhiteSpace + LineTerminator, which is what [ecmascript.IsWhiteSpace]
-// answers — an exotic-whitespace member-access chain would otherwise produce
-// different regex outcomes here and upstream.
+// WhiteSpace + LineTerminator, which is what
+// [ecmascript.IsWhiteSpaceOrLineTerminator] answers — an exotic-whitespace
+// member-access chain would otherwise produce different regex outcomes here and
+// upstream.
 func stripWhitespace(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if ecmascript.IsWhiteSpace(r) {
+		if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			continue
 		}
 		b.WriteRune(r)

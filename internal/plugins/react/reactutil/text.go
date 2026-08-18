@@ -41,7 +41,7 @@ func HorizontalWhitespacePrefix(s string) string {
 }
 
 func isHorizontalWhitespace(r rune) bool {
-	return ecmascript.IsWhiteSpace(r) && !ecmascript.IsLineTerminator(r)
+	return ecmascript.IsWhiteSpace(r)
 }
 
 // UTF16Length returns the number of UTF-16 code units required to encode s.

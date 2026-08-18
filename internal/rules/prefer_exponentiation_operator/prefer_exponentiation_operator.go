@@ -339,12 +339,12 @@ func previousAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	if text[pos-1] == '/' && pos >= 2 && text[pos-2] == '*' {
 		return "", false
 	}
-	if ecmascript.IsWhiteSpace(rune(text[pos-1])) {
+	if ecmascript.IsWhiteSpaceOrLineTerminator(rune(text[pos-1])) {
 		return "", false
 	}
 
 	start := pos - 1
-	for start > 0 && !ecmascript.IsWhiteSpace(rune(text[start-1])) {
+	for start > 0 && !ecmascript.IsWhiteSpaceOrLineTerminator(rune(text[start-1])) {
 		ch := text[start-1]
 		if strings.ContainsRune("()[]{};,.?:", rune(ch)) {
 			break
@@ -359,7 +359,7 @@ func nextAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	if pos < 0 || pos >= len(text) {
 		return "", false
 	}
-	if ecmascript.IsWhiteSpace(rune(text[pos])) {
+	if ecmascript.IsWhiteSpaceOrLineTerminator(rune(text[pos])) {
 		return "", false
 	}
 	if text[pos] == '/' && pos+1 < len(text) && (text[pos+1] == '*' || text[pos+1] == '/') {
@@ -367,7 +367,7 @@ func nextAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	}
 
 	end := pos + 1
-	for end < len(text) && !ecmascript.IsWhiteSpace(rune(text[end])) {
+	for end < len(text) && !ecmascript.IsWhiteSpaceOrLineTerminator(rune(text[end])) {
 		ch := text[end]
 		if strings.ContainsRune("()[]{};,.?:", rune(ch)) {
 			break

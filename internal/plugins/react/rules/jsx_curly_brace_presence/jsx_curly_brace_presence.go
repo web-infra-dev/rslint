@@ -197,7 +197,7 @@ func indexFirstNonSpace(s string) int {
 }
 
 func isJsRegexWhitespace(r rune) bool {
-	return ecmascript.IsWhiteSpace(r)
+	return ecmascript.IsWhiteSpaceOrLineTerminator(r)
 }
 
 func escapeBackslashes(s string) string {

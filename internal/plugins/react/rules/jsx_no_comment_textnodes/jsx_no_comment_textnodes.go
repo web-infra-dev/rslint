@@ -64,7 +64,7 @@ func indexJsLineTerminator(s string) (int, int) {
 // isJsWhitespace matches ECMAScript `\s` minus LineTerminator, which this
 // rule handles separately.
 func isJsWhitespace(r rune) bool {
-	return ecmascript.IsWhiteSpace(r) && !ecmascript.IsLineTerminator(r)
+	return ecmascript.IsWhiteSpace(r)
 }
 
 var JsxNoCommentTextnodesRule = rule.Rule{
