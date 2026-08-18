@@ -121,8 +121,13 @@ func hasInferredName(node *ast.Node) bool {
 		pa := parent.AsPropertyAssignment()
 		return pa.Initializer != nil && ast.SkipParentheses(pa.Initializer) == node
 	case ast.KindPropertyDeclaration:
+		// A TS auto-accessor (`accessor foo = ...`) is also a
+		// PropertyDeclaration in tsgo, but upstream parses it as
+		// AccessorProperty rather than PropertyDefinition, so its initializer
+		// is not an inferred-name context.
 		pd := parent.AsPropertyDeclaration()
-		return pd.Initializer != nil && ast.SkipParentheses(pd.Initializer) == node
+		return !ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) &&
+			pd.Initializer != nil && ast.SkipParentheses(pd.Initializer) == node
 	case ast.KindShorthandPropertyAssignment:
 		spa := parent.AsShorthandPropertyAssignment()
 		return spa.ObjectAssignmentInitializer != nil &&

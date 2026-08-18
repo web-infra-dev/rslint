@@ -127,6 +127,26 @@ func TestFuncNamesExtras(t *testing.T) {
 				},
 			},
 
+			// ---- Dimension 4: TS auto-accessor field — tsgo parses
+			// `accessor foo = ...` as a PropertyDeclaration too, but upstream
+			// parses it as AccessorProperty rather than PropertyDefinition,
+			// so its initializer is not an inferred-name context and the
+			// function is reported as a plain "function". ----
+			{
+				Code:    "class C { accessor foo = function() {}; }",
+				Options: []any{"as-needed"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnamed", Message: "Unexpected unnamed function.", Line: 1, Column: 26, EndLine: 1, EndColumn: 34},
+				},
+			},
+			{
+				Code:    "class C { static accessor foo = function() {}; }",
+				Options: []any{"as-needed"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnamed", Message: "Unexpected unnamed function.", Line: 1, Column: 33, EndLine: 1, EndColumn: 41},
+				},
+			},
+
 			// ---- Dimension 4: async function expression — never exercised
 			// by upstream's own test suite at all. ----
 			{
