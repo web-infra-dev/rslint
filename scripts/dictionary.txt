@@ -9,6 +9,7 @@ acking
 acks
 activedescendant
 addl
+aeiou
 affordances
 afoob
 agen
@@ -69,6 +70,7 @@ brefs
 Buttom
 butwhy
 cachedvfs
+caféx
 callbackify
 callees
 callsite
@@ -174,6 +176,7 @@ fieldset
 figcaption
 fileless
 finalizer
+fixability
 fixall
 flaggable
 flowto
@@ -287,6 +290,7 @@ lintable
 lintedfile
 lintprogram
 listitem
+litera
 llms
 lockdown
 lockdowns
@@ -585,6 +589,7 @@ tsoptions
 tsparser
 tspath
 tsutils
+tttodo
 txtar
 txtarfs
 typeparam
@@ -618,6 +623,7 @@ unrepresentable
 unrooted
 unshadowed
 unshift
+unspaced
 unstarted
 unstrict
 unstub

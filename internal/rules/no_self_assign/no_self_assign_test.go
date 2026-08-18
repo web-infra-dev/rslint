@@ -304,10 +304,27 @@ func TestNoSelfAssignRule(t *testing.T) {
 					{MessageId: "selfAssignment", Line: 1, Column: 8},
 				},
 			},
+			// rslint-specific: a TS non-null assertion has no runtime effect,
+			// so `a!.b` and `a.b` reference the same value. This is unreachable
+			// upstream (ESLint has no TS syntax); locks in utils.IsSameReference
+			// unwrapping `!` via ast.OEKAssertions.
+			{
+				Code: `a!.b = a.b`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Line: 1, Column: 8},
+				},
+			},
 			{
 				Code: `a['b'] = a['b']`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 10},
+				},
+			},
+			// `super` is a same-reference base case upstream, exactly like `this`.
+			{
+				Code: `class B { x: any } class C extends B { m() { super.x = super.x; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Line: 1, Column: 56},
 				},
 			},
 			{

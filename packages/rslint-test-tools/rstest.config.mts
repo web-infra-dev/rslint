@@ -118,6 +118,7 @@ export default defineConfig({
     './tests/eslint/rules/no-new-wrappers.test.ts',
     './tests/eslint/rules/no-param-reassign.test.ts',
     './tests/eslint/rules/no-plusplus.test.ts',
+    './tests/eslint/rules/no-promise-executor-return.test.ts',
     './tests/eslint/rules/no-self-assign.test.ts',
     './tests/eslint/rules/no-undef.test.ts',
     './tests/eslint/rules/no-undef-init.test.ts',
@@ -128,6 +129,7 @@ export default defineConfig({
     './tests/eslint/rules/no-use-before-define.test.ts',
     './tests/eslint/rules/no-var.test.ts',
     './tests/eslint/rules/one-var.test.ts',
+    './tests/eslint/rules/operator-assignment.test.ts',
     './tests/eslint/rules/prefer-arrow-callback.test.ts',
     './tests/eslint/rules/prefer-const.test.ts',
     './tests/eslint/rules/prefer-destructuring.test.ts',
@@ -141,6 +143,7 @@ export default defineConfig({
     './tests/eslint/rules/no-useless-assignment.test.ts',
     './tests/eslint/rules/no-useless-computed-key.test.ts',
     './tests/eslint/rules/no-useless-concat.test.ts',
+    './tests/eslint/rules/no-warning-comments.test.ts',
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
@@ -479,6 +482,7 @@ export default defineConfig({
     './tests/eslint/rules/max-lines-per-function.test.ts',
     './tests/eslint/rules/max-nested-callbacks.test.ts',
     './tests/eslint/rules/max-params.test.ts',
+    './tests/eslint/rules/max-statements.test.ts',
     './tests/eslint/rules/no-label-var.test.ts',
     './tests/eslint/rules/no-shadow.test.ts',
     './tests/eslint/rules/no-labels.test.ts',
@@ -559,6 +563,8 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/require-top-level-describe.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect.test.ts',
+    './tests/eslint-plugin-jest/rules/valid-expect-in-promise.test.ts',
+    './tests/eslint-plugin-jest/rules/valid-expect-in-promise.upstream.test.ts',
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
@@ -568,10 +574,12 @@ export default defineConfig({
     './tests/rstest/rules/no-disabled-tests.test.ts',
     './tests/rstest/rules/no-focused-tests.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
+    './tests/rstest/rules/no-import-node-test.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
     './tests/rstest/rules/no-standalone-expect.test.ts',
     './tests/rstest/rules/prefer-called-exactly-once-with.test.ts',
+    './tests/rstest/rules/valid-expect-in-promise.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
     './tests/rstest/rules/valid-title.test.ts',
 

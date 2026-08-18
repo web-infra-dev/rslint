@@ -44,6 +44,7 @@ export const UPSTREAM_GLOBAL_SET_NAMES = [
   'prototypejs',
   'protractor',
   'qunit',
+  'react-native',
   'rhino',
   'rspack',
   'serviceworker',
