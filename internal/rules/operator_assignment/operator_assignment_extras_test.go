@@ -325,11 +325,35 @@ func TestOperatorAssignmentExtras(t *testing.T) {
 				Options: []any{"never"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 23}},
 			},
+			// ---- ... and the `(` is just as fatal when it comes from the
+			// source instead of the fixer, so an already-parenthesized right
+			// side spelling type syntax is report-only too ----
+			{
+				Code:    `type T = number; declare const foo: any; x <<= (foo<T>);`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 42}},
+			},
+			{
+				Code:    `type T = number; declare const foo: any; declare const y: any; x <<= (y ? foo<T> : y);`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 64}},
+			},
+			{
+				Code:    `type T = number; declare const y: any; x <<= (y as Array<T>);`,
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 40}},
+			},
 			// ---- ... while angle brackets that are not type syntax leave the
 			// mis-scan nothing to close on, so those right sides are still fixed,
 			// matching ESLint 10.8.1 + @typescript-eslint/parser ----
 			{
 				Code:    `foo <<= bar | 1`,
+				Output:  []string{`foo = foo << (bar | 1)`},
+				Options: []any{"never"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `foo <<= (bar | 1)`,
 				Output:  []string{`foo = foo << (bar | 1)`},
 				Options: []any{"never"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpected", Line: 1, Column: 1}},

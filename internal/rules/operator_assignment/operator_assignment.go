@@ -2,6 +2,7 @@ package operator_assignment
 
 import (
 	_ "embed"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -315,21 +316,29 @@ func checkNever(ctx rule.RuleContext, node *ast.Node) {
 
 		newOperatorPrecedence := utils.EslintLikeBinaryOperatorPrecedence(plainOperatorKind)
 
+		rightRange := utils.TrimNodeTextRange(sourceFile, binExpr.Right)
+		inner := text[rightRange.Pos():rightRange.End()]
+		needsParens := rightNeedsParens(binExpr.Right, newOperatorPrecedence)
+
+		// TypeScript re-scans `x << (` as `x <` opening a type argument list,
+		// and a right side that spells its own `<...>` supplies the `>` that
+		// makes the parser commit to that reading: `x = x << (foo<T>)` is
+		// TS1005 instead of a shift. The `(` is the fixer's own when the right
+		// side needs parentheses, and the source's own when the right side is
+		// already parenthesized — both spellings mis-scan, and no extra layer
+		// of parentheses reliably escapes it (`x = x << ((a ? foo<T> : b))`
+		// still fails), so this is reported without a fix. Angle brackets that
+		// are not type syntax — comparisons, strings, templates, comments —
+		// leave no `>` for the mis-scan to close on and are fixed as usual.
+		if plainOperatorKind == ast.KindLessThanLessThanToken &&
+			(needsParens || strings.HasPrefix(inner, "(")) &&
+			spellsTypeAngleBrackets(binExpr.Right) {
+			return nil
+		}
+
 		var rightText string
-		if rightNeedsParens(binExpr.Right, newOperatorPrecedence) {
-			if plainOperatorKind == ast.KindLessThanLessThanToken && spellsTypeAngleBrackets(binExpr.Right) {
-				// TypeScript re-scans `x << (` as `x <` opening a type argument
-				// list, and a right side that spells its own `<...>` supplies
-				// the `>` that makes the parser commit to that reading:
-				// `x = x << (foo<T>)` is TS1005 instead of a shift. Angle
-				// brackets elsewhere — comparisons, strings, comments — leave no
-				// `>` for the mis-scan to close on, so only type syntax is
-				// suppressed, and it is reported without a fix.
-				return nil
-			}
-			rightRange := utils.TrimNodeTextRange(sourceFile, binExpr.Right)
+		if needsParens {
 			between := text[opRange.End():rightRange.Pos()]
-			inner := text[rightRange.Pos():rightRange.End()]
 			rightText = between + "(" + inner + ")"
 		} else {
 			rest := text[opRange.End():node.End()]
