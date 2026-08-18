@@ -24,6 +24,7 @@ linters:
     - errname
     - errorlint
     - fatcontext
+    - forbidigo
     - forcetypeassert
     - gocheckcompilerdirectives
     - goprintffuncname
@@ -68,6 +69,14 @@ linters:
     govet:
       enable:
         - nilness
+    forbidigo:
+      forbid:
+        - pattern: '^strings\.ToLower$'
+          msg: 'A string a rule lowercases is lowercased the way JavaScript lowercases it. Use ecmascript.StringToLowerCase, which is the same answer for ASCII and the right one past it.'
+        - pattern: '^strings\.ToUpper$'
+          msg: 'A string a rule uppercases is uppercased the way JavaScript uppercases it. Use ecmascript.StringToUpperCase, which grows the string where JavaScript grows it.'
+        - pattern: '^strings\.TrimSpace$'
+          msg: 'The whitespace a rule trims is what JavaScript trims: ECMAScript WhiteSpace plus LineTerminator. Use ecmascript.StringTrim.'
     depguard:
       rules:
         js-semantics:
@@ -97,6 +106,16 @@ linters:
       - path: '_test\.go$'
         linters:
           - forcetypeassert
+      # A rule reproduces JavaScript; everything else here is a linter written
+      # in Go, answering Go's questions with Go's standard library.
+      - path-except: '^internal/(rules|plugins)/'
+        linters:
+          - forbidigo
+      # Test scaffolding builds its own strings rather than reading a source
+      # file, so it is not asking the question the rule asks.
+      - path: '_test\.go$'
+        linters:
+          - forbidigo
 
     presets:
       - comments

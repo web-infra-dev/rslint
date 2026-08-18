@@ -199,6 +199,7 @@ footgun
 Foox
 foox
 fooz
+forbidigo
 forcetypeassert
 forinstatement
 formedness
