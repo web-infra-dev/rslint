@@ -14,7 +14,7 @@ export const PresetTable: React.FC = () => (
       <tr>
         <th>Preset</th>
         <th>Description</th>
-        <th />
+        <th>View rules</th>
       </tr>
     </thead>
     <tbody>

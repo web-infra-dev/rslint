@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -671,7 +672,7 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 
 	var diagnostics []rule.RuleDiagnostic
 	linter.RunLinterInProgram(
-		program,
+		lintprogram.NewFromCompiler(program),
 		[]string{sourceFile.FileName()},
 		nil,
 		nil,
@@ -688,7 +689,6 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 		func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		nil,
 		nil,
 	)
 	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
@@ -729,8 +729,12 @@ first("\\1(a)");
 	}
 
 	var diagnostics []rule.RuleDiagnostic
+	sourceProgram, err := lintprogram.NewFromBoundSources(program, program.SourceFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
 	linter.RunLinterInProgram(
-		program,
+		sourceProgram,
 		[]string{sourceFile.FileName()},
 		nil,
 		nil,
@@ -747,7 +751,6 @@ first("\\1(a)");
 		func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		map[string]struct{}{}, // Keep the Program/RefStore but withhold the checker.
 		nil,
 	)
 	if len(diagnostics) != 6 {

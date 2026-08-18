@@ -222,9 +222,9 @@ func TestRealConfig_RspackNpmArtifacts(t *testing.T) {
 // `!` re-include) must produce a gap-file set IDENTICAL to the linter's own
 // per-file decision (GetConfigForFile != nil), regardless of directory pruning.
 // Oracle = { f : f matches a files pattern ∧ GetConfigForFile(f) != nil }, the
-// same contract as TestDiscoverGapFiles_PruningPreservesGapFiles but on a
+// same contract as TestDiscoverFilesOutsidePrograms_PruningPreservesGapFiles but on a
 // realistic merged ignore set rather than synthetic patterns. ---
-func TestRealWorld_DiscoverGapFiles_MatchesLinterOracle(t *testing.T) {
+func TestRealWorld_discoverFilesOutsideProgramsForTest_MatchesLinterOracle(t *testing.T) {
 	layout := []string{
 		"packages/core/src/index.ts",                          // lintable
 		"packages/core/dist/bundle.ts",                        // dist cover → ignored
@@ -270,7 +270,7 @@ func TestRealWorld_DiscoverGapFiles_MatchesLinterOracle(t *testing.T) {
 	}
 	sort.Strings(oracle)
 
-	got := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+	got := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 	sort.Strings(got)
 
 	// Walker must equal the linter oracle exactly (no over-prune, no over-include).

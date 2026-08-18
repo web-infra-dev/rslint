@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -52,11 +52,10 @@ func runNoUnsafeArgumentLenientProgram(
 
 	var diagnostics []rule.RuleDiagnostic
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:         []*compiler.Program{program},
-		SingleThreaded:   true,
-		Scope:            linter.FileScope{Files: []string{sourceFile.FileName()}},
-		ExcludePaths:     []string{},
-		SyntaxErrorFiles: map[string]struct{}{},
+		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
+		SingleThreaded: true,
+		Scope:          linter.FileScope{Files: []string{sourceFile.FileName()}},
+		ExcludePaths:   []string{},
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return []linter.ConfiguredRule{{
 				Name:             NoUnsafeArgumentRule.Name,

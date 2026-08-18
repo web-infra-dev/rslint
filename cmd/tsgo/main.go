@@ -51,7 +51,7 @@ func CreateProgram(config string) (*compiler.Program, error) {
 	}
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 	host := utils.CreateCompilerHost(currentDirectory, fs)
-	program, err := utils.CreateProgram(
+	program, err := utils.CreateProgramUsingProjectReferenceSources(
 		true,
 		fs,
 		currentDirectory,
@@ -179,7 +179,7 @@ func runMain() int {
 	defer done()
 
 	checkResult := CheckResult{}
-	checkResult.RootFiles = program.CommandLine().FileNames()
+	checkResult.RootFiles = append(checkResult.RootFiles, program.CommandLine().FileNames()...)
 	checkResult.Semantic = NewSemantic()
 	checkResult.SourceFileExtra = []SourceFileExtra{}
 
@@ -195,6 +195,9 @@ func runMain() int {
 		fileMap[file.FileName()] = int32(sourcefileId)
 		checkResult.ModuleList = append(checkResult.ModuleList, file.FileName())
 		sourceFile := file.AsSourceFile()
+		if !sourceFile.IsDeclarationFile && program.IsSourceFromProjectReference(sourceFile.Path()) {
+			checkResult.RootFiles = append(checkResult.RootFiles, sourceFile.FileName())
+		}
 
 		encodedSourceFile, _, err := encoder.EncodeSourceFile(sourceFile)
 		if err != nil {

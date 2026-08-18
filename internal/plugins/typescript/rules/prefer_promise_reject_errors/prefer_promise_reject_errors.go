@@ -62,7 +62,7 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				if utils.IsErrorLike(ctx.Program, ctx.TypeChecker, t) || utils.IsReadonlyErrorLike(ctx.Program, ctx.TypeChecker, t) {
+				if utils.IsErrorLike(ctx.Program(), ctx.TypeChecker, t) || utils.IsReadonlyErrorLike(ctx.Program(), ctx.TypeChecker, t) {
 					return
 				}
 			} else if opts.AllowEmptyReject {
@@ -73,7 +73,7 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 
 		typeAtLocationIsLikePromise := func(node *ast.Node) bool {
 			t := ctx.TypeChecker.GetTypeAtLocation(node)
-			return (utils.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, t) || utils.IsPromiseLike(ctx.Program, ctx.TypeChecker, t))
+			return (utils.IsPromiseConstructorLike(ctx.Program(), ctx.TypeChecker, t) || utils.IsPromiseLike(ctx.Program(), ctx.TypeChecker, t))
 		}
 
 		return rule.RuleListeners{
@@ -122,7 +122,7 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 						break
 					}
 
-					if !utils.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(parentNode.Expression())) {
+					if !utils.IsPromiseConstructorLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(parentNode.Expression())) {
 						return
 					}
 

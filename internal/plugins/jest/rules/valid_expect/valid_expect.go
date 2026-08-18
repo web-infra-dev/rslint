@@ -8,7 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
-	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	sharedValidExpect "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/valid_expect"
 	"slices"
 	"strconv"
 )
@@ -217,92 +217,6 @@ func shouldBeAwaited(parsed *utils.ParsedJestFnCall, asyncMatchers []string) boo
 	return slices.Contains(asyncMatchers, parsed.Matcher)
 }
 
-func isPromiseMethodCall(node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindCallExpression {
-		return false
-	}
-
-	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
-	if !utils.IsMemberAccessNode(callee) {
-		return false
-	}
-
-	return testFramework.CalleeChainName(internalUtils.AccessExpressionObject(callee)) == "Promise"
-}
-
-func getPromiseCallExpressionNode(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-
-	if node.Kind == ast.KindArrayLiteralExpression && node.Parent != nil && node.Parent.Kind == ast.KindCallExpression {
-		node = node.Parent
-	}
-
-	if isPromiseMethodCall(node) {
-		return node
-	}
-
-	return nil
-}
-
-func findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
-	if node == nil || node.Parent == nil || node.Parent.Parent == nil {
-		return nil
-	}
-	if node.Parent.Kind != ast.KindCallExpression && node.Parent.Kind != ast.KindArrayLiteralExpression {
-		return nil
-	}
-	return getPromiseCallExpressionNode(node.Parent)
-}
-
-func getParentIfPromiseChained(node *ast.Node) *ast.Node {
-	if node == nil || node.Parent == nil || node.Parent.Parent == nil {
-		return node
-	}
-
-	grandParent := node.Parent.Parent
-	if grandParent.Kind != ast.KindCallExpression || !utils.IsMemberAccessNode(grandParent.AsCallExpression().Expression) {
-		return node
-	}
-
-	member := grandParent.AsCallExpression().Expression
-	entries := utils.GetJestFnMemberEntries(member)
-	if len(entries) == 0 {
-		return node
-	}
-
-	last := entries[len(entries)-1].Name
-	if last == "then" || last == "catch" {
-		return getParentIfPromiseChained(grandParent)
-	}
-
-	return node
-}
-
-func isAcceptableReturnNode(node *ast.Node, allowReturn bool) bool {
-	if node == nil {
-		return false
-	}
-
-	if allowReturn && node.Kind == ast.KindReturnStatement {
-		return true
-	}
-	if node.Kind == ast.KindConditionalExpression {
-		return isAcceptableReturnNode(node.Parent, allowReturn)
-	}
-
-	return node.Kind == ast.KindArrowFunction || node.Kind == ast.KindAwaitExpression
-}
-
-func promiseArrayExceptionKey(sourceFile *ast.SourceFile, node *ast.Node) string {
-	if sourceFile == nil || node == nil {
-		return ""
-	}
-	r := internalUtils.TrimNodeTextRange(sourceFile, node)
-	return fmt.Sprintf("%d:%d", r.Pos(), r.End())
-}
-
 func expectOpenParenRange(sourceFile *ast.SourceFile, call *ast.Node) core.TextRange {
 	if sourceFile == nil || call == nil || call.Kind != ast.KindCallExpression {
 		return internalUtils.TrimNodeTextRange(sourceFile, call)
@@ -329,26 +243,9 @@ func tooManyArgsRange(sourceFile *ast.SourceFile, args []*ast.Node, maxArgs int)
 	return core.NewTextRange(start, end)
 }
 
-func asyncInsertFix(sourceFile *ast.SourceFile, fn *ast.Node) rule.RuleFix {
-	switch fn.Kind {
-	case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
-		head := internalUtils.GetFunctionHeadLoc(sourceFile, fn)
-		return rule.RuleFixReplaceRange(core.NewTextRange(head.Pos(), head.Pos()), "async ")
-	default:
-		return rule.RuleFixInsertBefore(sourceFile, fn, "async ")
-	}
-}
-
-func awaitFix(sourceFile *ast.SourceFile, node *ast.Node, alwaysAwait bool) rule.RuleFix {
-	if alwaysAwait && node.Parent != nil && node.Parent.Kind == ast.KindReturnStatement {
-		ret := node.Parent
-		retRange := internalUtils.TrimNodeTextRange(sourceFile, ret)
-		nodeRange := internalUtils.TrimNodeTextRange(sourceFile, node)
-		return rule.RuleFixReplaceRange(core.NewTextRange(retRange.Pos(), nodeRange.Pos()), "await ")
-	}
-	return rule.RuleFixInsertBefore(sourceFile, node, "await ")
-}
-
+// resolveAsyncAssertionReportNode locates the assertion expression a matcher
+// belongs to — jest matchers are always called, so it is the call wrapping the
+// matcher's member access — and hands it to the shared resolver.
 func resolveAsyncAssertionReportNode(
 	matcherEntry *utils.ParsedJestFnMemberEntry,
 	alwaysAwait bool,
@@ -362,19 +259,7 @@ func resolveAsyncAssertionReportNode(
 		return nil, false, false, false
 	}
 
-	promiseChainedAssertionNode := getParentIfPromiseChained(matcherMemberNode.Parent)
-	insideAssertionArray = promiseChainedAssertionNode.Parent != nil && promiseChainedAssertionNode.Parent.Kind == ast.KindArrayLiteralExpression
-	reportNode = promiseChainedAssertionNode
-	if promiseCallNode := findPromiseCallExpressionNode(promiseChainedAssertionNode); promiseCallNode != nil {
-		reportNode = promiseCallNode
-		promiseWrapped = true
-	}
-
-	if reportNode.Parent == nil || isAcceptableReturnNode(reportNode.Parent, !alwaysAwait) {
-		return reportNode, promiseWrapped, insideAssertionArray, false
-	}
-
-	return reportNode, promiseWrapped, insideAssertionArray, true
+	return sharedValidExpect.ResolveAsyncAssertionReportNode(matcherMemberNode.Parent, alwaysAwait)
 }
 
 func reportAsyncDescriptor(
@@ -388,10 +273,10 @@ func reportAsyncDescriptor(
 	var fixes []rule.RuleFix
 	if fn := ast.GetContainingFunction(descriptor.node); fn != nil {
 		if !ast.IsAsyncFunction(fn) && !asyncInserted[fn] {
-			fixes = append(fixes, asyncInsertFix(ctx.SourceFile, fn))
+			fixes = append(fixes, sharedValidExpect.AsyncInsertFix(ctx.SourceFile, fn))
 			asyncInserted[fn] = true
 		}
-		fixes = append(fixes, awaitFix(ctx.SourceFile, descriptor.node, alwaysAwait))
+		fixes = append(fixes, sharedValidExpect.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait))
 	}
 
 	if len(fixes) > 0 {
@@ -485,7 +370,7 @@ var ValidExpectRule = rule.Rule{
 					return
 				}
 
-				reportNodeKey := promiseArrayExceptionKey(ctx.SourceFile, reportNode)
+				reportNodeKey := sharedValidExpect.PromiseArrayExceptionKey(ctx.SourceFile, reportNode)
 				if shouldReport && !arrayExceptions[reportNodeKey] {
 					descriptors = append(descriptors, asyncDescriptor{
 						node:           reportNode,

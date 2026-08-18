@@ -5,132 +5,40 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 // AccessorQuestionDotToken returns the optional-chain token owned by accessor.
 func AccessorQuestionDotToken(accessor *ast.Node) *ast.Node {
-	if accessor == nil {
-		return nil
-	}
-
-	switch accessor.Kind {
-	case ast.KindPropertyAccessExpression:
-		return accessor.AsPropertyAccessExpression().QuestionDotToken
-	case ast.KindElementAccessExpression:
-		return accessor.AsElementAccessExpression().QuestionDotToken
-	default:
-		return nil
-	}
-}
-
-func removeAccessorSyntax(
-	ctx rule.RuleContext,
-	accessor *ast.Node,
-	start int,
-) []rule.RuleFix {
-	if !rslintUtils.HasCommentInSpan(ctx.Comments.All(), start, accessor.End()) {
-		return []rule.RuleFix{
-			rule.RuleFixRemoveRange(core.NewTextRange(start, accessor.End())),
-		}
-	}
-
-	fixes := []rule.RuleFix{}
-	for _, token := range rslintUtils.TokensOfNode(ctx.SourceFile, accessor) {
-		if token.Start >= start && token.End <= accessor.End() {
-			fixes = append(fixes, rule.RuleFixRemoveRange(token.Range()))
-		}
-	}
-	return fixes
+	return testFramework.AccessorQuestionDotToken(accessor)
 }
 
 // RemoveMemberAccessorFixes removes one member from a parsed Jest chain while
 // preserving comments and the chain's optional boundary.
+//
+// The removal itself is framework-neutral, so it lives in test_framework and is
+// shared with the Rstest plugin. That version derives the operation following
+// the removed accessor from the AST rather than from the next element of the
+// parsed chain, which is both what an alias-resolved entry needs — its
+// neighbors are not in that chain at all — and one fewer way for two copies of
+// this logic to drift apart. It is also why this takes the entry itself: the
+// surrounding slice and an index into it are no longer needed.
 func RemoveMemberAccessorFixes(
 	ctx rule.RuleContext,
-	entries []ParsedJestFnMemberEntry,
-	index int,
+	entry *ParsedJestFnMemberEntry,
 ) ([]rule.RuleFix, bool) {
-	if index < 0 || index >= len(entries) {
+	ranges, ok := testFramework.RemoveAccessorEntryRanges(
+		ctx.SourceFile,
+		ctx.Comments.All(),
+		entry,
+	)
+	if !ok {
 		return nil, false
 	}
 
-	entry := &entries[index]
-	receiver, accessor := GetAccessorReceiverAndParent(entry)
-	if receiver == nil || accessor == nil {
-		return nil, false
-	}
-
-	questionDot := AccessorQuestionDotToken(accessor)
-	start := receiver.End()
-	if questionDot != nil {
-		start = questionDot.End()
-	}
-	fixes := removeAccessorSyntax(ctx, accessor, start)
-	if len(fixes) == 0 {
-		return nil, false
-	}
-
-	if questionDot == nil {
-		return fixes, true
-	}
-
-	// The retained `?.` must directly introduce the next member or call.
-	// Remove a duplicate connector from that operation, if present.
-	if index+1 < len(entries) {
-		nextEntry := &entries[index+1]
-		nextReceiver, nextAccessor := GetAccessorReceiverAndParent(nextEntry)
-		if nextReceiver != accessor {
-			return nil, false
-		}
-
-		switch nextAccessor.Kind {
-		case ast.KindPropertyAccessExpression:
-			connector, ok := rslintUtils.TokenAtOrAfter(ctx.SourceFile, accessor.End())
-			if !ok || (connector.Text != "." && connector.Text != "?.") {
-				return nil, false
-			}
-			nextNameStart := rslintUtils.TrimNodeTextRange(ctx.SourceFile, nextEntry.Node).Pos()
-			if rslintUtils.HasCommentInSpan(ctx.Comments.All(), accessor.End(), nextNameStart) {
-				fixes = append(fixes, rule.RuleFixRemoveRange(connector.Range()))
-			} else {
-				fixes = append(fixes, rule.RuleFixRemoveRange(
-					core.NewTextRange(accessor.End(), nextNameStart),
-				))
-			}
-		case ast.KindElementAccessExpression:
-			if nextQuestionDot := AccessorQuestionDotToken(nextAccessor); nextQuestionDot != nil {
-				nextQuestionDotRange := rslintUtils.TrimNodeTextRange(ctx.SourceFile, nextQuestionDot)
-				if rslintUtils.HasCommentInSpan(ctx.Comments.All(), accessor.End(), nextQuestionDotRange.End()) {
-					fixes = append(fixes, rule.RuleFixRemoveRange(nextQuestionDotRange))
-				} else {
-					fixes = append(fixes, rule.RuleFixRemoveRange(
-						core.NewTextRange(accessor.End(), nextQuestionDotRange.End()),
-					))
-				}
-			}
-		default:
-			return nil, false
-		}
-		return fixes, true
-	}
-
-	if entry.Call == nil {
-		return nil, false
-	}
-	callExpr := entry.Call.AsCallExpression()
-	if callExpr == nil || callExpr.Expression != accessor {
-		return nil, false
-	}
-	if callExpr.QuestionDotToken != nil {
-		callQuestionDotRange := rslintUtils.TrimNodeTextRange(ctx.SourceFile, callExpr.QuestionDotToken)
-		if rslintUtils.HasCommentInSpan(ctx.Comments.All(), accessor.End(), callQuestionDotRange.End()) {
-			fixes = append(fixes, rule.RuleFixRemoveRange(callQuestionDotRange))
-		} else {
-			fixes = append(fixes, rule.RuleFixRemoveRange(
-				core.NewTextRange(accessor.End(), callQuestionDotRange.End()),
-			))
-		}
+	fixes := make([]rule.RuleFix, 0, len(ranges))
+	for _, textRange := range ranges {
+		fixes = append(fixes, rule.RuleFixRemoveRange(textRange))
 	}
 	return fixes, true
 }

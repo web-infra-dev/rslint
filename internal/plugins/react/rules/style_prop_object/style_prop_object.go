@@ -43,8 +43,8 @@ var StylePropObjectRule = rule.Rule{
 		// to resolve variable.defs[0].node.init and checks isNonNullaryLiteral.
 		// We use TypeChecker symbol resolution which is more accurate (handles cross-file, type info).
 		checkIdentifier := func(expr *ast.Node, reportNode *ast.Node) {
-			// TypeChecker is nil for gap files (files in the program but not
-			// in typeInfoFiles). Without it we cannot resolve the identifier
+			// TypeChecker is nil when this Program cannot provide semantic
+			// services. Without it we cannot resolve the identifier
 			// to its declaration — skip the check instead of panicking.
 			if ctx.TypeChecker == nil {
 				return
@@ -178,7 +178,7 @@ var StylePropObjectRule = rule.Rule{
 							continue
 						}
 						// For shorthand { style }, resolve the value symbol to the variable declaration.
-						// TypeChecker is nil on gap files (files not in typeInfoFiles);
+						// TypeChecker can be nil for a source-only Program;
 						// skip the check instead of panicking. utils.GetDeclaration
 						// already nil-guards, but GetShorthandAssignmentValueSymbol
 						// is a direct checker method with no wrapper, so the guard
