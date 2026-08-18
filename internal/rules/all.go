@@ -42,6 +42,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_control_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
+	"github.com/web-infra-dev/rslint/internal/rules/no_div_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_class_members"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_else_if"
@@ -54,6 +55,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_function"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_static_block"
+	"github.com/web-infra-dev/rslint/internal/rules/no_eq_null"
 	"github.com/web-infra-dev/rslint/internal/rules/no_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extend_native"
@@ -209,6 +211,7 @@ func GetAllRules() []rule.Rule {
 		no_control_regex.NoControlRegexRule,
 		no_debugger.NoDebuggerRule,
 		no_delete_var.NoDeleteVarRule,
+		no_div_regex.NoDivRegexRule,
 		no_dupe_args.NoDupeArgsRule,
 		no_dupe_class_members.NoDupeClassMembersRule,
 		no_dupe_keys.NoDupeKeysRule,
@@ -219,6 +222,7 @@ func GetAllRules() []rule.Rule {
 		no_empty_function.NoEmptyFunctionRule,
 		no_empty_pattern.NoEmptyPatternRule,
 		no_empty_static_block.NoEmptyStaticBlockRule,
+		no_eq_null.NoEqNullRule,
 		no_eval.NoEvalRule,
 		no_ex_assign.NoExAssignRule,
 		no_extend_native.NoExtendNativeRule,

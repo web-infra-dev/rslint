@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`no-eq-null > invalid 1`] = `
+{
+  "code": "if (x == null) { }",
+  "diagnostics": [
+    {
+      "message": "Use '===' to compare with null.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eq-null",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eq-null > invalid 2`] = `
+{
+  "code": "if (x != null) { }",
+  "diagnostics": [
+    {
+      "message": "Use '===' to compare with null.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eq-null",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eq-null > invalid 3`] = `
+{
+  "code": "do {} while (null == x)",
+  "diagnostics": [
+    {
+      "message": "Use '===' to compare with null.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eq-null",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
