@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_curly_brace_presence.schema.json
@@ -197,11 +197,7 @@ func indexFirstNonSpace(s string) int {
 }
 
 func isJsRegexWhitespace(r rune) bool {
-	switch r {
-	case ' ', '\t', '\n', '\r', '\v', '\f', '\u00A0', '\uFEFF':
-		return true
-	}
-	return unicode.Is(unicode.Zs, r)
+	return ecmascript.IsWhiteSpace(r)
 }
 
 func escapeBackslashes(s string) string {

@@ -2,7 +2,6 @@ package prefer_exponentiation_operator
 
 import (
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 const messageUseExponentiation = "Use the '**' operator instead of 'Math.pow'."
@@ -307,7 +307,7 @@ func isBaseStartThatNeedsWholeParens(sf *ast.SourceFile, base *ast.Node) bool {
 }
 
 func trimTokenText(text string) string {
-	return strings.TrimFunc(text, unicode.IsSpace)
+	return ecmascript.StringTrim(text)
 }
 
 func canTokenTextsBeAdjacent(left string, right string) bool {
@@ -339,12 +339,12 @@ func previousAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	if text[pos-1] == '/' && pos >= 2 && text[pos-2] == '*' {
 		return "", false
 	}
-	if unicode.IsSpace(rune(text[pos-1])) {
+	if ecmascript.IsWhiteSpace(rune(text[pos-1])) {
 		return "", false
 	}
 
 	start := pos - 1
-	for start > 0 && !unicode.IsSpace(rune(text[start-1])) {
+	for start > 0 && !ecmascript.IsWhiteSpace(rune(text[start-1])) {
 		ch := text[start-1]
 		if strings.ContainsRune("()[]{};,.?:", rune(ch)) {
 			break
@@ -359,7 +359,7 @@ func nextAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	if pos < 0 || pos >= len(text) {
 		return "", false
 	}
-	if unicode.IsSpace(rune(text[pos])) {
+	if ecmascript.IsWhiteSpace(rune(text[pos])) {
 		return "", false
 	}
 	if text[pos] == '/' && pos+1 < len(text) && (text[pos+1] == '*' || text[pos+1] == '/') {
@@ -367,7 +367,7 @@ func nextAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	}
 
 	end := pos + 1
-	for end < len(text) && !unicode.IsSpace(rune(text[end])) {
+	for end < len(text) && !ecmascript.IsWhiteSpace(rune(text[end])) {
 		ch := text[end]
 		if strings.ContainsRune("()[]{};,.?:", rune(ch)) {
 			break

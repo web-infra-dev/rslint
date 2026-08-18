@@ -2,7 +2,8 @@ package reactutil
 
 import (
 	"strings"
-	"unicode"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // ApplyData expands `{{key}}` placeholders in a message template using the
@@ -40,11 +41,7 @@ func HorizontalWhitespacePrefix(s string) string {
 }
 
 func isHorizontalWhitespace(r rune) bool {
-	switch r {
-	case ' ', '\t', '\v', '\f', 0xFEFF:
-		return true
-	}
-	return unicode.Is(unicode.Zs, r)
+	return ecmascript.IsWhiteSpace(r) && !ecmascript.IsLineTerminator(r)
 }
 
 // UTF16Length returns the number of UTF-16 code units required to encode s.

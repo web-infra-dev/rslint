@@ -2,11 +2,11 @@ package jsx_no_comment_textnodes
 
 import (
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // hasCommentLikeLine mirrors ESLint's `/^\s*\/(\/|\*)/m` test. It cannot be
@@ -61,15 +61,10 @@ func indexJsLineTerminator(s string) (int, int) {
 	return -1, 0
 }
 
-// isJsWhitespace matches ECMAScript `\s` minus LineTerminator (handled
-// separately): tab, vertical tab, form feed, space, NBSP (U+00A0), BOM
-// (U+FEFF), and any rune in Unicode category Zs.
+// isJsWhitespace matches ECMAScript `\s` minus LineTerminator, which this
+// rule handles separately.
 func isJsWhitespace(r rune) bool {
-	switch r {
-	case '\t', '\v', '\f', ' ', '\u00A0', '\uFEFF':
-		return true
-	}
-	return unicode.Is(unicode.Zs, r)
+	return ecmascript.IsWhiteSpace(r) && !ecmascript.IsLineTerminator(r)
 }
 
 var JsxNoCommentTextnodesRule = rule.Rule{
