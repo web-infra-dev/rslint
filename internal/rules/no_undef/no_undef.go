@@ -226,14 +226,14 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	// core no-undef. TypeScript-Go also parses JSDoc types into its AST,
 	// however, while upstream parsers leave those comments outside the scope
 	// graph. Keep only those synthetic JSDoc identifiers invisible here.
-	if isInJSDocSyntax(node) {
+	if utils.IsInJSDocSyntax(node) {
 		return true
 	}
 
 	// `import("pkg").Name` treats both the module argument and qualifier as
 	// module syntax rather than references. Its type arguments remain normal
 	// type references and are deliberately not skipped.
-	if isImportTypeSyntax(node) {
+	if utils.IsImportTypeSyntax(node) {
 		return true
 	}
 
@@ -278,39 +278,6 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	}
 
 	return false
-}
-
-// isInJSDocSyntax reports whether node came from syntax parsed inside a JSDoc
-// comment. TypeScript-Go deep-clones some of these nodes into the executable
-// tree, preserving NodeFlagsJSDoc on the cloned subtree. Espree and
-// typescript-eslint keep the same text as comments, so none of these names are
-// references for core no-undef.
-func isInJSDocSyntax(node *ast.Node) bool {
-	for current := node; current != nil; current = current.Parent {
-		if current.Flags&ast.NodeFlagsJSDoc != 0 || ast.IsJSDocNode(current) {
-			return true
-		}
-		if current.Kind == ast.KindSourceFile {
-			return false
-		}
-	}
-	return false
-}
-
-// isImportTypeSyntax reports whether node belongs to the argument, attributes,
-// or qualifier of an ImportType. Type arguments are siblings of those fields
-// and remain references.
-func isImportTypeSyntax(node *ast.Node) bool {
-	current := node
-	for current.Parent != nil && current.Parent.Kind != ast.KindImportType {
-		current = current.Parent
-	}
-	if current.Parent == nil || current.Parent.Kind != ast.KindImportType {
-		return false
-	}
-	importType := current.Parent.AsImportTypeNode()
-	return importType != nil &&
-		(importType.Argument == current || importType.Attributes == current || importType.Qualifier == current)
 }
 
 type eslintReferenceSpace uint8

@@ -22,7 +22,7 @@ import event from "event-module";
 const event2 = 1;
 ```
 
-A direct restricted name does not need to be declared through [`languageOptions.globals`](/config/#languageoptionsglobals): an unshadowed `event` reference is still reported, while a local declaration or import is not. With `checkGlobalObject`, the receiver must be an active global for the file. For example, select `globals.browser` from `@rslint/core` to check `window.foo`, or `globals.worker` to check `self.foo`; no host environment is enabled by default.
+A direct restricted name does not need to be declared through [`languageOptions.globals`](/config/language-options#languageoptionsglobals): an unshadowed `event` reference is still reported, while a local declaration or import is not. With `checkGlobalObject`, the receiver must be an active global for the file. For example, select `globals.browser` from `@rslint/core` to check `window.foo`, or `globals.worker` to check `self.foo`; no host environment is enabled by default.
 
 The rule also accepts an object form so a custom message can be attached to each restricted name:
 

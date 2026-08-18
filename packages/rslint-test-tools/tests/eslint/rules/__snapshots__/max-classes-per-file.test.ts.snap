@@ -1,0 +1,251 @@
+// Rstest Snapshot v1
+
+exports[`max-classes-per-file > invalid 1`] = `
+{
+  "code": "class Foo {}
+class Bar {}",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (2). Maximum allowed is 1.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-classes-per-file > invalid 2`] = `
+{
+  "code": "class Foo {}
+const myExpression = class {}",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (2). Maximum allowed is 1.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-classes-per-file > invalid 3`] = `
+{
+  "code": "var x = class {};
+var y = class {};",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (2). Maximum allowed is 1.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-classes-per-file > invalid 4`] = `
+{
+  "code": "class Foo {}
+var x = class {};",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (2). Maximum allowed is 1.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-classes-per-file > invalid 5`] = `
+{
+  "code": "class Foo {} class Bar {}",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (2). Maximum allowed is 1.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-classes-per-file > invalid 6`] = `
+{
+  "code": "class Foo {} class Bar {} class Baz {}",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (3). Maximum allowed is 2.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-classes-per-file > invalid 7`] = `
+{
+  "code": "
+                class Foo {}
+                class Bar {}
+                const myExpression = class {}
+            ",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (2). Maximum allowed is 1.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-classes-per-file > invalid 8`] = `
+{
+  "code": "
+                class Foo {}
+                class Bar {}
+                class Baz {}
+                const myExpression = class {}
+            ",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (3). Maximum allowed is 2.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-classes-per-file > invalid 9`] = `
+{
+  "code": "/* comment */
+class A {}
+class B {}
+/* comment */",
+  "diagnostics": [
+    {
+      "message": "File has too many classes (2). Maximum allowed is 1.",
+      "messageId": "maximumExceeded",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-classes-per-file",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

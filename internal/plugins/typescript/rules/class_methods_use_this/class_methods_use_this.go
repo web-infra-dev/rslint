@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -274,30 +272,22 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 		// Class-field arrows / function expressions are classified as
 		// "method" by ESLint v9's getFunctionNameWithKind (parent.value === node
-		// && parent.type === PropertyDefinition/AccessorProperty branch).
-		// rslint's shared helpers retain the function-kind tokens
-		// ("arrow function" / "function") and key off the immediate parent
-		// for head-loc; both need rewriting for class-field initializers,
-		// including those wrapped in one or more ParenthesizedExpressions
-		// (tsgo preserves what ESTree elides).
+		// && parent.type === PropertyDefinition branch). rslint's shared name
+		// helper retains the function-kind tokens ("arrow function" /
+		// "function"), so that one needs rewriting for class-field
+		// initializers. An auto-accessor is ESTree's AccessorProperty, a kind
+		// upstream has no case for, so its initializer is named as a plain
+		// function even though the member itself is still what decides whether
+		// to report.
 		var name string
-		var loc core.TextRange
 		if field := classFieldOfFunctionLike(node); field != nil &&
+			!ast.HasSyntacticModifier(field, ast.ModifierFlagsAccessor) &&
 			(node.Kind == ast.KindArrowFunction || node.Kind == ast.KindFunctionExpression) {
 			name = classFieldFunctionDisplayName(field, node)
-			if node.Parent != nil && node.Parent.Kind == ast.KindPropertyDeclaration {
-				// Direct child of PropertyDeclaration — the shared helper
-				// already handles this shape correctly.
-				loc = utils.GetFunctionHeadLoc(ctx.SourceFile, node)
-			} else {
-				// Paren-wrapped: reconstruct the upstream head loc as
-				// "<field-start>...<function's own open paren>".
-				loc = classFieldHeadLocAcrossParens(ctx.SourceFile, field, node)
-			}
 		} else {
 			name = utils.GetFunctionNameWithKind(node)
-			loc = utils.GetFunctionHeadLoc(ctx.SourceFile, node)
 		}
+		loc := utils.GetFunctionHeadLoc(ctx.SourceFile, node)
 		ctx.ReportRange(
 			loc,
 			rule.RuleMessage{
@@ -489,115 +479,4 @@ func classFieldFunctionDisplayName(field, node *ast.Node) string {
 		tokens = append(tokens, fmt.Sprintf("'%s'", name))
 	}
 	return strings.Join(tokens, " ")
-}
-
-// classFieldHeadLocAcrossParens reconstructs upstream's `getFunctionHeadLoc`
-// output for a paren-wrapped class-field initializer:
-//
-//	class C { foo = (() => {}); }   // upstream: "foo = " head ending at inner '('
-//
-// Upstream's range runs from the PropertyDefinition's start (after decorators)
-// to the function's own open paren — except for parenless single-parameter
-// arrows, where it ends at whatever token immediately precedes the parameter
-// identifier (the outer wrapper '(' when paren-wrapped). rslint's shared
-// `GetFunctionHeadLoc` inspects only `node.Parent`, so when the immediate
-// parent is `ParenthesizedExpression` the existing helper falls through to
-// the default arrow case ("just the `=>` token") and we lose the field
-// context. This local helper mirrors ESLint's `getOpeningParenOfParams`
-// branches exactly:
-//
-//   - Arrow with `params.length === 1`: peek the first arrow-owned token.
-//     If it's '(' (parens-form like `(x) => …`), end at that '('.
-//     Otherwise (parenless `x => …`), end at the trimmed start of the
-//     immediate ParenthesizedExpression parent (the wrapping '(').
-//   - Arrow with 0 or 2+ params: scan for the first '(' between the
-//     arrow's start and its body. Falls back to the `=>` token when no
-//     '(' appears (shouldn't happen for these param counts; defensive).
-//   - FunctionExpression: scan for the first '(' between the function's
-//     start and its body — this is always the parameter list's '(',
-//     because the outer wrapper '(' sits before `node.Pos()`.
-//
-// The field start follows `nodeStartSkippingDecorators` semantics (which the
-// shared `GetFunctionHeadLoc` uses for the non-paren-wrapped case): skip past
-// any leading `@decorator` tokens so the head range matches ESLint's
-// `PropertyDefinition.loc.start` (decorators sit outside that range in
-// ESTree, but are part of `field.Pos()` in tsgo).
-func classFieldHeadLocAcrossParens(sf *ast.SourceFile, field, node *ast.Node) core.TextRange {
-	start := fieldStartAfterDecorators(sf, field)
-
-	endLimit := node.End()
-	if body := node.Body(); body != nil {
-		endLimit = body.Pos()
-	}
-
-	if node.Kind == ast.KindArrowFunction {
-		af := node.AsArrowFunction()
-		params := af.Parameters
-		if params != nil && len(params.Nodes) == 1 {
-			// ESLint's special path for single-parameter arrows.
-			firstToken := scanner.GetScannerForSourceFile(sf, node.Pos())
-			if firstToken.Token() == ast.KindOpenParenToken {
-				return core.NewTextRange(start, firstToken.TokenStart())
-			}
-			// Parenless `x => …`: token immediately before the param is the
-			// outer wrapper `(`. Use the immediate ParenthesizedExpression
-			// parent's trimmed Pos() (which is the position of that '(').
-			if node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
-				return core.NewTextRange(start, utils.TrimNodeTextRange(sf, node.Parent).Pos())
-			}
-			// Defensive fallback — this helper is only invoked when paren-wrapped,
-			// so the branch above should always succeed.
-			return core.NewTextRange(start, utils.TrimNodeTextRange(sf, params.Nodes[0]).Pos())
-		}
-		if pos := firstOpenParenPos(sf, node.Pos(), endLimit); pos >= 0 {
-			return core.NewTextRange(start, pos)
-		}
-		// 0 / 2+ params with no '(' before the body is impossible in valid
-		// TS; keep an `=>`-positioned fallback to stay total.
-		return core.NewTextRange(start, af.EqualsGreaterThanToken.Pos())
-	}
-
-	// FunctionExpression: outer paren is before node.Pos(); first '(' from
-	// `function` keyword to body is always the parameter list's '('.
-	if pos := firstOpenParenPos(sf, node.Pos(), endLimit); pos >= 0 {
-		return core.NewTextRange(start, pos)
-	}
-	return core.NewTextRange(start, endLimit)
-}
-
-// fieldStartAfterDecorators mirrors the private `nodeStartSkippingDecorators`
-// helper used by `GetFunctionHeadLoc` for the non-paren-wrapped case: walk
-// the PropertyDeclaration's modifiers, find the last `@decorator`, and
-// return the position of the next token after it. Without this, an `@dec`
-// field reports the head as starting at the `@`, while ESLint reports
-// starting after the decorators.
-func fieldStartAfterDecorators(sf *ast.SourceFile, field *ast.Node) int {
-	fallback := utils.TrimNodeTextRange(sf, field).Pos()
-	mods := field.Modifiers()
-	if mods == nil || len(mods.Nodes) == 0 {
-		return fallback
-	}
-	var lastDecoratorEnd int
-	for _, mod := range mods.Nodes {
-		if mod.Kind == ast.KindDecorator && mod.End() > lastDecoratorEnd {
-			lastDecoratorEnd = mod.End()
-		}
-	}
-	if lastDecoratorEnd == 0 {
-		return fallback
-	}
-	return scanner.GetRangeOfTokenAtPosition(sf, lastDecoratorEnd).Pos()
-}
-
-// firstOpenParenPos scans for the first `(` token in [start, end). Returns
-// -1 if none. Bounded so it never reads through the function body.
-func firstOpenParenPos(sf *ast.SourceFile, start, end int) int {
-	s := scanner.GetScannerForSourceFile(sf, start)
-	for s.TokenStart() < end {
-		if s.Token() == ast.KindOpenParenToken {
-			return s.TokenStart()
-		}
-		s.Scan()
-	}
-	return -1
 }
