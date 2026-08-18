@@ -196,12 +196,10 @@ type Later = string;
 
 ### `ignoreTypeReferences`
 
-Whether references in type positions — a type annotation such as `let x: Foo`,
-or a `typeof Foo` type query — are exempt. Default: `true`.
-
-Because type positions are erased before the code runs, they cannot observe a
-temporal dead zone, so they are ignored by default whatever `typedefs` and
-`enums` say.
+Whether direct type references such as `let x: Foo`, and `typeof Foo` type
+queries, are exempt. Default: `true`. As in ESLint core, this exemption does not
+cover heritage names (`implements Foo`), qualified-name roots (`NS.Foo`),
+export assignments, or type-predicate parameter names.
 
 Examples of **incorrect** code with `{ "ignoreTypeReferences": false }`:
 

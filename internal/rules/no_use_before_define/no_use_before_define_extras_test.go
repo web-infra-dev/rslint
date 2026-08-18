@@ -225,15 +225,7 @@ function f(X, a = X) {
 			// as the local half of a named export ----
 			{Code: `export { nothing };`},
 
-			// ---- `ignoreTypeReferences` exempts every type position, however
-			// the dotted name is spelled, plus the `export =` operand, which
-			// names whichever space its binding lives in ----
-			{Code: `class C implements Later {} interface Later {}`},
-			{Code: `class C implements NS.Later {} namespace NS { export interface Later {} }`},
-			{Code: `interface C extends NS.Later {} namespace NS { export interface Later {} }`},
-			{Code: `let x: NS.Later; namespace NS { export type Later = string; }`},
-			{Code: `export = X; const X = 1;`},
-			// A value-only binding does not intercept the dotted name of a
+			// ---- A value-only binding does not intercept the dotted name of a
 			// heritage clause, whichever way that name is spelled.
 			{Code: `
 namespace NS {
@@ -255,16 +247,6 @@ function f() {
   const NS = 1;
 }
 `},
-
-			// ---- Nothing in a function type's signature runs, so a reference
-			// from one is never reported ----
-			{Code: `let f: (x: Later) => void; type Later = string;`, Options: map[string]any{"ignoreTypeReferences": false}},
-			{Code: `let f: (this: Later) => void; type Later = string;`, Options: map[string]any{"ignoreTypeReferences": false}},
-			{Code: `let f: new (x: Later) => void; type Later = string;`, Options: map[string]any{"ignoreTypeReferences": false}},
-			{Code: `let f: <T extends Later>() => void; type Later = string;`, Options: map[string]any{"ignoreTypeReferences": false}},
-			{Code: `interface I { (x: Later): void } type Later = string;`, Options: map[string]any{"ignoreTypeReferences": false}},
-			{Code: `interface I { new (x: Later): void } type Later = string;`, Options: map[string]any{"ignoreTypeReferences": false}},
-			{Code: `interface I { m(x: Later): void } type Later = string;`, Options: map[string]any{"ignoreTypeReferences": false}},
 
 			// ---- A `this` pseudo-parameter declares no binding, but its type
 			// annotation is a real type reference ----
