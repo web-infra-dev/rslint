@@ -57,6 +57,15 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await Promise.all([...pending, other()]); });`},
 			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; for await (const settled of [...pending]) {} });`},
 			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await pending[0]; });`},
+			// Every chain in the literal binds to the same identifier, and one
+			// element-wise consumption of the binding consumes all of them.
+			{Code: `test("case", async () => { const pending = [first.then(value => expect(value).toBe(1)), second.then(value => expect(value).toBe(2))]; await Promise.all(pending); });`},
+			{Code: `test("case", async () => { const pending = [first.then(value => expect(value).toBe(1)), second.then(value => expect(value).toBe(2))]; for await (const settled of pending) {} });`},
+			{Code: `test("case", async () => { const pending = [first.then(value => expect(value).toBe(1)), second.then(value => expect(value).toBe(2))]; await Promise.all([...pending]); });`},
+			{Code: `test("case", async () => { const pending = [first.then(value => expect(value).toBe(1)), second.then(value => expect(value).toBe(2)), third.then(value => expect(value).toBe(3))]; await Promise.all(pending); });`},
+			// A `for await` over a literal holding the binding consumes it, just
+			// as `Promise.all` in that position does.
+			{Code: `test("case", async () => { const pending = promise.then(value => expect(value).toBe(1)); for await (const settled of [pending]) {} });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } catch (error) { throw error; } });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); if (!ready) { throw new Error("no"); } await pending; });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { setup(); await pending; } catch (error) { throw error; } });`},

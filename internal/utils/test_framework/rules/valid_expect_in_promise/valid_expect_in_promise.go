@@ -353,12 +353,16 @@ func (a *analyzer) resolveFunctionConsumption(
 				return
 			}
 			if boundGroups := groupsByTarget[node]; len(boundGroups) > 0 {
-				for _, group := range boundGroups {
+				for index, group := range boundGroups {
 					builder.Emit(flowEvent{
 						kind:      flowBind,
 						symbol:    symbol,
 						candidate: group,
-						extends:   group.binding.extends,
+						// One write can bind several chains, as
+						// `const pending = [a().then(...), b().then(...)]`
+						// does. Only the first of them replaces what the
+						// symbol held; the siblings join it.
+						extends: group.binding.extends || index > 0,
 					})
 				}
 				return
@@ -592,7 +596,8 @@ func (a *analyzer) isSafeIdentifierUse(identifier, function *ast.Node) (bool, bo
 		case ast.KindForOfStatement:
 			return forAwaitConsumesExpression(current, function), true
 		case ast.KindArrayLiteralExpression:
-			if safePromiseAggregatorForExpression(parent, current, function) {
+			if safePromiseAggregatorForExpression(parent, current, function) ||
+				forAwaitConsumesExpression(parent, function) {
 				return true, false
 			}
 			return false, false
