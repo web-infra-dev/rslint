@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -95,7 +96,15 @@ func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, strin
 
 type directoryAccessSpyFS struct {
 	vfs.FS
-	accessedDirs []string
+	accessedDirs   []string
+	gitignoreReads []string
+}
+
+func (fs *directoryAccessSpyFS) ReadFile(path string) (string, bool) {
+	if filepath.Base(path) == ".gitignore" {
+		fs.gitignoreReads = append(fs.gitignoreReads, tspath.NormalizePath(path))
+	}
+	return fs.FS.ReadFile(path)
 }
 
 func (fs *directoryAccessSpyFS) GetAccessibleEntries(path string) vfs.Entries {
@@ -1015,6 +1024,59 @@ func TestExecuteLintPipelineDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *tes
 	for _, accessed := range spy.accessedDirs {
 		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
 			t.Fatalf("JSON directory target entered unrelated directory %q", accessed)
+		}
+	}
+}
+
+func TestExecuteLintPipelineExplicitJSONDirectoryTargetUsesInvocationCWD(t *testing.T) {
+	repositoryRoot := t.TempDir()
+	cwd := filepath.Join(repositoryRoot, "packages", "app")
+	selectedDir := filepath.Join(cwd, "selected")
+	unrelatedDir := filepath.Join(cwd, "unrelated")
+	for _, path := range []string{selectedDir, unrelatedDir} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+	}
+	for path, content := range map[string]string{
+		filepath.Join(repositoryRoot, "rslint.jsonc"): `[{
+			"rules": {"no-debugger": "error"}
+		}]`,
+		filepath.Join(repositoryRoot, ".gitignore"): "packages/app/selected/index.js\n",
+		filepath.Join(cwd, ".gitignore"):            "cwd.generated.js\n",
+		filepath.Join(selectedDir, ".gitignore"):    "local.generated.js\n",
+		filepath.Join(selectedDir, "index.js"):      "debugger;\n",
+		filepath.Join(unrelatedDir, ".gitignore"):   "index.js\n",
+		filepath.Join(unrelatedDir, "index.js"):     "debugger;\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
+
+	code, stdout, stderr := runLintPipelineForTest(t, cwd, lintArgs{
+		Config:         filepath.Join(repositoryRoot, "rslint.jsonc"),
+		FS:             spy,
+		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 1 || !strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("selected directory was not linted from invocation cwd: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	wantGitignoreReads := []string{
+		tspath.NormalizePath(filepath.Join(cwd, ".gitignore")),
+		tspath.NormalizePath(filepath.Join(selectedDir, ".gitignore")),
+	}
+	if !slices.Equal(spy.gitignoreReads, wantGitignoreReads) {
+		t.Fatalf("explicit JSON CWD-rooted Git reads = %v, want %v", spy.gitignoreReads, wantGitignoreReads)
+	}
+	unrelatedDir = tspath.NormalizePath(unrelatedDir)
+	for _, accessed := range spy.accessedDirs {
+		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+			t.Fatalf("explicit JSON target entered unrelated directory %q", accessed)
 		}
 	}
 }
