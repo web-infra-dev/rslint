@@ -68,26 +68,31 @@ var commonJSRefStoreInit = RefStoreInit{
 
 // ResolveLanguageDefaults resolves the concrete Globals and RefStore
 // initialization supplied by ESLint's default language selection for fileName,
-// together with effective language options. Authored options win; otherwise
-// .cjs selects commonjs while .js/.mjs select module. Other extensions retain
-// the LanguageOptions zero-value defaults.
+// together with effective language options.
 //
-// JavaScript module files contribute only their non-global top-level scope.
-// An exact, case-sensitive .cjs extension contributes CommonJS's four globals,
-// non-global wrapper scope, and implicit wrapper arguments binding. Other
-// extensions return zero values.
+// An omitted source type is filled from the filename for JavaScript files:
+// .js/.mjs select module, .cjs selects commonjs. Other extensions, including
+// .ts/.tsx/.jsx/.cts, keep the empty value. Authored sourceType then selects
+// the inits on every extension, so a TypeScript file with sourceType
+// "commonjs" receives CommonJS globals and wrapper bindings. module
+// contributes a non-global top-level scope; commonjs additionally contributes
+// writable exports, read-only global/module/require, and the wrapper-local
+// arguments binding; script and the still-empty TypeScript/JSX value
+// contribute no defaults.
 func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (GlobalsInit, RefStoreInit, LanguageOptions) {
-	switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
-	case tspath.ExtensionJs, tspath.ExtensionMjs:
-		if languageOptions.SourceType == "" {
+	if languageOptions.SourceType == "" {
+		switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
+		case tspath.ExtensionJs, tspath.ExtensionMjs:
 			languageOptions.SourceType = "module"
-		}
-		return GlobalsInit{}, moduleRefStoreInit, languageOptions
-	case tspath.ExtensionCjs:
-		if languageOptions.SourceType == "" {
+		case tspath.ExtensionCjs:
 			languageOptions.SourceType = "commonjs"
 		}
+	}
+	switch languageOptions.SourceType {
+	case "commonjs":
 		return commonJSGlobalsInit, commonJSRefStoreInit, languageOptions
+	case "module":
+		return GlobalsInit{}, moduleRefStoreInit, languageOptions
 	}
 	return GlobalsInit{}, RefStoreInit{}, languageOptions
 }

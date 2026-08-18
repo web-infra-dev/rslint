@@ -351,6 +351,19 @@ func TestNoRedeclareExtras(t *testing.T) {
 				},
 			},
 
+			// Authored sourceType on a .js file selects the global program scope,
+			// so builtin Object is redeclared. Without the option, .js defaults to module.
+			{
+				Code:            "var Object = 0;",
+				FileName:        "a.js",
+				TSConfig:        "tsconfig.allow-js.json",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 1, 5),
+				},
+			},
+
 			// Locks in upstream iterateDeclarations() arm 2: syntax declarations after the first report as plain redeclarations.
 			invalidRedeclared("let a;\nlet a;", "a", 2, 5),
 

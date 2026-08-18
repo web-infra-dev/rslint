@@ -40,8 +40,7 @@ func TestNoRedeclareUpstream(t *testing.T) {
 
 			// ---- upstream valid: builtinGlobals option ----
 			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": false}},
-			// SKIP: rslint does not support ESLint's sourceType override without import/export syntax.
-			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
+			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, SourceType: "module"}},
 			// SKIP: rslint does not support ESLint's parserOptions.ecmaFeatures.globalReturn.
 			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
 			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
@@ -77,13 +76,12 @@ func TestNoRedeclareUpstream(t *testing.T) {
 					redeclaredError("a", 1, 28),
 				},
 			},
-			// SKIP: rslint does not support ESLint's sourceType override without import/export syntax.
 			{
-				Code: "var a; var a;",
+				Code:            "var a; var a;",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, SourceType: "module"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredError("a", 1, 12),
 				},
-				Skip: true,
 			},
 			invalidRedeclared("export var a; var a;", "a", 1, 19),
 
@@ -104,14 +102,13 @@ func TestNoRedeclareUpstream(t *testing.T) {
 					builtinError("Object", 1, 23),
 				},
 			},
-			// SKIP: rslint does not support ESLint's sourceType override without import/export syntax.
 			{
-				Code:    "var a; var {a = 0, b: Object = 0} = {};",
-				Options: map[string]interface{}{"builtinGlobals": true},
+				Code:            "var a; var {a = 0, b: Object = 0} = {};",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, SourceType: "module"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredError("a", 1, 13),
 				},
-				Skip: true,
 			},
 			// SKIP: rslint does not support ESLint's parserOptions.ecmaFeatures.globalReturn.
 			{

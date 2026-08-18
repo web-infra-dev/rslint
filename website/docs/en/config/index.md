@@ -216,9 +216,9 @@ Selects the standard ECMAScript globals exposed to native rules. Accepted number
 #### languageOptions.sourceType
 
 - **Type:** `'module' | 'script' | 'commonjs'`
-- **Default:** unset
+- **Default:** `.js` / `.mjs` → `'module'`; `.cjs` → `'commonjs'`; otherwise unset
 
-Exposes the configured module kind to rules through their per-file language context. This lets a rule whose behavior depends on module kind distinguish ECMAScript modules, scripts, and CommonJS—for example, to choose between an `import` declaration and a `require()` call. When omitted, the context leaves the value unset so a rule can fall back to structural detection from `import` / `export` syntax.
+Selects the module kind used by the per-file language context, including CommonJS globals (`require`, `module`, `exports`, `global`) and whether the top-level scope is the global object. When omitted, `.js` and `.mjs` resolve to `'module'` and `.cjs` to `'commonjs'` before rules see the value. Other extensions such as `.ts`, `.tsx`, and `.jsx` keep the option unset. An authored value applies on every extension.
 
 This option does not change TypeScript parsing or compiler module resolution. Support in an individual native rule depends on that rule consulting the configured value; rules that still document syntax-based module detection continue to use that behavior.
 

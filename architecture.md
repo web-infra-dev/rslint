@@ -386,12 +386,16 @@ authored overrides remain authoritative. Non-global wrapper bindings remain a
 
 Before constructing rule contexts, the linter calls `ResolveLanguageDefaults`
 once and passes its concrete `GlobalsInit`, `RefStoreInit`, and effective
-`LanguageOptions` results to their respective consumers. The resolver selects defaults from the source
-filename: `.js` and `.mjs` contribute a non-global top-level scope; `.cjs`
-additionally contributes writable `exports`, read-only `global`, `module`, and
-`require`, plus the wrapper-local `arguments` binding. Other extensions
-contribute no defaults. The resolver does not inspect `package.json`; authored
-language options override filename-derived values. A rule reads
+`LanguageOptions` results to their respective consumers. An omitted source
+type is filled from the filename for JavaScript files (`.cjs` → `commonjs`,
+`.js`/`.mjs` → `module`); `.ts`/`.tsx`/`.jsx` and other extensions keep the
+empty value. The resolver then selects inits from that effective source type:
+`commonjs` contributes writable `exports`, read-only `global`, `module`, and
+`require`, plus non-global wrapper scope and the wrapper-local `arguments`
+binding; `module` contributes a non-global top-level scope; `script` and the
+still-empty TypeScript/JSX value contribute no defaults. Authored `sourceType`
+therefore applies on every extension, including `.ts`/`.tsx`. The resolver
+does not inspect `package.json`. A rule reads
 `RuleContext.LanguageOptions` when its upstream behavior depends on them.
 Every authored alias is normalized to one of ESLint's three access levels —
 `utils.GlobalAccess`, whose zero value means no source mentioned the name.
