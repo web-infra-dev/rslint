@@ -59,7 +59,10 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
       code: `expect(x).toHaveBeenCalledOnce(); doMoreWork(); expect(x).toHaveBeenCalledWith('a')`,
     },
     {
-      code: `expect(x).toHaveBeenCalledOnce(); console.log('checkpoint'); expect(x).toHaveBeenCalledWith('a')`,
+      code: `expect(x).toHaveBeenCalledOnce(); console.log(x); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); [1, 2].forEach(cb); expect(x).toHaveBeenCalledWith('a')`,
     },
     {
       code: `expect(x).toHaveBeenCalledOnce(); const y = compute(); expect(x).toHaveBeenCalledWith('a')`,
@@ -141,6 +144,24 @@ expect(x).to.have.been.calledWith('a');`,
     {
       code: `expect(mocks['a']).toHaveBeenCalledOnce(); expect(mocks['a']).toHaveBeenCalledWith('x');`,
       output: ` expect(mocks['a']).toHaveBeenCalledExactlyOnceWith('x');`,
+      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce();
+console.log('checkpoint');
+expect(x).toHaveBeenCalledWith('a');`,
+      output: `console.log('checkpoint');
+expect(x).toHaveBeenCalledExactlyOnceWith('a');
+`,
+      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce();
+var hoge = 'foo';
+expect(x).toHaveBeenCalledWith('a');`,
+      output: `var hoge = 'foo';
+expect(x).toHaveBeenCalledExactlyOnceWith('a');
+`,
       errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
     },
     {

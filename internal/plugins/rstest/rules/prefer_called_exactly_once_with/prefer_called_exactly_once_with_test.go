@@ -76,12 +76,24 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			// A reset of some other mock cannot reach the target, but nothing
 			// here proves `y.mockClear` is that reset, so the pair is left alone.
 			{Code: `expect(x).toHaveBeenCalledOnce(); y.mockClear(); expect(x).toHaveBeenCalledWith('hoge');`},
-			// Harmless in fact, undecidable here: a call is a call.
-			{Code: `expect(x).toHaveBeenCalledOnce(); console.log('checkpoint'); expect(x).toHaveBeenCalledWith('a');`},
+			// A call the rule cannot resolve to the default library could reach
+			// the target through anything it calls.
 			{Code: `expect(x).toHaveBeenCalledOnce(); const y = compute(); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(makeExpected()); expect(x).toHaveBeenCalledWith('a');`},
+			// A default-library call handed something callable can invoke it,
+			// and what it invokes may reach the target.
+			{Code: `expect(x).toHaveBeenCalledOnce(); [1, 2].forEach(cb); expect(x).toHaveBeenCalledWith('a');`},
+			// An argument the checker cannot pin down stays callable, so a
+			// library call handed one is not inert either.
+			{Code: `expect(x).toHaveBeenCalledOnce(); console.log(unresolved); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); setTimeout(() => x('b'), 0); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); console.log(x); expect(x).toHaveBeenCalledWith('a');`},
+			// A `console` of the author's own resolves to their binding, not the
+			// library's, so nothing here says what it runs.
+			{Code: `function f() { const console = makeLogger(); expect(x).toHaveBeenCalledOnce(); console.log('checkpoint'); expect(x).toHaveBeenCalledWith('a'); }`},
 			// `var` is hoisted, so unlike `const` and `let` it can rebind a name
-			// the first assertion already read.
-			{Code: `expect(x).toHaveBeenCalledOnce(); var hoge = 'foo'; expect(x).toHaveBeenCalledWith('a');`},
+			// the assertions read.
+			{Code: `expect(x).toHaveBeenCalledOnce(); var x = makeMock; expect(x).toHaveBeenCalledWith('a');`},
 			// An intervening assertion that executes what it asserts on, or
 			// awaits it, hands control to code this rule cannot see.
 			{Code: `expect(x).toHaveBeenCalledOnce(); expect(callX).toThrow(); expect(x).toHaveBeenCalledWith('a');`},
@@ -115,8 +127,36 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 				Output: []string{`expect(x).toHaveBeenCalledExactlyOnceWith('hoge', 123); `},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
 			},
-			// An assertion that runs nothing of the author's may sit between the
-			// two halves, which is how mocks are commonly asserted in groups.
+			// A statement that runs nothing of the author's may sit between the
+			// two halves: assertions on other mocks, which is how they are
+			// commonly grouped, and calls into the default library, which have
+			// nothing of the author's to invoke.
+			{
+				Code: `expect(x).toHaveBeenCalledOnce();
+console.log('checkpoint');
+expect(x).toHaveBeenCalledWith('a');`,
+				Output: []string{`console.log('checkpoint');
+expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			{
+				Code: `expect(x).toHaveBeenCalledOnce();
+const parsed = JSON.parse('{}');
+expect(x).toHaveBeenCalledWith('a');`,
+				Output: []string{`const parsed = JSON.parse('{}');
+expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			// A hoisted declaration of a name neither assertion reads cannot
+			// change what they assert on.
+			{
+				Code: `expect(x).toHaveBeenCalledOnce();
+var hoge = 'foo';
+expect(x).toHaveBeenCalledWith('a');`,
+				Output: []string{`var hoge = 'foo';
+expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
 			{
 				Code: `expect(x).toHaveBeenCalledOnce();
 expect(y).toEqual({ id: 1 });

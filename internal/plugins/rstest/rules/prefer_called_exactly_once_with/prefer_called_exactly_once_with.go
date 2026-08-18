@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -374,29 +375,171 @@ func isExpectHelperCall(node *ast.Node, rootName string) bool {
 	return len(entries) == 2 && entries[0].Name == rootName && entries[0].Call == nil
 }
 
-// isInertAssertion reports whether a statement can sit between the two
+// betweenScanner decides whether the statements separating a pair leave its
+// merge intact. It carries what that needs: the parse cache, the checker
+// through ctx, and the names the two assertions read.
+type betweenScanner struct {
+	ctx            rule.RuleContext
+	analysis       *rstestUtils.RstestCallAnalysis
+	assertionNames map[string]bool
+}
+
+// isCallable reports whether an argument could be invoked by whoever receives
+// it. Anything the checker cannot resolve counts as callable, so an unknown
+// argument keeps its call out of the inert set.
+func (scanner *betweenScanner) isCallable(node *ast.Node) bool {
+	node = unwrapExpression(node)
+	if node == nil {
+		return true
+	}
+	switch node.Kind {
+	case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindClassExpression:
+		return true
+	}
+	if scanner.ctx.TypeChecker == nil {
+		return true
+	}
+	argumentType := scanner.ctx.TypeChecker.GetTypeAtLocation(node)
+	if argumentType == nil ||
+		internalUtils.IsTypeFlagSet(argumentType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
+		// `any` has no call signatures and answers nothing about the value, so
+		// an argument the checker could not pin down stays callable.
+		return true
+	}
+	return len(internalUtils.GetCallSignatures(scanner.ctx.TypeChecker, argumentType)) > 0 ||
+		len(internalUtils.GetConstructSignatures(scanner.ctx.TypeChecker, argumentType)) > 0
+}
+
+// isLibraryCall reports a call that runs nothing of the author's: its callee is
+// declared in TypeScript's default library, and nothing callable is handed to
+// it, so the library function has nothing of the author's to invoke.
+// `console.log('checkpoint')` and `JSON.stringify(value)` qualify;
+// `items.forEach(cb)`, `setTimeout(cb)` and `promise.then(cb)` do not, and
+// neither does a `console` the author declared themselves, which resolves to
+// their own binding rather than the library's. Without a checker nothing
+// qualifies, which leaves the pair unreported — the safe direction.
+func (scanner *betweenScanner) isLibraryCall(node *ast.Node) bool {
+	if node.Kind != ast.KindCallExpression || scanner.ctx.TypeChecker == nil {
+		return false
+	}
+	call := node.AsCallExpression()
+	if call == nil {
+		return false
+	}
+	symbol := scanner.ctx.TypeChecker.GetSymbolAtLocation(ast.SkipParentheses(call.Expression))
+	if symbol == nil || !internalUtils.IsSymbolFromDefaultLibrary(scanner.ctx.Program(), symbol) {
+		return false
+	}
+	for _, argument := range node.Arguments() {
+		if scanner.isCallable(argument) {
+			return false
+		}
+	}
+	return true
+}
+
+// inertSubtree reports whether a subtree transfers control nowhere, treating
+// the given framework calls, `<root>.helper(...)` calls and default-library
+// calls as known-safe. Their arguments are still walked, so a call nested in
+// one of them still counts.
+func (scanner *betweenScanner) inertSubtree(node *ast.Node, frameworkCalls map[*ast.Node]bool, rootName string) bool {
+	inert := true
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node == nil {
+			return false
+		}
+		if !frameworkCalls[node] && !isExpectHelperCall(node, rootName) &&
+			!scanner.isLibraryCall(node) && controlTransfer(node) {
+			inert = false
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	visit(node)
+	return inert
+}
+
+// isInertDeclaration accepts a declaration whose initializers transfer control
+// nowhere — `const hoge = 'foo';` between the two assertions changes nothing
+// about either. A `var` is additionally required to declare names neither
+// assertion reads: it is hoisted, so unlike `const` and `let` it can rebind a
+// name the first assertion already used without a temporal dead zone error.
+func (scanner *betweenScanner) isInertDeclaration(statement *ast.Node) bool {
+	if statement == nil || statement.Kind != ast.KindVariableStatement {
+		return false
+	}
+	variableStatement := statement.AsVariableStatement()
+	if variableStatement == nil || variableStatement.DeclarationList == nil {
+		return false
+	}
+	declarationList := variableStatement.DeclarationList
+	list := declarationList.AsVariableDeclarationList()
+	if list == nil || list.Declarations == nil {
+		return false
+	}
+	hoisted := declarationList.Flags&(ast.NodeFlagsConst|ast.NodeFlagsLet) == 0
+	for _, declaration := range list.Declarations.Nodes {
+		if declaration == nil {
+			return false
+		}
+		if hoisted && scanner.shadowsAssertion(declaration.Name()) {
+			return false
+		}
+		initializer := declaration.Initializer()
+		if initializer == nil {
+			continue
+		}
+		if !scanner.inertSubtree(initializer, nil, "") {
+			return false
+		}
+	}
+	return true
+}
+
+// shadowsAssertion reports whether a binding name occurs in either assertion,
+// which is the only way a hoisted declaration can change what they assert on.
+func (scanner *betweenScanner) shadowsAssertion(name *ast.Node) bool {
+	shadows := false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node == nil {
+			return false
+		}
+		if node.Kind == ast.KindIdentifier && scanner.assertionNames[node.AsIdentifier().Text] {
+			shadows = true
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	if name != nil {
+		visit(name)
+	}
+	return shadows
+}
+
+// isInertStatement reports whether a statement can sit between the two
 // assertions without invalidating their merge. The merge claims both halves
 // describe one call history, so nothing in between may call the asserted mock
 // or rebind it. Neither question is decidable from the syntax, so the rule
 // answers a narrower one it can decide: the statement must be an assertion
 // that transfers control nowhere.
 //
-// That means an expect chain whose factory and matcher calls are the only
-// calls in it — their semantics are known, they read the spy's record and
-// compare values — with no other call, no write, and no await anywhere in the
-// arguments. A matcher that executes its subject, and a modifier that awaits
-// one, are excluded by name.
+// That means an expect chain whose factory, matcher and default-library calls
+// are the only calls in it — their semantics are known, they read the spy's
+// record and compare values — with no other call, no write, and no await
+// anywhere in the arguments. A matcher that executes its subject, and a
+// modifier that awaits one, are excluded by name.
 //
 // What survives is the common shape: assertions on other mocks, or on other
 // aspects of this one, grouped between the two halves. What does not is
-// everything else, including a plain `console.log()` — harmless in fact, but
-// the rule cannot know that, and guessing costs a false report.
+// anything that could reach the target, and anything the rule cannot resolve.
 //
 // A property read is the one thing accepted without proof, since a getter
 // could run code. The rule already accepts that when it treats `obj.fn` as
 // stable under a second evaluation; refusing it here would reject the shape
 // the rule mostly exists for.
-func isInertAssertion(analysis *rstestUtils.RstestCallAnalysis, statement *ast.Node) bool {
+func (scanner *betweenScanner) isInertStatement(statement *ast.Node) bool {
 	if statement == nil || statement.Kind != ast.KindExpressionStatement {
 		return false
 	}
@@ -405,12 +548,18 @@ func isInertAssertion(analysis *rstestUtils.RstestCallAnalysis, statement *ast.N
 		return false
 	}
 	rootCall, awaited := assertionRootCall(expressionStatement.Expression)
-	if rootCall == nil || awaited {
+	if awaited {
 		return false
 	}
-	parsed := analysis.ParseExpectCall(rootCall)
+	var parsed *rstestUtils.ParsedRstestExpectCall
+	if rootCall != nil {
+		parsed = scanner.analysis.ParseExpectCall(rootCall)
+	}
 	if parsed == nil || parsed.Head == nil {
-		return false
+		// Not an assertion. It can still be inert on its own terms — a
+		// `console.log('checkpoint')` calls nothing of the author's — with no
+		// framework call to exempt.
+		return scanner.inertSubtree(expressionStatement.Expression, nil, "")
 	}
 	for _, modifier := range parsed.Modifiers {
 		if suspendingModifiers[modifier] {
@@ -426,62 +575,25 @@ func isInertAssertion(analysis *rstestUtils.RstestCallAnalysis, statement *ast.N
 			frameworkCalls[matcher.Entry.Call] = true
 		}
 	}
-	return inertSubtree(expressionStatement.Expression, frameworkCalls, expectRootName(parsed.Head))
+	return scanner.inertSubtree(expressionStatement.Expression, frameworkCalls, expectRootName(parsed.Head))
 }
 
-// isInertDeclaration accepts a block-scoped declaration whose initializers
-// transfer control nowhere — `const hoge = 'foo';` between the two assertions
-// changes nothing about either. `var` is excluded: it is hoisted, so it can
-// rebind a name the assertions already read, which `const` and `let` cannot
-// without a temporal dead zone error.
-func isInertDeclaration(statement *ast.Node) bool {
-	if statement == nil || statement.Kind != ast.KindVariableStatement {
-		return false
+// collectIdentifierNames gathers every identifier a subtree mentions.
+func collectIdentifierNames(node *ast.Node, into map[string]bool) {
+	if node == nil {
+		return
 	}
-	variableStatement := statement.AsVariableStatement()
-	if variableStatement == nil || variableStatement.DeclarationList == nil {
-		return false
-	}
-	declarationList := variableStatement.DeclarationList
-	if declarationList.Flags&(ast.NodeFlagsConst|ast.NodeFlagsLet) == 0 {
-		return false
-	}
-	list := declarationList.AsVariableDeclarationList()
-	if list == nil || list.Declarations == nil {
-		return false
-	}
-	for _, declaration := range list.Declarations.Nodes {
-		if declaration == nil {
-			return false
-		}
-		initializer := declaration.Initializer()
-		if initializer == nil {
-			continue
-		}
-		if !inertSubtree(initializer, nil, "") {
-			return false
-		}
-	}
-	return true
-}
-
-// inertSubtree reports whether a subtree transfers control nowhere, treating
-// the given framework calls and `<root>.helper(...)` calls as known-safe.
-func inertSubtree(node *ast.Node, frameworkCalls map[*ast.Node]bool, rootName string) bool {
-	inert := true
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
 		if node == nil {
 			return false
 		}
-		if !frameworkCalls[node] && !isExpectHelperCall(node, rootName) && controlTransfer(node) {
-			inert = false
-			return true
+		if node.Kind == ast.KindIdentifier {
+			into[node.AsIdentifier().Text] = true
 		}
 		return node.ForEachChild(visit)
 	}
 	visit(node)
-	return inert
 }
 
 // onlyInertStatementsBetween reports whether every statement between the two
@@ -490,8 +602,8 @@ func inertSubtree(node *ast.Node, frameworkCalls map[*ast.Node]bool, rootName st
 // merges across a reassignment, a re-invocation, or a reset it does not
 // recognise.
 func onlyInertStatementsBetween(
+	ctx rule.RuleContext,
 	analysis *rstestUtils.RstestCallAnalysis,
-	sourceFile *ast.SourceFile,
 	statements []*ast.Node,
 	first, second *mergeCandidate,
 ) bool {
@@ -499,15 +611,19 @@ func onlyInertStatementsBetween(
 	if minPosition > maxPosition {
 		minPosition, maxPosition = maxPosition, minPosition
 	}
+	scanner := &betweenScanner{ctx: ctx, analysis: analysis, assertionNames: map[string]bool{}}
+	collectIdentifierNames(first.statement, scanner.assertionNames)
+	collectIdentifierNames(second.statement, scanner.assertionNames)
+
 	for _, statement := range statements {
 		if statement == nil {
 			continue
 		}
-		position := internalUtils.TrimNodeTextRange(sourceFile, statement).Pos()
+		position := internalUtils.TrimNodeTextRange(ctx.SourceFile, statement).Pos()
 		if position <= minPosition || position >= maxPosition {
 			continue
 		}
-		if !isInertAssertion(analysis, statement) && !isInertDeclaration(statement) {
+		if !scanner.isInertStatement(statement) && !scanner.isInertDeclaration(statement) {
 			return false
 		}
 	}
@@ -592,7 +708,7 @@ func reportPair(
 ) {
 	first, second := candidates[0], candidates[1]
 	if first.hits[0].role == second.hits[0].role ||
-		!onlyInertStatementsBetween(analysis, ctx.SourceFile, statements, first, second) {
+		!onlyInertStatementsBetween(ctx, analysis, statements, first, second) {
 		return
 	}
 	message, with := mergeMessage(first.hits[0], second.hits[0])
