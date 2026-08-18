@@ -4,11 +4,11 @@
 //
 // Go 1.26's unicode tables are derived from Unicode 15.0, as are the tables
 // behind golang.org/x/text's caser. Node 26 carries ICU 78, which is Unicode
-// 17.0. Across the editions in between, ten characters that had no case mapping
+// 17.0. Across the editions in between, eight characters that had no case mapping
 // at all were given one, two bicameral scripts arrived whole, the two
 // properties that decide where a Greek capital sigma lowercases to a final sigma
-// — Cased and Case_Ignorable — took on a hundred and ninety more characters and
-// lost two, and the general categories a rule asks a character about grew by
+// — Cased and Case_Ignorable — took on a hundred and ninety-five more characters
+// and lost two, and the general categories a rule asks a character about grew by
 // nine thousand five hundred letters and ninety-three marks.
 //
 // Without the data here, two characters JavaScript compares equal under a
