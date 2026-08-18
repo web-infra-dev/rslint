@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/program"
 )
 
 // The rule's fixtures can only describe graphs someone is willing to write out
@@ -191,13 +191,13 @@ func TestComputeGroupsHandlesADeepChain(t *testing.T) {
 func TestWithheldDynamicEdges(t *testing.T) {
 	t.Parallel()
 
-	dynamic := rule.ModuleEdge{Kind: rule.ModuleEdgeDynamicImport}
-	static := rule.ModuleEdge{Kind: rule.ModuleEdgeImport}
+	dynamic := program.ModuleReference{Kind: program.ModuleReferenceDynamicImport}
+	static := program.ModuleReference{Kind: program.ModuleReferenceImport}
 
 	t.Run("a file with no dynamic import keeps its own edges", func(t *testing.T) {
 		t.Parallel()
 
-		node := &moduleNode{refs: []rule.ModuleEdge{static, static}, edge: []int32{1, 2}}
+		node := &moduleNode{refs: []program.ModuleReference{static, static}, edge: []int32{1, 2}}
 		expand := withheldDynamicEdges(node)
 		if &expand[0] != &node.edge[0] {
 			t.Fatal("expected the edge slice itself, not a copy")
@@ -207,7 +207,7 @@ func TestWithheldDynamicEdges(t *testing.T) {
 	t.Run("a dynamically imported target is withheld", func(t *testing.T) {
 		t.Parallel()
 
-		node := &moduleNode{refs: []rule.ModuleEdge{dynamic, static}, edge: []int32{1, 2}}
+		node := &moduleNode{refs: []program.ModuleReference{dynamic, static}, edge: []int32{1, 2}}
 		if got := withheldDynamicEdges(node); !reflect.DeepEqual(got, []int32{-1, 2}) {
 			t.Fatalf("expand = %v, want [-1 2]", got)
 		}
@@ -216,7 +216,7 @@ func TestWithheldDynamicEdges(t *testing.T) {
 	t.Run("a static reference to a withheld target is withheld too", func(t *testing.T) {
 		t.Parallel()
 
-		node := &moduleNode{refs: []rule.ModuleEdge{static, dynamic, static}, edge: []int32{1, 1, 2}}
+		node := &moduleNode{refs: []program.ModuleReference{static, dynamic, static}, edge: []int32{1, 1, 2}}
 		if got := withheldDynamicEdges(node); !reflect.DeepEqual(got, []int32{-1, -1, 2}) {
 			t.Fatalf("expand = %v, want [-1 -1 2]", got)
 		}
@@ -225,7 +225,7 @@ func TestWithheldDynamicEdges(t *testing.T) {
 	t.Run("an unfollowed dynamic reference withholds nothing", func(t *testing.T) {
 		t.Parallel()
 
-		node := &moduleNode{refs: []rule.ModuleEdge{dynamic, static}, edge: []int32{-1, 2}}
+		node := &moduleNode{refs: []program.ModuleReference{dynamic, static}, edge: []int32{-1, 2}}
 		if got := withheldDynamicEdges(node); !reflect.DeepEqual(got, []int32{-1, 2}) {
 			t.Fatalf("expand = %v, want [-1 2]", got)
 		}

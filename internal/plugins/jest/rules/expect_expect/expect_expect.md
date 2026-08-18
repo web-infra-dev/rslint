@@ -2,9 +2,24 @@
 
 ## Rule Details
 
-Ensure every Jest test callback contains at least one assertion. The rule tracks test APIs such as `test`, `it`, `fit`, `xit`, and `xtest` (including chained forms like `it.each` that the Jest integration recognizes) and reports when none of the configured assertion callee patterns appear in the body. Assertions inside a named function declaration that is passed as the test callback are attributed to outer tests that reference that name. This guards against tests that run side effects but never verify outcomes.
+Ensure every Jest test callback contains at least one assertion. The rule tracks test APIs such as `test`, `it`, `fit`, `xit`, and `xtest` (including chained forms like `it.each` that the Jest integration recognizes) and reports when none of the configured assertion callee patterns appear in the body. Assertions inside a named function declaration or variable function passed as the test callback are attributed to every test that references it, regardless of whether the callback is declared before or after the registration. This guards against tests that run side effects but never verify outcomes.
 
 Skipped [`test.todo` / `it.todo`](https://jestjs.io/docs/api#testtodotitle) bodies are ignored.
+
+### Divergence from `eslint-plugin-jest`
+
+When a callback is passed by reference, this rule resolves its declaration and counts the assertions found there, wherever that declaration sits:
+
+```js
+function myTest() {
+  expect(true).toBeDefined();
+}
+it('should pass', myTest);
+```
+
+Upstream `eslint-plugin-jest` reports `Test has no assertions` here, because it clears a registration only when the registration was already seen at the time the assertion was walked. The declaration is hoisted, so this is the same program as the call-first form `it('should pass', myTest); function myTest() { ... }` that both rules accept, and reporting one but not the other is an order-dependent false positive.
+
+Callbacks declared with `const` or `var` are resolved the same way, which upstream does not do at all — it only ever looks at function declarations, so it reports those tests in either order.
 
 Examples of **incorrect** code for this rule:
 

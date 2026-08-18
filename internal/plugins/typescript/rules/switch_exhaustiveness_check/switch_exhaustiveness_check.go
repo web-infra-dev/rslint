@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed switch_exhaustiveness_check.schema.json
@@ -36,7 +36,7 @@ var SwitchExhaustivenessCheckRule = rule.CreateRule(rule.Rule{
 // defaultCommentPattern mirrors upstream's DEFAULT_COMMENT_PATTERN
 // (/^no default$/iu). A configured defaultCaseCommentPattern is compiled
 // without the `i` flag, exactly like upstream's `new RegExp(pattern, "u")`.
-var defaultCommentPattern = regexp2.MustCompile(`^no default$`, utils.JSUnicodeRegexOptions|regexp2.IgnoreCase)
+var defaultCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 
 func parseOptions(options []any) SwitchExhaustivenessCheckOptions {
 	opts := SwitchExhaustivenessCheckOptions{
@@ -113,7 +113,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	if opts.DefaultCaseCommentPattern != nil {
 		// An invalid pattern is rejected by the schema's `format: "regex"`
 		// before linting starts, so this compile error is only defensive.
-		if compiled, err := utils.CompileRegexp2(*opts.DefaultCaseCommentPattern, utils.JSUnicodeRegexOptions); err == nil {
+		if compiled, err := esregexp.Compile(*opts.DefaultCaseCommentPattern, "u"); err == nil {
 			commentPattern = compiled
 		}
 	}
@@ -147,7 +147,7 @@ func getSwitchMetadata(
 	node *ast.Node,
 	switchStmt *ast.SwitchStatement,
 	clauses []*ast.Node,
-	commentPattern *regexp2.Regexp,
+	commentPattern *esregexp.RegExp,
 ) switchMetadata {
 	var defaultClause *ast.Node
 	for _, clause := range clauses {
@@ -222,7 +222,7 @@ func getCommentDefaultCase(
 	ctx rule.RuleContext,
 	node *ast.Node,
 	clauses []*ast.Node,
-	commentPattern *regexp2.Regexp,
+	commentPattern *esregexp.RegExp,
 ) *ast.CommentRange {
 	if len(clauses) == 0 {
 		return nil
@@ -246,7 +246,7 @@ func getCommentDefaultCase(
 		text = strings.TrimSpace(text[2 : len(text)-2])
 	}
 
-	if utils.Regexp2MatchString(commentPattern, text) {
+	if commentPattern.TestOrTimeout(text) {
 		return lastComment
 	}
 	return nil

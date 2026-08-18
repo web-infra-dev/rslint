@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -249,7 +250,7 @@ const second = {arrow: () => { return 2; }};`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			ExcludePaths: []string{},
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

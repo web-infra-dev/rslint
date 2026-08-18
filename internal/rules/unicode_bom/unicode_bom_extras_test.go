@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -360,7 +360,7 @@ func runUnicodeBom(t *testing.T, code string, demand rule.EditDemand) []rule.Rul
 
 	var diagnostics []rule.RuleDiagnostic
 	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 		SingleThreaded: true,
 		Scope:          linter.FileScope{Files: []string{program.GetSourceFile(fileName).FileName()}},
 		ExcludePaths:   []string{},

@@ -1,0 +1,157 @@
+// Rstest Snapshot v1
+
+exports[`no-negated-condition > invalid 1`] = `
+{
+  "code": "if (!a) {;} else {;}",
+  "diagnostics": [
+    {
+      "message": "Unexpected negated condition.",
+      "messageId": "unexpectedNegated",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-negated-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-negated-condition > invalid 2`] = `
+{
+  "code": "if (a != b) {;} else {;}",
+  "diagnostics": [
+    {
+      "message": "Unexpected negated condition.",
+      "messageId": "unexpectedNegated",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-negated-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-negated-condition > invalid 3`] = `
+{
+  "code": "if (a !== b) {;} else {;}",
+  "diagnostics": [
+    {
+      "message": "Unexpected negated condition.",
+      "messageId": "unexpectedNegated",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-negated-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-negated-condition > invalid 4`] = `
+{
+  "code": "!a ? b : c",
+  "diagnostics": [
+    {
+      "message": "Unexpected negated condition.",
+      "messageId": "unexpectedNegated",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-negated-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-negated-condition > invalid 5`] = `
+{
+  "code": "a != b ? c : d",
+  "diagnostics": [
+    {
+      "message": "Unexpected negated condition.",
+      "messageId": "unexpectedNegated",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-negated-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-negated-condition > invalid 6`] = `
+{
+  "code": "a !== b ? c : d",
+  "diagnostics": [
+    {
+      "message": "Unexpected negated condition.",
+      "messageId": "unexpectedNegated",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-negated-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

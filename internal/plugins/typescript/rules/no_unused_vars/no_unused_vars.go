@@ -5,11 +5,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_unused_vars.schema.json
@@ -33,10 +33,10 @@ type Config struct {
 	ReportUsedIgnorePattern        bool                 `json:"reportUsedIgnorePattern"`
 	EnableAutofixRemoval           EnableAutofixRemoval `json:"enableAutofixRemoval"`
 
-	varsIgnoreRe              *regexp2.Regexp
-	argsIgnoreRe              *regexp2.Regexp
-	caughtErrorsIgnoreRe      *regexp2.Regexp
-	destructuredArrayIgnoreRe *regexp2.Regexp
+	varsIgnoreRe              *esregexp.RegExp
+	argsIgnoreRe              *esregexp.RegExp
+	caughtErrorsIgnoreRe      *esregexp.RegExp
+	destructuredArrayIgnoreRe *esregexp.RegExp
 }
 
 type analysisContext struct {
@@ -90,10 +90,10 @@ const maxCachedPatterns = 64
 
 var patternCache = struct {
 	sync.RWMutex
-	entries map[string]*regexp2.Regexp
+	entries map[string]*esregexp.RegExp
 	order   []string
 }{
-	entries: make(map[string]*regexp2.Regexp),
+	entries: make(map[string]*esregexp.RegExp),
 	order:   make([]string, 0, maxCachedPatterns),
 }
 
@@ -169,7 +169,7 @@ func compilePatterns(config Config) Config {
 	return config
 }
 
-func cachedPattern(pattern string) *regexp2.Regexp {
+func cachedPattern(pattern string) *esregexp.RegExp {
 	if pattern == "" {
 		return nil
 	}
@@ -179,7 +179,7 @@ func cachedPattern(pattern string) *regexp2.Regexp {
 	if ok {
 		return cached
 	}
-	re, _ := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions)
+	re, _ := esregexp.Compile(pattern, "u")
 	patternCache.Lock()
 	if cached, ok := patternCache.entries[pattern]; ok {
 		patternCache.Unlock()
@@ -1007,7 +1007,7 @@ func isDestructuredArrayElement(node *ast.Node) bool {
 // reporting (when reportUsedIgnorePattern is true and the variable is used).
 // Returns: (shouldIgnore bool, matchesPattern bool)
 func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, writeRefs []*ast.Node) (bool, bool) {
-	var re *regexp2.Regexp
+	var re *esregexp.RegExp
 
 	if isParameterNode(varInfo.Definition) {
 		if opts.Args == "none" {
@@ -1023,13 +1023,13 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, w
 		re = opts.varsIgnoreRe
 	}
 
-	matched := utils.Regexp2MatchString(re, varName)
+	matched := re.TestOrTimeout(varName)
 
 	// destructuredArrayIgnorePattern applies to array-destructured elements,
 	// checking both the declaration site AND assignment sites (e.g., `let _x; [_x] = arr`).
 	if !matched && opts.destructuredArrayIgnoreRe != nil {
 		if isDestructuredArrayElement(varInfo.Definition) || hasArrayDestructuringWrite(writeRefs) {
-			matched = utils.Regexp2MatchString(opts.destructuredArrayIgnoreRe, varName)
+			matched = opts.destructuredArrayIgnoreRe.TestOrTimeout(varName)
 		}
 	}
 
@@ -1870,10 +1870,10 @@ func implicitJSXReference(
 	definition *ast.Node,
 	ac *analysisContext,
 ) *ast.Node {
-	if !isImportDefinition(definition) || ctx.Program == nil {
+	if !isImportDefinition(definition) || ctx.Program() == nil {
 		return nil
 	}
-	opts := ctx.Program.Options()
+	opts := ctx.Program().Options()
 	if opts == nil {
 		return nil
 	}

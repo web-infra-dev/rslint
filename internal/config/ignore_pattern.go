@@ -179,7 +179,7 @@ func ParseIgnorePattern(raw string) IgnorePattern {
 
 // ParseIgnorePatterns parses a list of raw ignore strings. Prefer parsing once
 // per ignore set (it is fixed for a config / walk) and reusing the result — the
-// directory walks (DiscoverGapFiles, the gitignore scan) hoist it out of their
+// directory walks (lint-target discovery and the gitignore scan) hoist it out of their
 // loops. The per-file GetConfigForFile path re-derives it, which is no costlier
 // than the pre-refactor code (that normalized every pattern inside each matcher
 // per file); centralizing the normalization here folds that work into one pass.
@@ -582,12 +582,12 @@ func directoryBlockCandidates(dirPath string) []string {
 }
 
 // canPruneDir reports whether a directory walk may skip dirPath entirely. It is
-// the single, negation-aware directory-prune predicate for the gap-file walk.
+// the single, negation-aware directory-prune predicate for lint-target walks.
 // The pre-refactor walk pruned only absolutely-blocked directories
 // (isDirPathBlocked); canPruneDir keeps that and ADDS pruning of gitignore
 // file-level covers (dir/**/*). Sound: prunes only when every descendant file
 // would be rejected by the linter's own ignore decision (directory block OR
-// isFileIgnored), so the gap-file set is unchanged.
+// isFileIgnored), so the lint-target set is unchanged.
 //
 //	absolute block (dir/**) → prune, ignoring `!` (ESLint absolute semantics)
 //	file-level cover (dir/**/*) → prune ONLY if no `!` reaches into the subtree

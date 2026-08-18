@@ -5,14 +5,13 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"weak"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/module"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 type TypeOrValueSpecifierFrom uint8
@@ -201,10 +200,10 @@ func typeDeclaredInFile(
 	relativePath string,
 	pathProvided bool,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
-	cwd := program.Host().GetCurrentDirectory()
-	useCaseSensitiveFileNames := program.Host().FS().UseCaseSensitiveFileNames()
+	cwd := program.CurrentDirectory()
+	useCaseSensitiveFileNames := program.FS().UseCaseSensitiveFileNames()
 	canonical := func(fileName string) string {
 		return tspath.GetCanonicalFileName(fileName, useCaseSensitiveFileNames)
 	}
@@ -221,7 +220,7 @@ func typeDeclaredInFile(
 
 func typeDeclaredInLib(
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	// Assertion: The type is not an error type.
 
@@ -230,7 +229,7 @@ func typeDeclaredInLib(
 		return true
 	}
 	return Some(declarationFiles, func(d *ast.SourceFile) bool {
-		return IsSourceFileDefaultLibrary(program, d)
+		return program.IsSourceFileDefaultLibrary(d)
 	})
 }
 
@@ -264,84 +263,18 @@ func typeDeclaredInDeclareModule(
 	})
 }
 
-type sourceFilePackageNamesCacheEntry struct {
-	once  sync.Once
-	names map[tspath.Path][]string
-}
-
-// sourceFilePackageNamesCache reconstructs TypeScript's sourceFileToPackageName
-// data from TypeScript-Go's resolution caches. Its weak Program keys keep
-// repeated rule matches cheap without retaining old Programs after an LSP
-// rebuild.
-var sourceFilePackageNamesCache = struct {
-	sync.Mutex
-	entries map[weak.Pointer[compiler.Program]]*sourceFilePackageNamesCacheEntry
-}{
-	entries: make(map[weak.Pointer[compiler.Program]]*sourceFilePackageNamesCacheEntry),
-}
-
-func sourceFilePackageNames(program *compiler.Program) map[tspath.Path][]string {
-	key := weak.Make(program)
-	sourceFilePackageNamesCache.Lock()
-	entry := sourceFilePackageNamesCache.entries[key]
-	if entry == nil {
-		// Weak keys do not remove themselves from a map. Opportunistically prune
-		// entries whose Programs have been collected whenever a new one appears.
-		for candidate := range sourceFilePackageNamesCache.entries {
-			if candidate.Value() == nil {
-				delete(sourceFilePackageNamesCache.entries, candidate)
-			}
-		}
-		entry = &sourceFilePackageNamesCacheEntry{}
-		sourceFilePackageNamesCache.entries[key] = entry
-	}
-	sourceFilePackageNamesCache.Unlock()
-
-	entry.once.Do(func() {
-		entry.names = make(map[tspath.Path][]string)
-		addResolution := func(fileName string, packageID module.PackageId) {
-			if packageID.Name == "" {
-				return
-			}
-			file := program.GetSourceFileForResolvedModule(fileName)
-			if file == nil {
-				return
-			}
-			packageName := packageID.PackageName()
-			if !slices.Contains(entry.names[file.Path()], packageName) {
-				entry.names[file.Path()] = append(entry.names[file.Path()], packageName)
-			}
-		}
-		for _, resolutions := range program.GetResolvedModules() {
-			for _, resolution := range resolutions {
-				if resolution != nil {
-					addResolution(resolution.ResolvedFileName, resolution.PackageId)
-				}
-			}
-		}
-		for _, resolutions := range program.GetResolvedTypeReferenceDirectives() {
-			for _, resolution := range resolutions {
-				if resolution != nil {
-					addResolution(resolution.ResolvedFileName, resolution.PackageId)
-				}
-			}
-		}
-	})
-	return entry.names
-}
-
 // packageMatchers caches the compiled matcher per `package` specifier, which
 // comes from the rule options and so takes only a handful of distinct values.
-var packageMatchers sync.Map // package name -> *regexp2.Regexp, nil when the pattern is invalid
+var packageMatchers sync.Map // package name -> *esregexp.RegExp, nil when the pattern is invalid
 
 // packageMatcher builds `new RegExp(`${packageName}|${typesPackageName}`)`. The
 // pattern carries no anchors, so "demo" matches "demo-pkg" as well.
-func packageMatcher(packageName string) *regexp2.Regexp {
+func packageMatcher(packageName string) *esregexp.RegExp {
 	if cached, ok := packageMatchers.Load(packageName); ok {
-		matcher, _ := cached.(*regexp2.Regexp)
+		matcher, _ := cached.(*esregexp.RegExp)
 		return matcher
 	}
-	matcher, err := CompileRegexp2(packageName+"|"+module.MangleScopedPackageName(packageName), JSRegexOptions)
+	matcher, err := esregexp.Compile(packageName+"|"+module.MangleScopedPackageName(packageName), "")
 	if err != nil {
 		matcher = nil
 	}
@@ -352,7 +285,7 @@ func packageMatcher(packageName string) *regexp2.Regexp {
 func typeDeclaredInDeclarationFile(
 	packageName string,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	matcher := packageMatcher(packageName)
 	if matcher == nil {
@@ -362,8 +295,8 @@ func typeDeclaredInDeclarationFile(
 		if file == nil || !program.IsSourceFileFromExternalLibrary(file) {
 			continue
 		}
-		for _, name := range sourceFilePackageNames(program)[file.Path()] {
-			if Regexp2MatchString(matcher, name) {
+		for _, name := range program.PackageNamesForSourceFile(file) {
+			if matcher.TestOrTimeout(name) {
 				return true
 			}
 		}
@@ -375,7 +308,7 @@ func typeDeclaredInPackageDeclarationFile(
 	packageName string,
 	declarations []*ast.Node,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	return typeDeclaredInDeclareModule(packageName, declarations) ||
 		typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
@@ -384,7 +317,7 @@ func typeDeclaredInPackageDeclarationFile(
 func typeMatchesSpecifier(
 	t *checker.Type,
 	specifier TypeOrValueSpecifier,
-	program *compiler.Program,
+	program *program.Program,
 	calleeNames []string,
 ) bool {
 	// Handle union types: all constituents must match the specifier
@@ -447,7 +380,7 @@ func TypeMatchesSomeSpecifier(
 	t *checker.Type,
 	specifiers []TypeOrValueSpecifier,
 	inlineSpecifiers []string,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	return TypeMatchesSomeSpecifierWithCalleeNames(t, specifiers, inlineSpecifiers, program, nil)
 }
@@ -459,7 +392,7 @@ func TypeMatchesSomeSpecifierWithCalleeNames(
 	t *checker.Type,
 	specifiers []TypeOrValueSpecifier,
 	inlineSpecifiers []string,
-	program *compiler.Program,
+	program *program.Program,
 	calleeNames []string,
 ) bool {
 	return Some(specifiers, func(s TypeOrValueSpecifier) bool {
@@ -486,7 +419,7 @@ func specifierStaticName(node *ast.Node) string {
 func valueMatchesSpecifier(
 	node *ast.Node,
 	specifier TypeOrValueSpecifier,
-	program *compiler.Program,
+	program *program.Program,
 	t *checker.Type,
 ) bool {
 	staticName := specifierStaticName(node)
@@ -520,7 +453,7 @@ func valueMatchesSpecifier(
 func ValueMatchesSomeSpecifier(
 	node *ast.Node,
 	specifiers []TypeOrValueSpecifier,
-	program *compiler.Program,
+	program *program.Program,
 	t *checker.Type,
 ) bool {
 	return Some(specifiers, func(s TypeOrValueSpecifier) bool {

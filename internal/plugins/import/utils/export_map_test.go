@@ -6,12 +6,14 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -150,6 +152,32 @@ func TestHasExport(t *testing.T) {
 				t.Fatalf("HasExport(%q, %q) = (%v, %v), want (%v, %v)", tc.source, tc.exportName, gotFound, gotOK, tc.wantFound, tc.wantOK)
 			}
 		})
+	}
+}
+
+func TestExportQueriesSupportSourceOnlyProgram(t *testing.T) {
+	programContext, specifier, raw := contextForImportWithCompiler(t, "./re-export")
+	if programContext.Program() == nil || raw == nil {
+		t.Fatal("fixture did not create a Program")
+	}
+
+	standalone, err := lintprogram.NewFromBoundSources(
+		raw,
+		raw.SourceFiles(),
+	)
+	if err != nil {
+		t.Fatalf("NewFromBoundSources: %v", err)
+	}
+	standaloneContext := (rule.RuleContext{
+		SourceFile: programContext.SourceFile,
+	}).WithProgram(standalone)
+
+	if found, ok := import_utils.HasExport(standaloneContext, specifier, "baz"); !ok || !found {
+		t.Fatalf("standalone HasExport = (%v, %v), want (true, true)", found, ok)
+	}
+	exportMap, ok := import_utils.GetExportMap(standaloneContext, specifier)
+	if !ok || exportMap == nil || !exportMap.Has("baz") {
+		t.Fatalf("standalone GetExportMap = (%v, %v), want map containing baz", exportMap, ok)
 	}
 }
 
@@ -498,7 +526,7 @@ func TestHasDefaultExportFollowsHostCaseSensitivity(t *testing.T) {
 			t.Parallel()
 
 			ctx, specifier := contextForImportWithFS(t, tc.fs, consumerPath)
-			resolved := ctx.Program.GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, specifier)
+			resolved := ctx.Program().GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, specifier)
 			if (resolved != nil && resolved.ResolvedFileName != "") != tc.wantResolve {
 				t.Fatalf("resolved = %#v, want resolved %v", resolved, tc.wantResolve)
 			}
@@ -566,6 +594,11 @@ func (fsys *caseInsensitiveOverlayFS) findVirtualPath(path string) (string, bool
 }
 
 func contextForImport(t *testing.T, source string) (rule.RuleContext, *ast.Node) {
+	ctx, specifier, _ := contextForImportWithCompiler(t, source)
+	return ctx, specifier
+}
+
+func contextForImportWithCompiler(t *testing.T, source string) (rule.RuleContext, *ast.Node, *compiler.Program) {
 	t.Helper()
 
 	rootDir := fixtures.GetRootDir()
@@ -581,18 +614,17 @@ func contextForImport(t *testing.T, source string) (rule.RuleContext, *ast.Node)
 	sourceFile := program.GetSourceFile(fileName)
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) == 0 {
 		t.Fatal("test source file was not parsed")
-		return rule.RuleContext{}, nil
+		return rule.RuleContext{}, nil, nil
 	}
 	importDecl := sourceFile.Statements.Nodes[0].AsImportDeclaration()
 	if importDecl == nil || importDecl.ModuleSpecifier == nil {
 		t.Fatal("test import declaration was not parsed")
-		return rule.RuleContext{}, nil
+		return rule.RuleContext{}, nil, nil
 	}
 
-	return rule.RuleContext{
-		Program:    program,
+	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}, importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewFromCompiler(program)), importDecl.ModuleSpecifier, program
 }
 
 func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.RuleContext, *ast.Node) {
@@ -618,10 +650,9 @@ func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.Rule
 		return rule.RuleContext{}, nil
 	}
 
-	return rule.RuleContext{
-		Program:    program,
+	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}, importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewFromCompiler(program)), importDecl.ModuleSpecifier
 }
 
 func contextForImportWithCompilerOptions(t *testing.T, source string, options *core.CompilerOptions) (rule.RuleContext, *ast.Node) {
@@ -649,8 +680,7 @@ func contextForImportWithCompilerOptions(t *testing.T, source string, options *c
 		return rule.RuleContext{}, nil
 	}
 
-	return rule.RuleContext{
-		Program:    program,
+	return (rule.RuleContext{
 		SourceFile: sourceFile,
-	}, importDecl.ModuleSpecifier
+	}).WithProgram(lintprogram.NewFromCompiler(program)), importDecl.ModuleSpecifier
 }

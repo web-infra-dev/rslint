@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -474,7 +475,7 @@ func lintPreferSetHasWithDemand(
 ) []rule.RuleDiagnostic {
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:     program,
+		Program:     lintprogram.NewFromCompiler(program),
 		File:        sourceFile.FileName(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

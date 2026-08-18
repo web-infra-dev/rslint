@@ -2,15 +2,15 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // localExports is everything one file says about its own exports, with every
 // module specifier resolved and none of them followed. It is a function of
 // that file's syntax alone, which is what makes it safe to compute once per
-// Program: what a dependency exports can change with the order modules are
-// visited in, but what a file itself declares cannot.
+// effective source set: what a dependency exports can change with the order
+// modules are visited in, but what a file itself declares cannot.
 type localExports struct {
 	// Steps replay the file's export statements in source order. Applying
 	// them in order reproduces what re-walking the statements would produce,
@@ -77,7 +77,7 @@ type importedModule struct {
 	NamespaceName string
 }
 
-func collectLocalExports(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings) *localExports {
+func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings) *localExports {
 	local := &localExports{}
 	if sourceFile == nil || sourceFile.Statements == nil {
 		return local
@@ -88,15 +88,15 @@ func collectLocalExports(program *compiler.Program, sourceFile *ast.SourceFile, 
 			continue
 		}
 		if stmt.Kind == ast.KindImportDeclaration {
-			local.Imports = append(local.Imports, importBinding(program, sourceFile, settings, stmt.AsImportDeclaration()))
+			local.Imports = append(local.Imports, importBinding(sourceProgram, sourceFile, settings, stmt.AsImportDeclaration()))
 		}
-		local.appendStatement(program, sourceFile, settings, stmt)
+		local.appendStatement(sourceProgram, sourceFile, settings, stmt)
 	}
 
 	return local
 }
 
-func (local *localExports) appendStatement(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
+func (local *localExports) appendStatement(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, stmt *ast.Node) {
 	if isExportedDeclaration(stmt) {
 		if names := exportedDeclarationNames(stmt); len(names) > 0 {
 			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: names})
@@ -116,11 +116,11 @@ func (local *localExports) appendStatement(program *compiler.Program, sourceFile
 			local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: []string{name.Text()}})
 		}
 	case ast.KindExportDeclaration:
-		local.appendExportDeclaration(program, sourceFile, settings, stmt.AsExportDeclaration())
+		local.appendExportDeclaration(sourceProgram, sourceFile, settings, stmt.AsExportDeclaration())
 	}
 }
 
-func (local *localExports) appendExportDeclaration(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, exportDecl *ast.ExportDeclaration) {
+func (local *localExports) appendExportDeclaration(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, exportDecl *ast.ExportDeclaration) {
 	if exportDecl == nil {
 		return
 	}
@@ -131,7 +131,7 @@ func (local *localExports) appendExportDeclaration(program *compiler.Program, so
 		}
 		local.Steps = append(local.Steps, exportStep{
 			Kind: exportStepStar,
-			Link: resolveExportLink(program, sourceFile, settings, exportDecl.ModuleSpecifier),
+			Link: resolveExportLink(sourceProgram, sourceFile, settings, exportDecl.ModuleSpecifier),
 		})
 		return
 	}
@@ -144,7 +144,7 @@ func (local *localExports) appendExportDeclaration(program *compiler.Program, so
 		}
 		step := exportStep{Kind: exportStepNamed, FromModule: exportDecl.ModuleSpecifier != nil}
 		if step.FromModule {
-			step.Link = resolveExportLink(program, sourceFile, settings, exportDecl.ModuleSpecifier)
+			step.Link = resolveExportLink(sourceProgram, sourceFile, settings, exportDecl.ModuleSpecifier)
 		}
 		for _, spec := range namedExports.Elements.Nodes {
 			if spec == nil || spec.Kind != ast.KindExportSpecifier {
@@ -181,12 +181,12 @@ func (local *localExports) appendExportDeclaration(program *compiler.Program, so
 	}
 }
 
-func importBinding(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, importDecl *ast.ImportDeclaration) importedModule {
+func importBinding(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, importDecl *ast.ImportDeclaration) importedModule {
 	binding := importedModule{}
 	if importDecl == nil || importDecl.ImportClause == nil {
 		return binding
 	}
-	binding.Link = resolveExportLink(program, sourceFile, settings, importDecl.ModuleSpecifier)
+	binding.Link = resolveExportLink(sourceProgram, sourceFile, settings, importDecl.ModuleSpecifier)
 
 	importClause := importDecl.ImportClause.AsImportClause()
 	if importClause == nil || importClause.NamedBindings == nil || importClause.NamedBindings.Kind != ast.KindNamespaceImport {
@@ -201,12 +201,12 @@ func importBinding(program *compiler.Program, sourceFile *ast.SourceFile, settin
 
 // resolveExportLink answers what getExportMap would answer for one specifier,
 // without building the target's map.
-func resolveExportLink(program *compiler.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
-	if program == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+func resolveExportLink(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, moduleSpecifier *ast.Node) exportLink {
+	if !sourceProgram.IsValid() || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return exportLink{}
 	}
-	_, target, ok := rslint_utils.ResolveModuleFile(program, sourceFile, moduleSpecifier)
-	if !ok || settings.IsIgnoredPath(target.FileName()) || !ast.IsExternalModule(target) {
+	_, target, ok := sourceProgram.ResolveModule(sourceFile, moduleSpecifier)
+	if !ok || target == nil || settings.IsIgnoredPath(target.FileName()) || !ast.IsExternalModule(target) {
 		return exportLink{}
 	}
 	return exportLink{Target: target, Resolved: true}
