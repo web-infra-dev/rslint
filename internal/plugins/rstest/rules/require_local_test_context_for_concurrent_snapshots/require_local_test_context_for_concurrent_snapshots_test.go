@@ -34,6 +34,25 @@ func TestRequireLocalTestContextForConcurrentSnapshotsRule(t *testing.T) {
 			// Declared outside every registration callback, so the rule cannot
 			// prove it runs concurrently.
 			{Code: `function helper() { expect(1).toMatchSnapshot(); } test.concurrent("x", () => helper());`},
+			// A mode declared in the options object is honored, so the local
+			// context satisfies it just as it does for a chained modifier.
+			{Code: `test("x", { concurrent: true }, ({ expect }) => expect(1).toMatchSnapshot());`},
+			{Code: `describe("s", { concurrent: true }, () => it("x", ({ expect }) => expect(1).toMatchSnapshot()));`},
+			// An options object opts back out of the mode the chain or the
+			// enclosing describe would otherwise supply.
+			{Code: `describe.concurrent("s", () => it("x", { concurrent: false }, () => expect(1).toMatchSnapshot()));`},
+			{Code: `describe.concurrent("s", () => it("x", { sequential: true }, () => expect(1).toMatchSnapshot()));`},
+			{Code: `test.concurrent("x", { concurrent: false }, () => expect(1).toMatchSnapshot());`},
+			// Nothing statically known is declared, so no mode is concluded.
+			{Code: `test("x", { concurrent }, () => expect(1).toMatchSnapshot());`},
+			{Code: `test("x", { concurrent: isConcurrent }, () => expect(1).toMatchSnapshot());`},
+			{Code: `test("x", { concurrent: true, ...options }, () => expect(1).toMatchSnapshot());`},
+			{Code: `test("x", { sequential: false }, () => expect(1).toMatchSnapshot());`},
+			// The file-wide callback index is scope-blind, so an unresolvable
+			// callback name must not be attributed to a nested function that
+			// this registration never runs.
+			{Code: `describe("s", () => { function cb() { expect(1).toMatchSnapshot(); } }); test.concurrent("x", cb);`},
+			{Code: `describe("s", () => { const cb = () => { expect(1).toMatchSnapshot(); }; }); test.concurrent("x", cb);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `it.concurrent("x", () => expect(true).toMatchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
@@ -52,6 +71,13 @@ func TestRequireLocalTestContextForConcurrentSnapshotsRule(t *testing.T) {
 			{Code: `test.concurrent("x", callback); function callback() { expect(1).toMatchSnapshot(); }`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 			{Code: `describe.concurrent("s", suite); function suite() { test("x", callback); } function callback() { expect(1).toMatchSnapshot(); }`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 			{Code: `test.sequential("a", callback); test.concurrent("b", callback); function callback() { expect(1).toMatchSnapshot(); }`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+			// The `(name, options, fn)` shape declares the mode through the same
+			// keys the runtime merges for the chained modifiers.
+			{Code: `test("x", { concurrent: true }, () => expect(1).toMatchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+			{Code: `describe("s", { concurrent: true }, () => it("x", () => expect(1).toMatchSnapshot()));`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+			{Code: `test("x", { "concurrent": true }, () => expect(1).toMatchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+			{Code: `test("x", { ...options, concurrent: true }, () => expect(1).toMatchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+			{Code: `test("x", { concurrent: true, sequential: true }, () => expect(1).toMatchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 			// Rstest supports this Chai alias even though the Vitest rule omits it.
 			{Code: `test.concurrent("x", () => expect(1).matchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 			// Assertions nested inside closures, hooks and helpers declared in a

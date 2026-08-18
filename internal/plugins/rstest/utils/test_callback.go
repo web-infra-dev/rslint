@@ -25,6 +25,14 @@ type rstestCallbackInfo struct {
 	name         string
 }
 
+// rstestFunctionEntry is one name in the file-wide function index. ambiguous
+// marks a name declared more than once, which makes the entry unusable for
+// attributing a callback.
+type rstestFunctionEntry struct {
+	node      *ast.Node
+	ambiguous bool
+}
+
 func newRstestTestCallbacks() RstestTestCallbacks {
 	return RstestTestCallbacks{
 		Functions:          map[*ast.Node]bool{},
@@ -59,12 +67,19 @@ func walkRstestCallbackRegistrations(
 	}
 
 	for name, registrations := range pending {
-		function := analysis.functions[name]
-		if function == nil {
+		entry := analysis.functions[name]
+		// The index is file-wide and scope-blind, so a name that is declared
+		// twice, or declared inside some other callback, cannot be attributed
+		// to this registration: `describe('s', () => { function cb() {} });
+		// test.concurrent('x', cb)` would otherwise be answered with the nested
+		// `cb`, which `test.concurrent` never runs. Reaching here at all means
+		// the checker could not resolve the identifier, so declining to guess
+		// costs coverage on code that already fails to compile.
+		if entry.node == nil || entry.ambiguous || !isModuleTopLevelFunction(entry.node) {
 			continue
 		}
 		for _, registration := range registrations {
-			visit(function, registration)
+			visit(entry.node, registration)
 		}
 	}
 }
@@ -99,6 +114,31 @@ func collectRstestCallbackOwnership(
 		},
 	)
 	return ownership
+}
+
+// isModuleTopLevelFunction reports whether function is declared directly at
+// module scope, the one place a file-wide name lookup is visible from every
+// call site in the file. The walk runs only for callbacks the checker failed
+// to resolve, so it is off the common path.
+func isModuleTopLevelFunction(function *ast.Node) bool {
+	if function == nil {
+		return false
+	}
+	for node := function.Parent; node != nil; node = node.Parent {
+		switch node.Kind {
+		case ast.KindSourceFile:
+			return true
+		case ast.KindVariableDeclaration,
+			ast.KindVariableDeclarationList,
+			ast.KindVariableStatement,
+			ast.KindParenthesizedExpression:
+			// The declaration chain a `const cb = () => {}` hangs from, and the
+			// parentheses SkipParentheses already looked through.
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 func resolveRstestTestCallback(

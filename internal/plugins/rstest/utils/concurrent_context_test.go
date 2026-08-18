@@ -181,3 +181,83 @@ func TestRstestConcurrentCallbackOwnership(t *testing.T) {
 		},
 	)
 }
+
+// findCallByCalleeName returns the first call whose callee is the identifier
+// name, which the ownership fixtures use as a stand-in for an assertion.
+func findCallByCalleeName(sourceFile *ast.SourceFile, name string) *ast.Node {
+	var found *ast.Node
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindCallExpression {
+			call := node.AsCallExpression()
+			if call != nil && call.Expression != nil &&
+				call.Expression.Kind == ast.KindIdentifier &&
+				call.Expression.AsIdentifier().Text == name {
+				found = node
+				return true
+			}
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.Node.ForEachChild(visit)
+	return found
+}
+
+// TestRstestCallbackOwnershipRejectsUnresolvableNames covers the callback name
+// index, which is file-wide and carries no scope information. Without a type
+// checker every callback passed by name reaches that index, so these cases
+// exercise the guards that keep it from attributing a registration to a
+// function it never runs.
+func TestRstestCallbackOwnershipRejectsUnresolvableNames(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		code       string
+		concurrent bool
+	}{
+		{
+			name:       "top level declaration is attributed",
+			code:       `function cb() { marker(); } test.concurrent("x", cb);`,
+			concurrent: true,
+		},
+		{
+			name:       "top level arrow initializer is attributed",
+			code:       `const cb = () => { marker(); }; test.concurrent("x", cb);`,
+			concurrent: true,
+		},
+		{
+			name:       "nested declaration is not attributed",
+			code:       `describe("s", () => { function cb() { marker(); } }); test.concurrent("x", cb);`,
+			concurrent: false,
+		},
+		{
+			name:       "nested arrow initializer is not attributed",
+			code:       `describe("s", () => { const cb = () => { marker(); }; }); test.concurrent("x", cb);`,
+			concurrent: false,
+		},
+		{
+			name:       "redeclared name is not attributed",
+			code:       `function cb() { marker(); } function other() { function cb() {} } test.concurrent("x", cb);`,
+			concurrent: false,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(
+				ast.SourceFileParseOptions{
+					FileName: "/ownership.test.ts",
+					Path:     "/ownership.test.ts",
+				},
+				testCase.code,
+				core.ScriptKindTS,
+			)
+			ctx := rule.RuleContext{SourceFile: sourceFile}.WithFileCache(rule.NewFileCache())
+			context := rstestUtils.GetRstestConcurrentContext(ctx, rstestUtils.GetRstestCallAnalysis(ctx))
+			marker := findCallByCalleeName(sourceFile, "marker")
+			if marker == nil {
+				t.Fatal("marker call not found")
+			}
+			if got := context.IsInConcurrentTest(marker); got != testCase.concurrent {
+				t.Fatalf("IsInConcurrentTest = %t, want %t", got, testCase.concurrent)
+			}
+		})
+	}
+}

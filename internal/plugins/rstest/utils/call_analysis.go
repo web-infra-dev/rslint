@@ -14,7 +14,12 @@ type RstestCallAnalysis struct {
 	isExpect    map[*ast.Node]bool
 	expectRoots map[*ast.Symbol]rstestExpectRoot
 	calls       []*ast.Node
-	functions   map[string]*ast.Node
+	// functions indexes named function declarations by name so a callback
+	// passed by an identifier the checker could not resolve still has a
+	// candidate. The index is file-wide and carries no scope information, so
+	// entries record whether the name was declared more than once; see
+	// walkRstestCallbackRegistrations for the guards that keeps it honest.
+	functions map[string]rstestFunctionEntry
 	// callbackInfos memoizes the overload-aware callback resolution, which
 	// costs a symbol lookup per registration and is asked for by both the test
 	// context collector and the callback ownership index.
@@ -49,7 +54,7 @@ func newRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 		expectCalls:   map[*ast.Node]*ParsedRstestExpectCall{},
 		isExpect:      map[*ast.Node]bool{},
 		expectRoots:   map[*ast.Symbol]rstestExpectRoot{},
-		functions:     map[string]*ast.Node{},
+		functions:     map[string]rstestFunctionEntry{},
 		callbackInfos: map[*ast.Node]rstestCallbackInfo{},
 	}
 	analysis.indexSourceFile()
@@ -417,9 +422,19 @@ func (analysis *RstestCallAnalysis) recordFunction(node *ast.Node) {
 			}
 		}
 	}
-	if function != nil && analysis.functions[name] == nil {
-		analysis.functions[name] = function
+	if function == nil {
+		return
 	}
+	entry, seen := analysis.functions[name]
+	if !seen {
+		analysis.functions[name] = rstestFunctionEntry{node: function}
+		return
+	}
+	// A redeclared name has no single answer, and the index cannot tell which
+	// declaration a call site meant. Recording the collision lets the lookup
+	// give up rather than guess the first one.
+	entry.ambiguous = true
+	analysis.functions[name] = entry
 }
 
 func isRstestRequireCall(node *ast.Node) bool {
