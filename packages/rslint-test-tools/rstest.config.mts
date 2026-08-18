@@ -564,6 +564,8 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/require-top-level-describe.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect.test.ts',
+    './tests/eslint-plugin-jest/rules/valid-expect-in-promise.test.ts',
+    './tests/eslint-plugin-jest/rules/valid-expect-in-promise.upstream.test.ts',
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
@@ -573,9 +575,11 @@ export default defineConfig({
     './tests/rstest/rules/no-disabled-tests.test.ts',
     './tests/rstest/rules/no-focused-tests.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
+    './tests/rstest/rules/no-import-node-test.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
     './tests/rstest/rules/no-standalone-expect.test.ts',
+    './tests/rstest/rules/valid-expect-in-promise.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
     './tests/rstest/rules/valid-title.test.ts',
 
