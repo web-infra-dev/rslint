@@ -4,6 +4,7 @@
 package no_magic_numbers
 
 import (
+	"math"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -40,6 +41,20 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 		{Code: `var one; ({one = 1} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var a, b; ({a = 1, b = 2} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var x; ({a: x = 42} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+
+		// ---- Signed zero (JS Set lookups use SameValueZero) ----
+		{Code: `f(-0)`, Options: map[string]interface{}{"ignore": []interface{}{float64(0)}}},
+		{Code: `f(0)`, Options: map[string]interface{}{"ignore": []interface{}{math.Copysign(0, -1)}}},
+		{Code: `f(-0)`, Options: map[string]interface{}{"ignore": []interface{}{math.Copysign(0, -1)}}},
+		{Code: `f(-0n)`, Options: map[string]interface{}{"ignore": []interface{}{"0n"}}},
+
+		// ---- Object-literal methods and accessors (ESTree Property) ----
+		{Code: `({ 42() {} })`},
+		{Code: `({ [42]() {} })`},
+		{Code: `({ get 42() {} })`},
+		{Code: `({ set 42(v) {} })`},
+		{Code: `({ async 42() {} })`},
+		{Code: `({ *42() {} })`},
 
 		// ---- Upstream semantic lock-in ----
 		{Code: `var stats = {avg: 42};`},
@@ -99,6 +114,23 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 		{
 			Code:   `function f() { return 60; }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 60."}},
+		},
+		{
+			Code:   `class A { 42() {} }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 11}},
+		},
+		{
+			Code:   `class A { [42]() {} }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 12}},
+		},
+		{
+			Code:   `class A { get 42() {} }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 15}},
+		},
+		{
+			Code:    `({ 42() {} })`,
+			Options: map[string]interface{}{"detectObjects": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 4}},
 		},
 		{
 			Code: `f(/* leading trivia */ 42, /* unary */ -(7), /* bigint */ 9n);`,

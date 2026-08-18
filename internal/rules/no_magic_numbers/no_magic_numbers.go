@@ -69,7 +69,7 @@ func parseOptions(rawOpts []any) options {
 		for _, item := range arr {
 			switch v := item.(type) {
 			case float64:
-				opts.ignore[normalizeIgnoreFloat(v)] = true
+				opts.ignore[normalizeFloatKey(v)] = true
 			case string:
 				// BigInt string like "100n" or "-100n"
 				opts.ignore[normalizeIgnoreBigIntString(v)] = true
@@ -79,8 +79,13 @@ func parseOptions(rawOpts []any) options {
 	return opts
 }
 
-// normalizeIgnoreFloat converts a float64 ignore value to a canonical string key.
-func normalizeIgnoreFloat(v float64) string {
+// normalizeFloatKey converts a float64 to a canonical lookup key. Upstream
+// looks values up in a JavaScript Set, whose SameValueZero comparison treats
+// -0 and 0 as the same value, so signed zero collapses to "0".
+func normalizeFloatKey(v float64) string {
+	if v == 0 {
+		return "0"
+	}
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
@@ -244,7 +249,7 @@ func RunTSESLint(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 			if isBigInt {
 				valueKey = "bigint:" + bigintValue.String()
 			} else {
-				valueKey = strconv.FormatFloat(numericValue, 'f', -1, 64)
+				valueKey = normalizeFloatKey(numericValue)
 			}
 			if opts.ignore[valueKey] {
 				return
@@ -319,9 +324,11 @@ func isOkParent(parent *ast.Node, detectObjects bool) bool {
 			return false
 		}
 		return true
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return isObjectLiteralMember(parent)
 	case ast.KindComputedPropertyName:
 		gp := parent.Parent
-		if gp != nil && (gp.Kind == ast.KindPropertyAssignment || gp.Kind == ast.KindShorthandPropertyAssignment) {
+		if gp != nil && (gp.Kind == ast.KindPropertyAssignment || gp.Kind == ast.KindShorthandPropertyAssignment || isObjectLiteralMember(gp)) {
 			return true
 		}
 		return false
@@ -336,6 +343,14 @@ func isOkParent(parent *ast.Node, detectObjects bool) bool {
 		}
 	}
 	return false
+}
+
+// isObjectLiteralMember reports whether a method or accessor belongs to an
+// object literal rather than a class. ESTree represents object-literal methods
+// and accessors as Property, which upstream allows, while class members are
+// MethodDefinition and stay reportable.
+func isObjectLiteralMember(node *ast.Node) bool {
+	return node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression
 }
 
 func isAssignmentOperator(kind ast.Kind) bool {
