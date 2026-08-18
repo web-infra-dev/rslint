@@ -150,13 +150,17 @@ var eslintDirectivePattern = esregexp.MustCompile(`^(?:eslint[- ]|(?:globals?|ex
 
 // isDirectiveComment ports astUtils.isDirectiveComment: a Line comment is a
 // directive if its trimmed text starts with "eslint-"; a Block comment is a
-// directive if its trimmed text matches eslintDirectivePattern.
+// directive if its trimmed text matches eslintDirectivePattern. Both forms
+// also accept the "rslint-" prefix this linter recognizes alongside "eslint-".
 func isDirectiveComment(kind ast.Kind, trimmedValue string) bool {
+	isLintDirective := strings.HasPrefix(trimmedValue, "eslint-") ||
+		strings.HasPrefix(trimmedValue, "rslint-")
+
 	switch kind {
 	case ast.KindSingleLineCommentTrivia:
-		return strings.HasPrefix(trimmedValue, "eslint-")
+		return isLintDirective
 	case ast.KindMultiLineCommentTrivia:
-		return eslintDirectivePattern.Test(trimmedValue)
+		return isLintDirective || eslintDirectivePattern.Test(trimmedValue)
 	default:
 		return false
 	}
@@ -169,7 +173,13 @@ func commentValue(text string, comment *ast.CommentRange) string {
 	case ast.KindSingleLineCommentTrivia:
 		return text[comment.Pos()+2 : comment.End()]
 	case ast.KindMultiLineCommentTrivia:
-		return text[comment.Pos()+2 : comment.End()-2]
+		// A block comment left unterminated at end of file still parses, and
+		// then has no closing delimiter to strip.
+		end := comment.End()
+		if end-comment.Pos() >= 4 && text[end-2:end] == "*/" {
+			end -= 2
+		}
+		return text[comment.Pos()+2 : end]
 	default:
 		return ""
 	}

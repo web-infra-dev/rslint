@@ -4,7 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -70,6 +74,14 @@ func TestNoWarningCommentsExtras(t *testing.T) {
 			// case); verified against real ESLint (eslint-disable-next-line
 			// reports zero no-warning-comments diagnostics for this input) ----
 			{Code: "// eslint-disable-next-line no-warning-comments", Options: map[string]any{"terms": []interface{}{"eslint"}, "location": "anywhere"}},
+
+			// ---- This linter recognizes "rslint-" directives alongside
+			// "eslint-" ones, so the self-config guard has to treat both
+			// prefixes alike in both comment kinds: a rslint- directive naming
+			// this rule is exempt from its own configured terms ----
+			{Code: "// rslint-disable-next-line no-warning-comments -- TODO", Options: map[string]any{"terms": []interface{}{"todo"}, "location": "anywhere"}},
+			{Code: "/* rslint-disable-next-line no-warning-comments -- TODO */", Options: map[string]any{"terms": []interface{}{"todo"}, "location": "anywhere"}},
+			{Code: "// rslint-enable no-warning-comments -- TODO", Options: map[string]any{"terms": []interface{}{"todo"}, "location": "anywhere"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- decoration is documented as ignored when location is
@@ -257,4 +269,64 @@ func TestNoWarningCommentsExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+// TestNoWarningCommentsUnterminatedBlockComment covers a block comment the
+// error-tolerant parser surfaces without its closing "*/" — the shape an
+// editor sees on every keystroke inside a half-typed comment. The rule tester
+// can't express it: it rejects any source carrying a syntactic error.
+func TestNoWarningCommentsUnterminatedBlockComment(t *testing.T) {
+	t.Parallel()
+
+	run := func(code string) []string {
+		t.Helper()
+
+		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: "/unterminated.ts",
+			Path:     "/unterminated.ts",
+		}, code, core.ScriptKindTS)
+
+		var messages []string
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       rule.NewCommentStore(sourceFile),
+			DisableManager: rule.NewDisableManager(sourceFile, rule.NewCommentStore(sourceFile)),
+		}.WithDiagnosticConsumer(NoWarningCommentsRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				messages = append(messages, diagnostic.Message.Description)
+			},
+		})
+		NoWarningCommentsRule.Run(ctx, []any{map[string]any{"terms": []any{"todo"}, "location": "anywhere"}})
+		return messages
+	}
+
+	for _, tc := range []struct {
+		code string
+		want []string
+	}{
+		// A comment with nothing after the opening delimiter has no text to
+		// match, and no closing delimiter to strip either.
+		{code: "/*", want: nil},
+		{code: "/*/", want: nil},
+		// Everything after the opening delimiter is the comment value, so the
+		// term is still found — a naive "drop the last two bytes" would leave
+		// " TO" here and miss it.
+		{code: "/* TODO", want: []string{"Unexpected 'todo' comment: 'TODO'."}},
+		// Closed comments keep stripping the delimiter, including the shortest
+		// possible one.
+		{code: "/**/", want: nil},
+		{code: "/* TODO */", want: []string{"Unexpected 'todo' comment: 'TODO'."}},
+	} {
+		got := run(tc.code)
+		if len(got) != len(tc.want) {
+			t.Errorf("%q: got %v, want %v", tc.code, got, tc.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("%q: got %v, want %v", tc.code, got, tc.want)
+				break
+			}
+		}
+	}
 }
