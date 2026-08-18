@@ -576,20 +576,36 @@ func (a *analyzer) isSafeIdentifierUse(identifier, function *ast.Node) (bool, bo
 		return false, false
 	}
 	current := identifier
+	// viaElement records that an element access stood between the identifier
+	// and the consumption, so the consumption reaches one element of what the
+	// identifier holds rather than the value itself.
+	viaElement := false
 	for current.Parent != nil {
 		parent := current.Parent
 		switch parent.Kind {
 		case ast.KindParenthesizedExpression:
 			current = parent
 		case ast.KindAwaitExpression:
-			return testFramework.AbruptCompletionPropagatesFailure(parent, function), false
+			return testFramework.AbruptCompletionPropagatesFailure(parent, function), viaElement
 		case ast.KindReturnStatement:
-			return testFramework.AbruptCompletionPropagatesFailure(parent, function), false
+			return testFramework.AbruptCompletionPropagatesFailure(parent, function), viaElement
 		case ast.KindForOfStatement:
 			return forAwaitConsumesExpression(current, function), true
 		case ast.KindArrayLiteralExpression:
 			if safePromiseAggregatorForExpression(parent, current, function) {
 				return true, false
+			}
+			return false, false
+		case ast.KindSpreadElement:
+			// `[...list]` spreads every element into the literal, so a literal
+			// that is consumed element-wise consumes what list holds.
+			array := parent.Parent
+			if array == nil || array.Kind != ast.KindArrayLiteralExpression {
+				return false, false
+			}
+			if safePromiseAggregatorForExpression(array, array, function) ||
+				forAwaitConsumesExpression(array, function) {
+				return true, true
 			}
 			return false, false
 		case ast.KindCallExpression:
@@ -613,7 +629,12 @@ func (a *analyzer) isSafeIdentifierUse(identifier, function *ast.Node) (bool, bo
 				return false, false
 			}
 			current = parent
-		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		case ast.KindElementAccessExpression:
+			if parent.AsElementAccessExpression().Expression == current {
+				viaElement = true
+			}
+			current = parent
+		case ast.KindPropertyAccessExpression:
 			current = parent
 		default:
 			return false, false
@@ -667,10 +688,12 @@ func (a *analyzer) assignmentPreservesSymbol(value *ast.Node, symbol *ast.Symbol
 	case ast.KindIdentifier:
 		return a.symbolOf(value) == symbol
 	case ast.KindConditionalExpression:
+		// Both branches must be able to be the old value. `p = c ? p : other`
+		// drops it whenever c is falsy.
 		conditional := value.AsConditionalExpression()
 		return conditional != nil &&
-			(a.assignmentPreservesSymbol(conditional.WhenTrue, symbol) ||
-				a.assignmentPreservesSymbol(conditional.WhenFalse, symbol))
+			a.assignmentPreservesSymbol(conditional.WhenTrue, symbol) &&
+			a.assignmentPreservesSymbol(conditional.WhenFalse, symbol)
 	case ast.KindBinaryExpression:
 		binary := value.AsBinaryExpression()
 		if binary == nil {
@@ -678,9 +701,12 @@ func (a *analyzer) assignmentPreservesSymbol(value *ast.Node, symbol *ast.Symbol
 		}
 		switch binary.OperatorToken.Kind {
 		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			return a.assignmentPreservesSymbol(binary.Left, symbol) ||
-				a.assignmentPreservesSymbol(binary.Right, symbol)
-		case ast.KindAmpersandAmpersandToken, ast.KindCommaToken:
+			// Only the left operand survives: a promise is truthy and
+			// non-nullish, so `p = p || other` keeps p, while `p = other || p`
+			// drops it for any truthy other. `&&` is absent because neither
+			// operand survives it.
+			return a.assignmentPreservesSymbol(binary.Left, symbol)
+		case ast.KindCommaToken:
 			return a.assignmentPreservesSymbol(binary.Right, symbol)
 		}
 	}

@@ -50,6 +50,13 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await Promise.all(pending); });`},
 			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; for await (const settled of pending) {} });`},
 			{Code: `test("case", async () => { for await (const settled of [promise.then(value => expect(value).toBe(1))]) {} });`},
+			// A spread carries every element of the binding into the literal,
+			// and an element access reaches one of them, so both keep an
+			// element-wise consumption of the binding.
+			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await Promise.all([...pending]); });`},
+			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await Promise.all([...pending, other()]); });`},
+			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; for await (const settled of [...pending]) {} });`},
+			{Code: `test("case", async () => { const pending = [promise.then(value => expect(value).toBe(1))]; await pending[0]; });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { await pending; } catch (error) { throw error; } });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); if (!ready) { throw new Error("no"); } await pending; });`},
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { setup(); await pending; } catch (error) { throw error; } });`},
@@ -296,6 +303,36 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			},
 			{
 				Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); try { throw new Error("suppressed"); } finally { return; } });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			// A write only preserves the promise a binding holds when every
+			// path through the right-hand side evaluates to it.
+			{
+				// a conditional drops the promise on the branch that is not the binding.
+				Code: `test("case", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = condition ? pending : other; await pending; });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				// a truthy left operand of `||` replaces the promise.
+				Code: `test("case", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = other || pending; await pending; });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				// a non-nullish left operand of `??` replaces the promise.
+				Code: `test("case", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = other ?? pending; await pending; });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				// a falsy left operand of `&&` becomes the value.
+				Code: `test("case", async () => { let pending = promise.then(value => assert.equal(value, 1)); pending = ready && pending; await pending; });`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "expectInFloatingPromise",
 				}},
