@@ -1,27 +1,31 @@
 package unicode17
 
 import (
-	"strconv"
-	"strings"
 	"testing"
 	"unicode"
 )
 
-// TestDeltaStillNeeded is the marker on this package: it fails once the
-// toolchain's own tables cover what the data here stands in for, which is the
-// moment the package should be deleted rather than maintained.
+// toolchainEdition is the edition of Unicode every table in this package is
+// written against. The data is a difference, not a set: it says what 17.0 has
+// that this edition does not, so it is only correct while the toolchain is
+// still on this one.
+const toolchainEdition = "15.0.0"
+
+// TestDeltaStillNeeded is the marker on this package: it fails the moment the
+// toolchain stops being the edition the data was written against, which is
+// either the moment the package should be deleted or the moment its tables
+// have to be worked out again.
 func TestDeltaStillNeeded(t *testing.T) {
-	major, _, _ := strings.Cut(unicode.Version, ".")
-	edition, err := strconv.Atoi(major)
-	if err != nil {
-		t.Fatalf("cannot read the edition out of unicode.Version %q", unicode.Version)
-	}
-	if edition >= 17 {
-		t.Fatalf("the standard library is on Unicode %s, so this package is obsolete: "+
+	if unicode.Version != toolchainEdition {
+		t.Fatalf("the standard library is on Unicode %s rather than %s, so this "+
+			"package no longer says what it means. On 17.0.0 or later it is obsolete: "+
 			"delete it, then drop the two lookups in ecmascript's isCased and "+
 			"isCaseIgnorable, the unicode17Uppercase and toLower calls beside them, "+
-			"and the three in ecmascript/regexp's Canonicalize, simpleFold and "+
-			"buildCaseTables", unicode.Version)
+			"the three in ecmascript/regexp's Canonicalize, simpleFold and "+
+			"buildCaseTables, and the category questions the rules ask it. On an "+
+			"edition in between, every table has to be recomputed against the new "+
+			"one and this constant moved with them",
+			unicode.Version, toolchainEdition)
 	}
 
 	for _, pair := range mappings() {
