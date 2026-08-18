@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed prefer_regex_literals.schema.json
@@ -427,7 +428,7 @@ func canFixTo(ctx rule.RuleContext, node *ast.Node, literal string) bool {
 			return false
 		}
 	}
-	return utils.IsValidRegexLiteral(literal)
+	return ecmascript.IsValidRegexLiteral(literal)
 }
 
 func areFlagsEqual(flagsA string, flagsB string) bool {

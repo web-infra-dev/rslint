@@ -1,0 +1,1808 @@
+// Rstest Snapshot v1
+
+exports[`operator-assignment > invalid 1`] = `
+{
+  "code": "x = x + y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 2`] = `
+{
+  "code": "x = x - y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (-=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 3`] = `
+{
+  "code": "x = x * y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (*=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 4`] = `
+{
+  "code": "x = y * x",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (*=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 5`] = `
+{
+  "code": "x = (y * z) * x",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (*=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 6`] = `
+{
+  "code": "x = x / y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (/=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 7`] = `
+{
+  "code": "x = x % y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (%=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 8`] = `
+{
+  "code": "x = x << y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (<<=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 9`] = `
+{
+  "code": "x = x >> y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (>>=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 10`] = `
+{
+  "code": "x = x >>> y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (>>>=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 11`] = `
+{
+  "code": "x = x & y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (&=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 12`] = `
+{
+  "code": "x = x ^ y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (^=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 13`] = `
+{
+  "code": "x = x | y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (|=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 14`] = `
+{
+  "code": "x[0] = x[0] - y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (-=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 15`] = `
+{
+  "code": "x.y[z['a']][0].b = x.y[z['a']][0].b * 2",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (*=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 16`] = `
+{
+  "code": "x = x + y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 17`] = `
+{
+  "code": "x = (x + y)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 18`] = `
+{
+  "code": "x = x + (y)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 19`] = `
+{
+  "code": "x += (y)",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 20`] = `
+{
+  "code": "x += y",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 21`] = `
+{
+  "code": "foo.bar = foo.bar + baz",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 22`] = `
+{
+  "code": "foo.bar += baz",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 23`] = `
+{
+  "code": "this.foo = this.foo + bar",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 24`] = `
+{
+  "code": "this.foo += bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 25`] = `
+{
+  "code": "foo.bar.baz = foo.bar.baz + qux",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 26`] = `
+{
+  "code": "foo.bar.baz += qux",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 27`] = `
+{
+  "code": "this.foo.bar = this.foo.bar + baz",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 28`] = `
+{
+  "code": "this.foo.bar += baz",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 29`] = `
+{
+  "code": "foo[bar] = foo[bar] + baz",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 30`] = `
+{
+  "code": "this[foo] = this[foo] + bar",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 31`] = `
+{
+  "code": "foo[bar] >>>= baz",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (>>>=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 32`] = `
+{
+  "code": "this[foo] >>>= bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (>>>=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 33`] = `
+{
+  "code": "foo[5] = foo[5] / baz",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (/=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 34`] = `
+{
+  "code": "this[5] = this[5] / foo",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (/=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 35`] = `
+{
+  "code": "/*1*/x/*2*/./*3*/y/*4*/= x.y +/*5*/z/*6*/./*7*/w/*8*/;",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 36`] = `
+{
+  "code": "x // 1
+ . // 2
+ y // 3
+ = x.y + //4
+ z //5
+ . //6
+ w;",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 37`] = `
+{
+  "code": "x = /*1*/ x + y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 38`] = `
+{
+  "code": "x = //1
+ x + y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 39`] = `
+{
+  "code": "x.y = x/*1*/.y + z",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 40`] = `
+{
+  "code": "x.y = x. //1
+ y + z",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 41`] = `
+{
+  "code": "x = x /*1*/ + y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 42`] = `
+{
+  "code": "x = x //1
+ + y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 43`] = `
+{
+  "code": "/*1*/x +=/*2*/y/*3*/;",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 44`] = `
+{
+  "code": "x +=//1
+ y",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 45`] = `
+{
+  "code": "(/*1*/x += y)",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 46`] = `
+{
+  "code": "x/*1*/+=  y",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 47`] = `
+{
+  "code": "x //1
+ +=  y",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 48`] = `
+{
+  "code": "(/*1*/x) +=  y",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 49`] = `
+{
+  "code": "x/*1*/.y +=  z",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 50`] = `
+{
+  "code": "x.//1
+ y +=  z",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 51`] = `
+{
+  "code": "(foo.bar) ^= ((((((((((((((((baz))))))))))))))))",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (^=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 52`] = `
+{
+  "code": "foo = foo ** bar",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (**=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 53`] = `
+{
+  "code": "foo **= bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (**=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 54`] = `
+{
+  "code": "foo *= bar + 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (*=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 55`] = `
+{
+  "code": "foo -= bar - baz",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (-=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 56`] = `
+{
+  "code": "foo += bar + baz",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 57`] = `
+{
+  "code": "foo += bar = 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 58`] = `
+{
+  "code": "foo *= (bar + 1)",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (*=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 59`] = `
+{
+  "code": "foo+=-bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 60`] = `
+{
+  "code": "foo/=bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (/=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 61`] = `
+{
+  "code": "foo/=/**/bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (/=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 62`] = `
+{
+  "code": "foo/=//
+bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (/=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 63`] = `
+{
+  "code": "foo/=/^bar$/",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (/=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 64`] = `
+{
+  "code": "foo+=+bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 65`] = `
+{
+  "code": "foo+= +bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 66`] = `
+{
+  "code": "foo+=/**/+bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 67`] = `
+{
+  "code": "foo+=+bar===baz",
+  "diagnostics": [
+    {
+      "message": "Unexpected operator assignment (+=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 68`] = `
+{
+  "code": "(obj?.a).b = (obj?.a).b + y",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`operator-assignment > invalid 69`] = `
+{
+  "code": "obj.a = obj?.a + b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (+=).",
+      "messageId": "replaced",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "operator-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

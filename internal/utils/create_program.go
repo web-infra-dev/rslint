@@ -37,6 +37,17 @@ func configNotFoundError(resolvedConfigPath string) error {
 }
 
 func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
+	return createProgram(singleThreaded, fs, cwd, tsconfigPath, host, false)
+}
+
+// CreateProgramUsingProjectReferenceSources creates a Program that redirects
+// project-reference declaration outputs back to their source files. This is
+// the mode used by the TypeScript language service for live source analysis.
+func CreateProgramUsingProjectReferenceSources(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
+	return createProgram(singleThreaded, fs, cwd, tsconfigPath, host, true)
+}
+
+func createProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost, useSourceOfProjectReference bool) (*compiler.Program, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
 	if !fs.FileExists(resolvedConfigPath) {
 		return nil, configNotFoundError(resolvedConfigPath)
@@ -44,7 +55,7 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 
 	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
 
-	return createProgramFromConfig(singleThreaded, configParseResult, host)
+	return createProgramFromConfig(singleThreaded, configParseResult, host, useSourceOfProjectReference)
 }
 
 // CreateProgramLenient creates a tsconfig-backed Program but tolerates
@@ -69,7 +80,7 @@ func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.Compile
 		CurrentDirectory:          host.GetCurrentDirectory(),
 	})
 
-	return createProgramFromConfig(singleThreaded, configParseResult, host)
+	return createProgramFromConfig(singleThreaded, configParseResult, host, false)
 }
 
 // CreateProgramFromOptionsLenient creates a Program like
@@ -106,11 +117,12 @@ func CreateProgramFromParsedConfigLenient(singleThreaded bool, config *tsoptions
 	return program, nil
 }
 
-func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) (*compiler.Program, error) {
+func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost, useSourceOfProjectReference bool) (*compiler.Program, error) {
 	opts := compiler.ProgramOptions{
-		Config:         config,
-		SingleThreaded: core.TSTrue,
-		Host:           host,
+		Config:                      config,
+		SingleThreaded:              core.TSTrue,
+		Host:                        host,
+		UseSourceOfProjectReference: useSourceOfProjectReference,
 	}
 	if !singleThreaded {
 		opts.SingleThreaded = core.TSFalse

@@ -103,6 +103,12 @@ func TestPreferNumericLiteralsExtras(t *testing.T) {
 
 			// Locks in upstream fix() suffix arm: keyword after replacement needs whitespace.
 			preferNumericInvalidFixed(`const ok = parseInt("11", 2)in foo;`, `parseInt("11", 2)`, `const ok = 0b11 in foo;`, "binary", "parseInt"),
+
+			// Locks in utils.SafeReplacementText's use of utils.CanTokenTextsBeAdjacent:
+			// `/` followed directly by a digit never merges into a different
+			// token, so no space is inserted. Verified against real ESLint
+			// 10.8.1, which produces the same unspaced fix.
+			preferNumericInvalidFixed(`foo/parseInt("111", 2)`, `parseInt("111", 2)`, `foo/0b111`, "binary", "parseInt"),
 		},
 	)
 }

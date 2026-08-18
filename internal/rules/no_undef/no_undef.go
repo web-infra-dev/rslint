@@ -47,9 +47,6 @@ var NoUndefRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		var authoredImportBindings map[string]struct{}
-		authoredImportBindingsCollected := false
-
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				// Skip identifiers that do not create scope references.
@@ -64,26 +61,12 @@ var NoUndefRule = rule.Rule{
 				referenceSpace := typescriptESLintReferenceSpace(node)
 				// An explicit `off` removes only implicit globals. A declaration or
 				// import authored in this file still defines its references.
-				if symbol := ctx.Refs.ResolveInFileWithMeaning(node, referenceSpace.symbolMeaning()); symbol != nil {
-					if !isOnlyJSDocImportSymbol(symbol) {
-						return
-					}
-					// The binder may keep only the earlier synthetic @import alias
-					// when a real import declares the same local name. Espree sees
-					// only the real import, so recover that authored binding from
-					// syntax before reporting the runtime reference.
-					if !authoredImportBindingsCollected {
-						authoredImportBindings = collectAuthoredImportBindings(ctx.SourceFile)
-						authoredImportBindingsCollected = true
-					}
-					if _, ok := authoredImportBindings[name]; ok {
-						return
-					}
+				if ctx.Refs.ResolveInFileWithMeaning(node, referenceSpace.symbolMeaning()) != nil {
+					return
 				}
 				// CommonJS's wrapper-level `arguments` binding is lexical rather than
 				// a configurable global, so it remains defined even when a same-named
-				// global is disabled. Check it only after rejecting synthetic JSDoc
-				// symbols above.
+				// global is disabled.
 				if ctx.Refs.HasImplicitWrapperBinding(name) {
 					return
 				}
@@ -105,53 +88,6 @@ var NoUndefRule = rule.Rule{
 			},
 		}
 	},
-}
-
-// isOnlyJSDocImportSymbol reports whether every declaration for symbol belongs
-// to a synthetic import declaration reparsed from a JSDoc @import tag. Espree
-// exposes the tag only as a comment, so these synthetic type bindings must not
-// define same-named runtime references for no-undef.
-func isOnlyJSDocImportSymbol(symbol *ast.Symbol) bool {
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		if !isInJSDocImportDeclaration(declaration) {
-			return false
-		}
-	}
-	return true
-}
-
-func isInJSDocImportDeclaration(node *ast.Node) bool {
-	for current := node; current != nil; current = current.Parent {
-		if current.Kind == ast.KindJSImportDeclaration &&
-			current.Flags&ast.NodeFlagsReparsed != 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func collectAuthoredImportBindings(sourceFile *ast.SourceFile) map[string]struct{} {
-	bindings := make(map[string]struct{})
-	var visit func(*ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindIdentifier && ast.IsDeclarationName(node) {
-			bindings[node.Text()] = struct{}{}
-		}
-		node.ForEachChild(visit)
-		return false
-	}
-	if sourceFile.Statements != nil {
-		for _, statement := range sourceFile.Statements.Nodes {
-			if statement.Kind == ast.KindImportDeclaration ||
-				statement.Kind == ast.KindImportEqualsDeclaration {
-				statement.ForEachChild(visit)
-			}
-		}
-	}
-	return bindings
 }
 
 // shouldSkip returns true if the identifier does not create a scope reference.
@@ -226,14 +162,14 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	// core no-undef. TypeScript-Go also parses JSDoc types into its AST,
 	// however, while upstream parsers leave those comments outside the scope
 	// graph. Keep only those synthetic JSDoc identifiers invisible here.
-	if isInJSDocSyntax(node) {
+	if utils.IsInJSDocSyntax(node) {
 		return true
 	}
 
 	// `import("pkg").Name` treats both the module argument and qualifier as
 	// module syntax rather than references. Its type arguments remain normal
 	// type references and are deliberately not skipped.
-	if isImportTypeSyntax(node) {
+	if utils.IsImportTypeSyntax(node) {
 		return true
 	}
 
@@ -278,39 +214,6 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	}
 
 	return false
-}
-
-// isInJSDocSyntax reports whether node came from syntax parsed inside a JSDoc
-// comment. TypeScript-Go deep-clones some of these nodes into the executable
-// tree, preserving NodeFlagsJSDoc on the cloned subtree. Espree and
-// typescript-eslint keep the same text as comments, so none of these names are
-// references for core no-undef.
-func isInJSDocSyntax(node *ast.Node) bool {
-	for current := node; current != nil; current = current.Parent {
-		if current.Flags&ast.NodeFlagsJSDoc != 0 || ast.IsJSDocNode(current) {
-			return true
-		}
-		if current.Kind == ast.KindSourceFile {
-			return false
-		}
-	}
-	return false
-}
-
-// isImportTypeSyntax reports whether node belongs to the argument, attributes,
-// or qualifier of an ImportType. Type arguments are siblings of those fields
-// and remain references.
-func isImportTypeSyntax(node *ast.Node) bool {
-	current := node
-	for current.Parent != nil && current.Parent.Kind != ast.KindImportType {
-		current = current.Parent
-	}
-	if current.Parent == nil || current.Parent.Kind != ast.KindImportType {
-		return false
-	}
-	importType := current.Parent.AsImportTypeNode()
-	return importType != nil &&
-		(importType.Argument == current || importType.Attributes == current || importType.Qualifier == current)
 }
 
 type eslintReferenceSpace uint8

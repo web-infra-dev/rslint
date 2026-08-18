@@ -20,11 +20,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_misleading_character_class.schema.json
@@ -1469,7 +1469,7 @@ func messageDescriptionFor(kind string) string {
 // This combination catches all the cases in ESLint's test suite that should
 // suppress the suggestion without special-casing.
 func patternValidWithUFlag(pattern string) bool {
-	if _, err := regexp2.Compile(pattern, regexp2.ECMAScript|regexp2.Unicode); err != nil {
+	if _, err := esregexp.Compile(pattern, "u"); err != nil {
 		return false
 	}
 	return !hasInvalidIdentityEscapeForUFlag(pattern)
