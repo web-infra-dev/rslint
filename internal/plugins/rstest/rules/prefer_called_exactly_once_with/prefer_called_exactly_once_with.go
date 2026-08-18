@@ -304,17 +304,32 @@ func chainAssertions(parsed *rstestUtils.ParsedRstestExpectCall) []chainAssertio
 	return hits
 }
 
-// invokingMatchers execute the value they assert on, so an assertion using one
-// can run arbitrary code — `expect(callTheMock).toThrow()` calls the mock. The
-// set is closed: it is fixed by the matchers @vitest/expect installs, unlike
-// the open question of which function eventually reaches the mock.
+// invokingMatchers execute something the assertion was handed, so an assertion
+// using one can run arbitrary code — `expect(callTheMock).toThrow()` calls the
+// mock. The set is enumerable because Rstest fixes which matchers it installs:
+// the jest-style matchers, the snapshot matchers, and Chai's core assertions,
+// which `@rstest/core` bundles alongside them. That is unlike the open question
+// of which function eventually reaches the mock.
 var invokingMatchers = map[string]bool{
-	"toThrow":      true,
-	"toThrowError": true,
-	"toSatisfy":    true,
-	"throw":        true,
-	"throws":       true,
-	"Throw":        true,
+	// Call the subject.
+	"toThrow":                            true,
+	"toThrowError":                       true,
+	"toThrowErrorMatchingSnapshot":       true,
+	"toThrowErrorMatchingInlineSnapshot": true,
+	"throw":                              true,
+	"throws":                             true,
+	"Throw":                              true,
+	// Call the subject before and after running the function they are given.
+	"change":    true,
+	"changes":   true,
+	"increase":  true,
+	"increases": true,
+	"decrease":  true,
+	"decreases": true,
+	// Call their argument with the subject.
+	"toSatisfy": true,
+	"satisfy":   true,
+	"satisfies": true,
 }
 
 // suspendingModifiers hand control to the microtask queue, which lets whatever
@@ -418,6 +433,9 @@ func (scanner *betweenScanner) isCallable(node *ast.Node) bool {
 // neither does a `console` the author declared themselves, which resolves to
 // their own binding rather than the library's. Without a checker nothing
 // qualifies, which leaves the pair unreported — the safe direction.
+//
+// `eval` is the one exception the criterion cannot cover: it needs nothing
+// callable, because the source it runs arrives as a string.
 func (scanner *betweenScanner) isLibraryCall(node *ast.Node) bool {
 	if node.Kind != ast.KindCallExpression || scanner.ctx.TypeChecker == nil {
 		return false
@@ -426,7 +444,11 @@ func (scanner *betweenScanner) isLibraryCall(node *ast.Node) bool {
 	if call == nil {
 		return false
 	}
-	symbol := scanner.ctx.TypeChecker.GetSymbolAtLocation(ast.SkipParentheses(call.Expression))
+	callee := ast.SkipParentheses(call.Expression)
+	if ast.IsIdentifier(callee) && callee.Text() == "eval" {
+		return false
+	}
+	symbol := scanner.ctx.TypeChecker.GetSymbolAtLocation(callee)
 	if symbol == nil || !internalUtils.IsSymbolFromDefaultLibrary(scanner.ctx.Program(), symbol) {
 		return false
 	}

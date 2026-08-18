@@ -99,6 +99,19 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			{Code: `expect(x).toHaveBeenCalledOnce(); expect(callX).toThrow(); expect(x).toHaveBeenCalledWith('a');`},
 			{Code: `async function f() { expect(x).toHaveBeenCalledOnce(); await expect(p).resolves.toBe(1); expect(x).toHaveBeenCalledWith('a'); }`},
 			{Code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(makeExpected()); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(callX).toThrowErrorMatchingSnapshot(); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(callX).toThrowErrorMatchingInlineSnapshot(); expect(x).toHaveBeenCalledWith('a');`},
+			// Chai's own assertions run the author's code just as the
+			// jest-style ones do: `satisfy` calls its argument with the
+			// subject, and `change` calls the subject itself.
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(v).to.satisfy(pred); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(v).to.satisfies(pred); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(callX).to.change(obj, 'value'); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(callX).to.increase(obj, 'value'); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(callX).to.decrease(obj, 'value'); expect(x).toHaveBeenCalledWith('a');`},
+			// `eval` is a default-library call, but the source it runs arrives
+			// as a string, so nothing callable has to be handed to it.
+			{Code: `expect(x).toHaveBeenCalledOnce(); eval('x("b")'); expect(x).toHaveBeenCalledWith('a');`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// An argument that is not stable under a second evaluation is still
