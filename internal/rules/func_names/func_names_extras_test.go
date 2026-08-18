@@ -36,6 +36,13 @@ func TestFuncNamesExtras(t *testing.T) {
 			{Code: "quux ||= function() {};", Options: []any{"as-needed"}},
 			{Code: "quux += (function() {});", Options: []any{"as-needed"}},
 
+			// ---- Dimension 4: parenthesized assignment target — Espree
+			// exposes the left side as the bare identifier, so the name is
+			// still inferred; tsgo keeps the ParenthesizedExpression. ----
+			{Code: "(foo) = function() {};", Options: []any{"as-needed"}},
+			{Code: "((foo)) = function() {};", Options: []any{"as-needed"}},
+			{Code: "(foo) ??= function() {};", Options: []any{"as-needed"}},
+
 			// ---- Dimension 4: optional chain — N/A, func-names never
 			// inspects a member/call expression's own object/callee shape;
 			// nothing in its logic branches on `?.`. ----

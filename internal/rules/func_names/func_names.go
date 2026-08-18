@@ -145,7 +145,7 @@ func hasInferredName(node *ast.Node) bool {
 		// the "quux ??= function() {};" as-needed example in the rule doc.
 		be := parent.AsBinaryExpression()
 		return ast.IsAssignmentOperator(be.OperatorToken.Kind) &&
-			be.Left.Kind == ast.KindIdentifier &&
+			ast.SkipParentheses(be.Left).Kind == ast.KindIdentifier &&
 			ast.SkipParentheses(be.Right) == node
 	}
 	return false
