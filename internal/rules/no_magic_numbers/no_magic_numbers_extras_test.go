@@ -42,6 +42,17 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 		{Code: `var a, b; ({a = 1, b = 2} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var x; ({a: x = 42} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 
+		// ---- Destructuring targets only (the iterable side still reports) ----
+		{Code: `for ([a = 1] of foo) {}`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+		{Code: `for ([a = 1] in foo) {}`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+		{Code: `[a = 1] = arr;`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+		{Code: `({ p: a = 1 } = o);`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+
+		// ---- Computed keys of readonly class properties (ESTree makes them
+		// direct children of the PropertyDefinition) ----
+		{Code: `class C { readonly [1] = foo; }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
+		{Code: `class C { readonly [-1] = foo; }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
+
 		// ---- Signed zero (JS Set lookups use SameValueZero) ----
 		{Code: `f(-0)`, Options: map[string]interface{}{"ignore": []interface{}{float64(0)}}},
 		{Code: `f(0)`, Options: map[string]interface{}{"ignore": []interface{}{math.Copysign(0, -1)}}},
@@ -131,6 +142,45 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 			Code:    `({ 42() {} })`,
 			Options: map[string]interface{}{"detectObjects": true},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 4}},
+		},
+		{
+			Code:    `for (const x of [a = 1]) {}`,
+			Options: map[string]interface{}{"ignoreDefaultValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 22, EndColumn: 23}},
+		},
+		{
+			Code:    `for (const x in [a = 1]) {}`,
+			Options: map[string]interface{}{"ignoreDefaultValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 22, EndColumn: 23}},
+		},
+		{
+			Code:    `[b] = [a = 1];`,
+			Options: map[string]interface{}{"ignoreDefaultValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 12, EndColumn: 13}},
+		},
+		{
+			Code:    `x = [a = 1];`,
+			Options: map[string]interface{}{"ignoreDefaultValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 10, EndColumn: 11}},
+		},
+		{
+			Code:    `class C { accessor x = 1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 24, EndColumn: 25}},
+		},
+		{
+			Code:    `class C { static accessor x = 1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 31, EndColumn: 32}},
+		},
+		{
+			Code:    `class C { [1] = foo; }`,
+			Options: map[string]interface{}{"ignoreReadonlyClassProperties": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 12, EndColumn: 13}},
+		},
+		{
+			Code:   `class C { readonly [1] = foo; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 21, EndColumn: 22}},
 		},
 		{
 			Code: `f(/* leading trivia */ 42, /* unary */ -(7), /* bigint */ 9n);`,

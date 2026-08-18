@@ -110,6 +110,10 @@ class Foo {
 			Options: map[string]interface{}{"ignoreReadonlyClassProperties": true},
 		},
 
+		// ---- TS: readonly properties are decided before the core options ----
+		{Code: `class C { readonly x = 1; }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": true, "ignoreReadonlyClassProperties": true}},
+		{Code: `class C { readonly [1] = foo; }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
+
 		// ---- TS: ignoreTypeIndexes ----
 		{Code: `type Foo = Bar[0];`, Options: map[string]interface{}{"ignoreTypeIndexes": true}},
 		{Code: `type Foo = Bar[-1];`, Options: map[string]interface{}{"ignoreTypeIndexes": true}},
@@ -482,7 +486,7 @@ enum foo {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noMagic", Message: "No magic number: 1000.", Line: 3, Column: 12},
 				{MessageId: "noMagic", Message: "No magic number: -1.", Line: 5, Column: 9},
-				{MessageId: "noMagic", Message: "No magic number: +1.", Line: 6, Column: 9},
+				{MessageId: "noMagic", Message: "No magic number: 1.", Line: 6, Column: 10},
 			},
 		},
 
@@ -506,9 +510,40 @@ class Foo {
 				{MessageId: "noMagic", Message: "No magic number: 3.", Line: 5, Column: 30},
 				{MessageId: "noMagic", Message: "No magic number: 4.", Line: 6, Column: 23},
 				{MessageId: "noMagic", Message: "No magic number: -5.", Line: 7, Column: 16},
-				{MessageId: "noMagic", Message: "No magic number: +6.", Line: 8, Column: 16},
+				{MessageId: "noMagic", Message: "No magic number: 6.", Line: 8, Column: 17},
 				{MessageId: "noMagic", Message: "No magic number: 100n.", Line: 9, Column: 24},
 			},
+		},
+
+		// ---- TS: the readonly decision precedes the core ignore options ----
+		{
+			Code:    `class C { readonly x = 1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true, "ignoreReadonlyClassProperties": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 24, EndColumn: 25}},
+		},
+		{
+			Code:    `class C { readonly x = -1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -1.", Line: 1, Column: 24, EndColumn: 26}},
+		},
+		{
+			Code:    `class C { readonly x = +1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 25, EndColumn: 26}},
+		},
+		{
+			Code:   `class C { readonly [1] = foo; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 21, EndColumn: 22}},
+		},
+		{
+			Code:    `class C { accessor x = 1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 24, EndColumn: 25}},
+		},
+		{
+			Code:    `for (const x of [a = 1]) {}`,
+			Options: map[string]interface{}{"ignoreDefaultValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 22, EndColumn: 23}},
 		},
 
 		// ---- TS: ignoreTypeIndexes: false ----

@@ -178,17 +178,25 @@ func noMagicNumberMessage(raw string) rule.RuleMessage {
 var NoMagicNumbersRule = rule.Rule{
 	Name:   "no-magic-numbers",
 	Schema: rule.NewSchema(schemaJSON),
-	Run:    RunTSESLint,
+	Run:    Run,
 }
 
-// RunTSESLint implements no-magic-numbers. It is exported so that
-// @typescript-eslint/no-magic-numbers (internal/plugins/typescript/rules/no_magic_numbers)
-// can share this implementation: as of the ESLint version this rule is
-// ported from, the core rule's schema and behavior already fully subsume
-// the typescript-eslint extension (ignoreEnums, ignoreNumericLiteralTypes,
-// ignoreReadonlyClassProperties, ignoreTypeIndexes), so there is no
-// TypeScript-specific variant to select between.
+// Run implements the core ESLint no-magic-numbers rule.
+func Run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+	return run(ctx, rawOptions, false)
+}
+
+// RunTSESLint implements @typescript-eslint/no-magic-numbers. It shares this
+// implementation because the core rule's schema already covers the extension's
+// options (ignoreEnums, ignoreNumericLiteralTypes, ignoreReadonlyClassProperties,
+// ignoreTypeIndexes), but the extension resolves those TypeScript-specific
+// positions itself before handing anything to the core rule, so the behavior of
+// the two differs where that decision is observable.
 func RunTSESLint(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
+	return run(ctx, rawOptions, true)
+}
+
+func run(ctx rule.RuleContext, rawOptions []any, tsExtension bool) rule.RuleListeners {
 	opts := parseOptions(rawOptions)
 	hasIgnoredValues := len(opts.ignore) != 0
 
@@ -252,6 +260,42 @@ func RunTSESLint(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 				valueKey = normalizeFloatKey(numericValue)
 			}
 			if opts.ignore[valueKey] {
+				return
+			}
+		}
+
+		// The typescript-eslint extension resolves the TypeScript-specific
+		// positions itself and only falls through to the core checks when the
+		// literal sits in none of them. When one matches but its option is
+		// off, it reports right away — so the core ignore options never get a
+		// chance to suppress it — and folds only unary minus into the reported
+		// node and text.
+		if tsExtension {
+			allowed := false
+			matched := true
+			switch {
+			case isParentTSEnumDeclaration(node):
+				allowed = opts.ignoreEnums
+			case isTSNumericLiteralType(node):
+				allowed = opts.ignoreNumericLiteralTypes
+			case isAncestorTSIndexedAccessType(node):
+				allowed = opts.ignoreTypeIndexes
+			case isParentTSReadonlyPropertyDefinition(node):
+				allowed = opts.ignoreReadonlyClassProperties
+			default:
+				matched = false
+			}
+			if matched {
+				if allowed {
+					return
+				}
+				reportRange := nodeRange
+				reportRaw := ownRaw
+				if unary, op := findUnaryParent(node); unary != nil && op == ast.KindMinusToken {
+					reportRange = utils.TrimNodeTextRange(ctx.SourceFile, unary)
+					reportRaw = "-" + ownRaw
+				}
+				ctx.ReportRange(reportRange, noMagicNumberMessage(reportRaw))
 				return
 			}
 		}
@@ -433,6 +477,11 @@ func isTSNumericLiteralType(node *ast.Node) bool {
 
 func isParentTSReadonlyPropertyDefinition(node *ast.Node) bool {
 	parent := getLiteralParent(node)
+	// ESTree makes a computed key such as `readonly [1] = foo` a direct child
+	// of the property; tsgo wraps it in a ComputedPropertyName.
+	if parent != nil && parent.Kind == ast.KindComputedPropertyName {
+		parent = parent.Parent
+	}
 	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
 		return false
 	}
@@ -481,27 +530,27 @@ func isDefaultValue(fullNumberNode *ast.Node, parent *ast.Node) bool {
 }
 
 func isInsideDestructuringAssignment(node *ast.Node) bool {
+	// The walk tracks the child it came from so that only the destructuring
+	// target counts: `for (const x of [a = 1]) {}` reaches the same ForOf
+	// statement as `for ([a = 1] of foo) {}`, but through the iterable.
+	child := node
 	parent := node.Parent
 	for parent != nil {
 		switch parent.Kind {
-		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
-			parent = parent.Parent
-			continue
-		case ast.KindSpreadElement, ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment:
-			parent = parent.Parent
-			continue
-		case ast.KindParenthesizedExpression:
+		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression,
+			ast.KindSpreadElement, ast.KindPropertyAssignment,
+			ast.KindShorthandPropertyAssignment, ast.KindParenthesizedExpression:
+			child = parent
 			parent = parent.Parent
 			continue
 		case ast.KindBinaryExpression:
 			binExpr := parent.AsBinaryExpression()
-			if binExpr.OperatorToken.Kind == ast.KindEqualsToken {
-				left := binExpr.Left
-				return left != nil && (left.Kind == ast.KindArrayLiteralExpression || left.Kind == ast.KindObjectLiteralExpression)
+			if binExpr.OperatorToken.Kind == ast.KindEqualsToken && binExpr.Left == child {
+				return child.Kind == ast.KindArrayLiteralExpression || child.Kind == ast.KindObjectLiteralExpression
 			}
 			return false
 		case ast.KindForOfStatement, ast.KindForInStatement:
-			return true
+			return parent.AsForInOrOfStatement().Initializer == child
 		default:
 			return false
 		}
@@ -513,6 +562,11 @@ func isInsideDestructuringAssignment(node *ast.Node) bool {
 // of a class field. parent is the already-resolved logical parent (parens skipped).
 func isClassFieldInitialValue(fullNumberNode *ast.Node, parent *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
+		return false
+	}
+	// ESTree gives `accessor x = 1` an AccessorProperty parent rather than a
+	// PropertyDefinition, so an auto-accessor is not a class field here.
+	if ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
 		return false
 	}
 	init := parent.AsPropertyDeclaration().Initializer

@@ -11,11 +11,12 @@ import (
 var schemaJSON []byte
 
 // NoMagicNumbersRule is the typescript-eslint wrapper around the core
-// no-magic-numbers implementation. As of the ESLint version the core rule
-// (internal/rules/no_magic_numbers) was ported from, its schema and behavior
-// already fully subsume the typescript-eslint extension's options
-// (ignoreEnums, ignoreNumericLiteralTypes, ignoreReadonlyClassProperties,
-// ignoreTypeIndexes), so the two rules share one implementation.
+// no-magic-numbers implementation (internal/rules/no_magic_numbers). The core
+// rule's schema already covers the extension's options (ignoreEnums,
+// ignoreNumericLiteralTypes, ignoreReadonlyClassProperties, ignoreTypeIndexes),
+// so the two share one implementation, selected here through core.RunTSESLint
+// because the extension settles those TypeScript-specific positions on its own
+// before the core checks ever run.
 var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 	Name:   "no-magic-numbers",
 	Schema: rule.NewSchema(schemaJSON),
