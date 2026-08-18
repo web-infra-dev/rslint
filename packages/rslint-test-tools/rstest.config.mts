@@ -486,6 +486,7 @@ export default defineConfig({
     './tests/eslint/rules/no-loop-func.test.ts',
     './tests/eslint/rules/no-multi-assign.test.ts',
     './tests/eslint/rules/no-multi-str.test.ts',
+    './tests/eslint/rules/no-negated-condition.test.ts',
     './tests/eslint/rules/no-nested-ternary.test.ts',
     './tests/eslint/rules/no-ternary.test.ts',
     './tests/eslint/rules/no-nonoctal-decimal-escape.test.ts',
