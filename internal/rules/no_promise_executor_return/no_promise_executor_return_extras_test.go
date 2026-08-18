@@ -166,6 +166,54 @@ new Promise(r => 1)`,
 			{
 				Code: `namespace N { var Promise: any; function g() { new Promise(r => 1); } }`,
 			},
+			// Locks in upstream isPromiseExecutor() arm 5: a JSDoc `@typedef` is only a
+			// comment to ESLint, but the real `const` beside it still defines the name.
+			{
+				Code: `/** @typedef {number} Promise */
+const Promise = globalThis.Promise;
+new Promise(r => 1)`,
+				FileName: "promise-jsdoc-and-const.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a parameter initializer sees
+			// the parameters declared beside it, so the callee is not the global.
+			{
+				Code:     `function f(Promise, x = new Promise(r => 1)) {}`,
+				FileName: "promise-sibling-parameter.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code: `function f(Promise: any, x = new Promise(r => 1)) {}`,
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: skipping the body scope a
+			// parameter initializer cannot see must continue outward, not jump to the
+			// global — the enclosing function's parameter still binds the name.
+			{
+				Code:     `function outer(Promise) { function f(x = new Promise(r => 1)) { function Promise() {} } }`,
+				FileName: "promise-outer-parameter.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code: `function outer(Promise: any) { function f(x = new Promise(r => 1)) { function Promise() {} } }`,
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a named function expression
+			// binds its own name outside the body, so the parameter list still sees it.
+			{
+				Code:     `const f = function Promise(x = new Promise(r => 1)) { function Promise() {} };`,
+				FileName: "promise-function-expression-name.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code: `const f = function Promise(x = new Promise(r => 1)) { function Promise() {} };`,
+			},
+			// Locks in the ctx.Globals gate on a `.js` file, where the JSDoc and
+			// parameter-scope paths above live.
+			{
+				Code: `/* globals Promise:off */
+new Promise(r => 1)`,
+				FileName: "promise-globals-off.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
 			// Locks in upstream onCodePathStart() arm 3: parentheses around `void` do not
 			// defeat the allowVoid exemption.
 			{
@@ -494,6 +542,81 @@ new Promise(r => 1)`,
 						Line:      1, Column: 32, EndLine: 1, EndColumn: 33,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "wrapBraces", Output: `namespace N { new Promise(r => {1}); }`},
+						},
+					},
+				},
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a JSDoc `@typedef` is a
+			// comment, so it declares nothing ESLint can scope the callee to.
+			{
+				Code: `/** @typedef {number} Promise */
+new Promise(r => 1)`,
+				FileName: "promise-jsdoc-typedef.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "returnsValue",
+						Line:      2, Column: 18, EndLine: 2, EndColumn: 19,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "wrapBraces", Output: `/** @typedef {number} Promise */
+new Promise(r => {1})`},
+						},
+					},
+				},
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a parameter initializer is
+			// evaluated in a scope outside the body, so a function declared there is
+			// invisible and the callee is still the global.
+			{
+				Code:     `function f(x = new Promise(r => 1)) { function Promise() {} }`,
+				FileName: "promise-body-function.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "returnsValue",
+						Line:      1, Column: 33, EndLine: 1, EndColumn: 34,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "wrapBraces", Output: `function f(x = new Promise(r => {1})) { function Promise() {} }`},
+						},
+					},
+				},
+			},
+			{
+				Code: `function f(x = new Promise(r => 1)) { function Promise() {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "returnsValue",
+						Line:      1, Column: 33, EndLine: 1, EndColumn: 34,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "wrapBraces", Output: `function f(x = new Promise(r => {1})) { function Promise() {} }`},
+						},
+					},
+				},
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: the same boundary holds for a
+			// `var` in the body, which shares the function's declaration table.
+			{
+				Code:     `function f(x = new Promise(r => 1)) { var Promise; }`,
+				FileName: "promise-body-var.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "returnsValue",
+						Line:      1, Column: 33, EndLine: 1, EndColumn: 34,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "wrapBraces", Output: `function f(x = new Promise(r => {1})) { var Promise; }`},
+						},
+					},
+				},
+			},
+			{
+				Code: `function f(x = new Promise(r => 1)) { var Promise: any; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "returnsValue",
+						Line:      1, Column: 33, EndLine: 1, EndColumn: 34,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "wrapBraces", Output: `function f(x = new Promise(r => {1})) { var Promise: any; }`},
 						},
 					},
 				},

@@ -269,10 +269,85 @@ func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name strin
 	if s == nil || location == nil || name == "" {
 		return false
 	}
-	if s.resolver.Resolve(location, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/) != nil {
+	if s.resolveName(location, name, meaning) != nil {
 		return true
 	}
 	return meaning&ast.SymbolFlagsValue != 0 && s.HasImplicitWrapperBinding(name)
+}
+
+// resolveName runs the binder scope walk for name at location and then applies
+// the one JavaScript scoping rule NameResolver deliberately leaves out: a
+// parameter initializer cannot see a declaration made in the function body.
+// TypeScript keeps that resolution so the checker can report "used before its
+// declaration" against the right symbol, but scope-shaped consumers need the
+// language answer — the parameter environment is the body environment's
+// parent, so the name belongs to whatever encloses the function.
+func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
+	for location != nil {
+		result := s.resolver.Resolve(location, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
+		if result == nil {
+			return nil
+		}
+		fn := bodyOnlyParameterBarrier(location, result)
+		if fn == nil {
+			return result
+		}
+		// A named function expression binds its own name outside the body, so
+		// that binding survives the barrier; everything else resolves from the
+		// scope holding the function.
+		if own := functionExpressionSelfBinding(fn, name, meaning); own != nil {
+			return own
+		}
+		location = fn.Parent
+	}
+	return nil
+}
+
+// bodyOnlyParameterBarrier returns the function whose body holds every
+// declaration of result while location sits in that function's parameter list,
+// which is the shape where the scope walk crossed a boundary the language does
+// not. It returns nil when no such function encloses location.
+func bodyOnlyParameterBarrier(location *ast.Node, result *ast.Symbol) *ast.Node {
+	if len(result.Declarations) == 0 {
+		return nil
+	}
+	for node := location; node != nil; node = node.Parent {
+		if node.Kind != ast.KindParameter || node.Parent == nil || !ast.IsFunctionLike(node.Parent) {
+			continue
+		}
+		fn := node.Parent
+		if body := fn.Body(); body != nil && declaredOnlyWithin(result, body) {
+			return fn
+		}
+	}
+	return nil
+}
+
+// declaredOnlyWithin reports whether every declaration of symbol lies inside
+// body. A symbol that also has a declaration outside it — a parameter of the
+// same name, a type parameter, a merged outer declaration — stays visible from
+// the parameter list.
+func declaredOnlyWithin(symbol *ast.Symbol, body *ast.Node) bool {
+	for _, decl := range symbol.Declarations {
+		if decl.Pos() < body.Pos() || decl.End() > body.End() {
+			return false
+		}
+	}
+	return true
+}
+
+// functionExpressionSelfBinding returns the symbol a named function expression
+// binds for its own name. The binder keeps that symbol off the function's
+// locals table, so a scope walk restarted outside the function would otherwise
+// lose it.
+func functionExpressionSelfBinding(fn *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
+	if meaning&ast.SymbolFlagsFunction == 0 || !ast.IsFunctionExpression(fn) {
+		return nil
+	}
+	if fnName := fn.Name(); fnName != nil && fnName.Text() == name {
+		return fn.Symbol()
+	}
+	return nil
 }
 
 // IsGlobalNameReference reports whether name at location refers to an
@@ -290,10 +365,27 @@ func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meanin
 		return false
 	}
 	if s.sourceFile != nil && ast.IsGlobalSourceFile(s.sourceFile.AsNode()) &&
-		s.sourceFile.Locals[name] != nil {
+		hasAuthoredDeclaration(s.sourceFile.Locals[name]) {
 		return false
 	}
 	return !s.IsNameDefinedInFileWithMeaning(location, name, meaning)
+}
+
+// hasAuthoredDeclaration reports whether symbol has a declaration the file
+// actually spells in syntax. A JSDoc tag such as `@typedef` is reparsed into a
+// synthesized declaration node that joins the file's symbol table; ESLint reads
+// that same text as a comment and creates no scope variable for it, so a symbol
+// declared only that way defines nothing.
+func hasAuthoredDeclaration(symbol *ast.Symbol) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, decl := range symbol.Declarations {
+		if decl.Flags&ast.NodeFlagsReparsed == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // HasNonGlobalTopLevelScope reports whether the resolved language defaults
