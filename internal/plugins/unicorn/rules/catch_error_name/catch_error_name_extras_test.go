@@ -11,6 +11,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func invalidTSX(code, output, original, fixed string) rule_tester.InvalidTestCase {
+	result := invalid(code, output, original, fixed)
+	result.Tsx = true
+	return result
+}
+
 func TestCatchErrorNameExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -62,7 +68,17 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("namespace N { interface error {}; try {} catch (bad) { use(bad) } }", "namespace N { interface error {}; try {} catch (error_) { use(error_) } }", "bad", "error_"),
 			invalid("namespace N { type error = string; try {} catch (bad) {} }", "namespace N { type error = string; try {} catch (error_) {} }", "bad", "error_"),
 			invalid("switch (x) { case 1: type error = string; try {} catch (bad) { use(bad) } }", "switch (x) { case 1: type error = string; try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			invalid("switch (x) { case 1: type error = string; default: try {} catch (bad) { use(bad) } }", "switch (x) { case 1: type error = string; default: try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			invalid("switch (x) { case 1: interface error {}; default: try {} catch (bad) { use(bad) } }", "switch (x) { case 1: interface error {}; default: try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			invalid("switch (x) { case 1: try {} catch (bad) { use(bad) }; case 2: type error = string }", "switch (x) { case 1: try {} catch (error_) { use(error_) }; case 2: type error = string }", "bad", "error_"),
 			invalid("function f<error>() { try {} catch (bad) { use(bad) } }", "function f<error>() { try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			// A catch parameter and type-space declarations in its body do not collide.
+			invalid("try {} catch (bad) { type error = string }", "try {} catch (error) { type error = string }", "bad", "error"),
+			invalid("try {} catch (bad) { interface error {} }", "try {} catch (error) { interface error {} }", "bad", "error"),
+			invalid("try {} catch (bad) { enum error {} }", "try {} catch (error) { enum error {} }", "bad", "error"),
+			// Namespace bodies expose their complete value-space bindings.
+			invalid("namespace N { const error = 1; try {} catch (bad) { use(bad) } }", "namespace N { const error = 1; try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			invalid("namespace N { function error() {}; try {} catch (bad) { use(bad) } }", "namespace N { function error() {}; try {} catch (error_) { use(error_) } }", "bad", "error_"),
 			// External references in descendant scopes remain collision candidates.
 			invalid("try {} catch (bad) { use(bad); function f() { return error } }", "try {} catch (error_) { use(error_); function f() { return error } }", "bad", "error_"),
 			invalid("promise.catch(bad => { use(bad); function f() { return error } })", "promise.catch(error_ => { use(error_); function f() { return error } })", "bad", "error_"),
@@ -74,6 +90,8 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			// `var` declarations nested in a rejection handler still hoist to its scope.
 			invalid("promise.catch(bad => { if (x) { var error = 1 } })", "promise.catch(error_ => { if (x) { var error = 1 } })", "bad", "error_"),
 			invalid("promise.catch(function (bad) { if (x) { var error = 1 } })", "promise.catch(function (error_) { if (x) { var error = 1 } })", "bad", "error_"),
+			// Lowercase intrinsic JSX tag names are not variable references.
+			invalidTSX("try {} catch (bad) { use(bad); const x = <error /> }", "try {} catch (error) { use(error); const x = <error /> }", "bad", "error"),
 			// Upstream upperFirst() operates on one UTF-16 code unit, so an astral
 			// initial character is not uppercased for the descriptive-name suffix.
 			invalid("try {} catch (descriptive𐐀) {}", "try {} catch (𐐨) {}", "descriptive𐐀", "𐐨", map[string]any{"name": "𐐨"}),

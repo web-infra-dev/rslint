@@ -171,6 +171,7 @@ func bodyHasExternalReference(ctx rule.RuleContext, body *ast.Node, originalSymb
 			return
 		}
 		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == candidate &&
+			!(ast.IsJsxTagName(node) && scanner.IsIntrinsicJsxName(node.Text())) &&
 			!utils.IsNonReferenceIdentifier(node) {
 			symbol := ctx.Refs.Resolve(node)
 			conflict = symbol != originalSymbol && !utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
@@ -218,7 +219,8 @@ func hasTypeDeclarationInScope(node *ast.Node, name string) bool {
 		case ast.KindModuleBlock:
 			moduleBlock := current.AsModuleBlock()
 			if moduleBlock != nil && moduleBlock.Statements != nil &&
-				statementsHaveTypeDeclaration(moduleBlock.Statements.Nodes, name) {
+				(utils.HasLocalDeclarationInStatements(moduleBlock.Statements.Nodes, name) ||
+					statementsHaveTypeDeclaration(moduleBlock.Statements.Nodes, name)) {
 				return true
 			}
 		case ast.KindCaseClause, ast.KindDefaultClause:
@@ -226,10 +228,47 @@ func hasTypeDeclarationInScope(node *ast.Node, name string) bool {
 			if clause != nil && clause.Statements != nil && statementsHaveTypeDeclaration(clause.Statements.Nodes, name) {
 				return true
 			}
+		case ast.KindCaseBlock:
+			caseBlock := current.AsCaseBlock()
+			if caseBlock != nil && caseBlock.Clauses != nil {
+				for _, clauseNode := range caseBlock.Clauses.Nodes {
+					clause := clauseNode.AsCaseOrDefaultClause()
+					if clause != nil && clause.Statements != nil &&
+						statementsHaveTypeDeclaration(clause.Statements.Nodes, name) {
+						return true
+					}
+				}
+			}
 		case ast.KindSourceFile:
 			sourceFile := current.AsSourceFile()
 			return sourceFile != nil && sourceFile.Statements != nil &&
 				statementsHaveTypeDeclaration(sourceFile.Statements.Nodes, name)
+		}
+	}
+	return false
+}
+
+func catchBodyHasUnsafeDeclaration(body *ast.Node, name string) bool {
+	block := body.AsBlock()
+	if block == nil || block.Statements == nil {
+		return false
+	}
+	for _, statement := range block.Statements.Nodes {
+		if statement == nil {
+			continue
+		}
+		switch statement.Kind {
+		case ast.KindVariableStatement:
+			variableStatement := statement.AsVariableStatement()
+			if variableStatement != nil && variableStatement.DeclarationList != nil &&
+				!utils.IsVarKeyword(variableStatement.DeclarationList) &&
+				utils.HasVarDeclListWithName(variableStatement.DeclarationList, name) {
+				return true
+			}
+		case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
+			if declarationName := statement.Name(); declarationName != nil && declarationName.Text() == name {
+				return true
+			}
 		}
 	}
 	return false
@@ -266,10 +305,14 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 		// NOTE: Unlike ESLint, avoid a known unsafe fix when an unused handler
 		// parameter would collide with a declaration in its body.
 		if available && len(references) == 0 && body != nil && body.Kind == ast.KindBlock {
-			block := body.AsBlock()
-			available = !utils.HasShadowingDeclaration(body, candidate) &&
-				!utils.HasHoistedVarDeclaration(body, candidate) &&
-				(block == nil || block.Statements == nil || !statementsHaveTypeDeclaration(block.Statements.Nodes, candidate))
+			if isCatchParameter(identifier) {
+				available = !catchBodyHasUnsafeDeclaration(body, candidate)
+			} else {
+				block := body.AsBlock()
+				available = !utils.HasShadowingDeclaration(body, candidate) &&
+					!utils.HasHoistedVarDeclaration(body, candidate) &&
+					(block == nil || block.Statements == nil || !statementsHaveTypeDeclaration(block.Statements.Nodes, candidate))
+			}
 		}
 		if available {
 			return candidate
