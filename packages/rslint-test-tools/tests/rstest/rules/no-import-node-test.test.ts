@@ -8,6 +8,7 @@ ruleTester.run('no-import-node-test', {} as never, {
     { code: `import { test } from 'vitest'` },
     { code: `import { test } from 'node:testing'` },
     { code: `const assert = require('node:assert')` },
+    { code: `import assert = require('node:assert')` },
   ],
   invalid: [
     {
@@ -67,6 +68,21 @@ ruleTester.run('no-import-node-test', {} as never, {
     },
     {
       code: `const nodeTest = require('node:test')`,
+      output: null,
+      errors: [{ messageId: 'noImportNodeTest' }],
+    },
+    {
+      code: `import nodeTest = require('node:test')`,
+      output: null,
+      errors: [{ messageId: 'noImportNodeTest' }],
+    },
+    {
+      code: `const nodeTest = (require)('node:test')`,
+      output: null,
+      errors: [{ messageId: 'noImportNodeTest' }],
+    },
+    {
+      code: `const nodeTest = require(('node:test'))`,
       output: null,
       errors: [{ messageId: 'noImportNodeTest' }],
     },

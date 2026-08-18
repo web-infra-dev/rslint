@@ -20,6 +20,7 @@ func TestNoImportNodeTestRule(t *testing.T) {
 			{Code: `import { test } from 'node:testing'`},
 			{Code: `const assert = require('node:assert')`},
 			{Code: `const t = import('node:test')`},
+			{Code: `import assert = require('node:assert')`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -87,6 +88,22 @@ func TestNoImportNodeTestRule(t *testing.T) {
 			},
 			{
 				Code:   `const { tap } = require('node:test/reporters')`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code:   `import nodeTest = require('node:test')`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code:   `import reporters = require('node:test/reporters')`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code:   `const nodeTest = (require)('node:test')`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code:   `const nodeTest = require(('node:test'))`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
 			},
 			{

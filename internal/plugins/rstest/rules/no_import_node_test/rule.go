@@ -116,19 +116,41 @@ var NoImportNodeTestRule = rule.Rule{
 					),
 				)
 			},
+			// `import nodeTest = require('node:test')` is a static runner import
+			// too, but TypeScript parses it as its own declaration kind rather
+			// than a call expression, so it needs its own listener. Like
+			// `require()`, it is reported without a fix.
+			ast.KindImportEqualsDeclaration: func(node *ast.Node) {
+				declaration := node.AsImportEqualsDeclaration()
+				if declaration == nil || declaration.ModuleReference == nil ||
+					declaration.ModuleReference.Kind != ast.KindExternalModuleReference {
+					return
+				}
+				reference := declaration.ModuleReference.AsExternalModuleReference()
+				if reference == nil || reference.Expression == nil {
+					return
+				}
+				specifier := ast.SkipParentheses(reference.Expression)
+				if specifier == nil || !isStringNode(specifier) || !isNodeTestModule(specifier.Text()) {
+					return
+				}
+				ctx.ReportNode(node, noImportNodeTestMessage())
+			},
 			// `require('node:test')` is reported as well, but never fixed: the
 			// binding forms a require can take do not map onto a specifier
 			// rewrite the way a static import does.
 			ast.KindCallExpression: func(node *ast.Node) {
-				callee := node.AsCallExpression().Expression
-				if callee.Kind != ast.KindIdentifier || callee.AsIdentifier().Text != "require" {
+				// Parentheses are transparent, so `(require)('node:test')` and
+				// `require(('node:test'))` are the same import as the bare form.
+				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+				if callee == nil || callee.Kind != ast.KindIdentifier || callee.AsIdentifier().Text != "require" {
 					return
 				}
 				arguments := node.Arguments()
 				if len(arguments) == 0 {
 					return
 				}
-				firstArg := arguments[0]
+				firstArg := ast.SkipParentheses(arguments[0])
 				if firstArg == nil || !isStringNode(firstArg) || !isNodeTestModule(firstArg.Text()) {
 					return
 				}
