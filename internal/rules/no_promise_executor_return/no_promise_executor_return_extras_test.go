@@ -600,6 +600,30 @@ new Promise(r => {1})`},
 					},
 				},
 			},
+			// Locks in upstream isPromiseExecutor() arm 5: the tag stays invisible when
+			// it is written inside a function, where the binder hoists it to file scope.
+			{
+				Code: `export {};
+function g() {
+  /** @import { Promise } from "x" */
+  return new Promise(r => 1);
+}`,
+				FileName: "promise-jsdoc-import-nested.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "returnsValue",
+						Line:      4, Column: 27, EndLine: 4, EndColumn: 28,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "wrapBraces", Output: `export {};
+function g() {
+  /** @import { Promise } from "x" */
+  return new Promise(r => {1});
+}`},
+						},
+					},
+				},
+			},
 			// Locks in upstream isPromiseExecutor() arm 5: a parameter initializer is
 			// evaluated in a scope outside the body, so a function declared there is
 			// invisible and the callee is still the global.
