@@ -7,122 +7,18 @@ import (
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_conditional_expect"
 )
 
-func collectTestFunctionCallbacks(ctx rule.RuleContext) map[*ast.Node]bool {
-	callbacks := map[*ast.Node]bool{}
-	pendingNames := map[string]bool{}
-
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-
-		if node.Kind == ast.KindCallExpression {
-			jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
-			if jestFnCall != nil && jestFnCall.Kind == jestUtils.JestFnTypeTest {
-				info := jestUtils.ResolveTestCallbackFunction(ctx, node.AsCallExpression())
-				if info.FunctionNode != nil {
-					callbacks[info.FunctionNode] = true
-				} else if info.Name != "" {
-					pendingNames[info.Name] = true
-				}
-			}
-		}
-
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-
-	if ctx.SourceFile != nil {
-		visit(ctx.SourceFile.Node.AsNode())
-	}
-
-	if len(pendingNames) > 0 {
-		resolvePendingTestCallbackNames(ctx, pendingNames, callbacks)
-	}
-
-	return callbacks
-}
-
-func resolvePendingTestCallbackNames(
-	ctx rule.RuleContext,
-	names map[string]bool,
-	callbacks map[*ast.Node]bool,
-) {
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-
-		switch node.Kind {
-		case ast.KindFunctionDeclaration:
-			fn := node.AsFunctionDeclaration()
-			if fn != nil && fn.Name() != nil && names[fn.Name().Text()] {
-				callbacks[node] = true
-				delete(names, fn.Name().Text())
-			}
-		case ast.KindVariableDeclaration:
-			vd := node.AsVariableDeclaration()
-			if vd == nil {
-				break
-			}
-			id := vd.Name()
-			if id == nil || id.Kind != ast.KindIdentifier {
-				break
-			}
-			name := id.AsIdentifier().Text
-			if !names[name] {
-				break
-			}
-			if vd.Initializer == nil {
-				break
-			}
-			init := ast.SkipParentheses(vd.Initializer)
-			if ast.IsFunctionExpressionOrArrowFunction(init) {
-				callbacks[init] = true
-				delete(names, name)
-			}
-		}
-
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-
-	if ctx.SourceFile != nil {
-		visit(ctx.SourceFile.Node.AsNode())
-	}
-}
-
 var NoConditionalExpectRule = shared.NewRule(shared.Config{
 	Name: "jest/no-conditional-expect",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
-		// The shared traversal calls IsTestCall and, only when an assertion can
-		// report, IsExpectCall consecutively for the same node. This one-entry
-		// cache avoids parsing that node twice; a miss only affects performance.
-		var lastNode *ast.Node
-		var lastParsed *jestUtils.ParsedJestFnCall
-		parseCall := func(node *ast.Node) *jestUtils.ParsedJestFnCall {
-			if node == lastNode {
-				return lastParsed
-			}
-			parsed := jestUtils.ParseJestFnCall(node, ctx)
-			lastNode = node
-			lastParsed = parsed
-			return parsed
-		}
+		callbacks := jestUtils.CollectJestTestCallbacks(ctx)
 		return shared.Runtime{
-			TestCallbackFunctions: collectTestFunctionCallbacks(ctx),
+			TestCallbackFunctions: callbacks.Functions,
 			IsTestCall: func(node *ast.Node) bool {
-				parsed := parseCall(node)
+				parsed := callbacks.ParseFnCall(node)
 				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest
 			},
 			IsExpectCall: func(node *ast.Node) bool {
-				parsed := parseCall(node)
+				parsed := callbacks.ParseFnCall(node)
 				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeExpect
 			},
 		}

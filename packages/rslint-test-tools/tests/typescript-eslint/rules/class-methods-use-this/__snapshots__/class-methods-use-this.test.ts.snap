@@ -99,15 +99,15 @@ class Foo {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class method 'method'.",
+      "message": "Expected 'this' to be used by class arrow function.",
       "messageId": "missingThis",
       "range": {
         "end": {
-          "column": 21,
+          "column": 26,
           "line": 3,
         },
         "start": {
-          "column": 3,
+          "column": 24,
           "line": 3,
         },
       },
@@ -129,15 +129,15 @@ class Foo {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class method 'method'.",
+      "message": "Expected 'this' to be used by class arrow function.",
       "messageId": "missingThis",
       "range": {
         "end": {
-          "column": 29,
+          "column": 34,
           "line": 3,
         },
         "start": {
-          "column": 3,
+          "column": 32,
           "line": 3,
         },
       },
@@ -159,15 +159,15 @@ class Foo {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class method 'method'.",
+      "message": "Expected 'this' to be used by class arrow function.",
       "messageId": "missingThis",
       "range": {
         "end": {
-          "column": 31,
+          "column": 36,
           "line": 3,
         },
         "start": {
-          "column": 3,
+          "column": 34,
           "line": 3,
         },
       },
