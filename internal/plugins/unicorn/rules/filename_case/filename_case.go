@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
@@ -274,11 +275,11 @@ func pascalLikeTransform(word string, index int) string {
 	}
 	char0, size := utf8.DecodeRuneInString(word)
 	first := word[:size]
-	rest := strings.ToLower(word[size:])
+	rest := ecmascript.StringToLowerCase(word[size:])
 	if index > 0 && isASCIIDigit(char0) {
 		return "_" + first + rest
 	}
-	return strings.ToUpper(first) + rest
+	return ecmascript.StringToUpperCase(first) + rest
 }
 
 func toCamelCase(s string) string {
@@ -288,7 +289,7 @@ func toCamelCase(s string) string {
 	}
 	var sb strings.Builder
 	sb.Grow(len(s) + len(words))
-	sb.WriteString(strings.ToLower(words[0]))
+	sb.WriteString(ecmascript.StringToLowerCase(words[0]))
 	for i := 1; i < len(words); i++ {
 		sb.WriteString(pascalLikeTransform(words[i], i))
 	}
@@ -325,7 +326,7 @@ func joinNoCase(words []string, delim string) string {
 		if i > 0 {
 			sb.WriteString(delim)
 		}
-		sb.WriteString(strings.ToLower(w))
+		sb.WriteString(ecmascript.StringToLowerCase(w))
 	}
 	return sb.String()
 }
@@ -640,7 +641,7 @@ var FilenameCaseRule = rule.Rule{
 		leading, words := splitFilename(filename)
 		cases := opts.selectedCases()
 		valid, invalidWord, invalidCandidates := validateFilename(words, cases)
-		lowerExt := strings.ToLower(ext)
+		lowerExt := ecmascript.StringToLowerCase(ext)
 		if valid {
 			if ext != lowerExt {
 				if ctx.DisableManager.IsRuleDisabled(filenameCaseRuleName, reportRange.Pos()) {

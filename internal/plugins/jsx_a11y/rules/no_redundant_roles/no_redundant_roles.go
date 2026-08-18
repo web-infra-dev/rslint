@@ -33,12 +33,12 @@ package no_redundant_roles
 
 import (
 	_ "embed"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_redundant_roles.schema.json
@@ -146,7 +146,7 @@ var NoRedundantRolesRule = rule.Rule{
 
 			ctx.ReportNode(node, rule.RuleMessage{
 				Id:          "noRedundantRoles",
-				Description: errorMessage(elementType, strings.ToLower(implicitRole)),
+				Description: errorMessage(elementType, ecmascript.StringToLowerCase(implicitRole)),
 			})
 		}
 

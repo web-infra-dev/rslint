@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed img_redundant_alt.schema.json
@@ -57,7 +58,7 @@ var ImgRedundantAltRule = rule.Rule{
 		redundantWords = append(redundantWords, defaultRedundantWords...)
 		redundantWords = append(redundantWords, opts.words...)
 		for i := range redundantWords {
-			redundantWords[i] = strings.ToLower(redundantWords[i])
+			redundantWords[i] = ecmascript.StringToLowerCase(redundantWords[i])
 		}
 
 		elementType := func(node *ast.Node) string {
@@ -202,7 +203,7 @@ func splitOnJSWhitespace(value string) []string {
 func containsRedundantWord(value string, redundantWords []string) bool {
 	if containsAnyASCIIPrintable(value) {
 		for _, token := range splitOnJSWhitespace(value) {
-			lower := strings.ToLower(token)
+			lower := ecmascript.StringToLowerCase(token)
 			for _, w := range redundantWords {
 				if lower == w {
 					return true
@@ -211,7 +212,7 @@ func containsRedundantWord(value string, redundantWords []string) bool {
 		}
 		return false
 	}
-	lowerValue := strings.ToLower(value)
+	lowerValue := ecmascript.StringToLowerCase(value)
 	for _, w := range redundantWords {
 		if strings.Contains(lowerValue, w) {
 			return true

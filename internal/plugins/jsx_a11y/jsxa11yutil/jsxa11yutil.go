@@ -14,6 +14,7 @@ import (
 	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // directAttributeStringValue extracts the JSX attribute's string value with
@@ -1301,7 +1302,7 @@ func IsHiddenFromScreenReader(child *ast.Node, getElementType func(*ast.Node) st
 // arguments by value, so passing the filtered list mirrors upstream
 // byte-for-byte.
 func IsHiddenFromScreenReaderFromTagAttrs(elementType string, attrs []*ast.Node) bool {
-	tag := strings.ToUpper(elementType)
+	tag := ecmascript.StringToUpperCase(elementType)
 	if tag == "INPUT" {
 		typeAttr := FindAttributeByName(attrs, "type")
 		if typeAttr != nil {

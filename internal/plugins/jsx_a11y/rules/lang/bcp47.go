@@ -3,6 +3,7 @@ package lang
 import (
 	"strings"
 
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"golang.org/x/text/language"
 )
 
@@ -71,14 +72,14 @@ func isValidBCP47Tag(value string) bool {
 	if strings.ContainsRune(value, '_') {
 		return false
 	}
-	trimmed := strings.TrimSpace(value)
+	trimmed := ecmascript.StringTrim(value)
 	if trimmed == "" {
 		return false
 	}
 	if strings.ContainsAny(trimmed, " \t\n\r\v\f") {
 		return false
 	}
-	if deprecatedGrandfatheredTags[strings.ToLower(trimmed)] {
+	if deprecatedGrandfatheredTags[ecmascript.StringToLowerCase(trimmed)] {
 		return false
 	}
 	if isPrivateUseOnly(trimmed) {
@@ -162,7 +163,7 @@ func hasSuppressScriptViolation(tag language.Tag) bool {
 		return false
 	}
 	base, _ := tag.Base()
-	suppress, ok := suppressScriptByLanguage[strings.ToLower(base.String())]
+	suppress, ok := suppressScriptByLanguage[ecmascript.StringToLowerCase(base.String())]
 	if !ok {
 		return false
 	}

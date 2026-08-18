@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // GetImplicitRole mirrors eslint-plugin-jsx-a11y's `util/getImplicitRole.js`:
@@ -117,7 +118,7 @@ func GetImplicitRole(elementType string, attrs []*ast.Node) (string, bool) {
 //	return 'img';
 //
 // The empty-alt arm fires only when alt is a LITERAL empty string — the
-// boolean form `<img alt />` extracts as `true`, not `''`, so it stays
+// boolean form `<img alt />` extracts as `true`, not `”`, so it stays
 // 'img'. Identifiers (`alt={foo}`) extract to null and likewise stay 'img'.
 //
 // The SVG arm uses optional chaining: only literal-string src values
@@ -146,8 +147,8 @@ func implicitRoleForImg(attrs []*ast.Node) string {
 //	range                     → slider
 //	(anything else / absent)  → textbox
 //
-// Upstream coerces the type value with `getLiteralPropValue(type) || ''` then
-// `.toUpperCase()`. The `|| ''` handles `<input type={null}>` (literal "null"),
+// Upstream coerces the type value with `getLiteralPropValue(type) || ”` then
+// `.toUpperCase()`. The `|| ”` handles `<input type={null}>` (literal "null"),
 // `<input type />` (boolean form → true), and `<input type={undefined}>` —
 // non-string values short-circuit to the `default → textbox` arm.
 func implicitRoleForInput(attrs []*ast.Node) string {
@@ -159,7 +160,7 @@ func implicitRoleForInput(attrs []*ast.Node) string {
 	if !ok {
 		return "textbox"
 	}
-	switch strings.ToUpper(v) {
+	switch ecmascript.StringToUpperCase(v) {
 	case "BUTTON", "IMAGE", "RESET", "SUBMIT":
 		return "button"
 	case "CHECKBOX":
@@ -207,7 +208,7 @@ func implicitRoleForMenuitem(attrs []*ast.Node) string {
 	if !ok {
 		return ""
 	}
-	switch strings.ToUpper(v) {
+	switch ecmascript.StringToUpperCase(v) {
 	case "COMMAND":
 		return "menuitem"
 	case "CHECKBOX":

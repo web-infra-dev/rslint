@@ -3,11 +3,11 @@ package no_duplicate_imports
 import (
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_duplicate_imports.schema.json
@@ -208,7 +208,7 @@ func getModule(node *ast.Node) string {
 	if spec == nil {
 		return ""
 	}
-	return strings.TrimSpace(utils.GetStaticStringValue(spec))
+	return ecmascript.StringTrim(utils.GetStaticStringValue(spec))
 }
 
 func reportMessage(ctx *rule.RuleContext, node *ast.Node, id, module string) {

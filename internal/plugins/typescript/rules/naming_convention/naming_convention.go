@@ -532,14 +532,14 @@ func checkSnakeCase(name string) bool {
 	if len(name) == 0 {
 		return true
 	}
-	return name == strings.ToLower(name) && validateSnakeUnderscores(name)
+	return name == ecmascript.StringToLowerCase(name) && validateSnakeUnderscores(name)
 }
 
 func checkUpperCase(name string) bool {
 	if len(name) == 0 {
 		return true
 	}
-	return name == strings.ToUpper(name) && validateSnakeUnderscores(name)
+	return name == ecmascript.StringToUpperCase(name) && validateSnakeUnderscores(name)
 }
 
 // validateSnakeUnderscores rejects leading `_`, adjacent `__`, and trailing `_`.

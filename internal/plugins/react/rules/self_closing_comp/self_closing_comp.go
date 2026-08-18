@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed self_closing_comp.schema.json
@@ -91,7 +92,7 @@ func isChildrenEmpty(jsxElement *ast.JsxElement) bool {
 				continue
 			}
 			// Only treat as empty if whitespace contains a newline (matching ESLint behavior)
-			if strings.TrimSpace(text.Text) == "" && strings.Contains(text.Text, "\n") {
+			if ecmascript.StringTrim(text.Text) == "" && strings.Contains(text.Text, "\n") {
 				continue
 			}
 			return false

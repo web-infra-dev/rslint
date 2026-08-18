@@ -36,6 +36,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // jsValue is a statically-evaluated JavaScript value, mirroring the shape of
@@ -987,7 +988,7 @@ func assignmentOperatorText(k ast.Kind) string {
 // `(altValue && !isNullValued) || altValue === ”` check. Skipping this
 // normalization would silently accept `alt="false"`.
 func jsxAstUtilsLiteralCoerce(text string) jsValue {
-	switch strings.ToLower(text) {
+	switch ecmascript.StringToLowerCase(text) {
 	case "true":
 		return jsValue{Kind: jvBool, Bool: true}
 	case "false":

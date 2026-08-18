@@ -3,13 +3,13 @@ package prefer_array_flat
 import (
 	_ "embed"
 	"fmt"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
@@ -250,7 +250,7 @@ func matchFlattenFunction(node *ast.Node, functions []string) (flattenMatch, boo
 		if unicornutil.NodeMatchesPath(callee, function) {
 			return flattenMatch{
 				array:       arguments[0],
-				description: strings.TrimSpace(function) + "()",
+				description: ecmascript.StringTrim(function) + "()",
 			}, true
 		}
 	}

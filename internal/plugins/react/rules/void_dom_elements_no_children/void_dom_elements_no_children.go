@@ -1,12 +1,11 @@
 package void_dom_elements_no_children
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // voidElements is the set of HTML void elements that cannot have children.
@@ -164,5 +163,5 @@ func getTagNameText(sourceFile *ast.SourceFile, tagName *ast.Node) string {
 	// For member expressions or other complex tag names, extract from source text
 	trimmed := utils.TrimNodeTextRange(sourceFile, tagName)
 	text := sourceFile.Text()[trimmed.Pos():trimmed.End()]
-	return strings.TrimSpace(text)
+	return ecmascript.StringTrim(text)
 }

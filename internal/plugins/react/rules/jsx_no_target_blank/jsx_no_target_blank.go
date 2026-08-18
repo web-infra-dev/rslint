@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_no_target_blank.schema.json
@@ -314,7 +315,7 @@ func hasSecureRel(attrs []*ast.Node, allowReferrer, warnOnSpread bool, spreadIdx
 		if v == nil {
 			return false
 		}
-		tags := strings.Split(strings.ToLower(*v), " ")
+		tags := strings.Split(ecmascript.StringToLowerCase(*v), " ")
 		if slices.Contains(tags, "noreferrer") {
 			continue
 		}

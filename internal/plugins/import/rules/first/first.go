@@ -340,7 +340,7 @@ func buildFix(sourceText string, body []*ast.Node, lastLegalImp *ast.Node, sortN
 	if lastLegalImp == nil {
 		// No preceding legal import: place the imports at the very top and
 		// preserve the original leading whitespace pattern after them.
-		trimmed := strings.TrimSpace(insertSourceCode)
+		trimmed := ecmascript.StringTrim(insertSourceCode)
 		leadingWSEnd := strings.IndexFunc(insertSourceCode, func(r rune) bool {
 			return !ecmascript.IsWhiteSpace(r)
 		})

@@ -1,7 +1,6 @@
 package jsxa11yutil
 
 import (
-	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -225,7 +224,7 @@ func labellingValueIsPresent(attr *ast.Node) bool {
 		return true
 	}
 	if s, ok := PropStaticStringValue(attr); ok {
-		return strings.TrimSpace(s) != ""
+		return ecmascript.StringTrim(s) != ""
 	}
 	return PropValueIsTruthy(attr)
 }
@@ -267,16 +266,16 @@ func MayHaveAccessibleLabel(node *ast.Node, depth, maxDepth int, labelAttributes
 	// JSXText — upstream's `node.type === 'JSXText' && !!tryTrim(node.value)`.
 	// tsgo splits text into two kinds; both carry the raw text on `.Text`.
 	case ast.KindJsxText, ast.KindJsxTextAllWhiteSpaces:
-		return strings.TrimSpace(node.AsJsxText().Text) != ""
+		return ecmascript.StringTrim(node.AsJsxText().Text) != ""
 	// Literal text — upstream's `node.type === 'Literal' && !!tryTrim(node.value)`.
 	// tsgo splits the ESTree `Literal` across several `Kind*Literal` kinds.
 	// Only string-shaped literals can carry a textual label; other literal
 	// kinds (NumericLiteral, etc.) are conceivable as JSX children only in
 	// edge cases and fall to the no-recursion default.
 	case ast.KindStringLiteral:
-		return strings.TrimSpace(node.AsStringLiteral().Text) != ""
+		return ecmascript.StringTrim(node.AsStringLiteral().Text) != ""
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return strings.TrimSpace(node.AsNoSubstitutionTemplateLiteral().Text) != ""
+		return ecmascript.StringTrim(node.AsNoSubstitutionTemplateLiteral().Text) != ""
 	// JSXExpressionContainer — upstream returns true unconditionally, even
 	// for `{undefined}`. We mirror; the only sound static analysis would
 	// require full constant folding which jsx-ast-utils does not perform.
