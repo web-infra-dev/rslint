@@ -175,6 +175,22 @@ new Promise(r => 1)`,
 				FileName: "promise-jsdoc-and-const.js",
 				TSConfig: "tsconfig.allow-js.json",
 			},
+			// Locks in upstream isPromiseExecutor() arm 5: a real import declares the
+			// name whether or not a JSDoc `@import` tag spells it first.
+			{
+				Code: `/** @import { Promise } from "x" */
+import { Promise } from "y";
+new Promise(r => 1)`,
+				FileName: "promise-jsdoc-and-import.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code: `import { Promise } from "y";
+/** @import { Promise } from "x" */
+new Promise(r => 1)`,
+				FileName: "promise-import-and-jsdoc.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
 			// Locks in upstream isPromiseExecutor() arm 5: a parameter initializer sees
 			// the parameters declared beside it, so the callee is not the global.
 			{
@@ -559,6 +575,26 @@ new Promise(r => 1)`,
 						Line:      2, Column: 18, EndLine: 2, EndColumn: 19,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "wrapBraces", Output: `/** @typedef {number} Promise */
+new Promise(r => {1})`},
+						},
+					},
+				},
+			},
+			// Locks in upstream isPromiseExecutor() arm 5: a JSDoc `@import` tag binds
+			// nothing ESLint can see either, in a module file as much as a script.
+			{
+				Code: `/** @import { Promise } from "x" */
+export {};
+new Promise(r => 1)`,
+				FileName: "promise-jsdoc-import.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "returnsValue",
+						Line:      3, Column: 18, EndLine: 3, EndColumn: 19,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "wrapBraces", Output: `/** @import { Promise } from "x" */
+export {};
 new Promise(r => {1})`},
 						},
 					},

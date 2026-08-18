@@ -51,6 +51,9 @@ type RefStore struct {
 	// still awaiting resolution; entries move into refs on first query.
 	candidates map[string][]*ast.Node
 	refs       map[*ast.Symbol][]*ast.Node
+	// authoredImports holds the local names bound by the file's own import
+	// declarations; nil until a JSDoc-synthesized binding forces the question.
+	authoredImports map[string]struct{}
 	// merged maps a raw binder symbol onto the checker-merged symbol that
 	// refs is keyed by for it; see mergedSymbol.
 	merged map[*ast.Symbol]*ast.Symbol
@@ -275,18 +278,29 @@ func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name strin
 	return meaning&ast.SymbolFlagsValue != 0 && s.HasImplicitWrapperBinding(name)
 }
 
-// resolveName runs the binder scope walk for name at location and then applies
-// the one JavaScript scoping rule NameResolver deliberately leaves out: a
-// parameter initializer cannot see a declaration made in the function body.
+// resolveName runs the binder scope walk for name at location and reconciles
+// its two departures from the scopes the source text actually spells.
+//
+// The first is a JavaScript scoping rule NameResolver deliberately leaves out:
+// a parameter initializer cannot see a declaration made in the function body.
 // TypeScript keeps that resolution so the checker can report "used before its
 // declaration" against the right symbol, but scope-shaped consumers need the
 // language answer — the parameter environment is the body environment's
 // parent, so the name belongs to whatever encloses the function.
+//
+// The second is the declarations the parser synthesizes from JSDoc tags, which
+// join a scope's symbol table without being written there. Both skips resume
+// the walk from the scope that held the rejected binding, so an outer
+// declaration of the same name is still found.
 func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
 	for location != nil {
 		result := s.resolver.Resolve(location, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
 		if result == nil {
 			return nil
+		}
+		if scope := jsdocOnlyScope(result, name); scope != nil && !s.hasAuthoredImportBinding(name) {
+			location = scope.Parent
+			continue
 		}
 		fn := bodyOnlyParameterBarrier(location, result)
 		if fn == nil {
@@ -301,6 +315,62 @@ func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.Symb
 		location = fn.Parent
 	}
 	return nil
+}
+
+// jsdocOnlyScope returns the scope whose symbol table binds name to symbol when
+// every declaration of symbol was synthesized from a JSDoc tag. ESLint reads
+// that text as a comment and declares nothing, so the binding has to be stepped
+// over. It returns nil when the symbol has a declaration the file spells, and
+// when no enclosing scope table claims it — leaving that symbol in place rather
+// than guessing where the walk should resume.
+func jsdocOnlyScope(symbol *ast.Symbol, name string) *ast.Node {
+	if len(symbol.Declarations) == 0 || hasAuthoredDeclaration(symbol) {
+		return nil
+	}
+	for node := symbol.Declarations[0].Parent; node != nil; node = node.Parent {
+		if locals := node.Locals(); locals != nil && locals[name] == symbol {
+			return node
+		}
+	}
+	return nil
+}
+
+// hasAuthoredImportBinding reports whether an import declaration the file
+// spells introduces name. Two aliases cannot share one table slot, so when a
+// JSDoc `@import` tag binds a name a real import already binds, the symbol the
+// binder keeps carries only one of them — and it can be the synthesized one.
+// The authored syntax declares the name either way.
+func (s *RefStore) hasAuthoredImportBinding(name string) bool {
+	if s.authoredImports == nil {
+		s.authoredImports = collectAuthoredImportBindings(s.sourceFile)
+	}
+	_, ok := s.authoredImports[name]
+	return ok
+}
+
+// collectAuthoredImportBindings gathers every local name bound by an import
+// declaration written in the file. The declarations reparsed from `@import`
+// tags carry their own node kind, so they never enter this set.
+func collectAuthoredImportBindings(sourceFile *ast.SourceFile) map[string]struct{} {
+	bindings := make(map[string]struct{})
+	if sourceFile == nil || sourceFile.Statements == nil {
+		return bindings
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && ast.IsDeclarationName(node) {
+			bindings[node.Text()] = struct{}{}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement.Kind == ast.KindImportDeclaration ||
+			statement.Kind == ast.KindImportEqualsDeclaration {
+			statement.ForEachChild(visit)
+		}
+	}
+	return bindings
 }
 
 // bodyOnlyParameterBarrier returns the function whose body holds every
@@ -372,16 +442,29 @@ func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meanin
 }
 
 // hasAuthoredDeclaration reports whether symbol has a declaration the file
-// actually spells in syntax. A JSDoc tag such as `@typedef` is reparsed into a
-// synthesized declaration node that joins the file's symbol table; ESLint reads
-// that same text as a comment and creates no scope variable for it, so a symbol
-// declared only that way defines nothing.
+// actually spells in syntax. A JSDoc tag such as `@typedef` or `@import` is
+// reparsed into synthesized declaration nodes that join the file's symbol
+// table; ESLint reads that same text as a comment and creates no scope variable
+// for it, so a symbol declared only that way defines nothing.
 func hasAuthoredDeclaration(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if decl.Flags&ast.NodeFlagsReparsed == 0 {
+		if !isJSDocSynthesized(decl) {
+			return true
+		}
+	}
+	return false
+}
+
+// isJSDocSynthesized reports whether the parser produced node from a JSDoc
+// tag. Only the root of a reparsed subtree carries the flag — the import
+// specifier a `@import` tag binds is a deep clone inside a flagged clause — so
+// the answer comes from the ancestor chain.
+func isJSDocSynthesized(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current.Flags&ast.NodeFlagsReparsed != 0 {
 			return true
 		}
 	}
@@ -401,7 +484,7 @@ func (s *RefStore) HasNonGlobalTopLevelScope() bool {
 // matches the requested meaning, NameResolver can otherwise return the alias
 // being declared instead of continuing to an outer lexical declaration.
 func (s *RefStore) binderReferenceSymbol(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
-	target := s.resolver.Resolve(node, node.Text(), meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
+	target := s.resolveName(node, node.Text(), meaning)
 	if !isOwnExportAlias(node, target) {
 		return target
 	}
@@ -409,7 +492,7 @@ func (s *RefStore) binderReferenceSymbol(node *ast.Node, meaning ast.SymbolFlags
 	if outer == nil {
 		return nil
 	}
-	return s.resolver.Resolve(outer, node.Text(), meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
+	return s.resolveName(outer, node.Text(), meaning)
 }
 
 // checkerReferenceSymbol resolves a reference the binder-only scope walk
