@@ -12,6 +12,14 @@ type RstestTestCallbacks struct {
 	ContextExpectNames map[*ast.Symbol]bool
 }
 
+// rstestCallbackRegistration ties a callback function back to one of the
+// registrations that runs it. A single function can be registered more than
+// once, so ownership is a slice rather than a single registration.
+type rstestCallbackRegistration struct {
+	call   *ast.Node
+	parsed *ParsedRstestFnCall
+}
+
 type rstestCallbackInfo struct {
 	functionNode *ast.Node
 	name         string
@@ -25,33 +33,72 @@ func newRstestTestCallbacks() RstestTestCallbacks {
 	}
 }
 
-func collectRstestTestCallbacks(analysis *RstestCallAnalysis) RstestTestCallbacks {
-	ctx := analysis.ctx
-	result := newRstestTestCallbacks()
-	pending := map[string][]*ParsedRstestFnCall{}
+// walkRstestCallbackRegistrations visits every registration accepted by parse
+// together with the function that runs its callback. Callbacks passed by name
+// are held back until the whole file has been seen, so a registration can
+// reference a function declared after it.
+func walkRstestCallbackRegistrations(
+	analysis *RstestCallAnalysis,
+	parse func(*ast.Node) *ParsedRstestFnCall,
+	visit func(function *ast.Node, registration rstestCallbackRegistration),
+) {
+	pending := map[string][]rstestCallbackRegistration{}
 
 	for _, node := range analysis.calls {
-		parsed := analysis.ParseTestCall(node)
-		if parsed != nil {
-			info := resolveRstestTestCallback(ctx, node.AsCallExpression())
-			if info.functionNode != nil {
-				recordRstestCallback(analysis, &result, info.functionNode, parsed)
-			} else if info.name != "" {
-				pending[info.name] = append(pending[info.name], parsed)
-			}
+		parsed := parse(node)
+		if parsed == nil {
+			continue
+		}
+		registration := rstestCallbackRegistration{call: node, parsed: parsed}
+		info := analysis.callbackInfo(node)
+		if info.functionNode != nil {
+			visit(info.functionNode, registration)
+		} else if info.name != "" {
+			pending[info.name] = append(pending[info.name], registration)
 		}
 	}
 
-	for name, parsedCalls := range pending {
+	for name, registrations := range pending {
 		function := analysis.functions[name]
 		if function == nil {
 			continue
 		}
-		for _, parsed := range parsedCalls {
-			recordRstestCallback(analysis, &result, function, parsed)
+		for _, registration := range registrations {
+			visit(function, registration)
 		}
 	}
+}
+
+// collectRstestTestCallbacks records the TestContext bindings each test
+// callback receives. Describe callbacks are deliberately excluded: their
+// parameters are not a TestContext.
+func collectRstestTestCallbacks(analysis *RstestCallAnalysis) RstestTestCallbacks {
+	result := newRstestTestCallbacks()
+	walkRstestCallbackRegistrations(
+		analysis,
+		analysis.ParseTestCall,
+		func(function *ast.Node, registration rstestCallbackRegistration) {
+			recordRstestTestCallback(analysis, &result, function, registration.parsed)
+		},
+	)
 	return result
+}
+
+// collectRstestCallbackOwnership indexes both test and describe callbacks by
+// the registrations that run them, which is what an execution mode is
+// inherited through.
+func collectRstestCallbackOwnership(
+	analysis *RstestCallAnalysis,
+) map[*ast.Node][]rstestCallbackRegistration {
+	ownership := map[*ast.Node][]rstestCallbackRegistration{}
+	walkRstestCallbackRegistrations(
+		analysis,
+		analysis.parseRegistrationCall,
+		func(function *ast.Node, registration rstestCallbackRegistration) {
+			ownership[function] = append(ownership[function], registration)
+		},
+	)
+	return ownership
 }
 
 func resolveRstestTestCallback(
@@ -119,7 +166,7 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 	return rstestCallbackInfo{}
 }
 
-func recordRstestCallback(
+func recordRstestTestCallback(
 	analysis *RstestCallAnalysis,
 	result *RstestTestCallbacks,
 	function *ast.Node,

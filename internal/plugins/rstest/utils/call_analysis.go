@@ -12,12 +12,16 @@ type RstestCallAnalysis struct {
 	fnCalls     map[*ast.Node]*ParsedRstestFnCall
 	expectCalls map[*ast.Node]*ParsedRstestExpectCall
 	isExpect    map[*ast.Node]bool
-	expectRoots map[*ast.Symbol]rstestExpectRootKind
+	expectRoots map[*ast.Symbol]rstestExpectRoot
 	calls       []*ast.Node
 	functions   map[string]*ast.Node
-	callbacks   RstestTestCallbacks
-	callbacksOK bool
-	hasTests    bool
+	// callbackInfos memoizes the overload-aware callback resolution, which
+	// costs a symbol lookup per registration and is asked for by both the test
+	// context collector and the callback ownership index.
+	callbackInfos map[*ast.Node]rstestCallbackInfo
+	callbacks     RstestTestCallbacks
+	callbacksOK   bool
+	hasTests      bool
 }
 
 type rstestCallAnalysisFileCacheKey struct{}
@@ -39,13 +43,14 @@ func GetRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 
 func newRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 	analysis := &RstestCallAnalysis{
-		ctx:         ctx,
-		candidates:  cloneRstestCandidateSeeds(),
-		fnCalls:     map[*ast.Node]*ParsedRstestFnCall{},
-		expectCalls: map[*ast.Node]*ParsedRstestExpectCall{},
-		isExpect:    map[*ast.Node]bool{},
-		expectRoots: map[*ast.Symbol]rstestExpectRootKind{},
-		functions:   map[string]*ast.Node{},
+		ctx:           ctx,
+		candidates:    cloneRstestCandidateSeeds(),
+		fnCalls:       map[*ast.Node]*ParsedRstestFnCall{},
+		expectCalls:   map[*ast.Node]*ParsedRstestExpectCall{},
+		isExpect:      map[*ast.Node]bool{},
+		expectRoots:   map[*ast.Symbol]rstestExpectRoot{},
+		functions:     map[string]*ast.Node{},
+		callbackInfos: map[*ast.Node]rstestCallbackInfo{},
 	}
 	analysis.indexSourceFile()
 	return analysis
@@ -93,8 +98,33 @@ func (analysis *RstestCallAnalysis) TestCallback(node *ast.Node) (*ast.Node, str
 	if analysis.ParseTestCall(node) == nil {
 		return nil, ""
 	}
-	info := resolveRstestTestCallback(analysis.ctx, node.AsCallExpression())
+	info := analysis.callbackInfo(node)
 	return info.functionNode, info.name
+}
+
+// callbackInfo resolves the callback argument of a registration call once per
+// file. Both callback collectors ask about the same calls, so resolving twice
+// would double the declaration lookups they perform.
+func (analysis *RstestCallAnalysis) callbackInfo(node *ast.Node) rstestCallbackInfo {
+	if info, ok := analysis.callbackInfos[node]; ok {
+		return info
+	}
+	info := resolveRstestTestCallback(analysis.ctx, node.AsCallExpression())
+	analysis.callbackInfos[node] = info
+	return info
+}
+
+// parseRegistrationCall keeps the registrations that own a callback body,
+// which are the only ones an execution mode can be inherited through.
+func (analysis *RstestCallAnalysis) parseRegistrationCall(
+	node *ast.Node,
+) *ParsedRstestFnCall {
+	parsed := analysis.ParseFnCall(node)
+	if parsed == nil ||
+		(parsed.Kind != RstestFnTypeTest && parsed.Kind != RstestFnTypeDescribe) {
+		return nil
+	}
+	return parsed
 }
 
 func (analysis *RstestCallAnalysis) IsExpectCall(node *ast.Node) bool {
