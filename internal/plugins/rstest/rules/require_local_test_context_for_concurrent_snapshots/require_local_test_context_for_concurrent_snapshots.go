@@ -14,8 +14,13 @@ func requireLocalTestContextMessage() rule.RuleMessage {
 }
 
 var RequireLocalTestContextForConcurrentSnapshotsRule = rule.Rule{
-	Name:   "rstest/require-local-test-context-for-concurrent-snapshots",
-	Schema: rule.EmptyArraySchema,
+	Name: "rstest/require-local-test-context-for-concurrent-snapshots",
+	// The local Test Context form this rule asks for is recognized by symbol
+	// identity, so without a checker every `({ expect })` callback looks like a
+	// global expect and the correct code gets reported. Declaring the
+	// requirement keeps the rule off source-only programs instead.
+	RequiresTypeInfo: true,
+	Schema:           rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		// The ownership index behind this context is built on the first query,
