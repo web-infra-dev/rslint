@@ -36,11 +36,36 @@ var onceMatchers = map[string]bool{
 	"calledOnce":           true,
 }
 
+// mockResetMethods are the per-mock resets: each clears the call history of
+// the mock it is called on, so only a call whose receiver is the asserted
+// target splits the pair.
 var mockResetMethods = map[string]bool{
 	"mockClear":   true,
 	"mockReset":   true,
 	"mockRestore": true,
 }
+
+// globalMockResetMethods are the suite-wide resets. They clear every mock's
+// call history, so one call anywhere between the two assertions splits them
+// just as a receiver-matched reset does and no receiver has to match. Matching
+// on the method name alone also accepts an unrelated object's clearAllMocks;
+// that only ever suppresses a report, which is the safe direction. Upstream
+// knows none of the three and merges across them.
+var globalMockResetMethods = map[string]bool{
+	"clearAllMocks":   true,
+	"resetAllMocks":   true,
+	"restoreAllMocks": true,
+}
+
+// mockResetKind classifies a call as a reset of one mock, a reset of every
+// mock, or neither.
+type mockResetKind uint8
+
+const (
+	resetNone mockResetKind = iota
+	resetTarget
+	resetGlobal
+)
 
 type assertionRole uint8
 
@@ -123,6 +148,36 @@ func unwrapExpression(node *ast.Node) *ast.Node {
 		return nil
 	}
 	return ast.SkipOuterExpressions(node, transparentWrappers)
+}
+
+// unwrapMocked additionally looks through `mocked(x)` and `rstest.mocked(x)`.
+// mocked is identity at runtime — `mocked: ((item: any) => item)` in rstest's
+// runtime/api/utilities.ts — and exists only to narrow the type, so
+// `rstest.mocked(x).mockClear()` really does reset `x` and the two spellings
+// have to compare equal. Only the reset barrier unwraps it: nothing here
+// promises the call is that mocked, and a wrong guess costs a missed report,
+// never a bad fix.
+func unwrapMocked(node *ast.Node) *ast.Node {
+	for {
+		unwrapped := unwrapExpression(node)
+		if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
+			return unwrapped
+		}
+		call := unwrapped.AsCallExpression()
+		arguments := unwrapped.Arguments()
+		if call == nil || len(arguments) != 1 {
+			return unwrapped
+		}
+		entries := test_framework.GetMemberEntries(ast.SkipParentheses(call.Expression))
+		if len(entries) == 0 {
+			return unwrapped
+		}
+		callee := entries[len(entries)-1]
+		if callee.Name != "mocked" || test_framework.IsComputedIdentifierAccessor(callee.Node) {
+			return unwrapped
+		}
+		node = arguments[0]
+	}
 }
 
 // isStableExpression reports whether evaluating the expression twice is
@@ -356,47 +411,60 @@ func chainAssertions(parsed *rstestUtils.ParsedRstestExpectCall) []chainAssertio
 	return hits
 }
 
-// mockResetReceiver returns the object a mockClear / mockReset / mockRestore
-// call resets, or false for any other call.
-func mockResetReceiver(callNode *ast.Node) (*ast.Node, bool) {
+// mockResetCall classifies a call as a reset, and for a per-mock reset also
+// returns the object it resets.
+func mockResetCall(callNode *ast.Node) (mockResetKind, *ast.Node) {
 	if callNode == nil || callNode.Kind != ast.KindCallExpression {
-		return nil, false
+		return resetNone, nil
 	}
 	callee := ast.SkipParentheses(callNode.AsCallExpression().Expression)
 	if callee == nil {
-		return nil, false
+		return resetNone, nil
 	}
 	entries := test_framework.GetMemberEntries(callee)
 	if len(entries) == 0 {
-		return nil, false
+		return resetNone, nil
 	}
 	method := entries[len(entries)-1]
-	if !mockResetMethods[method.Name] || test_framework.IsComputedIdentifierAccessor(method.Node) {
-		return nil, false
+	if test_framework.IsComputedIdentifierAccessor(method.Node) {
+		return resetNone, nil
+	}
+	if globalMockResetMethods[method.Name] {
+		return resetGlobal, nil
+	}
+	if !mockResetMethods[method.Name] {
+		return resetNone, nil
 	}
 	switch callee.Kind {
 	case ast.KindPropertyAccessExpression:
-		return callee.AsPropertyAccessExpression().Expression, true
+		return resetTarget, unwrapMocked(callee.AsPropertyAccessExpression().Expression)
 	case ast.KindElementAccessExpression:
-		return callee.AsElementAccessExpression().Expression, true
+		return resetTarget, unwrapMocked(callee.AsElementAccessExpression().Expression)
 	default:
-		return nil, false
+		return resetNone, nil
 	}
 }
 
-// hasMockResetBetween reports a reset of the shared target between the two
-// assertions, which splits them into claims about two different call
-// histories. The search descends into the statements that sit between the
-// pair, so a reset nested in an if or a loop still blocks the merge; upstream
-// only scans the sibling statements and merges across such a reset.
+// hasMockResetBetween reports a reset between the two assertions, which splits
+// them into claims about two different call histories: either a reset of the
+// shared target or a suite-wide reset, which clears that target along with
+// everything else. The search descends into the statements that sit between
+// the pair, so a reset nested in an if or a loop still blocks the merge;
+// upstream only scans the sibling statements and merges across such a reset.
 func hasMockResetBetween(
 	sourceFile *ast.SourceFile,
 	statements []*ast.Node,
 	first, second *mergeCandidate,
 ) bool {
-	if !sameTargetExpression(first.targetNode, second.targetNode) {
-		return false
-	}
+	// The pair was already keyed on identical `expect(...)` text, which assumes
+	// both spellings denote the same mock. A target the structural comparison
+	// cannot decide — `expect(getMock())`, say — must not silently disable the
+	// barrier as well, or `getMock().mockClear()` between the two assertions
+	// would pass unnoticed. For such a target any reset counts, whoever its
+	// receiver is: the report costs a false negative when the reset was aimed
+	// at some other mock, which is the direction to err in.
+	target := unwrapMocked(first.targetNode)
+	targetIsComparable := sameTargetExpression(target, unwrapMocked(second.targetNode))
 	minPosition, maxPosition := first.position, second.position
 	if minPosition > maxPosition {
 		minPosition, maxPosition = maxPosition, minPosition
@@ -408,8 +476,12 @@ func hasMockResetBetween(
 		if node == nil {
 			return false
 		}
-		if receiver, ok := mockResetReceiver(node); ok {
-			if sameTargetExpression(receiver, first.targetNode) {
+		switch kind, receiver := mockResetCall(node); kind {
+		case resetGlobal:
+			found = true
+			return true
+		case resetTarget:
+			if !targetIsComparable || sameTargetExpression(receiver, target) {
 				found = true
 				return true
 			}

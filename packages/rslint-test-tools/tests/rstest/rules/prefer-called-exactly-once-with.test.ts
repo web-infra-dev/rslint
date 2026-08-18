@@ -32,6 +32,24 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
       code: `expect(obj.fn).toHaveBeenCalledOnce(); obj.fn.mockRestore(); expect(obj.fn).toHaveBeenCalledWith('hoge')`,
     },
     {
+      code: `expect(x).toHaveBeenCalledOnce(); rstest.clearAllMocks(); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); rstest.resetAllMocks(); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); restoreAllMocks(); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); rstest.mocked(x).mockClear(); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(rstest.mocked(x)).toHaveBeenCalledOnce(); x.mockClear(); expect(rstest.mocked(x)).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(getMock()).toHaveBeenCalledOnce(); getMock().mockClear(); expect(getMock()).toHaveBeenCalledWith('a')`,
+    },
+    {
       code: `expect.soft(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge')`,
     },
     {
