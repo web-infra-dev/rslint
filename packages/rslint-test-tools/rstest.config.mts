@@ -487,6 +487,7 @@ export default defineConfig({
     './tests/eslint/rules/vars-on-top.test.ts',
     './tests/eslint/rules/no-unmodified-loop-condition.test.ts',
     './tests/eslint/rules/no-alert.test.ts',
+    './tests/eslint/rules/no-array-constructor.test.ts',
     './tests/eslint/rules/no-bitwise.test.ts',
     './tests/eslint/rules/complexity.test.ts',
     './tests/eslint/rules/consistent-return.test.ts',
