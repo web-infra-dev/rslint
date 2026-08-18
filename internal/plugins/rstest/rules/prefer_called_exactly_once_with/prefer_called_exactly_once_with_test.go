@@ -67,6 +67,26 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			// Chai allows a modifier between matchers, so `not` can follow the
 			// first matcher. The merged matcher would assert the opposite.
 			{Code: `expect(x).to.have.been.calledOnce.and.not.calledWith('a');`},
+			// Nothing between the two assertions may run code that could reach
+			// the target: a rebind and a further call both invalidate the merge,
+			// and neither is decidable through an arbitrary call.
+			{Code: `expect(x).toHaveBeenCalledOnce(); x = createMock(); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); x('b'); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); doMoreWork(); expect(x).toHaveBeenCalledWith('a');`},
+			// A reset of some other mock cannot reach the target, but nothing
+			// here proves `y.mockClear` is that reset, so the pair is left alone.
+			{Code: `expect(x).toHaveBeenCalledOnce(); y.mockClear(); expect(x).toHaveBeenCalledWith('hoge');`},
+			// Harmless in fact, undecidable here: a call is a call.
+			{Code: `expect(x).toHaveBeenCalledOnce(); console.log('checkpoint'); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); const y = compute(); expect(x).toHaveBeenCalledWith('a');`},
+			// `var` is hoisted, so unlike `const` and `let` it can rebind a name
+			// the first assertion already read.
+			{Code: `expect(x).toHaveBeenCalledOnce(); var hoge = 'foo'; expect(x).toHaveBeenCalledWith('a');`},
+			// An intervening assertion that executes what it asserts on, or
+			// awaits it, hands control to code this rule cannot see.
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(callX).toThrow(); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `async function f() { expect(x).toHaveBeenCalledOnce(); await expect(p).resolves.toBe(1); expect(x).toHaveBeenCalledWith('a'); }`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(makeExpected()); expect(x).toHaveBeenCalledWith('a');`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// An argument that is not stable under a second evaluation is still
@@ -95,17 +115,30 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 				Output: []string{`expect(x).toHaveBeenCalledExactlyOnceWith('hoge', 123); `},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
 			},
+			// An assertion that runs nothing of the author's may sit between the
+			// two halves, which is how mocks are commonly asserted in groups.
+			{
+				Code: `expect(x).toHaveBeenCalledOnce();
+expect(y).toEqual({ id: 1 });
+expect(x).toHaveBeenCalledWith('a');`,
+				Output: []string{`expect(y).toEqual({ id: 1 });
+expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			{
+				Code: `expect(x).toHaveBeenCalledOnce();
+expect(y).toHaveBeenCalledWith(expect.any(String));
+expect(x).toHaveBeenCalledWith('a');`,
+				Output: []string{`expect(y).toHaveBeenCalledWith(expect.any(String));
+expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
 			{
 				Code: `expect(x).toHaveBeenCalledOnce();
 const hoge = 'foo';
 expect(x).toHaveBeenCalledWith('hoge', 123);`,
 				Output: []string{`const hoge = 'foo';
 expect(x).toHaveBeenCalledExactlyOnceWith('hoge', 123);`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
-			},
-			{
-				Code:   `expect(x).toHaveBeenCalledOnce(); y.mockClear(); expect(x).toHaveBeenCalledWith('hoge');`,
-				Output: []string{` y.mockClear(); expect(x).toHaveBeenCalledExactlyOnceWith('hoge');`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
 			},
 			{

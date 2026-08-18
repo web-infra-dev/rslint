@@ -36,37 +36,6 @@ var onceMatchers = map[string]bool{
 	"calledOnce":           true,
 }
 
-// mockResetMethods are the per-mock resets: each clears the call history of
-// the mock it is called on, so only a call whose receiver is the asserted
-// target splits the pair.
-var mockResetMethods = map[string]bool{
-	"mockClear":   true,
-	"mockReset":   true,
-	"mockRestore": true,
-}
-
-// globalMockResetMethods are the suite-wide resets. They clear every mock's
-// call history, so one call anywhere between the two assertions splits them
-// just as a receiver-matched reset does and no receiver has to match. Matching
-// on the method name alone also accepts an unrelated object's clearAllMocks;
-// that only ever suppresses a report, which is the safe direction. Upstream
-// knows none of the three and merges across them.
-var globalMockResetMethods = map[string]bool{
-	"clearAllMocks":   true,
-	"resetAllMocks":   true,
-	"restoreAllMocks": true,
-}
-
-// mockResetKind classifies a call as a reset of one mock, a reset of every
-// mock, or neither.
-type mockResetKind uint8
-
-const (
-	resetNone mockResetKind = iota
-	resetTarget
-	resetGlobal
-)
-
 type assertionRole uint8
 
 const (
@@ -98,10 +67,6 @@ type mergeCandidate struct {
 	position int
 	// pairKey groups the assertions that may merge; see pairKey().
 	pairKey string
-	// targetNode is the first factory argument. It only identifies the mock for
-	// the reset barrier and never pairs assertions, and it is compared
-	// structurally so an equivalent spelling is still recognised.
-	targetNode *ast.Node
 	// fixable is false when the chain asserts more than the rule understands,
 	// so the merge is reported but left to the author: folding a statement away
 	// would drop the assertions sharing its chain, and rewriting the chain in
@@ -150,36 +115,6 @@ func unwrapExpression(node *ast.Node) *ast.Node {
 	return ast.SkipOuterExpressions(node, transparentWrappers)
 }
 
-// unwrapMocked additionally looks through `mocked(x)` and `rstest.mocked(x)`.
-// mocked is identity at runtime — `mocked: ((item: any) => item)` in rstest's
-// runtime/api/utilities.ts — and exists only to narrow the type, so
-// `rstest.mocked(x).mockClear()` really does reset `x` and the two spellings
-// have to compare equal. Only the reset barrier unwraps it: nothing here
-// promises the call is that mocked, and a wrong guess costs a missed report,
-// never a bad fix.
-func unwrapMocked(node *ast.Node) *ast.Node {
-	for {
-		unwrapped := unwrapExpression(node)
-		if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
-			return unwrapped
-		}
-		call := unwrapped.AsCallExpression()
-		arguments := unwrapped.Arguments()
-		if call == nil || len(arguments) != 1 {
-			return unwrapped
-		}
-		entries := test_framework.GetMemberEntries(ast.SkipParentheses(call.Expression))
-		if len(entries) == 0 {
-			return unwrapped
-		}
-		callee := entries[len(entries)-1]
-		if callee.Name != "mocked" || test_framework.IsComputedIdentifierAccessor(callee.Node) {
-			return unwrapped
-		}
-		node = arguments[0]
-	}
-}
-
 // isStableExpression reports whether evaluating the expression twice is
 // indistinguishable from evaluating it once: no call, no `new`, no `await`, no
 // assignment or update. Property and element access are accepted — a getter
@@ -210,45 +145,6 @@ func isStableExpression(node *ast.Node) bool {
 			(argument.Kind == ast.KindStringLiteral ||
 				argument.Kind == ast.KindNumericLiteral ||
 				argument.Kind == ast.KindNoSubstitutionTemplateLiteral)
-	default:
-		return false
-	}
-}
-
-// sameTargetExpression compares two expressions structurally, so a receiver
-// that differs from the target only in parentheses, type assertions or trivia
-// still counts as the same mock. Comparing the source text instead would let
-// `obj /* keep */ .fn.mockClear()` slip past the reset barrier and hand the
-// author a merge across two call histories.
-func sameTargetExpression(left, right *ast.Node) bool {
-	left, right = unwrapExpression(left), unwrapExpression(right)
-	if left == nil || right == nil || left.Kind != right.Kind {
-		return false
-	}
-	switch left.Kind {
-	case ast.KindIdentifier:
-		return left.AsIdentifier().Text == right.AsIdentifier().Text
-	case ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindNullKeyword,
-		ast.KindTrueKeyword, ast.KindFalseKeyword:
-		return true
-	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
-		ast.KindNoSubstitutionTemplateLiteral:
-		return left.Text() == right.Text()
-	case ast.KindPropertyAccessExpression:
-		leftAccess, rightAccess := left.AsPropertyAccessExpression(), right.AsPropertyAccessExpression()
-		if leftAccess == nil || rightAccess == nil ||
-			leftAccess.Name() == nil || rightAccess.Name() == nil ||
-			leftAccess.Name().Text() != rightAccess.Name().Text() {
-			return false
-		}
-		return sameTargetExpression(leftAccess.Expression, rightAccess.Expression)
-	case ast.KindElementAccessExpression:
-		leftAccess, rightAccess := left.AsElementAccessExpression(), right.AsElementAccessExpression()
-		if leftAccess == nil || rightAccess == nil ||
-			!sameTargetExpression(leftAccess.ArgumentExpression, rightAccess.ArgumentExpression) {
-			return false
-		}
-		return sameTargetExpression(leftAccess.Expression, rightAccess.Expression)
 	default:
 		return false
 	}
@@ -332,9 +228,6 @@ func mergeCandidateForStatement(
 	if len(arguments) == 0 {
 		return nil
 	}
-	if arguments[0] == nil {
-		return nil
-	}
 	// The fix keeps one `expect(...)` call and deletes the other, so every
 	// argument of the surviving call is evaluated once instead of twice. Equal
 	// source text does not make that safe: `expect(getMock())` may return a
@@ -353,7 +246,6 @@ func mergeCandidateForStatement(
 	candidate.statement = statement
 	candidate.position = internalUtils.TrimNodeTextRange(sourceFile, statement).Pos()
 	candidate.pairKey = pairKey(headText, parsed.Modifiers, awaited)
-	candidate.targetNode = arguments[0]
 	return candidate
 }
 
@@ -411,84 +303,202 @@ func chainAssertions(parsed *rstestUtils.ParsedRstestExpectCall) []chainAssertio
 	return hits
 }
 
-// mockResetCall classifies a call as a reset, and for a per-mock reset also
-// returns the object it resets.
-func mockResetCall(callNode *ast.Node) (mockResetKind, *ast.Node) {
-	if callNode == nil || callNode.Kind != ast.KindCallExpression {
-		return resetNone, nil
-	}
-	callee := ast.SkipParentheses(callNode.AsCallExpression().Expression)
-	if callee == nil {
-		return resetNone, nil
-	}
-	entries := test_framework.GetMemberEntries(callee)
-	if len(entries) == 0 {
-		return resetNone, nil
-	}
-	method := entries[len(entries)-1]
-	if test_framework.IsComputedIdentifierAccessor(method.Node) {
-		return resetNone, nil
-	}
-	if globalMockResetMethods[method.Name] {
-		return resetGlobal, nil
-	}
-	if !mockResetMethods[method.Name] {
-		return resetNone, nil
-	}
-	switch callee.Kind {
-	case ast.KindPropertyAccessExpression:
-		return resetTarget, unwrapMocked(callee.AsPropertyAccessExpression().Expression)
-	case ast.KindElementAccessExpression:
-		return resetTarget, unwrapMocked(callee.AsElementAccessExpression().Expression)
+// invokingMatchers execute the value they assert on, so an assertion using one
+// can run arbitrary code — `expect(callTheMock).toThrow()` calls the mock. The
+// set is closed: it is fixed by the matchers @vitest/expect installs, unlike
+// the open question of which function eventually reaches the mock.
+var invokingMatchers = map[string]bool{
+	"toThrow":      true,
+	"toThrowError": true,
+	"toSatisfy":    true,
+	"throw":        true,
+	"throws":       true,
+	"Throw":        true,
+}
+
+// suspendingModifiers hand control to the microtask queue, which lets whatever
+// is already pending run before the assertion resumes.
+var suspendingModifiers = map[string]bool{
+	"resolves": true,
+	"rejects":  true,
+}
+
+// controlTransfer reports whether a node hands control to code this rule
+// cannot see. Anything that runs user code qualifies, as does any write: a
+// write needs no target check, because a statement between the assertions has
+// no business assigning at all.
+func controlTransfer(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression,
+		ast.KindAwaitExpression, ast.KindYieldExpression, ast.KindDeleteExpression:
+		return true
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		return binary != nil && ast.IsAssignmentOperator(binary.OperatorToken.Kind)
+	case ast.KindPrefixUnaryExpression:
+		unary := node.AsPrefixUnaryExpression()
+		return unary != nil &&
+			(unary.Operator == ast.KindPlusPlusToken || unary.Operator == ast.KindMinusMinusToken)
+	case ast.KindPostfixUnaryExpression:
+		unary := node.AsPostfixUnaryExpression()
+		return unary != nil &&
+			(unary.Operator == ast.KindPlusPlusToken || unary.Operator == ast.KindMinusMinusToken)
 	default:
-		return resetNone, nil
+		return false
 	}
 }
 
-// hasMockResetBetween reports a reset between the two assertions, which splits
-// them into claims about two different call histories: either a reset of the
-// shared target or a suite-wide reset, which clears that target along with
-// everything else. The search descends into the statements that sit between
-// the pair, so a reset nested in an if or a loop still blocks the merge;
-// upstream only scans the sibling statements and merges across such a reset.
-func hasMockResetBetween(
-	sourceFile *ast.SourceFile,
-	statements []*ast.Node,
-	first, second *mergeCandidate,
-) bool {
-	// The pair was already keyed on identical `expect(...)` text, which assumes
-	// both spellings denote the same mock. A target the structural comparison
-	// cannot decide — `expect(getMock())`, say — must not silently disable the
-	// barrier as well, or `getMock().mockClear()` between the two assertions
-	// would pass unnoticed. For such a target any reset counts, whoever its
-	// receiver is: the report costs a false negative when the reset was aimed
-	// at some other mock, which is the direction to err in.
-	target := unwrapMocked(first.targetNode)
-	targetIsComparable := sameTargetExpression(target, unwrapMocked(second.targetNode))
-	minPosition, maxPosition := first.position, second.position
-	if minPosition > maxPosition {
-		minPosition, maxPosition = maxPosition, minPosition
+// expectRootName is the local name the assertion factory is reached through,
+// so `expect.any(String)` can be told apart from an arbitrary call. Empty when
+// the root is not a plain member chain, in which case no helper is allowed.
+func expectRootName(head *ast.Node) string {
+	if head == nil || head.Kind != ast.KindCallExpression {
+		return ""
 	}
+	entries := test_framework.GetMemberEntries(ast.SkipParentheses(head.AsCallExpression().Expression))
+	if len(entries) == 0 {
+		return ""
+	}
+	return entries[0].Name
+}
 
-	found := false
+// isExpectHelperCall reports a call such as expect.any(String) or
+// expect.objectContaining({}), reached through the same root as the assertion
+// itself. These are framework functions with known semantics: they build a
+// value to compare against and run nothing of the author's.
+func isExpectHelperCall(node *ast.Node, rootName string) bool {
+	if rootName == "" || node.Kind != ast.KindCallExpression {
+		return false
+	}
+	entries := test_framework.GetMemberEntries(ast.SkipParentheses(node.AsCallExpression().Expression))
+	return len(entries) == 2 && entries[0].Name == rootName && entries[0].Call == nil
+}
+
+// isInertAssertion reports whether a statement can sit between the two
+// assertions without invalidating their merge. The merge claims both halves
+// describe one call history, so nothing in between may call the asserted mock
+// or rebind it. Neither question is decidable from the syntax, so the rule
+// answers a narrower one it can decide: the statement must be an assertion
+// that transfers control nowhere.
+//
+// That means an expect chain whose factory and matcher calls are the only
+// calls in it — their semantics are known, they read the spy's record and
+// compare values — with no other call, no write, and no await anywhere in the
+// arguments. A matcher that executes its subject, and a modifier that awaits
+// one, are excluded by name.
+//
+// What survives is the common shape: assertions on other mocks, or on other
+// aspects of this one, grouped between the two halves. What does not is
+// everything else, including a plain `console.log()` — harmless in fact, but
+// the rule cannot know that, and guessing costs a false report.
+//
+// A property read is the one thing accepted without proof, since a getter
+// could run code. The rule already accepts that when it treats `obj.fn` as
+// stable under a second evaluation; refusing it here would reject the shape
+// the rule mostly exists for.
+func isInertAssertion(analysis *rstestUtils.RstestCallAnalysis, statement *ast.Node) bool {
+	if statement == nil || statement.Kind != ast.KindExpressionStatement {
+		return false
+	}
+	expressionStatement := statement.AsExpressionStatement()
+	if expressionStatement == nil {
+		return false
+	}
+	rootCall, awaited := assertionRootCall(expressionStatement.Expression)
+	if rootCall == nil || awaited {
+		return false
+	}
+	parsed := analysis.ParseExpectCall(rootCall)
+	if parsed == nil || parsed.Head == nil {
+		return false
+	}
+	for _, modifier := range parsed.Modifiers {
+		if suspendingModifiers[modifier] {
+			return false
+		}
+	}
+	frameworkCalls := map[*ast.Node]bool{parsed.Head: true}
+	for _, matcher := range parsed.Matchers {
+		if invokingMatchers[matcher.Name] {
+			return false
+		}
+		if matcher.Entry.Call != nil {
+			frameworkCalls[matcher.Entry.Call] = true
+		}
+	}
+	return inertSubtree(expressionStatement.Expression, frameworkCalls, expectRootName(parsed.Head))
+}
+
+// isInertDeclaration accepts a block-scoped declaration whose initializers
+// transfer control nowhere — `const hoge = 'foo';` between the two assertions
+// changes nothing about either. `var` is excluded: it is hoisted, so it can
+// rebind a name the assertions already read, which `const` and `let` cannot
+// without a temporal dead zone error.
+func isInertDeclaration(statement *ast.Node) bool {
+	if statement == nil || statement.Kind != ast.KindVariableStatement {
+		return false
+	}
+	variableStatement := statement.AsVariableStatement()
+	if variableStatement == nil || variableStatement.DeclarationList == nil {
+		return false
+	}
+	declarationList := variableStatement.DeclarationList
+	if declarationList.Flags&(ast.NodeFlagsConst|ast.NodeFlagsLet) == 0 {
+		return false
+	}
+	list := declarationList.AsVariableDeclarationList()
+	if list == nil || list.Declarations == nil {
+		return false
+	}
+	for _, declaration := range list.Declarations.Nodes {
+		if declaration == nil {
+			return false
+		}
+		initializer := declaration.Initializer()
+		if initializer == nil {
+			continue
+		}
+		if !inertSubtree(initializer, nil, "") {
+			return false
+		}
+	}
+	return true
+}
+
+// inertSubtree reports whether a subtree transfers control nowhere, treating
+// the given framework calls and `<root>.helper(...)` calls as known-safe.
+func inertSubtree(node *ast.Node, frameworkCalls map[*ast.Node]bool, rootName string) bool {
+	inert := true
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
 		if node == nil {
 			return false
 		}
-		switch kind, receiver := mockResetCall(node); kind {
-		case resetGlobal:
-			found = true
+		if !frameworkCalls[node] && !isExpectHelperCall(node, rootName) && controlTransfer(node) {
+			inert = false
 			return true
-		case resetTarget:
-			if !targetIsComparable || sameTargetExpression(receiver, target) {
-				found = true
-				return true
-			}
 		}
 		return node.ForEachChild(visit)
 	}
+	visit(node)
+	return inert
+}
 
+// onlyInertStatementsBetween reports whether every statement between the two
+// assertions leaves their merge intact. Upstream asks a much narrower
+// question — whether a mockClear on a plain identifier sits between them — and
+// merges across a reassignment, a re-invocation, or a reset it does not
+// recognise.
+func onlyInertStatementsBetween(
+	analysis *rstestUtils.RstestCallAnalysis,
+	sourceFile *ast.SourceFile,
+	statements []*ast.Node,
+	first, second *mergeCandidate,
+) bool {
+	minPosition, maxPosition := first.position, second.position
+	if minPosition > maxPosition {
+		minPosition, maxPosition = maxPosition, minPosition
+	}
 	for _, statement := range statements {
 		if statement == nil {
 			continue
@@ -497,11 +507,11 @@ func hasMockResetBetween(
 		if position <= minPosition || position >= maxPosition {
 			continue
 		}
-		if visit(statement); found {
-			return true
+		if !isInertAssertion(analysis, statement) && !isInertDeclaration(statement) {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 // statementRemovalRange is the range the fix deletes for the folded assertion.
@@ -574,10 +584,15 @@ func reportSelfMerge(ctx rule.RuleContext, candidate *mergeCandidate) {
 	ctx.ReportNode(candidate.hits[1].node, message)
 }
 
-func reportPair(ctx rule.RuleContext, statements []*ast.Node, candidates []*mergeCandidate) {
+func reportPair(
+	ctx rule.RuleContext,
+	analysis *rstestUtils.RstestCallAnalysis,
+	statements []*ast.Node,
+	candidates []*mergeCandidate,
+) {
 	first, second := candidates[0], candidates[1]
 	if first.hits[0].role == second.hits[0].role ||
-		hasMockResetBetween(ctx.SourceFile, statements, first, second) {
+		!onlyInertStatementsBetween(analysis, ctx.SourceFile, statements, first, second) {
 		return
 	}
 	message, with := mergeMessage(first.hits[0], second.hits[0])
@@ -667,7 +682,7 @@ func checkBlock(
 		}
 		pending = append(pending, pendingReport{
 			position: candidates[1].position,
-			report:   func() { reportPair(ctx, statements, candidates) },
+			report:   func() { reportPair(ctx, analysis, statements, candidates) },
 		})
 	}
 

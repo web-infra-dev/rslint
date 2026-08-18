@@ -50,6 +50,30 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
       code: `expect(getMock()).toHaveBeenCalledOnce(); getMock().mockClear(); expect(getMock()).toHaveBeenCalledWith('a')`,
     },
     {
+      code: `expect(x).toHaveBeenCalledOnce(); x = createMock(); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); x('b'); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); doMoreWork(); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); console.log('checkpoint'); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); const y = compute(); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); expect(callX).toThrow(); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `async function f() { expect(x).toHaveBeenCalledOnce(); await expect(p).resolves.toBe(1); expect(x).toHaveBeenCalledWith('a'); }`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(makeExpected()); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
       code: `expect.soft(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge')`,
     },
     {
@@ -117,6 +141,24 @@ expect(x).to.have.been.calledWith('a');`,
     {
       code: `expect(mocks['a']).toHaveBeenCalledOnce(); expect(mocks['a']).toHaveBeenCalledWith('x');`,
       output: ` expect(mocks['a']).toHaveBeenCalledExactlyOnceWith('x');`,
+      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce();
+expect(y).toEqual({ id: 1 });
+expect(x).toHaveBeenCalledWith('a');`,
+      output: `expect(y).toEqual({ id: 1 });
+expect(x).toHaveBeenCalledExactlyOnceWith('a');
+`,
+      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce();
+expect(y).toHaveBeenCalledWith(expect.any(String));
+expect(x).toHaveBeenCalledWith('a');`,
+      output: `expect(y).toHaveBeenCalledWith(expect.any(String));
+expect(x).toHaveBeenCalledExactlyOnceWith('a');
+`,
       errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
     },
     {
