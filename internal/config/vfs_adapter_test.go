@@ -136,7 +136,7 @@ func TestVfsDirFile_ReadDirPaginated(t *testing.T) {
 }
 
 // Default vfsAdapter (followSymlinks=false) skips symlinks entirely. This is
-// what DiscoverGapFiles relies on for deterministic concurrent traversal.
+// what discoverFilesOutsideProgramsForTest relies on for deterministic concurrent traversal.
 func TestVfsAdapter_SymlinksSkippedByDefault(t *testing.T) {
 	tmpDir := t.TempDir()
 	dirA := filepath.Join(tmpDir, "a")

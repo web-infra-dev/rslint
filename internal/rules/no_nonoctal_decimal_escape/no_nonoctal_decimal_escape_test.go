@@ -18,6 +18,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -1330,7 +1331,7 @@ func runRuleLeniently(t *testing.T, code string, tsx bool) []rule.RuleDiagnostic
 	}
 
 	var diags []rule.RuleDiagnostic
-	linter.RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	linter.RunLinterInProgram(lintprogram.NewFromCompiler(program), nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []linter.ConfiguredRule {
 			if sf.FileName() != filePath {
 				return nil
@@ -1339,7 +1340,6 @@ func runRuleLeniently(t *testing.T, code string, tsx bool) []rule.RuleDiagnostic
 		},
 		false,
 		func(d rule.RuleDiagnostic) { diags = append(diags, d) },
-		nil,
 		nil,
 	)
 	sort.SliceStable(diags, func(i, j int) bool {

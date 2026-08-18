@@ -8,7 +8,6 @@ run:
 linters:
   default: none
   disable:
-    - depguard
     - errcheck
     - paralleltest
   enable:
@@ -71,10 +70,15 @@ linters:
         - nilness
     depguard:
       rules:
-        main:
+        js-semantics:
+          files:
+            - '**/internal/rules/**'
+            - '**/internal/plugins/**'
           deny:
-            - pkg: 'encoding/json$'
-              desc: 'Use "github.com/microsoft/typescript-go/internal/json" instead.'
+            - pkg: 'github.com/dlclark/regexp2'
+              desc: 'A pattern a rule is handed was written as a JavaScript regexp. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp" instead.'
+            - pkg: 'github.com/bmatcuk/doublestar'
+              desc: 'A glob a rule is handed is read the way minimatch 3 reads one. Use "github.com/web-infra-dev/rslint/internal/utils/minimatch3" instead.'
 
   exclusions:
     rules:

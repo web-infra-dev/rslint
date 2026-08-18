@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -23,7 +24,7 @@ type ruleOptions struct {
 	maxDepth                           int
 	ignoreExternal                     bool
 	allowUnsafeDynamicCyclicDependency bool
-	syntax                             rule.ModuleSyntax
+	referenceKinds                     program.ModuleReferenceKinds
 }
 
 // NoCycleRule forbids dependency paths that resolve back to the linted module.
@@ -41,10 +42,8 @@ var NoCycleRule = rule.Rule{
 
 func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{
-		maxDepth: unlimitedDepth,
-		syntax: rule.ModuleSyntax{
-			ESModule: true,
-		},
+		maxDepth:       unlimitedDepth,
+		referenceKinds: program.ESModuleReferences,
 	}
 	if len(options) == 0 {
 		return opts
@@ -56,10 +55,18 @@ func parseOptions(options []any) ruleOptions {
 	}
 	opts.ignoreExternal, _ = optsMap["ignoreExternal"].(bool)
 	opts.allowUnsafeDynamicCyclicDependency, _ = optsMap["allowUnsafeDynamicCyclicDependency"].(bool)
-	opts.syntax.CommonJS, _ = optsMap["commonjs"].(bool)
-	opts.syntax.AMD, _ = optsMap["amd"].(bool)
+	if commonJS, _ := optsMap["commonjs"].(bool); commonJS {
+		opts.referenceKinds |= program.CommonJSReferences
+	}
+	if amd, _ := optsMap["amd"].(bool); amd {
+		opts.referenceKinds |= program.AMDReferences
+	}
 	if esmodule, ok := optsMap["esmodule"].(bool); ok {
-		opts.syntax.ESModule = esmodule
+		if esmodule {
+			opts.referenceKinds |= program.ESModuleReferences
+		} else {
+			opts.referenceKinds &^= program.ESModuleReferences
+		}
 	}
 
 	return opts
@@ -112,7 +119,7 @@ func normalizeDepth(depth int) (int, bool) {
 }
 
 func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
-	if ctx.SourceFile == nil || ctx.Program == nil {
+	if ctx.SourceFile == nil || !ctx.Program().IsValid() {
 		return
 	}
 
@@ -124,13 +131,14 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 	// Every report sits on a reference this file wrote, so a file that wrote
 	// none has no answer to look up. Asking that of the file alone, before the
 	// graph, is what keeps an import-free file off the build: the graph spans
-	// the whole Program, and the editor discards it on every keystroke, so
+	// the whole effective source set, and the editor discards it on every keystroke, so
 	// there is no run to amortize it over on that path.
-	if len(ctx.Modules.Edges(ctx.SourceFile, opts.syntax)) == 0 {
+	sourceGraph := ctx.Program().ModuleGraph()
+	if len(sourceGraph.References(ctx.SourceFile, opts.referenceKinds)) == 0 {
 		return
 	}
 
-	graph := moduleGraphFor(ctx, opts)
+	graph := moduleGraphFor(ctx, sourceGraph, opts)
 	if graph == nil {
 		return
 	}

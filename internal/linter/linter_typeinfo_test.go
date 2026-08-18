@@ -1,192 +1,126 @@
 package linter
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// typeCheckerRule returns a rule that records whether TypeChecker was nil or not.
-func typeCheckerRule(checkerWasNil *bool) []ConfiguredRule {
-	return []ConfiguredRule{
-		{
-			Name:     "checker-probe",
-			Severity: rule.SeverityWarning,
-			Run: func(ctx rule.RuleContext) rule.RuleListeners {
-				*checkerWasNil = (ctx.TypeChecker == nil)
-				return rule.RuleListeners{}
-			},
+func checkerProbeRule(checkerWasNil *bool) []ConfiguredRule {
+	return []ConfiguredRule{{
+		Name:     "checker-probe",
+		Severity: rule.SeverityWarning,
+		Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			*checkerWasNil = ctx.TypeChecker == nil
+			return nil
 		},
-	}
+	}}
 }
 
-func TestTypeInfoFiles_FileInSet_GetsTypeChecker(t *testing.T) {
-	program, paths := createTestProgramWithFiles(t, map[string]string{
+func runProgramCapabilityProbe(
+	t *testing.T,
+	sourceProgram *lintprogram.Program,
+	rules RuleHandler,
+) *LintResult {
+	t.Helper()
+	result, err := RunLinter(RunLinterOptions{
+		Programs:        []*lintprogram.Program{sourceProgram},
+		SingleThreaded:  true,
+		ExcludePaths:    []string{},
+		GetRulesForFile: rules,
+		Consumer:        rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
+	})
+	if err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	return result
+}
+
+func TestCompilerCapableProgramProvidesTypeChecker(t *testing.T) {
+	raw, _ := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x = 1;",
 	})
-
-	typeInfoFiles := map[string]struct{}{
-		paths["a.ts"]: {},
-	}
-
 	var checkerWasNil bool
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
-			return typeCheckerRule(&checkerWasNil)
-		},
-		false,
-		func(d rule.RuleDiagnostic) {},
-		typeInfoFiles,
-		nil,
-	)
-
+	runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(*ast.SourceFile) []ConfiguredRule {
+		return checkerProbeRule(&checkerWasNil)
+	})
 	if checkerWasNil {
-		t.Error("TypeChecker should NOT be nil for files in typeInfoFiles")
+		t.Fatal("compiler-capable Program did not provide a TypeChecker")
 	}
 }
 
-func TestTypeInfoFiles_FileNotInSet_NilTypeChecker(t *testing.T) {
-	program, paths := createTestProgramWithFiles(t, map[string]string{
+func TestSourceOnlyProgramWithholdsTypeChecker(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x = 1;",
 	})
-
-	// typeInfoFiles exists but does NOT contain a.ts → gap file
-	typeInfoFiles := map[string]struct{}{
-		"/some/other/file.ts": {},
+	file := raw.GetSourceFile(paths["a.ts"])
+	if file == nil {
+		t.Fatal("fixture Program did not contain a.ts")
 	}
-
+	sourceOnly := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{file})
 	var checkerWasNil bool
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
-			return typeCheckerRule(&checkerWasNil)
-		},
-		false,
-		func(d rule.RuleDiagnostic) {},
-		typeInfoFiles,
-		nil,
-	)
-
-	if !checkerWasNil {
-		t.Error("TypeChecker should be nil for gap files (not in typeInfoFiles)")
+	result := runProgramCapabilityProbe(t, sourceOnly, func(*ast.SourceFile) []ConfiguredRule {
+		return checkerProbeRule(&checkerWasNil)
+	})
+	if !checkerWasNil || result.LintedFileCount != 1 {
+		t.Fatalf("source-only result: checkerWasNil=%t files=%d", checkerWasNil, result.LintedFileCount)
 	}
-
-	// Verify the file was still linted (rule ran, just with nil checker).
-	_ = paths
 }
 
-func TestTypeInfoFiles_FileNotInSet_FiltersTypeAwareRule(t *testing.T) {
-	program, _ := createTestProgramWithFiles(t, map[string]string{
+func TestSourceOnlyProgramFiltersTypeAwareRule(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x = 1;",
 	})
-	typeInfoFiles := map[string]struct{}{"/some/other/file.ts": {}}
-
+	file := raw.GetSourceFile(paths["a.ts"])
+	if file == nil {
+		t.Fatal("fixture Program did not contain a.ts")
+	}
+	sourceOnly := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{file})
 	ruleRan := false
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
-		func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
-				Name:             "type-aware-probe",
-				Severity:         rule.SeverityWarning,
-				RequiresTypeInfo: true,
-				Run: func(rule.RuleContext) rule.RuleListeners {
-					ruleRan = true
-					return rule.RuleListeners{}
-				},
-			}}
-		},
-		false,
-		func(rule.RuleDiagnostic) {},
-		typeInfoFiles,
-		nil,
-	)
-
+	result := runProgramCapabilityProbe(t, sourceOnly, func(*ast.SourceFile) []ConfiguredRule {
+		return []ConfiguredRule{{
+			Name:             "type-aware-probe",
+			Severity:         rule.SeverityWarning,
+			RequiresTypeInfo: true,
+			Run: func(rule.RuleContext) rule.RuleListeners {
+				ruleRan = true
+				return nil
+			},
+		}}
+	})
 	if ruleRan {
-		t.Fatal("type-aware rule ran for a file outside typeInfoFiles")
+		t.Fatal("type-aware rule ran for a source-only Program")
+	}
+	if _, retained := result.ExecutedRules["type-aware-probe"]; retained {
+		t.Fatal("filtered type-aware rule appeared in ExecutedRules")
 	}
 }
 
-func TestTypeInfoFiles_Nil_AllGetTypeChecker(t *testing.T) {
-	program, _ := createTestProgramWithFiles(t, map[string]string{
+func TestCompilerCapableProgramRunsTypeAwareRule(t *testing.T) {
+	raw, _ := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x = 1;",
 	})
-
-	var checkerWasNil bool
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
-			return typeCheckerRule(&checkerWasNil)
-		},
-		false,
-		func(d rule.RuleDiagnostic) {},
-		nil, // nil means no gap-file distinction
-		nil,
-	)
-
-	if checkerWasNil {
-		t.Error("TypeChecker should NOT be nil when typeInfoFiles is nil")
-	}
-}
-
-func TestTypeCheck_TypeInfoFilesDoesNotRestrictProgramWideDiagnostics(t *testing.T) {
-	program, paths := createTestProgramWithFiles(t, map[string]string{
-		"a.ts": "const x: number = 'hello';", // type error
+	ruleRan := false
+	result := runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(*ast.SourceFile) []ConfiguredRule {
+		return []ConfiguredRule{{
+			Name:             "type-aware-probe",
+			Severity:         rule.SeverityWarning,
+			RequiresTypeInfo: true,
+			Run: func(ctx rule.RuleContext) rule.RuleListeners {
+				if ctx.TypeChecker == nil {
+					t.Fatal("type-aware rule received a nil TypeChecker")
+				}
+				ruleRan = true
+				return nil
+			},
+		}}
 	})
-
-	// TypeInfoFiles gates type-aware rule eligibility only. Program-wide
-	// type-check diagnostics are controlled by the Program skip mask.
-	typeInfoFiles := map[string]struct{}{
-		"/some/other/file.ts": {},
+	if !ruleRan {
+		t.Fatal("type-aware rule did not run for a compiler-capable Program")
 	}
-
-	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
-		true, // typeCheck enabled
-		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
-		typeInfoFiles,
-		nil,
-	)
-
-	found := false
-	for _, d := range diagnostics {
-		if strings.HasPrefix(d.RuleName, "TypeScript(") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected program-wide semantic diagnostics despite the lint TypeInfoFiles set")
-	}
-	_ = paths
-}
-
-func TestTypeCheck_ReportsSemanticDiagnosticsForTypeInfoFiles(t *testing.T) {
-	program, paths := createTestProgramWithFiles(t, map[string]string{
-		"a.ts": "const x: number = 'hello';", // type error
-	})
-
-	// a.ts IS in typeInfoFiles → should get semantic diagnostics
-	typeInfoFiles := map[string]struct{}{
-		paths["a.ts"]: {},
-	}
-
-	var diagnostics []rule.RuleDiagnostic
-	RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
-		true,
-		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
-		typeInfoFiles,
-		nil,
-	)
-
-	found := false
-	for _, d := range diagnostics {
-		if strings.HasPrefix(d.RuleName, "TypeScript(") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("Files in typeInfoFiles should get semantic diagnostics")
+	if _, retained := result.ExecutedRules["type-aware-probe"]; !retained {
+		t.Fatal("type-aware rule missing from ExecutedRules")
 	}
 }

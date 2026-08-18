@@ -4,26 +4,24 @@ import (
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// ModuleIndex answers what each file of one Program says about its own
-// exports. That answer depends only on the file's syntax, so it is derived
-// once for the whole lint run however many files ask for it.
+// ModuleIndex answers what each file of one Program says about its own exports.
+// That answer depends only on the immutable source generation and normalized
+// import settings, so every matching lint pass can reuse it.
 //
-// What a file *imports* is not here: the core module graph on RuleContext
-// answers that for every rule, not just these. This holds the part that is
-// specific to eslint-plugin-import — export maps, and the `import/` settings
-// that decide which references count.
+// What a file *imports* is not here: the core module graph derived from the
+// same Program answers that for every rule, not just these. This holds the part
+// that is specific to eslint-plugin-import — export maps, and the `import/`
+// settings that decide which references count.
 //
 // The index lives in the Program cache, so it must not hold the Program it was
-// built for: an entry that did would keep its Program reachable forever, the
-// weak key's cleanup would never run, and every editor keystroke — each of
-// which produces a new Program — would strand one. The Program is therefore
-// passed in by whoever is asking; every file of one run shares it, so any
-// caller's is the same one.
+// built for: compiler-adapted generations use weak ownership, and a back
+// reference would defeat it. Effective module services are therefore passed in
+// by whoever is asking.
 type ModuleIndex struct {
 	settings *ModuleSettings
 
@@ -42,11 +40,11 @@ type indexKey struct {
 	settings string
 }
 
-// IndexFor returns the Program's import index for these settings, building it
-// on the first rule of the run that asks for it.
+// IndexFor returns the Program generation's import index for these settings,
+// building it on the first rule that asks for it.
 func IndexFor(ctx rule.RuleContext) *ModuleIndex {
 	settings := SettingsFor(ctx)
-	return rule.CachedByProgram(ctx.Program, indexKey{settings: settings.Key()}, func() *ModuleIndex {
+	return rule.CachedByProgram(ctx, indexKey{settings: settings.Key()}, func() *ModuleIndex {
 		return newModuleIndex(settings)
 	})
 }
@@ -61,12 +59,12 @@ func newModuleIndex(settings *ModuleSettings) *ModuleIndex {
 // localExportsOf returns what file says about its own exports, with every
 // module specifier resolved and none of them followed. The result is shared
 // with every other caller and must not be modified.
-func (index *ModuleIndex) localExportsOf(program *compiler.Program, file *ast.SourceFile) *localExports {
+func (index *ModuleIndex) localExportsOf(sourceProgram *program.Program, file *ast.SourceFile) *localExports {
 	if index == nil || file == nil {
 		return nil
 	}
 	return index.exports.Get(file, func() *localExports {
-		return collectLocalExports(program, file, index.settings)
+		return collectLocalExports(sourceProgram, file, index.settings)
 	})
 }
 

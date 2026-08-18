@@ -12,20 +12,20 @@ import (
 )
 
 // vfsAdapter adapts a vfs.FS to a standard fs.FS rooted at a given directory,
-// used by the gap-file walker in DiscoverGapFiles and by doublestar.GlobWalk
+// used by lint-target discovery and by doublestar.GlobWalk
 // in expandProjectGlob. It is NOT a general-purpose fs.FS implementation —
 // Open() always returns a directory handle (vfsDirFile) because both callers
 // only open directories.
 //
 // followSymlinks controls how directory symlinks are handled in ReadDir:
 //
-//   - false (default, used by DiscoverGapFiles): symlinked subdirectories are
+//   - false (default, used by lint-target discovery): symlinked subdirectories are
 //     skipped entirely. This matches ESLint v10's flat-config file walker:
 //     it uses @humanfs/node, whose walk() recurses only when
 //     Dirent.isDirectory() is true — and Dirent.isDirectory() returns false
 //     for symbolic links because Node's readdir({withFileTypes: true})
 //     reports the dirent type without following links. The result for the
-//     gap-file walker is the same: symlinked directories are not entered,
+//     lint-target walk is the same: symlinked directories are not entered,
 //     output is deterministic regardless of the concurrency model, and
 //     cycles cannot occur.
 //
@@ -46,7 +46,7 @@ type vfsAdapter struct {
 
 var _ fs.FS = (*vfsAdapter)(nil)
 
-// Open implements fs.FS. Both callers (fs.WalkDir in DiscoverGapFiles and
+// Open implements fs.FS. Both callers (fs.WalkDir in lint-target discovery and
 // doublestar.GlobWalk in expandProjectGlob) only call Open() on directories.
 // Therefore we always return a vfsDirFile without calling DirectoryExists —
 // the parent's ReadDir already confirmed the entry is a directory, so the
@@ -155,7 +155,7 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 			if isSymlink {
 				if !f.adapter.followSymlinks {
 					// Skip symlinks entirely. See the type doc on vfsAdapter
-					// for why this is the default for DiscoverGapFiles.
+					// for why this is the default for lint-target discovery.
 					continue
 				}
 				if dirRealPath == "" {

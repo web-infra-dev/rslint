@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -963,11 +964,10 @@ function shadowed(a: number) {
 				}
 				ctx := (rule.RuleContext{
 					SourceFile:     sourceFile,
-					Program:        program,
 					TypeChecker:    checker,
 					Comments:       comments,
 					DisableManager: rule.NewDisableManager(sourceFile, comments),
-				}).WithDiagnosticConsumer(NoParamReassignRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+				}).WithProgram(lintprogram.NewFromCompiler(program)).WithDiagnosticConsumer(NoParamReassignRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
 					Demand: demand,
 					Report: func(diagnostic rule.RuleDiagnostic) {
 						diagnostics = append(diagnostics, diagnostic)

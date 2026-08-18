@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
@@ -181,7 +182,7 @@ func lintFile(t *testing.T, filePath string, fs vfs.FS) []rule.RuleDiagnostic {
 	ruleRan := false
 	var diagnostics []rule.RuleDiagnostic
 	linter.RunLinterInProgram(
-		program,
+		lintprogram.NewFromCompiler(program),
 		nil,
 		nil,
 		utils.ExcludePaths,
@@ -202,7 +203,6 @@ func lintFile(t *testing.T, filePath string, fs vfs.FS) []rule.RuleDiagnostic {
 		func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		nil,
 		nil,
 	)
 	assert.Assert(t, ruleRan, "the rule did not run for %s", filePath)

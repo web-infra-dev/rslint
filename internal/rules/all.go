@@ -17,6 +17,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
+	"github.com/web-infra-dev/rslint/internal/rules/max_classes_per_file"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines_per_function"
@@ -37,9 +39,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
+	"github.com/web-infra-dev/rslint/internal/rules/no_continue"
 	"github.com/web-infra-dev/rslint/internal/rules/no_control_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
+	"github.com/web-infra-dev/rslint/internal/rules/no_div_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_class_members"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_else_if"
@@ -52,6 +56,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_function"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_static_block"
+	"github.com/web-infra-dev/rslint/internal/rules/no_eq_null"
 	"github.com/web-infra-dev/rslint/internal/rules/no_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extend_native"
@@ -76,6 +81,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_misleading_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
+	"github.com/web-infra-dev/rslint/internal/rules/no_negated_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_func"
@@ -88,6 +94,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_param_reassign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_plusplus"
 	"github.com/web-infra-dev/rslint/internal/rules/no_proto"
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redeclare"
@@ -105,11 +112,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_shadow_restricted_names"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
+	"github.com/web-infra-dev/rslint/internal/rules/no_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unassigned_vars"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
+	"github.com/web-infra-dev/rslint/internal/rules/no_undefined"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
@@ -122,6 +131,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_private_class_members"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_vars"
+	"github.com/web-infra-dev/rslint/internal/rules/no_use_before_define"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_assignment"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_call"
@@ -176,6 +186,8 @@ func GetAllRules() []rule.Rule {
 		for_direction.ForDirectionRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
+		init_declarations.InitDeclarationsRule,
+		max_classes_per_file.MaxClassesPerFileRule,
 		max_depth.MaxDepthRule,
 		max_lines.MaxLinesRule,
 		max_lines_per_function.MaxLinesPerFunctionRule,
@@ -196,9 +208,11 @@ func GetAllRules() []rule.Rule {
 		no_constant_binary_expression.NoConstantBinaryExpressionRule,
 		no_constant_condition.NoConstantConditionRule,
 		no_constructor_return.NoConstructorReturnRule,
+		no_continue.NoContinueRule,
 		no_control_regex.NoControlRegexRule,
 		no_debugger.NoDebuggerRule,
 		no_delete_var.NoDeleteVarRule,
+		no_div_regex.NoDivRegexRule,
 		no_dupe_args.NoDupeArgsRule,
 		no_dupe_class_members.NoDupeClassMembersRule,
 		no_dupe_keys.NoDupeKeysRule,
@@ -209,6 +223,7 @@ func GetAllRules() []rule.Rule {
 		no_empty_function.NoEmptyFunctionRule,
 		no_empty_pattern.NoEmptyPatternRule,
 		no_empty_static_block.NoEmptyStaticBlockRule,
+		no_eq_null.NoEqNullRule,
 		no_eval.NoEvalRule,
 		no_ex_assign.NoExAssignRule,
 		no_extend_native.NoExtendNativeRule,
@@ -236,11 +251,13 @@ func GetAllRules() []rule.Rule {
 		no_restricted_syntax.NoRestrictedSyntaxRule,
 		no_multi_assign.NoMultiAssignRule,
 		no_multi_str.NoMultiStrRule,
+		no_negated_condition.NoNegatedConditionRule,
 		no_nested_ternary.NoNestedTernaryRule,
 		no_nonoctal_decimal_escape.NoNonoctalDecimalEscapeRule,
 		no_octal.NoOctalRule,
 		no_octal_escape.NoOctalEscapeRule,
 		no_param_reassign.NoParamReassignRule,
+		no_plusplus.NoPlusplusRule,
 		no_proto.NoProtoRule,
 		no_redeclare.NoRedeclareRule,
 		radix.RadixRule,
@@ -254,6 +271,7 @@ func GetAllRules() []rule.Rule {
 		no_shadow_restricted_names.NoShadowRestrictedNamesRule,
 		strict.StrictRule,
 		no_template_curly_in_string.NoTemplateCurlyInStringRule,
+		no_ternary.NoTernaryRule,
 		no_useless_computed_key.NoUselessComputedKeyRule,
 		no_useless_concat.NoUselessConcatRule,
 		no_sparse_arrays.NoSparseArraysRule,
@@ -261,6 +279,7 @@ func GetAllRules() []rule.Rule {
 		no_unneeded_ternary.NoUnneededTernaryRule,
 		no_undef.NoUndefRule,
 		no_undef_init.NoUndefInitRule,
+		no_undefined.NoUndefinedRule,
 		no_unassigned_vars.NoUnassignedVarsRule,
 		prefer_const.PreferConstRule,
 		prefer_destructuring.PreferDestructuringRule,
@@ -300,6 +319,7 @@ func GetAllRules() []rule.Rule {
 		no_unused_labels.NoUnusedLabelsRule,
 		no_unused_private_class_members.NoUnusedPrivateClassMembersRule,
 		no_unused_vars.NoUnusedVarsRule,
+		no_use_before_define.NoUseBeforeDefineRule,
 		one_var.OneVarRule,
 		prefer_arrow_callback.PreferArrowCallbackRule,
 		no_dupe_else_if.NoDupeElseIfRule,

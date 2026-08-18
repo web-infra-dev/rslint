@@ -54,3 +54,15 @@ func TestCachedByFileWithoutCacheBuildsEveryTime(t *testing.T) {
 		t.Fatalf("builder called %d times, want 2", created)
 	}
 }
+
+func TestRuleContextProcessCurrentDirectoryUsesFileSharedState(t *testing.T) {
+	ctx := RuleContext{}.WithFileCache(
+		NewFileCacheWithProcessCurrentDirectory("/repo"),
+	)
+	if got := ctx.ProcessCurrentDirectory(); got != "/repo" {
+		t.Fatalf("ProcessCurrentDirectory() = %q, want /repo", got)
+	}
+	if got := (&RuleContext{}).ProcessCurrentDirectory(); got != "" {
+		t.Fatalf("empty ProcessCurrentDirectory() = %q, want empty", got)
+	}
+}
