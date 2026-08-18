@@ -110,10 +110,9 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 				}},
 			},
 
-			// Locks in upstream needsParentheses(): the call is neither the
-			// start of an ExpressionStatement nor an arrow's own concise body
-			// (it is nested one level inside the parameter's default value),
-			// so the fix stays a bare `{}`.
+			// Locks in upstream needsParentheses(): the call neither starts an
+			// ExpressionStatement nor follows an `=>` (it sits inside the
+			// parameter's default value), so the fix stays a bare `{}`.
 			{
 				Code: `const f = (a = Object()) => a;`,
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -130,6 +129,28 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "preferLiteral", Line: 1, Column: 17, EndLine: 1, EndColumn: 29,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useLiteral", Output: `const f = () => ({});`}},
+				}},
+			},
+
+			// Locks in upstream needsParentheses(): the call only *starts* the
+			// concise body, so a bare `{}` would still be parsed as the arrow's
+			// block body — the token right before it is the `=>`, which is what
+			// upstream tests, not whether the call is the whole body.
+			{
+				Code: `const f = () => Object().x;`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferLiteral", Line: 1, Column: 17, EndLine: 1, EndColumn: 25,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useLiteral", Output: `const f = () => ({}).x;`}},
+				}},
+			},
+
+			// The explicit parentheses already open the concise body, so the
+			// token before the call is `(` and the fix stays a bare `{}`.
+			{
+				Code: `const f = () => (Object().x);`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferLiteral", Line: 1, Column: 18, EndLine: 1, EndColumn: 26,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useLiteral", Output: `const f = () => ({}.x);`}},
 				}},
 			},
 

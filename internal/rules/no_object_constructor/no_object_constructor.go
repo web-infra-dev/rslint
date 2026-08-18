@@ -47,14 +47,16 @@ func calleeAndArguments(node *ast.Node) (*ast.Node, *ast.NodeList) {
 
 // needsWrappingParens mirrors upstream's needsParentheses: a bare `{}` would
 // be misparsed (as a block, or as the arrow function's own block body) in
-// either of two positions — the start of an ExpressionStatement, or the
-// concise (unparenthesized) body of an arrow function.
+// either of two positions — the start of an ExpressionStatement, or directly
+// after an `=>`, where it opens the arrow function's concise body regardless
+// of whether the call is the whole body (`() => Object()`) or only starts it
+// (`() => Object().x`).
 func needsWrappingParens(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	if utils.IsStartOfExpressionStatement(sourceFile, node) {
 		return true
 	}
-	parent := node.Parent
-	return parent != nil && parent.Kind == ast.KindArrowFunction && parent.Body() == node
+	prevToken, ok := utils.TokenBeforePosition(sourceFile, utils.TrimNodeTextRange(sourceFile, node).Pos())
+	return ok && prevToken.Kind == ast.KindEqualsGreaterThanToken
 }
 
 func buildSuggestion(ctx rule.RuleContext, node *ast.Node) rule.RuleSuggestion {
