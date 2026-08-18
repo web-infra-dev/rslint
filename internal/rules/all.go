@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
 	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
+	"github.com/web-infra-dev/rslint/internal/rules/max_classes_per_file"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines_per_function"
@@ -182,6 +183,7 @@ func GetAllRules() []rule.Rule {
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
 		init_declarations.InitDeclarationsRule,
+		max_classes_per_file.MaxClassesPerFileRule,
 		max_depth.MaxDepthRule,
 		max_lines.MaxLinesRule,
 		max_lines_per_function.MaxLinesPerFunctionRule,
