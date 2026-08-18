@@ -21,6 +21,7 @@ func TestNoImportNodeTestRule(t *testing.T) {
 			{Code: `const assert = require('node:assert')`},
 			{Code: `const t = import('node:test')`},
 			{Code: `import assert = require('node:assert')`},
+			{Code: `import x from a.b;`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
