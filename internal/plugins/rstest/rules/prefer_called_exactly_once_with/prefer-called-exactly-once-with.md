@@ -46,14 +46,23 @@ expect(handler).to.have.been.calledWith('ready');
 // → expect(handler).to.have.been.calledOnceWith('ready').and.to.be.ok;
 ```
 
+The same holds when the target is not stable under a second evaluation. The fix keeps one `expect(...)` call and deletes the other, so an argument such as a function call would go from evaluated twice to evaluated once — and may not even denote the same mock both times:
+
+```typescript
+expect(getMock()).toHaveBeenCalledOnce();
+expect(getMock()).toHaveBeenCalledWith('ready');
+```
+
+Identifiers, property accesses, and element accesses with a literal key are stable, so those pairs are still fixed.
+
 ## Limits
 
 The rule does not merge two assertions when:
 
-- either carries `not`, because "not called once" and "not called with these arguments" is `¬ once ∧ ¬ with`, while the combined matcher negated is `¬(once ∧ with)`;
+- either carries `not` anywhere in its chain, because "not called once" and "not called with these arguments" is `¬ once ∧ ¬ with`, while the combined matcher negated is `¬(once ∧ with)`; Chai allows a modifier between matchers, so this includes `calledOnce.and.not.calledWith('ready')`;
 - they carry different modifiers, because each then claims something about a different value; matching `resolves` or `rejects` on both halves does merge, awaited or not;
 - one is awaited and the other is not, because dropping the awaited statement would leave a floating promise whose failure escapes as an unhandled rejection;
-- `mockClear`, `mockReset`, or `mockRestore` resets the target between them, at any nesting depth, because each assertion then describes a different call history;
+- `mockClear`, `mockReset`, or `mockRestore` resets the target between them, at any nesting depth, because each assertion then describes a different call history; the reset's receiver is matched against the target structurally, so parentheses, type assertions, and comments in either spelling do not hide it;
 - more than two of these assertions share one target, because which pair to merge is ambiguous.
 
 Where a fix is offered, it preserves the surviving call's arguments, type arguments, comments, and formatting. The folded assertion is removed with its line when it owns that line, and otherwise on its own so that neighbouring statements and comments are never disturbed.

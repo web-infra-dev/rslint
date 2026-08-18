@@ -17,6 +17,15 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
       code: `expect(x).toHaveBeenCalledOnce(); x.mockClear(); expect(x).toHaveBeenCalledWith('hoge')`,
     },
     {
+      code: `expect(obj.fn).toHaveBeenCalledOnce(); obj /* keep */ .fn.mockClear(); expect(obj.fn).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(obj.fn).toHaveBeenCalledOnce(); (obj.fn).mockClear(); expect(obj.fn).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).to.have.been.calledOnce.and.not.calledWith('a')`,
+    },
+    {
       code: `expect(x).toHaveBeenCalledOnce(); if (c) { x.mockClear(); } expect(x).toHaveBeenCalledWith('hoge')`,
     },
     {
@@ -80,6 +89,16 @@ expect(x).to.have.been.calledWith('a');`,
     {
       code: `expect(x).to.have.been.calledOnce.and.to.be.ok;
 expect(x).to.have.been.calledWith('a');`,
+      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+    },
+    {
+      code: `expect(getMock()).toHaveBeenCalledOnce(); expect(getMock()).toHaveBeenCalledWith('a');`,
+      output: null,
+      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+    },
+    {
+      code: `expect(mocks['a']).toHaveBeenCalledOnce(); expect(mocks['a']).toHaveBeenCalledWith('x');`,
+      output: ` expect(mocks['a']).toHaveBeenCalledExactlyOnceWith('x');`,
       errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
     },
     {

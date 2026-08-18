@@ -58,8 +58,33 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			// toBeCalledWith is an alias of toHaveBeenCalledWith; canonicalizing
 			// spellings is no-alias-methods' job, not this rule's.
 			{Code: `expect(x).toHaveBeenCalledOnce(); expect(x).toBeCalledWith('a');`},
+			// A reset receiver that differs from the target only in trivia or
+			// parentheses still splits the two call histories.
+			{Code: `expect(obj.fn).toHaveBeenCalledOnce(); obj /* keep */ .fn.mockClear(); expect(obj.fn).toHaveBeenCalledWith('a');`},
+			{Code: `expect(obj.fn).toHaveBeenCalledOnce(); (obj.fn).mockClear(); expect(obj.fn).toHaveBeenCalledWith('a');`},
+			{Code: `expect(obj.fn).toHaveBeenCalledOnce(); (obj.fn as Mock).mockClear(); expect(obj.fn).toHaveBeenCalledWith('a');`},
+			{Code: `expect(mocks['a']).toHaveBeenCalledOnce(); mocks["a"].mockClear(); expect(mocks['a']).toHaveBeenCalledWith('x');`},
+			// Chai allows a modifier between matchers, so `not` can follow the
+			// first matcher. The merged matcher would assert the opposite.
+			{Code: `expect(x).to.have.been.calledOnce.and.not.calledWith('a');`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// An argument that is not stable under a second evaluation is still
+			// worth reporting, but folding the pair would drop an evaluation.
+			{
+				Code:   `expect(getMock()).toHaveBeenCalledOnce(); expect(getMock()).toHaveBeenCalledWith('a');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			{
+				Code:   `expect(mocks[next()]).toHaveBeenCalledOnce(); expect(mocks[next()]).toHaveBeenCalledWith('a');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			// A literal element access is stable, so the merge is still fixed.
+			{
+				Code:   `expect(mocks['a']).toHaveBeenCalledOnce(); expect(mocks['a']).toHaveBeenCalledWith('x');`,
+				Output: []string{` expect(mocks['a']).toHaveBeenCalledExactlyOnceWith('x');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
 			{
 				Code:   `expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge');`,
 				Output: []string{` expect(x).toHaveBeenCalledExactlyOnceWith('hoge');`},

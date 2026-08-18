@@ -73,9 +73,10 @@ type mergeCandidate struct {
 	position int
 	// pairKey groups the assertions that may merge; see pairKey().
 	pairKey string
-	// targetText is the first factory argument as written. It only identifies
-	// the mock for the reset barrier and never pairs assertions.
-	targetText string
+	// targetNode is the first factory argument. It only identifies the mock for
+	// the reset barrier and never pairs assertions, and it is compared
+	// structurally so an equivalent spelling is still recognised.
+	targetNode *ast.Node
 	// fixable is false when the chain asserts more than the rule understands,
 	// so the merge is reported but left to the author: folding a statement away
 	// would drop the assertions sharing its chain, and rewriting the chain in
@@ -108,6 +109,94 @@ func nodeText(sourceFile *ast.SourceFile, node *ast.Node) (string, bool) {
 		return "", false
 	}
 	return text[r.Pos():r.End()], true
+}
+
+// transparentWrappers are the wrappers that change neither the value an
+// expression denotes nor whether evaluating it can be observed: parentheses
+// and the type-only assertions (`as`, `satisfies`, `!`).
+const transparentWrappers = ast.OEKParentheses | ast.OEKAssertions
+
+// unwrapExpression strips those wrappers, so `obj /* keep */ .fn` and
+// `(obj.fn as Mock)` reduce to the same shape as `obj.fn`.
+func unwrapExpression(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	return ast.SkipOuterExpressions(node, transparentWrappers)
+}
+
+// isStableExpression reports whether evaluating the expression twice is
+// indistinguishable from evaluating it once: no call, no `new`, no `await`, no
+// assignment or update. Property and element access are accepted — a getter
+// could in principle observe the second read, but treating `obj.fn` as
+// unstable would refuse a fix for the shape the rule mostly exists for.
+// Element access is limited to literal keys, so `mocks[i++]` stays out.
+func isStableExpression(node *ast.Node) bool {
+	node = unwrapExpression(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindThisKeyword, ast.KindSuperKeyword,
+		ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindNoSubstitutionTemplateLiteral, ast.KindTrueKeyword,
+		ast.KindFalseKeyword, ast.KindNullKeyword:
+		return true
+	case ast.KindPropertyAccessExpression:
+		access := node.AsPropertyAccessExpression()
+		return access != nil && isStableExpression(access.Expression)
+	case ast.KindElementAccessExpression:
+		access := node.AsElementAccessExpression()
+		if access == nil || !isStableExpression(access.Expression) {
+			return false
+		}
+		argument := unwrapExpression(access.ArgumentExpression)
+		return argument != nil &&
+			(argument.Kind == ast.KindStringLiteral ||
+				argument.Kind == ast.KindNumericLiteral ||
+				argument.Kind == ast.KindNoSubstitutionTemplateLiteral)
+	default:
+		return false
+	}
+}
+
+// sameTargetExpression compares two expressions structurally, so a receiver
+// that differs from the target only in parentheses, type assertions or trivia
+// still counts as the same mock. Comparing the source text instead would let
+// `obj /* keep */ .fn.mockClear()` slip past the reset barrier and hand the
+// author a merge across two call histories.
+func sameTargetExpression(left, right *ast.Node) bool {
+	left, right = unwrapExpression(left), unwrapExpression(right)
+	if left == nil || right == nil || left.Kind != right.Kind {
+		return false
+	}
+	switch left.Kind {
+	case ast.KindIdentifier:
+		return left.AsIdentifier().Text == right.AsIdentifier().Text
+	case ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindNullKeyword,
+		ast.KindTrueKeyword, ast.KindFalseKeyword:
+		return true
+	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindNoSubstitutionTemplateLiteral:
+		return left.Text() == right.Text()
+	case ast.KindPropertyAccessExpression:
+		leftAccess, rightAccess := left.AsPropertyAccessExpression(), right.AsPropertyAccessExpression()
+		if leftAccess == nil || rightAccess == nil ||
+			leftAccess.Name() == nil || rightAccess.Name() == nil ||
+			leftAccess.Name().Text() != rightAccess.Name().Text() {
+			return false
+		}
+		return sameTargetExpression(leftAccess.Expression, rightAccess.Expression)
+	case ast.KindElementAccessExpression:
+		leftAccess, rightAccess := left.AsElementAccessExpression(), right.AsElementAccessExpression()
+		if leftAccess == nil || rightAccess == nil ||
+			!sameTargetExpression(leftAccess.ArgumentExpression, rightAccess.ArgumentExpression) {
+			return false
+		}
+		return sameTargetExpression(leftAccess.Expression, rightAccess.Expression)
+	default:
+		return false
+	}
 }
 
 // assertionRootCall returns the call ParseExpectCall must be handed for an
@@ -164,7 +253,12 @@ func mergeCandidateForStatement(
 	// called with these arguments" is `¬once ∧ ¬with`, while the combined
 	// matcher negated is `¬(once ∧ with)`. Upstream drops `not` chains for the
 	// same reason.
-	if slices.Contains(parsed.Modifiers, "not") {
+	//
+	// Modifiers only holds what precedes the first matcher, and Chai permits a
+	// modifier between matchers, so `calledOnce.and.not.calledWith('a')` would
+	// otherwise reach the merge with an empty Modifiers and both matchers
+	// present. Scanning the whole chain is what actually disqualifies it.
+	if slices.Contains(parsed.Members, "not") {
 		return nil
 	}
 	if parsed.Head == nil || parsed.Head.Kind != ast.KindCallExpression {
@@ -175,7 +269,6 @@ func mergeCandidateForStatement(
 		return nil
 	}
 
-	candidate := &mergeCandidate{hits: hits, fixable: len(parsed.Matchers) == 1}
 	headText, ok := nodeText(sourceFile, parsed.Head)
 	if !ok {
 		return nil
@@ -184,15 +277,28 @@ func mergeCandidateForStatement(
 	if len(arguments) == 0 {
 		return nil
 	}
-	targetText, ok := nodeText(sourceFile, arguments[0])
-	if !ok {
+	if arguments[0] == nil {
 		return nil
 	}
+	// The fix keeps one `expect(...)` call and deletes the other, so every
+	// argument of the surviving call is evaluated once instead of twice. Equal
+	// source text does not make that safe: `expect(getMock())` may return a
+	// different mock each time, and dropping an evaluation drops whatever the
+	// expression did. Such a pair is still worth reporting, but the merge is
+	// the author's to make.
+	fixable := len(parsed.Matchers) == 1
+	for _, argument := range arguments {
+		if !isStableExpression(argument) {
+			fixable = false
+			break
+		}
+	}
+	candidate := &mergeCandidate{hits: hits, fixable: fixable}
 
 	candidate.statement = statement
 	candidate.position = internalUtils.TrimNodeTextRange(sourceFile, statement).Pos()
 	candidate.pairKey = pairKey(headText, parsed.Modifiers, awaited)
-	candidate.targetText = targetText
+	candidate.targetNode = arguments[0]
 	return candidate
 }
 
@@ -288,7 +394,7 @@ func hasMockResetBetween(
 	statements []*ast.Node,
 	first, second *mergeCandidate,
 ) bool {
-	if first.targetText != second.targetText {
+	if !sameTargetExpression(first.targetNode, second.targetNode) {
 		return false
 	}
 	minPosition, maxPosition := first.position, second.position
@@ -303,7 +409,7 @@ func hasMockResetBetween(
 			return false
 		}
 		if receiver, ok := mockResetReceiver(node); ok {
-			if text, textOK := nodeText(sourceFile, receiver); textOK && text == first.targetText {
+			if sameTargetExpression(receiver, first.targetNode) {
 				found = true
 				return true
 			}
