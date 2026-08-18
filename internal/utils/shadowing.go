@@ -256,7 +256,7 @@ func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
 		if ast.IsFunctionLikeDeclaration(current) && isDirectParameterOf(current, prevChild) &&
 			!escapesThroughParameterDecorator(current, prevChild, inParameterDecorator, crossedScope) {
 			if body := current.Body(); body != nil &&
-				(HasShadowingDeclaration(body, name) || HasHoistedVarDeclaration(body, name)) {
+				(hasFunctionScopeDeclaration(body, name) || HasHoistedVarDeclaration(body, name)) {
 				return true
 			}
 		}
@@ -264,6 +264,36 @@ func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
 			crossedScope = true
 		}
 		prevChild = current
+	}
+	return false
+}
+
+// hasFunctionScopeDeclaration reports whether the top level of a function body
+// declares name in any space scope-manager gives a function-scope variable:
+// every value declaration HasLocalDeclarationInStatements recognizes, plus the
+// TypeScript type-space declarations that exist as variables only in
+// scope-manager's model.
+func hasFunctionScopeDeclaration(body *ast.Node, name string) bool {
+	if body == nil || body.Kind != ast.KindBlock {
+		return false
+	}
+	block := body.AsBlock()
+	if block == nil || block.Statements == nil {
+		return false
+	}
+	if HasLocalDeclarationInStatements(block.Statements.Nodes, name) {
+		return true
+	}
+	for _, stmt := range block.Statements.Nodes {
+		if stmt == nil {
+			continue
+		}
+		switch stmt.Kind {
+		case ast.KindTypeAliasDeclaration, ast.KindInterfaceDeclaration:
+			if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
+				return true
+			}
+		}
 	}
 	return false
 }

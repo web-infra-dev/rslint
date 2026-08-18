@@ -224,6 +224,21 @@ func TestShadowingScopeModels(t *testing.T) {
 			code:              `function f(a = () => Target()) { var Target; }`,
 			fromParameterInit: true,
 		},
+		{
+			name:              "parameter default, body type alias",
+			code:              `function f(a = Target()) { type Target = {}; }`,
+			fromParameterInit: true,
+		},
+		{
+			name:              "parameter default, body interface",
+			code:              `function f(a = Target()) { interface Target {} }`,
+			fromParameterInit: true,
+		},
+		{
+			name:              "parameter default, body import equals",
+			code:              `function f(a = Target()) { import Target = require("x"); }`,
+			fromParameterInit: true,
+		},
 
 		// A reference directly in a parameter decorator acquires the decorated
 		// function's scope.

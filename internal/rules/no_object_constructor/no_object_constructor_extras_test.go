@@ -92,6 +92,11 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			// decorated function's own scope.
 			{Code: `class C { m(@dec(new Object()) x: number) { var Object; } }`},
 			{Code: `class C { m(@dec(new Object()) x: number, Object: any) { } }`},
+			// The same function scope holds TypeScript type-space and
+			// import-equals declarations.
+			{Code: `function f(a = new Object()) { type Object = {}; }`},
+			{Code: `function f(a = new Object()) { interface Object {} }`},
+			{Code: `function f(a = new Object()) { import Object = require("x"); }`},
 			// The enclosing class stays in the chain, so its name and type
 			// parameters shadow a call nested inside a parameter decorator.
 			{Code: `class Object { m(@dec(() => new Object()) x: number) { } }`},
@@ -103,6 +108,10 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			{Code: `namespace N { namespace Object {} Object(); }`},
 			{Code: `namespace N { import Object = require("x"); Object(); }`},
 			{Code: `namespace N.M { const Object = f; Object(); }`},
+			// An export specifier alongside a local declaration still leaves
+			// that declaration in the namespace.
+			{Code: `namespace N { const Object = f; export { Object }; Object(); }`},
+			{Code: `namespace N { import Object = require("x"); export { Object }; Object(); }`},
 
 			// Locks in upstream check() arm 1: callee is not an Identifier at
 			// all (a member access), independent of the NewExpression form
@@ -241,6 +250,15 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			},
 			asiCase(`class C { m(@dec(() => new Object()) x: number, Object: any) { } }`, "new Object()", false, false),
 			asiCase(`class C { m<Object>(@dec(() => new Object()) x: number) { } }`, "new Object()", false, false),
+
+			// ---- Dimension 2: scoping — a namespace re-export names what the
+			// namespace exports without declaring it inside, so scope-manager
+			// creates no variable and the call still reaches the global ----
+			asiCase(`namespace N { export { Object } from "x"; Object(); }`, "Object()", false, false),
+			asiCase(`namespace N { export type { Object } from "x"; Object(); }`, "Object()", false, false),
+			asiCase(`namespace N { export * as Object from "x"; Object(); }`, "Object()", false, false),
+			asiCase(`namespace N { export { Other as Object } from "x"; Object(); }`, "Object()", false, false),
+			asiCase(`namespace N { export { Object }; Object(); }`, "Object()", false, false),
 
 			// A type parameter is only in scope inside its own declaration.
 			{

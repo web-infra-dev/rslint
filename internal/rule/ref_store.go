@@ -302,6 +302,10 @@ func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.Symb
 			location = scope.Parent
 			continue
 		}
+		if isExportAliasOnly(result) {
+			location = outerExportScopeLocation(result.Declarations[0])
+			continue
+		}
 		fn := bodyOnlyParameterBarrier(location, result)
 		if fn == nil {
 			return result
@@ -315,6 +319,24 @@ func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.Symb
 		location = fn.Parent
 	}
 	return nil
+}
+
+// isExportAliasOnly reports whether every declaration of symbol is an export
+// specifier or a namespace export. A namespace's `export { X } from 'y'`,
+// `export * as X from 'y'`, and bare `export { X }` add X to what the namespace
+// exports without declaring it inside — ESLint's scope manager creates no
+// variable for them, so the scope walk has to step over the binding and resume
+// outside the namespace.
+func isExportAliasOnly(symbol *ast.Symbol) bool {
+	if len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration.Kind != ast.KindExportSpecifier && declaration.Kind != ast.KindNamespaceExport {
+			return false
+		}
+	}
+	return true
 }
 
 // jsdocOnlyScope returns the scope whose symbol table binds name to symbol when
