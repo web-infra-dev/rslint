@@ -118,6 +118,7 @@ export default defineConfig({
     './tests/eslint/rules/no-new-wrappers.test.ts',
     './tests/eslint/rules/no-param-reassign.test.ts',
     './tests/eslint/rules/no-plusplus.test.ts',
+    './tests/eslint/rules/no-promise-executor-return.test.ts',
     './tests/eslint/rules/no-self-assign.test.ts',
     './tests/eslint/rules/no-undef.test.ts',
     './tests/eslint/rules/no-undef-init.test.ts',
