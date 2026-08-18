@@ -64,14 +64,25 @@ func ParseOptions(options []any) Options {
 	return opts
 }
 
-// EngineOptions configures BuildListeners with the two policy points
+// EngineOptions configures BuildListeners with the three policy points
 // that genuinely differ between `no-invalid-this` and
 // `@typescript-eslint/no-invalid-this` (see BuildListeners doc comment).
 // Everything else — the parent-chain walker, JSDoc/this-param recognition,
-// computed-key deferral, decorator handling — is identical between the two
-// rules and lives here as the single shared implementation.
+// computed-key deferral, method-decorator handling — is identical between
+// the two rules and lives here as the single shared implementation.
 type EngineOptions struct {
 	CapIsConstructor bool
+	// FieldDecoratorUsesEnclosingScope decides which frame `this` inside a
+	// decorator attached to a class field belongs to. ESLint core opens the
+	// field's frame as a code path rooted at the initializer *value*
+	// (`onCodePathStart` for the class-field-initializer path, plus
+	// `AccessorProperty > *.value`), so a decorator — visited before the
+	// value — sees the enclosing scope: true. typescript-eslint's wrapper
+	// instead pushes on `PropertyDefinition` / `AccessorProperty` entry,
+	// which covers the decorator too and makes the field's always-valid
+	// frame swallow the report: false. Method-like decorators resolve to
+	// the enclosing scope under both rules.
+	FieldDecoratorUsesEnclosingScope bool
 	// TopLevelValid is the validity of `this` when no function/class-member
 	// frame is on the stack (i.e. at the top level of the file).
 	TopLevelValid bool
@@ -95,6 +106,8 @@ type EngineOptions struct {
 //   - `@typescript-eslint/no-invalid-this` assumes `sourceType: "module"`
 //     (typescript-eslint's RuleTester default), so every function frame is
 //     always strict and top-level `this` is always invalid.
+//   - The two also disagree on which frame a class field's decorator sees
+//     (see `FieldDecoratorUsesEnclosingScope`).
 //
 // Everything else — the AST shapes recognized, the order branches are
 // checked in, computed-key and decorator handling — is identical, since
@@ -211,28 +224,24 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 		// the enclosing frame governs.
 
 		ast.KindThisKeyword: func(node *ast.Node) {
-			// Decorators on Method / Constructor / Get/Set members are
-			// visited BEFORE the enclosing member's own frame push fires
-			// in ESTree. tsgo collapses MethodDefinition's FE child into
-			// the member node itself, so our `enterMethodLike` push happens
-			// one visitor tick too early to reproduce that timing. To
-			// compensate, peek one frame deeper when `this` appears inside
-			// such a decorator — but ONLY if the method's frame is actually
-			// on the stack already. A computed-key method-like defers its
-			// push to `ComputedPropertyName:exit`, which runs AFTER the
-			// modifier list (decorators), so at decorator visit time the
-			// stack top is already the surrounding scope and no peek is
-			// needed.
-			//
-			// PropertyDeclaration is intentionally NOT covered here: a
-			// non-computed field pushes on entry, before its decorators are
-			// visited, so decorators on such fields already see the field's
-			// frame with no peek needed. A computed-key field defers its
-			// push the same way a computed-key method-like does, so
-			// decorators there already see the surrounding scope.
+			// A decorator's expression is evaluated at class-definition
+			// time, in the scope surrounding the class — so `this` inside
+			// one belongs to the enclosing frame, not the decorated
+			// member's. Our listeners push the member's frame on entry,
+			// which happens before tsgo visits the modifier list, so peek
+			// one frame deeper when `this` appears inside a decorator —
+			// but ONLY if the member's frame is actually on the stack
+			// already. A computed-key member defers its push to
+			// `ComputedPropertyName:exit`, which runs AFTER the modifier
+			// list, so at decorator visit time the stack top is already
+			// the surrounding scope and no peek is needed. Field
+			// decorators peek only when `FieldDecoratorUsesEnclosingScope`
+			// says so.
 			skip := 0
-			if inside, methodLike := decoratorOfMethodLikeAncestor(node); inside && !hasComputedKey(methodLike) {
-				skip = 1
+			if inside, member := decoratorOfClassMemberAncestor(node); inside && !hasComputedKey(member) {
+				if member.Kind != ast.KindPropertyDeclaration || eo.FieldDecoratorUsesEnclosingScope {
+					skip = 1
+				}
 			}
 			idx := len(stack) - 1 - skip
 			var valid bool
@@ -255,8 +264,9 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Top-level `this` refers to the global object in scripts (always
 		// valid) and is `undefined` in ES modules (always invalid) —
 		// independent of strict mode.
-		TopLevelValid: !ast.IsExternalModule(ctx.SourceFile),
-		IsStrict:      isStrictFunction,
+		TopLevelValid:                    !ast.IsExternalModule(ctx.SourceFile),
+		IsStrict:                         isStrictFunction,
+		FieldDecoratorUsesEnclosingScope: true,
 	})
 }
 
@@ -718,15 +728,12 @@ func isCallApplyBind(name string) bool {
 	return name == "call" || name == "apply" || name == "bind"
 }
 
-// decoratorOfMethodLikeAncestor reports whether `thisNode` is positioned
-// inside a `@decorator(...)` expression attached to a method-like class
-// member (`KindMethodDeclaration` / `KindConstructor` / `KindGetAccessor` /
-// `KindSetAccessor`), and returns that member node when so. Decorators on
-// these members run at class-evaluation time, so their `this` resolves to
-// the enclosing scope, NOT the member's own implicit `this`. PropertyDeclaration
-// is excluded — upstream's `PropertyDefinition` / `AccessorProperty` listeners
-// push on entry, so decorators on fields stay in the field's frame to mirror
-// that.
+// decoratorOfClassMemberAncestor reports whether `thisNode` is positioned
+// inside a `@decorator(...)` expression attached to a class member
+// (`KindMethodDeclaration` / `KindConstructor` / `KindGetAccessor` /
+// `KindSetAccessor` / `KindPropertyDeclaration`), and returns that member
+// node when so. Decorators run at class-evaluation time, so their `this`
+// resolves to the enclosing scope, NOT the member's own implicit `this`.
 //
 // Arrow functions are walked past transparently because their `this` is
 // lexical — `@deco(() => this)` resolves `this` to whatever scope the
@@ -735,11 +742,11 @@ func isCallApplyBind(name string) bool {
 // false: a non-arrow function inside a decorator has its OWN `this`
 // (default-bound), independent of the decorator's host.
 //
-// The returned `methodLike` node lets the caller distinguish computed-key
+// The returned `member` node lets the caller distinguish computed-key
 // members (whose frame is deferred to `ComputedPropertyName:exit`) from
 // non-computed ones, since the two require different stack-peek depths at
 // decorator-visit time.
-func decoratorOfMethodLikeAncestor(thisNode *ast.Node) (bool, *ast.Node) {
+func decoratorOfClassMemberAncestor(thisNode *ast.Node) (bool, *ast.Node) {
 	current := thisNode.Parent
 	for current != nil {
 		switch current.Kind {
@@ -750,7 +757,8 @@ func decoratorOfMethodLikeAncestor(thisNode *ast.Node) (bool, *ast.Node) {
 			}
 			switch parent.Kind {
 			case ast.KindMethodDeclaration, ast.KindConstructor,
-				ast.KindGetAccessor, ast.KindSetAccessor:
+				ast.KindGetAccessor, ast.KindSetAccessor,
+				ast.KindPropertyDeclaration:
 				return true, parent
 			}
 			return false, nil

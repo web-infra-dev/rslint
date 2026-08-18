@@ -21,15 +21,15 @@ var schemaJSON []byte
 //     binds `this` to the class instance.
 //
 // Both recognitions — along with every other validity decision (parent-walk
-// via `isDefaultThisBinding`, JSDoc `@this`, computed-key deferral, decorator
-// handling, `capIsConstructor` at every uppercase-name branch) — are the
-// exact same algorithm ESLint core's own `no-invalid-this` uses: core
-// natively recognizes both the `this` parameter and `accessor` fields as of
-// the version this port targets, which is what let this rule become a thin
-// wrapper around internal/rules/no_invalid_this.BuildListeners rather than a
-// second copy of the walker. See that package's BuildListeners doc comment
-// for the two policy points where the rules genuinely differ (strict-mode
-// gating and top-level validity).
+// via `isDefaultThisBinding`, JSDoc `@this`, computed-key deferral,
+// method-decorator handling, `capIsConstructor` at every uppercase-name
+// branch) — are the exact same algorithm ESLint core's own `no-invalid-this`
+// uses: core natively recognizes both the `this` parameter and `accessor`
+// fields as of the version this port targets, which is what let this rule
+// become a thin wrapper around internal/rules/no_invalid_this.BuildListeners
+// rather than a second copy of the walker. See that package's BuildListeners doc comment
+// for the three policy points where the rules genuinely differ (strict-mode
+// gating, top-level validity, and the frame a field decorator sees).
 //
 // https://typescript-eslint.io/rules/no-invalid-this
 var NoInvalidThisRule = rule.CreateRule(rule.Rule{
@@ -53,5 +53,12 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// parser options, applied uniformly across rules.
 		TopLevelValid: false,
 		IsStrict:      func(*ast.Node, *ast.SourceFile) bool { return true },
+		// typescript-eslint's wrapper pushes the field's always-valid frame
+		// on `PropertyDefinition` / `AccessorProperty` entry, before the
+		// decorators are visited, so `this` in a field decorator resolves to
+		// the field rather than the enclosing scope. ESLint core scopes the
+		// field frame to the initializer value and reports there; this port
+		// follows the wrapper it mirrors.
+		FieldDecoratorUsesEnclosingScope: false,
 	})
 }

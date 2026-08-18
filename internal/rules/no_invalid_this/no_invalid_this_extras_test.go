@@ -205,7 +205,7 @@ function foo([Foo = function () { this; }]) {}
 
 			// ---- Decorator on a method: `this` resolves to the enclosing (valid) scope, not the method's own frame ----
 			// No upstream test exercises decorators (a TS-only / stage-3 syntax);
-			// this locks in decoratorOfMethodLikeAncestor's non-computed-key peek.
+			// this locks in decoratorOfClassMemberAncestor's non-computed-key peek.
 			{Code: `
 export {};
 function outer(this: Ctx) {
@@ -222,6 +222,50 @@ function outer(this: Ctx) {
   class C {
     @deco(this)
     [computedName]() {}
+  }
+}
+    `},
+
+			// ---- Decorator on a class field: same enclosing-scope resolution as a method decorator ----
+			// A field's own frame is always valid, so only the peek makes this
+			// case follow `outer`'s (valid, this-param) frame.
+			{Code: `
+export {};
+function outer(this: Ctx) {
+  class C {
+    @deco(this)
+    x = 1;
+  }
+}
+    `},
+			// ---- Decorator on an `accessor` field (tsgo folds AccessorProperty onto PropertyDeclaration) ----
+			{Code: `
+export {};
+function outer(this: Ctx) {
+  class C {
+    @deco(this)
+    accessor x = 1;
+  }
+}
+    `},
+			// ---- Decorator on a computed-key field: no peek needed (push already deferred) ----
+			{Code: `
+export {};
+function outer(this: Ctx) {
+  class C {
+    @deco(this)
+    [computedName] = 1;
+  }
+}
+    `},
+			// ---- Field initializer keeps its own always-valid frame ----
+			// Contrast case: only the decorator position peeks past the field.
+			{Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    x = this;
   }
 }
     `},
@@ -415,6 +459,50 @@ function outer() {
   class C {
     @deco(this)
     [computedName]() {}
+  }
+}
+    `,
+				Errors: unexpected(6, 11),
+			},
+
+			// ---- Decorator on a class field resolves to the enclosing INVALID scope ----
+			// The discriminating half of the "Decorator on a class field" valid
+			// case: without the peek the field's always-valid frame would
+			// swallow the report.
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(this)
+    x = 1;
+  }
+}
+    `,
+				Errors: unexpected(6, 11),
+			},
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(this)
+    accessor x = 1;
+  }
+}
+    `,
+				Errors: unexpected(6, 11),
+			},
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(this)
+    [computedName] = 1;
   }
 }
     `,

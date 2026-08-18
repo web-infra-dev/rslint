@@ -155,8 +155,10 @@ var obj = {
 			// ---- Wrapper-bug lock-in: `this` in decorator on a field is masked ----
 			// PropertyDefinition / AccessorProperty push happens on entry,
 			// so decorators on these (visited after entry) see the field's
-			// frame and the report is silently swallowed. Methods don't
-			// share this masking (see Layer-3 method-decorator tests).
+			// frame and the report is silently swallowed — the
+			// `FieldDecoratorUsesEnclosingScope: false` policy point.
+			// Methods don't share this masking (see Layer-3
+			// method-decorator tests), and ESLint core reports here.
 			{Code: `
 class A {
   @deco(this)
