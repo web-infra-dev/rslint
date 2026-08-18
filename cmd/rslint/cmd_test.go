@@ -93,6 +93,16 @@ func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, strin
 	return code, string(stdoutBytes), string(stderrBytes)
 }
 
+type directoryAccessSpyFS struct {
+	vfs.FS
+	accessedDirs []string
+}
+
+func (fs *directoryAccessSpyFS) GetAccessibleEntries(path string) vfs.Entries {
+	fs.accessedDirs = append(fs.accessedDirs, tspath.NormalizePath(path))
+	return fs.FS.GetAccessibleEntries(path)
+}
+
 // TestPrintDiagnosticUTF8 tests that the default output renderer correctly
 // handles UTF-8 characters (Chinese, Japanese, Korean, Emoji).
 func TestPrintDiagnosticUTF8(t *testing.T) {
@@ -963,6 +973,49 @@ func TestExecuteLintPipelineFocusedFileBuildsOnlyDirectProject(t *testing.T) {
 	}
 	if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); got != 0 {
 		t.Fatalf("project after the direct winner was parsed %d time(s)", got)
+	}
+}
+
+func TestExecuteLintPipelineDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testing.T) {
+	dir := t.TempDir()
+	selectedDir := filepath.Join(dir, "selected")
+	unrelatedDir := filepath.Join(dir, "unrelated")
+	for _, path := range []string{selectedDir, filepath.Join(selectedDir, "deep"), unrelatedDir} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+	}
+	for path, content := range map[string]string{
+		filepath.Join(dir, "rslint.jsonc"):            `[{"rules":{"no-debugger":"error"}}]`,
+		filepath.Join(dir, ".gitignore"):              "root.generated.js\n",
+		filepath.Join(selectedDir, ".gitignore"):      "local.generated.js\n",
+		filepath.Join(selectedDir, "index.js"):        "debugger;\n",
+		filepath.Join(selectedDir, "deep/.gitignore"): "deep.generated.js\n",
+		filepath.Join(unrelatedDir, ".gitignore"):     "index.js\n",
+		filepath.Join(unrelatedDir, "index.js"):       "debugger;\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
+
+	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		Config:         filepath.Join(dir, "rslint.jsonc"),
+		FS:             spy,
+		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 1 || !strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("selected directory was not linted: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	unrelatedDir = tspath.NormalizePath(unrelatedDir)
+	for _, accessed := range spy.accessedDirs {
+		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+			t.Fatalf("JSON directory target entered unrelated directory %q", accessed)
+		}
 	}
 }
 

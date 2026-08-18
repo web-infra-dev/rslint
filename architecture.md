@@ -901,8 +901,12 @@ Additional current behaviors:
   target's `.gitignore` sources. This preserves ESLint v10's per-target global
   ignore behavior: adding another literal target cannot change whether an
   existing target is ignored. File-only CLI/API requests read only target
-  directory chains within each governing config. The synthetic Git entry is
-  ordered before authored entries, so a later config `!` may re-include a target
+  directory chains within each governing config. Explicit JS/TS and JSON CLI
+  directory requests read the target ancestry and then recurse only below the
+  requested directories; mixed requests add the exact-file chains. Automatic
+  config discovery keeps its existing ownership walk. The synthetic Git entry
+  is ordered before authored entries, so a later config `!` may re-include a
+  target
 - when the client supports dynamic file-watch registration, Go watches
   workspace-descendant `.gitignore` files plus exact `.gitignore` paths in
   strict workspace ancestors that may contain an automatically selected config.
@@ -1008,7 +1012,10 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    - Native API roots carry an exact target-ancestor trie from the tinyglobby
      result, so only sibling branches leading to supplied files enter those
      frontiers. CLI/LSP directory roots, including CLI mixed file+directory
-     invocations, remain recursively unbounded within ignore boundaries.
+     invocations, remain recursively unbounded during automatic config
+     discovery. After an explicit JS/TS config loads, its fixed-owner Git
+     projection instead carries the CLI target trie: exact-file branches stop
+     at their parent, and requested directory branches recurse from that root.
    - Directory-root ancestry is loaded outer-to-inner before the root frontier.
      Each successful owner's authored global ignores and Git cursor control
      continuation below that boundary; local Git sources are observed only after
