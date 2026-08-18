@@ -199,8 +199,6 @@ func TestJsxHandlerNamesRule(t *testing.T) {
 		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "[a-Z]"}},
 		// `(?`           — unbalanced + Perl-syntax fragment.
 		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "(?"}},
-		// `[[:foo:]]`    — bogus POSIX class.
-		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "[[:foo:]]"}},
 
 		// Symmetric coverage on the prop side. Note: when the prop regex
 		// fails to compile, `propIsEventHandler` is permanently false, so
@@ -500,6 +498,17 @@ func TestJsxHandlerNamesRule(t *testing.T) {
 		// at every step.
 		{Code: `var x = <TestComponent onChange={() => (this.handleChange())} />`, Tsx: true, Options: map[string]interface{}{"checkInlineFunction": true}},
 	}, []rule_tester.InvalidTestCase{
+		// ---- `[[:foo:]]` is not a POSIX class in JavaScript, it is an
+		// ordinary character class, so the prefix compiles and the rule runs ----
+		{
+			Code:    `var x = <TestComponent onChange={this.handleChange} />`,
+			Tsx:     true,
+			Options: map[string]interface{}{"eventHandlerPrefix": "[[:foo:]]"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "badHandlerName", Line: 1, Column: 24},
+			},
+		},
+
 		// ---- Upstream: bad handler name (default options) ----
 		{
 			Code: `var x = <TestComponent onChange={this.doSomethingOnChange} />`,

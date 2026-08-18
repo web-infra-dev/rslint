@@ -58,6 +58,163 @@ func IsComputedIdentifierAccessor(node *ast.Node) bool {
 	return false
 }
 
+// AccessorReceiverAndParent returns the receiver and accessor expression that
+// own entry. Parentheses around a computed key are transparent.
+func AccessorReceiverAndParent(entry *MemberEntry) (*ast.Node, *ast.Node) {
+	if entry == nil || entry.Node == nil {
+		return nil, nil
+	}
+
+	parent := entry.Node.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+	if parent == nil {
+		return nil, nil
+	}
+
+	switch parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		property := parent.AsPropertyAccessExpression()
+		if property.Name() != entry.Node {
+			return nil, nil
+		}
+		return property.Expression, parent
+	case ast.KindElementAccessExpression:
+		element := parent.AsElementAccessExpression()
+		if ast.SkipParentheses(element.ArgumentExpression) != entry.Node {
+			return nil, nil
+		}
+		return element.Expression, parent
+	default:
+		return nil, nil
+	}
+}
+
+// AccessorQuestionDotToken returns the optional-chain token owned by accessor.
+func AccessorQuestionDotToken(accessor *ast.Node) *ast.Node {
+	if accessor == nil {
+		return nil
+	}
+
+	switch accessor.Kind {
+	case ast.KindPropertyAccessExpression:
+		return accessor.AsPropertyAccessExpression().QuestionDotToken
+	case ast.KindElementAccessExpression:
+		return accessor.AsElementAccessExpression().QuestionDotToken
+	default:
+		return nil
+	}
+}
+
+func removeAccessorSyntaxRanges(
+	sourceFile *ast.SourceFile,
+	comments []*ast.CommentRange,
+	accessor *ast.Node,
+	start int,
+) []core.TextRange {
+	if !utils.HasCommentInSpan(comments, start, accessor.End()) {
+		return []core.TextRange{core.NewTextRange(start, accessor.End())}
+	}
+
+	ranges := []core.TextRange{}
+	for _, token := range utils.TokensOfNode(sourceFile, accessor) {
+		if token.Start >= start && token.End <= accessor.End() {
+			ranges = append(ranges, token.Range())
+		}
+	}
+	return ranges
+}
+
+// RemoveAccessorEntryRanges removes entry without requiring the caller to
+// retain the full parsed member slice. It derives the next accessor or call
+// directly from the AST, which is required for semantic entries originating in
+// an alias initializer rather than the final call site's Members.
+func RemoveAccessorEntryRanges(
+	sourceFile *ast.SourceFile,
+	comments []*ast.CommentRange,
+	entry *MemberEntry,
+) ([]core.TextRange, bool) {
+	if sourceFile == nil || entry == nil {
+		return nil, false
+	}
+	receiver, accessor := AccessorReceiverAndParent(entry)
+	if receiver == nil || accessor == nil {
+		return nil, false
+	}
+
+	questionDot := AccessorQuestionDotToken(accessor)
+	start := receiver.End()
+	if questionDot != nil {
+		start = questionDot.End()
+	}
+	ranges := removeAccessorSyntaxRanges(sourceFile, comments, accessor, start)
+	if len(ranges) == 0 || questionDot == nil {
+		return ranges, len(ranges) > 0
+	}
+
+	next := accessor.Parent
+	for next != nil && next.Kind == ast.KindParenthesizedExpression {
+		next = next.Parent
+	}
+	if next == nil {
+		return nil, false
+	}
+
+	switch next.Kind {
+	case ast.KindPropertyAccessExpression:
+		property := next.AsPropertyAccessExpression()
+		if property.Expression != accessor {
+			return nil, false
+		}
+		connector, ok := utils.TokenAtOrAfter(sourceFile, accessor.End())
+		if !ok || (connector.Text != "." && connector.Text != "?.") {
+			return nil, false
+		}
+		nextNameStart := utils.TrimNodeTextRange(sourceFile, property.Name()).Pos()
+		if utils.HasCommentInSpan(comments, accessor.End(), nextNameStart) {
+			ranges = append(ranges, connector.Range())
+		} else {
+			ranges = append(ranges, core.NewTextRange(accessor.End(), nextNameStart))
+		}
+	case ast.KindElementAccessExpression:
+		element := next.AsElementAccessExpression()
+		if element.Expression != accessor {
+			return nil, false
+		}
+		if nextQuestionDot := AccessorQuestionDotToken(next); nextQuestionDot != nil {
+			nextQuestionDotRange := utils.TrimNodeTextRange(sourceFile, nextQuestionDot)
+			if utils.HasCommentInSpan(comments, accessor.End(), nextQuestionDotRange.End()) {
+				ranges = append(ranges, nextQuestionDotRange)
+			} else {
+				ranges = append(ranges, core.NewTextRange(accessor.End(), nextQuestionDotRange.End()))
+			}
+		}
+	case ast.KindCallExpression:
+		call := next.AsCallExpression()
+		if call.Expression != accessor {
+			return nil, false
+		}
+		if call.QuestionDotToken != nil {
+			callQuestionDotRange := utils.TrimNodeTextRange(sourceFile, call.QuestionDotToken)
+			if utils.HasCommentInSpan(comments, accessor.End(), callQuestionDotRange.End()) {
+				ranges = append(ranges, callQuestionDotRange)
+			} else {
+				ranges = append(ranges, core.NewTextRange(accessor.End(), callQuestionDotRange.End()))
+			}
+		}
+	case ast.KindVariableDeclaration:
+		declaration := next.AsVariableDeclaration()
+		if ast.SkipParentheses(declaration.Initializer) != accessor {
+			return nil, false
+		}
+		ranges = append(ranges, utils.TrimNodeTextRange(sourceFile, questionDot))
+	default:
+		return nil, false
+	}
+	return ranges, true
+}
+
 // AccessorRange returns the accessor's own source range, excluding leading
 // trivia. For string and template literals the range includes the delimiters.
 func AccessorRange(sourceFile *ast.SourceFile, node *ast.Node) (core.TextRange, bool) {

@@ -4,13 +4,13 @@ import (
 	_ "embed"
 	"regexp"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed dot_notation.schema.json
@@ -250,9 +250,9 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 		// so user patterns using lookaround, backreferences, or `\p{...}` work
 		// identically to the original rule (Go's standard `regexp` / RE2 does not
 		// support those). Invalid regex patterns are silently ignored for parity.
-		var allowRE *regexp2.Regexp
+		var allowRE *esregexp.RegExp
 		if opts.AllowPattern != "" {
-			if re, err := regexp2.Compile(opts.AllowPattern, regexp2.ECMAScript|regexp2.Unicode); err == nil {
+			if re, err := esregexp.Compile(opts.AllowPattern, "u"); err == nil {
 				allowRE = re
 			}
 		}
@@ -297,10 +297,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			// patterns behave identically, ES-only features like lookbehind
 			// are not supported).
 			if allowRE != nil {
-				// Fail open: on regex errors (e.g. catastrophic-backtracking
-				// timeouts if MatchTimeout is ever set) skip reporting rather
-				// than risk a false positive.
-				if matched, err := allowRE.MatchString(propName); err != nil || matched {
+				if allowRE.TestOrTimeout(propName) {
 					return
 				}
 			}

@@ -45,6 +45,12 @@ func IsCommaOperator(node *ast.Node) bool {
 	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindCommaToken
 }
 
+// IsLooseEqualityOperator reports whether kind is the == or != token, as
+// opposed to their strict (===, !==) counterparts.
+func IsLooseEqualityOperator(kind ast.Kind) bool {
+	return kind == ast.KindEqualsEqualsToken || kind == ast.KindExclamationEqualsToken
+}
+
 // IsCallee checks if a node is the callee of a CallExpression or NewExpression,
 // skipping parentheses and TS type assertions between the node and the call.
 func IsCallee(node *ast.Node) bool {
@@ -335,4 +341,37 @@ func VisitDescendants(node *ast.Node, visit func(*ast.Node) bool) {
 		VisitDescendants(child, visit)
 		return false
 	})
+}
+
+// IsInJSDocSyntax reports whether node came from syntax parsed inside a JSDoc
+// comment. TypeScript-Go deep-clones some of these nodes into the executable
+// tree, preserving NodeFlagsJSDoc on the cloned subtree. Espree and
+// typescript-eslint keep the same text as comments, so none of these names
+// are references for scope-sensitive rules like no-undef and no-undefined.
+func IsInJSDocSyntax(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current.Flags&ast.NodeFlagsJSDoc != 0 || ast.IsJSDocNode(current) {
+			return true
+		}
+		if current.Kind == ast.KindSourceFile {
+			return false
+		}
+	}
+	return false
+}
+
+// IsImportTypeSyntax reports whether node belongs to the argument,
+// attributes, or qualifier of an ImportType. Type arguments are siblings of
+// those fields and remain references.
+func IsImportTypeSyntax(node *ast.Node) bool {
+	current := node
+	for current.Parent != nil && current.Parent.Kind != ast.KindImportType {
+		current = current.Parent
+	}
+	if current.Parent == nil || current.Parent.Kind != ast.KindImportType {
+		return false
+	}
+	importType := current.Parent.AsImportTypeNode()
+	return importType != nil &&
+		(importType.Argument == current || importType.Attributes == current || importType.Qualifier == current)
 }

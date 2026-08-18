@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed max_lines.schema.json
@@ -109,7 +110,7 @@ func checkMaxLines(ctx rule.RuleContext, opts maxLinesOptions) {
 			) {
 				continue
 			}
-			if opts.skipBlankLines && utils.IsECMABlankLine(text[start:contentEnd]) {
+			if opts.skipBlankLines && ecmascript.IsBlank(text[start:contentEnd]) {
 				continue
 			}
 
@@ -187,7 +188,7 @@ func lineIsCommentOnly(
 		hasComment = true
 
 		commentStart := min(max(comment.Pos(), lineStart), contentEnd)
-		if commentStart > outsideStart && !utils.IsECMABlankLine(text[outsideStart:commentStart]) {
+		if commentStart > outsideStart && !ecmascript.IsBlank(text[outsideStart:commentStart]) {
 			return false
 		}
 		commentEnd := min(comment.End(), contentEnd)
@@ -196,5 +197,5 @@ func lineIsCommentOnly(
 		}
 	}
 
-	return hasComment && utils.IsECMABlankLine(text[outsideStart:contentEnd])
+	return hasComment && ecmascript.IsBlank(text[outsideStart:contentEnd])
 }

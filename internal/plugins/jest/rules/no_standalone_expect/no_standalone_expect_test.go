@@ -67,6 +67,40 @@ func TestNoStandaloneExpectRule(t *testing.T) {
 					map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"each.test"}},
 				},
 			},
+			// A nested registration with no inline callback must not close the
+			// scope of the test it sits in, whichever form leaves it without one.
+			{Code: `test('outer', () => { test.todo('inner'); expect(1).toBe(1); });`},
+			{Code: `test('outer', () => { test('inner', callback); expect(1).toBe(1); }); function callback() {}`},
+			{Code: `describe('d', () => { test('outer', () => { test.todo('inner'); expect(1).toBe(1); }); });`},
+			{Code: `test.each([1])('outer', value => { test.todo('inner'); expect(value).toBe(1); });`},
+			{
+				Code: `test('outer', () => { t('inner'); expect(1).toBe(1); });`,
+				Options: []interface{}{
+					map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"t"}},
+				},
+			},
+			// A registration's arguments belong to the test block it opens, which
+			// is where upstream also allows an assertion.
+			{Code: `test.todo(expect(1).toBe(1));`},
+			{Code: `test('case', expect(1).toBe(1), () => {});`},
+			{Code: `test('case', { timeout: expect(1).toBe(1) }, () => {});`},
+			{Code: `test('case', () => {}, expect(1).toBe(1));`},
+			{Code: `describe('d', () => { test('case', expect(1).toBe(1), () => {}); });`},
+			// Same asymmetry in the arrow branch: an arrow passed to a call opens
+			// no scope, so its exit must not close the enclosing arrow's.
+			{Code: `const outer = () => foo(() => {}) || expect(1).toBe(1);`},
+			// A tagged template returns the function that registers the cases, so
+			// the callback of the call it tags is inside the template scope.
+			{
+				Code: `
+        myEach` + "`" + `
+          value
+          ${1}
+        ` + "`" + `('case', value => {
+          expect(value).toBe(1);
+        });
+      `,
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
