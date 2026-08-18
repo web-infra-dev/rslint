@@ -65,6 +65,29 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			// nested arrows ----
 			{Code: `function f(Object) { return () => () => new Object(); }`},
 
+			// ---- Dimension 2: scoping — TypeScript type-space declarations.
+			// scope-manager gives a type alias, interface, or type parameter an
+			// `Object` variable with identifiers, so upstream stays silent even
+			// though TypeScript itself still resolves the call to the global. ----
+			{Code: `type Object = {}; Object();`},
+			{Code: `interface Object {} Object();`},
+			{Code: `{ type Object = {}; Object(); }`},
+			{Code: `type Object = {}; function g() { Object(); }`},
+			{Code: `function f<Object>() { Object(); }`},
+			{Code: `class C<Object> { m() { Object(); } }`},
+			// ---- Dimension 2: scoping — class type parameter inside a static
+			// member, which scope-manager keeps in the lexical scope chain while
+			// TypeScript's resolver hides it ----
+			{Code: `class C<Object> { static m() { Object(); } }`},
+			{Code: `class C<Object> { static p = Object(); }`},
+
+			// ---- Dimension 2: scoping — declarations in a namespace body ----
+			{Code: `namespace N { const Object = f; Object(); }`},
+			{Code: `namespace N { function Object() {} Object(); }`},
+			{Code: `namespace N { namespace Object {} Object(); }`},
+			{Code: `namespace N { import Object = require("x"); Object(); }`},
+			{Code: `namespace N.M { const Object = f; Object(); }`},
+
 			// Locks in upstream check() arm 1: callee is not an Identifier at
 			// all (a member access), independent of the NewExpression form
 			// upstream's own `new globalThis.Object` case already covers.
@@ -161,6 +184,33 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "preferLiteral", Line: 1, Column: 35, EndLine: 1, EndColumn: 43,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useLiteral", Output: `function f() { return () => () => ({}); }`}},
+				}},
+			},
+
+			// ---- Dimension 2: scoping — a namespace body that declares nothing
+			// leaves the call bound to the global; the fix needs wrapping parens
+			// because the call starts an ExpressionStatement ----
+			{
+				Code: `namespace N { Object(); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferLiteral", Line: 1, Column: 15, EndLine: 1, EndColumn: 23,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useLiteral", Output: `namespace N { ({}); }`}},
+				}},
+			},
+			// A namespace-local declaration doesn't reach the outer scope.
+			{
+				Code: `namespace N { const Object = f; } Object();`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferLiteral", Line: 1, Column: 35, EndLine: 1, EndColumn: 43,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useLiteral", Output: `namespace N { const Object = f; } ({});`}},
+				}},
+			},
+			// A type parameter is only in scope inside its own declaration.
+			{
+				Code: `declare function f<Object>(): void; Object();`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferLiteral", Line: 1, Column: 37, EndLine: 1, EndColumn: 45,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useLiteral", Output: `declare function f<Object>(): void; ({});`}},
 				}},
 			},
 

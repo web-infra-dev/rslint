@@ -118,6 +118,23 @@ var NoObjectConstructorRule = rule.Rule{
 			if utils.IsShadowed(callee, "Object") {
 				return
 			}
+			// scope-manager keeps class type parameters visible inside static
+			// members, where TypeScript's resolver hides them.
+			if utils.HasEnclosingTypeParameter(callee, "Object") {
+				return
+			}
+			// scope-manager also creates an `Object` variable for TypeScript
+			// type-space declarations — type aliases, interfaces, type
+			// parameters — and for declarations inside a namespace body, none
+			// of which utils.IsShadowed models. Resolving the name in every
+			// declaration space at the call site covers them.
+			if ctx.Refs != nil && ctx.Refs.IsNameDefinedInFileWithMeaning(
+				callee,
+				"Object",
+				ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
+			) {
+				return
+			}
 			// A config `/* global Object: off */` / `languageOptions.globals`
 			// entry un-declares the builtin, so `Object` no longer resolves to
 			// a known global — ESLint's `getVariableByName` would return

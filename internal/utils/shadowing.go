@@ -184,6 +184,26 @@ func isDirectParameterOf(fn *ast.Node, child *ast.Node) bool {
 	return false
 }
 
+// HasEnclosingTypeParameter reports whether any enclosing function-like or
+// class declaration declares a type parameter called name. scope-manager keeps
+// class type parameters in the lexical scope chain of static members, while
+// TypeScript's own resolver deliberately hides them there, so rules that model
+// scope-manager variables need this on top of a resolver-based lookup.
+func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
+	for current := node.Parent; current != nil; current = current.Parent {
+		if !ast.IsFunctionLikeDeclaration(current) &&
+			current.Kind != ast.KindClassDeclaration && current.Kind != ast.KindClassExpression {
+			continue
+		}
+		for _, typeParameter := range current.TypeParameters() {
+			if typeParameter != nil && typeParameter.Name() != nil && typeParameter.Name().Text() == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // IsShadowed checks whether the given identifier name is shadowed by a local
 // declaration at the usage site. It walks from node up to the SourceFile,
 // checking every scope boundary for variable/function/class/enum/import
