@@ -293,6 +293,83 @@ func TestMatchOptions(t *testing.T) {
 			options: minimatch3.Options{},
 			want:    true,
 		},
+		{
+			name:    "Partial accepts a matching prefix",
+			pattern: "a/b",
+			path:    "a",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial rejects a mismatched prefix",
+			pattern: "a/b",
+			path:    "x",
+			options: minimatch3.Options{Partial: true},
+			want:    false,
+		},
+		{
+			name:    "Partial treats the filesystem root as every pattern prefix",
+			pattern: "a/b",
+			path:    "/",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial lets globstar consume the current path suffix",
+			pattern: "a/**/b",
+			path:    "a/x/y",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial rejects a hidden suffix globstar cannot consume",
+			pattern: "a/**/b",
+			path:    "a/.hidden",
+			options: minimatch3.Options{Partial: true},
+			want:    false,
+		},
+		{
+			name:    "Partial traverses multiple globstar segments",
+			pattern: "a/**/b/**/c",
+			path:    "a/x/b/y",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial uses minimatch cutoffs between multiple globstars",
+			pattern: "a/**/b/**/c",
+			path:    "a/.hidden",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial still rejects a dot name inside the searched window",
+			pattern: "a/**/b/**/c",
+			path:    "a/.hidden/y",
+			options: minimatch3.Options{Partial: true},
+			want:    false,
+		},
+		{
+			name:    "Partial accepts a short prefix before a long globstar section",
+			pattern: "**/a/b",
+			path:    ".hidden",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial safely rejects an exhausted multi-globstar cursor",
+			pattern: "*/**/**",
+			path:    "x",
+			options: minimatch3.Options{Partial: true},
+			want:    false,
+		},
+		{
+			name:    "Partial follows the Dot-enabled exhausted cursor result",
+			pattern: "*/**/**",
+			path:    "x",
+			options: minimatch3.Options{Partial: true, Dot: true},
+			want:    true,
+		},
 	}
 
 	for _, test := range tests {
@@ -440,27 +517,27 @@ func TestMatchOverLongPattern(t *testing.T) {
 	}
 }
 
-// TestMatchManyGlobstars covers a pattern carrying more `**` than any rule
+// TestMatchManyGlobstarSegments covers a pattern carrying more `**` than any rule
 // would write. Dividing the path between them is a search, and one that misses
 // explores every division, so the answer has to come from a walk that
 // remembers where it has already failed rather than from raw backtracking.
-func TestMatchManyGlobstars(t *testing.T) {
+func TestMatchManyGlobstarSegments(t *testing.T) {
 	parts := make([]string, 0, 32)
 	for i := range 32 {
 		parts = append(parts, string(rune('a'+i%26))+strconv.Itoa(i))
 	}
 	path := strings.Join(parts, "/")
 
-	globstars := strings.TrimSuffix(strings.Repeat("**/", 16), "/")
+	globstarPattern := strings.TrimSuffix(strings.Repeat("**/", 16), "/")
 
 	tests := []struct {
 		name    string
 		pattern string
 		want    bool
 	}{
-		{name: "a miss on the last part", pattern: globstars + "/zz", want: false},
-		{name: "a hit on the last part", pattern: globstars + "/" + parts[len(parts)-1], want: true},
-		{name: "a miss in the middle", pattern: globstars + "/zz/**", want: false},
+		{name: "a miss on the last part", pattern: globstarPattern + "/zz", want: false},
+		{name: "a hit on the last part", pattern: globstarPattern + "/" + parts[len(parts)-1], want: true},
+		{name: "a miss in the middle", pattern: globstarPattern + "/zz/**", want: false},
 	}
 
 	for _, test := range tests {
@@ -475,6 +552,17 @@ func TestMatchManyGlobstars(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("partial mode handles a maximum-length globstar chain", func(t *testing.T) {
+		pattern := strings.TrimSuffix(strings.Repeat("**/", 21845), "/")
+		start := time.Now()
+		if !minimatch3.Match(pattern, "x", minimatch3.Options{Partial: true}) {
+			t.Error("maximum-length partial globstar chain did not match its prefix")
+		}
+		if elapsed := time.Since(start); elapsed > 5*time.Second {
+			t.Errorf("maximum-length partial globstar chain took %s", elapsed)
+		}
+	})
 }
 
 // TestBraceExpand pins the brace expansion against brace-expansion 1.1.16,

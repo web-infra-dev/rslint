@@ -15,8 +15,9 @@
 // because a negated list needs the lookahead RE2 has no syntax for.
 //
 // The port covers matching only: brace expansion, extended glob syntax, `**`,
-// character classes and negated patterns. Partial matching and the filesystem
-// traversal helpers are left out.
+// character classes, negated patterns, and the partial-prefix mode exposed by
+// matcher options. Filesystem traversal and list-expansion helpers are left
+// out.
 //
 // A `**` walks the path by recursion, remembering the pairs of path part and
 // pattern part it has already failed at so that a pattern carrying several of
@@ -71,6 +72,10 @@ type Options struct {
 	MatchBase bool
 	// FlipNegate returns the result of a negated pattern unnegated.
 	FlipNegate bool
+	// Partial accepts a path that matches the beginning of a pattern even when
+	// the path runs out first. minimatch uses this while walking a filesystem;
+	// eslint-plugin-import also exposes it through pathGroups.patternOptions.
+	Partial bool
 }
 
 var plTypes = map[byte]struct{ open, close string }{
@@ -687,6 +692,9 @@ func (m *Matcher) Match(path string) bool {
 	if m.empty {
 		return path == ""
 	}
+	if m.options.Partial && path == "/" {
+		return true
+	}
 
 	parts := splitSlashes(path)
 
@@ -722,7 +730,130 @@ func (m *Matcher) Match(path string) bool {
 }
 
 func (m *Matcher) matchOne(file []string, row []patternPart) bool {
+	if m.options.Partial {
+		for firstGlobStar, part := range row {
+			if part.globstar {
+				return m.matchPartialGlobStar(file, row, firstGlobStar)
+			}
+		}
+	}
 	return m.matchOneFrom(file, row, 0, 0, nil)
+}
+
+// partialGlobStarSection is a run of ordinary pattern parts between two
+// `**` tokens. after is the last file offset where minimatch 3.1.5 tries that
+// run before accepting the file as a viable prefix.
+type partialGlobStarSection struct {
+	parts []patternPart
+	after int
+}
+
+// matchPartialGlobStar follows minimatch 3.1.5's separate partial-mode
+// globstar algorithm. Its cutoffs are deliberately not the same as an exact
+// recursive globstar match: once too little of the current file remains to
+// place a later section, it accepts the file as a prefix without inspecting
+// every remaining part. That counter-intuitive cutoff is observable for
+// patterns with more than one `**`, including a dot-name near the cutoff.
+func (m *Matcher) matchPartialGlobStar(file []string, row []patternPart, firstGlobStar int) bool {
+	if !matchPartialPartsAt(file, row[:firstGlobStar], 0) {
+		return false
+	}
+	fileIndex := firstGlobStar
+	body := row[firstGlobStar+1:]
+	if len(body) == 0 {
+		for index := fileIndex; index < len(file); index++ {
+			if m.isDotPart(file[index]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	sections := []partialGlobStarSection{{}}
+	nonGlobStarParts := 0
+	nonGlobStarSums := []int{0}
+	for _, part := range body {
+		if part.globstar {
+			nonGlobStarSums = append(nonGlobStarSums, nonGlobStarParts)
+			sections = append(sections, partialGlobStarSection{})
+			continue
+		}
+		last := len(sections) - 1
+		sections[last].parts = append(sections[last].parts, part)
+		nonGlobStarParts++
+	}
+	for sectionIndex, sumIndex := 0, len(nonGlobStarSums)-1; sectionIndex < len(sections); sectionIndex, sumIndex = sectionIndex+1, sumIndex-1 {
+		sections[sectionIndex].after = len(file) - (nonGlobStarSums[sumIndex] + len(sections[sectionIndex].parts))
+	}
+
+	failed := make(map[[2]int]struct{})
+	return m.matchPartialGlobStarSections(file, sections, fileIndex, 0, failed)
+}
+
+func (m *Matcher) matchPartialGlobStarSections(file []string, sections []partialGlobStarSection, fileIndex int, sectionIndex int, failed map[[2]int]struct{}) bool {
+	state := [2]int{fileIndex, sectionIndex}
+	if _, found := failed[state]; found {
+		return false
+	}
+	if sectionIndex == len(sections) {
+		sawPart := false
+		for ; fileIndex < len(file); fileIndex++ {
+			sawPart = true
+			if m.isDotPart(file[fileIndex]) {
+				failed[state] = struct{}{}
+				return false
+			}
+		}
+		if !sawPart {
+			failed[state] = struct{}{}
+		}
+		return sawPart
+	}
+
+	section := sections[sectionIndex]
+	for fileIndex <= section.after {
+		if matchPartialPartsAt(file, section.parts, fileIndex) &&
+			m.matchPartialGlobStarSections(file, sections, fileIndex+len(section.parts), sectionIndex+1, failed) {
+			return true
+		}
+		// minimatch 3.1.5 throws if its section cursor has already run past
+		// the file. A malformed option must not crash the linter, so this port
+		// treats that otherwise unreachable branch as a failed match. With
+		// Dot enabled upstream skips the unsafe dot-name check and advances.
+		if fileIndex >= len(file) {
+			if m.options.Dot {
+				fileIndex++
+				continue
+			}
+			failed[state] = struct{}{}
+			return false
+		}
+		if m.isDotPart(file[fileIndex]) {
+			failed[state] = struct{}{}
+			return false
+		}
+		fileIndex++
+	}
+	return true
+}
+
+// matchPartialPartsAt mirrors the bounded slice minimatch hands its ordinary
+// matcher while placing one section. Running out of file is success in partial
+// mode; a cursor beyond the file is the unsafe upstream branch handled above.
+func matchPartialPartsAt(file []string, parts []patternPart, fileIndex int) bool {
+	if fileIndex > len(file) {
+		return false
+	}
+	for partIndex, part := range parts {
+		index := fileIndex + partIndex
+		if index >= len(file) {
+			return true
+		}
+		if part.globstar || !part.match(file[index]) {
+			return false
+		}
+	}
+	return true
 }
 
 // matchOneFrom matches the parts of a path from fi on against the parts of one
@@ -767,10 +898,15 @@ func (m *Matcher) matchOneFrom(file []string, row []patternPart, fi int, pi int,
 				// `.` and `..` are never swallowed, and a dot-name only when
 				// explicitly asked for.
 				if m.isDotPart(file[fr]) {
-					break
+					return false
 				}
 			}
-			return false
+			// In partial mode, consuming every remaining safe path part means
+			// the file can still grow into the rest of the pattern. minimatch 3
+			// uses this while walking a filesystem (for example, `a/x` is a
+			// partial match for `a/**/b`). A dot part returns above because `**`
+			// is not allowed to consume it under the current options.
+			return m.options.Partial
 		}
 
 		if !part.match(file[fi]) {
@@ -784,7 +920,7 @@ func (m *Matcher) matchOneFrom(file []string, row []patternPart, fi int, pi int,
 		return true
 	case fi == fl:
 		// ran out of file with pattern left over.
-		return false
+		return m.options.Partial
 	default:
 		// Ran out of pattern with file left over. That is only acceptable on
 		// the very last empty part of a path written with a trailing slash, so

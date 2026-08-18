@@ -15,6 +15,7 @@ import (
 // re-deriving the external module folders each time.
 type ModuleSettings struct {
 	ignore          []*esregexp.RegExp
+	internalRegex   *esregexp.RegExp
 	externalFolders []string
 	key             string
 }
@@ -29,7 +30,7 @@ type settingsKey struct {
 // them. Only the cache key is derived per call; compiling the settings —
 // notably their regexps — happens inside the build, once per Program and key.
 func SettingsFor(ctx rule.RuleContext) *ModuleSettings {
-	key := moduleSettingsKey(ctx.Settings)
+	key := compiledModuleSettingsCacheKey(ctx.Settings)
 	settings := ctx.Settings
 	return rule.CachedByProgram(ctx, settingsKey{settings: key}, func() *ModuleSettings {
 		return compileModuleSettings(settings)
@@ -48,13 +49,18 @@ func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
 			compiled.ignore = append(compiled.ignore, expression)
 		}
 	}
+	if pattern, ok := settingString(settings, "import/internal-regex"); ok && pattern != "" {
+		if expression, err := esregexp.Compile(pattern, ""); err == nil {
+			compiled.internalRegex = expression
+		}
+	}
 	return compiled
 }
 
-// moduleSettingsKey encodes the settings compileModuleSettings reads into one
-// string: two settings maps share a key exactly when they compile alike. Every
-// element is quoted so that list boundaries survive the encoding, and the
-// lists are read through the same coercions the compilation applies.
+// moduleSettingsKey encodes the settings used by shared module indexes. Every
+// element is quoted so list boundaries survive the encoding. Internal-regex
+// classification is intentionally excluded because it does not change those
+// indexes; compiledModuleSettingsCacheKey adds it for SettingsFor's cache.
 func moduleSettingsKey(settings map[string]interface{}) string {
 	var key strings.Builder
 	for _, pattern := range settingsStringList(settings, "import/ignore") {
@@ -65,6 +71,14 @@ func moduleSettingsKey(settings map[string]interface{}) string {
 		key.WriteString(strconv.Quote(folder))
 	}
 	return key.String()
+}
+
+func compiledModuleSettingsCacheKey(settings map[string]interface{}) string {
+	key := moduleSettingsKey(settings)
+	if pattern, ok := settingString(settings, "import/internal-regex"); ok {
+		key += "\x00" + strconv.Quote(pattern)
+	}
+	return key
 }
 
 // Key identifies the settings these were compiled from, for callers that key
@@ -90,6 +104,12 @@ func (compiled *ModuleSettings) IsIgnoredPath(fileName string) bool {
 	return false
 }
 
+// IsInternalSpecifier reports whether `import/internal-regex` classifies the
+// written module specifier as internal.
+func (compiled *ModuleSettings) IsInternalSpecifier(specifier string) bool {
+	return compiled != nil && compiled.internalRegex != nil && compiled.internalRegex.TestOrTimeout(specifier)
+}
+
 // IsExternalPath reports whether a resolved path or unresolved bare specifier
 // should be treated as external.
 func (compiled *ModuleSettings) IsExternalPath(specifier string, resolvedPath string) bool {
@@ -97,6 +117,12 @@ func (compiled *ModuleSettings) IsExternalPath(specifier string, resolvedPath st
 		return false
 	}
 	for _, folder := range compiled.externalFolders {
+		// Resolving an empty configured folder from the importing package
+		// yields that package root. Together with the outside-package check in
+		// eslint-plugin-import, it classifies every resolved target as external.
+		if folder == "" && resolvedPath != "" {
+			return true
+		}
 		if pathContainsSegment(resolvedPath, folder) {
 			return true
 		}
@@ -104,19 +130,65 @@ func (compiled *ModuleSettings) IsExternalPath(specifier string, resolvedPath st
 	return specifier != "" && !tspath.IsExternalModuleNameRelative(specifier) && resolvedPath == ""
 }
 
-// externalModuleFolders returns eslint-plugin-import's configured external
-// module folders, defaulting to node_modules when the setting names none.
-func externalModuleFolders(settings map[string]interface{}) []string {
-	var folders []string
-	for _, folder := range settingsStringList(settings, "import/external-module-folders") {
-		if folder != "" {
-			folders = append(folders, folder)
+// IsExternalPathFromPackage classifies a resolved target relative to the
+// importing package. A target outside that package is external; a target
+// inside it is external only when it is below a configured external-module
+// folder. Relative folders resolve from packagePath.
+func (compiled *ModuleSettings) IsExternalPathFromPackage(packagePath, resolvedPath string, caseSensitive bool) bool {
+	if compiled == nil || resolvedPath == "" {
+		return false
+	}
+	compareOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
+	if packagePath != "" && !tspath.ContainsPath(packagePath, resolvedPath, compareOptions) {
+		return true
+	}
+	for _, folder := range compiled.externalFolders {
+		folderPath := folder
+		if !tspath.IsRootedDiskPath(folderPath) {
+			if packagePath == "" {
+				if pathContainsSegment(resolvedPath, folderPath) {
+					return true
+				}
+				continue
+			}
+			folderPath = tspath.ResolvePath(packagePath, folderPath)
+		}
+		if tspath.ContainsPath(folderPath, resolvedPath, compareOptions) {
+			return true
 		}
 	}
-	if len(folders) == 0 {
+	return false
+}
+
+// externalModuleFolders returns eslint-plugin-import's configured external
+// module folders. The default applies only when the setting is absent or not
+// an array; an explicit empty array disables it, matching JavaScript truthiness.
+func externalModuleFolders(settings map[string]interface{}) []string {
+	if settings == nil {
 		return []string{"node_modules"}
 	}
-	return folders
+	raw, configured := settings["import/external-module-folders"]
+	if !configured {
+		return []string{"node_modules"}
+	}
+	var values []string
+	switch typed := raw.(type) {
+	case []string:
+		values = typed
+	case []interface{}:
+		values = make([]string, 0, len(typed))
+		for _, item := range typed {
+			if value, ok := item.(string); ok {
+				values = append(values, value)
+			}
+		}
+	default:
+		return []string{"node_modules"}
+	}
+	// Keep empty strings: resolving one from packagePath yields the package
+	// root, so this configuration classifies every resolved path below it as
+	// external.
+	return values
 }
 
 func settingsStringList(settings map[string]interface{}, name string) []string {
@@ -136,6 +208,14 @@ func settingsStringList(settings map[string]interface{}, name string) []string {
 		return values
 	}
 	return nil
+}
+
+func settingString(settings map[string]interface{}, name string) (string, bool) {
+	if settings == nil {
+		return "", false
+	}
+	value, ok := settings[name].(string)
+	return value, ok
 }
 
 func pathContainsSegment(fileName string, segment string) bool {
