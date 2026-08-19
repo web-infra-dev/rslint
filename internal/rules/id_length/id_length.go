@@ -702,7 +702,7 @@ func constructorKeywordRange(node *ast.Node, sourceFile *ast.SourceFile) (core.T
 	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
 	for {
 		switch s.Token() {
-		// An escaped spelling (`\u0063onstructor`) still declares the
+		// A unicode-escaped spelling of the keyword still declares the
 		// constructor, so accept whatever name token precedes the parameter
 		// list rather than the keyword alone.
 		case ast.KindConstructorKeyword, ast.KindIdentifier:
