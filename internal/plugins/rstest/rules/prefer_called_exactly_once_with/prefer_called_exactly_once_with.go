@@ -360,9 +360,17 @@ var suspendingModifiers = map[string]bool{
 // cannot see. Anything that runs user code qualifies, as does any write: a
 // write needs no target check, because a statement between the assertions has
 // no business assigning at all.
+//
+// Two of these kinds are calls the source does not spell as calls: a tagged
+// template invokes its tag, and a spread element runs the iterator protocol —
+// `[...gen]` calls `gen[Symbol.iterator]()` and then `next()` per element,
+// both the author's when the operand is a generator or a custom iterable. The
+// object form `{ ...obj }` is a different kind and stays out: it only triggers
+// getters, which the rule accepts wherever it reads a property.
 func controlTransfer(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression,
+		ast.KindSpreadElement,
 		ast.KindAwaitExpression, ast.KindYieldExpression, ast.KindDeleteExpression:
 		return true
 	case ast.KindBinaryExpression:
@@ -411,10 +419,14 @@ func isExpectHelperCall(node *ast.Node, rootName string) bool {
 	// is the context object, whose surface the author extends through
 	// `test.extend`, and `expect` itself takes new members through
 	// `expect.extend`. Only the constructors Rstest ships are known to build a
-	// value and run nothing, so the name has to be one of those — minus
-	// `toSatisfy`, which calls the predicate it is given when the comparison
-	// runs, exactly as the instance matcher of the same name does.
-	return rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[entries[1].Name] && entries[1].Name != "toSatisfy"
+	// value and run nothing, so the name has to be one of those — minus the two
+	// that run what they are handed when the comparison runs: `toSatisfy` calls
+	// its predicate, exactly as the instance matcher of the same name does, and
+	// `schemaMatching` calls the schema's `~standard` validator. The rest
+	// compare values, and `toBeOneOf` can only escape through a custom equality
+	// tester, which is the `expect.extend` limit documented above.
+	return rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[entries[1].Name] &&
+		entries[1].Name != "toSatisfy" && entries[1].Name != "schemaMatching"
 }
 
 // betweenScanner decides whether the statements separating a pair leave its
@@ -533,6 +545,14 @@ func (scanner *betweenScanner) isInertDeclaration(statement *ast.Node) bool {
 			return false
 		}
 		if hoisted && scanner.shadowsAssertion(declaration.Name()) {
+			return false
+		}
+		// A binding pattern is the destructuring side of the same protocol a
+		// spread runs: `const [a] = items;` calls `items[Symbol.iterator]()`
+		// and `next()`. Only a plain name is accepted. An object pattern reads
+		// properties, which the rule accepts elsewhere, but it can nest an
+		// array pattern, so the check stays on the shape rather than the kind.
+		if name := declaration.Name(); name == nil || name.Kind != ast.KindIdentifier {
 			return false
 		}
 		initializer := declaration.Initializer()

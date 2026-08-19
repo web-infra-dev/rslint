@@ -107,6 +107,18 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
       code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.toSatisfy(pred)); expect(x).toHaveBeenCalledWith('a')`,
     },
     {
+      code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.schemaMatching(schema)); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual([...gen]); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); const [a] = items; expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); const { b } = obj; expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
       code: `async function f() { expect(x).toHaveBeenCalledOnce(); await expect(p).resolves.toBe(1); expect(x).toHaveBeenCalledWith('a'); }`,
     },
     {
@@ -196,6 +208,15 @@ expect(x).toHaveBeenCalledExactlyOnceWith('a');
 var hoge = 'foo';
 expect(x).toHaveBeenCalledWith('a');`,
       output: `var hoge = 'foo';
+expect(x).toHaveBeenCalledExactlyOnceWith('a');
+`,
+      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce();
+expect(y).toEqual({ ...obj });
+expect(x).toHaveBeenCalledWith('a');`,
+      output: `expect(y).toEqual({ ...obj });
 expect(x).toHaveBeenCalledExactlyOnceWith('a');
 `,
       errors: [{ messageId: 'preferCalledExactlyOnceWith' }],

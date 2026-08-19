@@ -122,6 +122,15 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			// comparison runs, just as the instance matcher of that name does.
 			{Code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.toSatisfy(pred)); expect(x).toHaveBeenCalledWith('a');`},
 			{Code: `test('t', ({ expect }) => { expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.myAsymmetric()); expect(x).toHaveBeenCalledWith('a'); });`},
+			// `schemaMatching` runs the schema's own validator when the
+			// comparison runs, so it is exempt for the same reason as
+			// `toSatisfy` is not.
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.schemaMatching(schema)); expect(x).toHaveBeenCalledWith('a');`},
+			// A spread runs the iterator protocol, in an expression and in a
+			// binding pattern alike.
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual([...gen]); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); const [a] = items; expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); const { b } = obj; expect(x).toHaveBeenCalledWith('a');`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// An argument that is not stable under a second evaluation is still
@@ -188,6 +197,16 @@ expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
 var hoge = 'foo';
 expect(x).toHaveBeenCalledWith('a');`,
 				Output: []string{`var hoge = 'foo';
+expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			// An object spread only triggers getters, which the rule accepts
+			// wherever it reads a property, so it stays inert.
+			{
+				Code: `expect(x).toHaveBeenCalledOnce();
+expect(y).toEqual({ ...obj });
+expect(x).toHaveBeenCalledWith('a');`,
+				Output: []string{`expect(y).toEqual({ ...obj });
 expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
 			},
