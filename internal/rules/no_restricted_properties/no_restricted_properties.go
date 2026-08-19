@@ -17,8 +17,7 @@ var schemaJSON []byte
 // carries an allow-list (the schema forbids combining `allowProperties` with
 // `property` and `allowObjects` with `object`).
 type pairRestriction struct {
-	hasMessage bool
-	message    string
+	message string
 }
 
 // objectRestriction is an `{ object, allowProperties? }` restriction: every
@@ -26,7 +25,6 @@ type pairRestriction struct {
 type objectRestriction struct {
 	allowProperties    []string
 	hasAllowProperties bool
-	hasMessage         bool
 	message            string
 }
 
@@ -35,7 +33,6 @@ type objectRestriction struct {
 type propertyOnlyRestriction struct {
 	allowObjects    []string
 	hasAllowObjects bool
-	hasMessage      bool
 	message         string
 }
 
@@ -63,7 +60,7 @@ func parseOptions(options []any) restrictions {
 
 		objectName, hasObject := m["object"].(string)
 		propertyName, hasProperty := m["property"].(string)
-		message, hasMessage := m["message"].(string)
+		message, _ := m["message"].(string)
 
 		switch {
 		case !hasObject:
@@ -71,7 +68,6 @@ func parseOptions(options []any) restrictions {
 			r.properties[propertyName] = propertyOnlyRestriction{
 				allowObjects:    allowObjects,
 				hasAllowObjects: hasAllowObjects,
-				hasMessage:      hasMessage,
 				message:         message,
 			}
 		case !hasProperty:
@@ -79,7 +75,6 @@ func parseOptions(options []any) restrictions {
 			r.objects[objectName] = objectRestriction{
 				allowProperties:    allowProperties,
 				hasAllowProperties: hasAllowProperties,
-				hasMessage:         hasMessage,
 				message:            message,
 			}
 		default:
@@ -87,8 +82,7 @@ func parseOptions(options []any) restrictions {
 				r.pairs[objectName] = map[string]pairRestriction{}
 			}
 			r.pairs[objectName][propertyName] = pairRestriction{
-				hasMessage: hasMessage,
-				message:    message,
+				message: message,
 			}
 		}
 	}
@@ -126,7 +120,6 @@ type matchedProperty struct {
 	found        bool
 	allowList    []string
 	hasAllowList bool
-	hasMessage   bool
 	message      string
 }
 
@@ -146,14 +139,13 @@ func checkPropertyAccess(ctx rule.RuleContext, r restrictions, node *ast.Node, o
 			// whole-object restriction: a mismatched property here does NOT
 			// fall back to the whole-object entry, even if one exists.
 			if pr, ok2 := propMap[propertyName]; ok2 {
-				matched = matchedProperty{found: true, hasMessage: pr.hasMessage, message: pr.message}
+				matched = matchedProperty{found: true, message: pr.message}
 			}
 		} else if obj, ok2 := r.objects[objectName]; ok2 {
 			matched = matchedProperty{
 				found:        true,
 				allowList:    obj.allowProperties,
 				hasAllowList: obj.hasAllowProperties,
-				hasMessage:   obj.hasMessage,
 				message:      obj.message,
 			}
 		}
@@ -165,7 +157,7 @@ func checkPropertyAccess(ctx rule.RuleContext, r restrictions, node *ast.Node, o
 			allowedPropertiesMessage = " Only these properties are allowed: " + strings.Join(matched.allowList, ", ") + "."
 		}
 		messageSuffix := ""
-		if matched.hasMessage {
+		if matched.message != "" {
 			messageSuffix = " " + matched.message
 		}
 		ctx.ReportNode(node, rule.RuleMessage{
@@ -188,7 +180,7 @@ func checkPropertyAccess(ctx rule.RuleContext, r restrictions, node *ast.Node, o
 		allowedObjectsMessage = fmt.Sprintf(" Property '%s' is only allowed on these objects: %s.", propertyName, strings.Join(globalProp.allowObjects, ", "))
 	}
 	messageSuffix := ""
-	if globalProp.hasMessage {
+	if globalProp.message != "" {
 		messageSuffix = " " + globalProp.message
 	}
 	ctx.ReportNode(node, rule.RuleMessage{

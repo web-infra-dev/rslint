@@ -255,6 +255,36 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 				}},
 			},
 
+			// ---- Locks in message formatting: an explicitly empty `message` is
+			// falsy upstream, so no suffix (and no trailing space) is appended ----
+			{
+				Code:    `foo.bar`,
+				Options: []any{map[string]any{"object": "foo", "property": "bar", "message": ""}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedObjectProperty",
+					Message:   "'foo.bar' is restricted from being used.",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 8,
+				}},
+			},
+			{
+				Code:    `foo.bar`,
+				Options: []any{map[string]any{"object": "foo", "message": ""}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedObjectProperty",
+					Message:   "'foo.bar' is restricted from being used.",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 8,
+				}},
+			},
+			{
+				Code:    `foo.bar`,
+				Options: []any{map[string]any{"property": "bar", "message": ""}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bar' is restricted from being used.",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 8,
+				}},
+			},
+
 			// ---- Locks in getStaticPropertyName: a rest sibling never masks the
 			// restricted-property check on the other pattern elements ----
 			{
