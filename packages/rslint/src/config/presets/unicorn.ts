@@ -105,7 +105,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-invalid-character-comparison': 'error', // not implemented
     // 'unicorn/no-invalid-fetch-options': 'error', // not implemented
     // 'unicorn/no-invalid-file-input-accept': 'off', // not implemented
-    // 'unicorn/no-invalid-remove-event-listener': 'error', // not implemented
+    'unicorn/no-invalid-remove-event-listener': 'error',
     // 'unicorn/no-invalid-well-known-symbol-methods': 'error', // not implemented
     // 'unicorn/no-keyword-prefix': 'off', // not implemented
     // 'unicorn/no-late-current-target-access': 'error', // not implemented
