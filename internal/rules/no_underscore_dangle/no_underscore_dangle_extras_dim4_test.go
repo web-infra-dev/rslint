@@ -27,6 +27,7 @@ func TestNoUnderscoreDangleExtrasDim4(t *testing.T) {
 			{Code: `((this))._bar;`, Options: map[string]any{"allowAfterThis": true}},
 			{Code: `(this.constructor)._bar;`, Options: map[string]any{"allowAfterThisConstructor": true}},
 			{Code: `((this).constructor)._bar;`, Options: map[string]any{"allowAfterThisConstructor": true}},
+			{Code: `(this.constructor)?._bar;`, Options: map[string]any{"allowAfterThisConstructor": true}},
 
 			// ---- Dimension 4: optional chain ----
 			{Code: `this?._bar;`, Options: map[string]any{"allowAfterThis": true}},
@@ -147,6 +148,37 @@ func TestNoUnderscoreDangleExtrasDim4(t *testing.T) {
 				Code: `foo?.[_bar];`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedUnderscore", Message: "Unexpected dangling '_' in '_bar'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 12},
+				},
+			},
+			// Parentheses end an optional chain, so upstream sees a ChainExpression
+			// receiver here rather than the `this.constructor` member access
+			// `allowAfterThisConstructor` exempts.
+			{
+				Code:    `(this?.constructor)._bar;`,
+				Options: map[string]any{"allowAfterThisConstructor": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedUnderscore", Message: "Unexpected dangling '_' in '_bar'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code:    `(this?.constructor)?._bar;`,
+				Options: map[string]any{"allowAfterThisConstructor": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedUnderscore", Message: "Unexpected dangling '_' in '_bar'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    `((this?.constructor))._bar;`,
+				Options: map[string]any{"allowAfterThisConstructor": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedUnderscore", Message: "Unexpected dangling '_' in '_bar'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
+				},
+			},
+			{
+				Code:    `(this?.[constructor])._bar;`,
+				Options: map[string]any{"allowAfterThisConstructor": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedUnderscore", Message: "Unexpected dangling '_' in '_bar'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
 				},
 			},
 

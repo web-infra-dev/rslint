@@ -342,7 +342,7 @@ func checkMemberAccess(ctx rule.RuleContext, node *ast.Node, opts noUnderscoreDa
 		return
 	}
 
-	object := ast.SkipParentheses(memberObjectNode(node))
+	object := unwrapReceiver(memberObjectNode(node))
 	if opts.allowAfterThis && object.Kind == ast.KindThisKeyword {
 		return
 	}
@@ -395,7 +395,20 @@ func isThisConstructorReference(object *ast.Node) bool {
 	if !ok || name != "constructor" {
 		return false
 	}
-	return ast.SkipParentheses(memberObjectNode(object)).Kind == ast.KindThisKeyword
+	return unwrapReceiver(memberObjectNode(object)).Kind == ast.KindThisKeyword
+}
+
+// unwrapReceiver drops the parentheses ESTree does not model around a member
+// access receiver. Parentheses that end an optional chain do survive the
+// conversion: `(this?.constructor)._bar` hands the outer access a
+// ChainExpression receiver, which matches none of the `allowAfter*` shapes, so
+// the unwrap stops at the parentheses and the access stays reportable.
+func unwrapReceiver(object *ast.Node) *ast.Node {
+	inner := ast.SkipParentheses(object)
+	if inner != object && ast.IsOptionalChain(inner) {
+		return object
+	}
+	return inner
 }
 
 // checkAccessorName routes a getter/setter to the method-name check only when
