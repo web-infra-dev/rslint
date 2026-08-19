@@ -1,5 +1,8 @@
 package rule
 
+// SourceTypeDefault selects ESLint's extension-sensitive source type default.
+const SourceTypeDefault = "default"
+
 // LanguageOptions is the normalized, per-file subset of ESLint language
 // options consumed by the native rule framework. Its zero value intentionally
 // selects the moving `latest` ECMAScript edition.
@@ -9,6 +12,10 @@ package rule
 // rule.
 type LanguageOptions struct {
 	ECMAVersion int `json:"ecmaVersion"`
+	// SourceType is SourceTypeDefault, "module", "script", or "commonjs".
+	// An empty value leaves low-level callers on their filename-derived
+	// compatibility behavior.
+	SourceType string `json:"sourceType"`
 }
 
 // NormalizeECMAScriptVersion normalizes an Espree/ESLint-compatible numeric

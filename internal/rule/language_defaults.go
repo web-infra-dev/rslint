@@ -67,15 +67,26 @@ var commonJSRefStoreInit = RefStoreInit{
 }
 
 // ResolveLanguageDefaults resolves the concrete Globals and RefStore
-// initialization supplied by ESLint's default language selection for fileName.
-// It deliberately does not read authored sourceType, package.json, or
-// TypeScript-flavoured extensions.
+// initialization supplied by ESLint's language selection for fileName.
 //
-// JavaScript module files contribute only their non-global top-level scope.
-// An exact, case-sensitive .cjs extension contributes CommonJS's four globals,
-// non-global wrapper scope, and implicit wrapper arguments binding. Other
-// extensions return zero values.
-func ResolveLanguageDefaults(fileName string) (GlobalsInit, RefStoreInit) {
+// An explicit SourceType wins. Otherwise JavaScript module files contribute
+// only their non-global top-level scope; an exact, case-sensitive .cjs
+// extension contributes CommonJS's four globals, non-global wrapper scope, and
+// implicit wrapper arguments binding. Other extensions return zero values.
+func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (GlobalsInit, RefStoreInit) {
+	switch languageOptions.SourceType {
+	case "script":
+		return GlobalsInit{}, RefStoreInit{}
+	case "commonjs":
+		return commonJSGlobalsInit, commonJSRefStoreInit
+	case "module":
+		return GlobalsInit{}, moduleRefStoreInit
+	case SourceTypeDefault:
+		if tspath.GetAnyExtensionFromPath(fileName, nil, false) == tspath.ExtensionCjs {
+			return commonJSGlobalsInit, commonJSRefStoreInit
+		}
+		return GlobalsInit{}, moduleRefStoreInit
+	}
 	switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
 	case tspath.ExtensionJs, tspath.ExtensionMjs:
 		return GlobalsInit{}, moduleRefStoreInit
