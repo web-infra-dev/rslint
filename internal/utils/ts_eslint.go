@@ -1778,11 +1778,17 @@ func sameReferenceLiteralValue(left, right *ast.Node) bool {
 // (PropertyAccessExpression or ElementAccessExpression), or ("", false) if not static.
 // Element access arguments are unwrapped through parentheses and TS assertions
 // because ESTree-based helpers treat those wrappers as transparent.
+//
+// A private name has no static name: ESLint's getStaticPropertyName accepts a
+// dotted key only when it is an `Identifier`, and ESTree gives `#x` its own
+// `PrivateIdentifier` type, so upstream falls through to its string-value
+// branch and answers null. That keeps `obj.#x` and `obj['#x']` in separate
+// equivalence classes, as the language does.
 func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
-		if name != nil {
+		if name != nil && name.Kind != ast.KindPrivateIdentifier {
 			return name.Text(), true
 		}
 	case ast.KindElementAccessExpression:

@@ -103,6 +103,7 @@ export default defineConfig({
     './tests/eslint/rules/no-caller.test.ts',
 
     './tests/eslint/rules/default-case-last.test.ts',
+    './tests/eslint/rules/logical-assignment-operators.test.ts',
     './tests/eslint/rules/no-extend-native.test.ts',
     './tests/eslint/rules/no-extra-bind.test.ts',
     './tests/eslint/rules/no-extra-label.test.ts',
