@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/project/logging"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
@@ -258,7 +259,17 @@ func (s *Server) reloadConfig() error {
 	}
 	s.jsonConfig = rslintConfig
 	s.tsConfigPaths = paths
+	s.invalidateLintProjectCaches()
 	return nil
+}
+
+func (s *Server) invalidateLintProjectCaches() {
+	if s.lintPrograms != nil {
+		s.lintPrograms.Invalidate()
+	}
+	if s.lintSessionRoots != nil {
+		s.lintSessionRoots.Invalidate()
+	}
 }
 
 func validateRuleOptionsForConfig(
@@ -433,8 +444,10 @@ func isTsConfigURI(uri string) bool {
 		strings.HasSuffix(name, ".json")
 }
 
-// resolveTsConfigPaths resolves parserOptions.project from a config and
-// normalizes paths with realpath for cross-platform consistency.
+// resolveTsConfigPaths resolves parserOptions.project from a config while
+// preserving each declared path. TypeScript resolves relative includes from
+// that lexical location, so a symlinked tsconfig is not interchangeable with
+// its physical target.
 func (s *Server) resolveTsConfigPaths(cfg config.RslintConfig, cwd string) ([]string, error) {
 	return resolveTsConfigPathsWithFS(cfg, cwd, s.fs)
 }
@@ -472,6 +485,7 @@ func (s *Server) rebuildTsConfigPaths() error {
 
 	s.tsConfigPaths = tsConfigPaths
 	s.tsConfigPathsByConfig = byConfig
+	s.invalidateLintProjectCaches()
 	return nil
 }
 
@@ -488,6 +502,7 @@ func (s *Server) reloadConfigAndRelint() {
 		s.jsonConfig = config.RslintConfig{}
 		s.rslintConfigPath = ""
 		s.tsConfigPaths = nil
+		s.invalidateLintProjectCaches()
 	} else {
 		previousPath := s.rslintConfigPath
 		s.rslintConfigPath = configPath
@@ -963,12 +978,20 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-type lintProgramLoader func(
-	tsConfigPath string,
-) (*compiler.Program, *ast.SourceFile, error)
-
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
-	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil)
+	result, err := runLintWithProgramLoader(
+		uri,
+		session,
+		ctx,
+		rslintConfig,
+		cwd,
+		cwd,
+		enforcePlugins,
+		tsConfigPaths,
+		fs,
+		lintProjectLoaders{},
+		nil,
+	)
 	return result.Diagnostics, err
 }
 
@@ -986,7 +1009,8 @@ func runLintWithProgramLoader(
 	enforcePlugins bool,
 	tsConfigPaths []string,
 	fs vfs.FS,
-	loadProgram lintProgramLoader,
+	loaders lintProjectLoaders,
+	sessionRoots *lintSessionProjectRootCache,
 ) (lintPassResult, error) {
 	filename := uriToPath(uri)
 	configFilePath, configCwd := config.ResolveConfigPathSpace(filename, cwd, fs)
@@ -1007,7 +1031,8 @@ func runLintWithProgramLoader(
 		ctx,
 		tsConfigPaths,
 		fs,
-		loadProgram,
+		loaders,
+		sessionRoots,
 	)
 	if err != nil {
 		return lintPassResult{}, err
@@ -1125,7 +1150,8 @@ func selectLintProgram(
 	ctx context.Context,
 	tsConfigPaths []string,
 	fs vfs.FS,
-	loadProgram lintProgramLoader,
+	fallbackLoaders lintProjectLoaders,
+	sessionRoots *lintSessionProjectRootCache,
 ) (*compiler.Program, *ast.SourceFile, bool, error) {
 	filename := uriToPath(uri)
 	// Flush pending document changes and collect every already-loaded project
@@ -1139,31 +1165,62 @@ func selectLintProgram(
 	program := languageService.GetProgram()
 
 	// Type information follows parserOptions.project declaration order, not the
-	// TypeScript session's default-project heuristic. Prefer an already-loaded
-	// containing project. Custom config names that the main project service has
-	// not loaded are supplied by rslint-owned session-external ts-go Programs.
-	loadedByConfig := make(map[string]*compiler.Program, len(loadedProjects))
+	// TypeScript session's default-project heuristic. Direct config roots outrank
+	// files present only through imports. Custom config names that the main
+	// project service has not loaded are supplied by rslint-owned
+	// session-external ts-go Programs.
+	type loadedLintProject struct {
+		program     *compiler.Program
+		commandLine *tsoptions.ParsedCommandLine
+	}
+	loadedByConfig := make(map[tspath.Path]loadedLintProject, len(loadedProjects))
 	for _, candidate := range loadedProjects {
 		if candidate == nil || candidate.GetProgram() == nil {
 			continue
 		}
-		loadedByConfig[lspFilesystemPathID(string(candidate.Id()), fs)] = candidate.GetProgram()
-	}
-	for _, tsConfigPath := range tsConfigPaths {
-		configID := lspFilesystemPathID(tsConfigPath, fs)
-		if loadedProgram := loadedByConfig[configID]; loadedProgram != nil {
-			return loadedProgram, sourceFileForPath(loadedProgram, filename, fs), true, nil
-		}
-		if loadProgram == nil {
+		candidateProgram := candidate.GetProgram()
+		configPath := string(candidate.Id())
+		if configPath == "" {
 			continue
 		}
-		candidate, sourceFile, loadErr := loadProgram(tsConfigPath)
-		if loadErr != nil {
-			return nil, nil, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, loadErr)
+		commandLine := candidateProgram.CommandLine()
+		if sessionProject, ok := candidate.(*project.Project); ok && sessionProject.CommandLine != nil {
+			// The Program command line may include automatic type-acquisition
+			// roots. Project.CommandLine is the authored tsconfig root set.
+			commandLine = sessionProject.CommandLine
 		}
-		if sourceFile != nil {
-			return candidate, sourceFile, true, nil
+		loadedByConfig[lintProgramLexicalPathID(configPath, fs)] = loadedLintProject{
+			program:     candidateProgram,
+			commandLine: commandLine,
 		}
+	}
+	loaders := lintProjectLoaders{
+		metadata: func(tsConfigPath string) (*lintProjectMetadata, bool, error) {
+			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
+				metadata := sessionRoots.metadata(tsConfigPath, loadedProject.commandLine, fs)
+				return metadata, metadata != nil, nil
+			}
+			if fallbackLoaders.metadata == nil {
+				return nil, false, nil
+			}
+			return fallbackLoaders.metadata(tsConfigPath)
+		},
+		program: func(tsConfigPath string) (*compiler.Program, *ast.SourceFile, error) {
+			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
+				return loadedProject.program, sourceFileForPath(loadedProject.program, filename, fs), nil
+			}
+			if fallbackLoaders.program == nil {
+				return nil, nil, nil
+			}
+			return fallbackLoaders.program(tsConfigPath)
+		},
+	}
+	selected, found, err := selectConfiguredLintProject(tsConfigPaths, filename, loaders)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if found {
+		return selected.program, selected.sourceFile, true, nil
 	}
 	return program, sourceFileForPath(program, filename, fs), false, nil
 }
@@ -1238,26 +1295,6 @@ func (s *Server) addEditorOverlayFile(
 	return string(tspath.ToPath(filePath, "", caseSensitive))
 }
 
-func (s *Server) newStandaloneLintProgramLoader(uri lsproto.DocumentUri) lintProgramLoader {
-	var overlayFS vfs.FS
-	return func(tsConfigPath string) (*compiler.Program, *ast.SourceFile, error) {
-		if overlayFS == nil {
-			overlayFS = s.currentEditorOverlayFS(uri)
-		}
-		program, err := createStandaloneLintProgram(tsConfigPath, overlayFS)
-		if err != nil {
-			return nil, nil, err
-		}
-		return program, sourceFileForPath(program, uriToPath(uri), overlayFS), nil
-	}
-}
-
-func createStandaloneLintProgram(tsConfigPath string, fs vfs.FS) (*compiler.Program, error) {
-	configDir := tspath.GetDirectoryPath(tspath.NormalizePath(tsConfigPath))
-	host := utils.CreateCompilerHost(configDir, fs)
-	return utils.CreateProgramLenient(true, fs, configDir, tsConfigPath, host)
-}
-
 func createStandaloneFallbackProgram(filename string, cwd string, fs vfs.FS) (*compiler.Program, error) {
 	host := utils.CreateCompilerHost(cwd, fs)
 	return utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
@@ -1278,10 +1315,19 @@ func (s *Server) runConfiguredLint(
 	enforcePlugins bool,
 	tsConfigPaths []string,
 ) (lintPassResult, error) {
-	loadProgram := s.newStandaloneLintProgramLoader(uri)
+	request := newStandaloneLintProjectRequest(
+		uriToPath(uri),
+		func() vfs.FS { return s.currentEditorOverlayFS(uri) },
+	)
+	loaders := request.loaders()
 	finalize := func() {}
 	if s.lintPrograms != nil && s.lintPrograms.Usable() {
-		loadProgram, finalize = s.lintPrograms.Request(ctx, uri)
+		loadProgram, loadMetadata, requestFinalize := s.lintPrograms.Request(ctx, uri)
+		loaders = lintProjectLoaders{
+			program:  loadProgram,
+			metadata: loadMetadata,
+		}
+		finalize = requestFinalize
 	}
 	defer finalize()
 	return runLintWithProgramLoader(
@@ -1294,7 +1340,8 @@ func (s *Server) runConfiguredLint(
 		enforcePlugins,
 		tsConfigPaths,
 		s.fs,
-		loadProgram,
+		loaders,
+		s.lintSessionRoots,
 	)
 }
 
@@ -1326,23 +1373,26 @@ func (s *Server) runConfiguredLintForContent(
 	s.addEditorOverlayFile(files, filename, content)
 	overlayFS := utils.NewOverlayVFS(s.fs, files)
 
-	for _, tsConfigPath := range tsConfigPaths {
-		program, err := createStandaloneLintProgram(tsConfigPath, overlayFS)
-		if err != nil {
-			return lintPassResult{}, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
-		}
-		if sourceFile := sourceFileForPath(program, filename, overlayFS); sourceFile != nil {
-			return lintSingleFile(
-				program,
-				sourceFile,
-				configFilePath,
-				s.cwd,
-				true,
-				resolver,
-				rule.EditDemandAutofix,
-				ctx,
-			), nil
-		}
+	request := newStandaloneLintProjectRequestWithFS(filename, overlayFS)
+	selected, found, err := selectConfiguredLintProject(
+		tsConfigPaths,
+		filename,
+		request.loaders(),
+	)
+	if err != nil {
+		return lintPassResult{}, err
+	}
+	if found {
+		return lintSingleFile(
+			selected.program,
+			selected.sourceFile,
+			configFilePath,
+			s.cwd,
+			true,
+			resolver,
+			rule.EditDemandAutofix,
+			ctx,
+		), nil
 	}
 
 	program, err := createStandaloneFallbackProgram(filename, configCwd, overlayFS)
