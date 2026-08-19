@@ -3,7 +3,20 @@
  * package. Add small presets here; they are bundled as ordinary runtime
  * objects and do not pass through the JSON asset emitter.
  */
-export const RSLINT_GLOBAL_SETS = {} as const satisfies Record<
-  string,
-  Readonly<Record<string, boolean>>
->;
+export const RSLINT_GLOBAL_SETS = {
+  rstest: {
+    afterAll: false,
+    afterEach: false,
+    assert: false,
+    beforeAll: false,
+    beforeEach: false,
+    describe: false,
+    expect: false,
+    it: false,
+    onTestFailed: false,
+    onTestFinished: false,
+    rs: false,
+    rstest: false,
+    test: false,
+  },
+} as const satisfies Record<string, Readonly<Record<string, boolean>>>;

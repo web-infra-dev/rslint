@@ -31,6 +31,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 var _ = fmt.Sprintf // ensure fmt referenced
@@ -47,7 +48,7 @@ var _ core.TextRange
 //   - 1 for useImperativeHandle
 //   - 0 for additionalHooks-matching custom hooks
 //   - -1 otherwise
-func getReactiveHookCallbackIndex(callee *ast.Node, additionalHooks *regexp.Regexp) int {
+func getReactiveHookCallbackIndex(callee *ast.Node, additionalHooks *esregexp.RegExp) int {
 	n := react_hooksutil.StripReactNamespace(callee)
 	if n == nil || n.Kind != ast.KindIdentifier {
 		// `additionalHooks` is matched against the full path (e.g. `useFoo` or `Namespace.useFoo`);
@@ -66,7 +67,7 @@ func getReactiveHookCallbackIndex(callee *ast.Node, additionalHooks *regexp.Rege
 	// upstream's `node === calleeNode` gate. `React.useCustomEffect` is
 	// intentionally NOT treated as a reactive hook by the additionalHooks
 	// path — only the unqualified `useCustomEffect` is.
-	if additionalHooks != nil && n == callee && additionalHooks.MatchString(name) {
+	if additionalHooks != nil && n == callee && additionalHooks.Test(name) {
 		return 0
 	}
 	return -1
@@ -361,7 +362,7 @@ func getAssignmentBinaryExpr(node *ast.Node) (*ast.BinaryExpression, bool) {
 
 // Options holds the parsed rule options.
 type Options struct {
-	AdditionalHooks                                 *regexp.Regexp
+	AdditionalHooks                                 *esregexp.RegExp
 	EnableDangerousAutofixThisMayCauseInfiniteLoops bool
 	RequireExplicitEffectDeps                       bool
 	// AutoDepsHooks: experimental_autoDependenciesHooks. When the hook's
@@ -390,7 +391,7 @@ func parseOptions(options []any, settings map[string]interface{}) Options {
 	// it fails to compile; absent or empty keeps the settings-derived value.
 	if raw, _ := optsMap["additionalHooks"].(string); raw != "" {
 		opts.AdditionalHooks = nil
-		if re, err := regexp.Compile(raw); err == nil {
+		if re, err := esregexp.Compile(raw, ""); err == nil {
 			opts.AdditionalHooks = re
 		}
 	}

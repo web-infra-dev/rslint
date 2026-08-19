@@ -1,0 +1,900 @@
+// Rstest Snapshot v1
+
+exports[`no-undefined > invalid 1`] = `
+{
+  "code": "undefined",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 2`] = `
+{
+  "code": "undefined.a",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 3`] = `
+{
+  "code": "a[undefined]",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 4`] = `
+{
+  "code": "undefined[0]",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 5`] = `
+{
+  "code": "f(undefined)",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 6`] = `
+{
+  "code": "function f(undefined) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 7`] = `
+{
+  "code": "function f() { var undefined; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 8`] = `
+{
+  "code": "function f() { undefined = true; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 9`] = `
+{
+  "code": "var undefined;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 10`] = `
+{
+  "code": "try {} catch(undefined) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 11`] = `
+{
+  "code": "function undefined() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 12`] = `
+{
+  "code": "(function undefined(){}())",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 13`] = `
+{
+  "code": "var foo = function undefined() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 14`] = `
+{
+  "code": "foo = function undefined() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 15`] = `
+{
+  "code": "undefined = true",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 16`] = `
+{
+  "code": "var undefined = true",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 17`] = `
+{
+  "code": "({ undefined })",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 18`] = `
+{
+  "code": "({ [undefined]: foo })",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 19`] = `
+{
+  "code": "({ bar: undefined })",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 20`] = `
+{
+  "code": "({ bar: undefined } = foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 21`] = `
+{
+  "code": "var { undefined } = foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 22`] = `
+{
+  "code": "var { bar: undefined } = foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 23`] = `
+{
+  "code": "({ undefined: function undefined() {} })",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 24`] = `
+{
+  "code": "({ foo: function undefined() {} })",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 25`] = `
+{
+  "code": "class Foo { [undefined]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 26`] = `
+{
+  "code": "(class { [undefined]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 27`] = `
+{
+  "code": "var undefined = true; undefined = false;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 28`] = `
+{
+  "code": "import undefined from 'foo'",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 29`] = `
+{
+  "code": "import * as undefined from 'foo'",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 30`] = `
+{
+  "code": "import { undefined } from 'foo'",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 31`] = `
+{
+  "code": "import { a as undefined } from 'foo'",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 32`] = `
+{
+  "code": "let a = [b, ...undefined]",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 33`] = `
+{
+  "code": "[a, ...undefined] = b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undefined > invalid 34`] = `
+{
+  "code": "[a = undefined] = b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of undefined.",
+      "messageId": "unexpectedUndefined",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undefined",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

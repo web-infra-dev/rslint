@@ -15,6 +15,11 @@
     "activeMatch": "/rules/"
   },
   {
+    "text": "API",
+    "link": "/api/",
+    "activeMatch": "/api/"
+  },
+  {
     "text": "Playground",
     "link": "/playground/",
     "activeMatch": "/playground/"
