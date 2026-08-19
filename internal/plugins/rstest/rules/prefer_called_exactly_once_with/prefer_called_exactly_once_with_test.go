@@ -170,9 +170,9 @@ expect(x).toHaveBeenCalledWith('a');`,
 expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
 			},
-			// An unawaited poll builds its promise only in then, catch or
-			// finally, so the factory is never called and the statement runs
-			// nothing between the two halves.
+			// A poll that is not awaited builds its promise only in then,
+			// catch or finally, so the factory is never called and the
+			// statement runs nothing between the two halves.
 			{
 				Code: `expect(x).toHaveBeenCalledOnce();
 expect.poll(getSpy).toBe(1);
