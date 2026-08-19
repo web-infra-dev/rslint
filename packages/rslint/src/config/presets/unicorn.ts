@@ -103,7 +103,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-instanceof-builtins': 'error',
     // 'unicorn/no-invalid-argument-count': 'error', // not implemented
     // 'unicorn/no-invalid-character-comparison': 'error', // not implemented
-    // 'unicorn/no-invalid-fetch-options': 'error', // not implemented
+    'unicorn/no-invalid-fetch-options': 'error',
     // 'unicorn/no-invalid-file-input-accept': 'off', // not implemented
     // 'unicorn/no-invalid-remove-event-listener': 'error', // not implemented
     // 'unicorn/no-invalid-well-known-symbol-methods': 'error', // not implemented
