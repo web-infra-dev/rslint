@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,6 +23,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/project/logging"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
@@ -967,8 +969,10 @@ type lintProgramLoader func(
 	tsConfigPath string,
 ) (*compiler.Program, *ast.SourceFile, error)
 
+type lintProjectRootLoader func(tsConfigPath string) (*lintprogram.RootFileIndex, error)
+
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
-	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil)
+	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil, nil)
 	return result.Diagnostics, err
 }
 
@@ -987,6 +991,7 @@ func runLintWithProgramLoader(
 	tsConfigPaths []string,
 	fs vfs.FS,
 	loadProgram lintProgramLoader,
+	loadProjectRoots lintProjectRootLoader,
 ) (lintPassResult, error) {
 	filename := uriToPath(uri)
 	configFilePath, configCwd := config.ResolveConfigPathSpace(filename, cwd, fs)
@@ -1008,6 +1013,7 @@ func runLintWithProgramLoader(
 		tsConfigPaths,
 		fs,
 		loadProgram,
+		loadProjectRoots,
 	)
 	if err != nil {
 		return lintPassResult{}, err
@@ -1126,6 +1132,7 @@ func selectLintProgram(
 	tsConfigPaths []string,
 	fs vfs.FS,
 	loadProgram lintProgramLoader,
+	loadProjectRoots lintProjectRootLoader,
 ) (*compiler.Program, *ast.SourceFile, bool, error) {
 	filename := uriToPath(uri)
 	// Flush pending document changes and collect every already-loaded project
@@ -1139,9 +1146,10 @@ func selectLintProgram(
 	program := languageService.GetProgram()
 
 	// Type information follows parserOptions.project declaration order, not the
-	// TypeScript session's default-project heuristic. Prefer an already-loaded
-	// containing project. Custom config names that the main project service has
-	// not loaded are supplied by rslint-owned session-external ts-go Programs.
+	// TypeScript session's default-project heuristic. Direct config roots outrank
+	// files present only through imports. Custom config names that the main
+	// project service has not loaded are supplied by rslint-owned
+	// session-external ts-go Programs.
 	loadedByConfig := make(map[string]*compiler.Program, len(loadedProjects))
 	for _, candidate := range loadedProjects {
 		if candidate == nil || candidate.GetProgram() == nil {
@@ -1149,6 +1157,42 @@ func selectLintProgram(
 		}
 		loadedByConfig[lspFilesystemPathID(string(candidate.Id()), fs)] = candidate.GetProgram()
 	}
+	for _, tsConfigPath := range tsConfigPaths {
+		configID := lspFilesystemPathID(tsConfigPath, fs)
+		loadedProgram := loadedByConfig[configID]
+		var rootFiles *lintprogram.RootFileIndex
+		if loadedProgram != nil && loadedProgram.CommandLine() != nil {
+			rootFiles = lintprogram.NewRootFileIndex(loadedProgram.CommandLine().FileNames(), fs)
+		} else if loadProjectRoots != nil {
+			var loadErr error
+			rootFiles, loadErr = loadProjectRoots(tsConfigPath)
+			if loadErr != nil {
+				return nil, nil, false, fmt.Errorf("load configured project roots %q: %w", tsConfigPath, loadErr)
+			}
+		}
+		if rootFiles == nil || !rootFiles.Contains(filename, "") {
+			continue
+		}
+		if loadedProgram != nil {
+			sourceFile := sourceFileForPath(loadedProgram, filename, fs)
+			if sourceFile == nil {
+				return nil, nil, false, fmt.Errorf("configured project root %q was absent from %q", filename, tsConfigPath)
+			}
+			return loadedProgram, sourceFile, true, nil
+		}
+		if loadProgram == nil {
+			continue
+		}
+		candidate, sourceFile, loadErr := loadProgram(tsConfigPath)
+		if loadErr != nil {
+			return nil, nil, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, loadErr)
+		}
+		if sourceFile == nil {
+			return nil, nil, false, fmt.Errorf("configured project root %q was absent from %q", filename, tsConfigPath)
+		}
+		return candidate, sourceFile, true, nil
+	}
+
 	for _, tsConfigPath := range tsConfigPaths {
 		configID := lspFilesystemPathID(tsConfigPath, fs)
 		if loadedProgram := loadedByConfig[configID]; loadedProgram != nil {
@@ -1252,6 +1296,42 @@ func (s *Server) newStandaloneLintProgramLoader(uri lsproto.DocumentUri) lintPro
 	}
 }
 
+func (s *Server) newStandaloneLintProjectRootLoader(uri lsproto.DocumentUri) lintProjectRootLoader {
+	var overlayFS vfs.FS
+	indexes := make(map[string]*lintprogram.RootFileIndex)
+	return func(tsConfigPath string) (*lintprogram.RootFileIndex, error) {
+		if overlayFS == nil {
+			overlayFS = s.currentEditorOverlayFS(uri)
+		}
+		if index := indexes[tsConfigPath]; index != nil {
+			return index, nil
+		}
+		rootFileNames, err := loadStandaloneLintProjectRoots(tsConfigPath, overlayFS)
+		if err != nil {
+			return nil, err
+		}
+		index := lintprogram.NewRootFileIndex(rootFileNames, overlayFS)
+		indexes[tsConfigPath] = index
+		return index, nil
+	}
+}
+
+func loadStandaloneLintProjectRoots(tsConfigPath string, fs vfs.FS) ([]string, error) {
+	configDir := tspath.GetDirectoryPath(tspath.NormalizePath(tsConfigPath))
+	host := utils.CreateCompilerHost(configDir, fs)
+	parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(
+		tsConfigPath,
+		&core.CompilerOptions{},
+		nil,
+		host,
+		nil,
+	)
+	if parsed == nil {
+		return nil, errors.New("no parsed config returned")
+	}
+	return parsed.FileNames(), nil
+}
+
 func createStandaloneLintProgram(tsConfigPath string, fs vfs.FS) (*compiler.Program, error) {
 	configDir := tspath.GetDirectoryPath(tspath.NormalizePath(tsConfigPath))
 	host := utils.CreateCompilerHost(configDir, fs)
@@ -1279,9 +1359,10 @@ func (s *Server) runConfiguredLint(
 	tsConfigPaths []string,
 ) (lintPassResult, error) {
 	loadProgram := s.newStandaloneLintProgramLoader(uri)
+	loadProjectRoots := s.newStandaloneLintProjectRootLoader(uri)
 	finalize := func() {}
 	if s.lintPrograms != nil && s.lintPrograms.Usable() {
-		loadProgram, finalize = s.lintPrograms.Request(ctx, uri)
+		loadProgram, loadProjectRoots, finalize = s.lintPrograms.Request(ctx, uri)
 	}
 	defer finalize()
 	return runLintWithProgramLoader(
@@ -1295,6 +1376,7 @@ func (s *Server) runConfiguredLint(
 		tsConfigPaths,
 		s.fs,
 		loadProgram,
+		loadProjectRoots,
 	)
 }
 
@@ -1326,10 +1408,10 @@ func (s *Server) runConfiguredLintForContent(
 	s.addEditorOverlayFile(files, filename, content)
 	overlayFS := utils.NewOverlayVFS(s.fs, files)
 
-	for _, tsConfigPath := range tsConfigPaths {
+	lintConfiguredProject := func(tsConfigPath string) (lintPassResult, bool, error) {
 		program, err := createStandaloneLintProgram(tsConfigPath, overlayFS)
 		if err != nil {
-			return lintPassResult{}, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
+			return lintPassResult{}, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
 		}
 		if sourceFile := sourceFileForPath(program, filename, overlayFS); sourceFile != nil {
 			return lintSingleFile(
@@ -1341,7 +1423,36 @@ func (s *Server) runConfiguredLintForContent(
 				resolver,
 				rule.EditDemandAutofix,
 				ctx,
-			), nil
+			), true, nil
+		}
+		return lintPassResult{}, false, nil
+	}
+
+	for _, tsConfigPath := range tsConfigPaths {
+		rootFileNames, err := loadStandaloneLintProjectRoots(tsConfigPath, overlayFS)
+		if err != nil {
+			return lintPassResult{}, fmt.Errorf("load configured project roots %q: %w", tsConfigPath, err)
+		}
+		if !lintprogram.NewRootFileIndex(rootFileNames, overlayFS).Contains(filename, "") {
+			continue
+		}
+		result, found, err := lintConfiguredProject(tsConfigPath)
+		if err != nil {
+			return lintPassResult{}, err
+		}
+		if !found {
+			return lintPassResult{}, fmt.Errorf("configured project root %q was absent from %q", filename, tsConfigPath)
+		}
+		return result, nil
+	}
+
+	for _, tsConfigPath := range tsConfigPaths {
+		result, found, err := lintConfiguredProject(tsConfigPath)
+		if err != nil {
+			return lintPassResult{}, err
+		}
+		if found {
+			return result, nil
 		}
 	}
 
