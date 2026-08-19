@@ -95,12 +95,17 @@ func TestIdLengthExtras(t *testing.T) {
 			{Code: `empty();`},
 
 			// ---- Dimension 4: graceful degradation — TS overload signature
-			// and abstract/declare members (body-absent forms) must not crash,
-			// and their (short) names are still checked through the same
-			// MethodDeclaration/PropertyDeclaration paths ----
+			// and abstract/declare members (body-absent forms) must not
+			// crash ----
 			{Code: `declare function longName(xx: number): void;`},
 			{Code: `abstract class Foo { abstract longName(): void; }`},
 			{Code: `declare class Foo { longName: number; }`},
+
+			// ---- ...and a body-less function declaration is a
+			// TSDeclareFunction in ESTree rather than a FunctionDeclaration,
+			// so its name is not checked however short it is ----
+			{Code: `declare function q(xx: number): void;`},
+			{Code: `declare namespace NN { function q(): void; }`},
 
 			// ---- Branch lock-in: BindingElement's isKeyAndValueSame==true
 			// arm — the same isValidPatternPropertyValueNodes implementation
@@ -140,6 +145,53 @@ func TestIdLengthExtras(t *testing.T) {
 			{Code: `var x = 1;`, Options: map[string]any{"exceptionPatterns": []any{"(?=x)"}}},
 			{Code: `var x = 1;`, Options: map[string]any{"exceptionPatterns": []any{"(?<=^)x"}}},
 			{Code: `var e = 1;`, Options: map[string]any{"exceptionPatterns": []any{"^\\p{Ll}$"}}},
+
+			// ---- A TS parameter property is a TSParameterProperty in
+			// ESTree, which is not a supported parent, so the binding name
+			// goes unchecked no matter which modifiers spell it ----
+			{Code: `class Foo { constructor(private x: number) {} }`},
+			{Code: `class Foo { constructor(public readonly x: number) {} }`},
+			{Code: `class Foo { protected constructor(readonly x: number) {} }`},
+
+			// ---- An object literal's method/accessor name is a Property
+			// key, so `properties: never` exempts it (a class member's name
+			// is a MethodDefinition and stays checked) ----
+			{Code: `const obj = { x() {} };`, Options: map[string]any{"properties": "never"}},
+			{Code: `const obj = { get x() { return 1; } };`, Options: map[string]any{"properties": "never"}},
+			{Code: `const obj = { set x(v2) {} };`, Options: map[string]any{"properties": "never"}},
+			{Code: `const obj = { async *x() {} };`, Options: map[string]any{"properties": "never"}},
+
+			// ---- ...and a computed one is never checked at all, matching
+			// Property's `!parent.computed` guard ----
+			{Code: `const obj = { [x]() {} };`},
+			{Code: `const obj = { get [x]() { return 1; } };`},
+
+			// ---- A method key inside a dynamic import's options object is
+			// still an import attribute key ----
+			{Code: `import('foo.json', { with: { a() {} } });`},
+
+			// ---- Interface members are TSMethodSignature-shaped in ESTree,
+			// so neither a `constructor` member nor a short one is checked ----
+			{Code: `interface II { constructor(): void }`, Options: map[string]any{"min": 0, "max": 5}},
+			{Code: `interface II { x(): void }`},
+
+			// ---- `constructor` is exempt like any other name ----
+			{Code: `class Foo { constructor() {} }`, Options: map[string]any{"min": 0, "max": 5, "exceptions": []any{"constructor"}}},
+			{Code: `class Foo { constructor() {} }`, Options: map[string]any{"min": 0, "max": 5, "exceptionPatterns": []any{"^construct"}}},
+
+			// ---- An object literal's `constructor` method is a Property
+			// key, so `properties: never` exempts it ----
+			{Code: `const o2 = { constructor() {} };`, Options: map[string]any{"min": 0, "max": 5, "properties": "never"}},
+
+			// ---- An `abstract` or `accessor` class member is a
+			// TSAbstract*/AccessorProperty node in ESTree rather than a
+			// MethodDefinition/PropertyDefinition, so its name is never
+			// checked ----
+			{Code: `abstract class Cc { abstract x(): void }`},
+			{Code: `abstract class Cc { abstract x: number }`},
+			{Code: `abstract class Cc { abstract get x(): number }`},
+			{Code: `abstract class Cc { abstract [y]: number }`},
+			{Code: `class Cc { accessor x = 1; }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: (X).y parenthesized receiver — both the
@@ -264,20 +316,35 @@ func TestIdLengthExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 32}},
 			},
 
-			// ---- Dimension 4: graceful degradation — TS overload signature
-			// and abstract/declare members (body-absent forms) are still
-			// checked through the ordinary name paths ----
+			// ---- ...while the implementation that follows an overload
+			// signature is a real FunctionDeclaration, so only its name is
+			// reported ----
 			{
-				Code:   `declare function q(xx: number): void;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 18}},
+				Code: `function q(xx: number): void;
+function q(xx: any) { return xx; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 2, Column: 10},
+				},
 			},
-			{
-				Code:   `abstract class Foo { abstract q(): void; }`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 31}},
-			},
+
+			// ---- Dimension 4: graceful degradation — an ambient class
+			// member is a body-absent form that keeps its
+			// PropertyDefinition/MethodDefinition shape, so its name is
+			// still checked ----
 			{
 				Code:   `declare class Foo { q: number; }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 21}},
+			},
+			{
+				Code:   `declare class Foo { q(): void; }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 21}},
+			},
+			{
+				Code: `class Foo { q(); q() {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 13},
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 18},
+				},
 			},
 
 			// ---- Branch lock-in: rest element in assignment-destructuring
@@ -333,6 +400,144 @@ func TestIdLengthExtras(t *testing.T) {
 				Code: `el.addEventListener('click', function (e) { use(e); });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "tooShort", Message: "Identifier name 'e' is too short (< 2).", Line: 1, Column: 40},
+				},
+			},
+
+			// ---- A default value on a parameter property restores the
+			// AssignmentPattern that ESTree checks unconditionally, so the
+			// binding name is back in scope for the rule ----
+			{
+				Code: `class Foo { constructor(private x = 1) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 33},
+				},
+			},
+
+			// ---- An object literal's method name is checked when
+			// `properties` is on (the default) ----
+			{
+				Code: `const obj = { x() {} };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 15},
+				},
+			},
+
+			// ---- ...while a class member's name ignores `properties`
+			// entirely, computed or not ----
+			{
+				Code:    `class C { x() {} }`,
+				Options: map[string]any{"properties": "never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'C' is too short (< 2).", Line: 1, Column: 7},
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 11},
+				},
+			},
+			{
+				Code:    `class C { get [x]() { return 1; } }`,
+				Options: map[string]any{"properties": "never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'C' is too short (< 2).", Line: 1, Column: 7},
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 16},
+				},
+			},
+
+			// ---- A class constructor is a MethodDefinition whose key is an
+			// Identifier upstream, so its name counts against `max`; tsgo has
+			// no name node there, so the report lands on the keyword ----
+			{
+				Code:    `class Foo { constructor() {} }`,
+				Options: map[string]any{"min": 0, "max": 5},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooLong", Message: "Identifier name 'constructor' is too long (> 5).", Line: 1, Column: 13, EndColumn: 24},
+				},
+			},
+			{
+				Code:    `class Foo { public constructor() {} }`,
+				Options: map[string]any{"min": 0, "max": 5},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooLong", Message: "Identifier name 'constructor' is too long (> 5).", Line: 1, Column: 20, EndColumn: 31},
+				},
+			},
+			{
+				Code:    `const Cls = class { constructor() {} };`,
+				Options: map[string]any{"min": 0, "max": 5},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooLong", Message: "Identifier name 'constructor' is too long (> 5).", Line: 1, Column: 21, EndColumn: 32},
+				},
+			},
+
+			// ---- ...including an overload signature, which is its own
+			// MethodDefinition ----
+			{
+				Code:    `class C2 { constructor(); constructor(a?: number) {} }`,
+				Options: map[string]any{"min": 0, "max": 5},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooLong", Message: "Identifier name 'constructor' is too long (> 5).", Line: 1, Column: 12},
+					{MessageId: "tooLong", Message: "Identifier name 'constructor' is too long (> 5).", Line: 1, Column: 27},
+				},
+			},
+
+			// ---- An object literal's `constructor` method is an ordinary
+			// property key ----
+			{
+				Code:    `const o2 = { constructor() {} };`,
+				Options: map[string]any{"min": 0, "max": 5},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooLong", Message: "Identifier name 'constructor' is too long (> 5).", Line: 1, Column: 14},
+				},
+			},
+
+			// ---- A defaulted or rest binding is an AssignmentPattern /
+			// RestElement upstream, not a Property, so `properties: never`
+			// does not exempt it ----
+			{
+				Code:    `const { x = 1 } = obj;`,
+				Options: map[string]any{"properties": "never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 9},
+				},
+			},
+			{
+				Code:    `const { ...x } = obj;`,
+				Options: map[string]any{"properties": "never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 12},
+				},
+			},
+			{
+				Code:    `function ff({ x = 1 }) {}`,
+				Options: map[string]any{"properties": "never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 15},
+				},
+			},
+
+			// ---- ...while an ordinary (non-abstract) member of the same
+			// abstract class stays checked ----
+			{
+				Code: `abstract class Cc { declare x: number; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 29},
+				},
+			},
+
+			// ---- ...and a renamed-with-default binding still reports only
+			// the local name, never the property name it came from ----
+			{
+				Code:    `const { longName: b = 1 } = obj;`,
+				Options: map[string]any{"properties": "never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'b' is too short (< 2).", Line: 1, Column: 19},
+				},
+			},
+
+			// ---- The same holds for a destructuring assignment, where the
+			// default lives on a ShorthandPropertyAssignment ----
+			{
+				Code:    `({ x = 1 } = obj);`,
+				Options: map[string]any{"properties": "never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 4},
 				},
 			},
 		},
