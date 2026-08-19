@@ -110,5 +110,21 @@ ruleTester.run('no-invalid-fetch-options', null as never, {
 });`,
       'HEAD',
     ),
+    invalid('fetch(url, {method: "get".toUpperCase(), body})', 'GET'),
+    invalid(
+      'new Request(url, {method: String.fromCharCode(72, 69, 65, 68), body})',
+      'HEAD',
+    ),
+    invalid('fetch(url, {method: Array.of("GET")[0], body})', 'GET'),
+    invalid('fetch(url, {method: "xGETy".slice(1, 4), body})', 'GET'),
+    invalid('fetch(url, {method: "xHEADy".substring(1, 5), body})', 'HEAD'),
+    invalid(
+      'const S = String; fetch(url, {method: S.fromCharCode(71, 69, 84), body})',
+      'GET',
+    ),
+    invalid(
+      'const A = Array; fetch(url, {method: A.of("HEAD")[0], body})',
+      'HEAD',
+    ),
   ],
 });

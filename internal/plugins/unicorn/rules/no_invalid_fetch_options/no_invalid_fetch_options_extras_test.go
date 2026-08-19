@@ -133,6 +133,14 @@ func TestNoInvalidFetchOptionsExtras(t *testing.T) {
 			invalid(`fetch(url, {method: "he" + "ad", body})`, "body", "HEAD"),
 			invalid(`fetch(url, {method: true ? "GET" : "POST", body})`, "body", "GET"),
 			invalid(`const method = "get"; fetch(url, {method, body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "get".toUpperCase(), body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "get".toUpperCase(1), body})`, "body", "GET"),
+			invalid(`new Request(url, {method: String.fromCharCode(72, 69, 65, 68), body})`, "body", "HEAD"),
+			invalid(`fetch(url, {method: Array.of("GET")[0], body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "xGETy".slice(1, 4), body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "xHEADy".substring(1, 5), body})`, "body", "HEAD"),
+			invalid(`const S = String; fetch(url, {method: S.fromCharCode(71, 69, 84), body})`, "body", "GET"),
+			invalid(`const A = Array; fetch(url, {method: A.of("HEAD")[0], body})`, "body", "HEAD"),
 
 			// ---- Locks in upstream findLast(): last body/method wins across member kinds ----
 			invalid(`fetch(url, {body: undefined, body() {}})`, "body", "GET", 2),
