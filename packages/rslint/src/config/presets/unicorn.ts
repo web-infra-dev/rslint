@@ -59,7 +59,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-anonymous-default-export': 'error', // not implemented
     // 'unicorn/no-array-callback-reference': 'error', // not implemented
     // 'unicorn/no-array-concat-in-loop': 'error', // not implemented
-    // 'unicorn/no-array-fill-with-reference-type': 'error', // not implemented
+    'unicorn/no-array-fill-with-reference-type': 'error',
     // 'unicorn/no-array-from-fill': 'error', // not implemented
     // 'unicorn/no-array-front-mutation': 'off', // not implemented
     // 'unicorn/no-array-method-this-argument': 'error', // not implemented

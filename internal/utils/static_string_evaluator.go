@@ -150,6 +150,23 @@ func (staticEvaluator *StaticStringEvaluator) EvalValue(node *ast.Node) (any, bo
 	return result.value, true
 }
 
+// EvalArrayValue classifies a statically known value by whether it is an
+// array. The second result is false when the expression cannot be folded. It
+// keeps the evaluator's private aggregate representation encapsulated while
+// allowing callers that mirror eslint-utils' getStaticValue + Array.isArray
+// pattern to distinguish arrays from other known values.
+func (staticEvaluator *StaticStringEvaluator) EvalArrayValue(node *ast.Node) (isArray bool, known bool) {
+	if staticEvaluator == nil || node == nil {
+		return false, false
+	}
+	result := staticEvaluator.evalValue(node)
+	if !result.ok {
+		return false, false
+	}
+	_, isArray = result.value.(*staticArrayValue)
+	return isArray, true
+}
+
 // EvalStringValue returns a string without boxing it into an interface, or
 // classifies the result as a known non-string or an unknown value.
 func (staticEvaluator *StaticStringEvaluator) EvalStringValue(node *ast.Node) (string, StaticEvalValueKind) {
