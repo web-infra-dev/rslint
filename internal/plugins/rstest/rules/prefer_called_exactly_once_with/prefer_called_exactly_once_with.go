@@ -441,27 +441,41 @@ type betweenScanner struct {
 // isCallable reports whether an argument could be invoked by whoever receives
 // it. Anything the checker cannot resolve counts as callable, so an unknown
 // argument keeps its call out of the inert set.
+//
+// The type is read from the node as written, with only parentheses stripped:
+// an assertion is how a callable is spelled where the declared type does not
+// say so, so `t as unknown as () => void` has to answer as the asserted type
+// rather than as `t`. A union is asked constituent by constituent, because a
+// union carries no signatures of its own while `((a: number) => void) |
+// undefined` — the type of any optional library callback — invokes just as
+// readily as the bare function type.
 func (scanner *betweenScanner) isCallable(node *ast.Node) bool {
-	node = unwrapExpression(node)
 	if node == nil {
 		return true
 	}
-	switch node.Kind {
+	switch unwrapExpression(node).Kind {
 	case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindClassExpression:
 		return true
 	}
 	if scanner.ctx.TypeChecker == nil {
 		return true
 	}
-	argumentType := scanner.ctx.TypeChecker.GetTypeAtLocation(node)
-	if argumentType == nil ||
-		internalUtils.IsTypeFlagSet(argumentType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
-		// `any` has no call signatures and answers nothing about the value, so
-		// an argument the checker could not pin down stays callable.
+	argumentType := scanner.ctx.TypeChecker.GetTypeAtLocation(ast.SkipParentheses(node))
+	if argumentType == nil {
 		return true
 	}
-	return len(internalUtils.GetCallSignatures(scanner.ctx.TypeChecker, argumentType)) > 0 ||
-		len(internalUtils.GetConstructSignatures(scanner.ctx.TypeChecker, argumentType)) > 0
+	for _, part := range internalUtils.UnionTypeParts(argumentType) {
+		// `any` has no call signatures and answers nothing about the value, so
+		// an argument the checker could not pin down stays callable.
+		if internalUtils.IsTypeFlagSet(part, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
+			return true
+		}
+		if len(internalUtils.GetCallSignatures(scanner.ctx.TypeChecker, part)) > 0 ||
+			len(internalUtils.GetConstructSignatures(scanner.ctx.TypeChecker, part)) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // isLibraryCall reports a call that runs nothing of the author's: its callee is

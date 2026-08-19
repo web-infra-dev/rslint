@@ -104,6 +104,18 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
       code: `declare const obj: { fn: (a: string) => void }; expect(obj.fn).toHaveBeenCalledOnce(); obj.fn.apply(null, ['b']); expect(obj.fn).toHaveBeenCalledWith('a')`,
     },
     {
+      code: `declare const cmp: ((a: number, b: number) => number) | undefined; expect(x).toHaveBeenCalledOnce(); [2, 1].sort(cmp); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `declare const replacer: ((k: string, v: unknown) => unknown) | undefined; expect(x).toHaveBeenCalledOnce(); JSON.stringify({}, replacer); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `declare const pred: ((v: number) => boolean) | undefined; expect(x).toHaveBeenCalledOnce(); [1, 2].every(pred!); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
+      code: `declare const t: object; expect(x).toHaveBeenCalledOnce(); [1].forEach(t as unknown as () => void); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
       code: `async function f() { await expect.poll(getSpy).toHaveBeenCalledOnce(); await expect.poll(getSpy).toHaveBeenCalledWith('a'); }`,
     },
     {

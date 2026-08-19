@@ -119,6 +119,14 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			// handed to them.
 			{Code: `declare const x: { (a: string): void }; expect(x).toHaveBeenCalledOnce(); x.call(null, 'b'); expect(x).toHaveBeenCalledWith('a');`},
 			{Code: `declare const obj: { fn: (a: string) => void }; expect(obj.fn).toHaveBeenCalledOnce(); obj.fn.apply(null, ['b']); expect(obj.fn).toHaveBeenCalledWith('a');`},
+			// A library callback is usually an optional parameter, so its type
+			// is a union that carries no call signature of its own, and an
+			// assertion is how a callable is spelled where the declared type
+			// does not say so. Both still hand the library something to call.
+			{Code: `declare const cmp: ((a: number, b: number) => number) | undefined; expect(x).toHaveBeenCalledOnce(); [2, 1].sort(cmp); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `declare const replacer: ((k: string, v: unknown) => unknown) | undefined; expect(x).toHaveBeenCalledOnce(); JSON.stringify({}, replacer); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `declare const pred: ((v: number) => boolean) | undefined; expect(x).toHaveBeenCalledOnce(); [1, 2].every(pred!); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `declare const t: object; expect(x).toHaveBeenCalledOnce(); [1].forEach(t as unknown as () => void); expect(x).toHaveBeenCalledWith('a');`},
 			// A polled assertion retries until it passes, so the two halves
 			// can settle against different call histories.
 			{Code: `async function f() { await expect.poll(getSpy).toHaveBeenCalledOnce(); await expect.poll(getSpy).toHaveBeenCalledWith('a'); }`},
