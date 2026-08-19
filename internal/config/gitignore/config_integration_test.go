@@ -255,6 +255,87 @@ func TestConfigWithGitignore_DefaultAndExplicitScopes(t *testing.T) {
 	assert.Assert(t, base[0].Ignores == nil, "ConfigWithGitignore mutated its input: %v", base)
 }
 
+func TestConfigWithGitignoreForTargetsMatchesFullProjectionWithinTargets(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                                "*.generated.ts\n",
+		"packages/selected/.gitignore":              "local.ts\n!keep.generated.ts\n",
+		"packages/selected/index.ts":                "debugger;\n",
+		"packages/selected/local.ts":                "debugger;\n",
+		"packages/selected/keep.generated.ts":       "debugger;\n",
+		"packages/selected/deep/.gitignore":         "drop.ts\n",
+		"packages/selected/deep/drop.ts":            "debugger;\n",
+		"packages/selected/deep/other.generated.ts": "debugger;\n",
+		"packages/unrelated/.gitignore":             "index.ts\n",
+		"packages/unrelated/index.ts":               "debugger;\n",
+		"tools/.gitignore":                          "exact.ts\n",
+		"tools/exact.ts":                            "debugger;\n",
+	})
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	selectedDir := tspath.ResolvePath(dir, "packages/selected")
+	exactFile := tspath.ResolvePath(dir, "tools/exact.ts")
+	spy := &gitignoreSpyFS{FS: osvfs.FS()}
+
+	full := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
+	targeted := config.ConfigWithGitignoreForTargets(
+		base,
+		dir,
+		spy,
+		[]string{exactFile},
+		[]string{selectedDir},
+	)
+	for _, relativePath := range []string{
+		"packages/selected/index.ts",
+		"packages/selected/local.ts",
+		"packages/selected/keep.generated.ts",
+		"packages/selected/deep/drop.ts",
+		"packages/selected/deep/other.generated.ts",
+		"tools/exact.ts",
+	} {
+		path := tspath.ResolvePath(dir, relativePath)
+		assert.Equal(
+			t,
+			targeted.IsFileIgnored(path, dir),
+			full.IsFileIgnored(path, dir),
+			"target decision changed for %s",
+			relativePath,
+		)
+	}
+
+	unrelatedDir := tspath.ResolvePath(dir, "packages/unrelated")
+	for _, accessed := range spy.accessedDirs {
+		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+			t.Fatalf("targeted projection entered unrelated directory %q", accessed)
+		}
+	}
+}
+
+func TestConfigWithGitignoreForDirectoryPreservesIgnoredParentReachability(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":           "blocked/\n",
+		"blocked/.gitignore":   "keep.ts\n",
+		"blocked/keep.ts":      "debugger;\n",
+		"unrelated/.gitignore": "index.ts\n",
+		"unrelated/index.ts":   "debugger;\n",
+	})
+	base := config.RslintConfig{
+		{Ignores: []string{"!blocked/**"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
+	}
+	blockedDir := tspath.ResolvePath(dir, "blocked")
+	target := tspath.ResolvePath(dir, "blocked/keep.ts")
+	spy := &gitignoreSpyFS{FS: osvfs.FS()}
+
+	full := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
+	targeted := config.ConfigWithGitignoreForTargets(base, dir, spy, nil, []string{blockedDir})
+	assert.Equal(t, targeted.IsFileIgnored(target, dir), full.IsFileIgnored(target, dir))
+	assert.Assert(t, !targeted.IsFileIgnored(target, dir))
+	for _, accessed := range spy.accessedDirs {
+		if accessed == blockedDir || tspath.StartsWithDirectory(accessed, blockedDir, true) {
+			t.Fatalf("targeted projection read a Git-inaccessible directory %q", accessed)
+		}
+	}
+}
+
 func TestConfigWithGitignore_DoesNotReadParentOfConfigDir(t *testing.T) {
 	sandbox := t.TempDir()
 	workspace := filepath.Join(sandbox, "workspace")
@@ -450,11 +531,49 @@ func TestConfigWithGitignore_SymlinkedConfigPathSpace(t *testing.T) {
 		{name: "physical config and aliased target", configDir: realRoot, target: filepath.Join(aliasRoot, "src/source.ts")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			effective := config.ConfigWithGitignore(base, test.configDir, osvfs.FS(), []string{test.target})
+			exact := config.ConfigWithGitignore(base, test.configDir, osvfs.FS(), []string{test.target})
+			directory := config.ConfigWithGitignoreForTargets(
+				base,
+				test.configDir,
+				osvfs.FS(),
+				nil,
+				[]string{filepath.Dir(test.target)},
+			)
 			matchFile, matchDir := config.ResolveConfigPathSpace(test.target, test.configDir, osvfs.FS())
-			assert.Assert(t, effective.IsFileIgnored(matchFile, matchDir))
+			assert.Assert(t, exact.IsFileIgnored(matchFile, matchDir))
+			assert.Assert(t, directory.IsFileIgnored(matchFile, matchDir))
 		})
 	}
+}
+
+func TestConfigWithGitignore_DirectoryContainingAliasedConfigRoot(t *testing.T) {
+	physicalParent := t.TempDir()
+	physicalRoot := filepath.Join(physicalParent, "workspace")
+	if err := os.MkdirAll(filepath.Join(physicalRoot, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(physicalRoot, ".gitignore"), []byte("src/index.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	physicalTarget := filepath.Join(physicalRoot, "src/index.ts")
+	if err := os.WriteFile(physicalTarget, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasRoot := filepath.Join(t.TempDir(), "workspace-alias")
+	if err := os.Symlink(physicalRoot, aliasRoot); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+
+	effective := config.ConfigWithGitignoreForTargets(
+		base,
+		aliasRoot,
+		osvfs.FS(),
+		nil,
+		[]string{physicalParent},
+	)
+	matchFile, matchDir := config.ResolveConfigPathSpace(physicalTarget, aliasRoot, osvfs.FS())
+	assert.Assert(t, effective.IsFileIgnored(matchFile, matchDir))
 }
 
 func TestConfigWithGitignore_SymlinkedConfigDoesNotReadParents(t *testing.T) {

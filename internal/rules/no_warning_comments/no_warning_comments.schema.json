@@ -1,0 +1,31 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "location": {
+          "enum": ["start", "anywhere"]
+        },
+        "decoration": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\S$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

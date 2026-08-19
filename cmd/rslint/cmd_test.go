@@ -9,8 +9,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -20,6 +22,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -30,6 +33,26 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+type commandReadCountingFS struct {
+	vfs.FS
+	mu    sync.Mutex
+	reads map[string]int
+}
+
+func (fsys *commandReadCountingFS) ReadFile(fileName string) (string, bool) {
+	fileName = tspath.NormalizePath(fileName)
+	fsys.mu.Lock()
+	fsys.reads[fileName]++
+	fsys.mu.Unlock()
+	return fsys.FS.ReadFile(fileName)
+}
+
+func (fsys *commandReadCountingFS) readCount(fileName string) int {
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	return fsys.reads[tspath.NormalizePath(fileName)]
+}
 
 func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, string, string) {
 	t.Helper()
@@ -69,6 +92,24 @@ func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, strin
 		t.Fatalf("read stderr: %v", err)
 	}
 	return code, string(stdoutBytes), string(stderrBytes)
+}
+
+type directoryAccessSpyFS struct {
+	vfs.FS
+	accessedDirs   []string
+	gitignoreReads []string
+}
+
+func (fs *directoryAccessSpyFS) ReadFile(path string) (string, bool) {
+	if filepath.Base(path) == ".gitignore" {
+		fs.gitignoreReads = append(fs.gitignoreReads, tspath.NormalizePath(path))
+	}
+	return fs.FS.ReadFile(path)
+}
+
+func (fs *directoryAccessSpyFS) GetAccessibleEntries(path string) vfs.Entries {
+	fs.accessedDirs = append(fs.accessedDirs, tspath.NormalizePath(path))
+	return fs.FS.GetAccessibleEntries(path)
 }
 
 // TestPrintDiagnosticUTF8 tests that the default output renderer correctly
@@ -779,6 +820,30 @@ func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
 	}
 }
 
+func TestIsBroadProjectLoadScope(t *testing.T) {
+	const cwd = "/repo"
+	tests := []struct {
+		name       string
+		allowFiles []string
+		allowDirs  []string
+		want       bool
+	}{
+		{name: "implicit cwd", want: true},
+		{name: "explicit cwd", allowDirs: []string{"/repo"}, want: true},
+		{name: "cwd plus file", allowFiles: []string{"/repo/a.ts"}, allowDirs: []string{"/repo"}, want: true},
+		{name: "ancestor", allowDirs: []string{"/"}, want: true},
+		{name: "focused directory", allowDirs: []string{"/repo/packages/a"}},
+		{name: "focused file", allowFiles: []string{"/repo/packages/a/index.ts"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isBroadProjectLoadScope(test.allowFiles, test.allowDirs, cwd, true); got != test.want {
+				t.Fatalf("isBroadProjectLoadScope() = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
+
 func TestExecuteLintPipelineRejectsInvalidFormatBeforeWork(t *testing.T) {
 	code, stdout, stderr := runLintPipelineForTest(t, t.TempDir(), lintArgs{
 		Format:         "stylish",
@@ -865,6 +930,155 @@ func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
 			t.Fatalf("malformed explicit catalog escaped its invariant: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 		}
 	})
+}
+
+func TestExecuteLintPipelineFocusedFileBuildsOnlyDirectProject(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"target.ts":            `export const target = 1;`,
+		"import-main.ts":       `import "./target";`,
+		"unrelated.ts":         `export const unrelated = 1;`,
+		"tsconfig-import.json": `{"files":["import-main.ts"]}`,
+		"tsconfig-direct.json": `{"files":["target.ts"]}`,
+		"tsconfig-later.json":  `{"files":["unrelated.ts"]}`,
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	dir = tspath.NormalizePath(dir)
+	targetPath := tspath.ResolvePath(dir, "target.ts")
+	fsys := &commandReadCountingFS{
+		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		reads: make(map[string]int),
+	}
+	config := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+			Project: rslintconfig.ProjectPaths{
+				"./tsconfig-import.json",
+				"./tsconfig-direct.json",
+				"./tsconfig-later.json",
+			},
+		}},
+	}}
+	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		ConfigCatalog: &discovery.ConfigCatalog{
+			Configs:  map[string]rslintconfig.RslintConfig{dir: config},
+			Explicit: true,
+		},
+		AllowFiles:     []string{targetPath},
+		Format:         "default",
+		NoColor:        true,
+		SingleThreaded: true,
+		FS:             fsys,
+	})
+	if code != 0 {
+		t.Fatalf("focused lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if got := fsys.readCount(tspath.ResolvePath(dir, "import-main.ts")); got != 0 {
+		t.Fatalf("earlier import-only project source was read %d time(s)", got)
+	}
+	if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); got != 0 {
+		t.Fatalf("project after the direct winner was parsed %d time(s)", got)
+	}
+}
+
+func TestExecuteLintPipelineDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testing.T) {
+	dir := t.TempDir()
+	selectedDir := filepath.Join(dir, "selected")
+	unrelatedDir := filepath.Join(dir, "unrelated")
+	for _, path := range []string{selectedDir, filepath.Join(selectedDir, "deep"), unrelatedDir} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+	}
+	for path, content := range map[string]string{
+		filepath.Join(dir, "rslint.jsonc"):            `[{"rules":{"no-debugger":"error"}}]`,
+		filepath.Join(dir, ".gitignore"):              "root.generated.js\n",
+		filepath.Join(selectedDir, ".gitignore"):      "local.generated.js\n",
+		filepath.Join(selectedDir, "index.js"):        "debugger;\n",
+		filepath.Join(selectedDir, "deep/.gitignore"): "deep.generated.js\n",
+		filepath.Join(unrelatedDir, ".gitignore"):     "index.js\n",
+		filepath.Join(unrelatedDir, "index.js"):       "debugger;\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
+
+	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		Config:         filepath.Join(dir, "rslint.jsonc"),
+		FS:             spy,
+		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 1 || !strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("selected directory was not linted: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	unrelatedDir = tspath.NormalizePath(unrelatedDir)
+	for _, accessed := range spy.accessedDirs {
+		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+			t.Fatalf("JSON directory target entered unrelated directory %q", accessed)
+		}
+	}
+}
+
+func TestExecuteLintPipelineExplicitJSONDirectoryTargetUsesInvocationCWD(t *testing.T) {
+	repositoryRoot := t.TempDir()
+	cwd := filepath.Join(repositoryRoot, "packages", "app")
+	selectedDir := filepath.Join(cwd, "selected")
+	unrelatedDir := filepath.Join(cwd, "unrelated")
+	for _, path := range []string{selectedDir, unrelatedDir} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+	}
+	for path, content := range map[string]string{
+		filepath.Join(repositoryRoot, "rslint.jsonc"): `[{
+			"rules": {"no-debugger": "error"}
+		}]`,
+		filepath.Join(repositoryRoot, ".gitignore"): "packages/app/selected/index.js\n",
+		filepath.Join(cwd, ".gitignore"):            "cwd.generated.js\n",
+		filepath.Join(selectedDir, ".gitignore"):    "local.generated.js\n",
+		filepath.Join(selectedDir, "index.js"):      "debugger;\n",
+		filepath.Join(unrelatedDir, ".gitignore"):   "index.js\n",
+		filepath.Join(unrelatedDir, "index.js"):     "debugger;\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
+
+	code, stdout, stderr := runLintPipelineForTest(t, cwd, lintArgs{
+		Config:         filepath.Join(repositoryRoot, "rslint.jsonc"),
+		FS:             spy,
+		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 1 || !strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("selected directory was not linted from invocation cwd: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	wantGitignoreReads := []string{
+		tspath.NormalizePath(filepath.Join(cwd, ".gitignore")),
+		tspath.NormalizePath(filepath.Join(selectedDir, ".gitignore")),
+	}
+	if !slices.Equal(spy.gitignoreReads, wantGitignoreReads) {
+		t.Fatalf("explicit JSON CWD-rooted Git reads = %v, want %v", spy.gitignoreReads, wantGitignoreReads)
+	}
+	unrelatedDir = tspath.NormalizePath(unrelatedDir)
+	for _, accessed := range spy.accessedDirs {
+		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+			t.Fatalf("explicit JSON target entered unrelated directory %q", accessed)
+		}
+	}
 }
 
 func TestExecuteLintPipelineTypedCatalogEnforcesPluginDeclarations(t *testing.T) {

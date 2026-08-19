@@ -77,17 +77,19 @@ type Graph[E any] struct {
 // walk reaches, whether or not control can arrive there — a consumer that has
 // no use for unreachable code checks Builder.Current for it.
 //
-// Read runs where node is evaluated as a read, Write where its value is stored;
-// a target that is read before it is written — a compound assignment, an update
+// Expression runs before each expression is evaluated. Read runs where an
+// identifier is evaluated as a read, Write where its value is stored; a target
+// that is read before it is written — a compound assignment, an update
 // expression, a destructuring element — sees both, in that order.
 //
 // Statement runs as each statement is reached, before it is laid out. Loop runs
 // where control flows back into a loop for another iteration of it.
 type Hooks[E any] struct {
-	Read      func(b *Builder[E], node *ast.Node)
-	Write     func(b *Builder[E], node *ast.Node)
-	Statement func(b *Builder[E], node *ast.Node)
-	Loop      func(b *Builder[E], loop *ast.Node)
+	Expression func(b *Builder[E], node *ast.Node)
+	Read       func(b *Builder[E], node *ast.Node)
+	Write      func(b *Builder[E], node *ast.Node)
+	Statement  func(b *Builder[E], node *ast.Node)
+	Loop       func(b *Builder[E], loop *ast.Node)
 }
 
 // tryPosition is where in a `try` statement construction currently is.

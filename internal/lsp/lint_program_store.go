@@ -11,15 +11,17 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// lintProgramStore owns only the standalone Programs that fill gaps left by
-// Session. Session-owned projects always remain authoritative.
+// lintProgramStore owns standalone Programs that fill gaps left by Session.
+// Session-owned Programs always remain authoritative.
 type lintProgramStore struct {
-	server   *Server
-	coverage *lintProgramCoverage
-	programs map[string]*lintProgramState
+	server              *Server
+	coverage            *lintProgramCoverage
+	programs            map[string]*lintProgramState
+	observedRootConfigs map[string]struct{}
 }
 
 type lintProgramState struct {
@@ -31,6 +33,7 @@ type lintProgramState struct {
 	// corresponding watcher notification.
 	failedLookups            map[tspath.Path]struct{}
 	selectedSourceIdentities map[tspath.Path]tspath.Path
+	rootFiles                *lintprogram.RootFileIndex
 }
 
 type lintProgramRequest struct {
@@ -43,13 +46,15 @@ type lintProgramRequest struct {
 	overlayPrepared bool
 	usedConfig      string
 	usedState       *lintProgramState
+	rootFiles       map[string]*lintprogram.RootFileIndex
 }
 
 func newLintProgramStore(server *Server) *lintProgramStore {
 	return &lintProgramStore{
-		server:   server,
-		coverage: newLintProgramCoverage(server),
-		programs: make(map[string]*lintProgramState),
+		server:              server,
+		coverage:            newLintProgramCoverage(server),
+		programs:            make(map[string]*lintProgramState),
+		observedRootConfigs: make(map[string]struct{}),
 	}
 }
 
@@ -60,27 +65,57 @@ func (s *lintProgramStore) Usable() bool {
 func (s *lintProgramStore) Request(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
-) (lintProgramLoader, func()) {
+) (lintProgramLoader, lintProjectRootLoader, func()) {
 	request := &lintProgramRequest{
-		store: s,
-		ctx:   ctx,
-		uri:   uri,
+		store:     s,
+		ctx:       ctx,
+		uri:       uri,
+		rootFiles: make(map[string]*lintprogram.RootFileIndex),
 	}
 	load := func(configFileName string) (*compiler.Program, *ast.SourceFile, error) {
-		if !request.overlayPrepared {
-			request.overlayPrepared = true
-			var aliasesConflict bool
-			request.overlayFS, aliasesConflict =
-				s.server.currentEditorOverlayFSWithConflicts(uri)
-			request.targetPath = uriToPath(uri)
-			if aliasesConflict {
-				s.Invalidate()
-				request.freshOnly = true
-			}
-		}
+		request.prepareOverlay()
 		return request.load(configFileName)
 	}
-	return load, request.finalize
+	loadRoots := func(configFileName string) (*lintprogram.RootFileIndex, error) {
+		request.prepareOverlay()
+		if roots := request.rootFiles[configFileName]; roots != nil {
+			return roots, nil
+		}
+		if !request.freshOnly && request.store.Usable() {
+			if state := request.store.programs[configFileName]; state != nil && state.rootFiles != nil {
+				roots := state.rootFiles
+				request.rootFiles[configFileName] = roots
+				return roots, nil
+			}
+		}
+		request.store.observedRootConfigs[configFileName] = struct{}{}
+		rootFileNames, err := loadStandaloneLintProjectRoots(configFileName, request.overlayFS)
+		if err != nil {
+			return nil, err
+		}
+		// Metadata scanned for a project that was not selected has no watcher
+		// coverage. Keep it request-local; once a Program is retained, its root
+		// index lives with the watcher-protected Program state above.
+		roots := lintprogram.NewRootFileIndex(rootFileNames, request.overlayFS)
+		request.rootFiles[configFileName] = roots
+		return roots, nil
+	}
+	return load, loadRoots, request.finalize
+}
+
+func (r *lintProgramRequest) prepareOverlay() {
+	if r.overlayPrepared {
+		return
+	}
+	r.overlayPrepared = true
+	var aliasesConflict bool
+	r.overlayFS, aliasesConflict =
+		r.store.server.currentEditorOverlayFSWithConflicts(r.uri)
+	r.targetPath = uriToPath(r.uri)
+	if aliasesConflict {
+		r.store.Invalidate()
+		r.freshOnly = true
+	}
 }
 
 func (r *lintProgramRequest) load(
@@ -173,6 +208,12 @@ func (r *lintProgramRequest) rebuild(
 			dirtyFiles:               make(map[tspath.Path]struct{}),
 			failedLookups:            make(map[tspath.Path]struct{}),
 			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
+		}
+		if program.CommandLine() != nil {
+			state.rootFiles = lintprogram.NewRootFileIndex(
+				program.CommandLine().FileNames(),
+				r.overlayFS,
+			)
 		}
 		added, safe := r.cover(state)
 		if !safe {
@@ -300,9 +341,10 @@ func (s *lintProgramStore) isOpenSourceOverlayWatchChange(
 }
 
 func (s *lintProgramStore) Invalidate() bool {
-	hadPrograms := len(s.programs) != 0
+	hadState := len(s.programs) != 0 || len(s.observedRootConfigs) != 0
 	clear(s.programs)
-	return hadPrograms
+	clear(s.observedRootConfigs)
+	return hadState
 }
 
 func (s *lintProgramStore) markContent(

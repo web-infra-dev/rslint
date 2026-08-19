@@ -1,0 +1,852 @@
+// Rstest Snapshot v1
+
+exports[`no-warning-comments > invalid 1`] = `
+{
+  "code": "// fixme",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'fixme' comment: 'fixme'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 2`] = `
+{
+  "code": "// any fixme",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'fixme' comment: 'any fixme'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 3`] = `
+{
+  "code": "// any fixme",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'fixme' comment: 'any fixme'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 4`] = `
+{
+  "code": "// any FIXME",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'fixme' comment: 'any FIXME'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 5`] = `
+{
+  "code": "/* any fixme */",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'FIXME' comment: 'any fixme'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 6`] = `
+{
+  "code": "// any fixme or todo",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'fixme' comment: 'any fixme or todo'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+    {
+      "message": "Unexpected 'todo' comment: 'any fixme or todo'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 7`] = `
+{
+  "code": "/* fixme and todo */",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'fixme' comment: 'fixme and todo'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 8`] = `
+{
+  "code": "/* fixme and todo */",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: 'fixme and todo'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+    {
+      "message": "Unexpected 'fixme' comment: 'fixme and todo'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 9`] = `
+{
+  "code": "/* fixme! */",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'fixme' comment: 'fixme!'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 10`] = `
+{
+  "code": "// regex [litera|$]",
+  "diagnostics": [
+    {
+      "message": "Unexpected '[litera|$]' comment: 'regex [litera|$]'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 11`] = `
+{
+  "code": "/* eslint one-var: 2 */",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'eslint' comment: 'eslint one-var: 2'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 12`] = `
+{
+  "code": "/* eslint one-var: 2 */",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'one' comment: 'eslint one-var: 2'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 13`] = `
+{
+  "code": "/* any block comment with TODO, FIXME or XXX */",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: 'any block comment with TODO, FIXME or...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+    {
+      "message": "Unexpected 'fixme' comment: 'any block comment with TODO, FIXME or...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+    {
+      "message": "Unexpected 'xxx' comment: 'any block comment with TODO, FIXME or...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 14`] = `
+{
+  "code": "/** 
+ *any block comment 
+*with (TODO, FIXME's or XXX!) **/",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: '* *any block comment *with (TODO,...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+    {
+      "message": "Unexpected 'fixme' comment: '* *any block comment *with (TODO,...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+    {
+      "message": "Unexpected 'xxx' comment: '* *any block comment *with (TODO,...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 15`] = `
+{
+  "code": "// TODO: something small",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: 'TODO: something small'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 16`] = `
+{
+  "code": "// TODO: something really longer than 40 characters",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: 'TODO: something really longer than 40...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 17`] = `
+{
+  "code": "/* TODO: something 
+ really longer than 40 characters 
+ and also a new line */",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: 'TODO: something really longer than 40...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 18`] = `
+{
+  "code": "// https://github.com/eslint/eslint/pull/13522#discussion_r470293411 TODO",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: '...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 19`] = `
+{
+  "code": "// Comment ending with term followed by punctuation TODO!",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: 'Comment ending with term followed by...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 20`] = `
+{
+  "code": "// Comment ending with term including punctuation TODO!",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo!' comment: 'Comment ending with term including...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 21`] = `
+{
+  "code": "// !TODO comment starting with term preceded by punctuation",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: '!TODO comment starting with term...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 22`] = `
+{
+  "code": "// !TODO comment starting with term including punctuation",
+  "diagnostics": [
+    {
+      "message": "Unexpected '!todo' comment: '!TODO comment starting with term...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 23`] = `
+{
+  "code": "// FIX!term ending with punctuation followed word character",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'FIX!' comment: 'FIX!term ending with punctuation...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 24`] = `
+{
+  "code": "// Term starting with punctuation preceded word character!FIX",
+  "diagnostics": [
+    {
+      "message": "Unexpected '!FIX' comment: 'Term starting with punctuation preceded...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 25`] = `
+{
+  "code": "//!XXX comment starting with no spaces (anywhere)",
+  "diagnostics": [
+    {
+      "message": "Unexpected '!xxx' comment: '!XXX comment starting with no spaces...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 26`] = `
+{
+  "code": "//!XXX comment starting with no spaces (start)",
+  "diagnostics": [
+    {
+      "message": "Unexpected '!xxx' comment: '!XXX comment starting with no spaces...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 27`] = `
+{
+  "code": "/*
+TODO undecorated multi-line block comment (start)
+*/",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: 'TODO undecorated multi-line block...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 28`] = `
+{
+  "code": "///// TODO decorated single-line comment with decoration array 
+ /////",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'todo' comment: '/// TODO decorated single-line comment...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-warning-comments > invalid 29`] = `
+{
+  "code": "//**TODO term starts with a decoration character",
+  "diagnostics": [
+    {
+      "message": "Unexpected '*todo' comment: '**TODO term starts with a decoration...'.",
+      "messageId": "unexpectedComment",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-warning-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

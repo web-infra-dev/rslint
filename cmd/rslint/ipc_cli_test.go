@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 )
@@ -61,6 +62,90 @@ func TestClassifyPaths(t *testing.T) {
 	wantFiles := []string{tspath.NormalizePath(file), tspath.NormalizePath(missing)}
 	if len(files) != 2 || files[0] != wantFiles[0] || files[1] != wantFiles[1] {
 		t.Errorf("files = %v, want %v", files, wantFiles)
+	}
+}
+
+func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	selectedDir := filepath.Join(root, "selected")
+	unrelatedDir := filepath.Join(root, "unrelated")
+	toolsDir := filepath.Join(root, "tools")
+	for _, path := range []string{selectedDir, filepath.Join(selectedDir, "deep"), unrelatedDir, toolsDir} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", path, err)
+		}
+	}
+	for path, content := range map[string]string{
+		filepath.Join(root, ".gitignore"):             "root.generated.js\n",
+		filepath.Join(selectedDir, ".gitignore"):      "selected.generated.js\n",
+		filepath.Join(selectedDir, "deep/.gitignore"): "deep.generated.js\n",
+		filepath.Join(unrelatedDir, ".gitignore"):     "unrelated.generated.js\n",
+		filepath.Join(toolsDir, ".gitignore"):         "exact.js\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+	configPath := filepath.Join(root, "custom.config.cjs")
+	if err := os.WriteFile(configPath, []byte("export default [];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	exactFile := filepath.Join(toolsDir, "exact.js")
+	if err := os.WriteFile(exactFile, []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cli, peer := newCLIChannelPair(t)
+	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+		switch msg.Kind {
+		case kindLoadConfigs:
+			var request discovery.ConfigLoadBatchRequest
+			if err := msg.Decode(&request); err != nil {
+				return nil, err
+			}
+			if len(request.Candidates) != 1 || request.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+				return nil, fmt.Errorf("unexpected config candidates: %+v", request.Candidates)
+			}
+			return discovery.ConfigLoadBatchResponse{
+				TransactionID: request.TransactionID,
+				Results: []discovery.ConfigLoadResult{{
+					ID:     request.Candidates[0].ID,
+					Status: "loaded",
+				}},
+			}, nil
+		case kindActivateConfigs:
+			var request discovery.ConfigActivationRequest
+			if err := msg.Decode(&request); err != nil {
+				return nil, err
+			}
+			return discovery.ConfigActivationResponse{TransactionID: request.TransactionID}, nil
+		default:
+			return nil, fmt.Errorf("unexpected request kind %q", msg.Kind)
+		}
+	})
+	cli.Start()
+	peer.Start()
+	spy := &directoryAccessSpyFS{FS: osvfs.FS()}
+	args := lintArgs{
+		FS:             spy,
+		AllowFiles:     []string{tspath.NormalizePath(exactFile)},
+		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
+		SingleThreaded: true,
+	}
+	payload := initPayload{ConfigDiscovery: &configDiscoveryPayload{ExplicitConfigPath: configPath}}
+
+	if err := discoverCLIConfigCatalog(context.Background(), &args, &payload, cli); err != nil {
+		t.Fatalf("discoverCLIConfigCatalog: %v", err)
+	}
+	if args.ConfigCatalog == nil || !args.ConfigCatalog.Explicit {
+		t.Fatal("explicit config catalog was not installed")
+	}
+	unrelatedDir = tspath.NormalizePath(unrelatedDir)
+	for _, accessed := range spy.accessedDirs {
+		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
+			t.Fatalf("explicit CLI projection entered unrelated directory %q", accessed)
+		}
 	}
 }
 

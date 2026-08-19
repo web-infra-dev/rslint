@@ -62,13 +62,15 @@ type ConfigDiscoveryRequest struct {
 type ExplicitConfigRequest struct {
 	CWD        string
 	ConfigPath string
-	// TargetFiles limits Git projection to the directory chains between CWD
-	// and an exact target set. A nil slice projects the complete CWD-owned
-	// subtree; a non-nil empty slice projects nothing, as used by
-	// --type-check-only.
-	TargetFiles    []DiscoveryFile
-	Fresh          bool
-	SingleThreaded bool
+	// TargetFiles limits Git projection to exact target directory chains. With
+	// no TargetDirectories, a nil slice projects the complete CWD-owned subtree
+	// and a non-nil empty slice projects nothing, as used by --type-check-only.
+	TargetFiles []DiscoveryFile
+	// TargetDirectories limits Git projection to recursive directory targets.
+	// It may be combined with TargetFiles for mixed CLI invocations.
+	TargetDirectories []string
+	Fresh             bool
+	SingleThreaded    bool
 }
 
 type configSource struct {
@@ -187,6 +189,7 @@ func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoa
 	automatic := ConfigDiscoveryRequest{
 		CWD:            request.CWD,
 		Files:          request.TargetFiles,
+		Directories:    request.TargetDirectories,
 		Fresh:          request.Fresh,
 		SingleThreaded: request.SingleThreaded,
 	}
