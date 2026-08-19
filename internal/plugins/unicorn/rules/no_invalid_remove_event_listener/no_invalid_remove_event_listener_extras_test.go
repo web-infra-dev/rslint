@@ -91,7 +91,7 @@ func TestNoInvalidRemoveEventListenerExtras(t *testing.T) {
 				},
 			},
 
-			// ---- Real-user: #682 custom-element lifecycle removal with a fresh bound listener ----
+			// ---- Real-user: upstream issue 682 custom-element lifecycle removal with a fresh bound listener ----
 			tsInvalid(`class MyClass extends HTMLElement {
 	connectedCallback() {
 		this.addEventListener('click', this.handleClick.bind(this));
