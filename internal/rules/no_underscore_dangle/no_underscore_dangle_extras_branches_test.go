@@ -270,6 +270,21 @@ func TestNoUnderscoreDangleExtrasBranches(t *testing.T) {
 					{MessageId: "unexpectedUnderscore", Message: "Unexpected dangling '_' in '_b'.", Line: 1, Column: 7, EndLine: 1, EndColumn: 22},
 				},
 			},
+			// Locks in upstream checkForDanglingUnderscoreInVariableExpression(): getDeclaredVariables() yields one variable per name, so a name bound twice by one declarator reports once
+			{
+				Code:    `var {a: _x, b: _x} = o;`,
+				Options: map[string]any{"allowInObjectDestructuring": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedUnderscore", Message: "Unexpected dangling '_' in '_x'.", Line: 1, Column: 5, EndLine: 1, EndColumn: 23},
+				},
+			},
+			{
+				Code:    `var [_x, _x] = o;`,
+				Options: map[string]any{"allowInArrayDestructuring": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedUnderscore", Message: "Unexpected dangling '_' in '_x'.", Line: 1, Column: 5, EndLine: 1, EndColumn: 17},
+				},
+			},
 			{
 				Code: `let _a, _b;`,
 				Errors: []rule_tester.InvalidTestCaseError{

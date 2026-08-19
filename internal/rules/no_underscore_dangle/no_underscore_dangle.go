@@ -274,7 +274,15 @@ func checkVariableDeclaration(ctx rule.RuleContext, node *ast.Node, opts noUnder
 	}
 
 	reportRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+	// Upstream iterates the declarator's *variables*, so a name bound more than
+	// once by one declarator (`var {a: _x, b: _x} = o`) is checked once, using
+	// the first binding.
+	seen := make(map[string]struct{})
 	utils.CollectBindingNames(node.Name(), func(ident *ast.Node, identifier string) {
+		if _, duplicate := seen[identifier]; duplicate {
+			return
+		}
+		seen[identifier] = struct{}{}
 		if !hasDanglingUnderscore(identifier) || opts.isAllowed(identifier) {
 			return
 		}
