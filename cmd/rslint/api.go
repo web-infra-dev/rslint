@@ -440,9 +440,18 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	var projectSet loader.ProjectSet
 	if len(targetPlan.Targets) > 0 {
 		if configMap != nil {
-			projectSet, err = programSession.BuildProjects(targetPlan.ActiveConfigs(configMap), false)
+			projectSet, err = programSession.BuildTargetProjects(
+				targetPlan.ActiveConfigs(configMap),
+				targetPlan,
+				false,
+			)
 		} else {
-			projectSet, err = programSession.BuildProject(configDirectory, rslintConfig, false)
+			projectSet, err = programSession.BuildTargetProject(
+				configDirectory,
+				rslintConfig,
+				targetPlan,
+				false,
+			)
 		}
 		if err != nil {
 			return nil, err

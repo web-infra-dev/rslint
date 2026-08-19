@@ -413,6 +413,27 @@ func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (in
 	return 0, ""
 }
 
+func isBroadProjectLoadScope(
+	allowFiles []string,
+	allowDirs []string,
+	currentDirectory string,
+	useCaseSensitive bool,
+) bool {
+	if len(allowDirs) == 0 {
+		return len(allowFiles) == 0
+	}
+	options := tspath.ComparePathsOptions{
+		CurrentDirectory:          currentDirectory,
+		UseCaseSensitiveFileNames: useCaseSensitive,
+	}
+	for _, directory := range allowDirs {
+		if tspath.ContainsPath(directory, currentDirectory, options) {
+			return true
+		}
+	}
+	return false
+}
+
 func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]rslintconfig.RslintConfig {
 	if configMap == nil {
 		return nil
@@ -851,6 +872,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: true,
 	}
+	broadProjectLoad := isBroadProjectLoadScope(
+		allowFiles,
+		allowDirs,
+		cwd,
+		fs.UseCaseSensitiveFileNames(),
+	)
 
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
 	// This keeps an explicit --config outside the current directory from
@@ -891,10 +918,18 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if !buildAllPrograms {
 			if configMap != nil {
 				programConfigMap = targetPlan.ActiveConfigs(configMap)
-				projectSet, err = programSession.BuildProjects(programConfigMap, singleThreaded)
+				if broadProjectLoad {
+					projectSet, err = programSession.BuildProjects(programConfigMap, singleThreaded)
+				} else {
+					projectSet, err = programSession.BuildTargetProjects(programConfigMap, targetPlan, singleThreaded)
+				}
 			} else if len(targetPlan.Targets) > 0 {
 				buildSingleConfigPrograms = true
-				projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
+				if broadProjectLoad {
+					projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
+				} else {
+					projectSet, err = programSession.BuildTargetProject(currentDirectory, rslintConfig, targetPlan, singleThreaded)
+				}
 			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -920,9 +955,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		var rebuilt loader.ProjectSet
 		var err error
 		if configMap != nil {
-			rebuilt, err = programSession.BuildProjects(programConfigMap, singleThreaded)
+			if buildAllPrograms || broadProjectLoad {
+				rebuilt, err = programSession.BuildProjects(programConfigMap, singleThreaded)
+			} else {
+				rebuilt, err = programSession.BuildTargetProjects(programConfigMap, targetPlan, singleThreaded)
+			}
 		} else if buildSingleConfigPrograms {
-			rebuilt, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
+			if buildAllPrograms || broadProjectLoad {
+				rebuilt, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
+			} else {
+				rebuilt, err = programSession.BuildTargetProject(currentDirectory, rslintConfig, targetPlan, singleThreaded)
+			}
 		}
 		if err != nil {
 			return loader.LoadResult{}, err
