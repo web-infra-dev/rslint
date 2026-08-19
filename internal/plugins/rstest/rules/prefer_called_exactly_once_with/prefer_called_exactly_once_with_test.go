@@ -113,6 +113,12 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			// as a string, so nothing callable has to be handed to it.
 			{Code: `expect(x).toHaveBeenCalledOnce(); eval('x("b")'); expect(x).toHaveBeenCalledWith('a');`},
 			{Code: `expect(x).toHaveBeenCalledOnce(); globalThis.eval('x("b")'); expect(x).toHaveBeenCalledWith('a');`},
+			// `call` and `apply` are declared in the default library too, so
+			// they resolve to a library symbol for any callable the author
+			// wrote, while what they run is the receiver rather than anything
+			// handed to them.
+			{Code: `declare const x: { (a: string): void }; expect(x).toHaveBeenCalledOnce(); x.call(null, 'b'); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `declare const obj: { fn: (a: string) => void }; expect(obj.fn).toHaveBeenCalledOnce(); obj.fn.apply(null, ['b']); expect(obj.fn).toHaveBeenCalledWith('a');`},
 			// A polled assertion retries until it passes, so the two halves
 			// can settle against different call histories.
 			{Code: `async function f() { await expect.poll(getSpy).toHaveBeenCalledOnce(); await expect.poll(getSpy).toHaveBeenCalledWith('a'); }`},

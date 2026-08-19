@@ -473,9 +473,14 @@ func (scanner *betweenScanner) isCallable(node *ast.Node) bool {
 // their own binding rather than the library's. Without a checker nothing
 // qualifies, which leaves the pair unreported — the safe direction.
 //
-// `eval` is the one exception the criterion cannot cover: it needs nothing
-// callable, because the source it runs arrives as a string. It is excluded by
-// its symbol, so `globalThis.eval(...)` is caught along with the bare spelling.
+// Three symbols are the exceptions the criterion cannot cover, because what
+// they run is not something handed over as an argument. `eval` needs nothing
+// callable: the source it runs arrives as a string. `call` and `apply` run
+// their receiver, and since they are declared in the default library they
+// resolve to a library symbol for any callable the author wrote, which would
+// let `x.call(null, 'b')` sit between the two halves while calling the target.
+// All three are excluded by their symbol, so `globalThis.eval(...)` is caught
+// along with the bare spelling.
 func (scanner *betweenScanner) isLibraryCall(node *ast.Node) bool {
 	if node.Kind != ast.KindCallExpression || scanner.ctx.TypeChecker == nil {
 		return false
@@ -488,7 +493,8 @@ func (scanner *betweenScanner) isLibraryCall(node *ast.Node) bool {
 	if symbol == nil || !internalUtils.IsSymbolFromDefaultLibrary(scanner.ctx.Program(), symbol) {
 		return false
 	}
-	if symbol.Name == "eval" {
+	switch symbol.Name {
+	case "eval", "call", "apply":
 		return false
 	}
 	for _, argument := range node.Arguments() {
