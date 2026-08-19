@@ -10,6 +10,9 @@ ruleTester.run(
       { code: `it('x', () => expect(1).toMatchSnapshot())` },
       { code: `it.concurrent('x', () => expect(true).toBe(true))` },
       {
+        code: `it.concurrent('x', () => expect('a').to.be.a('string').and.have.length(1))`,
+      },
+      {
         code: `it.concurrent('x', ({ expect }) => expect(1).toMatchSnapshot())`,
       },
       {
@@ -61,6 +64,10 @@ ruleTester.run(
       },
       {
         code: `test.concurrent('x', () => expect(1).matchSnapshot())`,
+        errors: [{ messageId: 'requireLocalTestContext' }],
+      },
+      {
+        code: `test.concurrent('x', () => expect('a').to.be.a('string').and.matchSnapshot())`,
         errors: [{ messageId: 'requireLocalTestContext' }],
       },
       {

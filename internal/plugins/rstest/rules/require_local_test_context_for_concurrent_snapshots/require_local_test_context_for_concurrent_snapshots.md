@@ -36,4 +36,4 @@ test.concurrent('renders', async () => {
 
 A helper declared outside every registration callback is not checked, since the rule cannot tell which tests call it. A callback passed by a name the type checker cannot resolve is only matched against a function declared at the top level of the file under that exact name, so a same-named function nested inside another callback is never blamed for a test that does not run it.
 
-Rstest's `matchSnapshot` Chai alias is also checked because it uses the same snapshot state as `toMatchSnapshot`.
+Rstest's `matchSnapshot` Chai alias is also checked because it uses the same snapshot state as `toMatchSnapshot`. A Chai chain may carry several assertions, so every matcher in the chain is considered and `expect(value).to.be.a('string').and.matchSnapshot()` is reported once.

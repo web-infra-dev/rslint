@@ -19,6 +19,9 @@ func TestRequireLocalTestContextForConcurrentSnapshotsRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `it("x", () => expect(1).toMatchSnapshot());`},
 			{Code: `it.concurrent("x", () => expect(true).toBe(true));`},
+			// A multi-assertion Chai chain with no snapshot matcher anywhere.
+			{Code: `it.concurrent("x", () => expect("a").to.be.a("string").and.have.length(1));`},
+			{Code: `it.concurrent("x", ({ expect }) => expect("a").to.be.a("string").and.matchSnapshot());`},
 			{Code: `it.concurrent("x", ({ expect }) => expect(1).toMatchSnapshot());`},
 			{Code: `it.concurrent("x", ({ expect }) => expect(1).toMatchInlineSnapshot("1"));`},
 			{Code: `it.concurrent("x", ctx => ctx.expect(1).toMatchSnapshot());`},
@@ -70,6 +73,10 @@ func TestRequireLocalTestContextForConcurrentSnapshotsRule(t *testing.T) {
 			{Code: `describe.concurrent("s", () => it("x", { sequential: true }, () => expect(1).toMatchSnapshot()));`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 			// Rstest supports this Chai alias even though the Vitest rule omits it.
 			{Code: `test.concurrent("x", () => expect(1).matchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+			// A Chai chain may carry several assertions, and the snapshot one
+			// need not come first. One chain still yields one report.
+			{Code: `test.concurrent("x", () => expect("a").to.be.a("string").and.matchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+			{Code: `test.concurrent("x", () => expect(1).to.matchSnapshot().and.matchSnapshot());`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 			// Assertions nested inside closures, hooks and helpers declared in a
 			// concurrent body still run as part of the concurrent test.
 			{Code: `test.concurrent("x", () => { const helper = () => expect(1).toMatchSnapshot(); });`, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
