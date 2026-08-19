@@ -420,6 +420,8 @@ func TestDefaultExcludeDirNames_ContainsExpected(t *testing.T) {
 	}
 }
 
+// Every expectation here is what natural-compare@1.4.0 answers, which is the
+// package the rules that sort naturally hand the pair to.
 func TestNaturalCompare(t *testing.T) {
 	tests := []struct {
 		a, b string
@@ -433,25 +435,55 @@ func TestNaturalCompare(t *testing.T) {
 		{"a2", "a10", -1},
 		{"a10", "a2", 1},
 		{"a1", "a1", 0},
-		// leading zeros
-		{"a01", "a1", 0},
-		{"a02", "a1", 1},
+		{"a1b2", "a1b10", -1},
+		{"a1", "a1b", -1},
+		{"a10", "a1b", 1},
+		// A run that starts with `0` is not a number, so it is read character
+		// by character and `a01` lands below `a1`.
+		{"a01", "a1", -1},
+		{"a1", "a01", 1},
+		{"a02", "a1", -1},
+		{"a0", "a1", -1},
+		{"a00", "a0", 1},
+		// A run that starts past `0` carries its zeros, so `a007` is seven.
+		{"a007", "a7", -1},
+		{"a7", "a007", 1},
 		// length difference
 		{"a", "ab", -1},
 		{"ab", "a", 1},
 		// multi-byte UTF-8 characters
-		{"α1", "α2", -1},
-		{"α2", "α10", -1},
-		{"中1", "中2", -1},
-		{"中10", "中2", 1},
-		// A digit of another script is not a numeric segment: natural-compare
-		// reads it as the character it is, so U+0669 ٩ sorts after U+0661 ١
-		// rather than nine sorting before ten.
-		{"x٩", "x١٠", 1},
-		{"a٠٢", "a٠١٠", 1},
-		{"x۹", "x۱۰", 1},
-		// Nor does a leading zero of another script get stripped.
-		{"a٠١", "a١", -1},
+		{"\u03B11", "\u03B12", -1},
+		{"\u03B12", "\u03B110", -1},
+		{"\u4E2D1", "\u4E2D2", -1},
+		{"\u4E2D10", "\u4E2D2", 1},
+		// A digit of another script does not start a number, so it is read as
+		// the character it is and nine sorts after one rather than before ten.
+		{"x\u0669", "x\u0661\u0660", 1},
+		{"a\u0660\u0662", "a\u0660\u0661\u0660", 1},
+		{"\u0669", "\u0661", 1},
+		// The order is not the code unit's own: `-` sits just below the
+		// digits, and the punctuation around the letters is folded in below
+		// them rather than left where ASCII puts it.
+		{"B", "_", 1},
+		{"_", "A", -1},
+		{"Z", "a", -1},
+		{"a", "{", 1},
+		{"-", "0", -1},
+		{".", "-", -1},
+		{"a-1", "a.1", 1},
+		{"a~", "aA", -1},
+		// A character outside the basic plane is walked as its two UTF-16
+		// code units, so it compares as the first of them.
+		{"\U0001F600", "\uFFFF", -1},
+		{"\uFFFF", "\U0001F600", 1},
+		// A NUL reads as the end of the string does, so a pair that differs
+		// only past one of them sorts alike.
+		{"a\x001", "a\x002", 0},
+		{"a\x00", "ab", -1},
+		// Two numbers too large to tell apart as JavaScript numbers sort
+		// alike, which is the one way unequal strings come back 0.
+		{"a9007199254740993", "a9007199254740992", 0},
+		{"a99999999999999999999999999999999", "a99999999999999999999999999999998", 0},
 		// empty
 		{"", "", 0},
 		{"a", "", 1},
