@@ -29,6 +29,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+// literalCase builds an InvalidTestCase for a call whose replacement needs no
+// wrapping parentheses: it neither starts an expression statement nor opens an
+// arrow function's concise body.
+func literalCase(code, pattern string) rule_tester.InvalidTestCase {
+	return suggestionCase(code, pattern, "{}", "useLiteral", false)
+}
+
 func TestNoObjectConstructorExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -101,6 +108,23 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			// parameters shadow a call nested inside a parameter decorator.
 			{Code: `class Object { m(@dec(() => new Object()) x: number) { } }`},
 			{Code: `class C<Object> { m(@dec(() => new Object()) x: number) { } }`},
+
+			// ---- Dimension 2: scoping — a member's decorators and computed
+			// name are evaluated in the enclosing class or object literal, so
+			// only that outer scope shadows a call there ----
+			{Code: `class C<Object> { @dec(new Object()) m() { } }`},
+			{Code: `class C<Object> { [Object()]() { } }`},
+			{Code: `class Object { [new Object()]() { } }`},
+
+			// ---- Dimension 2: scoping — a function declaration with no block
+			// to hold it is defined in the innermost scope that already exists
+			// at its position ----
+			{Code: `function f(a = new Object()) { if (b) function Object() {} }`},
+			{Code: `function f(a = new Object()) { lbl: function Object() {} }`},
+			{Code: `function f(a = new Object()) { while (b) function Object() {} }`},
+			{Code: `function f() { if (b) function Object() {} Object(); }`},
+			{Code: `if (b) function Object() {} Object();`},
+			{Code: `namespace N { if (b) function Object() {} Object(); }`},
 
 			// ---- Dimension 2: scoping — declarations in a namespace body ----
 			{Code: `namespace N { const Object = f; Object(); }`},
@@ -250,6 +274,35 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			},
 			asiCase(`class C { m(@dec(() => new Object()) x: number, Object: any) { } }`, "new Object()", false, false),
 			asiCase(`class C { m<Object>(@dec(() => new Object()) x: number) { } }`, "new Object()", false, false),
+
+			// ---- Dimension 2: scoping — a decorator or computed name belongs
+			// to the enclosing class or object literal, not to the member that
+			// carries it, so the member's own type parameters, parameters, and
+			// body bindings never reach the call ----
+			literalCase(`class C { @dec(new Object()) m() { var Object; } }`, "new Object()"),
+			literalCase(`class C { @dec(new Object()) m(Object: any) { } }`, "new Object()"),
+			literalCase(`class C { @dec(new Object()) m<Object>() { } }`, "new Object()"),
+			literalCase(`class C { @dec(Object()) get m() { var Object; return 1; } }`, "Object()"),
+			literalCase(`class C { [new Object()]() { var Object; } }`, "new Object()"),
+			literalCase(`class C { [Object()](Object: any) { } }`, "Object()"),
+			literalCase(`class C { [Object()]<Object>() { } }`, "Object()"),
+			literalCase(`const o = { [Object()]() { var Object; } };`, "Object()"),
+
+			// ---- Dimension 2: scoping — a block or a `let`-scoped loop does
+			// hold the function declaration, keeping it out of the function
+			// scope the parameter initializer resolves against ----
+			literalCase(`function f(a = new Object()) { { function Object() {} } }`, "new Object()"),
+			literalCase(`function f(a = new Object()) { for (let i; ;) function Object() {} }`, "new Object()"),
+			{
+				Code: `function f() { { function Object() {} } Object(); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferLiteral", Line: 1, Column: 41, EndLine: 1, EndColumn: 49,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "useLiteral",
+						Output:    `function f() { { function Object() {} } ({}); }`,
+					}},
+				}},
+			},
 
 			// ---- Dimension 2: scoping — a namespace re-export names what the
 			// namespace exports without declaring it inside, so scope-manager

@@ -199,7 +199,7 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 		}
 		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
 		if (isFunctionLike || ast.IsClassLike(current)) &&
-			!escapesThroughParameterDecorator(current, prevChild, inParameterDecorator, crossedScope) {
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
 			for _, typeParameter := range current.TypeParameters() {
 				if typeParameter != nil && typeParameter.Name() != nil && typeParameter.Name().Text() == name {
 					return true
@@ -214,16 +214,26 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 	return false
 }
 
-// escapesThroughParameterDecorator reports whether a reference that reached fn
-// through prevChild is out of fn's own scope because it sits in a function or
-// class nested inside one of fn's parameter decorators. scope-manager attaches
-// such a scope to the enclosing class rather than to the decorated function, so
-// none of fn's bindings — parameters, type parameters, body declarations —
-// reach the reference. A reference sitting directly in the decorator, with no
-// scope in between, still acquires fn's scope.
-func escapesThroughParameterDecorator(fn *ast.Node, prevChild *ast.Node, inParameterDecorator bool, crossedScope bool) bool {
-	return inParameterDecorator && crossedScope &&
-		ast.IsFunctionLikeDeclaration(fn) && isDirectParameterOf(fn, prevChild)
+// escapesFunctionScope reports whether a reference that reached fn through
+// prevChild is out of fn's own scope, so none of fn's bindings — parameters,
+// type parameters, function name, body declarations — reach it.
+//
+// Two member positions do that. A decorator or a computed property name of fn
+// belongs to the enclosing class or object literal: ESTree keeps both on the
+// member rather than on the function expression that carries the type
+// parameters, the parameters, and the body, so scope-manager evaluates them in
+// the enclosing scope. And a function or class nested inside one of fn's
+// parameter decorators gets its scope attached to the enclosing class rather
+// than to the decorated function; a reference sitting directly in the
+// decorator, with no scope in between, still acquires fn's scope.
+func escapesFunctionScope(fn *ast.Node, prevChild *ast.Node, inParameterDecorator bool, crossedScope bool) bool {
+	if prevChild == nil || !ast.IsFunctionLikeDeclaration(fn) {
+		return false
+	}
+	if prevChild.Kind == ast.KindDecorator || prevChild == fn.Name() {
+		return true
+	}
+	return inParameterDecorator && crossedScope && isDirectParameterOf(fn, prevChild)
 }
 
 // IsShadowedFromParameterInitializer reports whether name is declared by the
@@ -237,8 +247,9 @@ func escapesThroughParameterDecorator(fn *ast.Node, prevChild *ast.Node, inParam
 // model scope-manager variables need this on top of IsShadowed.
 //
 // Only the declarations scope-manager puts in that function scope count: vars
-// hoisted from any depth, plus lexical declarations at the top level of the
-// body. A `let` in a nested block stays in that block's scope.
+// hoisted from any depth, lexical declarations at the top level of the body,
+// and function declarations with no block to hold them. A `let` in a nested
+// block stays in that block's scope.
 //
 // A parameter decorator counts the same way while the reference sits directly
 // in it, but scope-manager attaches any scope created *inside* a parameter
@@ -254,7 +265,7 @@ func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
 			inParameterDecorator = prevChild.Kind == ast.KindDecorator
 		}
 		if ast.IsFunctionLikeDeclaration(current) && isDirectParameterOf(current, prevChild) &&
-			!escapesThroughParameterDecorator(current, prevChild, inParameterDecorator, crossedScope) {
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
 			if body := current.Body(); body != nil &&
 				(hasFunctionScopeDeclaration(body, name) || HasHoistedVarDeclaration(body, name)) {
 				return true
@@ -268,11 +279,124 @@ func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
 	return false
 }
 
-// hasFunctionScopeDeclaration reports whether the top level of a function body
-// declares name in any space scope-manager gives a function-scope variable:
-// every value declaration HasLocalDeclarationInStatements recognizes, plus the
-// TypeScript type-space declarations that exist as variables only in
-// scope-manager's model.
+// hasHoistedFunctionDeclaration reports whether container — a source file,
+// function body, block, namespace body, or switch case block — declares a
+// function named name in its own scope, including through a construct that
+// creates no scope to hold it: the branch of an `if`, the body of a label, or
+// the unbraced body of a loop. The declaration is defined in the innermost
+// scope that already exists at its position, which is container's. A `for`
+// with a `let`/`const` initializer does create a scope of its own, and a
+// brace-delimited body keeps the declaration to itself.
+func hasHoistedFunctionDeclaration(container *ast.Node, name string) bool {
+	if container == nil {
+		return false
+	}
+	switch container.Kind {
+	case ast.KindSourceFile:
+		sourceFile := container.AsSourceFile()
+		return sourceFile != nil && sourceFile.Statements != nil &&
+			hasHoistedFunctionDeclarationInStatements(sourceFile.Statements.Nodes, name)
+
+	case ast.KindBlock:
+		block := container.AsBlock()
+		return block != nil && block.Statements != nil &&
+			hasHoistedFunctionDeclarationInStatements(block.Statements.Nodes, name)
+
+	case ast.KindModuleBlock:
+		moduleBlock := container.AsModuleBlock()
+		return moduleBlock != nil && moduleBlock.Statements != nil &&
+			hasHoistedFunctionDeclarationInStatements(moduleBlock.Statements.Nodes, name)
+
+	case ast.KindCaseBlock:
+		caseBlock := container.AsCaseBlock()
+		if caseBlock == nil || caseBlock.Clauses == nil {
+			return false
+		}
+		for _, clause := range caseBlock.Clauses.Nodes {
+			if clause == nil {
+				continue
+			}
+			clauseData := clause.AsCaseOrDefaultClause()
+			if clauseData == nil || clauseData.Statements == nil {
+				continue
+			}
+			if hasHoistedFunctionDeclarationInStatements(clauseData.Statements.Nodes, name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasHoistedFunctionDeclarationInStatements(statements []*ast.Node, name string) bool {
+	for _, stmt := range statements {
+		if hasHoistedFunctionDeclarationInStatement(stmt, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasHoistedFunctionDeclarationInStatement(stmt *ast.Node, name string) bool {
+	if stmt == nil {
+		return false
+	}
+	switch stmt.Kind {
+	case ast.KindFunctionDeclaration:
+		if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
+			return true
+		}
+
+	case ast.KindIfStatement:
+		ifStmt := stmt.AsIfStatement()
+		if ifStmt == nil {
+			return false
+		}
+		return hasHoistedFunctionDeclarationInStatement(ifStmt.ThenStatement, name) ||
+			hasHoistedFunctionDeclarationInStatement(ifStmt.ElseStatement, name)
+
+	case ast.KindLabeledStatement:
+		labeled := stmt.AsLabeledStatement()
+		return labeled != nil && hasHoistedFunctionDeclarationInStatement(labeled.Statement, name)
+
+	case ast.KindWhileStatement:
+		while := stmt.AsWhileStatement()
+		return while != nil && hasHoistedFunctionDeclarationInStatement(while.Statement, name)
+
+	case ast.KindDoStatement:
+		do := stmt.AsDoStatement()
+		return do != nil && hasHoistedFunctionDeclarationInStatement(do.Statement, name)
+
+	case ast.KindForStatement:
+		forStmt := stmt.AsForStatement()
+		if forStmt == nil || isBlockScopedForInitializer(forStmt.Initializer) {
+			return false
+		}
+		return hasHoistedFunctionDeclarationInStatement(forStmt.Statement, name)
+
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		forInOrOf := stmt.AsForInOrOfStatement()
+		if forInOrOf == nil || isBlockScopedForInitializer(forInOrOf.Initializer) {
+			return false
+		}
+		return hasHoistedFunctionDeclarationInStatement(forInOrOf.Statement, name)
+	}
+	return false
+}
+
+// isBlockScopedForInitializer reports whether a loop initializer declares
+// `let`/`const`, which gives the loop a scope of its own.
+func isBlockScopedForInitializer(initializer *ast.Node) bool {
+	return initializer != nil && initializer.Kind == ast.KindVariableDeclarationList &&
+		!IsVarKeyword(initializer)
+}
+
+// hasFunctionScopeDeclaration reports whether a function body declares name in
+// any space scope-manager gives a function-scope variable: every value
+// declaration HasLocalDeclarationInStatements recognizes at the top level, the
+// function declarations hasHoistedFunctionDeclaration reaches through
+// scope-less constructs, plus the TypeScript type-space declarations that
+// exist as variables only in scope-manager's model.
 func hasFunctionScopeDeclaration(body *ast.Node, name string) bool {
 	if body == nil || body.Kind != ast.KindBlock {
 		return false
@@ -281,7 +405,8 @@ func hasFunctionScopeDeclaration(body *ast.Node, name string) bool {
 	if block == nil || block.Statements == nil {
 		return false
 	}
-	if HasLocalDeclarationInStatements(block.Statements.Nodes, name) {
+	if HasLocalDeclarationInStatements(block.Statements.Nodes, name) ||
+		hasHoistedFunctionDeclarationInStatements(block.Statements.Nodes, name) {
 		return true
 	}
 	for _, stmt := range block.Statements.Nodes {
@@ -302,7 +427,7 @@ func hasFunctionScopeDeclaration(body *ast.Node, name string) bool {
 // declaration at the usage site. It walks from node up to the SourceFile,
 // checking every scope boundary for variable/function/class/enum/import
 // declarations, namespace bodies, function parameters, catch variables, and
-// hoisted var declarations.
+// hoisted var and function declarations.
 func IsShadowed(node *ast.Node, name string) bool {
 	prevChild := node
 	inParameterDecorator := false
@@ -320,13 +445,13 @@ func IsShadowed(node *ast.Node, name string) bool {
 					return true
 				}
 			}
-			if HasHoistedVarDeclaration(current, name) {
+			if HasHoistedVarDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
 				return true
 			}
 			return false
 
 		case ast.KindBlock:
-			if HasShadowingDeclaration(current, name) {
+			if HasShadowingDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
 				return true
 			}
 
@@ -342,12 +467,12 @@ func IsShadowed(node *ast.Node, name string) bool {
 					return true
 				}
 			}
-			if HasHoistedVarDeclaration(current, name) {
+			if HasHoistedVarDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
 				return true
 			}
 
 		case ast.KindCaseBlock:
-			if HasShadowingDeclarationInCaseBlock(current, name) {
+			if HasShadowingDeclarationInCaseBlock(current, name) || hasHoistedFunctionDeclaration(current, name) {
 				return true
 			}
 
@@ -390,7 +515,7 @@ func IsShadowed(node *ast.Node, name string) bool {
 
 		default:
 			if ast.IsFunctionLikeDeclaration(current) {
-				if escapesThroughParameterDecorator(current, prevChild, inParameterDecorator, crossedScope) {
+				if escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
 					break
 				}
 				if HasShadowingParameter(current, name) {

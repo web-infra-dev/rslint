@@ -282,6 +282,111 @@ func TestShadowingScopeModels(t *testing.T) {
 			code:                 `class C<Target> { m(@dec(() => Target()) x: number) { } }`,
 			enclosingTypeParameter: true,
 		},
+
+		// A member's decorators and computed name belong to the enclosing class
+		// or object literal, so the member's own scope never reaches them.
+		{
+			name: "method decorator, body var",
+			code: `class C { @dec(Target()) m() { var Target; } }`,
+		},
+		{
+			name: "method decorator, parameter",
+			code: `class C { @dec(Target()) m(Target: any) { } }`,
+		},
+		{
+			name: "method decorator, method type parameter",
+			code: `class C { @dec(Target()) m<Target>() { } }`,
+		},
+		{
+			name:                 "method decorator, class type parameter",
+			code:                 `class C<Target> { @dec(Target()) m() { } }`,
+			enclosingTypeParameter: true,
+		},
+		{
+			name: "accessor decorator, body var",
+			code: `class C { @dec(Target()) get m() { var Target; return 1; } }`,
+		},
+		{
+			name: "computed method name, body var",
+			code: `class C { [Target()]() { var Target; } }`,
+		},
+		{
+			name: "computed method name, parameter",
+			code: `class C { [Target()](Target: any) { } }`,
+		},
+		{
+			name: "computed method name, method type parameter",
+			code: `class C { [Target()]<Target>() { } }`,
+		},
+		{
+			name:                 "computed method name, class type parameter",
+			code:                 `class C<Target> { [Target()]() { } }`,
+			enclosingTypeParameter: true,
+		},
+		{
+			name:     "computed method name, class name",
+			code:     `class Target { [Target()]() { } }`,
+			shadowed: true,
+		},
+		{
+			name: "computed object method name, body var",
+			code: `const o = { [Target()]() { var Target; } };`,
+		},
+
+		// A function declaration with no block to hold it is defined in the
+		// innermost scope that already exists at its position.
+		{
+			name:              "parameter default, body function in an if branch",
+			code:              `function f(a = Target()) { if (b) function Target() {} }`,
+			fromParameterInit: true,
+		},
+		{
+			name:              "parameter default, body function in an else branch",
+			code:              `function f(a = Target()) { if (b) ; else function Target() {} }`,
+			fromParameterInit: true,
+		},
+		{
+			name:              "parameter default, body function in a labelled statement",
+			code:              `function f(a = Target()) { lbl: function Target() {} }`,
+			fromParameterInit: true,
+		},
+		{
+			name:              "parameter default, body function in an unbraced loop",
+			code:              `function f(a = Target()) { while (b) function Target() {} }`,
+			fromParameterInit: true,
+		},
+		{
+			name: "parameter default, body function in a nested block stays there",
+			code: `function f(a = Target()) { { function Target() {} } }`,
+		},
+		{
+			name: "parameter default, body function in a let-scoped loop stays there",
+			code: `function f(a = Target()) { for (let i; ;) function Target() {} }`,
+		},
+		{
+			name:     "function in an if branch reaches the function scope",
+			code:     `function f() { if (b) function Target() {} Target(); }`,
+			shadowed: true,
+		},
+		{
+			name:     "function in an if branch reaches the source file scope",
+			code:     `if (b) function Target() {} Target();`,
+			shadowed: true,
+		},
+		{
+			name:     "function in an if branch reaches the namespace scope",
+			code:     `namespace N { if (b) function Target() {} Target(); }`,
+			shadowed: true,
+		},
+		{
+			name:     "function in an if branch reaches the switch case scope",
+			code:     `switch (a) { case 1: if (b) function Target() {} case 2: Target(); }`,
+			shadowed: true,
+		},
+		{
+			name: "function in a nested block stays there",
+			code: `function f() { { function Target() {} } Target(); }`,
+		},
 	}
 
 	for _, test := range tests {

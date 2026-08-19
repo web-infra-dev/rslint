@@ -14,26 +14,28 @@ import (
 )
 
 // asiCase builds an InvalidTestCase for one of upstream's ASI-safety
-// fixtures: code containing exactly one occurrence of pattern (either
-// "Object()" or "new Object()"), reported and replaced as a whole, mirroring
-// upstream's `props.code.replace(/(new )?Object\(\)/u, fixText)`.
+// fixtures, whose replacement is always parenthesized, mirroring upstream's
+// `props.code.replace(/(new )?Object\(\)/u, fixText)`.
 func asiCase(code, pattern string, needsSemicolon bool, tsx bool) rule_tester.InvalidTestCase {
+	if needsSemicolon {
+		return suggestionCase(code, pattern, ";({})", "useLiteralAfterSemicolon", tsx)
+	}
+	return suggestionCase(code, pattern, "({})", "useLiteral", tsx)
+}
+
+// suggestionCase builds an InvalidTestCase for code containing exactly one
+// occurrence of pattern (either "Object()" or "new Object()"), reported and
+// replaced as a whole by fixText.
+func suggestionCase(code, pattern, fixText, messageId string, tsx bool) rule_tester.InvalidTestCase {
 	idx := strings.Index(code, pattern)
 	if idx < 0 {
-		panic("asiCase: pattern not found in code: " + pattern)
+		panic("suggestionCase: pattern not found in code: " + pattern)
 	}
 	before := code[:idx]
 	line := 1 + strings.Count(before, "\n")
 	lastNL := strings.LastIndex(before, "\n")
 	col := idx - lastNL
 	endCol := col + len(pattern)
-
-	fixText := "({})"
-	messageId := "useLiteral"
-	if needsSemicolon {
-		fixText = ";({})"
-		messageId = "useLiteralAfterSemicolon"
-	}
 	output := before + fixText + code[idx+len(pattern):]
 
 	return rule_tester.InvalidTestCase{
