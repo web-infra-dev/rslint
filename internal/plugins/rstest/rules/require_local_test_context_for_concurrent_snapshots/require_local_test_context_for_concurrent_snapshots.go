@@ -34,21 +34,16 @@ var RequireLocalTestContextForConcurrentSnapshotsRule = rule.Rule{
 		concurrentContext := rstestUtils.GetRstestConcurrentContext(ctx, analysis)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				// Only the outermost call of a chain is parsed, so a chain
-				// carrying two snapshot assertions is answered once.
-				if rstestUtils.FindTopMostCallExpression(node) != node {
-					return
-				}
-				parsed := analysis.ParseExpectCall(node)
-				if parsed == nil || parsed.FromTestContext ||
-					!concurrentContext.IsInConcurrentTest(node) {
-					return
-				}
 				// Chai permits several assertions in one chain, so every matcher
 				// is considered rather than just the first one: the snapshot
 				// matcher of `expect(x).to.be.a("string").and.matchSnapshot()`
-				// is not the one Matcher mirrors.
-				if !slices.ContainsFunc(parsed.Matchers, isSnapshotMatcher) {
+				// is not the one Matcher mirrors. The matcher test comes before
+				// the ownership query so a file with no snapshot assertion never
+				// builds the callback ownership index.
+				parsed := analysis.ParseExpectCall(node)
+				if parsed == nil || parsed.FromTestContext ||
+					!slices.ContainsFunc(parsed.Matchers, isSnapshotMatcher) ||
+					!concurrentContext.IsInConcurrentTest(node) {
 					return
 				}
 				ctx.ReportNode(parsed.Expression, requireLocalTestContextMessage())
