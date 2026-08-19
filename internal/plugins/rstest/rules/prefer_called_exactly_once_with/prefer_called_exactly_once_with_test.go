@@ -112,6 +112,7 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			// `eval` is a default-library call, but the source it runs arrives
 			// as a string, so nothing callable has to be handed to it.
 			{Code: `expect(x).toHaveBeenCalledOnce(); eval('x("b")'); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `expect(x).toHaveBeenCalledOnce(); globalThis.eval('x("b")'); expect(x).toHaveBeenCalledWith('a');`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// An argument that is not stable under a second evaluation is still
