@@ -116,14 +116,17 @@ var ConsistentThisRule = rule.Rule{
 		// checkWasAssigned mirrors upstream's checkWasAssigned: it looks up
 		// alias among scopeNode's own directly-declared bindings and, unless
 		// already initialized or later assigned `this` in that exact scope,
-		// reports every declaration of it.
+		// reports every declaration of it. Every local of the scope counts,
+		// type-space ones included — typescript-eslint's scope manager makes a
+		// `type`/`interface`/`namespace` declaration and a type parameter
+		// variables of their scope just like a value declaration.
 		checkWasAssigned := func(scopeNode *ast.Node, alias string) {
 			locals := ast.GetLocals(scopeNode)
 			if locals == nil {
 				return
 			}
 			sym := locals[alias]
-			if sym == nil || sym.Flags&aliasSymbolFlags == 0 {
+			if sym == nil {
 				return
 			}
 			// The two halves of an exported declaration each hold one of the
@@ -228,15 +231,6 @@ var ConsistentThisRule = rule.Rule{
 	},
 }
 
-// aliasSymbolFlags are the symbol flags a designated alias's binding can
-// carry in a scope's locals. A plain declaration carries SymbolFlagsValue,
-// but in a module the binder splits an exported one in two: the export
-// symbol keeps the real flags while the local left behind carries only
-// SymbolFlagsExportValue, and an import binding carries only
-// SymbolFlagsAlias. All three are variables of the scope as eslint-scope
-// sees it; a type-only declaration, which carries none of them, is not.
-const aliasSymbolFlags = ast.SymbolFlagsValue | ast.SymbolFlagsExportValue | ast.SymbolFlagsAlias
-
 // declarationTextRange is the range upstream reports a declaration at.
 // ESTree wraps an exported declaration in an ExportNamedDeclaration /
 // ExportDefaultDeclaration whose inner declaration begins past the `export`
@@ -261,15 +255,15 @@ func declarationTextRange(sourceFile *ast.SourceFile, decl *ast.Node) core.TextR
 // container, with three corrections where tsgo's containers and
 // eslint-scope's scopes disagree: a loop whose header declares no
 // block-scoped binding is walked past, an object-literal member is walked
-// past for a reference in its computed key, and a `with` body — no container
-// of tsgo's at all — is a scope of its own.
+// past for a reference in its computed key, and a `with` body or an `enum`
+// body — no container of tsgo's at all — is a scope of its own.
 func referenceScopeNode(ref *ast.Node) *ast.Node {
 	scopeNode := ast.GetEnclosingBlockScopeContainer(ref)
 	for scopeNode != nil && (isLoopWithoutOwnScope(scopeNode) || isComputedKeyOfObjectLiteralMember(scopeNode, ref)) {
 		scopeNode = ast.GetEnclosingBlockScopeContainer(scopeNode)
 	}
-	if withStatement := enclosingWithStatement(ref, scopeNode); withStatement != nil {
-		return withStatement
+	if unmapped := enclosingUnmappedScope(ref, scopeNode); unmapped != nil {
+		return unmapped
 	}
 	return scopeNode
 }
@@ -297,17 +291,31 @@ func isComputedKeyOfObjectLiteralMember(node *ast.Node, ref *ast.Node) bool {
 	return name.Pos() <= ref.Pos() && ref.End() <= name.End()
 }
 
-// enclosingWithStatement returns the innermost `with` statement whose body
-// holds ref, looking no further out than stopNode. eslint-scope opens a scope
-// for a `with` body, which tsgo counts as no container at all, so without
-// this a reference written directly under one — `with (obj) self = this` —
-// would be attributed to the enclosing function. The object expression is
-// evaluated in that enclosing scope and so is deliberately not matched.
-func enclosingWithStatement(ref *ast.Node, stopNode *ast.Node) *ast.Node {
+// enclosingUnmappedScope returns the innermost `with` statement or `enum`
+// declaration holding ref, looking no further out than stopNode. eslint-scope
+// opens a scope for a `with` body and for an enum body, both of which tsgo
+// counts as no container at all, so without this a reference written directly
+// under one — `with (obj) self = this`, `enum E { A = (self = this, 1) }` —
+// would be attributed to the enclosing function.
+func enclosingUnmappedScope(ref *ast.Node, stopNode *ast.Node) *ast.Node {
 	for node := ref; node != nil && node != stopNode; node = node.Parent {
 		parent := node.Parent
-		if parent != nil && parent.Kind == ast.KindWithStatement && parent.AsWithStatement().Statement == node {
-			return parent
+		if parent == nil {
+			break
+		}
+		switch parent.Kind {
+		case ast.KindWithStatement:
+			// A `with` statement's object expression is evaluated in the
+			// enclosing scope, so only its body is matched.
+			if parent.AsWithStatement().Statement == node {
+				return parent
+			}
+		case ast.KindEnumDeclaration:
+			// An enum's own name is bound in the enclosing scope, so only
+			// its members are matched.
+			if parent.Name() != node {
+				return parent
+			}
 		}
 	}
 	return nil

@@ -83,11 +83,6 @@ func TestConsistentThisExtras(t *testing.T) {
 			{Code: "abstract class Foo { abstract bar(): void; }", Options: []any{"self"}},
 			{Code: "function foo(a: number): void;\nfunction foo(a: string): void;\nfunction foo(a: any) {}", Options: []any{"self"}},
 
-			// ---- Dimension 1: TS-specific syntax — a type-only declaration
-			// (no value symbol) sharing an alias's name must not be mistaken
-			// for an unassigned variable ----
-			{Code: "type self = string;", Options: []any{"self"}},
-
 			// ---- Locks in upstream checkWasAssigned() the-alias-was-never-declared
 			// arm: scope.set.get(alias) is undefined, checkWasAssigned no-ops ----
 			{Code: "function f() { var x = 1; }", Options: []any{"self"}},
@@ -133,6 +128,12 @@ func TestConsistentThisExtras(t *testing.T) {
 			// enclosing scope, so an assignment written there counts as the
 			// enclosing function's ----
 			{Code: "function f() { var self; with (self = this) { } }", Options: []any{"self"}},
+
+			// ---- An enum body is a scope of its own, but the enum's own name
+			// is bound in — and its members are irrelevant to — the enclosing
+			// scope, so an assignment written outside the body still counts as
+			// the enclosing function's ----
+			{Code: "function f() { var self; enum E { A = 1 } self = this; }", Options: []any{"self"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Options contract: the schema declares no JSON Schema
@@ -339,6 +340,83 @@ func TestConsistentThisExtras(t *testing.T) {
 				Options: []any{"self"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+
+			// ---- An enum body is a scope of its own, so an assignment written
+			// in a member's initializer does not count as the enclosing scope's ----
+			{
+				Code:    "function f() { var self; enum E { A = (self = this, 1) } }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    "var self; enum E { A = (self = this, 1) }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+
+			// ---- Dimension 1: TS-specific syntax — a type alias, interface,
+			// namespace or type parameter is a variable of its scope just like a
+			// value declaration, and is reported when it shadows an alias name ----
+			{
+				Code:    "type self = string;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 1, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    "interface self {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 1, EndLine: 1, EndColumn: 18},
+				},
+			},
+			{
+				Code:    "namespace self {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 1, EndLine: 1, EndColumn: 18},
+				},
+			},
+			{
+				Code:    "export namespace self {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code:    "function f() { type self = string; }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 16, EndLine: 1, EndColumn: 35},
+				},
+			},
+			{
+				Code:    "function f<self>() {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 12, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code:    "function f<self extends object>() {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 12, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "class C { m<self>() {} }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 13, EndLine: 1, EndColumn: 17},
 				},
 			},
 
