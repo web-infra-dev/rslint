@@ -102,6 +102,21 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			{Code: "class Array { m(@dec(() => Array()) x: number) { } }"},
 			{Code: "class C<Array> { m(@dec(() => Array()) x: number) { } }"},
 
+			// ---- Dimension 2: scoping — a member's decorators and computed
+			// name are evaluated in the enclosing class or object literal, so
+			// only that outer scope shadows a call there ----
+			{Code: `class C<Array> { @dec(Array()) m() { } }`},
+			{Code: `class C<Array> { [Array()]() { } }`},
+			{Code: `class Array { [Array()]() { } }`},
+
+			// ---- Dimension 2: scoping — a function declaration with no block
+			// to hold it is defined in the innermost scope that already exists
+			// at its position, which is the function scope the parameter
+			// initializer resolves against ----
+			{Code: `function f(x = Array()) { if (a) function Array() {} }`},
+			{Code: `function f(x = Array()) { lbl: function Array() {} }`},
+			{Code: `function f(x = Array()) { while (a) function Array() {} }`},
+
 			// ---- Dimension 2: scoping — a TypeScript namespace body is a
 			// scope of its own, so a declaration inside it shadows the global
 			// constructor for the whole module block ----
@@ -213,6 +228,60 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 				"class C { m<Array>(@dec(() => Array()) x: number) { } }",
 				`Array()`,
 				"class C { m<Array>(@dec(() => []) x: number) { } }",
+			),
+
+			// ---- Dimension 2: scoping — a decorator or computed name belongs
+			// to the enclosing class or object literal, not to the member that
+			// carries it, so the member's own type parameters, parameters, and
+			// body bindings never reach the call ----
+			directFixCase(
+				`class C { @dec(Array()) m() { var Array; } }`,
+				`Array()`,
+				`class C { @dec([]) m() { var Array; } }`,
+			),
+			directFixCase(
+				`class C { @dec(Array()) m(Array: any) { } }`,
+				`Array()`,
+				`class C { @dec([]) m(Array: any) { } }`,
+			),
+			directFixCase(
+				`class C { @dec(Array()) m<Array>() { } }`,
+				`Array()`,
+				`class C { @dec([]) m<Array>() { } }`,
+			),
+			directFixCase(
+				`class C { [Array()]() { var Array; } }`,
+				`Array()`,
+				`class C { [[]]() { var Array; } }`,
+			),
+			directFixCase(
+				`class C { [Array()](Array: any) { } }`,
+				`Array()`,
+				`class C { [[]](Array: any) { } }`,
+			),
+			directFixCase(
+				`class C { [Array()]<Array>() { } }`,
+				`Array()`,
+				`class C { [[]]<Array>() { } }`,
+			),
+			directFixCase(
+				`const o = { [Array()]() { var Array; } };`,
+				`Array()`,
+				`const o = { [[]]() { var Array; } };`,
+			),
+
+			// ---- Dimension 2: scoping — a block or a `let`-scoped loop does
+			// hold the function declaration, keeping it out of the function
+			// scope the parameter initializer resolves against ----
+			directFixCase(
+				`function f(x = Array()) { { function Array() {} } }`,
+				`Array()`,
+				`function f(x = []) { { function Array() {} } }`,
+			),
+			directFixCase(
+				`function f(x = Array()) { for (let i; ;) function Array() {} }`,
+				`Array()`,
+				`function f(x = []) { for (let i; ;) function Array() {} }`,
 			),
 
 			// A type parameter is only in scope inside its own declaration.
