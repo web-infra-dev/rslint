@@ -192,7 +192,7 @@ class Foo {
 
 ## Differences from ESLint
 
-- rslint reports `this` used inside a computed key of a class field, e.g. `class A { [this.foo] = 1; }`. `@typescript-eslint/no-invalid-this` never reports this — its own implementation always treats a class field as fully valid before visiting the field's key, masking the report.
+- rslint treats every file as an ES module, so top-level `this` is always reported and every function body is checked as strict-mode code. `@typescript-eslint/no-invalid-this` derives both from `languageOptions.sourceType`, which rslint does not expose.
 
 ## When Not To Use It
 

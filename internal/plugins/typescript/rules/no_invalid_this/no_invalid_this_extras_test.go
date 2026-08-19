@@ -156,7 +156,7 @@ var obj = {
 			// PropertyDefinition / AccessorProperty push happens on entry,
 			// so decorators on these (visited after entry) see the field's
 			// frame and the report is silently swallowed — the
-			// `FieldDecoratorUsesEnclosingScope: false` policy point.
+			// `FieldFrameScopedToValue: false` policy point.
 			// Methods don't share this masking (see Layer-3
 			// method-decorator tests), and ESLint core reports here.
 			{Code: `
@@ -169,6 +169,29 @@ class A {
 class A {
   @deco(this)
   accessor foo = 1;
+}
+    `},
+			// ---- Wrapper-bug lock-in: `this` in a computed key of a field is masked ----
+			// The same entry push covers the key, which ESTree visits after
+			// the `PropertyDefinition` / `AccessorProperty` node itself.
+			// Method-likes don't share the masking (see the computed
+			// method/accessor key cases below), and ESLint core reports here.
+			{Code: `
+class A {
+  [this.foo] = 1;
+}
+    `},
+			{Code: `
+class A {
+  accessor [this.foo] = 1;
+}
+    `},
+			// A computed key doesn't defer the field's push the way it does
+			// for a method-like, so a decorator on such a field is masked too.
+			{Code: `
+class A {
+  @deco(this)
+  [bar] = 1;
 }
     `},
 			// ---- Wrapper-bug lock-in: masking also covers members nested inside a field decorator ----
@@ -471,33 +494,6 @@ var obj = {
 };
       `,
 				Errors: unexpected(3, 4),
-			},
-			// ---- Dimension 4: `this` inside a computed key of a class FIELD ----
-			// Same "computed key sees the enclosing scope, not the member's
-			// own frame" reasoning as the method/accessor cases above.
-			// Genuine `@typescript-eslint/no-invalid-this` masks this report
-			// (its wrapper's `PropertyDefinition`/`AccessorProperty` listeners
-			// push a valid frame on entry, before the key is visited, and its
-			// `ThisExpression` listener never delegates to baseRule once that
-			// frame is on top) — this port intentionally diverges from that
-			// wrapper-specific bug in favor of reusing ESLint core's correct,
-			// already-verified algorithm; see this rule's .md "Differences
-			// from ESLint" section.
-			{
-				Code: `
-class A {
-  [this.foo] = 1;
-}
-      `,
-				Errors: unexpected(3, 4),
-			},
-			{
-				Code: `
-class A {
-  accessor [this.foo] = 1;
-}
-      `,
-				Errors: unexpected(3, 13),
 			},
 			// ---- Dimension 4: `this` in decorator on a method ----
 			// Decorators on method-likes run at class-evaluation time, so

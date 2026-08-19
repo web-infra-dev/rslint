@@ -55,10 +55,10 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		IsStrict:      func(*ast.Node, *ast.SourceFile) bool { return true },
 		// typescript-eslint's wrapper pushes the field's always-valid frame
 		// on `PropertyDefinition` / `AccessorProperty` entry, before the
-		// decorators are visited, so `this` in a field decorator resolves to
-		// the field rather than the enclosing scope. ESLint core scopes the
-		// field frame to the initializer value and reports there; this port
-		// follows the wrapper it mirrors.
-		FieldDecoratorUsesEnclosingScope: false,
+		// decorators and the computed key are visited, so `this` in either
+		// position resolves to the field rather than the enclosing scope.
+		// ESLint core scopes the field frame to the initializer value and
+		// reports in both; this port follows the wrapper it mirrors.
+		FieldFrameScopedToValue: false,
 	})
 }

@@ -72,17 +72,18 @@ func ParseOptions(options []any) Options {
 // the two rules and lives here as the single shared implementation.
 type EngineOptions struct {
 	CapIsConstructor bool
-	// FieldDecoratorUsesEnclosingScope decides which frame `this` inside a
-	// decorator attached to a class field belongs to. ESLint core opens the
-	// field's frame as a code path rooted at the initializer *value*
-	// (`onCodePathStart` for the class-field-initializer path, plus
-	// `AccessorProperty > *.value`), so a decorator — visited before the
-	// value — sees the enclosing scope: true. typescript-eslint's wrapper
-	// instead pushes on `PropertyDefinition` / `AccessorProperty` entry,
-	// which covers the decorator too and makes the field's always-valid
-	// frame swallow the report: false. Method-like decorators resolve to
-	// the enclosing scope under both rules.
-	FieldDecoratorUsesEnclosingScope bool
+	// FieldFrameScopedToValue decides how much of a class field the field's
+	// always-valid frame covers. ESLint core opens it as a code path rooted
+	// at the initializer *value* (`onCodePathStart` for the
+	// class-field-initializer path, plus `AccessorProperty > *.value`), so
+	// the positions visited before the value — the decorators and a
+	// computed key — see the enclosing scope instead: true.
+	// typescript-eslint's wrapper instead pushes on `PropertyDefinition` /
+	// `AccessorProperty` entry, so the field's frame covers the whole
+	// member and swallows the report in both positions: false. Method-likes
+	// are unaffected: under both rules their decorators resolve to the
+	// enclosing scope and their computed keys defer the push.
+	FieldFrameScopedToValue bool
 	// TopLevelValid is the validity of `this` when no function/class-member
 	// frame is on the stack (i.e. at the top level of the file).
 	TopLevelValid bool
@@ -106,8 +107,8 @@ type EngineOptions struct {
 //   - `@typescript-eslint/no-invalid-this` assumes `sourceType: "module"`
 //     (typescript-eslint's RuleTester default), so every function frame is
 //     always strict and top-level `this` is always invalid.
-//   - The two also disagree on which frame a class field's decorator sees
-//     (see `FieldDecoratorUsesEnclosingScope`).
+//   - The two also disagree on how much of a class field the field's own
+//     frame covers (see `FieldFrameScopedToValue`).
 //
 // Everything else — the AST shapes recognized, the order branches are
 // checked in, computed-key and decorator handling — is identical, since
@@ -153,15 +154,18 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 		push(true)
 	}
 
-	// enterPropertyDeclaration defers the push past a computed key, exactly
-	// like `enterMethodLike`. Core ESLint gives a class field's *value*
-	// position its own implicit-function code path (`PropertyDefinition#value`
-	// — see `isDefaultThisBinding`'s doc comment) but does NOT extend that
+	// enterPropertyDeclaration defers the push past a computed key exactly
+	// like `enterMethodLike` — but only under `FieldFrameScopedToValue`.
+	// Core ESLint gives a class field's *value* position its own
+	// implicit-function code path (`PropertyDefinition#value` — see
+	// `isDefaultThisBinding`'s doc comment) but does NOT extend that
 	// treatment to the key: a computed key (`[this.foo]`) is evaluated at
 	// class-definition time in the *enclosing* scope, not the field's own
-	// context, so it must see whatever frame was already on the stack.
+	// context, so it must see whatever frame was already on the stack. The
+	// wrapper's `PropertyDefinition()` / `AccessorProperty()` listeners push
+	// on entry unconditionally, so there the key is covered too.
 	enterPropertyDeclaration := func(node *ast.Node) {
-		if hasComputedKey(node) {
+		if eo.FieldFrameScopedToValue && hasComputedKey(node) {
 			return
 		}
 		push(true)
@@ -210,9 +214,14 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 			}
 			switch parent.Kind {
 			case ast.KindMethodDeclaration, ast.KindConstructor,
-				ast.KindGetAccessor, ast.KindSetAccessor,
-				ast.KindPropertyDeclaration:
+				ast.KindGetAccessor, ast.KindSetAccessor:
 				push(true)
+			case ast.KindPropertyDeclaration:
+				// Already pushed on entry unless the field's frame is
+				// scoped to the initializer value.
+				if eo.FieldFrameScopedToValue {
+					push(true)
+				}
 			}
 		},
 
@@ -229,7 +238,7 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 			// one belongs to the enclosing frame, not the decorated
 			// member's. `decoratorFrameSkip` counts how many frames on the
 			// stack sit between `this` and the frame that governs it.
-			idx := len(stack) - 1 - decoratorFrameSkip(node, eo.FieldDecoratorUsesEnclosingScope)
+			idx := len(stack) - 1 - decoratorFrameSkip(node, eo.FieldFrameScopedToValue)
 			var valid bool
 			if idx < 0 {
 				valid = eo.TopLevelValid
@@ -250,9 +259,9 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Top-level `this` refers to the global object in scripts (always
 		// valid) and is `undefined` in ES modules (always invalid) —
 		// independent of strict mode.
-		TopLevelValid:                    !ast.IsExternalModule(ctx.SourceFile),
-		IsStrict:                         isStrictFunction,
-		FieldDecoratorUsesEnclosingScope: true,
+		TopLevelValid:           !ast.IsExternalModule(ctx.SourceFile),
+		IsStrict:                isStrictFunction,
+		FieldFrameScopedToValue: true,
 	})
 }
 
@@ -737,9 +746,10 @@ func isCallApplyBind(name string) bool {
 // reached through its body or initializer — owns the stack top, so the
 // walk stops there with whatever has been counted so far.
 //
-// Field decorators hop only when `FieldDecoratorUsesEnclosingScope` says
-// so; otherwise the field's own frame governs and the walk stops.
-func decoratorFrameSkip(thisNode *ast.Node, fieldDecoratorUsesEnclosingScope bool) int {
+// A class field takes part in either kind of hop only when
+// `FieldFrameScopedToValue` says so; otherwise its frame is already on the
+// stack for both positions and the walk stops there.
+func decoratorFrameSkip(thisNode *ast.Node, fieldFrameScopedToValue bool) int {
 	skip := 0
 	prev, current := thisNode, thisNode.Parent
 	for current != nil {
@@ -749,7 +759,7 @@ func decoratorFrameSkip(thisNode *ast.Node, fieldDecoratorUsesEnclosingScope boo
 			if member == nil || !isDecoratedClassMember(member) {
 				return skip
 			}
-			if member.Kind == ast.KindPropertyDeclaration && !fieldDecoratorUsesEnclosingScope {
+			if member.Kind == ast.KindPropertyDeclaration && !fieldFrameScopedToValue {
 				return skip
 			}
 			if !hasComputedKey(member) {
@@ -761,9 +771,13 @@ func decoratorFrameSkip(thisNode *ast.Node, fieldDecoratorUsesEnclosingScope boo
 			continue
 		case ast.KindArrowFunction:
 			// Lexical `this` — keep walking up.
+		case ast.KindPropertyDeclaration:
+			if !fieldFrameScopedToValue {
+				return skip
+			}
+			fallthrough
 		case ast.KindMethodDeclaration, ast.KindConstructor,
-			ast.KindGetAccessor, ast.KindSetAccessor,
-			ast.KindPropertyDeclaration:
+			ast.KindGetAccessor, ast.KindSetAccessor:
 			if !hasComputedKey(current) || prev != ast.GetNameOfDeclaration(current) {
 				return skip
 			}
