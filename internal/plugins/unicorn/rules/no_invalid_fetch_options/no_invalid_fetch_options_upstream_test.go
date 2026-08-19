@@ -7,6 +7,7 @@ package no_invalid_fetch_options_test
 import (
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
@@ -132,12 +133,12 @@ func nthIndex(value string, target string, nth int) int {
 func lineColumnForOffset(code string, offset int) (int, int) {
 	line := 1
 	column := 1
-	for i := range offset {
-		if code[i] == '\n' {
+	for _, character := range code[:offset] {
+		if character == '\n' {
 			line++
 			column = 1
 		} else {
-			column++
+			column += utf16.RuneLen(character)
 		}
 	}
 	return line, column

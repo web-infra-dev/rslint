@@ -1,11 +1,10 @@
 package no_invalid_fetch_options
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 const messageID = "no-invalid-fetch-options"
@@ -155,7 +154,7 @@ func checkFetchOptions(ctx rule.RuleContext, staticStrings *utils.StaticStringEv
 		return
 	}
 
-	method = strings.ToUpper(method)
+	method = ecmascript.StringToUpperCase(method)
 	if method != "GET" && method != "HEAD" {
 		return
 	}

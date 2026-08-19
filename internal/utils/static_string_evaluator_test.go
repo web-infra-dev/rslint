@@ -32,6 +32,31 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const stringCall = String(\"then\");\n" +
 		"const stringNumberCall = String(1 + 2);\n" +
 		"const stringNoArgumentCall = String();\n" +
+		"const uppercase = \"get\".toUpperCase();\n" +
+		"const uppercaseExpansion = \"ß\".toUpperCase();\n" +
+		"const uppercaseStaticExtraArgument = \"get\".toUpperCase(1);\n" +
+		"const uppercaseExtraArgument = \"get\".toUpperCase(unknown);\n" +
+		"const lowercase = \"HEAD\".toLowerCase();\n" +
+		"const lowercaseFinalSigma = \"ΟΣ\".toLowerCase();\n" +
+		"const fromCharCode = String.fromCharCode(71, 69, 84);\n" +
+		"const fromCharCodeNegativeModulo = String.fromCharCode(-4294967225);\n" +
+		"const fromCharCodeHexString = String.fromCharCode(\"0x47\");\n" +
+		"const fromCharCodeNEL = String.fromCharCode(\"\u008571\");\n" +
+		"const fromCharCodeBOM = String.fromCharCode(\"\uFEFF71\");\n" +
+		"const fromCharCodeSpread = String.fromCharCode(...[72, 69, 65, 68]);\n" +
+		"const arrayOfFirst = Array.of(\"GET\")[0];\n" +
+		"const arrayOfSpread = Array.of(...[\"HEAD\"])[0];\n" +
+		"const stringSlice = \"xGETy\".slice(1, 4);\n" +
+		"const stringSliceDefault = \"GET\".slice(undefined);\n" +
+		"const stringSliceUtf16 = \"😀GETx\".slice(2, 5);\n" +
+		"const stringSubstring = \"xHEADy\".substring(1, 5);\n" +
+		"const stringSubstringReversed = \"HEAD\".substring(4, 0);\n" +
+		"const StringAlias = String;\n" +
+		"const aliasFromCharCode = StringAlias.fromCharCode(71, 69, 84);\n" +
+		"const ArrayAlias = Array;\n" +
+		"const aliasArrayOf = ArrayAlias.of(\"GET\")[0];\n" +
+		"{ const String = {fromCharCode: () => \"GET\"}; const shadowedFromCharCode = String.fromCharCode(71); }\n" +
+		"{ const Array = {of: () => [\"GET\"]}; const shadowedArrayOf = Array.of(\"GET\")[0]; }\n" +
 		"const stringRaw = String.raw`then`;\n" +
 		"const stringRawSubstitution = String.raw`th${\"e\"}n`;\n" +
 		"const RawString = String;\n" +
@@ -133,6 +158,29 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "stringCall", want: "then", ok: true},
 		{name: "stringNumberCall", want: "3", ok: true},
 		{name: "stringNoArgumentCall", want: "", ok: true},
+		{name: "uppercase", want: "GET", ok: true},
+		{name: "uppercaseExpansion", want: "SS", ok: true},
+		{name: "uppercaseStaticExtraArgument", want: "GET", ok: true},
+		{name: "uppercaseExtraArgument"},
+		{name: "lowercase", want: "head", ok: true},
+		{name: "lowercaseFinalSigma", want: "ος", ok: true},
+		{name: "fromCharCode", want: "GET", ok: true},
+		{name: "fromCharCodeNegativeModulo", want: "G", ok: true},
+		{name: "fromCharCodeHexString", want: "G", ok: true},
+		{name: "fromCharCodeNEL", want: "\x00", ok: true},
+		{name: "fromCharCodeBOM", want: "G", ok: true},
+		{name: "fromCharCodeSpread", want: "HEAD", ok: true},
+		{name: "arrayOfFirst", want: "GET", ok: true},
+		{name: "arrayOfSpread", want: "HEAD", ok: true},
+		{name: "stringSlice", want: "GET", ok: true},
+		{name: "stringSliceDefault", want: "GET", ok: true},
+		{name: "stringSliceUtf16", want: "GET", ok: true},
+		{name: "stringSubstring", want: "HEAD", ok: true},
+		{name: "stringSubstringReversed", want: "HEAD", ok: true},
+		{name: "aliasFromCharCode", want: "GET", ok: true},
+		{name: "aliasArrayOf", want: "GET", ok: true},
+		{name: "shadowedFromCharCode"},
+		{name: "shadowedArrayOf"},
 		{name: "stringRaw", want: "then", ok: true},
 		{name: "stringRawSubstitution", want: "then", ok: true},
 		{name: "stringRawAlias", want: "then", ok: true},

@@ -71,6 +71,9 @@ func TestNoInvalidFetchOptionsExtras(t *testing.T) {
 			jsValid(`fetch(url, {method: "OPTIONS", body})`),
 			jsValid(`fetch(url, {method: "TRACE", body})`),
 			jsValid(`fetch(url, {method: "CONNECT", body})`),
+			// ECMAScript does not trim U+0085 before numeric coercion, so the first
+			// character becomes NUL rather than G.
+			jsValid(`fetch(url, {method: String.fromCharCode("\u008571", 69, 84), body})`),
 
 			// ---- Locks in upstream findLast(): the last matching member controls behavior ----
 			jsValid(`fetch(url, {body() {}, body: undefined})`),
@@ -95,6 +98,8 @@ func TestNoInvalidFetchOptionsExtras(t *testing.T) {
 			invalid(`(fetch)(url, {body})`, "body", "GET"),
 			invalid(`((fetch))(url, (({body})))`, "body", "GET"),
 			invalid(`new (Request)(url, ({body}))`, "body", "GET"),
+			// Diagnostic columns count UTF-16 code units, as ESLint does.
+			invalid(`fetch("😀", {body})`, "body", "GET"),
 
 			// ---- Dimension 4: Type arguments do not wrap the callee ----
 			tsInvalid(`fetch<string>(url, {body})`, "body", "GET"),
@@ -133,6 +138,18 @@ func TestNoInvalidFetchOptionsExtras(t *testing.T) {
 			invalid(`fetch(url, {method: "he" + "ad", body})`, "body", "HEAD"),
 			invalid(`fetch(url, {method: true ? "GET" : "POST", body})`, "body", "GET"),
 			invalid(`const method = "get"; fetch(url, {method, body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "get".toUpperCase(), body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "get".toUpperCase(1), body})`, "body", "GET"),
+			invalid(`new Request(url, {method: String.fromCharCode(72, 69, 65, 68), body})`, "body", "HEAD"),
+			// StringToNumber accepts non-decimal prefixes and trims U+FEFF exactly
+			// as JavaScript does.
+			invalid(`fetch(url, {method: String.fromCharCode("0x47", 69, 84), body})`, "body", "GET"),
+			invalid(`fetch(url, {method: String.fromCharCode("\uFEFF71", 69, 84), body})`, "body", "GET"),
+			invalid(`fetch(url, {method: Array.of("GET")[0], body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "xGETy".slice(1, 4), body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "xHEADy".substring(1, 5), body})`, "body", "HEAD"),
+			invalid(`const S = String; fetch(url, {method: S.fromCharCode(71, 69, 84), body})`, "body", "GET"),
+			invalid(`const A = Array; fetch(url, {method: A.of("HEAD")[0], body})`, "body", "HEAD"),
 
 			// ---- Locks in upstream findLast(): last body/method wins across member kinds ----
 			invalid(`fetch(url, {body: undefined, body() {}})`, "body", "GET", 2),

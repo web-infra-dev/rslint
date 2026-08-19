@@ -1,12 +1,15 @@
 package utils
 
 import (
+	"math"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/evaluator"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // StaticStringEvaluator folds expressions to string constants. It wraps tsgo's
@@ -279,6 +282,9 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 			return result
 		}
 	case ast.KindCallExpression:
+		if result := staticEvaluator.evalBuiltinStaticCall(node); result.ok {
+			return result
+		}
 		if result := staticEvaluator.evalStringCall(node); result.ok {
 			return result
 		}
@@ -338,7 +344,7 @@ func (staticEvaluator *StaticStringEvaluator) ResolveIdentifierInitializer(node 
 }
 
 func (staticEvaluator *StaticStringEvaluator) resolveIdentifierInitializer(node *ast.Node) (*ast.Node, *ast.Symbol, bool) {
-	if staticEvaluator == nil || staticEvaluator.typeChecker == nil {
+	if staticEvaluator == nil || (staticEvaluator.typeChecker == nil && staticEvaluator.referenceResolver == nil) {
 		return nil, nil, false
 	}
 
@@ -1022,6 +1028,229 @@ func (staticEvaluator *StaticStringEvaluator) evalStringCall(node *ast.Node) sta
 	return staticEvalResult{value: value, ok: true}
 }
 
+// evalBuiltinStaticCall folds the narrow built-in call subset that
+// eslint-utils' getStaticValue permits and that string-consuming native rules
+// need. It intentionally recognizes only the real String / Array constructors
+// (or stable aliases) and only fully static arguments, never arbitrary methods
+// named like a built-in.
+func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.Node) staticEvalResult {
+	call := node.AsCallExpression()
+	if call == nil {
+		return staticEvalResult{}
+	}
+
+	callee := ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions)
+	if callee == nil || !ast.IsAccessExpression(callee) {
+		return staticEvalResult{}
+	}
+	method, ok := staticEvaluator.evalAccessExpressionKey(callee)
+	if !ok {
+		return staticEvalResult{}
+	}
+	arguments, ok := staticEvaluator.evalCallArguments(node)
+	if !ok {
+		return staticEvalResult{}
+	}
+
+	receiverNode := AccessExpressionObject(callee)
+	if staticEvaluator.isBuiltinStringValue(receiverNode, map[*ast.Symbol]bool{}) {
+		switch method {
+		case "fromCharCode":
+			return staticStringFromCharCode(arguments)
+		}
+	}
+	if staticEvaluator.isBuiltinArrayValue(receiverNode, map[*ast.Symbol]bool{}) && method == "of" {
+		return staticEvalResult{value: staticArrayFromValues(arguments), ok: true}
+	}
+
+	receiver := staticEvaluator.evalValue(receiverNode)
+	text, ok := staticValueAsString(receiver.value)
+	if !receiver.ok || !ok {
+		return staticEvalResult{}
+	}
+
+	switch method {
+	case "toUpperCase":
+		return staticEvalResult{value: ecmascript.StringToUpperCase(text), ok: true}
+	case "toLowerCase":
+		return staticEvalResult{value: ecmascript.StringToLowerCase(text), ok: true}
+	case "slice":
+		return staticStringSlice(text, arguments)
+	case "substring":
+		return staticStringSubstring(text, arguments)
+	}
+
+	return staticEvalResult{}
+}
+
+func (staticEvaluator *StaticStringEvaluator) evalCallArguments(node *ast.Node) ([]any, bool) {
+	values := make([]any, 0, len(node.Arguments()))
+	for _, argumentNode := range node.Arguments() {
+		if ast.IsSpreadElement(argumentNode) {
+			spread := staticEvaluator.evalValue(argumentNode.AsSpreadElement().Expression)
+			array, ok := spread.value.(*staticArrayValue)
+			if !spread.ok || !ok {
+				return nil, false
+			}
+			for index := range array.length {
+				values = append(values, array.element(index))
+			}
+			continue
+		}
+		argument := staticEvaluator.evalValue(argumentNode)
+		if !argument.ok {
+			return nil, false
+		}
+		values = append(values, argument.value)
+	}
+	return values, true
+}
+
+func staticArrayFromValues(values []any) *staticArrayValue {
+	array := &staticArrayValue{length: len(values)}
+	if array.length > len(array.inline) {
+		array.overflow = make([]any, array.length-len(array.inline))
+	}
+	for index, value := range values {
+		array.set(index, value)
+	}
+	return array
+}
+
+func staticStringFromCharCode(arguments []any) staticEvalResult {
+	units := make([]uint16, 0, len(arguments))
+	for _, argument := range arguments {
+		number, ok := staticValueToNumber(argument)
+		if !ok {
+			return staticEvalResult{}
+		}
+		units = append(units, uint16(toUint32(number)))
+	}
+	return staticEvalResult{value: string(utf16.Decode(units)), ok: true}
+}
+
+func staticStringSlice(text string, arguments []any) staticEvalResult {
+	start, ok := staticArgumentInteger(arguments, 0, 0)
+	if !ok {
+		return staticEvalResult{}
+	}
+	end, ok := staticArgumentInteger(arguments, 1, math.MaxInt)
+	if !ok {
+		return staticEvalResult{}
+	}
+	units := utf16.Encode([]rune(text))
+	length := len(units)
+	from := normalizeSliceIndex(start, length)
+	to := normalizeSliceIndex(end, length)
+	if to < from {
+		to = from
+	}
+	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+}
+
+func staticStringSubstring(text string, arguments []any) staticEvalResult {
+	start, ok := staticArgumentInteger(arguments, 0, 0)
+	if !ok {
+		return staticEvalResult{}
+	}
+	end, ok := staticArgumentInteger(arguments, 1, math.MaxInt)
+	if !ok {
+		return staticEvalResult{}
+	}
+	units := utf16.Encode([]rune(text))
+	length := len(units)
+	from := clampSubstringIndex(start, length)
+	to := clampSubstringIndex(end, length)
+	if from > to {
+		from, to = to, from
+	}
+	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+}
+
+func staticArgumentInteger(arguments []any, index int, defaultValue int) (int, bool) {
+	if index >= len(arguments) || staticValueUndefined(arguments[index]) {
+		return defaultValue, true
+	}
+	number, ok := staticValueToNumber(arguments[index])
+	if !ok {
+		return 0, false
+	}
+	if math.IsNaN(number) || number == 0 {
+		return 0, true
+	}
+	if math.IsInf(number, 1) {
+		return math.MaxInt, true
+	}
+	if math.IsInf(number, -1) {
+		return math.MinInt, true
+	}
+	if number >= float64(math.MaxInt) {
+		return math.MaxInt, true
+	}
+	if number <= float64(math.MinInt) {
+		return math.MinInt, true
+	}
+	return int(math.Trunc(number)), true
+}
+
+func normalizeSliceIndex(index, length int) int {
+	if index < 0 {
+		return max(length+index, 0)
+	}
+	return min(index, length)
+}
+
+func clampSubstringIndex(index, length int) int {
+	return min(max(index, 0), length)
+}
+
+func toUint32(number float64) uint32 {
+	if math.IsNaN(number) || math.IsInf(number, 0) || number == 0 {
+		return 0
+	}
+	remainder := math.Mod(math.Trunc(number), 1<<32)
+	if remainder < 0 {
+		remainder += 1 << 32
+	}
+	return uint32(remainder)
+}
+
+func staticValueToNumber(value any) (float64, bool) {
+	switch value := value.(type) {
+	case bool:
+		if value {
+			return 1, true
+		}
+		return 0, true
+	case staticNullValue:
+		return 0, true
+	case staticUndefinedValue:
+		return math.NaN(), true
+	case string:
+		return parseStaticNumber(value)
+	case *staticStringNode:
+		text, _ := staticValueAsString(value)
+		return parseStaticNumber(text)
+	default:
+		text, ok := staticValueToString(value)
+		if !ok {
+			return 0, false
+		}
+		return parseStaticNumber(text)
+	}
+}
+
+func parseStaticNumber(text string) (float64, bool) {
+	value, ok := ecmascript.StringToNumber(text)
+	if !ok {
+		// StringToNumber returns NaN for an invalid numeric string. NaN is still
+		// a statically known value and downstream coercions must be allowed to
+		// observe it (for example, String.fromCharCode(NaN) produces a NUL).
+		return math.NaN(), true
+	}
+	return value, true
+}
+
 func (staticEvaluator *StaticStringEvaluator) evalStringRawTag(node *ast.Node) staticEvalResult {
 	tagged := node.AsTaggedTemplateExpression()
 	if tagged == nil || tagged.Template == nil || !staticEvaluator.isStringRawTag(tagged.Tag) {
@@ -1070,6 +1299,23 @@ func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Nod
 	return staticEvaluator.isBuiltinStringValue(initializer, resolvingAliases)
 }
 
+func (staticEvaluator *StaticStringEvaluator) isBuiltinArrayValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
+	node = SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	if isIdentifierWithText(node, "Array") && !IsShadowed(node, "Array") {
+		return true
+	}
+	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
+	if !ok || resolvingAliases[symbol] {
+		return false
+	}
+	resolvingAliases[symbol] = true
+	defer delete(resolvingAliases, symbol)
+	return staticEvaluator.isBuiltinArrayValue(initializer, resolvingAliases)
+}
+
 func (staticEvaluator *StaticStringEvaluator) evalWithTsgo(node *ast.Node) (result staticEvalResult) {
 	defer func() {
 		if recover() != nil {
@@ -1100,14 +1346,16 @@ func (staticEvaluator *StaticStringEvaluator) evaluateEntity(expr *ast.Node, loc
 }
 
 func (staticEvaluator *StaticStringEvaluator) hasWrites(symbol *ast.Symbol) bool {
-	if staticEvaluator.sourceFile == nil || staticEvaluator.typeChecker == nil {
+	if staticEvaluator.sourceFile == nil ||
+		(staticEvaluator.typeChecker == nil && staticEvaluator.referenceResolver == nil) {
 		return true
 	}
 	return staticEvaluator.referenceFlagsFor(symbol)&staticReferenceWrite != 0
 }
 
 func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Symbol) bool {
-	if staticEvaluator.sourceFile == nil || staticEvaluator.typeChecker == nil {
+	if staticEvaluator.sourceFile == nil ||
+		(staticEvaluator.typeChecker == nil && staticEvaluator.referenceResolver == nil) {
 		return true
 	}
 	return staticEvaluator.referenceFlagsFor(symbol)&staticReferencePropertyMutation != 0
