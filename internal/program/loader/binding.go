@@ -399,58 +399,6 @@ func orderedProgramIndexesForConfig(set ProjectSet, configDir string) []int {
 	return indexes
 }
 
-func (s *Session) bindTargetsToProjects(
-	set ProjectSet,
-	plan rslintconfig.LintTargetPlan,
-	singleThreaded bool,
-) (LoadResult, []rslintconfig.DiscoveredLintTarget) {
-	fsys := s.FS()
-	binding := LoadResult{
-		compilerPrograms:           append([]*compiler.Program(nil), set.compilerPrograms...),
-		Programs:                   append([]*lintprogram.Program(nil), set.programs...),
-		TargetsByProgram:           make([][]string, len(set.compilerPrograms)),
-		TargetPathBySourcePath:     make(map[string]string),
-		ConfigPathBySourcePath:     make(map[string]string),
-		OwnerConfigDirBySourcePath: make(map[string]string),
-	}
-
-	var unbound []rslintconfig.DiscoveredLintTarget
-	programIndexesByConfig := make(map[string][]int)
-	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Targets, fsys, singleThreaded)
-	for _, target := range plan.Targets {
-		programIndexes, cached := programIndexesByConfig[target.ConfigDirectory]
-		if !cached {
-			programIndexes = orderedProgramIndexesForConfig(set, target.ConfigDirectory)
-			programIndexesByConfig[target.ConfigDirectory] = programIndexes
-		}
-		bound := false
-		for _, programIndex := range programIndexes {
-			sourceFile := exactProgramSourceFile(set.compilerPrograms[programIndex], target.Path)
-			if sourceFile == nil {
-				sourceFile = programFiles.sourceFile(programIndexes, programIndex, target.CanonicalPath)
-			}
-			if sourceFile == nil {
-				continue
-			}
-			sourcePath := sourceFile.FileName()
-			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.ConfigDirectory)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, target.MatchPath(fsys))
-			if tspath.NormalizePath(sourcePath) != target.Path {
-				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.CanonicalPath, target.Path)
-			}
-			bound = true
-			break
-		}
-		if !bound {
-			unbound = append(unbound, target)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, target.Path, target.CanonicalPath, target.ConfigDirectory)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, target.Path, target.CanonicalPath, target.MatchPath(fsys))
-		}
-	}
-	return binding, unbound
-}
-
 func (s *Session) appendCompatibilityPrograms(
 	binding *LoadResult,
 	targets []rslintconfig.DiscoveredLintTarget,

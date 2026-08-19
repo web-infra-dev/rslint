@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -20,6 +21,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -30,6 +32,26 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+type commandReadCountingFS struct {
+	vfs.FS
+	mu    sync.Mutex
+	reads map[string]int
+}
+
+func (fsys *commandReadCountingFS) ReadFile(fileName string) (string, bool) {
+	fileName = tspath.NormalizePath(fileName)
+	fsys.mu.Lock()
+	fsys.reads[fileName]++
+	fsys.mu.Unlock()
+	return fsys.FS.ReadFile(fileName)
+}
+
+func (fsys *commandReadCountingFS) readCount(fileName string) int {
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	return fsys.reads[tspath.NormalizePath(fileName)]
+}
 
 func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, string, string) {
 	t.Helper()
@@ -779,6 +801,30 @@ func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
 	}
 }
 
+func TestIsBroadProjectLoadScope(t *testing.T) {
+	const cwd = "/repo"
+	tests := []struct {
+		name       string
+		allowFiles []string
+		allowDirs  []string
+		want       bool
+	}{
+		{name: "implicit cwd", want: true},
+		{name: "explicit cwd", allowDirs: []string{"/repo"}, want: true},
+		{name: "cwd plus file", allowFiles: []string{"/repo/a.ts"}, allowDirs: []string{"/repo"}, want: true},
+		{name: "ancestor", allowDirs: []string{"/"}, want: true},
+		{name: "focused directory", allowDirs: []string{"/repo/packages/a"}},
+		{name: "focused file", allowFiles: []string{"/repo/packages/a/index.ts"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isBroadProjectLoadScope(test.allowFiles, test.allowDirs, cwd, true); got != test.want {
+				t.Fatalf("isBroadProjectLoadScope() = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
+
 func TestExecuteLintPipelineRejectsInvalidFormatBeforeWork(t *testing.T) {
 	code, stdout, stderr := runLintPipelineForTest(t, t.TempDir(), lintArgs{
 		Format:         "stylish",
@@ -865,6 +911,59 @@ func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
 			t.Fatalf("malformed explicit catalog escaped its invariant: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 		}
 	})
+}
+
+func TestExecuteLintPipelineFocusedFileBuildsOnlyDirectProject(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"target.ts":            `export const target = 1;`,
+		"import-main.ts":       `import "./target";`,
+		"unrelated.ts":         `export const unrelated = 1;`,
+		"tsconfig-import.json": `{"files":["import-main.ts"]}`,
+		"tsconfig-direct.json": `{"files":["target.ts"]}`,
+		"tsconfig-later.json":  `{"files":["unrelated.ts"]}`,
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	dir = tspath.NormalizePath(dir)
+	targetPath := tspath.ResolvePath(dir, "target.ts")
+	fsys := &commandReadCountingFS{
+		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		reads: make(map[string]int),
+	}
+	config := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+			Project: rslintconfig.ProjectPaths{
+				"./tsconfig-import.json",
+				"./tsconfig-direct.json",
+				"./tsconfig-later.json",
+			},
+		}},
+	}}
+	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		ConfigCatalog: &discovery.ConfigCatalog{
+			Configs:  map[string]rslintconfig.RslintConfig{dir: config},
+			Explicit: true,
+		},
+		AllowFiles:     []string{targetPath},
+		Format:         "default",
+		NoColor:        true,
+		SingleThreaded: true,
+		FS:             fsys,
+	})
+	if code != 0 {
+		t.Fatalf("focused lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if got := fsys.readCount(tspath.ResolvePath(dir, "import-main.ts")); got != 0 {
+		t.Fatalf("earlier import-only project source was read %d time(s)", got)
+	}
+	if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); got != 0 {
+		t.Fatalf("project after the direct winner was parsed %d time(s)", got)
+	}
 }
 
 func TestExecuteLintPipelineTypedCatalogEnforcesPluginDeclarations(t *testing.T) {
