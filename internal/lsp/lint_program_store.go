@@ -11,7 +11,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
-	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -21,6 +20,7 @@ type lintProgramStore struct {
 	server              *Server
 	coverage            *lintProgramCoverage
 	programs            map[string]*lintProgramState
+	projectMetadata     map[string]*lintProjectMetadata
 	observedRootConfigs map[string]struct{}
 }
 
@@ -33,20 +33,21 @@ type lintProgramState struct {
 	// corresponding watcher notification.
 	failedLookups            map[tspath.Path]struct{}
 	selectedSourceIdentities map[tspath.Path]tspath.Path
-	rootFiles                *lintprogram.RootFileIndex
+	metadata                 *lintProjectMetadata
 }
 
 type lintProgramRequest struct {
-	store           *lintProgramStore
-	ctx             context.Context
-	uri             lsproto.DocumentUri
-	overlayFS       vfs.FS
-	targetPath      string
-	freshOnly       bool
-	overlayPrepared bool
-	usedConfig      string
-	usedState       *lintProgramState
-	rootFiles       map[string]*lintprogram.RootFileIndex
+	store             *lintProgramStore
+	ctx               context.Context
+	uri               lsproto.DocumentUri
+	overlayFS         vfs.FS
+	targetPath        string
+	freshOnly         bool
+	overlayPrepared   bool
+	usedConfig        string
+	usedState         *lintProgramState
+	projectMetadata   map[string]*lintProjectMetadata
+	transientMetadata map[string]struct{}
 }
 
 func newLintProgramStore(server *Server) *lintProgramStore {
@@ -54,6 +55,7 @@ func newLintProgramStore(server *Server) *lintProgramStore {
 		server:              server,
 		coverage:            newLintProgramCoverage(server),
 		programs:            make(map[string]*lintProgramState),
+		projectMetadata:     make(map[string]*lintProjectMetadata),
 		observedRootConfigs: make(map[string]struct{}),
 	}
 }
@@ -65,42 +67,22 @@ func (s *lintProgramStore) Usable() bool {
 func (s *lintProgramStore) Request(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
-) (lintProgramLoader, lintProjectRootLoader, func()) {
+) (lintProgramLoader, lintProjectMetadataLoader, func()) {
 	request := &lintProgramRequest{
-		store:     s,
-		ctx:       ctx,
-		uri:       uri,
-		rootFiles: make(map[string]*lintprogram.RootFileIndex),
+		store:             s,
+		ctx:               ctx,
+		uri:               uri,
+		projectMetadata:   make(map[string]*lintProjectMetadata),
+		transientMetadata: make(map[string]struct{}),
 	}
-	load := func(configFileName string) (*compiler.Program, *ast.SourceFile, error) {
-		request.prepareOverlay()
-		return request.load(configFileName)
-	}
-	loadRoots := func(configFileName string) (*lintprogram.RootFileIndex, error) {
-		request.prepareOverlay()
-		if roots := request.rootFiles[configFileName]; roots != nil {
-			return roots, nil
-		}
-		if !request.freshOnly && request.store.Usable() {
-			if state := request.store.programs[configFileName]; state != nil && state.rootFiles != nil {
-				roots := state.rootFiles
-				request.rootFiles[configFileName] = roots
-				return roots, nil
-			}
-		}
-		request.store.observedRootConfigs[configFileName] = struct{}{}
-		rootFileNames, err := loadStandaloneLintProjectRoots(configFileName, request.overlayFS)
-		if err != nil {
-			return nil, err
-		}
-		// Metadata scanned for a project that was not selected has no watcher
-		// coverage. Keep it request-local; once a Program is retained, its root
-		// index lives with the watcher-protected Program state above.
-		roots := lintprogram.NewRootFileIndex(rootFileNames, request.overlayFS)
-		request.rootFiles[configFileName] = roots
-		return roots, nil
-	}
-	return load, loadRoots, request.finalize
+	return request.load, request.loadMetadata, request.finalize
+}
+
+func (r *lintProgramRequest) loadMetadata(
+	configFileName string,
+) (*lintProjectMetadata, bool, error) {
+	metadata, err := r.metadata(configFileName)
+	return metadata, err == nil && metadata != nil, err
 }
 
 func (r *lintProgramRequest) prepareOverlay() {
@@ -118,16 +100,98 @@ func (r *lintProgramRequest) prepareOverlay() {
 	}
 }
 
+func (r *lintProgramRequest) metadata(
+	configFileName string,
+) (*lintProjectMetadata, error) {
+	r.prepareOverlay()
+	configFileName = tspath.NormalizePath(configFileName)
+	if metadata := r.projectMetadata[configFileName]; metadata != nil {
+		return metadata, nil
+	}
+	if !r.freshOnly && r.store.Usable() {
+		if state := r.store.programs[configFileName]; state != nil && state.metadata != nil {
+			r.projectMetadata[configFileName] = state.metadata
+			return state.metadata, nil
+		}
+		if metadata := r.store.projectMetadata[configFileName]; metadata != nil {
+			r.projectMetadata[configFileName] = metadata
+			return metadata, nil
+		}
+	}
+
+	r.store.observedRootConfigs[configFileName] = struct{}{}
+	metadata, retain, err := r.parseProjectMetadata(configFileName)
+	if err != nil {
+		return nil, err
+	}
+	r.projectMetadata[configFileName] = metadata
+	if retain {
+		r.store.projectMetadata[configFileName] = metadata
+	} else {
+		r.transientMetadata[configFileName] = struct{}{}
+	}
+	return metadata, nil
+}
+
+func (r *lintProgramRequest) parseProjectMetadata(
+	configFileName string,
+) (*lintProjectMetadata, bool, error) {
+	if r.freshOnly || !r.store.Usable() {
+		metadata, err := parseStandaloneLintProject(
+			configFileName,
+			r.overlayFS,
+			r.store.server.fs,
+		)
+		return metadata, false, err
+	}
+
+	for attempt := range 2 {
+		tracker := newLintTrackingFS(r.overlayFS)
+		metadata, err := parseStandaloneLintProject(
+			configFileName,
+			tracker,
+			r.store.server.fs,
+		)
+		if err != nil {
+			return nil, false, err
+		}
+		lookups := tracker.drain()
+		added, safe, _ := r.store.coverage.ensure(
+			r.ctx,
+			lookups.seenFiles,
+			tspath.GetDirectoryPath(configFileName),
+		)
+		if !safe {
+			r.store.coverage.disabled = true
+			r.store.Invalidate()
+			r.freshOnly = true
+			return metadata, false, nil
+		}
+		if added && attempt == 0 {
+			continue
+		}
+		if added {
+			// The second parse expanded watcher coverage again. Serve this
+			// request, but do not retain metadata from the uncovered interval.
+			return metadata, false, nil
+		}
+		return metadata, true, nil
+	}
+	panic("unreachable")
+}
+
 func (r *lintProgramRequest) load(
 	configFileName string,
 ) (*compiler.Program, *ast.SourceFile, error) {
+	r.prepareOverlay()
+	configFileName = tspath.NormalizePath(configFileName)
 	if r.freshOnly || !r.store.Usable() {
 		return r.loadFresh(configFileName)
 	}
 
 	state := r.store.programs[configFileName]
 	if state == nil {
-		return r.rebuild(configFileName)
+		return r.rebuild(configFileName, r.projectMetadata[configFileName])
 	}
 
 	targetSource := state.sources.SourceFileForPath(r.targetPath)
@@ -145,17 +209,17 @@ func (r *lintProgramRequest) load(
 	for _, dirtyPath := range sortedLintProgramPaths(state.dirtyFiles) {
 		oldSourceFile := program.GetSourceFileByPath(dirtyPath)
 		if oldSourceFile == nil {
-			return r.rebuild(configFileName)
+			return r.rebuild(configFileName, state.metadata)
 		}
 		updated, newSourceFile, graphReused :=
 			program.UpdateProgram(dirtyPath, program.Host(), nil)
 		if updated == nil {
-			return r.rebuild(configFileName)
+			return r.rebuild(configFileName, state.metadata)
 		}
 		updated.BindSourceFiles()
 		if graphReused &&
 			!lintProgramGraphReusable(program, updated, oldSourceFile, newSourceFile) {
-			return r.rebuild(configFileName)
+			return r.rebuild(configFileName, state.metadata)
 		}
 		program = updated
 		if !graphReused {
@@ -173,7 +237,7 @@ func (r *lintProgramRequest) load(
 		return program, state.sources.SourceFileForPath(r.targetPath), nil
 	}
 	if added {
-		return r.rebuild(configFileName)
+		return r.rebuild(configFileName, state.metadata)
 	}
 	return r.result(configFileName, state)
 }
@@ -181,7 +245,11 @@ func (r *lintProgramRequest) load(
 func (r *lintProgramRequest) loadFresh(
 	configFileName string,
 ) (*compiler.Program, *ast.SourceFile, error) {
-	program, err := createStandaloneLintProgram(configFileName, r.overlayFS)
+	metadata, err := r.metadata(configFileName)
+	if err != nil {
+		return nil, nil, err
+	}
+	program, err := createStandaloneLintProgram(metadata, r.overlayFS)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -190,14 +258,30 @@ func (r *lintProgramRequest) loadFresh(
 
 func (r *lintProgramRequest) rebuild(
 	configFileName string,
+	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
 	delete(r.store.programs, configFileName)
+	if metadata == nil {
+		var err error
+		metadata, err = r.metadata(configFileName)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	_, metadataIsTransient := r.transientMetadata[configFileName]
+	if r.freshOnly || !r.store.Usable() || metadataIsTransient {
+		program, err := createStandaloneLintProgram(metadata, r.overlayFS)
+		if err != nil {
+			return nil, nil, err
+		}
+		return program, sourceFileForPath(program, r.targetPath, r.overlayFS), nil
+	}
 
 	// Register every dependency discovered by the first build, then rebuild
 	// once so no filesystem change can fall into the registration gap.
 	for attempt := range 2 {
 		tracker := newLintTrackingFS(r.overlayFS)
-		program, err := createStandaloneLintProgram(configFileName, tracker)
+		program, err := createStandaloneLintProgram(metadata, tracker)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -208,16 +292,18 @@ func (r *lintProgramRequest) rebuild(
 			dirtyFiles:               make(map[tspath.Path]struct{}),
 			failedLookups:            make(map[tspath.Path]struct{}),
 			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
+			metadata:                 metadata,
 		}
-		if program.CommandLine() != nil {
-			state.rootFiles = lintprogram.NewRootFileIndex(
-				program.CommandLine().FileNames(),
-				r.overlayFS,
-			)
+		sourceFile := state.sources.SourceFileForPath(r.targetPath)
+		if sourceFile == nil {
+			// A fallback probe that did not contain this target must not make an
+			// unrelated Program resident. Previously selected resident Programs
+			// are handled by load and remain available to their documents.
+			return program, nil, nil
 		}
 		added, safe := r.cover(state)
 		if !safe {
-			return program, state.sources.SourceFileForPath(r.targetPath), nil
+			return program, sourceFile, nil
 		}
 		if added && attempt == 0 {
 			continue
@@ -225,8 +311,9 @@ func (r *lintProgramRequest) rebuild(
 		if added {
 			// Lazy compiler reads expanded coverage again. Serve this Program
 			// once, but do not retain it across the uncovered interval.
-			return program, state.sources.SourceFileForPath(r.targetPath), nil
+			return program, sourceFile, nil
 		}
+		delete(r.store.projectMetadata, configFileName)
 		r.store.programs[configFileName] = state
 		return r.result(configFileName, state)
 	}
@@ -341,8 +428,11 @@ func (s *lintProgramStore) isOpenSourceOverlayWatchChange(
 }
 
 func (s *lintProgramStore) Invalidate() bool {
-	hadState := len(s.programs) != 0 || len(s.observedRootConfigs) != 0
+	hadState := len(s.programs) != 0 ||
+		len(s.projectMetadata) != 0 ||
+		len(s.observedRootConfigs) != 0
 	clear(s.programs)
+	clear(s.projectMetadata)
 	clear(s.observedRootConfigs)
 	return hadState
 }
@@ -354,6 +444,15 @@ func (s *lintProgramStore) markContent(
 ) (discarded bool) {
 	if tspath.HasJSONFileExtension(fileName) {
 		return s.Invalidate()
+	}
+	if invalidatePossibleNewSource {
+		for configFileName, metadata := range s.projectMetadata {
+			if metadata != nil && metadata.commandLine != nil &&
+				metadata.commandLine.PossiblyMatchesFileName(fileName) {
+				delete(s.projectMetadata, configFileName)
+				discarded = true
+			}
+		}
 	}
 	lexicalID := lintProgramLexicalPathID(fileName, s.server.fs)
 	var physicalID tspath.Path
