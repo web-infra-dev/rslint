@@ -25,6 +25,11 @@ jobs:
     name: Test Go
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    env:
+      # The Linux runner is a pod on a shared 192-core node, and `go test -p`
+      # defaults to GOMAXPROCS: 192 packages in flight buries the box for no
+      # gain. The other two runners keep their own count.
+      GOMAXPROCS: "${{ matrix.runner == 'rspack-ubuntu-22.04-large' && '16' || '' }}"
     strategy:
       fail-fast: false
       matrix:
