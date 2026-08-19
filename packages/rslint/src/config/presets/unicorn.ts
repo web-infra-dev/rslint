@@ -71,7 +71,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-asterisk-prefix-in-documentation-comments': 'off', // not implemented
     // 'unicorn/no-async-promise-finally': 'error', // not implemented
     // 'unicorn/no-await-expression-member': 'error', // not implemented
-    // 'unicorn/no-await-in-promise-methods': 'error', // not implemented
+    'unicorn/no-await-in-promise-methods': 'error',
     // 'unicorn/no-blob-to-file': 'error', // not implemented
     // 'unicorn/no-boolean-sort-comparator': 'error', // not implemented
     // 'unicorn/no-break-in-nested-loop': 'error', // not implemented
