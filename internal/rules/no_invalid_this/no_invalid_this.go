@@ -227,23 +227,9 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 			// A decorator's expression is evaluated at class-definition
 			// time, in the scope surrounding the class — so `this` inside
 			// one belongs to the enclosing frame, not the decorated
-			// member's. Our listeners push the member's frame on entry,
-			// which happens before tsgo visits the modifier list, so peek
-			// one frame deeper when `this` appears inside a decorator —
-			// but ONLY if the member's frame is actually on the stack
-			// already. A computed-key member defers its push to
-			// `ComputedPropertyName:exit`, which runs AFTER the modifier
-			// list, so at decorator visit time the stack top is already
-			// the surrounding scope and no peek is needed. Field
-			// decorators peek only when `FieldDecoratorUsesEnclosingScope`
-			// says so.
-			skip := 0
-			if inside, member := decoratorOfClassMemberAncestor(node); inside && !hasComputedKey(member) {
-				if member.Kind != ast.KindPropertyDeclaration || eo.FieldDecoratorUsesEnclosingScope {
-					skip = 1
-				}
-			}
-			idx := len(stack) - 1 - skip
+			// member's. `decoratorFrameSkip` counts how many frames on the
+			// stack sit between `this` and the frame that governs it.
+			idx := len(stack) - 1 - decoratorFrameSkip(node, eo.FieldDecoratorUsesEnclosingScope)
 			var valid bool
 			if idx < 0 {
 				valid = eo.TopLevelValid
@@ -728,52 +714,79 @@ func isCallApplyBind(name string) bool {
 	return name == "call" || name == "apply" || name == "bind"
 }
 
-// decoratorOfClassMemberAncestor reports whether `thisNode` is positioned
-// inside a `@decorator(...)` expression attached to a class member
-// (`KindMethodDeclaration` / `KindConstructor` / `KindGetAccessor` /
-// `KindSetAccessor` / `KindPropertyDeclaration`), and returns that member
-// node when so. Decorators run at class-evaluation time, so their `this`
-// resolves to the enclosing scope, NOT the member's own implicit `this`.
+// decoratorFrameSkip reports how many frames the `this` at `thisNode` must
+// look past on the validity stack before reaching the frame that governs
+// it. It walks the ancestor chain outward from `thisNode` until it meets
+// the construct whose frame is on top of the stack at visit time.
 //
-// Arrow functions are walked past transparently because their `this` is
-// lexical — `@deco(() => this)` resolves `this` to whatever scope the
-// arrow is defined in (the decorator's scope, which is outside the
-// member). Non-arrow function-likes and class-member boundaries return
-// false: a non-arrow function inside a decorator has its OWN `this`
-// (default-bound), independent of the decorator's host.
+// A `@decorator(...)` expression is evaluated at class-evaluation time, in
+// the scope surrounding the class, so `this` inside one resolves to the
+// enclosing scope rather than to the decorated member. Our listeners push
+// the member's frame on entry, which happens before tsgo visits the
+// modifier list, so each such decorator hop costs one skip and the walk
+// resumes outside the member — a decorator nested inside another
+// decorator (`@dec(class I { @dec2(this) m(){} })`) therefore skips both.
 //
-// The returned `member` node lets the caller distinguish computed-key
-// members (whose frame is deferred to `ComputedPropertyName:exit`) from
-// non-computed ones, since the two require different stack-peek depths at
-// decorator-visit time.
-func decoratorOfClassMemberAncestor(thisNode *ast.Node) (bool, *ast.Node) {
-	current := thisNode.Parent
+// Constructs that have NOT pushed a frame at decorator-visit time are
+// walked past transparently and cost no skip:
+//   - Arrow functions, whose `this` is lexical.
+//   - A member reached through its own computed key: the push is deferred
+//     to `ComputedPropertyName:exit`, which runs after the key is visited.
+//
+// Everything else — a non-arrow function-like, a static block, or a member
+// reached through its body or initializer — owns the stack top, so the
+// walk stops there with whatever has been counted so far.
+//
+// Field decorators hop only when `FieldDecoratorUsesEnclosingScope` says
+// so; otherwise the field's own frame governs and the walk stops.
+func decoratorFrameSkip(thisNode *ast.Node, fieldDecoratorUsesEnclosingScope bool) int {
+	skip := 0
+	prev, current := thisNode, thisNode.Parent
 	for current != nil {
 		switch current.Kind {
 		case ast.KindDecorator:
-			parent := current.Parent
-			if parent == nil {
-				return false, nil
+			member := current.Parent
+			if member == nil || !isDecoratedClassMember(member) {
+				return skip
 			}
-			switch parent.Kind {
-			case ast.KindMethodDeclaration, ast.KindConstructor,
-				ast.KindGetAccessor, ast.KindSetAccessor,
-				ast.KindPropertyDeclaration:
-				return true, parent
+			if member.Kind == ast.KindPropertyDeclaration && !fieldDecoratorUsesEnclosingScope {
+				return skip
 			}
-			return false, nil
+			if !hasComputedKey(member) {
+				skip++
+			}
+			// Resume outside the decorated member: further decorator hops
+			// (a nested class inside this decorator) add their own skips.
+			prev, current = member, member.Parent
+			continue
 		case ast.KindArrowFunction:
 			// Lexical `this` — keep walking up.
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-			ast.KindMethodDeclaration, ast.KindConstructor,
+		case ast.KindMethodDeclaration, ast.KindConstructor,
 			ast.KindGetAccessor, ast.KindSetAccessor,
-			ast.KindPropertyDeclaration,
+			ast.KindPropertyDeclaration:
+			if !hasComputedKey(current) || prev != ast.GetNameOfDeclaration(current) {
+				return skip
+			}
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
 			ast.KindClassStaticBlockDeclaration:
-			return false, nil
+			return skip
 		}
-		current = current.Parent
+		prev, current = current, current.Parent
 	}
-	return false, nil
+	return skip
+}
+
+// isDecoratedClassMember reports whether `node` is one of the class
+// members this rule pushes a frame for. A decorator attached to anything
+// else (a class declaration, a parameter) leaves the stack top alone.
+func isDecoratedClassMember(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindMethodDeclaration, ast.KindConstructor,
+		ast.KindGetAccessor, ast.KindSetAccessor,
+		ast.KindPropertyDeclaration:
+		return true
+	}
+	return false
 }
 
 // hasComputedKey is exposed as a package-level helper so the

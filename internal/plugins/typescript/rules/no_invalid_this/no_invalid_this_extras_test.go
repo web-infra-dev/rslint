@@ -171,6 +171,18 @@ class A {
   accessor foo = 1;
 }
     `},
+			// ---- Wrapper-bug lock-in: masking also covers members nested inside a field decorator ----
+			// The field frame is on top for everything the decorator
+			// contains, so the walk stops at the field instead of peeking
+			// out to `outer` — same policy point as the two cases above.
+			{Code: `
+function outer() {
+  class C {
+    @deco(class I { [this]() {} })
+    x = 1;
+  }
+}
+    `},
 			// ---- Lock-in: `this` in decorator of a computed-key method nested in another method ----
 			// `class A { foo() { class B { @deco(this) [bar]() {} } } }`:
 			// `this` in the decorator resolves to `foo`'s frame (the
@@ -813,6 +825,34 @@ var func = function bar() {
 };
       `,
 				Errors: unexpected(3, 3),
+			},
+
+			// ---- A member nested inside a method decorator doesn't restore the decorated member's frame ----
+			// `I`'s computed key is evaluated while the decorator runs, in
+			// `outer`'s scope; its own frame is deferred, so the walk passes
+			// through it and still peeks past `C.foo`.
+			{
+				Code: `
+function outer() {
+  class C {
+    @deco(class I { [this]() {} })
+    foo() {}
+  }
+}
+      `,
+				Errors: unexpected(4, 22),
+			},
+			// ---- Each nested decorator hop peeks past its own member ----
+			{
+				Code: `
+function outer() {
+  class C {
+    @deco(class I { @deco2(class J { [this]() {} }) bar() {} })
+    foo() {}
+  }
+}
+      `,
+				Errors: unexpected(4, 39),
 			},
 		},
 	)

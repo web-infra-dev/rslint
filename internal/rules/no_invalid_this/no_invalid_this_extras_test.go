@@ -508,6 +508,95 @@ function outer() {
     `,
 				Errors: unexpected(6, 11),
 			},
+
+			// ---- Nested member boundary inside a decorator does not restore the decorated member's frame ----
+			// The computed key of `I`'s member is evaluated while the
+			// decorator runs, i.e. in `outer`'s scope — but `I`'s own member
+			// has not pushed its frame yet (computed keys defer), so the walk
+			// must pass straight through it and still peek past `C.foo`.
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(class I { [this]() {} })
+    foo() {}
+  }
+}
+    `,
+				Errors: unexpected(6, 22),
+			},
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(class I { [this] = 1 })
+    foo() {}
+  }
+}
+    `,
+				Errors: unexpected(6, 22),
+			},
+			// Object-literal accessor key, same shape.
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco({ get [this]() {} })
+    foo() {}
+  }
+}
+    `,
+				Errors: unexpected(6, 18),
+			},
+
+			// ---- Each nested decorator hop peeks past its own member ----
+			// `this` sits two decorated members deep, so a single peek would
+			// land on `I.bar`'s always-valid frame instead of `outer`'s.
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(class I { @deco2(this) bar() {} })
+    foo() {}
+  }
+}
+    `,
+				Errors: unexpected(6, 28),
+			},
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  class C {
+    @deco(class I { @deco2(class J { [this]() {} }) bar() {} })
+    foo() {}
+  }
+}
+    `,
+				Errors: unexpected(6, 39),
+			},
+
+			// ---- A class decorator hosts no member frame of its own ----
+			{
+				Code: `
+export {};
+function outer() {
+  "use strict";
+  @deco(class I { [this]() {} })
+  class C {}
+}
+    `,
+				Errors: unexpected(5, 20),
+			},
 		},
 	)
 }
