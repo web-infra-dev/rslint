@@ -143,8 +143,12 @@ func buildCaseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 			}
 		}
 	}
-	// Except the ones Go has no case mapping for at all.
+	// Except the ones Go has no case mapping for at all, and the ones it folds
+	// together with no case mapping between them.
 	for _, r := range unicode17.CaseAdditions() {
+		record(r)
+	}
+	for _, r := range unicode17.FoldAdditions() {
 		record(r)
 	}
 

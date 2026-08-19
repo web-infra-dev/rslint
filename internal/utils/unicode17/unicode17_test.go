@@ -21,7 +21,7 @@ func TestDeltaStillNeeded(t *testing.T) {
 			"package no longer says what it means. On 17.0.0 or later it is obsolete: "+
 			"delete it, then drop the two lookups in ecmascript's isCased and "+
 			"isCaseIgnorable, the unicode17Uppercase and toLower calls beside them, "+
-			"the three in ecmascript/regexp's Canonicalize, simpleFold and "+
+			"the four in ecmascript/regexp's Canonicalize, simpleFold and "+
 			"buildCaseTables, and the category questions the rules ask it. On an "+
 			"edition in between, every table has to be recomputed against the new "+
 			"one and this constant moved with them",
@@ -38,20 +38,27 @@ func TestDeltaStillNeeded(t *testing.T) {
 				"has to carry this pair", pair[1], lower, unicode.Version)
 		}
 	}
+
+	for _, pair := range foldPairs {
+		if folded := unicode.SimpleFold(pair[0]); folded != pair[0] {
+			t.Errorf("unicode.SimpleFold(%U) = %U on Unicode %s, so the delta no longer "+
+				"has to carry this pair", pair[0], folded, unicode.Version)
+		}
+	}
 }
 
 // TestMappedCharactersAreCased covers the seam between the two halves of the
-// data: a character the mapping half names has a case, so the property half has
-// to agree it is cased — either by naming it too, or by leaving it to a
-// toolchain that already knows.
+// data: a character the mapping or folding half names has a case, so the
+// property half has to agree it is cased — either by naming it too, or by
+// leaving it to a toolchain that already knows.
 func TestMappedCharactersAreCased(t *testing.T) {
-	for _, r := range CaseAdditions() {
+	for _, r := range append(CaseAdditions(), FoldAdditions()...) {
 		cased, ok := Cased(r)
 		if !ok {
 			cased = casedByToolchain(r)
 		}
 		if !cased {
-			t.Errorf("%U has a case mapping but is not cased", r)
+			t.Errorf("%U has a case mapping or folding but is not cased", r)
 		}
 	}
 }

@@ -4,12 +4,13 @@
 //
 // Go 1.26's unicode tables are derived from Unicode 15.0, as are the tables
 // behind golang.org/x/text's caser. Node 26 carries ICU 78, which is Unicode
-// 17.0. Across the editions in between, eight characters that had no case mapping
-// at all were given one, two bicameral scripts arrived whole, the two
-// properties that decide where a Greek capital sigma lowercases to a final sigma
-// — Cased and Case_Ignorable — took on a hundred and ninety-five more characters
-// and lost two, and the general categories a rule asks a character about grew by
-// nine thousand five hundred letters and ninety-three marks.
+// 17.0. Across the editions in between, eight characters that had no case
+// mapping at all were given one, two bicameral scripts arrived whole, three
+// pairs with no case mapping between them were made to fold together, the two
+// properties that decide where a Greek capital sigma lowercases to a final
+// sigma — Cased and Case_Ignorable — took on a hundred and ninety-five more
+// characters and lost two, and the general categories a rule asks a character
+// about grew by nine thousand five hundred letters and ninety-three marks.
 //
 // Without the data here, two characters JavaScript compares equal under a
 // regexp's `iu` flags compare unequal, a string comes back from a case mapping
@@ -66,9 +67,18 @@ func ToLower(r rune) (rune, bool) {
 
 // Fold returns the other member of the pair r folds together with under
 // Unicode 16 and 17, reporting false when Go's own tables already hold the
-// answer. Each pair is a lowercase character and its uppercase, which simple
-// case folding puts in one orbit.
+// answer. Most pairs are a lowercase character and its uppercase, which simple
+// case folding puts in one orbit; the rest are in foldPairs, where neither
+// character is the other's case.
 func Fold(r rune) (rune, bool) {
+	for _, pair := range foldPairs {
+		switch r {
+		case pair[0]:
+			return pair[1], true
+		case pair[1]:
+			return pair[0], true
+		}
+	}
 	if upper, ok := ToUpper(r); ok {
 		return upper, true
 	}
@@ -88,6 +98,18 @@ func CaseAdditions() []rune {
 		for lower := run.lower; lower <= run.lastLower; lower++ {
 			runes = append(runes, lower, lower+run.toUpper)
 		}
+	}
+	return runes
+}
+
+// FoldAdditions returns every character the folding data names. It stands to
+// foldPairs as [CaseAdditions] stands to the mapping data, and a caller walking
+// unicode.CaseRanges is out of reach of these for the same reason: Go folds
+// neither character onto the other, so no case range names the pair.
+func FoldAdditions() []rune {
+	var runes []rune
+	for _, pair := range foldPairs {
+		runes = append(runes, pair[0], pair[1])
 	}
 	return runes
 }
@@ -164,6 +186,18 @@ var caseRuns = [...]struct {
 }{
 	{0x10D70, 0x10D85, -0x20}, // Garay
 	{0x16EBB, 0x16ED3, -0x1B}, // Beria Erfe
+}
+
+// foldPairs holds the two characters of every pair Unicode 16 and 17 brought
+// together under simple case folding without either being the other's case.
+// Each of the three had only a full folding before, onto a sequence of
+// characters, which a simple folding cannot express; the editions gave it a
+// single character to fold onto as well. The lower of the two comes first,
+// which is the one the pair folds onto.
+var foldPairs = [...][2]rune{
+	{0x0390, 0x1FD3},
+	{0x03B0, 0x1FE3},
+	{0xFB05, 0xFB06},
 }
 
 // casedAdded holds the characters Unicode 16 and 17 made cased: the letters of

@@ -36,6 +36,11 @@ func TestCanonicalize(t *testing.T) {
 		// The uppercase of an eszett is two characters, so it stays put; the
 		// capital eszett folds onto the small one.
 		{name: "eszett", left: 0x00DF, right: 0x1E9E, plain: false, uFlag: true},
+		// Three pairs whose members fold together while neither is the other's
+		// case, so only the `u` reading joins them.
+		{name: "iota with dialytika", left: 0x1FD3, right: 0x0390, plain: false, uFlag: true},
+		{name: "upsilon with dialytika", left: 0x1FE3, right: 0x03B0, plain: false, uFlag: true},
+		{name: "st ligature", left: 0xFB05, right: 0xFB06, plain: false, uFlag: true},
 	}
 
 	for _, test := range tests {
@@ -74,6 +79,10 @@ func TestCaseEquivalents(t *testing.T) {
 		{name: "kelvin sign under u", r: 0x212A, unicodeMode: true, want: []rune{'K', 'k', 0x212A}},
 		{name: "long s under u", r: 0x017F, unicodeMode: true, want: []rune{'S', 's', 0x017F}},
 		{name: "digit under u", r: '4', unicodeMode: true, want: nil},
+		// A pair that folds together with no case mapping between its members.
+		{name: "st ligature", r: 0xFB05, want: nil},
+		{name: "st ligature under u", r: 0xFB05, unicodeMode: true, want: []rune{0xFB05, 0xFB06}},
+		{name: "iota with dialytika under u", r: 0x1FD3, unicodeMode: true, want: []rune{0x0390, 0x1FD3}},
 	}
 
 	for _, test := range tests {
