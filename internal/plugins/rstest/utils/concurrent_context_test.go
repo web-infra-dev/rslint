@@ -13,7 +13,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestRstestConcurrentContextIsSharedAndLazy(t *testing.T) {
+// TestRstestConcurrentContextIsSharedPerFile covers the part only this test
+// covers: every rule asking for the concurrent context of one file gets the
+// same instance, so the ownership index is built once rather than per rule.
+// Laziness itself is asserted by TestRstestConcurrentContextBuildsOwnershipLazily,
+// which runs inside the package and can read the ownership field.
+func TestRstestConcurrentContextIsSharedPerFile(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
 			FileName: "/concurrent-context.test.ts",
@@ -30,25 +35,8 @@ func TestRstestConcurrentContextIsSharedAndLazy(t *testing.T) {
 	if first != second {
 		t.Fatal("contexts for one file did not share concurrent ownership")
 	}
-	if len(analysis.Callbacks().Functions) == 0 {
-		t.Fatal("test callback fixture was not collected")
-	}
 
-	var markerCall *ast.Node
-	var visit func(*ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindCallExpression {
-			call := node.AsCallExpression()
-			if call != nil && call.Expression != nil &&
-				call.Expression.Kind == ast.KindIdentifier &&
-				call.Expression.AsIdentifier().Text == "marker" {
-				markerCall = node
-				return true
-			}
-		}
-		return node.ForEachChild(visit)
-	}
-	sourceFile.Node.ForEachChild(visit)
+	markerCall := findCallByCalleeName(sourceFile, "marker")
 	if markerCall == nil {
 		t.Fatal("marker call not found")
 	}
