@@ -1804,14 +1804,20 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	}
 
 	sourceURI := toURI(sourcePath)
+	standaloneLoaders := func(uri lsproto.DocumentUri) lintProjectLoaders {
+		return newStandaloneLintProjectRequest(
+			uriToPath(uri),
+			func() vfs.FS { return s.currentEditorOverlayFS(uri) },
+		).loaders()
+	}
 	program, _, hasTypeInfo, err := selectLintProgram(
 		sourceURI,
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
 		fsys,
-		s.newStandaloneLintProgramLoader(sourceURI),
-		s.newStandaloneLintProjectRootLoader(sourceURI),
+		standaloneLoaders(sourceURI),
+		s.lintSessionRoots,
 	)
 	if err != nil {
 		t.Fatalf("select typed program: %v", err)
@@ -1829,8 +1835,8 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		ctx,
 		[]string{importConfig, firstConfig},
 		fsys,
-		s.newStandaloneLintProgramLoader(sourceURI),
-		s.newStandaloneLintProjectRootLoader(sourceURI),
+		standaloneLoaders(sourceURI),
+		s.lintSessionRoots,
 	)
 	if err != nil {
 		t.Fatalf("select direct project over import: %v", err)
@@ -1872,8 +1878,8 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		ctx,
 		[]string{secondConfig, firstConfig},
 		fsys,
-		s.newStandaloneLintProgramLoader(gapURI),
-		s.newStandaloneLintProjectRootLoader(gapURI),
+		standaloneLoaders(gapURI),
+		s.lintSessionRoots,
 	)
 	if err != nil {
 		t.Fatalf("select gap program: %v", err)
@@ -1939,14 +1945,17 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 		ctx,
 		[]string{configPath},
 		fsys,
-		func(string) (*compiler.Program, *ast.SourceFile, error) {
-			loaderCalls++
-			return nil, nil, errors.New("standalone loader must not run")
+		lintProjectLoaders{
+			program: func(string) (*compiler.Program, *ast.SourceFile, error) {
+				loaderCalls++
+				return nil, nil, errors.New("standalone loader must not run")
+			},
+			metadata: func(string) (*lintProjectMetadata, bool, error) {
+				rootLoaderCalls++
+				return nil, false, errors.New("standalone root loader must not run")
+			},
 		},
-		func(string) (*lintprogram.RootFileIndex, error) {
-			rootLoaderCalls++
-			return nil, errors.New("standalone root loader must not run")
-		},
+		s.lintSessionRoots,
 	)
 	if err != nil {
 		t.Fatal(err)
