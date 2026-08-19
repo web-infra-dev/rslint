@@ -1901,7 +1901,7 @@ func TestNoUndefLanguageDefaults(t *testing.T) {
 				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
 			},
 			{
-				Code:            `require; arguments;`,
+				Code:            `require;`,
 				FileName:        "authored-commonjs.ts",
 				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
 			},
@@ -1938,6 +1938,12 @@ func TestNoUndefLanguageDefaults(t *testing.T) {
 				Code:     `require;`,
 				FileName: "typed-commonjs.cts",
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `arguments;`,
+				FileName:        "authored-commonjs.ts",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
 			},
 			{
 				Code:     `process;`,

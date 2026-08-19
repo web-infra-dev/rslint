@@ -11,7 +11,8 @@ func TestResolveLanguageDefaults(t *testing.T) {
 
 	tests := []struct {
 		fileName               string
-		commonJS               bool
+		commonJSGlobals        bool
+		commonJSWrapper        bool
 		nonGlobalTopLevelScope bool
 		sourceType             string
 	}{
@@ -23,9 +24,9 @@ func TestResolveLanguageDefaults(t *testing.T) {
 		{fileName: "/repo/file.CJS"},
 		{fileName: "/repo/file.cjs.js", nonGlobalTopLevelScope: true, sourceType: "module"},
 		{fileName: "/repo/dir.cjs/file.js", nonGlobalTopLevelScope: true, sourceType: "module"},
-		{fileName: "/repo/file.cjs", commonJS: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
-		{fileName: ".cjs", commonJS: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
-		{fileName: `C:\repo\file.cjs`, commonJS: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
+		{fileName: "/repo/file.cjs", commonJSGlobals: true, commonJSWrapper: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
+		{fileName: ".cjs", commonJSGlobals: true, commonJSWrapper: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
+		{fileName: `C:\repo\file.cjs`, commonJSGlobals: true, commonJSWrapper: true, nonGlobalTopLevelScope: true, sourceType: "commonjs"},
 	}
 
 	for _, test := range tests {
@@ -37,7 +38,7 @@ func TestResolveLanguageDefaults(t *testing.T) {
 			}
 
 			wantAccess := map[string]utils.GlobalAccess{}
-			if test.commonJS {
+			if test.commonJSGlobals {
 				wantAccess = map[string]utils.GlobalAccess{
 					"exports": utils.GlobalAccessWritable,
 					"global":  utils.GlobalAccessReadonly,
@@ -55,8 +56,8 @@ func TestResolveLanguageDefaults(t *testing.T) {
 				}
 			}
 
-			if got := refsInit.hasImplicitWrapperBinding("arguments"); got != test.commonJS {
-				t.Errorf("refsInit.hasImplicitWrapperBinding(arguments) = %v, want %v", got, test.commonJS)
+			if got := refsInit.hasImplicitWrapperBinding("arguments"); got != test.commonJSWrapper {
+				t.Errorf("refsInit.hasImplicitWrapperBinding(arguments) = %v, want %v", got, test.commonJSWrapper)
 			}
 			if got := refsInit.nonGlobalTopLevelScope; got != test.nonGlobalTopLevelScope {
 				t.Errorf("nonGlobalTopLevelScope = %v, want %v", got, test.nonGlobalTopLevelScope)
@@ -74,17 +75,18 @@ func TestResolveLanguageDefaults(t *testing.T) {
 			fileName               string
 			authored               string
 			wantSourceType         string
-			commonJS               bool
+			commonJSGlobals        bool
+			commonJSWrapper        bool
 			nonGlobalTopLevelScope bool
 		}{
-			{fileName: "file.js", authored: "commonjs", wantSourceType: "commonjs", commonJS: true, nonGlobalTopLevelScope: true},
+			{fileName: "file.js", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true, commonJSWrapper: true, nonGlobalTopLevelScope: true},
 			{fileName: "file.js", authored: "script", wantSourceType: "script"},
 			{fileName: "file.cjs", authored: "module", wantSourceType: "module", nonGlobalTopLevelScope: true},
 			{fileName: "file.cjs", authored: "script", wantSourceType: "script"},
-			{fileName: "file.ts", authored: "commonjs", wantSourceType: "commonjs", commonJS: true, nonGlobalTopLevelScope: true},
+			{fileName: "file.ts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
 			{fileName: "file.ts", authored: "module", wantSourceType: "module", nonGlobalTopLevelScope: true},
 			{fileName: "file.tsx", authored: "script", wantSourceType: "script"},
-			{fileName: "file.jsx", authored: "commonjs", wantSourceType: "commonjs", commonJS: true, nonGlobalTopLevelScope: true},
+			{fileName: "file.jsx", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
 		}
 		for _, test := range tests {
 			t.Run(test.fileName+"/"+test.authored, func(t *testing.T) {
@@ -97,14 +99,14 @@ func TestResolveLanguageDefaults(t *testing.T) {
 					t.Errorf("EffectiveSourceType() = %q, want %q", got, test.wantSourceType)
 				}
 				wantAccess := utils.GlobalAccessUnset
-				if test.commonJS {
+				if test.commonJSGlobals {
 					wantAccess = utils.GlobalAccessReadonly
 				}
 				if got := globalsInit.access("require"); got != wantAccess {
 					t.Errorf("globalsInit.access(require) = %s, want %s", got, wantAccess)
 				}
-				if got := refsInit.hasImplicitWrapperBinding("arguments"); got != test.commonJS {
-					t.Errorf("hasImplicitWrapperBinding(arguments) = %v, want %v", got, test.commonJS)
+				if got := refsInit.hasImplicitWrapperBinding("arguments"); got != test.commonJSWrapper {
+					t.Errorf("hasImplicitWrapperBinding(arguments) = %v, want %v", got, test.commonJSWrapper)
 				}
 				if got := refsInit.nonGlobalTopLevelScope; got != test.nonGlobalTopLevelScope {
 					t.Errorf("nonGlobalTopLevelScope = %v, want %v", got, test.nonGlobalTopLevelScope)

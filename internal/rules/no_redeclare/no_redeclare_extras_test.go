@@ -363,6 +363,17 @@ func TestNoRedeclareExtras(t *testing.T) {
 					builtinError("Object", 1, 5),
 				},
 			},
+			// TypeScript-flavoured commonjs keeps a global program scope without the
+			// espree wrapper, so builtin Object is still redeclared.
+			{
+				Code:            "var Object = 0;",
+				FileName:        "a.ts",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 1, 5),
+				},
+			},
 
 			// Locks in upstream iterateDeclarations() arm 2: syntax declarations after the first report as plain redeclarations.
 			invalidRedeclared("let a;\nlet a;", "a", 2, 5),

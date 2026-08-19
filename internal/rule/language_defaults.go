@@ -66,6 +66,17 @@ var commonJSRefStoreInit = RefStoreInit{
 	nonGlobalTopLevelScope:  true,
 }
 
+var javascriptSourceExtensions = []string{
+	tspath.ExtensionJs,
+	tspath.ExtensionMjs,
+	tspath.ExtensionCjs,
+}
+
+func isJavaScriptSourceExtension(fileName string) bool {
+	ext := tspath.GetAnyExtensionFromPath(fileName, nil, false)
+	return tspath.ExtensionIsOneOf(ext, javascriptSourceExtensions)
+}
+
 // ResolveLanguageDefaults resolves the concrete Globals and RefStore
 // initialization supplied by ESLint's default language selection for fileName,
 // together with effective language options.
@@ -73,12 +84,13 @@ var commonJSRefStoreInit = RefStoreInit{
 // An omitted source type is filled from the filename for JavaScript files:
 // .js/.mjs select module, .cjs selects commonjs. Other extensions, including
 // .ts/.tsx/.jsx/.cts, keep the empty value. Authored sourceType then selects
-// the inits on every extension, so a TypeScript file with sourceType
-// "commonjs" receives CommonJS globals and wrapper bindings. module
-// contributes a non-global top-level scope; commonjs additionally contributes
-// writable exports, read-only global/module/require, and the wrapper-local
-// arguments binding; script and the still-empty TypeScript/JSX value
-// contribute no defaults.
+// the inits on every extension. On JavaScript files, commonjs contributes
+// writable exports, read-only global/module/require, a non-global top-level
+// scope, and the wrapper-local arguments binding; module contributes a
+// non-global top-level scope. On TypeScript-flavoured extensions, commonjs
+// contributes only the four CommonJS globals and module contributes no
+// RefStore facts, matching typescript-eslint's scope manager. script and the
+// still-empty TypeScript/JSX value contribute no defaults.
 func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (GlobalsInit, RefStoreInit, LanguageOptions) {
 	if languageOptions.SourceType == "" {
 		switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
@@ -90,7 +102,10 @@ func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (
 	}
 	switch languageOptions.SourceType {
 	case "commonjs":
-		return commonJSGlobalsInit, commonJSRefStoreInit, languageOptions
+		if isJavaScriptSourceExtension(fileName) {
+			return commonJSGlobalsInit, commonJSRefStoreInit, languageOptions
+		}
+		return commonJSGlobalsInit, RefStoreInit{}, languageOptions
 	case "module":
 		return GlobalsInit{}, moduleRefStoreInit, languageOptions
 	}
