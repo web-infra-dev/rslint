@@ -127,7 +127,7 @@ func TestBuildOwnedFileSet_TsconfigProgram(t *testing.T) {
 		"a.ts": "const a = 1;",
 		"b.ts": "const b = 2;",
 	})
-	owned := buildOwnedFileSet(program)
+	owned := buildOwnedFileSet(wrapTestPrograms(program)[0])
 	if owned == nil {
 		t.Fatal("expected non-nil owned set")
 	}
@@ -156,7 +156,7 @@ func TestBuildOwnedFileSet_ExcludesImportedFiles(t *testing.T) {
 	// Hard precondition: lib.ts MUST be pulled in via import for the test to be meaningful
 	requireProgramHasFile(t, program, libPath)
 
-	owned := buildOwnedFileSet(program)
+	owned := buildOwnedFileSet(wrapTestPrograms(program)[0])
 	if _, ok := owned[libPath]; ok {
 		t.Error("lib.ts should NOT be owned (not in tsconfig include, only pulled in via import)")
 	}
@@ -178,7 +178,7 @@ func TestBuildOwnedFileSet_GapProgram(t *testing.T) {
 	// Hard precondition: lib.ts must be pulled into gap program via import
 	requireProgramHasFile(t, prog, libPath)
 
-	owned := buildOwnedFileSet(prog)
+	owned := buildOwnedFileSet(wrapTestPrograms(prog)[0])
 	if _, ok := owned[gapPath]; !ok {
 		t.Error("gap.ts should be owned (root file of gap program)")
 	}
@@ -280,7 +280,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 
 	// Baseline: diagnostic count for lib.ts in single-program mode
 	singleDiags := 0
-	RunLinterInProgram(programLib, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(programLib, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
 			if d.FilePath == libPath {
@@ -418,14 +418,14 @@ func TestRunLinterInProgram_DirectCallNotFiltered(t *testing.T) {
 	// lib.ts is NOT in tsconfig include, only pulled in via import
 	requireProgramHasFile(t, program, libPath)
 
-	owned := buildOwnedFileSet(program)
+	owned := buildOwnedFileSet(wrapTestPrograms(program)[0])
 	if _, ok := owned[libPath]; ok {
 		t.Fatal("precondition failed: lib.ts should NOT be in owned set")
 	}
 
 	// Direct RunLinterInProgram call (like LSP) — no ownedFiles filter applied
 	lintedFiles := make(map[string]int)
-	RunLinterInProgram(program, []string{libPath}, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, []string{libPath}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			lintedFiles[sf.FileName()]++
 			return noopRule()

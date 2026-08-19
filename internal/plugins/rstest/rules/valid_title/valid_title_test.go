@@ -221,7 +221,7 @@ f("%z", () => {});`},
 			Options: []interface{}{map[string]interface{}{"disallowedWords": []interface{}{"ok", "(unterminated"}}},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "invalidPattern",
-				Message:   "Invalid regular expression in `disallowedWords` option: `(?i)\\b(ok|(unterminated)\\b`: error parsing regexp: missing closing ) in `(?i)\\b(ok|(unterminated)\\b`",
+				Message:   "Invalid regular expression in `disallowedWords` option: `\\b(ok|(unterminated)\\b`: error parsing regexp: missing closing ) in `\\b(ok|(unterminated)\\b`",
 				Line:      1,
 				Column:    1,
 			}},

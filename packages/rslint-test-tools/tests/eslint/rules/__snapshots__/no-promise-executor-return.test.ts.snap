@@ -1,0 +1,1561 @@
+// Rstest Snapshot v1
+
+exports[`no-promise-executor-return > invalid 1`] = `
+{
+  "code": "new Promise(function (resolve, reject) { return 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 2`] = `
+{
+  "code": "new Promise((resolve, reject) => resolve(1))",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 3`] = `
+{
+  "code": "new Promise((resolve, reject) => { return 1 })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 4`] = `
+{
+  "code": "new Promise(r => 1)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 5`] = `
+{
+  "code": "new Promise(r => 1 ? 2 : 3)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 6`] = `
+{
+  "code": "new Promise(r => (1 ? 2 : 3))",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 7`] = `
+{
+  "code": "new Promise(r => (1))",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 8`] = `
+{
+  "code": "new Promise(r => () => {})",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 9`] = `
+{
+  "code": "new Promise(r => null)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 10`] = `
+{
+  "code": "new Promise(r => null)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 11`] = `
+{
+  "code": "new Promise(r => /*hi*/ ~0)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 12`] = `
+{
+  "code": "new Promise(r => /*hi*/ ~0)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 13`] = `
+{
+  "code": "new Promise(r => { return 0 })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 14`] = `
+{
+  "code": "new Promise(r => { return 0 })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 15`] = `
+{
+  "code": "new Promise(r => { if (foo) { return void 0 } return 0 })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 16`] = `
+{
+  "code": "new Promise(resolve => { return (foo = resolve(1)); })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 17`] = `
+{
+  "code": "new Promise(resolve => r = resolve)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 18`] = `
+{
+  "code": "new Promise(r => { return(1) })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 19`] = `
+{
+  "code": "new Promise(r =>1)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 20`] = `
+{
+  "code": "new Promise(r => ((1)))",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 21`] = `
+{
+  "code": "new Promise(function foo(resolve, reject) { return 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 22`] = `
+{
+  "code": "new Promise((resolve, reject) => { return 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 23`] = `
+{
+  "code": "new Promise(function (resolve, reject) { return undefined; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 24`] = `
+{
+  "code": "new Promise((resolve, reject) => { return null; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 25`] = `
+{
+  "code": "new Promise(function (resolve, reject) { return false; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 26`] = `
+{
+  "code": "new Promise((resolve, reject) => resolve)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 27`] = `
+{
+  "code": "new Promise((resolve, reject) => null)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 28`] = `
+{
+  "code": "new Promise(function (resolve, reject) { return resolve(foo); })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 29`] = `
+{
+  "code": "new Promise((resolve, reject) => { return reject(foo); })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 30`] = `
+{
+  "code": "new Promise((resolve, reject) => x + y)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 31`] = `
+{
+  "code": "new Promise((resolve, reject) => { return Promise.resolve(42); })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 32`] = `
+{
+  "code": "new Promise(function (resolve, reject) { if (foo) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 33`] = `
+{
+  "code": "new Promise((resolve, reject) => { try { return 1; } catch(e) {} })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 34`] = `
+{
+  "code": "new Promise(function (resolve, reject) { while (foo){ if (bar) break; else return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 85,
+          "line": 1,
+        },
+        "start": {
+          "column": 76,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 35`] = `
+{
+  "code": "new Promise(() => { return void 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 36`] = `
+{
+  "code": "new Promise(() => (1))",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 37`] = `
+{
+  "code": "() => new Promise(() => ({}));",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 38`] = `
+{
+  "code": "new Promise(function () { return 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 39`] = `
+{
+  "code": "new Promise(() => { return 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 40`] = `
+{
+  "code": "new Promise(() => 1)",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 41`] = `
+{
+  "code": "function foo() {} new Promise(function () { return 1; });",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 42`] = `
+{
+  "code": "function foo() { return; } new Promise(() => { return 1; });",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 43`] = `
+{
+  "code": "function foo() { return 1; } new Promise(() => { return 2; });",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 44`] = `
+{
+  "code": "function foo () { return new Promise(function () { return 1; }); }",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 45`] = `
+{
+  "code": "function foo() { return new Promise(() => { bar(() => { return 1; }); return false; }); }",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 84,
+          "line": 1,
+        },
+        "start": {
+          "column": 71,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 46`] = `
+{
+  "code": "() => new Promise(() => { if (foo) { return 0; } else bar(() => { return 1; }); })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 47`] = `
+{
+  "code": "function foo () { return 1; return new Promise(function () { return 2; }); return 3;}",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 48`] = `
+{
+  "code": "() => 1; new Promise(() => { return 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 49`] = `
+{
+  "code": "new Promise(function () { return 1; }); function foo() { return 1; } ",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 50`] = `
+{
+  "code": "() => new Promise(() => { return 1; });",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 51`] = `
+{
+  "code": "() => new Promise(() => 1);",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 52`] = `
+{
+  "code": "() => new Promise(() => () => 1);",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 53`] = `
+{
+  "code": "() => new Promise(() => async () => 1);",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 54`] = `
+{
+  "code": "() => new Promise(() => function () {});",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 55`] = `
+{
+  "code": "() => new Promise(() => class {});",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 56`] = `
+{
+  "code": "() => new Promise(() => function foo() {});",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 57`] = `
+{
+  "code": "() => new Promise(() => class Foo {});",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 58`] = `
+{
+  "code": "() => new Promise(() => []);",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 59`] = `
+{
+  "code": "new Promise((Promise) => { return 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-promise-executor-return > invalid 60`] = `
+{
+  "code": "new Promise(function Promise(resolve, reject) { return 1; })",
+  "diagnostics": [
+    {
+      "message": "Return values from promise executor functions cannot be read.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-promise-executor-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

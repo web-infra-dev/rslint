@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -2793,7 +2794,7 @@ func TestOneVarEditDemand(t *testing.T) {
 
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      program,
+					Program:      lintprogram.NewFromCompiler(program),
 					File:         sourceFile.FileName(),
 					HasTypeInfo:  true,
 					ExcludePaths: []string{},
@@ -2992,7 +2993,7 @@ func TestOneVarDisableDirectives(t *testing.T) {
 
 			diagnosticCount := 0
 			linter.LintSingleFile(linter.LintSingleFileOptions{
-				Program:      program,
+				Program:      lintprogram.NewFromCompiler(program),
 				File:         sourceFile.FileName(),
 				HasTypeInfo:  true,
 				ExcludePaths: []string{},

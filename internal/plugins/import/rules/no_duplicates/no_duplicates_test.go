@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_duplicates"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -728,7 +729,7 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:         program,
+			Program:         lintprogram.NewFromCompiler(program),
 			File:            sourceFile.FileName(),
 			HasTypeInfo:     true,
 			GetRulesForFile: noDuplicatesConfiguredRules,
@@ -803,7 +804,7 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 	unfixableProgram, unfixableSourceFile := createNoDuplicatesProgram(t, "unfixable.ts", unfixableCode)
 	var unfixableDiagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:         unfixableProgram,
+		Program:         lintprogram.NewFromCompiler(unfixableProgram),
 		File:            unfixableSourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noDuplicatesConfiguredRules,
@@ -875,7 +876,7 @@ import type { RequireType } from "conditional-package" with { "resolution-mode":
 
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:         program,
+		Program:         lintprogram.NewFromCompiler(program),
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noDuplicatesConfiguredRules,

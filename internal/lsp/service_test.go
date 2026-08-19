@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1623,7 +1624,7 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 		t.Helper()
 		var diags []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program: program,
+			Program: lintprogram.NewFromCompiler(program),
 			File:    file,
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return lspActiveRulesForFile(cfg, sourceFile.FileName(), dir, false, true)
@@ -1747,6 +1748,7 @@ func TestSourceFileForPath_FindsProgramFileSymlinkFromRealTarget(t *testing.T) {
 func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "src", "index.ts")
+	importerPath := filepath.Join(dir, "importer.ts")
 	gapPath := filepath.Join(dir, "gap.ts")
 	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
 		t.Fatal(err)
@@ -1756,12 +1758,19 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 			t.Fatal(err)
 		}
 	}
+	if err := os.WriteFile(importerPath, []byte(`import "./src/index";`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	firstConfig := filepath.Join(dir, "tsconfig.lint-first.json")
 	secondConfig := filepath.Join(dir, "tsconfig.lint-second.json")
 	for _, configPath := range []string{firstConfig, secondConfig} {
 		if err := os.WriteFile(configPath, []byte(`{"files":["src/index.ts"]}`), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+	importConfig := filepath.Join(dir, "tsconfig.lint-import.json")
+	if err := os.WriteFile(importConfig, []byte(`{"files":["importer.ts"]}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
 
 	ctx := context.Background()
@@ -1802,6 +1811,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		[]string{secondConfig, firstConfig},
 		fsys,
 		s.newStandaloneLintProgramLoader(sourceURI),
+		s.newStandaloneLintProjectRootLoader(sourceURI),
 	)
 	if err != nil {
 		t.Fatalf("select typed program: %v", err)
@@ -1811,6 +1821,25 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	}
 	if got := lspFilesystemPathID(program.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(secondConfig, fsys) {
 		t.Fatalf("expected first declared containing project %q, got %q", secondConfig, program.Options().ConfigFilePath)
+	}
+
+	directProgram, _, directHasTypeInfo, err := selectLintProgram(
+		sourceURI,
+		s.session,
+		ctx,
+		[]string{importConfig, firstConfig},
+		fsys,
+		s.newStandaloneLintProgramLoader(sourceURI),
+		s.newStandaloneLintProjectRootLoader(sourceURI),
+	)
+	if err != nil {
+		t.Fatalf("select direct project over import: %v", err)
+	}
+	if !directHasTypeInfo {
+		t.Fatal("direct project lost type information")
+	}
+	if got := lspFilesystemPathID(directProgram.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(firstConfig, fsys) {
+		t.Fatalf("expected direct project %q to outrank importing project %q, got %q", firstConfig, importConfig, directProgram.Options().ConfigFilePath)
 	}
 	secondConfigID := tspath.ToPath(fsys.Realpath(secondConfig), "", fsys.UseCaseSensitiveFileNames())
 	if opened := s.session.Snapshot().ProjectCollection.ConfiguredProject(secondConfigID); opened != nil {
@@ -1844,6 +1873,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		[]string{secondConfig, firstConfig},
 		fsys,
 		s.newStandaloneLintProgramLoader(gapURI),
+		s.newStandaloneLintProjectRootLoader(gapURI),
 	)
 	if err != nil {
 		t.Fatalf("select gap program: %v", err)
@@ -1902,6 +1932,7 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 	}
 
 	loaderCalls := 0
+	rootLoaderCalls := 0
 	program, sourceFile, hasTypeInfo, err := selectLintProgram(
 		uri,
 		s.session,
@@ -1912,12 +1943,19 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 			loaderCalls++
 			return nil, nil, errors.New("standalone loader must not run")
 		},
+		func(string) (*lintprogram.RootFileIndex, error) {
+			rootLoaderCalls++
+			return nil, errors.New("standalone root loader must not run")
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if loaderCalls != 0 {
 		t.Fatalf("standalone loader called %d times for a Session-owned project", loaderCalls)
+	}
+	if rootLoaderCalls != 0 {
+		t.Fatalf("standalone root loader called %d times for a Session-owned project", rootLoaderCalls)
 	}
 	if !hasTypeInfo || sourceFile == nil {
 		t.Fatal("Session-owned configured source lost type information")

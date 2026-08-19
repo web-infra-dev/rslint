@@ -1,8 +1,8 @@
 package no_restricted_syntax
 
 import (
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // selector models the subset of the ESLint / esquery selector grammar that the
@@ -65,7 +65,7 @@ type attrValue struct {
 	Regex         string
 	Flags         string
 	Ident         string
-	compiledRegex *regexp2.Regexp
+	compiledRegex *esregexp.RegExp
 	regexPrefix   string
 }
 

@@ -9,12 +9,12 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed naming_convention.schema.json
@@ -301,7 +301,7 @@ func parseTypeModifier(s string) (typeModifierKind, bool) {
 // ---- Normalized config types ----
 
 type matchRegex struct {
-	regex *regexp2.Regexp
+	regex *esregexp.RegExp
 	match bool
 }
 
@@ -309,9 +309,9 @@ const maxCachedNamingRegexps = 256
 
 var namingRegexpCache = struct {
 	sync.RWMutex
-	entries map[string]*regexp2.Regexp
+	entries map[string]*esregexp.RegExp
 }{
-	entries: make(map[string]*regexp2.Regexp),
+	entries: make(map[string]*esregexp.RegExp),
 }
 
 type normalizedSelector struct {
@@ -812,7 +812,7 @@ func parseMatchRegex(val interface{}) *matchRegex {
 // the same config. regexp2.Regexp is safe for concurrent use. The bounded
 // cache avoids retaining an unbounded stream of patterns in long-lived LSP
 // processes while removing repeated compilation for ordinary project configs.
-func compileNamingRegexp(pattern string) *regexp2.Regexp {
+func compileNamingRegexp(pattern string) *esregexp.RegExp {
 	namingRegexpCache.RLock()
 	re, ok := namingRegexpCache.entries[pattern]
 	namingRegexpCache.RUnlock()
@@ -826,7 +826,7 @@ func compileNamingRegexp(pattern string) *regexp2.Regexp {
 	if re, ok = namingRegexpCache.entries[pattern]; ok {
 		return re
 	}
-	re, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions)
+	re, err := esregexp.Compile(pattern, "u")
 	if err != nil {
 		return nil
 	}
@@ -1029,9 +1029,9 @@ func validate(name string, sel normalizedSelector, idMods modifierKind, idSelect
 
 	// 7. Validate custom regex (against processed name, after stripping underscores and affixes)
 	if sel.custom != nil {
-		matches := utils.Regexp2MatchString(sel.custom.regex, processedName)
-		if sel.custom.match != matches {
-			msg := satisfyCustomMessage(typeName, name, sel.custom.match, sel.custom.regex.String())
+		matches, err := sel.custom.regex.TestOrError(processedName)
+		if err == nil && sel.custom.match != matches {
+			msg := satisfyCustomMessage(typeName, name, sel.custom.match, sel.custom.regex.Source())
 			return validationResult{valid: false, message: &msg}
 		}
 	}
@@ -2388,8 +2388,8 @@ func validateIdentifier(
 		// Check filter match — if filter doesn't match the name, skip this
 		// selector entirely so the next one in specificity order can match.
 		if sel.filter != nil {
-			matches := utils.Regexp2MatchString(sel.filter.regex, id.name)
-			if sel.filter.match != matches {
+			matches, err := sel.filter.regex.TestOrError(id.name)
+			if err != nil || sel.filter.match != matches {
 				continue
 			}
 		}

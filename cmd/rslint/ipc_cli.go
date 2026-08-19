@@ -280,7 +280,7 @@ func runCLI(args []string) int {
 	// payload-authoritative; the rest supplement flag values.
 	if payload.WorkingDirectory != "" {
 		// Hard-fail on chdir: every downstream path (config discovery, scope,
-		// gap-file matching) anchors at process cwd; the wrong dir would
+		// lint-target matching) anchors at process cwd; the wrong dir would
 		// silently lint the wrong files.
 		if err := os.Chdir(payload.WorkingDirectory); err != nil {
 			fmt.Fprintf(os.Stderr, "rslint: chdir to %q failed: %v\n", payload.WorkingDirectory, err)

@@ -16,8 +16,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-
-	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type lintProgramStoreFixture struct {
@@ -77,7 +75,7 @@ func newLintProgramStoreFixture(t *testing.T, source string) *lintProgramStoreFi
 
 func (f *lintProgramStoreFixture) load(t *testing.T) *compiler.Program {
 	t.Helper()
-	loader, finalize := f.store.Request(context.Background(), f.sourceURI)
+	loader, _, finalize := f.store.Request(context.Background(), f.sourceURI)
 	program, _, err := loader(f.configPath)
 	if err != nil {
 		t.Fatalf("load lint Program: %v", err)
@@ -119,33 +117,32 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 	}
 }
 
-// TestLintProgramStoreDiscardReleasesModuleSpecifiers locks in that the
-// resident Programs and the collections read from their files go away
-// together. A rebuilt Program hands its files' paths to the run that rebuilds
-// it, which supersedes their entries; a discarded one hands them to nobody, so
-// its trees would sit in the cache for the rest of the session.
-func TestLintProgramStoreDiscardReleasesModuleSpecifiers(t *testing.T) {
+func TestLintProgramStoreDoesNotPersistUnselectedProjectRoots(t *testing.T) {
 	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
-	fixture.server.moduleSpecifiers = rule.NewModuleSpecifierCache()
-
-	program := fixture.load(t)
-	sourceFile := program.GetSourceFile(fixture.sourcePath)
-	if sourceFile == nil {
-		t.Fatal("the resident Program does not contain the lint target")
-		return
+	_, loadRoots, finalize := fixture.store.Request(context.Background(), fixture.sourceURI)
+	roots, err := loadRoots(fixture.configPath)
+	if err != nil {
+		t.Fatalf("load roots: %v", err)
 	}
-	rule.NewCachedModuleGraph(program, fixture.server.moduleSpecifiers).
-		Edges(sourceFile, rule.ModuleSyntax{ESModule: true})
-	if fixture.server.moduleSpecifiers.Len() == 0 {
-		t.Fatal("the run read nothing into the cache; the test proves nothing")
+	finalize()
+	if roots == nil || !roots.Contains(fixture.sourcePath, fixture.sourcePath) {
+		t.Fatalf("root metadata did not contain the configured source: %v", roots)
 	}
-
 	if !fixture.store.Invalidate() {
-		t.Fatal("the store had no resident Program to discard")
+		t.Fatal("a project-root change would not trigger diagnostics refresh")
 	}
 
-	if held := fixture.server.moduleSpecifiers.Len(); held != 0 {
-		t.Fatalf("the cache holds %d paths of the discarded Program, want 0", held)
+	if err := os.WriteFile(fixture.configPath, []byte(`{"files":[]}`), 0o644); err != nil {
+		t.Fatalf("rewrite config: %v", err)
+	}
+	_, loadRoots, finalize = fixture.store.Request(context.Background(), fixture.sourceURI)
+	roots, err = loadRoots(fixture.configPath)
+	if err != nil {
+		t.Fatalf("reload roots: %v", err)
+	}
+	finalize()
+	if roots == nil || roots.Contains(fixture.sourcePath, fixture.sourcePath) {
+		t.Fatalf("unselected root metadata leaked across requests: %v", roots)
 	}
 }
 
@@ -214,7 +211,7 @@ func TestLintProgramStoreUnsavedFileSaveRemainsIncremental(t *testing.T) {
 	fixture.server.documents[newURI] = content
 	fixture.store.DidOpen(newURI, content, false)
 
-	loader, finalize := fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize := fixture.store.Request(context.Background(), newURI)
 	first, sourceFile, err := loader(fixture.configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -230,7 +227,7 @@ func TestLintProgramStoreUnsavedFileSaveRemainsIncremental(t *testing.T) {
 	}
 	identityAfterSave := lspFilesystemPathID(newPath, fixture.server.fs)
 	fixture.store.DidSave(newURI, true)
-	loader, finalize = fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize = fixture.store.Request(context.Background(), newURI)
 	saved, _, err := loader(fixture.configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -243,7 +240,7 @@ func TestLintProgramStoreUnsavedFileSaveRemainsIncremental(t *testing.T) {
 	const changed = "export const value = 2;\n"
 	fixture.server.documents[newURI] = changed
 	fixture.store.DidChange(newURI, changed)
-	loader, finalize = fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize = fixture.store.Request(context.Background(), newURI)
 	updated, updatedSource, err := loader(fixture.configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -262,7 +259,7 @@ func TestLintProgramStoreUnsavedFileCloseInvalidates(t *testing.T) {
 	fixture.server.documents[newURI] = content
 	fixture.store.DidOpen(newURI, content, false)
 
-	loader, finalize := fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize := fixture.store.Request(context.Background(), newURI)
 	if _, sourceFile, err := loader(fixture.configPath); err != nil {
 		t.Fatal(err)
 	} else if sourceFile == nil {
@@ -440,7 +437,7 @@ func TestLintProgramStoreOpeningNewIncludedFileRebuilds(t *testing.T) {
 		t.Fatal("newly included source retained a Program built before the file existed")
 	}
 
-	loader, finalize := fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize := fixture.store.Request(context.Background(), newURI)
 	defer finalize()
 	rebuilt, sourceFile, err := loader(fixture.configPath)
 	if err != nil {
@@ -488,7 +485,7 @@ func TestLintProgramStoreOpeningNewImportedFileRebuildsBeforeWatchEvent(t *testi
 		t.Fatal("newly resolved import retained a Program built while it was missing")
 	}
 
-	loader, finalize := fixture.store.Request(context.Background(), importedURI)
+	loader, _, finalize := fixture.store.Request(context.Background(), importedURI)
 	defer finalize()
 	rebuilt, sourceFile, err := loader(fixture.configPath)
 	if err != nil {
@@ -517,7 +514,7 @@ func TestLintProgramStoreConflictingAliasesUseFreshPrograms(t *testing.T) {
 
 	load := func() *compiler.Program {
 		t.Helper()
-		loader, finalize := fixture.store.Request(context.Background(), fixture.sourceURI)
+		loader, _, finalize := fixture.store.Request(context.Background(), fixture.sourceURI)
 		defer finalize()
 		program, _, err := loader(fixture.configPath)
 		if err != nil {
@@ -619,7 +616,7 @@ func TestLintProgramStoreWatchesExternalEmptyIncludeDirectory(t *testing.T) {
 		return nil
 	}
 
-	loader, finalize := store.Request(context.Background(), sourceURI)
+	loader, _, finalize := store.Request(context.Background(), sourceURI)
 	if _, _, err := loader(configPath); err != nil {
 		t.Fatal(err)
 	}

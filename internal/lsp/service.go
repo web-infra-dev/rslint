@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,12 +23,14 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/project/logging"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -153,7 +156,6 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 	if s.watchEnabled && s.outgoingQueue != nil {
 		s.lintPrograms = newLintProgramStore(s)
 	}
-	s.moduleSpecifiers = rule.NewModuleSpecifierCache()
 
 	// Populate the global rule registry once per process; the LSP request path
 	// resolves rule names against it after config merging.
@@ -242,7 +244,7 @@ func fileURIFromPath(filePath string) lsproto.URI {
 
 // reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
 // The LSP reuses projects already loaded by project service and builds a
-// standalone Program for a declared custom project. Resolving
+// session-external ts-go Program for a declared custom project. Resolving
 // project paths here preserves declaration order and ensures type-aware rules
 // run only when the governing config's first containing project supplies type
 // information.
@@ -967,6 +969,8 @@ type lintProgramLoader func(
 	tsConfigPath string,
 ) (*compiler.Program, *ast.SourceFile, error)
 
+type lintProjectRootLoader func(tsConfigPath string) (*lintprogram.RootFileIndex, error)
+
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
 	result, err := runLintWithProgramLoader(uri, session, ctx, rslintConfig, cwd, cwd, enforcePlugins, tsConfigPaths, fs, nil, nil)
 	return result.Diagnostics, err
@@ -975,7 +979,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 // runLintWithProgramLoader resolves one document against two distinct
 // directories: configCwd is the config's own path space, which a nested JS
 // config moves to its own directory, while processCwd is the server's working
-// directory that rules see as RuleContext.Cwd.
+// directory that rules see through RuleContext.ProcessCurrentDirectory.
 func runLintWithProgramLoader(
 	uri lsproto.DocumentUri,
 	session *project.Session,
@@ -987,7 +991,7 @@ func runLintWithProgramLoader(
 	tsConfigPaths []string,
 	fs vfs.FS,
 	loadProgram lintProgramLoader,
-	moduleSpecifiers *rule.ModuleSpecifierCache,
+	loadProjectRoots lintProjectRootLoader,
 ) (lintPassResult, error) {
 	filename := uriToPath(uri)
 	configFilePath, configCwd := config.ResolveConfigPathSpace(filename, cwd, fs)
@@ -1009,6 +1013,7 @@ func runLintWithProgramLoader(
 		tsConfigPaths,
 		fs,
 		loadProgram,
+		loadProjectRoots,
 	)
 	if err != nil {
 		return lintPassResult{}, err
@@ -1021,7 +1026,6 @@ func runLintWithProgramLoader(
 		hasTypeInfo,
 		fileConfigResolver,
 		rule.EditDemandAll,
-		moduleSpecifiers,
 		ctx,
 	), nil
 }
@@ -1044,12 +1048,12 @@ var rulesSkippedInEditors = map[string]bool{
 // rulesServedToEditors drops the rules the language server never runs. The
 // input is a cached slice shared across files, so filtering builds a new one
 // and an unaffected configuration keeps the original.
-func rulesServedToEditors(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
-	skipped := func(r linter.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
+func rulesServedToEditors(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
+	skipped := func(r rule.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
 	if !slices.ContainsFunc(rules, skipped) {
 		return rules
 	}
-	served := make([]linter.ConfiguredRule, 0, len(rules))
+	served := make([]rule.ConfiguredRule, 0, len(rules))
 	for _, configured := range rules {
 		if !skipped(configured) {
 			served = append(served, configured)
@@ -1066,13 +1070,13 @@ func lintSingleFile(
 	hasTypeInfo bool,
 	fileConfigResolver *config.FileConfigResolver,
 	editDemand rule.EditDemand,
-	moduleSpecifiers *rule.ModuleSpecifierCache,
 	ctx context.Context,
 ) lintPassResult {
 	if sourceFile == nil {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}
 	}
-	if syntacticDiagnostics := program.GetSyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
+	sourceProgram := lintprogram.NewFromCompiler(program)
+	if syntacticDiagnostics := sourceProgram.SyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
 		diagnostics := make([]rule.RuleDiagnostic, 0, len(syntacticDiagnostics))
 		for _, diagnostic := range syntacticDiagnostics {
 			diagnostics = append(diagnostics, rule.RuleDiagnostic{
@@ -1101,13 +1105,13 @@ func lintSingleFile(
 	}
 
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:          program,
-		File:             sourceFile.FileName(),
-		Cwd:              processCwd,
-		HasTypeInfo:      hasTypeInfo,
-		ModuleSpecifiers: moduleSpecifiers,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return rulesServedToEditors(fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo))
+		Program:     sourceProgram,
+		File:        sourceFile.FileName(),
+		Cwd:         processCwd,
+		HasTypeInfo: hasTypeInfo,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			rules, _ := fileConfigResolver.EnabledRulesForFile(configFilePath)
+			return rulesServedToEditors(rules)
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: editDemand,
@@ -1128,6 +1132,7 @@ func selectLintProgram(
 	tsConfigPaths []string,
 	fs vfs.FS,
 	loadProgram lintProgramLoader,
+	loadProjectRoots lintProjectRootLoader,
 ) (*compiler.Program, *ast.SourceFile, bool, error) {
 	filename := uriToPath(uri)
 	// Flush pending document changes and collect every already-loaded project
@@ -1141,9 +1146,10 @@ func selectLintProgram(
 	program := languageService.GetProgram()
 
 	// Type information follows parserOptions.project declaration order, not the
-	// TypeScript session's default-project heuristic. Prefer an already-loaded
-	// containing project. Custom config names that the main project service has
-	// not loaded are supplied by rslint-owned standalone Programs.
+	// TypeScript session's default-project heuristic. Direct config roots outrank
+	// files present only through imports. Custom config names that the main
+	// project service has not loaded are supplied by rslint-owned
+	// session-external ts-go Programs.
 	loadedByConfig := make(map[string]*compiler.Program, len(loadedProjects))
 	for _, candidate := range loadedProjects {
 		if candidate == nil || candidate.GetProgram() == nil {
@@ -1151,6 +1157,42 @@ func selectLintProgram(
 		}
 		loadedByConfig[lspFilesystemPathID(string(candidate.Id()), fs)] = candidate.GetProgram()
 	}
+	for _, tsConfigPath := range tsConfigPaths {
+		configID := lspFilesystemPathID(tsConfigPath, fs)
+		loadedProgram := loadedByConfig[configID]
+		var rootFiles *lintprogram.RootFileIndex
+		if loadedProgram != nil && loadedProgram.CommandLine() != nil {
+			rootFiles = lintprogram.NewRootFileIndex(loadedProgram.CommandLine().FileNames(), fs)
+		} else if loadProjectRoots != nil {
+			var loadErr error
+			rootFiles, loadErr = loadProjectRoots(tsConfigPath)
+			if loadErr != nil {
+				return nil, nil, false, fmt.Errorf("load configured project roots %q: %w", tsConfigPath, loadErr)
+			}
+		}
+		if rootFiles == nil || !rootFiles.Contains(filename, "") {
+			continue
+		}
+		if loadedProgram != nil {
+			sourceFile := sourceFileForPath(loadedProgram, filename, fs)
+			if sourceFile == nil {
+				return nil, nil, false, fmt.Errorf("configured project root %q was absent from %q", filename, tsConfigPath)
+			}
+			return loadedProgram, sourceFile, true, nil
+		}
+		if loadProgram == nil {
+			continue
+		}
+		candidate, sourceFile, loadErr := loadProgram(tsConfigPath)
+		if loadErr != nil {
+			return nil, nil, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, loadErr)
+		}
+		if sourceFile == nil {
+			return nil, nil, false, fmt.Errorf("configured project root %q was absent from %q", filename, tsConfigPath)
+		}
+		return candidate, sourceFile, true, nil
+	}
+
 	for _, tsConfigPath := range tsConfigPaths {
 		configID := lspFilesystemPathID(tsConfigPath, fs)
 		if loadedProgram := loadedByConfig[configID]; loadedProgram != nil {
@@ -1254,6 +1296,42 @@ func (s *Server) newStandaloneLintProgramLoader(uri lsproto.DocumentUri) lintPro
 	}
 }
 
+func (s *Server) newStandaloneLintProjectRootLoader(uri lsproto.DocumentUri) lintProjectRootLoader {
+	var overlayFS vfs.FS
+	indexes := make(map[string]*lintprogram.RootFileIndex)
+	return func(tsConfigPath string) (*lintprogram.RootFileIndex, error) {
+		if overlayFS == nil {
+			overlayFS = s.currentEditorOverlayFS(uri)
+		}
+		if index := indexes[tsConfigPath]; index != nil {
+			return index, nil
+		}
+		rootFileNames, err := loadStandaloneLintProjectRoots(tsConfigPath, overlayFS)
+		if err != nil {
+			return nil, err
+		}
+		index := lintprogram.NewRootFileIndex(rootFileNames, overlayFS)
+		indexes[tsConfigPath] = index
+		return index, nil
+	}
+}
+
+func loadStandaloneLintProjectRoots(tsConfigPath string, fs vfs.FS) ([]string, error) {
+	configDir := tspath.GetDirectoryPath(tspath.NormalizePath(tsConfigPath))
+	host := utils.CreateCompilerHost(configDir, fs)
+	parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(
+		tsConfigPath,
+		&core.CompilerOptions{},
+		nil,
+		host,
+		nil,
+	)
+	if parsed == nil {
+		return nil, errors.New("no parsed config returned")
+	}
+	return parsed.FileNames(), nil
+}
+
 func createStandaloneLintProgram(tsConfigPath string, fs vfs.FS) (*compiler.Program, error) {
 	configDir := tspath.GetDirectoryPath(tspath.NormalizePath(tsConfigPath))
 	host := utils.CreateCompilerHost(configDir, fs)
@@ -1281,16 +1359,10 @@ func (s *Server) runConfiguredLint(
 	tsConfigPaths []string,
 ) (lintPassResult, error) {
 	loadProgram := s.newStandaloneLintProgramLoader(uri)
+	loadProjectRoots := s.newStandaloneLintProjectRootLoader(uri)
 	finalize := func() {}
-	// Only the resident Programs hand the same file objects to the next run.
-	// The standalone loader builds over a host of its own every time, so every
-	// file it produces is a new object the cache could only miss on and then
-	// hold — pinning the discarded Program's whole tree until the request after
-	// next displaced it. That path passes none, as the speculative one does.
-	var moduleSpecifiers *rule.ModuleSpecifierCache
 	if s.lintPrograms != nil && s.lintPrograms.Usable() {
-		loadProgram, finalize = s.lintPrograms.Request(ctx, uri)
-		moduleSpecifiers = s.moduleSpecifiers
+		loadProgram, loadProjectRoots, finalize = s.lintPrograms.Request(ctx, uri)
 	}
 	defer finalize()
 	return runLintWithProgramLoader(
@@ -1304,7 +1376,7 @@ func (s *Server) runConfiguredLint(
 		tsConfigPaths,
 		s.fs,
 		loadProgram,
-		moduleSpecifiers,
+		loadProjectRoots,
 	)
 }
 
@@ -1336,14 +1408,10 @@ func (s *Server) runConfiguredLintForContent(
 	s.addEditorOverlayFile(files, filename, content)
 	overlayFS := utils.NewOverlayVFS(s.fs, files)
 
-	// This path builds its Program over a filesystem of its own on every
-	// request, so its files are new objects that share nothing with the
-	// server's cache and would only displace what the diagnostics path put
-	// there. It passes none.
-	for _, tsConfigPath := range tsConfigPaths {
+	lintConfiguredProject := func(tsConfigPath string) (lintPassResult, bool, error) {
 		program, err := createStandaloneLintProgram(tsConfigPath, overlayFS)
 		if err != nil {
-			return lintPassResult{}, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
+			return lintPassResult{}, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
 		}
 		if sourceFile := sourceFileForPath(program, filename, overlayFS); sourceFile != nil {
 			return lintSingleFile(
@@ -1354,9 +1422,37 @@ func (s *Server) runConfiguredLintForContent(
 				true,
 				resolver,
 				rule.EditDemandAutofix,
-				nil,
 				ctx,
-			), nil
+			), true, nil
+		}
+		return lintPassResult{}, false, nil
+	}
+
+	for _, tsConfigPath := range tsConfigPaths {
+		rootFileNames, err := loadStandaloneLintProjectRoots(tsConfigPath, overlayFS)
+		if err != nil {
+			return lintPassResult{}, fmt.Errorf("load configured project roots %q: %w", tsConfigPath, err)
+		}
+		if !lintprogram.NewRootFileIndex(rootFileNames, overlayFS).Contains(filename, "") {
+			continue
+		}
+		result, found, err := lintConfiguredProject(tsConfigPath)
+		if err != nil {
+			return lintPassResult{}, err
+		}
+		if !found {
+			return lintPassResult{}, fmt.Errorf("configured project root %q was absent from %q", filename, tsConfigPath)
+		}
+		return result, nil
+	}
+
+	for _, tsConfigPath := range tsConfigPaths {
+		result, found, err := lintConfiguredProject(tsConfigPath)
+		if err != nil {
+			return lintPassResult{}, err
+		}
+		if found {
+			return result, nil
 		}
 	}
 
@@ -1372,7 +1468,6 @@ func (s *Server) runConfiguredLintForContent(
 		false,
 		resolver,
 		rule.EditDemandAutofix,
-		nil,
 		ctx,
 	), nil
 }
@@ -1397,9 +1492,12 @@ func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {
 	return config.IsDefaultExcludedPath(filePath, cwd, useCaseSensitive)
 }
 
-func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []linter.ConfiguredRule {
-	return config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).
-		ActiveRulesForFileHasTypeInfo(filePath, hasTypeInfo)
+func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []rule.ConfiguredRule {
+	rules, _ := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).EnabledRulesForFile(filePath)
+	if !hasTypeInfo {
+		return rule.FilterNonTypeAwareRules(rules)
+	}
+	return rules
 }
 
 // Helper function to check if two ranges overlap

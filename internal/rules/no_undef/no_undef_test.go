@@ -358,6 +358,12 @@ func TestNoUndefRule(t *testing.T) {
 			// === Re-export alias (export { X as Y } from 'module') ===
 			{Code: `export { resolve as r } from "path";`},
 			{Code: `export type { PlatformPath as PP } from "path";`},
+
+			// === Parameter initializers resolve outside the function body ===
+			{Code: `function Foo() {}
+function f(x = new Foo()) { function Foo() {} }`},
+			{Code: `function f(Foo, x = new Foo()) {}`},
+			{Code: `const f = function Foo(x = new Foo()) { function Foo() {} };`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// === Basic undeclared references ===
@@ -409,6 +415,14 @@ func TestNoUndefRule(t *testing.T) {
 				TSConfig: "tsconfig.allowJs.json",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 2, Column: 1},
+				},
+			},
+			// A parameter initializer is evaluated in a scope outside the body, so a
+			// function declared there does not define the name.
+			{
+				Code: `function f(x = new Foo()) { function Foo() {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 20},
 				},
 			},
 			{

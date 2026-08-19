@@ -84,7 +84,7 @@ func setupDiscoveryFixture(t *testing.T, files []string) (string, map[string]str
 	return tspath.NormalizePath(tmpDir), paths
 }
 
-func TestDiscoverGapFiles_Basic(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_Basic(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"scripts/b.ts",
@@ -99,14 +99,14 @@ func TestDiscoverGapFiles_Basic(t *testing.T) {
 		paths["src/a.ts"]: {},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil, "should not be nil when config has files")
 	assert.Equal(t, len(gapFiles), 1)
 	assert.Equal(t, gapFiles[0], paths["scripts/b.ts"])
 }
 
-func TestDiscoverGapFiles_GlobalIgnoresExclude(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_GlobalIgnoresExclude(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"scripts/b.ts",
@@ -123,14 +123,14 @@ func TestDiscoverGapFiles_GlobalIgnoresExclude(t *testing.T) {
 		paths["src/a.ts"]: {},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	// scripts/b.ts should be excluded by global ignores
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 0)
 }
 
-func TestDiscoverGapFiles_ProgramFilesSkipped(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_ProgramFilesSkipped(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"src/b.ts",
@@ -146,13 +146,13 @@ func TestDiscoverGapFiles_ProgramFilesSkipped(t *testing.T) {
 		paths["src/b.ts"]: {},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 0)
 }
 
-func TestDiscoverGapFiles_EntryIgnoreDoesNotRemoveTarget(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_EntryIgnoreDoesNotRemoveTarget(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"test/b.ts",
@@ -171,7 +171,7 @@ func TestDiscoverGapFiles_EntryIgnoreDoesNotRemoveTarget(t *testing.T) {
 		paths["src/a.ts"]: {},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	// The default TypeScript baseline independently selects both files, so the
 	// entry-level ignore only prevents this entry from contributing rules.
@@ -388,7 +388,7 @@ func TestDiscoverLintFiles_EmptyFilesAndGroupMatchesSupportedBaseline(t *testing
 	assert.DeepEqual(t, targets, expected)
 }
 
-func TestDiscoverGapFiles_NoFilesField_UsesDefaultExtensions(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_NoFilesField_UsesDefaultExtensions(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"src/b.jsx",
@@ -401,14 +401,14 @@ func TestDiscoverGapFiles_NoFilesField_UsesDefaultExtensions(t *testing.T) {
 		{Rules: Rules{"test-rule": "error"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	expected := []string{paths["src/a.ts"], paths["src/b.jsx"], paths["src/c.cjs"], paths["src/d.cts"]}
 	sort.Strings(expected)
 	assert.DeepEqual(t, gapFiles, expected)
 }
 
-func TestDiscoverGapFiles_AllowDirsScope(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_AllowDirsScope(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"scripts/b.ts",
@@ -423,7 +423,7 @@ func TestDiscoverGapFiles_AllowDirsScope(t *testing.T) {
 
 	// Only allow scripts/ directory
 	scriptsDir := tspath.NormalizePath(filepath.Join(configDir, "scripts"))
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, []string{scriptsDir}, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, []string{scriptsDir}, false)
 
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 1)
@@ -705,7 +705,7 @@ func TestDiscoverWalkRootsMapsCanonicalDirectoryAlias(t *testing.T) {
 	assert.DeepEqual(t, discoverWalkRoots("/alias", []string{"/real/pkg"}, fsys), []string{"pkg"})
 }
 
-func TestDiscoverGapFiles_MultipleFilesPatterns(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_MultipleFilesPatterns(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"src/b.tsx",
@@ -720,7 +720,7 @@ func TestDiscoverGapFiles_MultipleFilesPatterns(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	sort.Strings(gapFiles)
@@ -734,7 +734,7 @@ func TestDiscoverGapFiles_MultipleFilesPatterns(t *testing.T) {
 	}
 }
 
-func TestDiscoverGapFiles_DefaultJsDiscoveredWithoutExplicitPattern(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_DefaultJsDiscoveredWithoutExplicitPattern(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"src/b.js",
@@ -747,13 +747,13 @@ func TestDiscoverGapFiles_DefaultJsDiscoveredWithoutExplicitPattern(t *testing.T
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 2)
 }
 
-func TestDiscoverGapFiles_AllowFilesScope(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_AllowFilesScope(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"scripts/b.ts",
@@ -767,7 +767,7 @@ func TestDiscoverGapFiles_AllowFilesScope(t *testing.T) {
 	programFiles := map[string]struct{}{}
 
 	// Only allow scripts/b.ts via allowFiles
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles,
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles,
 		[]string{paths["scripts/b.ts"]}, nil,
 		false,
 	)
@@ -802,7 +802,7 @@ func TestDiscoverLintFiles_ExplicitFileBypassesFilesWithDirScope(t *testing.T) {
 	assert.DeepEqual(t, targets, expected)
 }
 
-func TestDiscoverGapFiles_AllExtensionsDiscoveredByPattern(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_AllExtensionsDiscoveredByPattern(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"src/b.jsx",
@@ -819,7 +819,7 @@ func TestDiscoverGapFiles_AllExtensionsDiscoveredByPattern(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	expected := []string{paths["src/a.ts"], paths["src/b.jsx"], paths["src/c.cjs"]}
@@ -827,7 +827,7 @@ func TestDiscoverGapFiles_AllExtensionsDiscoveredByPattern(t *testing.T) {
 	assert.DeepEqual(t, gapFiles, expected)
 }
 
-func TestDiscoverGapFilesMultiConfig(t *testing.T) {
+func TestDiscoverFilesOutsideProgramsMultiConfig(t *testing.T) {
 	configDir1, paths1 := setupDiscoveryFixture(t, []string{
 		"a.ts",
 	})
@@ -846,7 +846,7 @@ func TestDiscoverGapFilesMultiConfig(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFilesMultiConfig(configMap, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsMultiConfigForTest(configMap, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 2)
@@ -1228,7 +1228,7 @@ func TestDiscoverLintTargets_PhysicalConfigFallbackPreservesDirectoryAliasPath(t
 	assert.Equal(t, targets[0].CanonicalPath, tspath.NormalizePath(fSys.Realpath(paths["real/sub/index.ts"])))
 }
 
-func TestDiscoverGapFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
+func TestDiscoverFilesOutsideProgramsMultiConfig_UsesNearestConfigOwner(t *testing.T) {
 	rootDir, rootPaths := setupDiscoveryFixture(t, []string{
 		"root.ts",
 		"pkg/child.ts",
@@ -1245,14 +1245,14 @@ func TestDiscoverGapFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
 		},
 	}
 
-	gapFiles := DiscoverGapFilesMultiConfig(configMap, osvfs.FS(), map[string]struct{}{}, nil, []string{rootDir}, false)
+	gapFiles := discoverFilesOutsideProgramsMultiConfigForTest(configMap, osvfs.FS(), map[string]struct{}{}, nil, []string{rootDir}, false)
 
 	expected := []string{rootPaths["pkg/child.jsx"], rootPaths["pkg/child.ts"], rootPaths["root.ts"]}
 	sort.Strings(expected)
 	assert.DeepEqual(t, gapFiles, expected)
 }
 
-func TestDiscoverGapFiles_FilesButNoRules(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_FilesButNoRules(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 	})
@@ -1262,16 +1262,16 @@ func TestDiscoverGapFiles_FilesButNoRules(t *testing.T) {
 		{Files: []string{"**/*.ts"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	// Discovery retains the gap target; the linter counts and parses it but does
 	// not execute a rule traversal when the merged rule set is empty.
 	assert.Assert(t, gapFiles != nil)
 }
 
-// --- Directory-level ignore blocking in DiscoverGapFiles ---
+// --- Directory-level ignore blocking in discoverFilesOutsideProgramsForTest ---
 
-func TestDiscoverGapFiles_DirIgnoreBlocksTraversal(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_DirIgnoreBlocksTraversal(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"build/keep.ts",
@@ -1286,7 +1286,7 @@ func TestDiscoverGapFiles_DirIgnoreBlocksTraversal(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	// build/ entirely blocked — neither keep.ts nor other.ts discovered
@@ -1305,7 +1305,7 @@ func TestDiscoverGapFiles_DirIgnoreBlocksTraversal(t *testing.T) {
 	assert.Assert(t, found, "src/index.ts should be discovered")
 }
 
-func TestDiscoverGapFiles_FileIgnoreAllowsNegation(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_FileIgnoreAllowsNegation(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"build/keep.ts",
@@ -1320,7 +1320,7 @@ func TestDiscoverGapFiles_FileIgnoreAllowsNegation(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 
@@ -1342,7 +1342,7 @@ func TestDiscoverGapFiles_FileIgnoreAllowsNegation(t *testing.T) {
 	assert.Assert(t, hasSrc, "src/index.ts should be discovered")
 }
 
-func TestDiscoverGapFiles_WildcardMiddleDirIgnoreBlocks(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_WildcardMiddleDirIgnoreBlocks(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"packages/app/dist/gen.ts",
@@ -1355,7 +1355,7 @@ func TestDiscoverGapFiles_WildcardMiddleDirIgnoreBlocks(t *testing.T) {
 	}
 
 	programFiles := map[string]struct{}{}
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	gapSet := make(map[string]struct{})
 	for _, f := range gapFiles {
@@ -1369,7 +1369,7 @@ func TestDiscoverGapFiles_WildcardMiddleDirIgnoreBlocks(t *testing.T) {
 	assert.Assert(t, hasSrc, "packages/app/src/ should not be blocked")
 }
 
-func TestDiscoverGapFiles_CrossEntryDirIgnoreAndNegation(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_CrossEntryDirIgnoreAndNegation(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"build/keep.ts",
@@ -1386,7 +1386,7 @@ func TestDiscoverGapFiles_CrossEntryDirIgnoreAndNegation(t *testing.T) {
 	}
 
 	programFiles := map[string]struct{}{}
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	for _, f := range gapFiles {
 		if f == paths["build/keep.ts"] || f == paths["build/other.ts"] {
@@ -1395,7 +1395,7 @@ func TestDiscoverGapFiles_CrossEntryDirIgnoreAndNegation(t *testing.T) {
 	}
 }
 
-func TestDiscoverGapFiles_DoubleStarDirIgnoreBlocksNested(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_DoubleStarDirIgnoreBlocksNested(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"packages/app/dist/gen.ts",
@@ -1409,7 +1409,7 @@ func TestDiscoverGapFiles_DoubleStarDirIgnoreBlocksNested(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	for _, f := range gapFiles {
@@ -1421,7 +1421,7 @@ func TestDiscoverGapFiles_DoubleStarDirIgnoreBlocksNested(t *testing.T) {
 
 // --- Default excludes (node_modules, .git) ---
 
-func TestDiscoverGapFiles_DefaultExcludesNodeModules(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_DefaultExcludesNodeModules(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"node_modules/pkg/index.ts",
@@ -1432,7 +1432,7 @@ func TestDiscoverGapFiles_DefaultExcludesNodeModules(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	for _, f := range gapFiles {
@@ -1450,7 +1450,7 @@ func TestDiscoverGapFiles_DefaultExcludesNodeModules(t *testing.T) {
 	assert.Assert(t, found, "src/index.ts should be discovered")
 }
 
-func TestDiscoverGapFiles_DefaultExcludesGitDir(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_DefaultExcludesGitDir(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		".git/hooks/pre-commit.ts",
@@ -1460,7 +1460,7 @@ func TestDiscoverGapFiles_DefaultExcludesGitDir(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	for _, f := range gapFiles {
@@ -1481,7 +1481,7 @@ func TestDiscoverGapFiles_DefaultExcludesGitDir(t *testing.T) {
 // actually enters a directory. If a directory is pruned, this method is
 // never called for it.
 //
-// DiscoverGapFiles walks concurrently, so the recorder needs a lock.
+// discoverFilesOutsideProgramsForTest walks concurrently, so the recorder needs a lock.
 type spyFS struct {
 	vfs.FS
 	mu           sync.Mutex
@@ -1510,7 +1510,7 @@ func (s *caseInsensitiveSpyFS) UseCaseSensitiveFileNames() bool {
 	return false
 }
 
-func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PrunesNodeModulesAtWalkLevel(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"node_modules/pkg/index.ts",
@@ -1522,7 +1522,7 @@ func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.Contains(dir, "node_modules") {
@@ -1531,7 +1531,7 @@ func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
 	}
 }
 
-func TestDiscoverGapFiles_PrunesDefaultExcludesCaseInsensitive(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PrunesDefaultExcludesCaseInsensitive(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"Node_Modules/pkg/index.ts",
@@ -1542,7 +1542,7 @@ func TestDiscoverGapFiles_PrunesDefaultExcludesCaseInsensitive(t *testing.T) {
 	}
 
 	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
-	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
+	discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
 
 	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.Contains(dir, "Node_Modules") {
@@ -1551,7 +1551,7 @@ func TestDiscoverGapFiles_PrunesDefaultExcludesCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestDiscoverGapFiles_PrunesGitDirAtWalkLevel(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PrunesGitDirAtWalkLevel(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		".git/objects/ab/file.ts",
@@ -1562,7 +1562,7 @@ func TestDiscoverGapFiles_PrunesGitDirAtWalkLevel(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.Contains(dir, ".git") {
@@ -1571,7 +1571,7 @@ func TestDiscoverGapFiles_PrunesGitDirAtWalkLevel(t *testing.T) {
 	}
 }
 
-func TestDiscoverGapFiles_PrunesUserIgnoredDirAtWalkLevel(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PrunesUserIgnoredDirAtWalkLevel(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"vendor/lib/util.ts",
@@ -1584,7 +1584,7 @@ func TestDiscoverGapFiles_PrunesUserIgnoredDirAtWalkLevel(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.Contains(dir, "vendor") {
@@ -1593,7 +1593,7 @@ func TestDiscoverGapFiles_PrunesUserIgnoredDirAtWalkLevel(t *testing.T) {
 	}
 }
 
-func TestDiscoverGapFiles_PrunesNestedIgnoredDirButEntersParent(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_PrunesNestedIgnoredDirButEntersParent(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"build/index.ts",
 		"build/output/bundle.ts",
@@ -1606,7 +1606,7 @@ func TestDiscoverGapFiles_PrunesNestedIgnoredDirButEntersParent(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	// build/ should be entered (not blocked)
 	buildEntered := false
@@ -1632,7 +1632,7 @@ func TestDiscoverGapFiles_PrunesNestedIgnoredDirButEntersParent(t *testing.T) {
 	assert.Assert(t, found, "build/index.ts should be discovered")
 }
 
-func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_EntersNonExcludedDirs(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"src/components/button.ts",
@@ -1644,7 +1644,7 @@ func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	// src/ and lib/ should be entered
 	srcEntered := false
@@ -1671,7 +1671,7 @@ func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
 // These tests simulate the full flow:
 //   1. ConfigWithGitignore (with config ignores for pruning)
 //   2. Inject gitignore globs into config
-//   3. DiscoverGapFiles
+//   3. discoverFilesOutsideProgramsForTest
 //   4. Verify GetConfigForFile (linter's per-file decision) is consistent
 //
 // The structural guarantee being tested: if isDirAbsolutelyBlocked(dir, configIgnores)
@@ -1679,7 +1679,7 @@ func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
 // GetConfigForFile also returns nil for any file in that dir.
 // =============================================================================
 
-// e2eSetup creates a fixture, applies ConfigWithGitignore, then runs DiscoverGapFiles,
+// e2eSetup creates a fixture, applies ConfigWithGitignore, then runs discoverFilesOutsideProgramsForTest,
 // and returns gap files + the final config (for GetConfigForFile verification).
 func e2eSetup(t *testing.T, files map[string]string, config RslintConfig, programFiles map[string]struct{}) (string, []string, RslintConfig) {
 	t.Helper()
@@ -1691,7 +1691,7 @@ func e2eSetup(t *testing.T, files map[string]string, config RslintConfig, progra
 		programFiles = map[string]struct{}{}
 	}
 
-	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, osvfs.FS(), programFiles, nil, nil, false)
 	return dir, gapFiles, config
 }
 
@@ -1880,7 +1880,7 @@ func TestE2E_ProgramFilesExcluded(t *testing.T) {
 
 	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
-	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, osvfs.FS(), programFiles, nil, nil, false)
 	gapSet := toSet(gapFiles)
 
 	// index.ts in program → NOT a gap file
@@ -1988,7 +1988,7 @@ func TestE2E_AllowDirsWithConfigIgnores(t *testing.T) {
 
 	// Only allow packages/foo/
 	fooDir := tspath.NormalizePath(dir + "/packages/foo")
-	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), map[string]struct{}{}, nil, []string{fooDir}, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, osvfs.FS(), map[string]struct{}{}, nil, []string{fooDir}, false)
 	gapSet := toSet(gapFiles)
 
 	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/packages/foo/src/a.ts")], "packages/foo/src/a.ts should be discovered (in allowDirs)")
@@ -2016,7 +2016,7 @@ func TestE2E_AllowFilesWithGitignore(t *testing.T) {
 	distFile := tspath.NormalizePath(dir + "/dist/bundle.ts")
 
 	// Simulate lint-staged passing both files explicitly.
-	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), map[string]struct{}{}, []string{srcFile, distFile}, nil, false)
+	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, osvfs.FS(), map[string]struct{}{}, []string{srcFile, distFile}, nil, false)
 	gapSet := toSet(gapFiles)
 
 	assert.Assert(t, gapSet[srcFile], "src/index.ts should be discovered (explicit allowFile)")
@@ -2033,11 +2033,11 @@ func toSet(items []string) map[string]bool {
 
 // --- Concurrency/correctness regressions ---
 
-// Symlinks are never followed in DiscoverGapFiles, so symlinked subtrees do
+// Symlinks are never followed in discoverFilesOutsideProgramsForTest, so symlinked subtrees do
 // not contribute gap files even if their target would otherwise match the
 // `files` pattern. This guarantees output determinism regardless of how the
 // concurrent walker schedules sibling directories.
-func TestDiscoverGapFiles_SkipsSymlinkedDirs(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_SkipsSymlinkedDirs(t *testing.T) {
 	tmpDir := t.TempDir()
 	configDir := tspath.NormalizePath(tmpDir)
 
@@ -2062,7 +2062,7 @@ func TestDiscoverGapFiles_SkipsSymlinkedDirs(t *testing.T) {
 	}
 
 	for _, single := range []bool{false, true} {
-		gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(),
+		gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(),
 			map[string]struct{}{}, nil, nil, single)
 		assert.Equal(t, len(gapFiles), 1, "singleThreaded=%v: only the real path should produce a gap file", single)
 		realPath := tspath.NormalizePath(filepath.Join(realDir, "in_real.ts"))
@@ -2073,7 +2073,7 @@ func TestDiscoverGapFiles_SkipsSymlinkedDirs(t *testing.T) {
 // singleThreaded=true and singleThreaded=false must produce the same gap-file
 // set. The concurrent walker is correctness-preserving; --singleThreaded is a
 // performance/debuggability knob, not a behavioral one.
-func TestDiscoverGapFiles_SingleThreadedEquivalence(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_SingleThreadedEquivalence(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"src/nested/deep/b.ts",
@@ -2087,12 +2087,12 @@ func TestDiscoverGapFiles_SingleThreadedEquivalence(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
 	}
 
-	parallelGaps := DiscoverGapFiles(config, configDir, osvfs.FS(),
+	parallelGaps := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(),
 		map[string]struct{}{}, nil, nil, false)
-	serialGaps := DiscoverGapFiles(config, configDir, osvfs.FS(),
+	serialGaps := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(),
 		map[string]struct{}{}, nil, nil, true)
 
-	// Both already sorted by DiscoverGapFiles; equality is exact.
+	// Both already sorted by discoverFilesOutsideProgramsForTest; equality is exact.
 	assert.Equal(t, len(parallelGaps), len(serialGaps), "must produce same count")
 	for i := range parallelGaps {
 		assert.Equal(t, parallelGaps[i], serialGaps[i], "diverged at i=%d", i)
@@ -2102,7 +2102,7 @@ func TestDiscoverGapFiles_SingleThreadedEquivalence(t *testing.T) {
 // allowFiles fast path must produce a deterministic, sorted result. The
 // implementation iterates a map, so without an explicit sort the output
 // order is randomized across runs.
-func TestDiscoverGapFiles_AllowFilesFastPathSorted(t *testing.T) {
+func TestDiscoverFilesOutsidePrograms_AllowFilesFastPathSorted(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"a.ts",
 		"b.ts",
@@ -2120,7 +2120,7 @@ func TestDiscoverGapFiles_AllowFilesFastPathSorted(t *testing.T) {
 	// Run multiple times to give Go's randomized map iteration a chance to
 	// surface non-determinism if the sort is missing.
 	for i := range 8 {
-		got := DiscoverGapFiles(config, configDir, osvfs.FS(),
+		got := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(),
 			map[string]struct{}{}, allow, nil, false)
 		assert.Equal(t, len(got), len(expected), "run %d: count mismatch", i)
 		for j := range expected {

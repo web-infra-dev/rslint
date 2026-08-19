@@ -334,7 +334,7 @@ func bigintValue(text string, negate bool) (literalValue, bool) {
 // like `0 <= x && x < 1`: the shared operand is leftBin.Right/rightBin.Left,
 // and the literal bounds (when both present) must be ascending.
 func isBetweenTest(leftBin, rightBin *ast.BinaryExpression) bool {
-	if !utils.IsSameReference(leftBin.Right, rightBin.Left) {
+	if !utils.IsSameReference(leftBin.Right, rightBin.Left, false) {
 		return false
 	}
 	return isAscendingRange(leftBin.Left, rightBin.Right)
@@ -345,7 +345,7 @@ func isBetweenTest(leftBin, rightBin *ast.BinaryExpression) bool {
 // rightBin.Right, and the literal bounds (when both present) must be
 // ascending.
 func isOutsideTest(leftBin, rightBin *ast.BinaryExpression) bool {
-	if !utils.IsSameReference(leftBin.Left, rightBin.Right) {
+	if !utils.IsSameReference(leftBin.Left, rightBin.Right, false) {
 		return false
 	}
 	return isAscendingRange(leftBin.Right, rightBin.Left)

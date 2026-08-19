@@ -46,6 +46,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_top_level_describe"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_title"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -97,6 +98,7 @@ func GetAllRules() []rule.Rule {
 		require_top_level_describe.RequireTopLevelDescribeRule,
 		valid_describe_callback.ValidDescribeCallbackRule,
 		valid_expect.ValidExpectRule,
+		valid_expect_in_promise.ValidExpectInPromiseRule,
 		valid_title.ValidTitleRule,
 	}
 }

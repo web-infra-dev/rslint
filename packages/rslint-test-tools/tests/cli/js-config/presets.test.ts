@@ -143,12 +143,18 @@ describe('defineConfig and config presets', () => {
     expect(rec.plugins).toBeDefined();
     expect(rec.plugins).toContain('rstest');
     expect(rec.rules).toEqual({
+      'rstest/expect-expect': 'warn',
       'rstest/no-commented-out-tests': 'warn',
       'rstest/no-conditional-expect': 'error',
       'rstest/no-disabled-tests': 'warn',
+      'rstest/no-focused-tests': 'error',
       'rstest/no-identical-title': 'error',
+      'rstest/no-import-node-test': 'error',
       'rstest/no-interpolation-in-snapshots': 'error',
       'rstest/no-mocks-import': 'error',
+      'rstest/no-standalone-expect': 'error',
+      'rstest/valid-expect': 'error',
+      'rstest/valid-expect-in-promise': 'error',
       'rstest/valid-title': 'error',
     });
   });

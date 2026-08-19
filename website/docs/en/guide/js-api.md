@@ -2,7 +2,9 @@
 
 The JavaScript API lets you run rslint programmatically — lint files or in-memory source from a JavaScript runtime script, an editor integration, or a build tool. It is designed for JavaScript runtime hosts such as Node.js, Bun, or Deno when they can load npm packages and provide the Node-compatible filesystem and process APIs that `@rslint/core` uses. Its surface is aligned with [ESLint](https://eslint.org/docs/latest/integrate/nodejs-api)'s v10 programmatic API shape, so most ESLint API code ports over with minimal changes.
 
-All config resolution (override config, config-file selection, discovery, normalization) happens in JavaScript; rslint's engine receives only the final resolved config object and never reads config from disk.
+With automatic discovery, the native engine selects config candidates and file ownership while the JavaScript host evaluates and normalizes the selected JS or TS modules. Explicit config files and inline overrides use the same public API.
+
+This guide focuses on common workflows. For complete method signatures and lifecycle details, see the [`Rslint` reference](/api/rslint).
 
 ## Getting started
 
@@ -21,7 +23,7 @@ for (const result of results) {
 
 ## Linting files
 
-`lintFiles` takes one or more glob patterns resolved against `cwd`. It keeps supported source-file extensions that are not excluded by global config ignores or `.gitignore`. With automatic discovery, each selected file is routed to its nearest loadable config, so files in different monorepo packages can use different configs.
+[`lintFiles`](/api/rslint#lintfiles) takes one or more glob patterns resolved against `cwd`. It keeps supported source-file extensions that are not excluded by global config ignores or `.gitignore`. With automatic discovery, each selected file is routed to its nearest loadable config, so files in different monorepo packages can use different configs.
 
 ```ts
 const results = await rslint.lintFiles(['src/**/*.ts', 'test/**/*.ts']);
@@ -33,7 +35,7 @@ If no file matches the patterns, `lintFiles` returns an empty array rather than 
 
 ## Linting a string
 
-`lintText` lints an in-memory string as if it lived at `filePath`:
+[`lintText`](/api/rslint#linttext) lints an in-memory string as if it lived at `filePath`:
 
 ```ts
 const [result] = await rslint.lintText('const x = 1', {
@@ -44,6 +46,8 @@ const [result] = await rslint.lintText('const x = 1', {
 `lintText` always returns exactly one result — for the linted buffer. If you omit `filePath`, the result's `filePath` is the `"<text>"` sentinel (matching ESLint).
 
 ## In-memory linting
+
+See [In-memory projects](/api/rslint#in-memory-projects) for the complete constructor contract and path behavior.
 
 By default `lintText` still reads the config and tsconfig from disk. To provide the source, config, tsconfig, and project files from memory, combine `overrideConfigFile: true` (use only the inline config), an inline `overrideConfig`, and a `virtualFiles` overlay:
 
@@ -92,7 +96,7 @@ const [result] = await rslint.lintText(
 
 Pass `fix: true`. A result whose file a fix changed then carries an `output` string — the full fixed source; results with no applied fix have no `output`.
 
-**Write fixes to disk** with the static `Rslint.outputFixes`:
+**Write fixes to disk** with the static [`Rslint.outputFixes`](/api/rslint#outputfixes):
 
 ```ts
 const rslint = new Rslint({ fix: true });
@@ -118,7 +122,7 @@ const fixed = result.output ?? 'let x = foo!!.bar'; // fixed source, or the orig
 
 Each `Rslint` instance owns a long-lived rslint engine child process. You **don't** need to call `close()` — like ESLint, a one-off script exits cleanly on its own (the idle child is unref'd, so it never blocks the event loop).
 
-Call `close()` only in a long-running host (an editor server, a watch process) that creates many instances, to free each child promptly:
+Call [`close()`](/api/rslint#close) only in a long-running host (an editor server, a watch process) that creates many instances, to free each child promptly:
 
 ```ts
 const rslint = new Rslint();
@@ -167,7 +171,7 @@ Each `LintMessage`:
 
 ## Options
 
-`new Rslint(options)` accepts:
+[`new Rslint(options)`](/api/rslint#constructor) accepts:
 
 | Option               | Type                                        | Default     | Description                                                                                                                                    |
 | -------------------- | ------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |

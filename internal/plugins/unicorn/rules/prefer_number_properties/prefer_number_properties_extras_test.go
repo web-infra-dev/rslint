@@ -156,6 +156,12 @@ func TestPreferNumberPropertiesExtras(t *testing.T) {
 			// Locks in upstream defaultOptions merge: `{}` keeps checkNaN enabled.
 			fixedWithOptions(`NaN;`, `Number.NaN;`, "NaN", "NaN", map[string]interface{}{}, 1, 1, 1, 4),
 
+			// Locks in utils.SafeReplacementText's use of utils.CanTokenTextsBeAdjacent:
+			// `/` followed directly by an identifier never merges into a
+			// different token, so no space is inserted. Verified against real
+			// ESLint, which produces the same unspaced fix.
+			fixed(`foo/parseInt`, `foo/Number.parseInt`, "parseInt", "parseInt", 1, 5, 1, 13),
+
 			// ---- Real-user: config objects often carry parser helpers and sentinel values together ----
 			{
 				Code:   `const config = {parse: globalThis.parseFloat, missing: (globalThis as any)["NaN" as const]};`,
