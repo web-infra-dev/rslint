@@ -1493,10 +1493,11 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 // normalized string representation, matching ESLint's String(node.value) behavior.
 // e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
 func NormalizeNumericLiteral(text string) string {
-	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
-	// Use big.Int to handle arbitrary precision, then convert to float64
-	// to match JavaScript's String(Number(...)) behavior.
-	if len(text) > 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
+	// ParseFloat doesn't handle JS hex (0x), octal (0o) or binary (0b)
+	// prefixes — it only reads hexadecimal floats, which require a `p`
+	// exponent. Use big.Int to handle arbitrary precision, then convert to
+	// float64 to match JavaScript's String(Number(...)) behavior.
+	if len(text) > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X' || text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
 		if n, ok := new(big.Int).SetString(text, 0); ok {
 			f, _ := new(big.Float).SetInt(n).Float64()
 			return strconv.FormatFloat(f, 'f', -1, 64)
@@ -1581,6 +1582,37 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 	return "", false
 }
 
+// literalNodeKey identifies a literal by its ESTree `Literal` type and its
+// value, so that two keys are equal exactly when the literals denote the same
+// value: `1` and `0x1` match, `1` and `'1'` do not.
+type literalNodeKey struct {
+	kind  ast.Kind
+	value string
+}
+
+// literalNodeValue returns the key of an ESTree `Literal` node, which tsgo
+// splits across several node kinds. Template literals are deliberately absent:
+// ESTree models even a substitution-free template as a TemplateLiteral rather
+// than a Literal, and ESLint's isSameReference never treats one as equal to
+// anything.
+func literalNodeValue(node *ast.Node) (literalNodeKey, bool) {
+	switch node.Kind {
+	case ast.KindStringLiteral:
+		return literalNodeKey{kind: node.Kind, value: node.AsStringLiteral().Text}, true
+	case ast.KindNumericLiteral:
+		return literalNodeKey{kind: node.Kind, value: NormalizeNumericLiteral(node.AsNumericLiteral().Text)}, true
+	case ast.KindBigIntLiteral:
+		return literalNodeKey{kind: node.Kind, value: NormalizeBigIntLiteral(node.AsBigIntLiteral().Text)}, true
+	case ast.KindRegularExpressionLiteral:
+		// ESLint compares a regex literal's pattern and flags, which together
+		// are exactly its source text.
+		return literalNodeKey{kind: node.Kind, value: node.Text()}, true
+	case ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
+		return literalNodeKey{kind: node.Kind}, true
+	}
+	return literalNodeKey{}, false
+}
+
 // IsSameReference reports whether two AST nodes refer to the same runtime value.
 // It recursively compares member expression chains (PropertyAccessExpression,
 // ElementAccessExpression), walking through the object/property structure.
@@ -1593,7 +1625,9 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 //   - Cross-syntax comparison is supported via static property names:
 //     a.b and a['b'] are the same reference; a[0] and a['0'] likewise.
 //   - For non-static element access (a[x]), falls back to comparing the argument
-//     nodes structurally (same Kind + same Identifier/ThisKeyword).
+//     expressions as references (a[x] and a[x]; a[c[0]] and a[c[0]]).
+//   - Literals compare by type and value: 1 and 1 are the same reference, while
+//     1 and '1' are not.
 //   - Function calls break the chain: a.b() and a.b() are NOT the same reference,
 //     because each call may return a different value.
 //
@@ -1613,6 +1647,12 @@ func IsSameReference(left, right *ast.Node) bool {
 	}
 	if left.Kind == ast.KindThisKeyword && right.Kind == ast.KindThisKeyword {
 		return true
+	}
+
+	// Literal comparison, mirroring ESLint's equalLiteralValue.
+	if leftLiteral, ok := literalNodeValue(left); ok {
+		rightLiteral, ok := literalNodeValue(right)
+		return ok && leftLiteral == rightLiteral
 	}
 
 	// Member expression comparison.

@@ -55,6 +55,18 @@ func TestYodaExtras(t *testing.T) {
 			// ---- Dimension 4: PrivateIdentifier access in a range test ----
 			{Code: `if (0 <= this.#x && this.#x < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 
+			// ---- Dimension 4: a literal shared between the two comparisons is still
+			// the same reference, whatever kind of literal it is and however it is
+			// spelled ----
+			{Code: `if (0 < 1 && 1 < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 < 1 && 0x1 < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 < 'a' && "a" < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 < 1n && 1n < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 < true && true < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 < null && null < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 < /a/ && /a/ < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if ('a' < 'b' && 'b' < c) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
 			// ---- Dimension 4: a bare range test wrapped in genuinely redundant parens
 			// (not an if/while condition) is still recognized as parenthesized ----
 			{Code: `(0 <= x && x < 1);`, Options: []any{"never", map[string]any{"exceptRange": true}}},
@@ -63,6 +75,11 @@ func TestYodaExtras(t *testing.T) {
 			// walked through when finding the logical parent (tsgo ParenthesizedExpression,
 			// unlike ESTree, would otherwise sit between the comparison and its `&&`) ----
 			{Code: `if ((0 <= x) && x < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
+			// ---- Docs: parenthesizing a range test keeps it exempt when it is joined
+			// with a further condition ----
+			{Code: `if ((0 <= rand && rand < 1) && count < 10) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `function isReddish(color) { return (color.hue < 60 || 300 < color.hue); }`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 
 			// ---- Real-user: `undefined` is a global Identifier, not an ESTree Literal,
 			// so yoda does not enforce ordering against it (a common "why doesn't this
@@ -124,6 +141,35 @@ func TestYodaExtras(t *testing.T) {
 				Output:  []string{`if (x >= 0 || x < 1) {}`},
 				Options: []any{"never", map[string]any{"exceptRange": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5}},
+			},
+
+			// ---- A shared literal is the same reference only when both its kind and
+			// its value match, so a number and the string spelling it are two
+			// different bounds ----
+			{
+				Code:    `if (0 < 1 && "1" < x) {}`,
+				Output:  []string{`if (0 < 1 && x > "1") {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 14}},
+			},
+
+			// ---- A substitution-free template is an ESTree TemplateLiteral rather
+			// than a Literal, so two of them are never the same reference ----
+			{
+				Code:    "if (0 < `a` && `a` < x) {}",
+				Output:  []string{"if (0 < `a` && x > `a`) {}"},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 16}},
+			},
+
+			// ---- Docs: a range test joined with a further condition needs its own
+			// parentheses, otherwise the comparison's logical parent is the
+			// `count < 10 && 0 <= rand` pair, which is not a range test ----
+			{
+				Code:    `if (count < 10 && 0 <= rand && rand < 1) {}`,
+				Output:  []string{`if (count < 10 && rand >= 0 && rand < 1) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 19}},
 			},
 
 			// ---- Locks in upstream isRangeTest(): the sibling of a comparison inside

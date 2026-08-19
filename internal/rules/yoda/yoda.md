@@ -58,15 +58,17 @@ Examples of **correct** code for this rule with `{ "exceptRange": true }`:
 
 ```javascript
 function isReddish(color) {
-  return color.hue < 60 || 300 < color.hue;
+  return (color.hue < 60 || 300 < color.hue);
 }
 
 if (x < -1 || 1 < x) {
 }
 
-if (count < 10 && 0 <= rand && rand < 1) {
+if ((0 <= rand && rand < 1) && count < 10) {
 }
 ```
+
+Each parenthesized pair of comparisons forms one range comparison, so a range comparison combined with a further condition needs its own parentheses.
 
 Examples of **correct** code for this rule with `{ "onlyEquality": true }`:
 

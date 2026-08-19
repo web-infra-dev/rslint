@@ -263,9 +263,10 @@ func (v literalValue) numeric() float64 {
 }
 
 // normalizedLiteralValue extracts a comparable bound from a range-test
-// operand, mirroring ESLint's getNormalizedLiteral. ok is false when node
-// isn't a bound yoda can reason about (e.g. a variable, or a boolean/null/
-// regex literal, which are not meaningful range bounds).
+// operand, mirroring ESLint's getNormalizedLiteral. Every literal is a bound,
+// including a boolean, null or regex one, because ESLint compares bounds with
+// `<=`, which coerces whatever value the literal carries. ok is false for
+// anything that isn't a literal (e.g. a variable or a call).
 func normalizedLiteralValue(node *ast.Node) (literalValue, bool) {
 	node = ast.SkipParentheses(node)
 	switch node.Kind {
