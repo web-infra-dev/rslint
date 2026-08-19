@@ -490,27 +490,29 @@ func TestExtractLanguageOptions(t *testing.T) {
 		raw  map[string]any
 		want rule.LanguageOptions
 	}{
-		{name: "missing uses zero-value latest"},
+		{name: "missing uses latest source-type defaults", want: rule.LanguageOptions{SourceType: rule.SourceTypeDefault}},
 		{
 			name: "explicit latest remains semantic latest",
 			raw:  map[string]any{"ecmaVersion": "latest"},
-			want: rule.LanguageOptions{},
+			want: rule.LanguageOptions{SourceType: rule.SourceTypeDefault},
 		},
 		{
 			name: "edition alias 6",
 			raw:  map[string]any{"ecmaVersion": float64(6)},
-			want: rule.LanguageOptions{ECMAVersion: 2015},
+			want: rule.LanguageOptions{ECMAVersion: 2015, SourceType: rule.SourceTypeDefault},
 		},
 		{
 			name: "edition alias 17",
 			raw:  map[string]any{"ecmaVersion": 17},
-			want: rule.LanguageOptions{ECMAVersion: 2026},
+			want: rule.LanguageOptions{ECMAVersion: 2026, SourceType: rule.SourceTypeDefault},
 		},
 		{
 			name: "year",
 			raw:  map[string]any{"ecmaVersion": float64(2020)},
-			want: rule.LanguageOptions{ECMAVersion: 2020},
+			want: rule.LanguageOptions{ECMAVersion: 2020, SourceType: rule.SourceTypeDefault},
 		},
+		{name: "script source type", raw: map[string]any{"sourceType": "script"}, want: rule.LanguageOptions{SourceType: "script"}},
+		{name: "commonjs source type", raw: map[string]any{"sourceType": "commonjs"}, want: rule.LanguageOptions{SourceType: "commonjs"}},
 	}
 
 	for _, tt := range tests {
@@ -561,6 +563,29 @@ func TestValidateConfigECMAVersion(t *testing.T) {
 	}
 }
 
+func TestValidateConfigSourceType(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []any{"module", "script", "commonjs"} {
+		cfg := RslintConfig{{LanguageOptions: &LanguageOptions{Raw: map[string]any{"sourceType": value}}}}
+		if err := ValidateConfig(cfg); err != nil {
+			t.Errorf("valid sourceType %#v rejected: %v", value, err)
+		}
+	}
+
+	for _, value := range []any{nil, "Module", "unambiguous", true, []any{"module"}} {
+		cfg := RslintConfig{{LanguageOptions: &LanguageOptions{Raw: map[string]any{"sourceType": value}}}}
+		err := ValidateConfig(cfg)
+		if err == nil {
+			t.Errorf("invalid sourceType %#v was accepted", value)
+			continue
+		}
+		if !strings.Contains(err.Error(), "key \"languageOptions.sourceType\"") {
+			t.Errorf("error for %#v does not identify sourceType: %v", value, err)
+		}
+	}
+}
+
 func TestRuleRegistryPropagatesLanguageOptions(t *testing.T) {
 	t.Parallel()
 
@@ -575,7 +600,7 @@ func TestRuleRegistryPropagatesLanguageOptions(t *testing.T) {
 	if len(configured) != 1 {
 		t.Fatalf("configured rules = %d, want 1", len(configured))
 	}
-	want := rule.LanguageOptions{ECMAVersion: 2025}
+	want := rule.LanguageOptions{ECMAVersion: 2025, SourceType: rule.SourceTypeDefault}
 	if got := configured[0].Environment.LanguageOptions; got != want {
 		t.Fatalf("configured language options = %+v, want %+v", got, want)
 	}

@@ -11,6 +11,7 @@ func TestResolveLanguageDefaults(t *testing.T) {
 
 	tests := []struct {
 		fileName               string
+		sourceType             string
 		commonJS               bool
 		nonGlobalTopLevelScope bool
 	}{
@@ -25,12 +26,16 @@ func TestResolveLanguageDefaults(t *testing.T) {
 		{fileName: "/repo/file.cjs", commonJS: true, nonGlobalTopLevelScope: true},
 		{fileName: ".cjs", commonJS: true, nonGlobalTopLevelScope: true},
 		{fileName: `C:\repo\file.cjs`, commonJS: true, nonGlobalTopLevelScope: true},
+		{fileName: "/repo/file.js", sourceType: "script"},
+		{fileName: "/repo/file.ts", sourceType: "module", nonGlobalTopLevelScope: true},
+		{fileName: "/repo/file.js", sourceType: "commonjs", commonJS: true, nonGlobalTopLevelScope: true},
+		{fileName: "/repo/file.cjs", sourceType: "script"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.fileName, func(t *testing.T) {
 			t.Parallel()
-			globalsInit, refsInit := ResolveLanguageDefaults(test.fileName)
+			globalsInit, refsInit := ResolveLanguageDefaults(test.fileName, LanguageOptions{SourceType: test.sourceType})
 
 			wantAccess := map[string]utils.GlobalAccess{}
 			if test.commonJS {

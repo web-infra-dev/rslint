@@ -280,6 +280,15 @@ func validateLanguageOptions(languageOptions *LanguageOptions) error {
 			)
 		}
 	}
+	if value, present := languageOptions.Raw["sourceType"]; present {
+		sourceType, ok := value.(string)
+		if !ok || (sourceType != "module" && sourceType != "script" && sourceType != "commonjs") {
+			return fmt.Errorf(
+				"key \"languageOptions.sourceType\": invalid value %v; expected \"module\", \"script\", or \"commonjs\"",
+				value,
+			)
+		}
+	}
 
 	return nil
 }
@@ -1090,16 +1099,23 @@ func ExtractGlobals(langOpts *LanguageOptions) map[string]utils.GlobalAccess {
 }
 
 // ExtractLanguageOptions normalizes the effective per-file language options
-// for native rules. The zero value deliberately represents ESLint flat-config
-// defaults, so a missing languageOptions object needs no allocation.
+// for native rules. A missing sourceType keeps ESLint flat config's
+// extension-sensitive default; ECMAVersion keeps zero as the moving latest
+// edition.
 func ExtractLanguageOptions(langOpts *LanguageOptions) rule.LanguageOptions {
-	var result rule.LanguageOptions
+	result := rule.LanguageOptions{SourceType: rule.SourceTypeDefault}
 	if langOpts == nil || langOpts.Raw == nil {
 		return result
 	}
 	if value, present := langOpts.Raw["ecmaVersion"]; present {
 		if version, ok := normalizeConfigECMAVersion(value); ok {
 			result.ECMAVersion = version
+		}
+	}
+	if sourceType, ok := langOpts.Raw["sourceType"].(string); ok {
+		switch sourceType {
+		case "module", "script", "commonjs":
+			result.SourceType = sourceType
 		}
 	}
 	return result

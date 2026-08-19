@@ -1,6 +1,7 @@
 import type { RslintConfigEntry } from '../define-config.js';
 
-// Aligned with official eslint-plugin-unicorn@72.x recommended.
+// Based on official eslint-plugin-unicorn@72.x recommended, with later rules
+// added as they are individually ported.
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 // The official preset also injects `languageOptions.globals` (Array, Promise, Map, …);
 // rslint declares those ECMAScript built-ins as readonly globals already, so that
@@ -58,7 +59,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-accidental-bitwise-operator': 'error', // not implemented
     // 'unicorn/no-anonymous-default-export': 'error', // not implemented
     // 'unicorn/no-array-callback-reference': 'error', // not implemented
-    // 'unicorn/no-array-concat-in-loop': 'error', // not implemented
+    'unicorn/no-array-concat-in-loop': 'error',
     // 'unicorn/no-array-fill-with-reference-type': 'error', // not implemented
     // 'unicorn/no-array-from-fill': 'error', // not implemented
     // 'unicorn/no-array-front-mutation': 'off', // not implemented
