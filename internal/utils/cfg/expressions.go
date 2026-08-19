@@ -8,6 +8,9 @@ func (b *Builder[E]) expr(node *ast.Node) {
 	if node == nil {
 		return
 	}
+	if b.hooks.Expression != nil {
+		b.hooks.Expression(b, node)
+	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
