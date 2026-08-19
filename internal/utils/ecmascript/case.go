@@ -51,6 +51,11 @@ func StringToLowerCase(s string) string {
 	}
 	var out strings.Builder
 	out.Grow(len(s))
+	// Final_Sigma is the only condition the walk carries a context for, and it
+	// asks about one character. Without that character there is nothing to
+	// accumulate, and the two derived properties below cost more per character
+	// than the mapping does.
+	tracksFinalSigma := strings.ContainsRune(s, 0x03A3)
 	// Whether the most recent character that Final_Sigma does not ignore was a
 	// cased one. Accumulating it while walking forwards is what saves the
 	// condition from having to scan backwards.
@@ -75,7 +80,7 @@ func StringToLowerCase(s string) string {
 		default:
 			out.WriteRune(toLower(r))
 		}
-		if !isCaseIgnorable(r) {
+		if tracksFinalSigma && !isCaseIgnorable(r) {
 			casedBefore = isCased(r)
 		}
 		i += size
