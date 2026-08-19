@@ -101,6 +101,14 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			// parameters shadow a call nested inside a parameter decorator.
 			{Code: "class Array { m(@dec(() => Array()) x: number) { } }"},
 			{Code: "class C<Array> { m(@dec(() => Array()) x: number) { } }"},
+			// A class's own decorator is evaluated in the scope holding the
+			// class, but a reference sitting directly in one, with no scope in
+			// between, still resolves against the class scope.
+			{Code: `@dec(Array()) class C<Array> { }`},
+			{Code: `const C = @dec(Array()) class Array { };`},
+			// A class declaration's name is declared in the scope holding the
+			// class, so it shadows the call wherever the decorator resolves.
+			{Code: `@dec(() => Array()) class Array { }`},
 
 			// ---- Dimension 2: scoping — a member's decorators and computed
 			// name are evaluated in the enclosing class or object literal, so
@@ -128,6 +136,10 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			// The shadow reaches into nested namespaces, which are ordinary
 			// lexical children of the outer module block.
 			{Code: `namespace N { const Array = () => 1; namespace M { Array(); } }`},
+			// A dotted namespace name declares nothing itself, but the body
+			// it opens is still a scope of its own.
+			{Code: `namespace N.Array { const Array = () => 1; Array(); }`},
+			{Code: `namespace N { const Array = () => 1; namespace M.Array { Array(); } }`},
 
 			// Real-user: eslint/eslint#12273 (closed as intentional — a
 			// single non-spread argument is left alone even when it's
@@ -228,6 +240,55 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 				"class C { m<Array>(@dec(() => Array()) x: number) { } }",
 				`Array()`,
 				"class C { m<Array>(@dec(() => []) x: number) { } }",
+			),
+
+			// ---- Dimension 2: scoping — the same holds for a class's own
+			// decorator: a scope created inside one is attached to the scope
+			// holding the class, so neither the class's type parameters nor a
+			// class expression's own name reach the call ----
+			directFixCase(
+				`@dec(() => Array()) class C<Array> { }`,
+				`Array()`,
+				`@dec(() => []) class C<Array> { }`,
+			),
+			directFixCase(
+				`@dec(function () { return Array(); }) class C<Array> { }`,
+				`Array()`,
+				`@dec(function () { return []; }) class C<Array> { }`,
+			),
+			directFixCase(
+				`@dec(class { p = Array(); }) class C<Array> { }`,
+				`Array()`,
+				`@dec(class { p = []; }) class C<Array> { }`,
+			),
+			directFixCase(
+				`const C = @dec(() => Array()) class Array { };`,
+				`Array()`,
+				`const C = @dec(() => []) class Array { };`,
+			),
+			directFixCase(
+				`const C = @dec(class { p = Array(); }) class Array { };`,
+				`Array()`,
+				`const C = @dec(class { p = []; }) class Array { };`,
+			),
+
+			// ---- Dimension 2: scoping — only a namespace whose name is a
+			// plain identifier declares a variable, so neither segment of a
+			// dotted name shadows the call ----
+			directFixCase(
+				`namespace N.Array { Array(); }`,
+				`Array()`,
+				`namespace N.Array { []; }`,
+			),
+			directFixCase(
+				`namespace Array.M { Array(); }`,
+				`Array()`,
+				`namespace Array.M { []; }`,
+			),
+			directFixCase(
+				`namespace N { namespace M.Array { } Array(); }`,
+				`Array()`,
+				`namespace N { namespace M.Array { } []; }`,
 			),
 
 			// ---- Dimension 2: scoping — a decorator or computed name belongs
