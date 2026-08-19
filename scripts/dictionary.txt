@@ -137,6 +137,7 @@ destabilising
 destructures
 desugars
 desync
+dialytika
 dirxml
 disqualifier
 disqualifiers
@@ -144,6 +145,7 @@ dlclark
 Dmts
 dobedo
 dont
+dotless
 doublestar
 DPUB
 dropeffect
@@ -641,6 +643,7 @@ Unwatch
 unwinded
 uppercased
 uppercases
+uppercasing
 useeffectevent
 usemap
 USERPROFILE

@@ -1,3 +1,5 @@
+// cspell:ignore Fcript
+
 package ecmascript
 
 import (
@@ -92,6 +94,54 @@ func TestStringToLowerCase(t *testing.T) {
 			}
 			if got := StringToLocaleLowerCase(test.in); got != test.want {
 				t.Errorf("StringToLocaleLowerCase(%U) = %U, want %U", []rune(test.in), []rune(got), []rune(test.want))
+			}
+		})
+	}
+}
+
+// Every expectation here is what the pair of comparisons the two functions
+// port answers in JavaScript, which is why several rows disagree with
+// themselves: uppercasing and lowercasing are not one question asked twice.
+func TestEqualsWhenCased(t *testing.T) {
+	tests := []struct {
+		name                   string
+		a, b                   string
+		lowercased, uppercased bool
+	}{
+		{name: "identical", a: "role", b: "role", lowercased: true, uppercased: true},
+		{name: "ascii case", a: "tabIndex", b: "TABINDEX", lowercased: true, uppercased: true},
+		{name: "different", a: "role", b: "rule"},
+		{name: "different length", a: "role", b: "roles"},
+		{name: "empty", a: "", b: "", lowercased: true, uppercased: true},
+		{name: "empty against a word", a: "", b: "a"},
+		// A Kelvin sign lowercases onto `k` and uppercases onto itself.
+		{name: "kelvin sign", a: "\u212A", b: "k", lowercased: true},
+		// A dotless `ı` is the other way round.
+		{name: "dotless i", a: "\u0131", b: "i", uppercased: true},
+		// A long s uppercases onto `S` and lowercases onto itself. Go's case
+		// folding puts it in `s`'s orbit either way round; JavaScript does not.
+		{name: "long s", a: "\u017F", b: "s", uppercased: true},
+		{name: "long s inside a word", a: "java\u017Fcript:", b: "javascript:", uppercased: true},
+		// An eszett uppercases to two characters and a capital one lowercases
+		// to a single character, so only one of the two questions joins them.
+		{name: "eszett", a: "\u1E9E", b: "\u00DF", lowercased: true},
+		// A dotted capital I lowercases to two characters, which is the only
+		// place a lowercase mapping changes a string's length.
+		{name: "dotted capital i", a: "\u0130", b: "i\u0307", lowercased: true},
+		{name: "dotted capital i against plain i", a: "\u0130", b: "i"},
+		// A character a rule reads past the toolchain's edition of Unicode.
+		{name: "unicode 17 capital", a: "\uA7DC", b: "\u019B", lowercased: true, uppercased: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for _, side := range [][2]string{{test.a, test.b}, {test.b, test.a}} {
+				if got := EqualsWhenLowercased(side[0], side[1]); got != test.lowercased {
+					t.Errorf("EqualsWhenLowercased(%q, %q) = %v, want %v", side[0], side[1], got, test.lowercased)
+				}
+				if got := EqualsWhenUppercased(side[0], side[1]); got != test.uppercased {
+					t.Errorf("EqualsWhenUppercased(%q, %q) = %v, want %v", side[0], side[1], got, test.uppercased)
+				}
 			}
 		})
 	}

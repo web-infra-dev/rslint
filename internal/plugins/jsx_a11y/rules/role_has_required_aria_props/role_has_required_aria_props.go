@@ -180,7 +180,7 @@ var RoleHasRequiredAriaPropsRule = rule.Rule{
 			ast.KindJsxAttribute: func(attr *ast.Node) {
 				// Step 1: name === 'role' (case-insensitive — mirrors
 				// upstream `propName(attribute).toLowerCase() !== 'role'`).
-				if !strings.EqualFold(reactutil.GetJsxPropName(attr), "role") {
+				if !ecmascript.EqualsWhenLowercased(reactutil.GetJsxPropName(attr), "role") {
 					return
 				}
 

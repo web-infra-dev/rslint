@@ -407,11 +407,12 @@ func normalizeAttributeCase(name string) string {
 // React will accept: starts with `data-`, does not start with `data-xml`
 // (case-insensitive), and does not contain a colon.
 func isValidDataAttribute(name string) bool {
-	if !strings.HasPrefix(ecmascript.StringToLowerCase(name), "data-") {
+	lower := ecmascript.StringToLowerCase(name)
+	if !strings.HasPrefix(lower, "data-") {
 		return false
 	}
 	// `data-xml*` is reserved and rejected by React.
-	if len(name) >= 8 && strings.EqualFold(name[:8], "data-xml") {
+	if strings.HasPrefix(lower, "data-xml") {
 		return false
 	}
 	// Colons split the attribute into a namespace; `data-*` must not contain

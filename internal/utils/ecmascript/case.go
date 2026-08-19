@@ -105,6 +105,78 @@ func StringToLocaleLowerCase(s string) string {
 	return StringToLowerCase(s)
 }
 
+// EqualsWhenLowercased ports the comparison a rule makes by lowercasing both
+// sides — `a.toLowerCase() === b.toLowerCase()`.
+//
+// It is not strings.EqualFold, which asks Go's own question. Go folds U+017F
+// LATIN SMALL LETTER LONG S together with `s`, and JavaScript keeps the two
+// apart here, because neither lowercases onto the other.
+func EqualsWhenLowercased(a, b string) bool {
+	if equal, settled := asciiEquals(a, b); settled {
+		return equal
+	}
+	return StringToLowerCase(a) == StringToLowerCase(b)
+}
+
+// EqualsWhenUppercased is [EqualsWhenLowercased] for the other half of the
+// pair — `a.toUpperCase() === b.toUpperCase()` — which is a different question
+// and not always the same answer. A dotless `ı` uppercases onto `I` while it
+// lowercases onto itself; a Kelvin sign lowercases onto `k` while it
+// uppercases onto itself.
+//
+// Which one a rule asks is whichever one it is ported from asks: jsx-ast-utils
+// looks a prop up by uppercasing, and the rules that read a value rather than
+// a name mostly lowercase.
+func EqualsWhenUppercased(a, b string) bool {
+	if equal, settled := asciiEquals(a, b); settled {
+		return equal
+	}
+	return StringToUpperCase(a) == StringToUpperCase(b)
+}
+
+// asciiEquals compares two strings that hold nothing but ASCII, where a case
+// mapping is one byte for one byte and both directions come to the same
+// answer. The second result is false when one of them holds anything else, so
+// the caller has to map in full. Nearly every comparison a rule makes ends
+// here.
+func asciiEquals(a, b string) (equal, settled bool) {
+	if len(a) != len(b) {
+		// Past ASCII a lowercase mapping can change a string's length, so an
+		// unequal length only settles the question while both sides are ASCII.
+		return false, isASCII(a) && isASCII(b)
+	}
+	for i := range len(a) {
+		left, right := a[i], b[i]
+		if left >= utf8.RuneSelf || right >= utf8.RuneSelf {
+			return false, false
+		}
+		if left != right && asciiLower(left) != asciiLower(right) {
+			return false, true
+		}
+	}
+	return true, true
+}
+
+// isASCII reports whether s holds nothing a case mapping reads as more than
+// one byte.
+func isASCII(s string) bool {
+	for i := range len(s) {
+		if s[i] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
+}
+
+// asciiLower is the lowercase mapping of one ASCII byte, which is the whole of
+// String.prototype.toLowerCase for a string that holds nothing else.
+func asciiLower(c byte) byte {
+	if c >= 'A' && c <= 'Z' {
+		return c + 'a' - 'A'
+	}
+	return c
+}
+
 // asciiCase maps the letters of s between lo and hi by delta, reporting false
 // when s holds a character outside ASCII — which is where a case mapping stops
 // being a per-byte one. Most strings a rule reads hold nothing else.

@@ -77,6 +77,8 @@ linters:
           msg: 'A string a rule uppercases is uppercased the way JavaScript uppercases it. Use ecmascript.StringToUpperCase, which grows the string where JavaScript grows it.'
         - pattern: '^strings\.TrimSpace$'
           msg: 'The whitespace a rule trims is what JavaScript trims: ECMAScript WhiteSpace plus LineTerminator. Use ecmascript.StringTrim.'
+        - pattern: '^strings\.EqualFold$'
+          msg: 'Two strings a rule compares without regard to case are compared the way whatever it is ported from compares them: use ecmascript.EqualsWhenUppercased where upstream writes toUpperCase (jsx-ast-utils looks a prop up that way) and ecmascript.EqualsWhenLowercased where it writes toLowerCase. strings.EqualFold is neither: it folds U+017F ſ onto `s` in both directions, and never folds U+0131 ı onto `i` although uppercasing does.'
     depguard:
       rules:
         js-semantics:
@@ -86,6 +88,13 @@ linters:
           files:
             - '**/internal/rules/**'
             - '**/internal/plugins/**'
+            # A helper a rule calls answers the rule's question, so it is held
+            # to the rule's standard. The ports themselves are the exception:
+            # reading Go's tables is how they are built.
+            - '**/internal/utils/**'
+            - '!**/internal/utils/ecmascript/**'
+            - '!**/internal/utils/unicode17/**'
+            - '!**/internal/utils/minimatch3/**'
           allow:
             # depguard matches an import by prefix, and the deny below would
             # otherwise take these with it. A UTF-16 code unit is what
@@ -109,9 +118,15 @@ linters:
       - path: '_test\.go$'
         linters:
           - forcetypeassert
-      # A rule reproduces JavaScript; everything else here is a linter written
-      # in Go, answering Go's questions with Go's standard library.
-      - path-except: '^internal/(rules|plugins)/'
+      # A rule reproduces JavaScript, as does a helper it calls; everything
+      # else here is a linter written in Go, answering Go's questions with Go's
+      # standard library.
+      - path-except: '^internal/(rules|plugins|utils)/'
+        linters:
+          - forbidigo
+      # The ports are where a JavaScript answer is assembled out of Go's, so
+      # they are the one place the standard library's calls belong.
+      - path: '^internal/utils/(ecmascript|unicode17|minimatch3)/'
         linters:
           - forbidigo
       # Test scaffolding builds its own strings rather than reading a source

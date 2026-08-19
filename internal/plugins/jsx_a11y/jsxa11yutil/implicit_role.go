@@ -187,7 +187,7 @@ func implicitRoleForMenu(attrs []*ast.Node) string {
 	if !ok {
 		return ""
 	}
-	if strings.EqualFold(v, "toolbar") {
+	if ecmascript.EqualsWhenUppercased(v, "toolbar") {
 		return "toolbar"
 	}
 	return ""

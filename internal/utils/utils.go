@@ -6,7 +6,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -317,8 +316,10 @@ func Flatten[T any](array [][]T) []T {
 // prefix is strictly ASCII while the case test is `c === c.toUpperCase()`,
 // which a character with no case of its own passes.
 func IsConstructorName(name string) bool {
-	for i, r := range name {
+	for i := 0; i < len(name); {
+		r, size := utf8.DecodeRuneInString(name[i:])
 		if r == '_' || r == '$' || (r >= '0' && r <= '9') {
+			i += size
 			continue
 		}
 		// First non-prefix rune: constructor iff it is its own uppercase.
@@ -327,7 +328,7 @@ func IsConstructorName(name string) bool {
 		if r > 0xFFFF {
 			return true
 		}
-		first := name[i : i+utf8.RuneLen(r)]
+		first := name[i : i+size]
 		return ecmascript.StringToUpperCase(first) == first
 	}
 	return false
@@ -564,6 +565,11 @@ func NeedsLeadingSpaceForReplacement(src string, insertPos int, replacement stri
 // where embedded numeric segments are compared by their numeric value
 // (e.g., "a2" < "a10" instead of "a10" < "a2").
 // Returns -1 if a < b, 0 if a == b, 1 if a > b.
+//
+// Only `0` through `9` start a numeric segment, which is what the
+// natural-compare package the rules follow reads: it maps a character outside
+// the printable ASCII range to its own code point, so a digit of another
+// script sorts as the character it is rather than as a number.
 func NaturalCompare(a, b string) int {
 	ra := []rune(a)
 	rb := []rune(b)
@@ -571,7 +577,7 @@ func NaturalCompare(a, b string) int {
 	for ai < len(ra) && bi < len(rb) {
 		ca, cb := ra[ai], rb[bi]
 
-		if unicode.IsDigit(ca) && unicode.IsDigit(cb) {
+		if isASCIIDigit(ca) && isASCIIDigit(cb) {
 			na, nextA := extractRuneDigits(ra, ai)
 			nb, nextB := extractRuneDigits(rb, bi)
 			naTrimmed := strings.TrimLeft(na, "0")
@@ -619,8 +625,12 @@ func NaturalCompare(a, b string) int {
 
 func extractRuneDigits(runes []rune, start int) (string, int) {
 	end := start
-	for end < len(runes) && unicode.IsDigit(runes[end]) {
+	for end < len(runes) && isASCIIDigit(runes[end]) {
 		end++
 	}
 	return string(runes[start:end]), end
+}
+
+func isASCIIDigit(r rune) bool {
+	return r >= '0' && r <= '9'
 }

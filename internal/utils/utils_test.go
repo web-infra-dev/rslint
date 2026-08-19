@@ -444,6 +444,14 @@ func TestNaturalCompare(t *testing.T) {
 		{"α2", "α10", -1},
 		{"中1", "中2", -1},
 		{"中10", "中2", 1},
+		// A digit of another script is not a numeric segment: natural-compare
+		// reads it as the character it is, so U+0669 ٩ sorts after U+0661 ١
+		// rather than nine sorting before ten.
+		{"x٩", "x١٠", 1},
+		{"a٠٢", "a٠١٠", 1},
+		{"x۹", "x۱۰", 1},
+		// Nor does a leading zero of another script get stripped.
+		{"a٠١", "a١", -1},
 		// empty
 		{"", "", 0},
 		{"a", "", 1},
@@ -513,6 +521,14 @@ func TestIsConstructorName(t *testing.T) {
 		{"\uA7DCFoo", true},
 		// Its lowercase is not.
 		{"\u019BFoo", false},
+
+		// ── Bytes that are not UTF-8 ──
+		// A source file the scanner never produces, but the walk still has to
+		// step one byte at a time rather than the three a replacement
+		// character is written in.
+		{"\xff", true},
+		{"_\xff", true},
+		{"$\xed\xa0", true},
 	}
 	for _, tt := range tests {
 		got := IsConstructorName(tt.name)

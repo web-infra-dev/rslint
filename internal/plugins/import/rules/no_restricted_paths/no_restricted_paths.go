@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/isglob"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
@@ -353,7 +354,7 @@ func isPathWithin(filePath string, target string, windows bool) bool {
 // up reading filePath as inside target. Two shares on one UNC server still
 // share that first segment and keep the ordinary component comparison.
 func rootsDiverge(filePath string, target string, windows bool) bool {
-	return windows && !strings.EqualFold(firstPathSegment(filePath), firstPathSegment(target))
+	return windows && !ecmascript.EqualsWhenLowercased(firstPathSegment(filePath), firstPathSegment(target))
 }
 
 // firstPathSegment returns the leading segment `path.win32.relative` compares
@@ -369,7 +370,7 @@ func firstPathSegment(p string) string {
 
 func equalPathComponent(a string, b string, windows bool) bool {
 	if windows {
-		return strings.EqualFold(a, b)
+		return ecmascript.EqualsWhenLowercased(a, b)
 	}
 	return a == b
 }

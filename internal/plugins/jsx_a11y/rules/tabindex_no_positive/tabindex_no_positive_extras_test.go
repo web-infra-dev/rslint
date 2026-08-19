@@ -1,3 +1,5 @@
+// cspell:ignore tabındex
+
 package tabindex_no_positive
 
 import (
@@ -283,7 +285,6 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 		{Code: `<div tabIndex={"&#49;"} />`, Tsx: true},
 		{Code: "<div tabIndex={`&#49;`} />", Tsx: true},
 
-
 		// ============================================================
 		// JsxText "tabIndex=5" — pure text, not a JSX attribute, no report
 		// ============================================================
@@ -405,6 +406,14 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 		{Code: `<div tabIndex={/* note */ -1} />`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ============================================================
+		// The prop name is matched by uppercasing it
+		// ============================================================
+		// jsx-ast-utils compares `propName(attribute).toUpperCase()` against
+		// the name it was asked for, and a dotless `ı` uppercases onto `I`,
+		// so `tabındex` is the prop. Go's case folding leaves the two apart.
+		{Code: `<div tabındex="1" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+
+		// ============================================================
 		// String "true" → boolean coercion
 		// ============================================================
 		// Direct StringLiteral "true" — jsxAstUtilsLiteralCoerce → bool true
@@ -487,9 +496,8 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 		{Code: `<div tabIndex="&#x31;" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div tabIndex="&nbsp;5" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		// Larger numeric entity values.
-		{Code: `<div tabIndex="&#53;" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // "5"
+		{Code: `<div tabIndex="&#53;" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},  // "5"
 		{Code: `<div tabIndex="&#x35;" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // "5"
-
 
 		// ============================================================
 		// NoSubstitutionTemplateLiteral and TaggedTemplate
