@@ -29,11 +29,11 @@ expect(handler).to.have.been.calledWith('ready');
 // → expect(handler).to.have.been.calledOnceWith('ready');
 ```
 
-A Chai chain can also state both halves by itself, and is reported on its own:
+A Chai chain can also state both halves by itself. It is reported, but not fixed, for the same reason as the chains below — the rewrite folds one matcher into another inside a single chain, and the rule does not model what else the chain asserts:
 
 ```typescript
 expect(handler).to.have.been.calledOnce.and.calledWith('ready');
-// → expect(handler).to.have.been.calledOnceWith('ready');
+// merge by hand into: expect(handler).to.have.been.calledOnceWith('ready');
 ```
 
 ## Reported without a fix
@@ -63,6 +63,9 @@ The rule does not merge two assertions when:
 - they carry different modifiers, because each then claims something about a different value; matching `resolves` or `rejects` on both halves does merge, awaited or not;
 - one is awaited and the other is not, because dropping the awaited statement would leave a floating promise whose failure escapes as an unhandled rejection;
 - anything other than an inert statement sits between them. The merge claims both assertions describe one call history, so nothing in between may call the target or rebind it. Neither question is decidable from the syntax, so the rule answers a narrower one it can: a statement may sit between the two halves only if it runs nothing of the author's. That covers an assertion whose `expect(...)` and matcher calls are its only calls, where no matcher executes what it asserts on and the arguments hold no other call, no `await` and no assignment; a call into TypeScript's default library, such as `console.log('checkpoint')` or `JSON.parse(text)`, provided it is not `eval`, whose source arrives as a string, and nothing callable is handed to it; and a declaration whose initializers meet the same bar, where a hoisted `var` must also declare names neither assertion reads. Assertions on other mocks therefore keep their place between the two halves, while a reset, a reassignment, a further call to the target, and any call the rule cannot resolve leave the pair alone. Resolving the library call needs type information, so without a type checker such a call blocks the merge as well;
+- either is an `expect.poll(...)` or `expect.element(...)` assertion, because each half then retries on its own until it passes and the two can settle against different call histories, which is the one thing the merge claims they do not do;
 - more than two of these assertions share one target, because which pair to merge is ambiguous.
+
+One case is not covered: a matcher registered through `expect.extend` can invoke its subject the way `toThrow` does, and the rule has no way to know it. Recognising only the matchers Rstest ships would need a matcher table this repo does not have, and refusing an intervening assertion whose subject is callable would reject `expect(otherMock).toHaveBeenCalledWith(...)` — the assertion the barrier exists to let through.
 
 Where a fix is offered, it preserves the surviving call's arguments, type arguments, comments, and formatting. The folded assertion is removed with its line when it owns that line, and otherwise on its own so that neighbouring statements and comments are never disturbed.

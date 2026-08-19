@@ -113,6 +113,15 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			// as a string, so nothing callable has to be handed to it.
 			{Code: `expect(x).toHaveBeenCalledOnce(); eval('x("b")'); expect(x).toHaveBeenCalledWith('a');`},
 			{Code: `expect(x).toHaveBeenCalledOnce(); globalThis.eval('x("b")'); expect(x).toHaveBeenCalledWith('a');`},
+			// A polled assertion retries until it passes, so the two halves
+			// can settle against different call histories.
+			{Code: `async function f() { await expect.poll(getSpy).toHaveBeenCalledOnce(); await expect.poll(getSpy).toHaveBeenCalledWith('a'); }`},
+			{Code: `async function f() { await expect.element(locator).toHaveBeenCalledOnce(); await expect.element(locator).toHaveBeenCalledWith('a'); }`},
+			// Only the value constructors Rstest ships are exempt under the
+			// assertion's root name. `toSatisfy` calls its predicate when the
+			// comparison runs, just as the instance matcher of that name does.
+			{Code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.toSatisfy(pred)); expect(x).toHaveBeenCalledWith('a');`},
+			{Code: `test('t', ({ expect }) => { expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.myAsymmetric()); expect(x).toHaveBeenCalledWith('a'); });`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// An argument that is not stable under a second evaluation is still
@@ -158,6 +167,17 @@ expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
 const parsed = JSON.parse('{}');
 expect(x).toHaveBeenCalledWith('a');`,
 				Output: []string{`const parsed = JSON.parse('{}');
+expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			// An unawaited poll builds its promise only in then, catch or
+			// finally, so the factory is never called and the statement runs
+			// nothing between the two halves.
+			{
+				Code: `expect(x).toHaveBeenCalledOnce();
+expect.poll(getSpy).toBe(1);
+expect(x).toHaveBeenCalledWith('a');`,
+				Output: []string{`expect.poll(getSpy).toBe(1);
 expect(x).toHaveBeenCalledExactlyOnceWith('a');`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
 			},

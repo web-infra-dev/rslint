@@ -98,6 +98,15 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
       code: `expect(x).toHaveBeenCalledOnce(); globalThis.eval('x("b")'); expect(x).toHaveBeenCalledWith('a')`,
     },
     {
+      code: `async function f() { await expect.poll(getSpy).toHaveBeenCalledOnce(); await expect.poll(getSpy).toHaveBeenCalledWith('a'); }`,
+    },
+    {
+      code: `async function f() { await expect.element(locator).toHaveBeenCalledOnce(); await expect.element(locator).toHaveBeenCalledWith('a'); }`,
+    },
+    {
+      code: `expect(x).toHaveBeenCalledOnce(); expect(y).toEqual(expect.toSatisfy(pred)); expect(x).toHaveBeenCalledWith('a')`,
+    },
+    {
       code: `async function f() { expect(x).toHaveBeenCalledOnce(); await expect(p).resolves.toBe(1); expect(x).toHaveBeenCalledWith('a'); }`,
     },
     {

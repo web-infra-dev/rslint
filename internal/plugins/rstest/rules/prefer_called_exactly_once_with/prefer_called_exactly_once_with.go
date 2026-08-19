@@ -213,6 +213,18 @@ func mergeCandidateForStatement(
 	if slices.Contains(parsed.Members, "not") {
 		return nil
 	}
+	// Both halves have to describe one instant for the merge to mean anything:
+	// the key pairs them on the factory text, the modifiers and the await, all
+	// of which assume the two statements evaluate their target at the point
+	// they are written. `expect.poll(fn)` and `expect.element(locator)` break
+	// that assumption by retrying each half on its own until it passes, so the
+	// halves can settle against different call histories — the first on one
+	// call, the second on a later one. Merging them asserts both against
+	// whichever history the combined matcher happens to poll into.
+	if parsed.Entry != rstestUtils.RstestExpectEntryCall &&
+		parsed.Entry != rstestUtils.RstestExpectEntrySoft {
+		return nil
+	}
 	if parsed.Head == nil || parsed.Head.Kind != ast.KindCallExpression {
 		return nil
 	}
@@ -306,10 +318,15 @@ func chainAssertions(parsed *rstestUtils.ParsedRstestExpectCall) []chainAssertio
 
 // invokingMatchers execute something the assertion was handed, so an assertion
 // using one can run arbitrary code — `expect(callTheMock).toThrow()` calls the
-// mock. The set is enumerable because Rstest fixes which matchers it installs:
-// the jest-style matchers, the snapshot matchers, and Chai's core assertions,
-// which `@rstest/core` bundles alongside them. That is unlike the open question
-// of which function eventually reaches the mock.
+// mock. The set enumerates the matchers Rstest installs itself: the jest-style
+// matchers, the snapshot matchers, and Chai's core assertions, which
+// `@rstest/core` bundles alongside them. It is not a complete list of the
+// matchers a file can use — one registered through `expect.extend` is the
+// author's, and a custom `toThrow`-alike invokes its subject just the same.
+// Closing that would mean inverting the test to "a matcher Rstest ships",
+// which needs a matcher table this repo does not have, or refusing a callable
+// subject, which would drop `expect(otherMock).toHaveBeenCalledWith(...)` —
+// the assertion the barrier exists to let through.
 var invokingMatchers = map[string]bool{
 	// Call the subject.
 	"toThrow":                            true,
@@ -387,7 +404,17 @@ func isExpectHelperCall(node *ast.Node, rootName string) bool {
 		return false
 	}
 	entries := test_framework.GetMemberEntries(ast.SkipParentheses(node.AsCallExpression().Expression))
-	return len(entries) == 2 && entries[0].Name == rootName && entries[0].Call == nil
+	if len(entries) != 2 || entries[0].Name != rootName || entries[0].Call != nil {
+		return false
+	}
+	// The root name alone says nothing: for the test-context `expect` the root
+	// is the context object, whose surface the author extends through
+	// `test.extend`, and `expect` itself takes new members through
+	// `expect.extend`. Only the constructors Rstest ships are known to build a
+	// value and run nothing, so the name has to be one of those — minus
+	// `toSatisfy`, which calls the predicate it is given when the comparison
+	// runs, exactly as the instance matcher of the same name does.
+	return rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[entries[1].Name] && entries[1].Name != "toSatisfy"
 }
 
 // betweenScanner decides whether the statements separating a pair leave its
