@@ -51,8 +51,7 @@ Examples of **correct** code:
 
 ```javascript
 if (a) b = c;
-if (a) a = b;
-else a = c;
+if (a) a = b; else a = c;
 if (predicate(a)) a = b;
 ```
 
@@ -82,7 +81,9 @@ a = a ?? b;
 
 ## Fixes and suggestions
 
-The rewrite is applied automatically only when it cannot change how many times a getter or a setter runs. Where it could — a nested member access such as `a.b.c`, or a bare name inside a `with` block — the same rewrite is offered as a suggestion instead.
+The rewrite is applied automatically when it cannot change how many times a getter or a setter runs, and is offered as a suggestion otherwise.
+
+For `a = a || b` and for the `never` option, the target has to be a plain identifier. For `a || (a = b)` and for `if` statements, a single property access such as `a.b` also qualifies, as long as an `if` condition is a single test rather than a `||` chain. A bare name inside a non-strict `with` block may resolve to a property, so it counts as a single property access rather than a plain identifier.
 
 A TypeScript assertion makes the two sides count as different values, so `a = a! || b` and `a[b!] || (a[b!] = c)` are left alone.
 
