@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -443,18 +444,42 @@ func requiresOuterParenthesis(node *ast.Node) bool {
 	return parentPrecedence == -1 || assignmentPrecedence < parentPrecedence
 }
 
+// previousTokenLastCharacter returns the last character of the token before
+// node, or 0 when node starts the file. A node's Pos() is where the token
+// before it ended, so the answer is one index back from there — no
+// re-tokenizing, which is what makes this safe in a file that already contains
+// a template literal or a regular expression. Re-scanning such a file from the
+// start drifts out of step with the parser at the first `}` or `/` whose
+// meaning depends on parser context.
+func previousTokenLastCharacter(sourceFile *ast.SourceFile, node *ast.Node) byte {
+	start := node.Pos()
+	if start <= 0 {
+		return 0
+	}
+	return sourceFile.Text()[start-1]
+}
+
+// nextTokenFirstCharacter returns the first character of the token after node,
+// or 0 when node ends the file.
+func nextTokenFirstCharacter(sourceFile *ast.SourceFile, node *ast.Node) byte {
+	text := sourceFile.Text()
+	position := scanner.SkipTrivia(text, node.End())
+	if position >= len(text) {
+		return 0
+	}
+	return text[position]
+}
+
 // isParenthesised mirrors ESLint's token-level astUtils.isParenthesised: the
 // parentheses do not have to be the node's own. An argument list, an `if`
 // head, or a `while` head all supply a `(` before and a `)` after the
 // expression, and upstream counts those.
+//
+// Comparing single characters is enough to identify the two tokens: `(` is the
+// only token that ends with `(`, and `)` the only one that starts with `)`.
 func isParenthesised(sourceFile *ast.SourceFile, node *ast.Node) bool {
-	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
-	previous, ok := utils.TokenBeforePosition(sourceFile, nodeRange.Pos())
-	if !ok || previous.Text != "(" {
-		return false
-	}
-	next, ok := utils.TokenAtOrAfter(sourceFile, nodeRange.End())
-	return ok && next.Text == ")" && next.Start >= nodeRange.End()
+	return previousTokenLastCharacter(sourceFile, node) == '(' &&
+		nextTokenFirstCharacter(sourceFile, node) == ')'
 }
 
 // isIdentifierOrKeywordToken reports whether token is what espree types as an
@@ -743,8 +768,10 @@ func (s *ruleState) checkIfStatement(node *ast.Node) {
 
 			bodyRange := utils.TrimNodeTextRange(sourceFile, body)
 			firstBodyToken, hasFirstBodyToken := utils.TokenAtOrAfter(sourceFile, bodyRange.Pos())
-			previousToken, hasPreviousToken := utils.TokenBeforePosition(sourceFile, ifRange.Pos())
-			if hasPreviousToken && previousToken.Text != ";" && previousToken.Text != "{" &&
+			// Only `;` ends a `;` token, and only `{` ends a `{` token in a
+			// position a statement can follow.
+			previousCharacter := previousTokenLastCharacter(sourceFile, node)
+			if previousCharacter != 0 && previousCharacter != ';' && previousCharacter != '{' &&
 				(!hasFirstBodyToken || !isIdentifierOrKeywordToken(firstBodyToken)) {
 				// The statement left behind could otherwise be read as a
 				// continuation of the previous one, turning `fn() if (a == null)
@@ -764,7 +791,7 @@ func (s *ruleState) checkIfStatement(node *ast.Node) {
 			// A braced body may have ended on `}` rather than `;`, and the
 			// braces are about to go away.
 			if hasBody {
-				if next, ok := utils.TokenAtOrAfter(sourceFile, expression.End()); ok && next.Text != ";" {
+				if next := nextTokenFirstCharacter(sourceFile, expression); next != 0 && next != ';' {
 					fixes = append(fixes, insertAt(ifRange.End(), ";"))
 				}
 			}

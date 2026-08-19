@@ -524,6 +524,23 @@ a ??= b`},
 					{MessageId: `logical`, Message: `Logical expression can be replaced with an assignment (||=).`, Line: 1, Column: 7, EndLine: 1, EndColumn: 19},
 				},
 			},
+			// A template literal earlier in the file must not disturb the check for
+			// the parentheses already around the logical expression: `while (...)`
+			// supplies them, so the rewrite must not add a second pair.
+			{
+				Code:   "`${x}`;\nwhile (a || (a = b)) {}",
+				Output: []string{"`${x}`;\nwhile (a ||= b) {}"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `logical`, Message: `Logical expression can be replaced with an assignment (||=).`, Line: 2, Column: 8, EndLine: 2, EndColumn: 20},
+				},
+			},
+			{
+				Code:   "`${x}`;\nfn(a || (a = b));",
+				Output: []string{"`${x}`;\nfn(a ||= b);"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `logical`, Message: `Logical expression can be replaced with an assignment (||=).`, Line: 2, Column: 4, EndLine: 2, EndColumn: 16},
+				},
+			},
 			// ---- Locks in the right-side parenthesis arms of the never-mode fixer ----
 			{
 				Code:    `a ||= b && c`,
