@@ -19,8 +19,33 @@ func sanitizeSymbolName(name string) []byte {
 	return []byte(name)
 }
 
-//go:linkname getAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetAliasedSymbol
-func getAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
+// symbolDeclaration preserves value-bearing alias boundaries when a symbol has
+// no concrete value declaration of its own.
+func symbolDeclaration(symbol *ast.Symbol) *ast.Node {
+	if symbol == nil {
+		return nil
+	}
+	if symbol.ValueDeclaration != nil {
+		return symbol.ValueDeclaration
+	}
+
+	for _, declaration := range symbol.Declarations {
+		if declaration == nil {
+			continue
+		}
+		switch declaration.Kind {
+		case ast.KindImportSpecifier, ast.KindExportSpecifier:
+			if !ast.IsTypeOnlyImportOrExportDeclaration(declaration) {
+				return declaration
+			}
+		}
+	}
+
+	return nil
+}
+
+//go:linkname getImmediateAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).getImmediateAliasedSymbol
+func getImmediateAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 
 type CString = []byte
 type SourceFileId = int
@@ -271,7 +296,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				if ty := tc.GetTypeOfSymbol(symbol); ty != nil {
 					typeID := recordType(ty)
 					sym_id := ast.GetSymbolId(symbol)
-					declRef := nodeReference(symbol.ValueDeclaration)
+					declRef := nodeReference(symbolDeclaration(symbol))
 
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
@@ -287,16 +312,45 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					// A merged symbol can contain both a local value and an imported type.
 					// Value references must keep the local symbol instead of resolving the alias.
 					if symbol.Flags&ast.SymbolFlagsAlias != 0 && symbol.Flags&ast.SymbolFlagsValue == 0 {
-						if aliasedSymbol := getAliasedSymbol(tc, symbol); aliasedSymbol != nil {
-							aliased_id := ast.GetSymbolId(aliasedSymbol)
-							if aliased_id != sym_id {
-								semantic.AliasSymbols[sym_id] = aliased_id
+						currentSymbol := symbol
+						currentSymbolID := sym_id
+						for currentSymbol.Flags&ast.SymbolFlagsAlias != 0 && currentSymbol.Flags&ast.SymbolFlagsValue == 0 {
+							if _, exists := semantic.AliasSymbols[currentSymbolID]; exists {
+								break
 							}
+
+							aliasedSymbol := getImmediateAliasedSymbol(tc, currentSymbol)
+							if aliasedSymbol == nil {
+								break
+							}
+							aliasedSymbolID := ast.GetSymbolId(aliasedSymbol)
+							if aliasedSymbolID == currentSymbolID {
+								break
+							}
+							semantic.AliasSymbols[currentSymbolID] = aliasedSymbolID
+
+							if _, exists := semantic.Symtab[aliasedSymbolID]; !exists {
+								semantic.Symtab[aliasedSymbolID] = SymbolInfo{
+									Id:         aliasedSymbolID,
+									Name:       sanitizeSymbolName(aliasedSymbol.Name),
+									Flags:      int(aliasedSymbol.Flags),
+									CheckFlags: int(aliasedSymbol.CheckFlags),
+									Decl:       nodeReference(symbolDeclaration(aliasedSymbol)),
+								}
+							}
+							if _, exists := semantic.Sym2type[aliasedSymbolID]; !exists {
+								if aliasedType := tc.GetTypeOfSymbol(aliasedSymbol); aliasedType != nil {
+									semantic.Sym2type[aliasedSymbolID] = recordType(aliasedType)
+								}
+							}
+
+							currentSymbol = aliasedSymbol
+							currentSymbolID = aliasedSymbolID
 						}
 					}
 				} else if isImportModuleSpecifier(node) {
 					sym_id := ast.GetSymbolId(symbol)
-					declRef := nodeReference(symbol.ValueDeclaration)
+					declRef := nodeReference(symbolDeclaration(symbol))
 
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
@@ -317,7 +371,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				if _, exists := semantic.Symtab[value_sym_id]; !exists {
 					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
 						typeID := recordType(ty)
-						declRef := nodeReference(valueSymbol.ValueDeclaration)
+						declRef := nodeReference(symbolDeclaration(valueSymbol))
 						semantic.Symtab[value_sym_id] = SymbolInfo{
 							Id:         value_sym_id,
 							Name:       sanitizeSymbolName(valueSymbol.Name),
@@ -341,7 +395,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 							if _, exists := semantic.Symtab[parameterSymbolID]; !exists {
 								if ty := tc.GetTypeOfSymbol(parameterSymbol); ty != nil {
 									typeID := recordType(ty)
-									declRef := nodeReference(parameterSymbol.ValueDeclaration)
+									declRef := nodeReference(symbolDeclaration(parameterSymbol))
 									semantic.Symtab[parameterSymbolID] = SymbolInfo{
 										Id:         parameterSymbolID,
 										Name:       sanitizeSymbolName(parameterSymbol.Name),
