@@ -279,7 +279,7 @@ func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name strin
 }
 
 // resolveName runs the binder scope walk for name at location and reconciles
-// its two departures from the scopes the source text actually spells.
+// its departures from the scopes the source text actually spells.
 //
 // The first is a JavaScript scoping rule NameResolver deliberately leaves out:
 // a parameter initializer cannot see a declaration made in the function body.
@@ -289,9 +289,14 @@ func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name strin
 // parent, so the name belongs to whatever encloses the function.
 //
 // The second is the declarations the parser synthesizes from JSDoc tags, which
-// join a scope's symbol table without being written there. Both skips resume
-// the walk from the scope that held the rejected binding, so an outer
-// declaration of the same name is still found.
+// join a scope's symbol table without being written there.
+//
+// The rest are bindings the binder's symbol tables carry that the language
+// declares nowhere the walk passes: a namespace re-export, a segment of a
+// dotted namespace name, and a class expression's self-reference seen from the
+// class's own decorators. Every skip resumes the walk from the scope that held
+// the rejected binding, so an outer declaration of the same name is still
+// found.
 func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
 	for location != nil {
 		result := s.resolver.Resolve(location, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
@@ -304,6 +309,16 @@ func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.Symb
 		}
 		if isExportAliasOnly(result) {
 			location = outerExportScopeLocation(result.Declarations[0])
+			continue
+		}
+		if isQualifiedNamespaceNameOnly(result) {
+			if scope := bindingScope(result, name); scope != nil {
+				location = scope.Parent
+				continue
+			}
+		}
+		if class := classExpressionNameInOwnDecorator(location, result); class != nil {
+			location = class.Parent
 			continue
 		}
 		fn := bodyOnlyParameterBarrier(location, result)
@@ -337,6 +352,61 @@ func isExportAliasOnly(symbol *ast.Symbol) bool {
 		}
 	}
 	return true
+}
+
+// isQualifiedNamespaceNameOnly reports whether every declaration of symbol is a
+// segment of a dotted namespace name. `namespace N.M {}` opens one scope for
+// the whole declaration and declares neither segment in it — ESLint's scope
+// manager only creates a variable for a namespace named by a plain identifier
+// — so the scope walk has to step over the binding and resume outside.
+func isQualifiedNamespaceNameOnly(symbol *ast.Symbol) bool {
+	if len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if !utils.IsQualifiedNamespaceSegment(declaration) {
+			return false
+		}
+	}
+	return true
+}
+
+// bindingScope returns the node whose symbol table binds name to symbol —
+// either as a local or, for a namespace member, as an export. It returns nil
+// when no enclosing table claims it, leaving the caller to keep the symbol
+// rather than guess where the walk should resume.
+func bindingScope(symbol *ast.Symbol, name string) *ast.Node {
+	if len(symbol.Declarations) == 0 {
+		return nil
+	}
+	for node := symbol.Declarations[0].Parent; node != nil; node = node.Parent {
+		if locals := node.Locals(); locals != nil && locals[name] == symbol {
+			return node
+		}
+		if owner := node.Symbol(); owner != nil && owner.Exports != nil && owner.Exports[name] == symbol {
+			return node
+		}
+	}
+	return nil
+}
+
+// classExpressionNameInOwnDecorator returns the class expression that binds
+// result to its own name while location sits in one of that class's
+// decorators. A class's decorators are evaluated in the scope holding the
+// class, so the name a class expression binds for itself does not reach them,
+// but TypeScript's resolver keeps that self-reference visible throughout the
+// class node — decorators included.
+func classExpressionNameInOwnDecorator(location *ast.Node, result *ast.Symbol) *ast.Node {
+	if len(result.Declarations) != 1 || result.Declarations[0].Kind != ast.KindClassExpression {
+		return nil
+	}
+	class := result.Declarations[0]
+	for node := location; node != nil; node = node.Parent {
+		if node.Kind == ast.KindDecorator && node.Parent == class {
+			return class
+		}
+	}
+	return nil
 }
 
 // jsdocOnlyScope returns the scope whose symbol table binds name to symbol when

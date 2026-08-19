@@ -108,6 +108,14 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			// parameters shadow a call nested inside a parameter decorator.
 			{Code: `class Object { m(@dec(() => new Object()) x: number) { } }`},
 			{Code: `class C<Object> { m(@dec(() => new Object()) x: number) { } }`},
+			// A class's own decorator is evaluated in the scope holding the
+			// class, but a reference sitting directly in one, with no scope in
+			// between, still resolves against the class scope.
+			{Code: `@dec(new Object()) class C<Object> { }`},
+			{Code: `const C = @dec(new Object()) class Object { };`},
+			// A class declaration's name is declared in the scope holding the
+			// class, so it shadows the call wherever the decorator resolves.
+			{Code: `@dec(() => new Object()) class Object { }`},
 
 			// ---- Dimension 2: scoping — a member's decorators and computed
 			// name are evaluated in the enclosing class or object literal, so
@@ -132,6 +140,10 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			{Code: `namespace N { namespace Object {} Object(); }`},
 			{Code: `namespace N { import Object = require("x"); Object(); }`},
 			{Code: `namespace N.M { const Object = f; Object(); }`},
+			// A dotted namespace name declares nothing itself, but the body
+			// it opens is still a scope of its own.
+			{Code: `namespace N.Object { const Object = f; Object(); }`},
+			{Code: `namespace N { const Object = f; namespace M.Object { Object(); } }`},
 			// An export specifier alongside a local declaration still leaves
 			// that declaration in the namespace.
 			{Code: `namespace N { const Object = f; export { Object }; Object(); }`},
@@ -275,6 +287,16 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			asiCase(`class C { m(@dec(() => new Object()) x: number, Object: any) { } }`, "new Object()", false, false),
 			asiCase(`class C { m<Object>(@dec(() => new Object()) x: number) { } }`, "new Object()", false, false),
 
+			// ---- Dimension 2: scoping — the same holds for a class's own
+			// decorator: a scope created inside one is attached to the scope
+			// holding the class, so neither the class's type parameters nor a
+			// class expression's own name reach the call ----
+			asiCase(`@dec(() => new Object()) class C<Object> { }`, "new Object()", false, false),
+			literalCase(`@dec(function () { return new Object(); }) class C<Object> { }`, "new Object()"),
+			literalCase(`@dec(class { p = new Object(); }) class C<Object> { }`, "new Object()"),
+			asiCase(`const C = @dec(() => new Object()) class Object { };`, "new Object()", false, false),
+			literalCase(`const C = @dec(class { p = new Object(); }) class Object { };`, "new Object()"),
+
 			// ---- Dimension 2: scoping — a decorator or computed name belongs
 			// to the enclosing class or object literal, not to the member that
 			// carries it, so the member's own type parameters, parameters, and
@@ -312,6 +334,13 @@ func TestNoObjectConstructorExtras(t *testing.T) {
 			asiCase(`namespace N { export * as Object from "x"; Object(); }`, "Object()", false, false),
 			asiCase(`namespace N { export { Other as Object } from "x"; Object(); }`, "Object()", false, false),
 			asiCase(`namespace N { export { Object }; Object(); }`, "Object()", false, false),
+
+			// ---- Dimension 2: scoping — only a namespace whose name is a
+			// plain identifier declares a variable, so neither segment of a
+			// dotted name shadows the call ----
+			asiCase(`namespace N.Object { Object(); }`, "Object()", false, false),
+			asiCase(`namespace Object.M { Object(); }`, "Object()", false, false),
+			asiCase(`namespace N { namespace M.Object { } Object(); }`, "Object()", false, false),
 
 			// A type parameter is only in scope inside its own declaration.
 			{

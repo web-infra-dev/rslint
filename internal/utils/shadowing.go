@@ -198,15 +198,16 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 			inParameterDecorator = prevChild.Kind == ast.KindDecorator
 		}
 		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
-		if (isFunctionLike || ast.IsClassLike(current)) &&
-			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
+		isClassLike := ast.IsClassLike(current)
+		if (isFunctionLike && !escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)) ||
+			(isClassLike && !escapesClassScope(prevChild, crossedScope)) {
 			for _, typeParameter := range current.TypeParameters() {
 				if typeParameter != nil && typeParameter.Name() != nil && typeParameter.Name().Text() == name {
 					return true
 				}
 			}
 		}
-		if isFunctionLike || ast.IsClassLike(current) {
+		if isFunctionLike || isClassLike {
 			crossedScope = true
 		}
 		prevChild = current
@@ -234,6 +235,19 @@ func escapesFunctionScope(fn *ast.Node, prevChild *ast.Node, inParameterDecorato
 		return true
 	}
 	return inParameterDecorator && crossedScope && isDirectParameterOf(fn, prevChild)
+}
+
+// escapesClassScope reports whether a reference that reached a class through
+// prevChild is out of the class's own scope, so neither its type parameters
+// nor a class expression's own name reach it.
+//
+// A class's decorators are evaluated in the scope holding the class. ESTree
+// keeps them on the class node, so a reference sitting directly in one, with
+// no scope in between, still acquires the class scope, but scope-manager
+// parents a scope created inside a decorator to the scope holding the class,
+// leaving the class itself out of the chain.
+func escapesClassScope(prevChild *ast.Node, crossedScope bool) bool {
+	return prevChild != nil && prevChild.Kind == ast.KindDecorator && crossedScope
 }
 
 // IsShadowedFromParameterInitializer reports whether name is declared by the
@@ -487,7 +501,14 @@ func IsShadowed(node *ast.Node, name string) bool {
 				}
 			}
 
+		// A class declaration's name is declared in the scope holding the
+		// class, so it shadows the call from anywhere the class does; a class
+		// expression's name is declared in the class scope alone, which a
+		// scope created inside the class's own decorator sits outside of.
 		case ast.KindClassDeclaration, ast.KindClassExpression:
+			if current.Kind == ast.KindClassExpression && escapesClassScope(prevChild, crossedScope) {
+				break
+			}
 			if n := current.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
 				return true
 			}
@@ -545,6 +566,22 @@ func IsShadowed(node *ast.Node, name string) bool {
 		current = current.Parent
 	}
 	return false
+}
+
+// IsQualifiedNamespaceSegment reports whether a module declaration is one
+// segment of a dotted namespace name (`namespace A.B {}`). The parser nests
+// one declaration per segment, and ESLint's scope manager creates a variable
+// only for a namespace named by a plain identifier, so neither segment of a
+// dotted name declares one.
+func IsQualifiedNamespaceSegment(declaration *ast.Node) bool {
+	if declaration == nil || declaration.Kind != ast.KindModuleDeclaration {
+		return false
+	}
+	if declaration.Parent != nil && declaration.Parent.Kind == ast.KindModuleDeclaration {
+		return true
+	}
+	body := declaration.AsModuleDeclaration().Body
+	return body != nil && body.Kind == ast.KindModuleDeclaration
 }
 
 // HasShadowingParameter checks if a function-like node has a parameter
@@ -667,9 +704,10 @@ func hasShadowingDeclarationInStatements(statements []*ast.Node, name string) bo
 		case ast.KindModuleDeclaration:
 			// `namespace X {}` / `module X {}` introduce a value binding when
 			// named by an identifier. Skip ambient modules (`declare module "x"`),
-			// which use a string literal name and don't bind a variable.
+			// which use a string literal name and don't bind a variable, and
+			// dotted names, which bind none of their segments.
 			modDecl := stmt.AsModuleDeclaration()
-			if modDecl != nil && modDecl.Name() != nil &&
+			if modDecl != nil && modDecl.Name() != nil && !IsQualifiedNamespaceSegment(stmt) &&
 				modDecl.Name().Kind == ast.KindIdentifier && modDecl.Name().Text() == name {
 				return true
 			}
@@ -723,9 +761,10 @@ func HasLocalDeclarationInStatements(statements []*ast.Node, name string) bool {
 
 		case ast.KindModuleDeclaration:
 			// Ambient module (`declare module "x"`) uses a string-literal name
-			// and doesn't bind a variable — only identifier-named namespaces do.
+			// and doesn't bind a variable — only identifier-named namespaces
+			// do, and a dotted name binds none of its segments.
 			modDecl := stmt.AsModuleDeclaration()
-			if modDecl != nil && modDecl.Name() != nil &&
+			if modDecl != nil && modDecl.Name() != nil && !IsQualifiedNamespaceSegment(stmt) &&
 				modDecl.Name().Kind == ast.KindIdentifier && modDecl.Name().Text() == name {
 				return true
 			}
