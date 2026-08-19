@@ -7,9 +7,15 @@ package no_unsafe_string_replacement_test
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoUnsafeStringReplacementExtras(t *testing.T) {
@@ -152,4 +158,63 @@ router.replace("/about", options);`),
 			invalid(`(1).replace("x", replacement)`, `replacement`, "replace"),
 		},
 	)
+}
+
+// TestNoUnsafeStringReplacementSourceOnlyTypeSyntax locks in ESLint's
+// syntax-only isKnownNonString path. A source-only rslint Program deliberately
+// withholds TypeChecker, but still has binder / RefStore services.
+func TestNoUnsafeStringReplacementSourceOnlyTypeSyntax(t *testing.T) {
+	t.Parallel()
+
+	root := fixtures.GetRootDir()
+	fileName := "source-only.ts"
+	filePath := tspath.ResolvePath(root.Dir, fileName)
+	code := `
+declare const router: { replace(a: string, b: unknown): void };
+declare const path: string;
+declare const options: unknown;
+router.replace(path, options);
+`
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{filePath: code})
+	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
+	if err != nil {
+		t.Fatalf("create source program: %v", err)
+	}
+	sourceFile := program.GetSourceFile(fileName)
+	if sourceFile == nil {
+		t.Fatal("source fixture was not loaded")
+	}
+	sourceProgram, err := lintprogram.NewFromBoundSources(program, []*ast.SourceFile{sourceFile})
+	if err != nil {
+		t.Fatalf("create source-only Program: %v", err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.RunLinterInProgram(
+		sourceProgram,
+		[]string{filePath},
+		nil,
+		[]string{},
+		func(file *ast.SourceFile) []linter.ConfiguredRule {
+			if file.FileName() != filePath {
+				return nil
+			}
+			return []linter.ConfiguredRule{{
+				Name:     no_unsafe_string_replacement.NoUnsafeStringReplacementRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if ctx.TypeChecker != nil {
+						t.Error("source-only Program unexpectedly supplied a TypeChecker")
+					}
+					return no_unsafe_string_replacement.NoUnsafeStringReplacementRule.Run(ctx, nil)
+				},
+			}}
+		},
+		false,
+		func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
+		nil,
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("source-only typed router produced %d diagnostics: %+v", len(diagnostics), diagnostics)
+	}
 }

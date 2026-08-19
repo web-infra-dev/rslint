@@ -16,6 +16,7 @@ func TestClassifyType(t *testing.T) {
 	root := fixtures.GetRootDir()
 	filePath := tspath.ResolvePath(root.Dir, "type-classifier.ts")
 	code := `
+export {};
 declare const stringValue: string;
 declare const numberValue: number;
 declare const unknownValue: unknown;
@@ -27,6 +28,8 @@ function constrained<T extends string>(value: T) { return value; }
 interface Text extends String {}
 declare const inheritedString: Text;
 class ClassText extends String {}
+interface Map<T> extends Array<T> {}
+function inheritedMapTarget(xs: Map<number>) { return xs; }
 declare const inheritedClassString: ClassText;
 void stringValue;
 void numberValue;
@@ -78,6 +81,20 @@ void inheritedClassString;
 				t.Fatalf("ClassifyType(%s) = %v, want %v", test.name, got, test.want)
 			}
 		})
+	}
+
+	arrayOptions := TypeClassifierOptions{
+		TargetTypeNames:          utils.NewSetFromItems("Array", "ReadonlyArray"),
+		NonTargetTypeNames:       utils.NewSetFromItems("Map"),
+		HeritageSymbolFlags:      ast.SymbolFlagsInterface,
+		AllowNullishInMixedUnion: true,
+		IsTargetType: func(t *checker.Type) bool {
+			return checker.Checker_isArrayOrTupleType(typeChecker, t)
+		},
+	}
+	xs := findReferenceIdentifier(t, sourceFile, "xs")
+	if got := ClassifyType(ctx, typeChecker.GetTypeAtLocation(xs), arrayOptions); got != TypeTarget {
+		t.Fatalf("ClassifyType(local Map extending Array) = %v, want %v", got, TypeTarget)
 	}
 }
 

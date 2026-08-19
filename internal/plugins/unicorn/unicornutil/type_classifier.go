@@ -78,12 +78,12 @@ func ClassifyType(ctx rule.RuleContext, t *checker.Type, options TypeClassifierO
 	if options.TargetTypeNames != nil && options.TargetTypeNames.Has(name) {
 		return TypeTarget
 	}
-	if options.NonTargetTypeNames != nil && options.NonTargetTypeNames.Has(name) {
-		return TypeNonTarget
-	}
 	if options.HeritageSymbolFlags != 0 &&
 		classifyHeritage(ctx, t, options) == TypeTarget {
 		return TypeTarget
+	}
+	if options.NonTargetTypeNames != nil && options.NonTargetTypeNames.Has(name) {
+		return TypeNonTarget
 	}
 	return TypeNonTarget
 }
