@@ -3,7 +3,6 @@ package no_unsafe_string_replacement
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -146,13 +145,6 @@ func isPlainObjectProperty(property *ast.Node) bool {
 	if name == nil || name.Kind == ast.KindComputedPropertyName {
 		return false
 	}
-	// ESTree represents these non-computed object keys as Literal nodes. They
-	// cannot name one of the three coercion hooks, so they are plain keys even
-	// though the shared static-name helper only handles them in computed form.
-	if name.Kind == ast.KindNullKeyword || name.Kind == ast.KindTrueKeyword ||
-		name.Kind == ast.KindFalseKeyword {
-		return true
-	}
 	staticName, ok := utils.GetStaticPropertyName(name)
 	if !ok && name.Kind == ast.KindBigIntLiteral {
 		staticName, ok = utils.NormalizeBigIntLiteral(name.AsBigIntLiteral().Text), true
@@ -165,13 +157,18 @@ func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
 		return true
 	}
 
-	// ESLint's default JavaScript parser has no TypeScript Program. Preserve
-	// that behavior even though rslint may have a checker for a JS file.
-	if ctx.TypeChecker == nil || tspath.HasJSFileExtension(ctx.SourceFile.FileName()) {
+	if ctx.TypeChecker == nil {
 		return false
 	}
 
 	t := ctx.TypeChecker.GetTypeAtLocation(node)
+	// Unicorn only treats primitive types as non-target through intrinsicName.
+	// TypeScript literal types have neither that name nor a symbol upstream, so
+	// keep them unknown rather than suppressing this rule's diagnostic.
+	if checker.Type_symbol(t) == nil && checker.Type_alias(t) == nil &&
+		utils.IsTypeFlagSet(t, checker.TypeFlagsNumberLiteral|checker.TypeFlagsBooleanLiteral|checker.TypeFlagsBigIntLiteral) {
+		return false
+	}
 	return unicornutil.ClassifyType(ctx, t, unicornutil.TypeClassifierOptions{
 		HeritageSymbolFlags: ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
 		IsTargetType: func(t *checker.Type) bool {
@@ -204,14 +201,17 @@ func classifyStringReceiverSyntax(ctx rule.RuleContext, node *ast.Node, visiting
 			return unicornutil.TypeUnknown
 		}
 		symbol := ctx.Refs.Resolve(node)
-		if symbol == nil || visiting[symbol] {
+		// getTypeFromVariable() in Unicorn only reasons about a variable with one
+		// definition. A merged type/value symbol must stay unknown: selecting the
+		// type declaration could otherwise hide the value receiver's diagnostic.
+		if symbol == nil || visiting[symbol] || len(symbol.Declarations) != 1 {
 			return unicornutil.TypeUnknown
 		}
 		visiting[symbol] = true
 		defer delete(visiting, symbol)
 
-		for _, declaration := range symbol.Declarations {
-			if class := classifyStringTypeSyntax(ctx, declaration.Type(), visiting); class != unicornutil.TypeUnknown {
+		if typeAnnotation := bindingTypeAnnotation(symbol.Declarations[0]); typeAnnotation != nil {
+			if class := classifyStringTypeSyntax(ctx, typeAnnotation, visiting); class != unicornutil.TypeUnknown {
 				return class
 			}
 		}
@@ -221,6 +221,24 @@ func classifyStringReceiverSyntax(ctx rule.RuleContext, node *ast.Node, visiting
 	}
 
 	return unicornutil.TypeUnknown
+}
+
+// bindingTypeAnnotation returns only a type annotation on the binding itself.
+// In particular, FunctionDeclaration.Type() is its return type, not a type for
+// the function binding; Unicorn's definition.name.typeAnnotation does not read
+// that return type.
+func bindingTypeAnnotation(declaration *ast.Node) *ast.Node {
+	if declaration == nil {
+		return nil
+	}
+	switch declaration.Kind {
+	case ast.KindVariableDeclaration:
+		return declaration.AsVariableDeclaration().Type
+	case ast.KindParameter:
+		return declaration.AsParameterDeclaration().Type
+	default:
+		return nil
+	}
 }
 
 func classifyStringTypeSyntax(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) unicornutil.TypeClass {
@@ -239,7 +257,7 @@ func classifyStringTypeSyntax(ctx rule.RuleContext, node *ast.Node, visiting map
 		return unicornutil.TypeNonTarget
 	case ast.KindBigIntKeyword, ast.KindBooleanKeyword, ast.KindNeverKeyword,
 		ast.KindNumberKeyword, ast.KindObjectKeyword, ast.KindSymbolKeyword,
-		ast.KindVoidKeyword, ast.KindArrayType, ast.KindTupleType,
+		ast.KindUndefinedKeyword, ast.KindVoidKeyword, ast.KindArrayType, ast.KindTupleType,
 		ast.KindTypeLiteral, ast.KindFunctionType, ast.KindConstructorType:
 		return unicornutil.TypeNonTarget
 	case ast.KindParenthesizedType:
@@ -302,6 +320,8 @@ func classifyStringTypeReference(ctx rule.RuleContext, typeName *ast.Node, visit
 			if class := classifyStringTypeSyntax(ctx, declaration.Type(), visiting); class != unicornutil.TypeUnknown {
 				return class
 			}
+		case ast.KindTypeParameter:
+			return classifyStringTypeSyntax(ctx, declaration.AsTypeParameterDeclaration().Constraint, visiting)
 		case ast.KindInterfaceDeclaration:
 			interfaces := ast.GetHeritageElements(declaration, ast.KindExtendsKeyword)
 			if len(interfaces) == 0 {

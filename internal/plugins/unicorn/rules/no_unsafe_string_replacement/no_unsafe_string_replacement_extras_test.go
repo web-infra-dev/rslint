@@ -71,6 +71,10 @@ func TestNoUnsafeStringReplacementExtras(t *testing.T) {
 declare const router: Router;
 declare const options: unknown;
 router.replace("/about", options);`),
+			// Type information applies to JavaScript too when the Program provides it.
+			jsValid(`/** @type {{replace(href: string, options: unknown): void}} */
+const router = {};
+router.replace("/about", options);`),
 
 			// Locks in upstream isAllowedReplacement() static String.raw arm.
 			jsValid("template.replace(\"x\", ((String.raw))`safe`)"),
@@ -156,6 +160,11 @@ router.replace("/about", options);`),
 			tsInvalid(`declare const value: unknown; value.replace("x", replacement)`, `replacement`, "replace"),
 			// Locks in upstream JavaScript fallback: a literal number receiver is still reported without parser services.
 			invalid(`(1).replace("x", replacement)`, `replacement`, "replace"),
+			// TypeScript literal types have no intrinsicName upstream and remain unknown.
+			tsInvalid(`(1).replace("x", replacement)`, `replacement`, "replace"),
+			// A merged type/value name has multiple definitions and must remain unknown.
+			tsInvalid(`type Sep = number; const Sep = "-"; Sep.replace("x", replacement)`, `replacement`, "replace"),
+			tsInvalid(`type T = {a: 1}; const T = "x"; T.replace("x", replacement)`, `replacement`, "replace"),
 		},
 	)
 }
@@ -174,6 +183,16 @@ declare const router: { replace(a: string, b: unknown): void };
 declare const path: string;
 declare const options: unknown;
 router.replace(path, options);
+
+declare const undefinedValue: undefined;
+undefinedValue.replace("x", options);
+
+function constrained<T extends number>(value: T) {
+	value.replace("x", options);
+}
+
+function functionValue(): number { return 1; }
+functionValue.replace("x", options);
 `
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{filePath: code})
 	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
@@ -214,7 +233,7 @@ router.replace(path, options);
 		func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
 		nil,
 	)
-	if len(diagnostics) != 0 {
-		t.Fatalf("source-only typed router produced %d diagnostics: %+v", len(diagnostics), diagnostics)
+	if len(diagnostics) != 1 {
+		t.Fatalf("source-only syntax classification produced %d diagnostics, want 1: %+v", len(diagnostics), diagnostics)
 	}
 }
