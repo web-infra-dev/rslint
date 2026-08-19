@@ -13,9 +13,25 @@ type projectRootMembership struct {
 	pathIndex int
 }
 
-// directRootProgramOwners returns the first declared project that selects each
-// target as a tsconfig root. A targeted build supplies this result directly;
-// an eager build derives it in batches after all Programs are ready.
+func targetBindingOwners(
+	set ProjectSet,
+	targets []rslintconfig.DiscoveredLintTarget,
+) ([]int, bool) {
+	binding := set.targetBinding
+	if binding == nil || len(binding.targets) != len(targets) || len(binding.owners) != len(targets) {
+		return nil, false
+	}
+	for targetIndex, target := range targets {
+		if binding.targets[targetIndex] != target {
+			return nil, false
+		}
+	}
+	return append([]int(nil), binding.owners...), true
+}
+
+// directRootProgramOwners derives the first declared direct-root owner after
+// eager construction. A targeted build supplies its complete owner binding
+// directly and bypasses this batch.
 func directRootProgramOwners(
 	set ProjectSet,
 	targets []rslintconfig.DiscoveredLintTarget,
@@ -25,21 +41,6 @@ func directRootProgramOwners(
 	owners := make([]int, len(targets))
 	for index := range owners {
 		owners[index] = -1
-	}
-	if binding := set.targetBinding; binding != nil &&
-		len(binding.targets) == len(targets) &&
-		len(binding.owners) == len(targets) {
-		matchesPlan := true
-		for targetIndex, target := range targets {
-			if binding.targets[targetIndex] != target {
-				matchesPlan = false
-				break
-			}
-		}
-		if matchesPlan {
-			copy(owners, binding.owners)
-			return owners
-		}
 	}
 
 	rootPaths := make([]string, 0)
@@ -239,7 +240,10 @@ func (s *Session) bindTargetsToProjects(
 	var unbound []rslintconfig.DiscoveredLintTarget
 	programIndexesByConfig := make(map[string][]int)
 	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Targets, fsys, singleThreaded)
-	directOwners := directRootProgramOwners(set, plan.Targets, fsys, singleThreaded)
+	owners, completeTargetBinding := targetBindingOwners(set, plan.Targets)
+	if !completeTargetBinding {
+		owners = directRootProgramOwners(set, plan.Targets, fsys, singleThreaded)
+	}
 	for targetIndex, target := range plan.Targets {
 		programIndexes, cached := programIndexesByConfig[target.ConfigDirectory]
 		if !cached {
@@ -251,10 +255,19 @@ func (s *Session) bindTargetsToProjects(
 			set,
 			programFiles,
 			programIndexes,
-			directOwners[targetIndex],
+			owners[targetIndex],
 			target,
 			fsys,
 		) {
+			continue
+		}
+		// A targeted ProjectSet carries the loader's complete direct/import/none
+		// decision. Do not let a second scan of retained Programs choose a
+		// different owner; an invalid cached owner safely becomes source-only.
+		if completeTargetBinding {
+			unbound = append(unbound, target)
+			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, target.Path, target.CanonicalPath, target.ConfigDirectory)
+			storeSourcePathMapping(binding.ConfigPathBySourcePath, target.Path, target.CanonicalPath, target.MatchPath(fsys))
 			continue
 		}
 

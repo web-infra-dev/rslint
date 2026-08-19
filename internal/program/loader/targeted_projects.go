@@ -17,7 +17,8 @@ import (
 
 type projectTargetBinding struct {
 	targets []rslintconfig.DiscoveredLintTarget
-	owners  []int
+	// owners is complete: direct-root owner, import-fallback owner, or -1.
+	owners []int
 }
 
 type targetedProjectSlot struct {
@@ -305,7 +306,7 @@ func runTargetConfigTasks(
 
 func (execution *targetedProjectExecution) projectSet(
 	keep []bool,
-	directProjectByTarget []int,
+	ownerProjectByTarget []int,
 	targets []rslintconfig.DiscoveredLintTarget,
 ) ProjectSet {
 	binding := &projectTargetBinding{
@@ -335,7 +336,7 @@ func (execution *targetedProjectExecution) projectSet(
 		set.configOrders = append(set.configOrders, execution.plan.specs[index].configOrders)
 		projectSetIndexByPlanIndex[index] = len(set.compilerPrograms) - 1
 	}
-	for targetIndex, projectIndex := range directProjectByTarget {
+	for targetIndex, projectIndex := range ownerProjectByTarget {
 		if projectIndex < 0 || targetIndex >= len(targets) {
 			continue
 		}
@@ -545,6 +546,7 @@ func (s *Session) BuildTargetProjects(
 		s.context.enableConcurrentProgramQueries()
 	}
 	var keepMu sync.Mutex
+	ownerProjectByTarget := append([]int(nil), directProjectByTarget...)
 	err = runTargetConfigTasks(configDirs, singleThreaded, func(configDir string) error {
 		pending := make(map[int]struct{})
 		for _, targetIndex := range targetIndexesByConfig[configDir] {
@@ -580,6 +582,7 @@ func (s *Session) BuildTargetProjects(
 			for targetIndex := range pending {
 				if execution.containsTarget(projectIndex, targetPlan.Targets[targetIndex]) {
 					delete(pending, targetIndex)
+					ownerProjectByTarget[targetIndex] = projectIndex
 					selected = true
 				}
 			}
@@ -595,7 +598,7 @@ func (s *Session) BuildTargetProjects(
 		return ProjectSet{}, err
 	}
 
-	return execution.projectSet(keep, directProjectByTarget, targetPlan.Targets), nil
+	return execution.projectSet(keep, ownerProjectByTarget, targetPlan.Targets), nil
 }
 
 func (s *Session) BuildTargetProject(

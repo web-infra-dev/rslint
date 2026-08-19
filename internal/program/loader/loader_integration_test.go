@@ -1293,6 +1293,63 @@ func TestBuildTargetProjectFallsBackToFirstImportOnlyAfterRootScan(t *testing.T)
 	}
 }
 
+func TestBuildTargetProjectCarriesCompleteOwnersIntoLoad(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"direct.ts":     `export const direct = 1;`,
+		"main.ts":       `import "./imported";`,
+		"imported.ts":   `export const imported = 1;`,
+		"gap.ts":        `export const gap = 1;`,
+		"tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["direct.ts","main.ts"]}`,
+	})
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
+		testLintTarget(fsys, dir, filepath.Join(dir, "direct.ts")),
+		testLintTarget(fsys, dir, filepath.Join(dir, "imported.ts")),
+		testLintTarget(fsys, dir, filepath.Join(dir, "gap.ts")),
+	}}
+	context := newBuildContext(fsys)
+	session := sessionForTest(context)
+	set, err := session.BuildTargetProject(
+		dir,
+		projectConfig("./tsconfig.json"),
+		plan,
+		true,
+	)
+	if err != nil {
+		t.Fatalf("BuildTargetProject: %v", err)
+	}
+	if set.Len() != 1 || set.targetBinding == nil {
+		t.Fatalf("targeted build returned Programs=%d binding=%v", set.Len(), set.targetBinding)
+	}
+	wantOwners := []int{0, 0, -1}
+	if !slices.Equal(set.targetBinding.owners, wantOwners) {
+		t.Fatalf("complete owners = %v, want %v", set.targetBinding.owners, wantOwners)
+	}
+	if !slices.Equal(set.targetBinding.targets, plan.Targets) {
+		t.Fatalf("binding targets = %v, want %v", set.targetBinding.targets, plan.Targets)
+	}
+
+	binding, err := session.LoadAPI(set, plan, dir, true)
+	if err != nil {
+		t.Fatalf("LoadAPI: %v", err)
+	}
+	if len(binding.TargetsByProgram) != 2 {
+		t.Fatalf("loaded Programs = %d, want configured plus source-only", len(binding.TargetsByProgram))
+	}
+	wantConfigured := []string{
+		tspath.ResolvePath(dir, "direct.ts"),
+		tspath.ResolvePath(dir, "imported.ts"),
+	}
+	if !slices.Equal(binding.TargetsByProgram[0], wantConfigured) {
+		t.Fatalf("configured targets = %v, want %v", binding.TargetsByProgram[0], wantConfigured)
+	}
+	wantGap := []string{tspath.ResolvePath(dir, "gap.ts")}
+	if !slices.Equal(binding.TargetsByProgram[1], wantGap) {
+		t.Fatalf("source-only targets = %v, want %v", binding.TargetsByProgram[1], wantGap)
+	}
+}
+
 func TestBuildTargetProjectSkipsImportFallbackWithUnsupportedExtension(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
@@ -1868,6 +1925,48 @@ func TestLoadProgramsRejectsCaseFoldedSourceWithDifferentCanonicalIdentity(t *te
 	}
 	if got := binding.TargetsByProgram[1]; len(got) != 1 || got[0] != lower {
 		t.Fatalf("lower-case target must bind to its exact compatibility source, got %v", got)
+	}
+}
+
+func TestBuildTargetProjectKeepsDistinctCanonicalCaseIdentities(t *testing.T) {
+	configDir := "/repo"
+	configPath := "/repo/tsconfig.json"
+	upper := "/repo/Source.ts"
+	lower := "/repo/source.ts"
+	fsys := &exactCaseProgramFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			configPath: `{"compilerOptions":{"noLib":true,"noResolve":true},"files":["Source.ts"]}`,
+			upper:      "export const upper = 1;\n",
+			lower:      "export const lower = 2;\n",
+		},
+	}
+	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
+		Path:            lower,
+		CanonicalPath:   lower,
+		ConfigDirectory: configDir,
+	}}}
+	context := newBuildContext(fsys)
+	session := sessionForTest(context)
+	set, err := session.BuildTargetProject(
+		configDir,
+		projectConfig("./tsconfig.json"),
+		plan,
+		false,
+	)
+	if err != nil {
+		t.Fatalf("BuildTargetProject: %v", err)
+	}
+	if set.Len() != 0 {
+		t.Fatalf("distinct lower-case target retained %d upper-case Programs", set.Len())
+	}
+	binding, err := session.LoadAPI(set, plan, configDir, false)
+	if err != nil {
+		t.Fatalf("LoadAPI: %v", err)
+	}
+	if len(binding.TargetsByProgram) != 1 ||
+		!slices.Equal(binding.TargetsByProgram[0], []string{lower}) {
+		t.Fatalf("lower-case target must remain source-only, got %v", binding.TargetsByProgram)
 	}
 }
 

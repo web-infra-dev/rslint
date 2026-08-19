@@ -85,21 +85,40 @@ func TestRootFileIndexUsesDirectAndPhysicalIdentity(t *testing.T) {
 	workers.Wait()
 }
 
-func TestRootFileIndexUsesFilesystemCaseSensitivity(t *testing.T) {
+func TestRootFileIndexUsesCanonicalIdentityInsteadOfGlobalCaseFlag(t *testing.T) {
 	const (
-		root  = "/repo/Source/Index.ts"
-		query = "/REPO/source/index.ts"
+		root     = "/repo/Source/Index.ts"
+		query    = "/REPO/source/index.ts"
+		physical = "/physical/repo/source/index.ts"
 	)
-	base := &rootFileAliasFS{
-		FS:            osvfs.FS(),
-		realPaths:     make(map[string]string),
-		realpathCalls: make(map[string]int),
-	}
-	index := lintprogram.NewRootFileIndex([]string{root}, &caseInsensitiveRootFS{base})
-	if !index.Contains(query, query) {
-		t.Fatal("case-insensitive direct root was not recognized")
-	}
-	if got := base.realpathCallCount(query); got != 0 {
-		t.Fatalf("case-insensitive exact lookup resolved the path %d time(s)", got)
-	}
+
+	t.Run("distinct physical paths remain distinct", func(t *testing.T) {
+		base := &rootFileAliasFS{
+			FS:            osvfs.FS(),
+			realPaths:     make(map[string]string),
+			realpathCalls: make(map[string]int),
+		}
+		index := lintprogram.NewRootFileIndex([]string{root}, &caseInsensitiveRootFS{base})
+		if index.Contains(query, query) {
+			t.Fatal("global case behavior merged distinct canonical paths")
+		}
+	})
+
+	t.Run("same physical path is recognized", func(t *testing.T) {
+		base := &rootFileAliasFS{
+			FS: osvfs.FS(),
+			realPaths: map[string]string{
+				root:  physical,
+				query: physical,
+			},
+			realpathCalls: make(map[string]int),
+		}
+		index := lintprogram.NewRootFileIndex([]string{root}, &caseInsensitiveRootFS{base})
+		if !index.Contains(query, "") {
+			t.Fatal("paths with the same canonical identity were not matched")
+		}
+		if got := base.realpathCallCount(query); got != 1 {
+			t.Fatalf("query was resolved %d time(s), want one", got)
+		}
+	})
 }

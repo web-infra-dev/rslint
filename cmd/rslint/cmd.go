@@ -414,24 +414,59 @@ func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (in
 }
 
 func isBroadProjectLoadScope(
-	allowFiles []string,
 	allowDirs []string,
 	currentDirectory string,
-	useCaseSensitive bool,
+	activeConfigDirectories []string,
+	configTargetScopes map[string]rslintconfig.LintDiscoveryScope,
+	fsys vfs.FS,
 ) bool {
-	if len(allowDirs) == 0 {
-		return len(allowFiles) == 0
+	if len(allowDirs) == 0 || len(activeConfigDirectories) == 0 {
+		return false
 	}
-	options := tspath.ComparePathsOptions{
+	// Global filesystem case behavior is not a path identity: request overlays
+	// may keep case-distinct canonical directories. Realpath below is the only
+	// authority allowed to merge lexical aliases.
+	lexicalOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          currentDirectory,
-		UseCaseSensitiveFileNames: useCaseSensitive,
+		UseCaseSensitiveFileNames: true,
 	}
-	for _, directory := range allowDirs {
-		if tspath.ContainsPath(directory, currentDirectory, options) {
-			return true
+	physicalCurrentDirectory := authoritativeFilesystemPath(currentDirectory, fsys)
+	physicalOptions := tspath.ComparePathsOptions{
+		CurrentDirectory:          physicalCurrentDirectory,
+		UseCaseSensitiveFileNames: true,
+	}
+	physicalScopeDirectories := make([]string, len(allowDirs))
+	if fsys != nil {
+		for index, directory := range allowDirs {
+			physicalScopeDirectories[index] = authoritativeFilesystemPath(directory, fsys)
 		}
 	}
-	return false
+	containsPath := func(path string) bool {
+		for _, directory := range allowDirs {
+			if tspath.ContainsPath(directory, path, lexicalOptions) {
+				return true
+			}
+		}
+		if fsys == nil {
+			return false
+		}
+		physicalPath := authoritativeFilesystemPath(path, fsys)
+		for _, directory := range physicalScopeDirectories {
+			if tspath.ContainsPath(directory, physicalPath, physicalOptions) {
+				return true
+			}
+		}
+		return false
+	}
+	// A recursive directory can use the eager path only when it covers every
+	// active config owner. Invocation CWD is deliberately irrelevant after an
+	// implicit no-argument scope has been normalized to its directory.
+	for _, configDirectory := range activeConfigDirectories {
+		if configTargetScopes[configDirectory].ExplicitOnly || !containsPath(configDirectory) {
+			return false
+		}
+	}
+	return true
 }
 
 func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]rslintconfig.RslintConfig {
@@ -876,13 +911,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: true,
 	}
-	broadProjectLoad := isBroadProjectLoadScope(
-		allowFiles,
-		allowDirs,
-		cwd,
-		fs.UseCaseSensitiveFileNames(),
-	)
-
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
 	// This keeps an explicit --config outside the current directory from
 	// widening the scanned root to the config file's directory.
@@ -894,6 +922,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	programs := projectSet.Programs()
 	programConfigMap := configMap
 	buildSingleConfigPrograms := buildAllPrograms
+	broadProjectLoad := false
 	var (
 		targetPlan                 rslintconfig.LintTargetPlan
 		loadedPrograms             loader.LoadResult
@@ -920,8 +949,25 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			return 1
 		}
 		if !buildAllPrograms {
+			var activeConfigDirectories []string
 			if configMap != nil {
 				programConfigMap = targetPlan.ActiveConfigs(configMap)
+				activeConfigDirectories = make([]string, 0, len(programConfigMap))
+				for configDirectory := range programConfigMap {
+					activeConfigDirectories = append(activeConfigDirectories, configDirectory)
+				}
+			} else if len(targetPlan.Targets) > 0 {
+				activeConfigDirectories = []string{currentDirectory}
+			}
+			broadProjectLoad = isBroadProjectLoadScope(
+				allowDirs,
+				cwd,
+				activeConfigDirectories,
+				configTargetScopes,
+				fs,
+			)
+
+			if configMap != nil {
 				if broadProjectLoad {
 					projectSet, err = programSession.BuildProjects(programConfigMap, singleThreaded)
 				} else {
