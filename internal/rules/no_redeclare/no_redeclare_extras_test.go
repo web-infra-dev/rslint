@@ -134,6 +134,14 @@ func TestNoRedeclareExtras(t *testing.T) {
 				Options: map[string]interface{}{"builtinGlobals": false},
 				Globals: map[string]any{"chatgpt": "readonly"},
 			},
+			// espree-parsed commonjs uses a wrapper scope, so builtins are not program globals.
+			{
+				Code:            "var Object = 0;",
+				FileName:        "a.jsx",
+				TSConfig:        "tsconfig.allow-js.json",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Annex B: nested function declarations use their true scope ----
@@ -372,6 +380,16 @@ func TestNoRedeclareExtras(t *testing.T) {
 				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("Object", 1, 5),
+				},
+			},
+			// typescript-eslint keys module scope on sourceType alone; script keeps global scope.
+			{
+				Code:            "export {};\nvar Object = 0;",
+				FileName:        "a.ts",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 2, 5),
 				},
 			},
 

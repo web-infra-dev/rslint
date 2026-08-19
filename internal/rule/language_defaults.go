@@ -36,6 +36,7 @@ func (i GlobalsInit) access(name string) utils.GlobalAccess {
 type RefStoreInit struct {
 	implicitWrapperBindings []string
 	nonGlobalTopLevelScope  bool
+	globalTopLevelScope     bool
 }
 
 func (i RefStoreInit) hasImplicitWrapperBinding(name string) bool {
@@ -61,6 +62,8 @@ var commonJSGlobalsInit = GlobalsInit{entries: languageGlobalCatalog}
 
 var moduleRefStoreInit = RefStoreInit{nonGlobalTopLevelScope: true}
 
+var scriptRefStoreInit = RefStoreInit{globalTopLevelScope: true}
+
 var commonJSRefStoreInit = RefStoreInit{
 	implicitWrapperBindings: []string{"arguments"},
 	nonGlobalTopLevelScope:  true,
@@ -68,6 +71,7 @@ var commonJSRefStoreInit = RefStoreInit{
 
 var javascriptSourceExtensions = []string{
 	tspath.ExtensionJs,
+	tspath.ExtensionJsx,
 	tspath.ExtensionMjs,
 	tspath.ExtensionCjs,
 }
@@ -83,14 +87,15 @@ func isJavaScriptSourceExtension(fileName string) bool {
 //
 // An omitted source type is filled from the filename for JavaScript files:
 // .js/.mjs select module, .cjs selects commonjs. Other extensions, including
-// .ts/.tsx/.jsx/.cts, keep the empty value. Authored sourceType then selects
-// the inits on every extension. On JavaScript files, commonjs contributes
-// writable exports, read-only global/module/require, a non-global top-level
-// scope, and the wrapper-local arguments binding; module contributes a
-// non-global top-level scope. On TypeScript-flavoured extensions, commonjs
-// contributes only the four CommonJS globals and module contributes no
-// RefStore facts, matching typescript-eslint's scope manager. script and the
-// still-empty TypeScript/JSX value contribute no defaults.
+// .jsx/.ts/.tsx/.cts, keep the empty value. Authored sourceType then selects
+// the inits on every extension. module contributes a non-global top-level
+// scope. commonjs contributes writable exports and read-only
+// global/module/require everywhere; on espree-parsed extensions
+// (.js/.jsx/.mjs/.cjs) it adds the non-global wrapper scope and the
+// wrapper-local arguments binding, while TypeScript-flavoured extensions stop
+// at the four globals, matching typescript-eslint's scope manager. script
+// forces a global program scope even when module syntax is present; the
+// still-empty TypeScript/JSX value contributes no defaults.
 func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (GlobalsInit, RefStoreInit, LanguageOptions) {
 	if languageOptions.SourceType == "" {
 		switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
@@ -108,6 +113,8 @@ func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (
 		return commonJSGlobalsInit, RefStoreInit{}, languageOptions
 	case "module":
 		return GlobalsInit{}, moduleRefStoreInit, languageOptions
+	case "script":
+		return GlobalsInit{}, scriptRefStoreInit, languageOptions
 	}
 	return GlobalsInit{}, RefStoreInit{}, languageOptions
 }

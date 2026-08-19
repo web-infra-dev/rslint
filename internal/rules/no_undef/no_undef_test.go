@@ -1905,6 +1905,12 @@ func TestNoUndefLanguageDefaults(t *testing.T) {
 				FileName:        "authored-commonjs.ts",
 				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
 			},
+			{
+				Code:            `arguments;`,
+				FileName:        "a.jsx",
+				TSConfig:        "tsconfig.allow-js.json",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

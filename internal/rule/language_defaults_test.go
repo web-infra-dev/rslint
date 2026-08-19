@@ -78,15 +78,18 @@ func TestResolveLanguageDefaults(t *testing.T) {
 			commonJSGlobals        bool
 			commonJSWrapper        bool
 			nonGlobalTopLevelScope bool
+			globalTopLevelScope    bool
 		}{
 			{fileName: "file.js", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true, commonJSWrapper: true, nonGlobalTopLevelScope: true},
-			{fileName: "file.js", authored: "script", wantSourceType: "script"},
+			{fileName: "file.js", authored: "script", wantSourceType: "script", globalTopLevelScope: true},
 			{fileName: "file.cjs", authored: "module", wantSourceType: "module", nonGlobalTopLevelScope: true},
-			{fileName: "file.cjs", authored: "script", wantSourceType: "script"},
+			{fileName: "file.cjs", authored: "script", wantSourceType: "script", globalTopLevelScope: true},
 			{fileName: "file.ts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
 			{fileName: "file.ts", authored: "module", wantSourceType: "module", nonGlobalTopLevelScope: true},
-			{fileName: "file.tsx", authored: "script", wantSourceType: "script"},
-			{fileName: "file.jsx", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
+			{fileName: "file.tsx", authored: "script", wantSourceType: "script", globalTopLevelScope: true},
+			{fileName: "file.jsx", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true, commonJSWrapper: true, nonGlobalTopLevelScope: true},
+			{fileName: "file.mts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
+			{fileName: "file.cts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
 		}
 		for _, test := range tests {
 			t.Run(test.fileName+"/"+test.authored, func(t *testing.T) {
@@ -110,6 +113,9 @@ func TestResolveLanguageDefaults(t *testing.T) {
 				}
 				if got := refsInit.nonGlobalTopLevelScope; got != test.nonGlobalTopLevelScope {
 					t.Errorf("nonGlobalTopLevelScope = %v, want %v", got, test.nonGlobalTopLevelScope)
+				}
+				if got := refsInit.globalTopLevelScope; got != test.globalTopLevelScope {
+					t.Errorf("globalTopLevelScope = %v, want %v", got, test.globalTopLevelScope)
 				}
 			})
 		}
