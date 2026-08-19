@@ -56,12 +56,13 @@ type discoveryWalkNode struct {
 	targets            *discoveryTargetTrie
 }
 
-// discoveryTargetTrie bounds a directory catalog walk to the lexical ancestor
-// paths of an already-expanded target set. A nil trie means an unbounded
-// directory-only walk (CLI/LSP); a non-nil leaf still visits that directory so
-// its config can govern a file located directly within it.
+// discoveryTargetTrie bounds a directory walk to branches that can govern an
+// invocation target. A nil trie means the current subtree is unbounded. A
+// recursive node makes its subtree unbounded, while a non-recursive leaf still
+// visits that directory so its sources can govern a file directly within it.
 type discoveryTargetTrie struct {
-	children map[tspath.Path]*discoveryTargetTrie
+	recursive bool
+	children  map[tspath.Path]*discoveryTargetTrie
 }
 
 type suspendedDiscoveryNode struct {
@@ -293,14 +294,14 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 
 // projectExplicitConfigGitignore freezes the invocation-scoped Git projection
 // after the exact config has loaded. Config selection is already complete:
-// full-subtree projection uses the catalog's bounded parallel frontier with one
-// fixed owner, while exact targets reuse the source-chain path used by literal
-// automatic targets. Neither path performs automatic candidate discovery.
+// full and directory-target projections use the catalog's parallel frontier
+// with one fixed owner, while exact-file-only targets reuse the source-chain
+// path used by automatic literals. Neither path discovers config candidates.
 func (builder *configCatalogBuilder) projectExplicitConfigGitignore(state *configLoadState) error {
 	if state == nil || state.failure != nil {
 		return nil
 	}
-	if builder.request.Files != nil {
+	if len(builder.request.Directories) == 0 && builder.request.Files != nil {
 		files := builder.normalizedFiles()
 		seeds := make([]*discoverySeed, 0, len(files))
 		for _, file := range files {
@@ -319,6 +320,14 @@ func (builder *configCatalogBuilder) projectExplicitConfigGitignore(state *confi
 		builder.collectExactTargetGitignore(seeds)
 		return builder.ctx.Err()
 	}
+	var targets *discoveryTargetTrie
+	if len(builder.request.Directories) > 0 {
+		var hasTargets bool
+		targets, hasTargets = builder.explicitProjectionTargets(state.candidate.directory)
+		if !hasTargets {
+			return builder.ctx.Err()
+		}
+	}
 
 	root := state.candidate.directory
 	canonicalRoot := builder.fs.Realpath(root)
@@ -333,7 +342,93 @@ func (builder *configCatalogBuilder) projectExplicitConfigGitignore(state *confi
 		gitDirectory:       root,
 		gitCursor:          gitignore.NewCursor(root, builder.fs.UseCaseSensitiveFileNames()),
 		gitActive:          true,
+		targets:            targets,
 	}})
+}
+
+func (builder *configCatalogBuilder) explicitProjectionTargets(configDir string) (*discoveryTargetTrie, bool) {
+	root := &discoveryTargetTrie{}
+	hasTargets := false
+	for _, file := range builder.normalizedFiles() {
+		collectionPath := rslintconfig.ResolveGitignoreCollectionPath(
+			file.Path,
+			file.CanonicalPath,
+			configDir,
+			builder.fs,
+		)
+		hasTargets = addDiscoveryTarget(
+			root,
+			configDir,
+			tspath.GetDirectoryPath(collectionPath),
+			false,
+			builder.fs.UseCaseSensitiveFileNames(),
+		) || hasTargets
+	}
+	for _, directory := range builder.normalizedDirectoryRoots() {
+		collectionPath := rslintconfig.ResolveGitignoreCollectionDirectory(
+			directory,
+			configDir,
+			builder.fs,
+		)
+		hasTargets = addDiscoveryTarget(
+			root,
+			configDir,
+			collectionPath,
+			true,
+			builder.fs.UseCaseSensitiveFileNames(),
+		) || hasTargets
+	}
+	return root, hasTargets
+}
+
+func addDiscoveryTarget(
+	root *discoveryTargetTrie,
+	configDir string,
+	targetDirectory string,
+	recursive bool,
+	useCaseSensitive bool,
+) bool {
+	relative, within := rslintconfig.RelativePathWithinConfigRoot(
+		targetDirectory,
+		configDir,
+		useCaseSensitive,
+	)
+	if !within {
+		if recursive {
+			if _, containsRoot := rslintconfig.RelativePathWithinConfigRoot(
+				configDir,
+				targetDirectory,
+				useCaseSensitive,
+			); containsRoot {
+				root.recursive = true
+				root.children = nil
+				return true
+			}
+		}
+		return false
+	}
+
+	node := root
+	for _, component := range splitDiscoveryPath(relative) {
+		if node.recursive {
+			return true
+		}
+		if node.children == nil {
+			node.children = make(map[tspath.Path]*discoveryTargetTrie)
+		}
+		identity := tspath.ToPath(component, "", useCaseSensitive)
+		child := node.children[identity]
+		if child == nil {
+			child = &discoveryTargetTrie{}
+			node.children[identity] = child
+		}
+		node = child
+	}
+	if recursive {
+		node.recursive = true
+		node.children = nil
+	}
+	return true
 }
 
 func (builder *configCatalogBuilder) normalizedDirectoryRoots() []string {
@@ -393,31 +488,12 @@ func (builder *configCatalogBuilder) targetAncestorTries(
 	useCaseSensitive := builder.fs.UseCaseSensitiveFileNames()
 	for _, file := range files {
 		for _, root := range roots {
-			relative, within := rslintconfig.RelativePathWithinConfigRoot(file.Path, root, useCaseSensitive)
-			if !within {
-				continue
-			}
 			trie := tries[root]
 			if trie == nil {
 				trie = &discoveryTargetTrie{}
-				tries[root] = trie
 			}
-			relativeDirectory := tspath.GetDirectoryPath(relative)
-			relativeDirectory = strings.ReplaceAll(relativeDirectory, "\\", "/")
-			for _, segment := range strings.Split(relativeDirectory, "/") {
-				if segment == "" || segment == "." {
-					continue
-				}
-				if trie.children == nil {
-					trie.children = make(map[tspath.Path]*discoveryTargetTrie)
-				}
-				key := tspath.ToPath(segment, "", useCaseSensitive)
-				child := trie.children[key]
-				if child == nil {
-					child = &discoveryTargetTrie{}
-					trie.children[key] = child
-				}
-				trie = child
+			if addDiscoveryTarget(trie, root, tspath.GetDirectoryPath(file.Path), false, useCaseSensitive) {
+				tries[root] = trie
 			}
 		}
 	}
@@ -1142,7 +1218,11 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 		node.gitCursor = nextCursor
 		result.gitignoreObservation = observation
 	}
-	if node.targets != nil && len(node.targets.children) == 0 {
+	walkTargets := node.targets
+	if walkTargets != nil && walkTargets.recursive {
+		walkTargets = nil
+	}
+	if walkTargets != nil && len(walkTargets.children) == 0 {
 		return result
 	}
 
@@ -1156,8 +1236,8 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 	children := make([]discoveryWalkNode, 0, len(directories))
 	for _, name := range directories {
 		var childTargets *discoveryTargetTrie
-		if node.targets != nil {
-			childTargets = node.targets.child(name, builder.fs.UseCaseSensitiveFileNames())
+		if walkTargets != nil {
+			childTargets = walkTargets.child(name, builder.fs.UseCaseSensitiveFileNames())
 			if childTargets == nil {
 				continue
 			}
