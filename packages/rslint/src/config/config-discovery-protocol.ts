@@ -61,8 +61,7 @@ export interface FailedConfigModuleResult {
 }
 
 export type ConfigModuleLoadResult =
-  | LoadedConfigModuleResult
-  | FailedConfigModuleResult;
+  LoadedConfigModuleResult | FailedConfigModuleResult;
 
 export interface LoadConfigsResponse {
   transactionId: string;
