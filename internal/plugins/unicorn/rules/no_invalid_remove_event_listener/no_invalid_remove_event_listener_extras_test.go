@@ -71,7 +71,7 @@ func TestNoInvalidRemoveEventListenerExtras(t *testing.T) {
 			tsInvalid(`(target satisfies EventTarget).removeEventListener('click', () => {})`, `=>`, 1),
 
 			// ---- Dimension 4: optional receiver member remains reportable ----
-			// ---- Real-user: #2253 optional receiver regression ----
+			// ---- Real-user: upstream issue 2253 optional receiver regression ----
 			tsInvalid(`this.input?.removeEventListener(event, this.onInputEvent.bind(this), true)`, `bind`, 1),
 
 			// ---- Dimension 4: function expression variants all report their function heads ----
