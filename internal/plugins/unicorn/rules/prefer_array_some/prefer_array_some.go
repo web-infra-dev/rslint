@@ -663,12 +663,12 @@ func isArray(ctx rule.RuleContext, node *ast.Node) bool {
 	return classifyReceiver(ctx, node, arrayTargets, knownNonArrayNames) == classTarget
 }
 
-type typeClass int
+type typeClass = unicornutil.TypeClass
 
 const (
-	classUnknown typeClass = iota
-	classTarget
-	classNonTarget
+	classUnknown   = unicornutil.TypeUnknown
+	classTarget    = unicornutil.TypeTarget
+	classNonTarget = unicornutil.TypeNonTarget
 )
 
 var arrayTargets = utils.NewSetFromItems("Array", "ReadonlyArray")
@@ -755,7 +755,16 @@ func classifyReceiver(ctx rule.RuleContext, node *ast.Node, targetNames, nonTarg
 		return classUnknown
 	}
 	t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
-	return classifyType(ctx, t, targetNames, nonTargetNames)
+	return unicornutil.ClassifyType(ctx, t, unicornutil.TypeClassifierOptions{
+		TargetTypeNames:          targetNames,
+		NonTargetTypeNames:       nonTargetNames,
+		HeritageSymbolFlags:      ast.SymbolFlagsInterface,
+		AllowNullishInMixedUnion: true,
+		IsTargetType: func(t *checker.Type) bool {
+			return targetNames.Has("Array") &&
+				checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
+		},
+	})
 }
 
 // constInitializer returns the initializer expression of a `const` variable
@@ -840,157 +849,4 @@ func isSyntacticNonArrayNode(node *ast.Node) bool {
 		return true
 	}
 	return false
-}
-
-// classifyType mirrors unicorn's getTypeScriptType: recurse through
-// unions/intersections/type-parameter constraints, then decide by the resolved
-// symbol name.
-func classifyType(ctx rule.RuleContext, t *checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	if t == nil {
-		return classUnknown
-	}
-	if utils.IsTypeAnyType(t) || utils.IsTypeUnknownType(t) || utils.IsIntrinsicErrorType(t) {
-		return classUnknown
-	}
-	// null / undefined are nullish → treated as non-target by both callers.
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-		return classNonTarget
-	}
-
-	if utils.IsTypeParameter(t) {
-		constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
-		if constraint == nil {
-			return classUnknown
-		}
-		return classifyType(ctx, constraint, targetNames, nonTargetNames)
-	}
-
-	if utils.IsUnionType(t) {
-		return combineUnion(ctx, utils.UnionTypeParts(t), targetNames, nonTargetNames)
-	}
-	if utils.IsIntersectionType(t) {
-		return combineIntersection(ctx, utils.IntersectionTypeParts(t), targetNames, nonTargetNames)
-	}
-
-	// Array / tuple structural check (mirrors upstream isTargetType).
-	if targetNames.Has("Array") && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
-		return classTarget
-	}
-
-	// Base constraint fallback (e.g. `T extends string[]` reached via apparent
-	// constraint rather than the type-parameter branch above).
-	constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
-	if constraint != nil && constraint != t {
-		return classifyType(ctx, constraint, targetNames, nonTargetNames)
-	}
-
-	name, ok := typeSymbolName(t)
-	if !ok {
-		// A primitive (string / number / boolean / bigint / symbol, literal or
-		// not) or any other intrinsic is never an Array or keyed collection →
-		// non-target. Mirrors upstream, where such a value resolves to
-		// non-target via its intrinsicName or static value.
-		if utils.IsTypeFlagSet(t, checker.TypeFlagsPrimitive|checker.TypeFlagsIntrinsic) {
-			return classNonTarget
-		}
-		return classUnknown
-	}
-	if targetNames.Has(name) {
-		return classTarget
-	}
-	// Interface heritage: `interface Items extends Array<string>` resolves to
-	// the array target through its base types. Upstream reaches the same
-	// conclusion via its interface-heritage walk, which runs with
-	// `checkClassHeritage: false` — `class MyArray extends Array {}` therefore
-	// stays a non-target. Only consult heritage when the receiver could be an
-	// array target; keyed-collection classification does not widen through it.
-	if targetNames.Has("Array") && classifyHeritage(ctx, t, targetNames, nonTargetNames) == classTarget {
-		return classTarget
-	}
-	return classNonTarget
-}
-
-// classifyHeritage inspects the base types of an interface symbol, returning
-// classTarget when any base resolves to the target classification. Classes are
-// excluded to match upstream's `checkClassHeritage: false`.
-func classifyHeritage(ctx rule.RuleContext, t *checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	symbol := checker.Type_symbol(t)
-	if symbol == nil || symbol.Flags&ast.SymbolFlagsInterface == 0 {
-		return classUnknown
-	}
-	declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)
-	if declared == nil {
-		return classUnknown
-	}
-	for _, base := range checker.Checker_getBaseTypes(ctx.TypeChecker, declared) {
-		if classifyType(ctx, base, targetNames, nonTargetNames) == classTarget {
-			return classTarget
-		}
-	}
-	return classUnknown
-}
-
-func combineUnion(ctx rule.RuleContext, parts []*checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	// Filter nullish parts (normalizeType folds nullish → nonTarget, and a
-	// union is target only when every non-nullish part is target).
-	filtered := make([]typeClass, 0, len(parts))
-	for _, part := range parts {
-		if utils.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-			continue
-		}
-		filtered = append(filtered, classifyType(ctx, part, targetNames, nonTargetNames))
-	}
-	if len(filtered) == 0 {
-		return classNonTarget
-	}
-	allTarget := true
-	allNonTarget := true
-	for _, c := range filtered {
-		if c != classTarget {
-			allTarget = false
-		}
-		if c != classNonTarget {
-			allNonTarget = false
-		}
-	}
-	if allTarget {
-		return classTarget
-	}
-	if allNonTarget {
-		return classNonTarget
-	}
-	return classUnknown
-}
-
-func combineIntersection(ctx rule.RuleContext, parts []*checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	classes := make([]typeClass, 0, len(parts))
-	for _, part := range parts {
-		classes = append(classes, classifyType(ctx, part, targetNames, nonTargetNames))
-	}
-	for _, c := range classes {
-		if c == classTarget {
-			return classTarget
-		}
-	}
-	for _, c := range classes {
-		if c != classNonTarget {
-			return classUnknown
-		}
-	}
-	return classNonTarget
-}
-
-// typeSymbolName returns the symbol name of a type (its own symbol, falling
-// back to the alias symbol), mirroring upstream's `type.getSymbol() ??
-// type.aliasSymbol` + `symbol.getName()`.
-func typeSymbolName(t *checker.Type) (string, bool) {
-	if sym := checker.Type_symbol(t); sym != nil && sym.Name != "" {
-		return sym.Name, true
-	}
-	if alias := checker.Type_alias(t); alias != nil {
-		if sym := alias.Symbol(); sym != nil && sym.Name != "" {
-			return sym.Name, true
-		}
-	}
-	return "", false
 }
