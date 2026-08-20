@@ -159,7 +159,7 @@ var { category_id = 1 } = query;
 
 ## Differences from ESLint
 
-- A parameter carrying a type annotation is reported over the parameter name alone. ESLint with a TypeScript parser reports over the name and its annotation together, so on `function f(a_1: string) {}` the report ends at column 15 here and at column 26 there.
+- A name carrying a type annotation, a `?`, or a `!` is reported over the name alone. ESLint with a TypeScript parser reports over the name and everything the annotation adds, so on `function f(a_1: string) {}` the report ends at column 15 here and at column 26 there, and on `let a_1!: number;` at column 8 here and at column 17 there.
 
 ## Original Documentation
 

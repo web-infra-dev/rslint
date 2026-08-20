@@ -227,10 +227,10 @@ func TestIdMatchExtrasBranches(t *testing.T) {
 				Code: `var noOptionsAtAll = 1;
 var __weird_$name = 2;`,
 			},
-			// ---- Locks in the rule's own guard: a pattern that is not a regexp checks nothing ----
+			// ---- Locks in the rule's own guard: a pattern only the `u` flag rejects checks nothing ----
 			{
 				Code:    `var __foo = 1;`,
-				Options: []any{`(`},
+				Options: []any{`\p`},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -450,6 +450,29 @@ var __weird_$name = 2;`,
 						Column:    14,
 						EndLine:   1,
 						EndColumn: 17,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() ObjectPattern arm 3: an assignment pattern reports both nodes too ----
+			{
+				Code:    `({ a_1: a_1 } = o);`,
+				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    4,
+						EndLine:   1,
+						EndColumn: 7,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    9,
+						EndLine:   1,
+						EndColumn: 12,
 					},
 				},
 			},

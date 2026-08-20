@@ -107,7 +107,7 @@ func (r *idMatch) isInvalid(name string) bool {
 // gives the same answer and only asks about names that are already invalid,
 // which keeps the scope lookup off the path every identifier takes.
 func (r *idMatch) report(node *ast.Node, name string) {
-	if r.isReferenceToGlobalVariable(node, name) || r.isExternallyDeclaredType(node) {
+	if r.isReferenceToGlobalVariable(node, name) || r.isExternallyDeclaredType(node, name) {
 		return
 	}
 	r.ctx.ReportNode(node, messageNotMatch(name, r.opts.pattern))
@@ -290,17 +290,20 @@ func (r *idMatch) shouldReport(node *ast.Node, effectiveParent *ast.Node, name s
 // linted file does not declare. Those names are outside the author's control,
 // so upstream leaves them alone.
 func (r *idMatch) isReferenceToGlobalVariable(node *ast.Node, name string) bool {
-	if !r.ctx.Globals.Access(name).IsDeclared() || isNonReferenceIdentifier(node) {
-		return false
-	}
-	if r.ctx.Refs == nil {
-		return !utils.IsShadowed(node, name)
-	}
 	// A name this file declares is the author's, however global the spelling.
-	// Asking the reference index costs a scope-chain lookup, where scanning
-	// for a shadowing declaration costs a walk of the whole file — and this
-	// question is asked of every unmatched occurrence of a global name.
-	return r.ctx.Refs.ResolveInFile(node) == nil
+	return r.ctx.Globals.Access(name).IsDeclared() && !isNonReferenceIdentifier(node) &&
+		!r.isDeclaredInFile(node, name)
+}
+
+// isDeclaredInFile reports whether the linted file itself declares or imports
+// the name node reads. Asking the reference index costs a scope-chain lookup,
+// where scanning for a shadowing declaration costs a walk of the whole file —
+// and this question is asked of every unmatched occurrence of a global name.
+func (r *idMatch) isDeclaredInFile(node *ast.Node, name string) bool {
+	if r.ctx.Refs == nil {
+		return utils.IsShadowed(node, name)
+	}
+	return r.ctx.Refs.ResolveInFile(node) != nil
 }
 
 // isNonReferenceIdentifier reports whether an identifier names something rather
@@ -333,9 +336,18 @@ func isNonReferenceIdentifier(node *ast.Node) bool {
 // to answer this to stay usable on TypeScript: without it every `Record<K, V>`
 // in the project is reported against a pattern its author never chose. A name
 // the file itself declares or imports still counts as the author's.
-func (r *idMatch) isExternallyDeclaredType(node *ast.Node) bool {
-	if r.ctx.Refs == nil || r.ctx.SourceFile == nil || !ast.IsPartOfTypeNode(node) {
+func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
+	if r.ctx.SourceFile == nil || !ast.IsPartOfTypeNode(node) {
 		return false
+	}
+	// The standard library's own names are answered without asking for a
+	// symbol, because a lib declaration reaches Resolve only through its
+	// TypeChecker fallback: asking there alone reports `Record` in a file no
+	// tsconfig owns and stays quiet in one a tsconfig does. This list is the
+	// type-capable global scope typescript-eslint seeds, which is where its
+	// own scope model finds these names.
+	if rule.IsDefaultTypeScriptTypeGlobal(name) && !r.isDeclaredInFile(node, name) {
+		return true
 	}
 	symbol := r.ctx.Refs.Resolve(node)
 	if symbol == nil || len(symbol.Declarations) == 0 {
