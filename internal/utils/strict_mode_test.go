@@ -143,10 +143,11 @@ func TestIsInStrictMode(t *testing.T) {
 }
 
 // TestIsInStrictModeByFileExtension covers the extensions TypeScript hands an
-// ExternalModuleIndicator on the strength of the name alone. .cjs/.cts get one
-// so they receive their own top-level scope, but they stay CommonJS — sloppy
-// mode — until they use module syntax themselves; .mjs/.mts are genuine ESM
-// either way.
+// ExternalModuleIndicator on the strength of the name alone. .cjs gets one so
+// it receives its own top-level scope, but it stays CommonJS — sloppy mode —
+// until it uses module syntax itself. .mjs/.mts are genuine ESM either way, and
+// so is .cts: ESLint's default language selection picks CommonJS for .cjs
+// alone.
 func TestIsInStrictModeByFileExtension(t *testing.T) {
 	t.Parallel()
 
@@ -162,7 +163,7 @@ func TestIsInStrictModeByFileExtension(t *testing.T) {
 			code:     `if (true) function f() {}`,
 			fileName: "commonjs.cts",
 			tsconfig: "tsconfig.json",
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "cts with export",

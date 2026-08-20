@@ -81,9 +81,9 @@ var NoImplicitGlobalsRule = rule.Rule{
 		// ESLint records an implicit global only for a write in sloppy-mode
 		// code, so top-level strictness decides whether a leak is reportable.
 		// It comes from the same module-ness the declaration checks use, minus
-		// CommonJS: a .cjs/.cts file has its own top-level scope without being
-		// an ES module, so its top level stays sloppy until it uses module
-		// syntax itself.
+		// CommonJS: a .cjs file has its own top-level scope without being an ES
+		// module, so its top level stays sloppy until it uses module syntax
+		// itself.
 		strictTopLevel := hasNonGlobalTopLevelScope &&
 			(utils.HasModuleSyntax(ctx.SourceFile) || !utils.IsCommonJSFileExtension(ctx.SourceFile.FileName()))
 
@@ -141,8 +141,10 @@ func reportDeclaration(ctx rule.RuleContext, declNode *ast.Node, name string, ki
 func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node, opts options) {
 	if node.Flags&ast.NodeFlagsAmbient != 0 {
 		// `declare var x;` (bare or inside `declare global { ... }`) produces
-		// no runtime binding at all, so it can't leak or shadow anything —
-		// an ESLint-invisible TypeScript-only shape.
+		// no runtime binding at all, so it can't leak or shadow anything.
+		// Upstream reports the bare form — the scope manager gives it an
+		// ordinary Variable def — but "wrap in an IIFE" is not advice an
+		// ambient declaration can act on; see the rule doc's differences list.
 		return
 	}
 	isVar := utils.IsVarKeyword(node)
@@ -201,8 +203,10 @@ func lexicalDeclarationKind(flags ast.NodeFlags) (kind string, ok bool) {
 func checkFunctionDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node) {
 	fn := node.AsFunctionDeclaration()
 	if fn == nil || node.Body() == nil {
-		// Bodyless overload/ambient signatures are a TypeScript-only shape
-		// with no ESLint analog; only a real function declaration binds a name.
+		// Only a real function declaration binds a name: an overload signature
+		// shares the implementation's binding and an ambient one has no runtime
+		// binding at all. Upstream counts one declaration per signature and
+		// reports ambient forms too; see the rule doc's differences list.
 		return
 	}
 	nameNode := fn.Name()
@@ -217,9 +221,10 @@ func checkFunctionDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNo
 
 func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node) {
 	if node.Flags&ast.NodeFlagsAmbient != 0 {
-		// `declare class Foo {}` produces no runtime binding, unlike a
-		// bodyless function declaration a class always has a body — an
-		// ESLint-invisible TypeScript-only shape.
+		// `declare class Foo {}` produces no runtime binding; unlike a function
+		// declaration a class always has a body, so the ambient flag is the
+		// only signal. Upstream reports it; see the rule doc's differences
+		// list.
 		return
 	}
 	cls := node.AsClassDeclaration()
@@ -279,10 +284,10 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 
 // findPureAssignmentRoot walks from a candidate write-target identifier up
 // through destructuring containers and transparent TS wrappers (parens,
-// non-null assertions) to the enclosing pure `=` assignment or for-in/for-of
-// statement, mirroring upstream's ASSIGNMENT_NODES walk of
-// reference.identifier.parent. Alongside the root it returns how many write
-// references the scope manager records for the identifier: the assignment
+// non-null assertions, `as` and `<T>` assertions) to the enclosing pure `=`
+// assignment or for-in/for-of statement, mirroring upstream's ASSIGNMENT_NODES
+// walk of reference.identifier.parent. Alongside the root it returns how many
+// write references the scope manager records for the identifier: the assignment
 // itself, plus one for every destructuring default the identifier sits under,
 // since eslint-scope adds a write per enclosing AssignmentPattern before the
 // one for the assignment. `[[foo = 1] = []] = arr` therefore reports three
@@ -290,12 +295,11 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 // write target: compound/logical assignment operators and update expressions
 // read as well as write, so ESLint's scope analysis (and this walk) does not
 // treat them as leak/readonly-assignment candidates. It also returns nil when
-// the write happens through an opaque TS wrapper (`as`, `<T>`, `satisfies`) —
-// ESLint's scope manager only recognizes Identifier/ObjectPattern/ArrayPattern
-// (and their spreads) as assignment patterns, so a write reaching an
-// AssignmentExpression's Left through one of those wrappers is treated as a
-// plain read-write reference instead, the same reasoning behind
-// no_global_assign's isWriteThroughTypeAssertion exclusion.
+// the write happens through a `satisfies` expression: the scope manager unwraps
+// an AssignmentExpression's Left through TSAsExpression, TSTypeAssertion and
+// TSNonNullExpression before deciding whether it is a pattern, but
+// TSSatisfiesExpression is absent from that list, so a write reaching Left
+// through it stays a plain read-write reference.
 func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 	current := node
 	writes := 1
@@ -349,7 +353,8 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			current = parent
 
 		case ast.KindSpreadElement, ast.KindSpreadAssignment,
-			ast.KindParenthesizedExpression, ast.KindNonNullExpression:
+			ast.KindParenthesizedExpression, ast.KindNonNullExpression,
+			ast.KindAsExpression, ast.KindTypeAssertionExpression:
 			current = parent
 
 		default:

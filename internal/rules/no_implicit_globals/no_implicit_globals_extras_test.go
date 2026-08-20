@@ -23,12 +23,10 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// ---- Dimension 4: receiver wrappers, opaque TS wrappers ----
 
-			// `as`/`satisfies` writes are not eslint-scope-recognized patterns
-			// (see findPureAssignmentRoot doc comment); mirrors
-			// no_global_assign's isWriteThroughTypeAssertion exclusion.
-			{Code: `(foo as any) = 1;`},
+			// A `satisfies` write is not an eslint-scope-recognized pattern,
+			// unlike the `as`/`<T>` assertions the scope manager unwraps (see
+			// findPureAssignmentRoot doc comment).
 			{Code: `(foo satisfies any) = 1;`},
-			{Code: `(Array as any) = 1;`},
 			{Code: `(Array satisfies any) = 1;`},
 
 			// ---- Dimension 4: declaration vs expression forms ----
@@ -55,6 +53,9 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{Code: `const [] = [];`, Options: lexical},
 
 			// ---- Dimension 4: `declare` / ambient forms have no runtime binding ----
+			//
+			// A documented divergence: upstream reports the bare `declare`
+			// forms and each overload signature (see the rule doc).
 
 			{Code: `declare var foo: number;`},
 			{Code: `declare function foo(): void;`},
@@ -84,8 +85,10 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// even with no import/export syntax of its own, so its top level is
 			// strict and cannot leak.
 			{Code: `foo = 1;`, FileName: "js/default-module-leak.js", TSConfig: "tsconfig.allow-js.json"},
-			// A .cts becomes strict once it really is an ES module, even though
-			// its extension alone would leave it CommonJS.
+			// ESLint's default language selection picks CommonJS for .cjs alone,
+			// so a .cts follows the module default and its top level is strict
+			// whether or not it carries module syntax of its own.
+			{Code: `foo = 1;`, FileName: "cts/default-module-leak.cts"},
 			{Code: `export {}; foo = 1;`, FileName: "cts/module-leak.cts"},
 
 			// ---- `/* exported */` exempts the read-only global assignment ----
@@ -111,13 +114,26 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Code:   `((foo)) = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
-			// Non-null assertion is transparent too (unlike `as`/`satisfies`).
+			// Non-null and type assertions are transparent too (unlike
+			// `satisfies`).
 			{
 				Code:   `foo! = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 			{
 				Code:   `Array! = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:   `(foo as any) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 17}},
+			},
+			{
+				Code:   `(<any>foo) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:   `(Array as any) = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
 			},
 			{
@@ -147,6 +163,14 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{
 				Code:   `function outer() { function inner() {} }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalNonLexicalBinding"}},
+			},
+
+			// An overload pair binds one name, so only the implementation is
+			// reported. Upstream counts one def per signature and reports the
+			// pair twice — a documented divergence (see the rule doc).
+			{
+				Code:   "function foo(a: string): void;\nfunction foo(a: any): void {}",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalNonLexicalBinding", Line: 2}},
 			},
 
 			// `var` hoists past a bare block to the true global scope — this
@@ -320,11 +344,6 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Code:     `foo = 1;`,
 				FileName: "cjs/commonjs-leak.cjs",
 				TSConfig: "tsconfig.allow-js.json",
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
-			},
-			{
-				Code:     `foo = 1;`,
-				FileName: "cts/commonjs-leak.cts",
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 

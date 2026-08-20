@@ -12,10 +12,10 @@ import (
 //   - The node is inside a class body (class bodies are implicitly strict in ES2015+)
 func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	// ES modules are always strict. ast.IsExternalModule also reports true for
-	// .cjs/.cts files with no import/export at all: TS forces their
-	// ExternalModuleIndicator so they get their own (non-global) top-level
-	// scope, but they're still CommonJS — sloppy mode by default — not real ES
-	// modules. Such a file is strict only once it uses module syntax itself.
+	// a .cjs file with no import/export at all: TS forces its
+	// ExternalModuleIndicator so it gets its own (non-global) top-level scope,
+	// but it is still CommonJS — sloppy mode by default — not a real ES module.
+	// Such a file is strict only once it uses module syntax itself.
 	if ast.IsExternalModule(sourceFile) &&
 		(HasModuleSyntax(sourceFile) || !IsCommonJSFileExtension(sourceFile.FileName())) {
 		return true
@@ -62,18 +62,13 @@ func HasModuleSyntax(sourceFile *ast.SourceFile) bool {
 }
 
 // IsCommonJSFileExtension reports whether fileName's extension makes the file
-// CommonJS rather than an ES module: .cjs and .cts. Both still get their own
-// (non-global) top-level scope — .cjs from ESLint's default language selection,
-// .cts from TypeScript forcing an ExternalModuleIndicator — so callers deriving
-// module-ness from scoping need this to tell the two apart. .mjs/.mts are
-// excluded: those are genuine ESM.
+// CommonJS rather than an ES module. ESLint's default language selection picks
+// CommonJS for exactly one extension, .cjs; every other name, .cts included,
+// falls back to the module default. A .cjs file still gets its own (non-global)
+// top-level scope, so callers deriving module-ness from scoping need this to
+// tell that wrapper scope apart from a real ES module's.
 func IsCommonJSFileExtension(fileName string) bool {
-	switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
-	case tspath.ExtensionCjs, tspath.ExtensionCts:
-		return true
-	default:
-		return false
-	}
+	return tspath.GetAnyExtensionFromPath(fileName, nil, false) == tspath.ExtensionCjs
 }
 
 // HasUseStrictDirective checks if a block or source file starts with a "use strict" directive.
