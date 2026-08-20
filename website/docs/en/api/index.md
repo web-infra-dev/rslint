@@ -16,9 +16,13 @@ Use the configuration exports to compose flat configs without constructing inter
 | [`globalIgnores`](/api/configuration/global-ignores) | Creates a global ignore entry               |
 | [`globals`](/api/configuration/globals)              | Lazily loaded runtime-global catalog        |
 
-## Presets
+## Plugin API
 
-| API                                                   | Presets                                             |
+These exports provide the configuration API for Rslint's built-in rule groups and plugins. The rules are compiled into Rslint, so the upstream ESLint plugins do not need to be installed. Each page lists the upstream project its rules are based on and maps every available Rslint preset to its upstream configuration source.
+
+An upstream mapping describes the compatibility source, not a byte-for-byte copy. Rslint presets include the rules Rslint currently supports and may contain adaptations for its native runtime.
+
+| API                                                   | Description                                         |
 | ----------------------------------------------------- | --------------------------------------------------- |
 | [`js`](/api/presets/js)                               | JavaScript                                          |
 | [`ts`](/api/presets/ts)                               | TypeScript baseline, strict, and stylistic variants |

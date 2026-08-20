@@ -1,6 +1,6 @@
 import type { RslintConfigEntry } from '../define-config.js';
 
-// Aligned with official eslint-plugin-unicorn@72.x recommended.
+// Aligned with official eslint-plugin-unicorn@73.x recommended.
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 // The official preset also injects `languageOptions.globals` (Array, Promise, Map, …);
 // rslint declares those ECMAScript built-ins as readonly globals already, so that
@@ -20,6 +20,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/catch-error-name': 'error', // not implemented
     // 'unicorn/class-reference-in-static-methods': 'error', // not implemented
     // 'unicorn/comment-content': 'off', // not implemented
+    // 'unicorn/consistent-arrow-return-style': 'off', // not implemented
     // 'unicorn/consistent-assert': 'error', // not implemented
     // 'unicorn/consistent-boolean-name': 'error', // not implemented
     // 'unicorn/consistent-class-member-order': 'error', // not implemented
@@ -49,6 +50,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/id-match': 'off', // not implemented
     // 'unicorn/import-style': 'error', // not implemented
     // 'unicorn/isolated-functions': 'error', // not implemented
+    // 'unicorn/iteration-fallback-style': 'off', // not implemented
     // 'unicorn/logical-assignment-operators': 'error', // not implemented
     // 'unicorn/max-nested-calls': 'error', // not implemented
     // 'unicorn/name-replacements': 'error', // not implemented
@@ -72,6 +74,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-async-promise-finally': 'error', // not implemented
     // 'unicorn/no-await-expression-member': 'error', // not implemented
     'unicorn/no-await-in-promise-methods': 'error',
+    // 'unicorn/no-barrel-files': 'off', // not implemented
     // 'unicorn/no-blob-to-file': 'error', // not implemented
     // 'unicorn/no-boolean-sort-comparator': 'error', // not implemented
     // 'unicorn/no-break-in-nested-loop': 'error', // not implemented
@@ -170,6 +173,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-unsafe-dom-html': 'off', // not implemented
     // 'unicorn/no-unsafe-promise-all-settled-values': 'error', // not implemented
     // 'unicorn/no-unsafe-property-key': 'error', // not implemented
+    // 'unicorn/no-unsafe-sqlite-interpolation': 'error', // not implemented
     // 'unicorn/no-unsafe-string-replacement': 'error', // not implemented
     // 'unicorn/no-unused-array-method-return': 'error', // not implemented
     // 'unicorn/no-unused-properties': 'off', // not implemented
@@ -342,6 +346,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/require-passive-events': 'error', // not implemented
     // 'unicorn/require-post-message-target-origin': 'off', // not implemented
     // 'unicorn/require-proxy-trap-boolean-return': 'error', // not implemented
+    // 'unicorn/single-line-block-comment-style': 'error', // not implemented
     // 'unicorn/string-content': 'off', // not implemented
     // 'unicorn/switch-case-braces': 'error', // not implemented
     // 'unicorn/switch-case-break-position': 'error', // not implemented
