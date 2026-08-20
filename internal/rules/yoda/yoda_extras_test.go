@@ -106,6 +106,16 @@ func TestYodaExtras(t *testing.T) {
 			// RegExp via ToPrimitive to its source text, so "/a/" <= "/b/" compares
 			// lexicographically and the range is ascending ----
 			{Code: `if (/a/ <= x && x < /b/) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
+			// ---- Bug fix: a string range bound is coerced by JS's ToNumber, which
+			// reads an unsigned `0x`/`0o`/`0b` integer, unlike Go's own float parsing ----
+			{Code: `if ('0x10' <= x && x < 20) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if ('0o17' <= x && x < 20) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
+			// ---- Bug fix: ToNumber and StringToBigInt both trim a U+FEFF ZWNBSP off
+			// a string bound, which is ECMAScript whitespace but not Go's ----
+			{Code: "if ('\ufeff5' <= x && x < 10) {}", Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: "if (1n <= x && x < '\ufeff2') {}", Options: []any{"never", map[string]any{"exceptRange": true}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Real-user: optional chaining under "always" mode ----
@@ -219,6 +229,28 @@ func TestYodaExtras(t *testing.T) {
 				Output:  []string{`if (x >= "9007199254740993" && x < 9007199254740992n) {}`},
 				Options: []any{"never", map[string]any{"exceptRange": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5}},
+			},
+
+			// ---- Bug fix: ToNumber has no grammar for a digit separator, nor for any
+			// spelling of Infinity but that one, so neither string is a bound the
+			// range below it ascends to. Go's ParseFloat reads both ----
+			{
+				Code:    `if ('1_000' <= x && x < 2000) {}`,
+				Output:  []string{`if (x >= '1_000' && x < 2000) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 17}},
+			},
+			{
+				Code:    `if (5 <= x && x < 'INFINITY') {}`,
+				Output:  []string{`if (x >= 5 && x < 'INFINITY') {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 11}},
+			},
+			{
+				Code:    "if (2n <= x && x < '\ufeff1') {}",
+				Output:  []string{"if (x >= 2n && x < '\ufeff1') {}"},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 12}},
 			},
 		},
 	)

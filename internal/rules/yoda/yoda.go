@@ -6,13 +6,13 @@ import (
 	"math"
 	"math/big"
 	"strconv"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed yoda.schema.json
@@ -186,7 +186,7 @@ func (v literalValue) lessOrEqual(other literalValue) bool {
 // fails to parse, matching JS returning undefined (which makes the
 // comparison false, not a numeric fallback).
 func stringToBigInt(s string) (*big.Int, bool) {
-	rest := strings.TrimSpace(s)
+	rest := ecmascript.StringTrim(s)
 	if rest == "" {
 		return big.NewInt(0), true
 	}
@@ -239,25 +239,17 @@ func compareBigIntFloat(b *big.Int, f float64) (cmp int, ok bool) {
 	return new(big.Rat).SetInt(b).Cmp(new(big.Rat).SetFloat64(f)), true
 }
 
-// numeric converts v to a float64 following JS's ToNumber coercion closely
-// enough for range-test bound comparison: numbers convert directly, strings
-// parse as a JS number literal (empty/blank is 0, anything else that doesn't
-// parse is NaN). lessOrEqual never calls this for a bigint bound — every
+// numeric converts v to a float64 the way JS's ToNumber coerces a bound:
+// numbers convert directly and strings read as a JS numeric literal, which is
+// a wider set of spellings than Go's own float parsing accepts and a narrower
+// one in places. lessOrEqual never calls this for a bigint bound — every
 // bigint/other-kind pairing has its own exact comparison above.
 func (v literalValue) numeric() float64 {
 	switch v.kind {
 	case "number":
 		return v.num
 	case "string":
-		trimmed := strings.TrimSpace(v.str)
-		if trimmed == "" {
-			return 0
-		}
-		f, err := strconv.ParseFloat(trimmed, 64)
-		if err != nil {
-			return math.NaN()
-		}
-		return f
+		return ecmascript.StringToNumber(v.str)
 	}
 	return math.NaN()
 }
