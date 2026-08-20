@@ -56,9 +56,11 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-test-go
 
-      - name: Unit Test
-        if: matrix.runner != 'rspack-windows-2022-large'
-        run: go test -count=1 -p 16 -parallel 16 ./cmd/... ./internal/...
+      - name: Unit Test (Linux)
+        if: matrix.runner == 'rspack-ubuntu-22.04-large'
+        run: go test -count=1 ./cmd/... ./internal/...
+        env:
+          GOMAXPROCS: 16
 
       - name: Unit Test (Windows)
         if: matrix.runner == 'rspack-windows-2022-large'
@@ -93,6 +95,12 @@ jobs:
             go test -p $packageParallelism -count=1 $batch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+      # Fallback for any runner without a dedicated step above: macOS today,
+      # plus anything later added to the matrix. Uses the runner's own count.
+      - name: Unit Test
+        if: matrix.runner != 'rspack-ubuntu-22.04-large' && matrix.runner != 'rspack-windows-2022-large'
+        run: go test -count=1 ./cmd/... ./internal/...
 
   lint:
     name: Lint&Check
