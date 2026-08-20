@@ -6,9 +6,9 @@
 //
 // N/A: Dimension 3 (autofix boundaries) — the rule emits neither a fix nor a
 // suggestion, so there is no edit demand to keep invariant.
-// N/A: Dimension 4 ancestor walks — every decision reads the identifier's
-// immediate parent, so no traversal can bleed across an arrow body, a method
-// body, or a class static block.
+// N/A: Dimension 4 scope-container walks — the rule classifies an identifier
+// from the expression around it and never looks for an enclosing function,
+// method, arrow, or class static block, so no traversal can bleed across one.
 // cspell:ignore axios
 package id_denylist
 
@@ -77,9 +77,27 @@ func TestIdDenylistExtras(t *testing.T) {
 			// nothing, in a pattern the key half is skipped and the reference half decides.
 			{Code: `({ Number } = x);`, Options: deny("Number")},
 
+			// A denied name is matched against the private name without its `#`, so
+			// denying the spelling with the `#` matches nothing.
+			{Code: `class C { #bar; }`, Options: deny("#bar")},
+
+			// A literal that only feeds a member access is read as a value, however
+			// the result of that access is then destructured.
+			{Code: `[[obj.b][0]] = d;`, Options: deny("b")},
+			{Code: `[...[obj.b][0]] = d;`, Options: deny("b")},
+			{Code: `({ x: { a: obj.b }.c } = d);`, Options: deny("b")},
+			{Code: `({ a: { ...obj.b }.c } = d);`, Options: deny("b")},
+
+			// Parentheses around a dynamic import's options object, or around a nested
+			// attribute value, still leave their keys import attributes.
+			{Code: `import('x', ({ type: 'json' }));`, Options: deny("type")},
+			{Code: `import('x', { with: ({ type: 'json' }) });`, Options: deny("type")},
+
 			// ---- Dimension 4: JSX name positions, which upstream parses as JSXIdentifier
 			// nodes that this rule's Identifier listener never visits ----
 			{Code: `const x = <Foo.Bar />;`, Options: deny("Foo", "Bar"), Tsx: true},
+			{Code: `const x = <svg xlink:href="a" />;`, Options: deny("xlink", "href", "svg"), Tsx: true},
+			{Code: `const x = <a:b />;`, Options: deny("a", "b"), Tsx: true},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized receiver and parenthesized assignment target ----
@@ -122,6 +140,13 @@ func TestIdDenylistExtras(t *testing.T) {
 			{Code: `class foo { m() { class foo {} } }`, Options: deny("foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 7), restricted("foo", 1, 25)}},
 			{Code: `const {a: {b: {c}}} = d;`, Options: deny("a", "b", "c"), Errors: []rule_tester.InvalidTestCaseError{restricted("c", 1, 16)}},
 
+			// A literal that only feeds a member access is read as a value, so its own
+			// members are checked as an object literal's rather than a pattern's.
+			{Code: `[{ a: 1 }.b] = c;`, Options: deny("a"), Errors: []rule_tester.InvalidTestCaseError{restricted("a", 1, 4)}},
+			{Code: `[{ a: obj.b }.c] = d;`, Options: deny("a", "b"), Errors: []rule_tester.InvalidTestCaseError{restricted("a", 1, 4)}},
+			{Code: `({ a: { b: 1 }.c } = d);`, Options: deny("b"), Errors: []rule_tester.InvalidTestCaseError{restricted("b", 1, 9)}},
+			{Code: `[{ Number }.x] = y;`, Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 4)}},
+
 			// ---- Dimension 4: spread, rest, body-absent and empty forms ----
 			{Code: `[...foo.bar] = baz;`, Options: deny("bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("bar", 1, 9)}},
 			{Code: `const {...bar} = baz;`, Options: deny("bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("bar", 1, 11)}},
@@ -162,6 +187,9 @@ function foo(a: any) {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTes
 			{Code: `import({ with: { type: 1 } });`, Options: deny("type"), Errors: []rule_tester.InvalidTestCaseError{restricted("type", 1, 18)}},
 			{Code: `import('x', { [w]: 1 });`, Options: deny("w"), Errors: []rule_tester.InvalidTestCaseError{restricted("w", 1, 16)}},
 			{Code: `let obj = { get with() { return 1; } };`, Options: deny("with"), Errors: []rule_tester.InvalidTestCaseError{restricted("with", 1, 17)}},
+			// The nested-key recursion reaches the computed-key guard: a key
+			// spelled `[w]` names nothing, so what it holds is not an attribute.
+			{Code: `import('x', { [w]: { type: 1 } });`, Options: deny("type", "w"), Errors: []rule_tester.InvalidTestCaseError{restricted("w", 1, 16), restricted("type", 1, 22)}},
 
 			// Locks in upstream's two roles for a shorthand property, which tsgo spells with
 			// a single node: in an object literal the key half is checked and resolves to
@@ -170,9 +198,25 @@ function foo(a: any) {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTes
 			{Code: `var bar = 1; ({bar} = x);`, Options: deny("bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("bar", 1, 5), restricted("bar", 1, 16)}},
 			{Code: `x = { Number };`, Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 7)}},
 
-			// Locks in upstream isReferenceToGlobalVariable() for a PrivateIdentifier, which
-			// is never a variable reference however its parent reads.
+			// Locks in upstream isReferenceToGlobalVariable() for a PrivateIdentifier,
+			// which is never a variable reference however its parent reads — `#Number`
+			// stays reported where the plain name would be excused as a global.
 			{Code: `class C { #x; m(o) { return #x in o; } }`, Options: deny("x"), Errors: []rule_tester.InvalidTestCaseError{restrictedPrivate("x", 1, 11), restrictedPrivate("x", 1, 29)}},
+			{Code: `class C { #Number; m(o) { return #Number in o; } }`, Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restrictedPrivate("Number", 1, 11), restrictedPrivate("Number", 1, 34)}},
+
+			// A denied name is matched against the private name without its `#`, so the
+			// two spellings form separate equivalence classes and never pair up.
+			{Code: `class C { bar; #bar; }`, Options: deny("bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("bar", 1, 11), restrictedPrivate("bar", 1, 16)}},
+
+			// In a script every top-level declaration shares the global scope, so one of
+			// them claims the name for the whole file even from another declaration
+			// space; a nested one, and a module's top level, reach only their own scope.
+			{Code: "interface Number { q: string }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 2, 1)}},
+			{Code: "const Number = 1;\nlet x: Number;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 7), restricted("Number", 2, 8)}},
+			{Code: "namespace Number { export type A = 1; }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 2, 1)}},
+			{Code: "function f() { interface Number { q: string } }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 26)}},
+			{Code: "declare global { interface Number { q: string } }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 28)}},
+			{Code: "import {} from 'x';\ninterface Number { q: string }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 2, 11)}},
 
 			// Locks in upstream isReferenceToGlobalVariable() on a qualified type name: the
 			// right side names a member and is always checked, while the left side is a
@@ -180,12 +224,14 @@ function foo(a: any) {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTes
 			{Code: `let x: Foo.Bar;`, Options: deny("Foo", "Bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("Foo", 1, 8), restricted("Bar", 1, 12)}},
 			{Code: `let a: Array<Foo>;`, Options: deny("Array", "Foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("Foo", 1, 14)}},
 
-			// ---- Dimension 4: an annotated declaration name is reported over the name
-			// alone, where ESLint's TypeScript parser stretches the range over the
-			// annotation too ----
+			// ---- Dimension 4: an annotated variable declarator or parameter is
+			// reported over the name alone, where ESLint ends the range after the
+			// annotation. A class field, an interface member and a type-literal
+			// member carry an annotation too and do not differ ----
 			{Code: `let x: Foo;`, Options: deny("x"), Errors: []rule_tester.InvalidTestCaseError{restricted("x", 1, 5)}},
 			{Code: `function f(a: string) {}`, Options: deny("a"), Errors: []rule_tester.InvalidTestCaseError{restricted("a", 1, 12)}},
 			{Code: `class C { data: string[] = []; }`, Options: deny("data"), Errors: []rule_tester.InvalidTestCaseError{restricted("data", 1, 11)}},
+			{Code: `interface I { data: string }`, Options: deny("data"), Errors: []rule_tester.InvalidTestCaseError{restricted("data", 1, 15)}},
 
 			// ---- Dimension 4: JSX name positions, which upstream parses as JSXIdentifier
 			// nodes that this rule's Identifier listener never visits ----

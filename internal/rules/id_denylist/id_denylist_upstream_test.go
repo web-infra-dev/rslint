@@ -4,7 +4,9 @@
 // it was authored with (the suite default is 5), because the edition decides
 // which names count as language globals and this rule leaves those alone.
 // languageOptions.sourceType is dropped: rslint infers module-ness from actual
-// import/export syntax, which every case that sets it already has.
+// import/export syntax. Every case that sets it either has that syntax or
+// reaches the same verdict as a script, and the cases where module-ness does
+// change the verdict are locked in from both sides in the extras file.
 // rslint-specific lock-in cases live in id_denylist_extras_test.go.
 // cspell:ignore bingg mydate myarray
 package id_denylist

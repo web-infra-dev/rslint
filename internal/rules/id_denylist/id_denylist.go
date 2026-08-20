@@ -146,12 +146,31 @@ func isAssignmentTarget(node *ast.Node) bool {
 		binary := parent.AsBinaryExpression()
 		return ast.IsAssignmentOperator(binary.OperatorToken.Kind) && binary.Left == target
 	case ast.KindArrayLiteralExpression, ast.KindSpreadElement, ast.KindSpreadAssignment:
-		return utils.IsInDestructuringAssignment(parent)
+		return isDestructuredFrom(target)
 	case ast.KindPropertyAssignment:
 		return parent.AsPropertyAssignment().Initializer == target &&
-			utils.IsInDestructuringAssignment(parent)
+			isDestructuredFrom(target)
 	}
 	return false
+}
+
+// isDestructuredFrom reports whether node is an element of an array or object
+// literal that an enclosing assignment reinterprets as a destructuring pattern.
+// Upstream reads this off the node type alone, because ESTree gives a pattern
+// its own kinds; tsgo reuses the expression syntax, so the enclosing assignment
+// has to be found by walking out. The walk climbs only the nodes a pattern is
+// built from and stops at the first parent that consumes the literal as a value
+// — `[{ a: obj.b }.c] = d` destructures the result of a member access, not the
+// literal the member access reads from. An update expression is not one of
+// upstream's arms, so it does not count as an enclosing assignment here.
+func isDestructuredFrom(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	assignment := ast.GetAssignmentTarget(node)
+	return assignment != nil &&
+		assignment.Kind != ast.KindPrefixUnaryExpression &&
+		assignment.Kind != ast.KindPostfixUnaryExpression
 }
 
 // isRenamedImport reports whether node is an imported or re-exported name that
@@ -180,7 +199,7 @@ func isPropertyNameInDestructuring(node *ast.Node) bool {
 		return parent.AsBindingElement().PropertyName == node
 	case ast.KindPropertyAssignment:
 		return parent.AsPropertyAssignment().Name() == node &&
-			utils.IsInDestructuringAssignment(parent)
+			isDestructuredFrom(parent.Parent)
 	}
 	return false
 }
@@ -193,12 +212,27 @@ func isReferenceToGlobalVariable(ctx rule.RuleContext, node *ast.Node) bool {
 	if ctx.Refs == nil || !isVariableReference(node) {
 		return false
 	}
-	if !ctx.Globals.Access(node.Text()).IsDeclared() {
+	name := node.Text()
+	if !ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
-	// A name the file declares — at any depth, the top level included —
+	// A name this file declares in the reference's own declaration space
 	// resolves to that declaration instead of to the global.
-	return ctx.Refs.ResolveInFile(node) == nil
+	if ctx.Refs.ResolveInFile(node) != nil {
+		return false
+	}
+	// In a script every top-level declaration shares the one global scope, so a
+	// single one of them takes the name away from the global for the whole
+	// file: `interface Number {}` at the top of a script also claims a later
+	// `Number` used as a value, and a `Number` read from inside a function. A
+	// module keeps its top level to itself, and a declaration nested in a scope
+	// of its own reaches only what that scope encloses; the resolution above
+	// already settles both.
+	if ctx.SourceFile != nil && ast.IsGlobalSourceFile(ctx.SourceFile.AsNode()) &&
+		ctx.SourceFile.Locals[name] != nil {
+		return false
+	}
+	return true
 }
 
 // isVariableReference reports whether node occupies a position that upstream's
@@ -214,7 +248,7 @@ func isVariableReference(node *ast.Node) bool {
 	// outcome; in an object literal the key half is checked and resolves to
 	// nothing.
 	if node.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		return utils.IsInDestructuringAssignment(node.Parent)
+		return isDestructuredFrom(node.Parent.Parent)
 	}
 	return !utils.IsNonReferenceIdentifier(node)
 }
@@ -251,6 +285,12 @@ func isImportAttributeKey(node *ast.Node) bool {
 	object := parent.Parent
 	if object == nil || object.Kind != ast.KindObjectLiteralExpression {
 		return false
+	}
+	// Upstream sees the object literal directly, because ESTree has no node for
+	// a parenthesis: `import('x', ({ type: 'json' }))` passes the same options
+	// object as the unparenthesized form.
+	for object.Parent != nil && object.Parent.Kind == ast.KindParenthesizedExpression {
+		object = object.Parent
 	}
 	owner := object.Parent
 	if owner == nil {

@@ -210,9 +210,11 @@ if nameNode.Kind == ast.KindComputedPropertyName {
 
 ### Annotated Declaration Names
 
-typescript-eslint's `Identifier` node spans the type annotation that follows it, so a diagnostic ESLint reports on the name of `let x: SomeType` covers `x: SomeType`. tsgo keeps the annotation in a sibling node, so `ctx.ReportNode(nameNode, msg)` covers `x` alone. The same gap applies to every annotated declaration name — parameters (`function f(a: string)`), class properties, and so on.
+typescript-eslint's `Identifier` node spans the type annotation that follows it, so a diagnostic ESLint reports on the name of `let x: SomeType` covers `x: SomeType`. tsgo keeps the annotation in a sibling node, so `ctx.ReportNode(nameNode, msg)` covers `x` alone.
 
-Reporting the name node is the right call: the narrower range points at what the diagnostic is about. Note the difference in the rule's `.md` when a port reports on such a name, since a reader comparing columns against ESLint will see it.
+The gap is narrower than it looks — it appears for **variable declarators and parameters** (including catch and arrow parameters) and not for class properties, interface members, or type-literal members, whose names carry an annotation too yet end at the same column in both. Measure the shapes your rule actually reports on rather than assuming either way.
+
+Reporting the name node is the right call: the narrower range points at what the diagnostic is about. Note the difference in the rule's `.md` when a port reports on a declarator or parameter name, since a reader comparing columns against ESLint will see it.
 
 ---
 

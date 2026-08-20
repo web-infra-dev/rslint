@@ -110,7 +110,7 @@ The rule takes one or more strings: the names of the denied identifiers.
 
 ## Differences from ESLint
 
-- When a denied identifier carries a TypeScript type annotation, the reported range covers the name only. ESLint's TypeScript parser stretches it over the annotation as well, so `let data: string` is reported as `data` here and as `data: string` there.
+- On an annotated variable declarator or parameter, the report covers the name alone: `let data: string` is reported as `data`, where ESLint ends the report after the annotation, at `data: string`. An annotated class field, interface member or type-literal member is reported the same way by both.
 
 ## Original Documentation
 
