@@ -79,6 +79,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_lone_blocks"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
+	"github.com/web-infra-dev/rslint/internal/rules/no_magic_numbers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_misleading_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
@@ -247,6 +248,7 @@ func GetAllRules() []rule.Rule {
 		no_lone_blocks.NoLoneBlocksRule,
 		no_loop_func.NoLoopFuncRule,
 		no_loss_of_precision.NoLossOfPrecisionRule,
+		no_magic_numbers.NoMagicNumbersRule,
 		no_misleading_character_class.NoMisleadingCharacterClassRule,
 		no_new.NoNewRule,
 		no_new_func.NoNewFuncRule,
