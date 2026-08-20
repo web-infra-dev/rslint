@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -596,7 +597,7 @@ var ObjectShorthandRule = rule.Rule{
 			arrowTokenPos := arrow.EqualsGreaterThanToken.Pos()
 			arrowTokenEnd := arrow.EqualsGreaterThanToken.End()
 
-			paramsText := strings.TrimSpace(sourceText[paramsStart:arrowTokenPos])
+			paramsText := ecmascript.StringTrim(sourceText[paramsStart:arrowTokenPos])
 			bodyText := strings.TrimLeft(sourceText[arrowTokenEnd:fnRange.End()], " \t")
 
 			// Wrap a single identifier parameter in parentheses: `x => …`.

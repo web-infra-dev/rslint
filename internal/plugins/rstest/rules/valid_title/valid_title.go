@@ -381,7 +381,7 @@ func duplicatePrefixReplacement(rawSrc string, fnName string) (string, bool) {
 	default:
 		return "", false
 	}
-	if rawSrc[prefixEnd] != ' ' || !strings.EqualFold(rawSrc[1:prefixEnd], fnName) {
+	if rawSrc[prefixEnd] != ' ' || !ecmascript.EqualsWhenLowercased(rawSrc[1:prefixEnd], fnName) {
 		return "", false
 	}
 	return rawSrc[:1] + rawSrc[prefixEnd+1:], true
@@ -540,7 +540,7 @@ var ValidTitleRule = rule.Rule{
 				if i := strings.IndexByte(title, ' '); i >= 0 {
 					firstTok = title[:i]
 				}
-				if strings.EqualFold(firstTok, fnName) {
+				if ecmascript.EqualsWhenLowercased(firstTok, fnName) {
 					raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 					msg := rule.RuleMessage{
 						Id:          "duplicatePrefix",

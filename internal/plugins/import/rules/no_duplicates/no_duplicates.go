@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_duplicates.schema.json
@@ -487,7 +488,7 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 	existingIdentifiers := make(map[string]bool)
 	if firstOpenBrace >= 0 && firstCloseBrace >= 0 && !firstIsEmpty {
 		for id := range strings.SplitSeq(text[firstOpenBrace+1:firstCloseBrace], ",") {
-			if trimmed := strings.TrimSpace(id); trimmed != "" {
+			if trimmed := ecmascript.StringTrim(id); trimmed != "" {
 				existingIdentifiers[trimmed] = true
 			}
 		}
@@ -515,7 +516,7 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 
 		// Append this import's identifiers directly, deduplicating as we go.
 		for id := range strings.SplitSeq(spec.identifiersRaw, ",") {
-			trimmed := strings.TrimSpace(id)
+			trimmed := ecmascript.StringTrim(id)
 			if trimmed == "" || existingIdentifiers[trimmed] {
 				continue
 			}

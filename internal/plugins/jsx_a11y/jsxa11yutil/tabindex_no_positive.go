@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // LiteralPropToNumber mirrors upstream's `Number(getLiteralPropValue(prop))`
@@ -435,7 +436,7 @@ func jsValueToNumber(v jsValue) (float64, bool) {
 // Note: signed decimals (`"+1"`, `"-5"`, `" -5 "`) work via ParseFloat
 // natively. Signed hex/oct/bin are intentionally rejected to mirror JS.
 func tabIndexNoPositiveStringToNumber(s string) (float64, bool) {
-	s = strings.TrimSpace(s)
+	s = ecmascript.StringTrim(s)
 	if s == "" {
 		return 0, true
 	}

@@ -37,12 +37,12 @@
 package tabindex_no_positive
 
 import (
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // errorMessage mirrors upstream's `errorMessage` string verbatim.
@@ -65,7 +65,7 @@ var TabindexNoPositiveRule = rule.Rule{
 				// behavior on the namespace-stripped attribute name. Locked
 				// by the case-variant tests below.
 				name := reactutil.GetJsxPropName(attr)
-				if !strings.EqualFold(name, "tabIndex") {
+				if !ecmascript.EqualsWhenUppercased(name, "tabIndex") {
 					return
 				}
 				value, ok := jsxa11yutil.LiteralPropToNumber(attr, sourceText)

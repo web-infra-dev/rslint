@@ -23,6 +23,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed anchor_ambiguous_text.schema.json
@@ -76,10 +77,10 @@ var (
 // top-level traversal) so that punctuation removal and whitespace collapse
 // compose across nested elements, not just at the leaves.
 func standardizeSpaceAndCase(input string) string {
-	s := strings.TrimSpace(input)
+	s := ecmascript.StringTrim(input)
 	s = punctuationRE.ReplaceAllString(s, "")
 	s = multiSpaceRE.ReplaceAllString(s, " ")
-	return strings.ToLower(s)
+	return ecmascript.StringToLowerCase(s)
 }
 
 // getAccessibleChildText mirrors upstream's recursive

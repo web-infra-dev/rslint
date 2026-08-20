@@ -71,6 +71,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // errorMessage mirrors upstream's `errorMessage(role, requiredProps)`
@@ -179,7 +180,7 @@ var RoleHasRequiredAriaPropsRule = rule.Rule{
 			ast.KindJsxAttribute: func(attr *ast.Node) {
 				// Step 1: name === 'role' (case-insensitive — mirrors
 				// upstream `propName(attribute).toLowerCase() !== 'role'`).
-				if !strings.EqualFold(reactutil.GetJsxPropName(attr), "role") {
+				if !ecmascript.EqualsWhenLowercased(reactutil.GetJsxPropName(attr), "role") {
 					return
 				}
 
@@ -272,7 +273,7 @@ var RoleHasRequiredAriaPropsRule = rule.Rule{
 				// uses `.split(' ')` (single ASCII space, NOT `\s+`), so
 				// tabs / newlines / multiple spaces produce empty or
 				// non-matching tokens that fall out at this filter step.
-				normalized := strings.Split(strings.ToLower(roleAttrValue), " ")
+				normalized := strings.Split(ecmascript.StringToLowerCase(roleAttrValue), " ")
 				validRoles := make([]string, 0, len(normalized))
 				for _, tok := range normalized {
 					if jsxa11yutil.IsValidAriaRole(tok) {

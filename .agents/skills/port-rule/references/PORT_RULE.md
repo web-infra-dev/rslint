@@ -283,7 +283,7 @@ Before starting, familiarize yourself with these key source locations:
    | `is-glob`                             | `utils/isglob`                                              |
    | any other glob package                | **not supported — stop and report to the user (see below)** |
 
-   `depguard` denies `regexp2` and `doublestar` under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. Trimming, blankness, case comparison and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
+   `depguard` denies `regexp2`, `doublestar` and the standard library's `unicode` under `internal/rules/**` and `internal/plugins/**`, and `forbidigo` denies `strings.ToLower`, `strings.ToUpper` and `strings.TrimSpace` there, so a rule cannot reach past these by accident. Trimming, blankness, casing, character categories and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
 
    The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks, because RE2 refuses syntax JavaScript accepts and the caller usually swallows the compile error.
 

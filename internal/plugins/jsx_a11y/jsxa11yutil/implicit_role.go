@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // GetImplicitRole mirrors eslint-plugin-jsx-a11y's `util/getImplicitRole.js`:
@@ -159,7 +160,7 @@ func implicitRoleForInput(attrs []*ast.Node) string {
 	if !ok {
 		return "textbox"
 	}
-	switch strings.ToUpper(v) {
+	switch ecmascript.StringToUpperCase(v) {
 	case "BUTTON", "IMAGE", "RESET", "SUBMIT":
 		return "button"
 	case "CHECKBOX":
@@ -186,7 +187,7 @@ func implicitRoleForMenu(attrs []*ast.Node) string {
 	if !ok {
 		return ""
 	}
-	if strings.EqualFold(v, "toolbar") {
+	if ecmascript.EqualsWhenUppercased(v, "toolbar") {
 		return "toolbar"
 	}
 	return ""
@@ -207,7 +208,7 @@ func implicitRoleForMenuitem(attrs []*ast.Node) string {
 	if !ok {
 		return ""
 	}
-	switch strings.ToUpper(v) {
+	switch ecmascript.StringToUpperCase(v) {
 	case "COMMAND":
 		return "menuitem"
 	case "CHECKBOX":
