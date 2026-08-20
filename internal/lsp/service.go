@@ -1194,13 +1194,22 @@ func selectLintProgram(
 		}
 		candidateProgram := candidate.GetProgram()
 		commandLine := candidateProgram.CommandLine()
-		if sessionProject, ok := candidate.(*project.Project); ok && sessionProject.CommandLine != nil {
-			// The Program command line may include automatic type-acquisition
-			// roots. Project.CommandLine is the authored tsconfig root set.
-			commandLine = sessionProject.CommandLine
-		}
 		configPath := ""
-		if commandLine != nil && commandLine.CompilerOptions() != nil {
+		if sessionProject, ok := candidate.(*project.Project); ok {
+			if sessionProject.CommandLine != nil {
+				// The Program command line may include automatic type-acquisition
+				// roots. Project.CommandLine is the authored tsconfig root set.
+				commandLine = sessionProject.CommandLine
+			}
+			if sessionProject.Kind == project.KindConfigured {
+				// ConfigFileName preserves the Session project's lexical config
+				// filename. ConfigFilePath and Id are filesystem-canonical lookup
+				// keys and may be case-folded on Windows, which must not become the
+				// declaration identity.
+				configPath = sessionProject.ConfigFileName()
+			}
+		}
+		if configPath == "" && commandLine != nil && commandLine.CompilerOptions() != nil {
 			configPath = commandLine.CompilerOptions().ConfigFilePath
 		}
 		if configPath == "" {
