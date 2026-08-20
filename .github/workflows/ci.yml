@@ -60,6 +60,7 @@ jobs:
         if: matrix.runner == 'rspack-ubuntu-22.04-large'
         run: go test -count=1 ./cmd/... ./internal/...
         env:
+          # The pod sees the shared node's 192 cores; that much concurrency only thrashes.
           GOMAXPROCS: 16
 
       - name: Unit Test (Windows)
@@ -96,8 +97,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
-      # Fallback for any runner without a dedicated step above: macOS today,
-      # plus anything later added to the matrix. Uses the runner's own count.
+      # Fallback for any runner without a dedicated step above.
+      # Uses the runner's own nprocs.
       - name: Unit Test
         if: matrix.runner != 'rspack-ubuntu-22.04-large' && matrix.runner != 'rspack-windows-2022-large'
         run: go test -count=1 ./cmd/... ./internal/...
