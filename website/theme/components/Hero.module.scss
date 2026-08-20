@@ -1,8 +1,124 @@
-:global {
-  .rs-oval {
-    width: 70% !important;
-    height: 70% !important;
-    top: calc(50% + 20px) !important;
-    left: calc(50% + 5px) !important;
+/* Custom hero styles — faithfully replicate the shared @rstack-dev/doc-ui
+   <Hero> visuals (279deg orange→red gradient title, button shapes, GitHub
+   link, light/dark colours pulled from doc-ui's own values) but scaled down
+   and left-aligned to sit beside the lint demo. These are OUR module classes
+   (referenced via styles.* in Hero.tsx), so the build-hashed names are
+   resolved automatically — no fragile coupling to doc-ui internals.
+
+   rspress marks dark mode with `.dark` on <html> (theme/index.scss). */
+.hero {
+  --hero-title-color: #0b0c0e;
+  --hero-desc-color: #6b7075;
+  --hero-gradient: linear-gradient(279deg, #ff8b00 35.21%, #f93920 63.34%);
+  --hero-btn-border: #ff8b00;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  text-align: left;
+
+  :global(html.dark) & {
+    --hero-title-color: #ffffff;
+    --hero-desc-color: #c6cacd;
+  }
+}
+
+.logo {
+  height: 130px;
+  width: auto;
+  user-select: none;
+}
+
+.title {
+  margin: 0;
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1.1;
+  background: var(--hero-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--hero-title-color);
+}
+
+.description {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--hero-desc-color);
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Shared button shape — copied from doc-ui's .button (radius/padding/weight/
+   capitalize + hover lift). */
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 120px;
+  padding: 12px 28px;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 150%;
+  text-align: center;
+  text-transform: capitalize;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    opacity: 0.75;
+    transform: translate3d(0, -2px, 0);
+  }
+  &:active {
+    opacity: 0.5;
+  }
+}
+
+.buttonPrimary {
+  border: none;
+  color: #ffffff;
+  background: var(--hero-gradient);
+}
+
+.buttonSecondary {
+  border: 1.5px solid var(--hero-btn-border);
+  color: var(--hero-title-color);
+  background: none;
+}
+
+.githubIcon {
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+  color: currentColor;
+}
+
+/* When the hero/demo row stacks (<=1024px, see pages/index.module.scss),
+   re-center the copy. */
+@media (max-width: 1024px) {
+  .hero {
+    align-items: center;
+    text-align: center;
+  }
+  .buttons {
+    justify-content: center;
   }
 }
