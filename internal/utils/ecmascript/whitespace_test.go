@@ -11,30 +11,32 @@ const (
 	ls   = "\u2028" // U+2028 line separator
 )
 
-// Every expectation here is what JavaScript answers: `s.trim()`, and
-// `s.trim() === ""` for the blank cases.
+// Every expectation here is what JavaScript answers: the WhiteSpace column is
+// what a `/[^\S\r\n\u2028\u2029]/` character class accepts, and the whole of
+// `\s` is the two columns together.
 func TestWhiteSpace(t *testing.T) {
 	tests := []struct {
-		name string
-		r    rune
-		want bool
+		name       string
+		r          rune
+		want       bool
+		terminator bool
 	}{
 		{name: "space", r: ' ', want: true},
 		{name: "tab", r: '\t', want: true},
 		{name: "vertical tab", r: '\v', want: true},
 		{name: "form feed", r: '\f', want: true},
-		{name: "newline", r: '\n', want: true},
-		{name: "carriage return", r: '\r', want: true},
-		{name: "line separator", r: 0x2028, want: true},
-		{name: "paragraph separator", r: 0x2029, want: true},
+		{name: "newline", r: '\n', terminator: true},
+		{name: "carriage return", r: '\r', terminator: true},
+		{name: "line separator", r: 0x2028, terminator: true},
+		{name: "paragraph separator", r: 0x2029, terminator: true},
 		{name: "no-break space", r: 0x00A0, want: true},
 		{name: "ideographic space", r: 0x3000, want: true},
 		// U+FEFF is whitespace to JavaScript but not to Unicode, and U+0085
 		// is the other way around. Go's own predicates get both backwards.
 		{name: "byte order mark", r: 0xFEFF, want: true},
-		{name: "next line", r: 0x0085, want: false},
-		{name: "zero width space", r: 0x200B, want: false},
-		{name: "letter", r: 'a', want: false},
+		{name: "next line", r: 0x0085},
+		{name: "zero width space", r: 0x200B},
+		{name: "letter", r: 'a'},
 	}
 
 	for _, test := range tests {
@@ -42,24 +44,13 @@ func TestWhiteSpace(t *testing.T) {
 			if got := IsWhiteSpace(test.r); got != test.want {
 				t.Errorf("IsWhiteSpace(%U) = %v, want %v", test.r, got, test.want)
 			}
+			if got := IsLineTerminator(test.r); got != test.terminator {
+				t.Errorf("IsLineTerminator(%U) = %v, want %v", test.r, got, test.terminator)
+			}
+			if got := IsWhiteSpaceOrLineTerminator(test.r); got != (test.want || test.terminator) {
+				t.Errorf("IsWhiteSpaceOrLineTerminator(%U) = %v, want %v", test.r, got, test.want || test.terminator)
+			}
 		})
-	}
-}
-
-func TestIsLineTerminator(t *testing.T) {
-	for _, r := range []rune{'\n', '\r', 0x2028, 0x2029} {
-		if !IsLineTerminator(r) {
-			t.Errorf("IsLineTerminator(%U) = false, want true", r)
-		}
-		if !IsWhiteSpace(r) {
-			t.Errorf("IsWhiteSpace(%U) = false, want true: every terminator is whitespace", r)
-		}
-	}
-	// A form feed and a vertical tab are whitespace without ending a line.
-	for _, r := range []rune{'\t', '\v', '\f', ' ', 0xFEFF} {
-		if IsLineTerminator(r) {
-			t.Errorf("IsLineTerminator(%U) = true, want false", r)
-		}
 	}
 }
 

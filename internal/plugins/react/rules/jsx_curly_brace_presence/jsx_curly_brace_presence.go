@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_curly_brace_presence.schema.json
@@ -85,7 +85,7 @@ func containsLineTerminators(s string) bool {
 func containsHTMLEntity(s string) bool { return htmlEntityRegex.MatchString(s) }
 
 func containsOnlyHTMLEntities(s string) bool {
-	return strings.TrimSpace(htmlEntityRegex.ReplaceAllString(s, "")) == ""
+	return ecmascript.StringTrim(htmlEntityRegex.ReplaceAllString(s, "")) == ""
 }
 
 func containsDisallowedJSXChars(s string) bool { return disallowedJSXChars.MatchString(s) }
@@ -96,11 +96,11 @@ func containsMultilineCommentMarker(s string) bool {
 }
 
 func isLineBreak(s string) bool {
-	return containsLineTerminators(s) && strings.TrimSpace(s) == ""
+	return containsLineTerminators(s) && ecmascript.StringTrim(s) == ""
 }
 
 func isAllWhitespace(s string) bool {
-	return strings.TrimSpace(s) == ""
+	return ecmascript.StringTrim(s) == ""
 }
 
 func isStringWithTrailingWhitespaces(s string) bool {
@@ -170,7 +170,7 @@ func wrapJsxTextWithCurlyBraces(rawText string) string {
 	}
 	lines := strings.Split(rawText, "\n")
 	for i, line := range lines {
-		if strings.TrimSpace(line) == "" {
+		if ecmascript.StringTrim(line) == "" {
 			continue
 		}
 		firstCharIdx := indexFirstNonSpace(line)
@@ -197,11 +197,7 @@ func indexFirstNonSpace(s string) int {
 }
 
 func isJsRegexWhitespace(r rune) bool {
-	switch r {
-	case ' ', '\t', '\n', '\r', '\v', '\f', '\u00A0', '\uFEFF':
-		return true
-	}
-	return unicode.Is(unicode.Zs, r)
+	return ecmascript.IsWhiteSpaceOrLineTerminator(r)
 }
 
 func escapeBackslashes(s string) string {

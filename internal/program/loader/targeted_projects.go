@@ -196,20 +196,10 @@ func (execution *targetedProjectExecution) supportsTarget(
 	if err != nil {
 		return false, err
 	}
-	extensions := tspath.SupportedTSExtensions
-	if parsed.config.CompilerOptions().GetAllowJS() {
-		extensions = tspath.AllSupportedExtensions
-	}
-	extensions = tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule(
+	return lintprogram.CompilerOptionsSupportFileName(
 		parsed.config.CompilerOptions(),
-		extensions,
-	)
-	for _, group := range extensions {
-		if tspath.FileExtensionIsOneOf(target.Path, group) {
-			return true, nil
-		}
-	}
-	return false, nil
+		target.Path,
+	), nil
 }
 
 func (execution *targetedProjectExecution) parseConcurrent(indexes []int) {

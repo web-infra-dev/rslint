@@ -1,12 +1,11 @@
 package jsxa11yutil
 
 import (
-	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // OpeningElementOf returns the focal "opening element" used for label-prop
@@ -76,32 +75,37 @@ func JsxElementHasNoChildren(node *ast.Node) bool {
 //
 //	name.length > 0 && name[0] === name[0].toUpperCase()
 //
-// JS `String.prototype.toUpperCase` is Unicode-aware (Unicode Default Case
-// Conversion). To stay byte-faithful with `c === c.toUpperCase()` across
-// non-ASCII tag names, we decode the first rune and compare against
-// `unicode.ToUpper(r)`:
+// so the comparison runs through the port of String.prototype.toUpperCase
+// rather than Go's single-character mapping. The two part company on a
+// character whose uppercase runs to several characters — `ß` uppercases to
+// `SS`, which is not `ß`, so a tag named `ßar` is not a component — and on the
+// characters Node knows a case for and Go's tables do not.
 //
-//   - ASCII uppercase letters / digits / `$` / `_` / other symbols satisfy
-//     `ToUpper(r) == r` → classified as React component (matches JS).
-//   - ASCII lowercase letters: `ToUpper('a') = 'A' != 'a'` → not a React
-//     component (matches JS).
-//   - Non-ASCII lowercase like `'é'` / `'à'` / `'ı'`:
-//     `ToUpper('é') = 'É' != 'é'` → not a React component (matches JS's
-//     `'é'.toUpperCase() === 'É'`). A byte-level check on `name[0]`
-//     would wrongly classify these as React component because the leading
-//     UTF-8 byte (e.g. 0xC3 for `'é'`) is outside `'a'..'z'`.
-//   - Non-ASCII characters without case (CJK, symbols, etc.):
-//     `ToUpper('中') = '中'` → classified as React component (matches JS).
+//   - Uppercase letters, digits, `$`, `_` and other symbols are their own
+//     uppercase → React component (matches JS).
+//   - Lowercase letters are not, `é` and `à` among them → not a React
+//     component (matches JS's `'é'.toUpperCase() === 'É'`).
+//   - Characters with no case at all, CJK and emoji among them, are their own
+//     uppercase → React component (matches JS).
 //
-// Locale-sensitive Turkish dotted I (`'İ'` ↔ `'i'`): both Go's
-// `unicode.ToUpper` and JS's default `toUpperCase` use the locale-
-// independent Unicode mapping, so behavior aligns.
+// The first character is read as a rune rather than a byte: a byte-level check
+// would wrongly classify `é` as a component, since the leading UTF-8 byte
+// (0xC3) is outside `'a'..'z'`.
+//
+// Locale-sensitive Turkish dotted I (`'İ'` ↔ `'i'`): the port and JS's default
+// toUpperCase both use the locale-independent mapping, so behavior aligns.
 func IsReactComponentName(name string) bool {
 	if name == "" {
 		return false
 	}
-	r, _ := utf8.DecodeRuneInString(name)
-	return unicode.ToUpper(r) == r
+	r, size := utf8.DecodeRuneInString(name)
+	if r > 0xFFFF {
+		// Upstream reads one UTF-16 code unit, and a lone surrogate is its own
+		// uppercase, so a character outside the BMP passes.
+		return true
+	}
+	first := name[:size]
+	return ecmascript.StringToUpperCase(first) == first
 }
 
 // AnyMinimatch returns true iff at least one pattern in `patterns` matches
@@ -220,7 +224,7 @@ func labellingValueIsPresent(attr *ast.Node) bool {
 		return true
 	}
 	if s, ok := PropStaticStringValue(attr); ok {
-		return strings.TrimSpace(s) != ""
+		return ecmascript.StringTrim(s) != ""
 	}
 	return PropValueIsTruthy(attr)
 }
@@ -262,16 +266,16 @@ func MayHaveAccessibleLabel(node *ast.Node, depth, maxDepth int, labelAttributes
 	// JSXText — upstream's `node.type === 'JSXText' && !!tryTrim(node.value)`.
 	// tsgo splits text into two kinds; both carry the raw text on `.Text`.
 	case ast.KindJsxText, ast.KindJsxTextAllWhiteSpaces:
-		return strings.TrimSpace(node.AsJsxText().Text) != ""
+		return ecmascript.StringTrim(node.AsJsxText().Text) != ""
 	// Literal text — upstream's `node.type === 'Literal' && !!tryTrim(node.value)`.
 	// tsgo splits the ESTree `Literal` across several `Kind*Literal` kinds.
 	// Only string-shaped literals can carry a textual label; other literal
 	// kinds (NumericLiteral, etc.) are conceivable as JSX children only in
 	// edge cases and fall to the no-recursion default.
 	case ast.KindStringLiteral:
-		return strings.TrimSpace(node.AsStringLiteral().Text) != ""
+		return ecmascript.StringTrim(node.AsStringLiteral().Text) != ""
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return strings.TrimSpace(node.AsNoSubstitutionTemplateLiteral().Text) != ""
+		return ecmascript.StringTrim(node.AsNoSubstitutionTemplateLiteral().Text) != ""
 	// JSXExpressionContainer — upstream returns true unconditionally, even
 	// for `{undefined}`. We mirror; the only sound static analysis would
 	// require full constant folding which jsx-ast-utils does not perform.

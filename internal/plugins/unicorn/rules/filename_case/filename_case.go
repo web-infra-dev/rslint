@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 //go:embed filename_case.schema.json
@@ -231,7 +232,7 @@ func splitWords(s string) []string {
 	wordStart := -1
 	var previous rune
 	for pos, current := range s {
-		if !unicode.IsLetter(current) && !isASCIIDigit(current) {
+		if !unicode17.IsLetter(current) && !isASCIIDigit(current) {
 			if wordStart >= 0 {
 				words = append(words, s[wordStart:pos])
 				wordStart = -1
@@ -242,11 +243,11 @@ func splitWords(s string) []string {
 		if wordStart < 0 {
 			wordStart = pos
 		} else {
-			boundary := (unicode.IsLower(previous) || isASCIIDigit(previous)) && unicode.IsUpper(current)
-			if !boundary && unicode.IsUpper(previous) && unicode.IsUpper(current) {
+			boundary := (unicode17.IsLower(previous) || isASCIIDigit(previous)) && unicode17.IsUpper(current)
+			if !boundary && unicode17.IsUpper(previous) && unicode17.IsUpper(current) {
 				_, size := utf8.DecodeRuneInString(s[pos:])
 				next, _ := utf8.DecodeRuneInString(s[pos+size:])
-				boundary = unicode.IsLower(next)
+				boundary = unicode17.IsLower(next)
 			}
 			if boundary {
 				words = append(words, s[wordStart:pos])
@@ -274,11 +275,11 @@ func pascalLikeTransform(word string, index int) string {
 	}
 	char0, size := utf8.DecodeRuneInString(word)
 	first := word[:size]
-	rest := strings.ToLower(word[size:])
+	rest := ecmascript.StringToLowerCase(word[size:])
 	if index > 0 && isASCIIDigit(char0) {
 		return "_" + first + rest
 	}
-	return strings.ToUpper(first) + rest
+	return ecmascript.StringToUpperCase(first) + rest
 }
 
 func toCamelCase(s string) string {
@@ -288,7 +289,7 @@ func toCamelCase(s string) string {
 	}
 	var sb strings.Builder
 	sb.Grow(len(s) + len(words))
-	sb.WriteString(strings.ToLower(words[0]))
+	sb.WriteString(ecmascript.StringToLowerCase(words[0]))
 	for i := 1; i < len(words); i++ {
 		sb.WriteString(pascalLikeTransform(words[i], i))
 	}
@@ -325,7 +326,7 @@ func joinNoCase(words []string, delim string) string {
 		if i > 0 {
 			sb.WriteString(delim)
 		}
-		sb.WriteString(strings.ToLower(w))
+		sb.WriteString(ecmascript.StringToLowerCase(w))
 	}
 	return sb.String()
 }
@@ -640,7 +641,7 @@ var FilenameCaseRule = rule.Rule{
 		leading, words := splitFilename(filename)
 		cases := opts.selectedCases()
 		valid, invalidWord, invalidCandidates := validateFilename(words, cases)
-		lowerExt := strings.ToLower(ext)
+		lowerExt := ecmascript.StringToLowerCase(ext)
 		if valid {
 			if ext != lowerExt {
 				if ctx.DisableManager.IsRuleDisabled(filenameCaseRuleName, reportRange.Pos()) {

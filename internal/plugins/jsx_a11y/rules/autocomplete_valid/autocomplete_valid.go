@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed autocomplete_valid.schema.json
@@ -231,7 +232,7 @@ var AutocompleteValidRule = rule.Rule{
 			// `virtualNode.props.type`.
 			if typeAttr := jsxa11yutil.FindAttributeByName(attrs, "type"); typeAttr != nil {
 				if typeValue, ok := jsxa11yutil.LiteralPropStringValue(typeAttr); ok {
-					if _, excluded := excludedInputTypes[strings.ToLower(typeValue)]; excluded {
+					if _, excluded := excludedInputTypes[ecmascript.StringToLowerCase(typeValue)]; excluded {
 						return
 					}
 				}
@@ -271,7 +272,7 @@ var AutocompleteValidRule = rule.Rule{
 //
 // Returns false for any value that doesn't fit the grammar.
 func isValidAutocomplete(value string) bool {
-	value = strings.TrimSpace(strings.ToLower(value))
+	value = ecmascript.StringTrim(ecmascript.StringToLowerCase(value))
 	if _, ok := stateTerms[value]; ok {
 		return true
 	}

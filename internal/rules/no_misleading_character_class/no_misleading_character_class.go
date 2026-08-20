@@ -17,7 +17,6 @@ package no_misleading_character_class
 import (
 	_ "embed"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -25,6 +24,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 //go:embed no_misleading_character_class.schema.json
@@ -1352,7 +1352,7 @@ func isSurrogatePair(hi, lo uint32) bool {
 }
 func isSurrogateValue(v uint32) bool { return v >= 0xD800 && v <= 0xDFFF }
 func isCombiningCharacter(cp uint32) bool {
-	return cp <= 0x10FFFF && unicode.Is(unicode.M, rune(cp))
+	return cp <= 0x10FFFF && unicode17.IsMark(rune(cp))
 }
 func isEmojiModifier(cp uint32) bool { return cp >= 0x1F3FB && cp <= 0x1F3FF }
 func isRegionalIndicatorSymbol(cp uint32) bool {

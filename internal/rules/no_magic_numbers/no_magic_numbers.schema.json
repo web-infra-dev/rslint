@@ -1,0 +1,55 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "detectObjects": {
+          "type": "boolean"
+        },
+        "enforceConst": {
+          "type": "boolean"
+        },
+        "ignore": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^[+-]?(?:0|[1-9][0-9]*)n$"
+              }
+            ]
+          },
+          "uniqueItems": true
+        },
+        "ignoreArrayIndexes": {
+          "type": "boolean"
+        },
+        "ignoreDefaultValues": {
+          "type": "boolean"
+        },
+        "ignoreClassFieldInitialValues": {
+          "type": "boolean"
+        },
+        "ignoreEnums": {
+          "type": "boolean"
+        },
+        "ignoreNumericLiteralTypes": {
+          "type": "boolean"
+        },
+        "ignoreReadonlyClassProperties": {
+          "type": "boolean"
+        },
+        "ignoreTypeIndexes": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

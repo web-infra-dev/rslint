@@ -1,18 +1,21 @@
 package utils
 
 import (
+	"errors"
 	"iter"
 	"math"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
-	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
@@ -313,14 +316,23 @@ func Flatten[T any](array [][]T) []T {
 // `object-shorthand` rules, including Unicode identifier characters
 // (e.g. `Π`). ESLint's regex `/[^_$0-9]/u` pairs an ASCII-only digit range
 // with a Unicode-aware `toUpperCase()` check — we mirror that: the digit
-// prefix is strictly ASCII while the case test is `unicode.IsUpper`.
+// prefix is strictly ASCII while the case test is `c === c.toUpperCase()`,
+// which a character with no case of its own passes.
 func IsConstructorName(name string) bool {
-	for _, r := range name {
+	for i := 0; i < len(name); {
+		r, size := utf8.DecodeRuneInString(name[i:])
 		if r == '_' || r == '$' || (r >= '0' && r <= '9') {
+			i += size
 			continue
 		}
-		// First non-prefix rune: constructor iff uppercase.
-		return unicode.IsUpper(r)
+		// First non-prefix rune: constructor iff it is its own uppercase.
+		// ESLint indexes one UTF-16 code unit, and a lone surrogate is its own
+		// uppercase, so a character outside the BMP counts as one.
+		if r > 0xFFFF {
+			return true
+		}
+		first := name[i : i+size]
+		return ecmascript.StringToUpperCase(first) == first
 	}
 	return false
 }
@@ -552,67 +564,116 @@ func NeedsLeadingSpaceForReplacement(src string, insertPos int, replacement stri
 	return scanner.IsIdentifierPart(prevRune)
 }
 
-// NaturalCompare compares two strings using natural sort order,
-// where embedded numeric segments are compared by their numeric value
-// (e.g., "a2" < "a10" instead of "a10" < "a2").
-// Returns -1 if a < b, 0 if a == b, 1 if a > b.
+// NaturalCompare ports the natural-compare package, which is what the rules
+// that offer a natural order sort by. It returns -1 if a sorts before b, 1 if
+// it sorts after, and 0 if the two sort alike.
+//
+// The package does not order characters by their code unit. It gives each one
+// a rank of its own, where `-` sits just below the digits, the digits below
+// the capitals and the capitals below the small letters, and everything
+// outside printable ASCII keeps its code unit — so `_` sorts before `B` rather
+// than after `Z`. A run of digits that starts with `1` through `9` is then
+// read as the number it spells, which is what makes `a2` sort before `a10`. A
+// run that starts with `0` is not a number, so `a01` sorts before `a1`.
+//
+// Two runs that spell numbers too large to tell apart as JavaScript numbers
+// sort alike, which is why a pair of unequal strings can still come back 0.
+//
+// https://github.com/litejs/natural-compare-lite
 func NaturalCompare(a, b string) int {
-	ra := []rune(a)
-	rb := []rune(b)
-	ai, bi := 0, 0
-	for ai < len(ra) && bi < len(rb) {
-		ca, cb := ra[ai], rb[bi]
-
-		if unicode.IsDigit(ca) && unicode.IsDigit(cb) {
-			na, nextA := extractRuneDigits(ra, ai)
-			nb, nextB := extractRuneDigits(rb, bi)
-			naTrimmed := strings.TrimLeft(na, "0")
-			nbTrimmed := strings.TrimLeft(nb, "0")
-			if naTrimmed == "" {
-				naTrimmed = "0"
-			}
-			if nbTrimmed == "" {
-				nbTrimmed = "0"
-			}
-			if len(naTrimmed) != len(nbTrimmed) {
-				if len(naTrimmed) < len(nbTrimmed) {
-					return -1
-				}
-				return 1
-			}
-			if naTrimmed < nbTrimmed {
-				return -1
-			}
-			if naTrimmed > nbTrimmed {
-				return 1
-			}
-			ai = nextA
-			bi = nextB
-		} else {
-			if ca < cb {
-				return -1
-			}
-			if ca > cb {
-				return 1
-			}
-			ai++
-			bi++
+	if a == b {
+		return 0
+	}
+	left, right := codeUnits(a), codeUnits(b)
+	positionA, positionB := 0, 0
+	// The walk runs until b is spent, which only happens with a spent as
+	// well: any earlier difference has already been answered.
+	for rankB := float64(1); rankB != 0; {
+		rankA := naturalRank(left, positionA)
+		positionA++
+		rankB = naturalRank(right, positionB)
+		positionB++
+		// A rank in this range is a digit from `1` to `9`, so both sides
+		// carry a number rather than a character.
+		if rankA > 66 && rankA < 76 && rankB > 66 && rankB < 76 {
+			rankA, positionA = naturalNumber(left, positionA)
+			rankB, positionB = naturalNumber(right, positionB)
 		}
-	}
-
-	if ai < len(ra) {
-		return 1
-	}
-	if bi < len(rb) {
-		return -1
+		if rankA != rankB {
+			if rankA < rankB {
+				return -1
+			}
+			return 1
+		}
 	}
 	return 0
 }
 
-func extractRuneDigits(runes []rune, start int) (string, int) {
-	end := start
-	for end < len(runes) && unicode.IsDigit(runes[end]) {
+// naturalRank is the order natural-compare puts one code unit in. Past the end
+// of the string it answers 0, as it does for a NUL, which is what ends the
+// walk.
+func naturalRank(units []uint16, position int) float64 {
+	if position >= len(units) {
+		return 0
+	}
+	code := int(units[position])
+	switch {
+	case code < 45 || code > 127:
+		return float64(code)
+	case code < 46: // `-`
+		return 65
+	case code < 48: // `.` and `/`
+		return float64(code - 1)
+	case code < 58: // `0` through `9`
+		return float64(code + 18)
+	case code < 65:
+		return float64(code - 11)
+	case code < 91: // `A` through `Z`
+		return float64(code + 11)
+	case code < 97:
+		return float64(code - 37)
+	case code < 123: // `a` through `z`
+		return float64(code + 5)
+	default:
+		return float64(code - 63)
+	}
+}
+
+// naturalNumber reads out the digit run whose first digit the caller has just
+// stepped over, so position is the one after it. It returns the number the run
+// spells, read as JavaScript reads it, and the position just past the run.
+func naturalNumber(units []uint16, position int) (float64, int) {
+	end := position
+	// A `0` ranks 66, which is inside this range although it cannot start a
+	// run, so a number carries its trailing zeros.
+	for rank := naturalRank(units, end); rank > 65 && rank < 76; rank = naturalRank(units, end) {
 		end++
 	}
-	return string(runes[start:end]), end
+	digits := make([]byte, 0, end-position+1)
+	for _, unit := range units[position-1 : end] {
+		digits = append(digits, byte(unit))
+	}
+	// The run is nothing but digits, so the only reading that can fail is one
+	// too large for a float, which JavaScript answers with an infinity too.
+	value, err := strconv.ParseFloat(string(digits), 64)
+	if err != nil && !errors.Is(err, strconv.ErrRange) {
+		return 0, end
+	}
+	return value, end
+}
+
+// codeUnits reads s as the UTF-16 code units JavaScript indexes a string by,
+// which is what natural-compare walks: a character outside the basic plane is
+// two of them, and compares as the first of the two.
+func codeUnits(s string) []uint16 {
+	units := make([]uint16, 0, len(s))
+	for _, r := range s {
+		if r > 0xFFFF {
+			high, low := utf16.EncodeRune(r)
+			units = append(units, uint16(high), uint16(low))
+			continue
+		}
+		units = append(units, uint16(r))
+	}
+	return units
 }

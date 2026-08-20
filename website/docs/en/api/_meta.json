@@ -13,7 +13,7 @@
   {
     "type": "dir",
     "name": "presets",
-    "label": "Presets",
+    "label": "Plugin API",
     "collapsed": false
   },
   {
