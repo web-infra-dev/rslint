@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -63,12 +64,12 @@ var DefaultCaseRule = rule.Rule{
 				}
 
 				if lastComment != nil {
-					commentText := strings.TrimSpace(ctx.SourceFile.Text()[lastComment.Pos():lastComment.End()])
+					commentText := ecmascript.StringTrim(ctx.SourceFile.Text()[lastComment.Pos():lastComment.End()])
 					// Remove comment markers
 					if strings.HasPrefix(commentText, "//") {
-						commentText = strings.TrimSpace(commentText[2:])
+						commentText = ecmascript.StringTrim(commentText[2:])
 					} else if strings.HasPrefix(commentText, "/*") && strings.HasSuffix(commentText, "*/") {
-						commentText = strings.TrimSpace(commentText[2 : len(commentText)-2])
+						commentText = ecmascript.StringTrim(commentText[2 : len(commentText)-2])
 					}
 
 					if opts.commentPattern.TestOrTimeout(commentText) {

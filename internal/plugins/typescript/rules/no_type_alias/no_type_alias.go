@@ -2,10 +2,10 @@ package no_type_alias
 
 import (
 	_ "embed"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_type_alias.schema.json
@@ -100,7 +100,7 @@ func parseOptions(options []any) NoTypeAliasOptions {
 func buildNoTypeAliasMessage(alias string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "noTypeAlias",
-		Description: "Type " + strings.ToLower(alias) + " are not allowed.",
+		Description: "Type " + ecmascript.StringToLowerCase(alias) + " are not allowed.",
 	}
 }
 

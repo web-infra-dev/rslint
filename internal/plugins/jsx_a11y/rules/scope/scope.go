@@ -32,12 +32,12 @@
 package scope
 
 import (
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // errorMessage mirrors upstream's `errorMessage` string verbatim.
@@ -57,7 +57,7 @@ var ScopeRule = rule.Rule{
 				// quirk literally so we don't accidentally skip cases upstream
 				// would still process.
 				name := reactutil.GetJsxPropName(attr)
-				if name != "" && !strings.EqualFold(name, "scope") {
+				if name != "" && !ecmascript.EqualsWhenUppercased(name, "scope") {
 					return
 				}
 				// Resolve the parent element via the JsxAttributes container
@@ -88,7 +88,7 @@ var ScopeRule = rule.Rule{
 				// lowercase "th" will reach this branch in practice; the
 				// EqualFold is upstream-faithful but functionally equivalent
 				// to a direct `tagName == "th"` check.
-				if strings.EqualFold(tagName, "th") {
+				if ecmascript.EqualsWhenUppercased(tagName, "th") {
 					return
 				}
 				ctx.ReportNode(attr, rule.RuleMessage{

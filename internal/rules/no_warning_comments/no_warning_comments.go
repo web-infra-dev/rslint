@@ -211,10 +211,10 @@ func truncateForDisplay(comment string) string {
 
 	// Splitting on runs of ECMAScript WhiteSpace/LineTerminator, and dropping
 	// the empty leading/trailing pieces, is what `comment.trim().split(/\s+/u)`
-	// comes to: JS regex `\s` is that same WhiteSpace production. strings.Fields
-	// can't stand in for it — Go's unicode.IsSpace counts U+0085 NEL, which JS
-	// does not, and skips U+FEFF BOM, which JS counts.
-	for _, word := range strings.FieldsFunc(comment, ecmascript.IsWhiteSpace) {
+	// comes to: JS regex `\s` matches those two productions together.
+	// strings.Fields can't stand in for it — Go's unicode.IsSpace counts U+0085
+	// NEL, which JS does not, and skips U+FEFF BOM, which JS counts.
+	for _, word := range strings.FieldsFunc(comment, ecmascript.IsWhiteSpaceOrLineTerminator) {
 		var candidate string
 		if first {
 			candidate = word

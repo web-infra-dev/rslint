@@ -6,8 +6,6 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // classAtomKind says what one member of a character class is. Keeping the four
@@ -245,7 +243,7 @@ func caseExtras(atoms []classAtom, unicodeMode bool) string {
 	}
 
 	var extras strings.Builder
-	for _, members := range ecmascript.CaseEquivalenceGroups(unicodeMode) {
+	for _, members := range CaseEquivalenceGroups(unicodeMode) {
 		if !slices.ContainsFunc(members, covers) {
 			continue
 		}

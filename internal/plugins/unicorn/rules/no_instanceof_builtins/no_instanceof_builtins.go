@@ -3,7 +3,6 @@ package no_instanceof_builtins
 import (
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -212,7 +211,7 @@ func replaceWithTypeOfExpression(sourceFile *ast.SourceFile, binary *ast.BinaryE
 	return []rule.RuleFix{
 		insertAt(leftRange.Pos(), insertBefore),
 		rule.RuleFixReplaceRange(utils.TrimNodeTextRange(sourceFile, binary.OperatorToken), "==="),
-		rule.RuleFixReplaceRange(utils.TrimNodeTextRange(sourceFile, binary.Right), fmt.Sprintf("'%s'", strings.ToLower(constructorName))),
+		rule.RuleFixReplaceRange(utils.TrimNodeTextRange(sourceFile, binary.Right), fmt.Sprintf("'%s'", ecmascript.StringToLowerCase(constructorName))),
 	}
 }
 
@@ -286,7 +285,7 @@ func messageNoInstanceofBuiltins() rule.RuleMessage {
 }
 
 func messageSwitchToTypeOf(constructorName string) rule.RuleMessage {
-	typeName := strings.ToLower(constructorName)
+	typeName := ecmascript.StringToLowerCase(constructorName)
 	return rule.RuleMessage{
 		Id:          messageIDSwitchToTypeOf,
 		Description: fmt.Sprintf("Switch to `typeof … === '%s'`.", typeName),

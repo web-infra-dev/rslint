@@ -87,6 +87,50 @@ func TestPatternTraversalVisitsComputedAssignmentKeyAsExpression(t *testing.T) {
 	}
 }
 
+func TestPatternTraversalVisitsPlainAssignmentKeyAsExpression(t *testing.T) {
+	var events []string
+	recordIdentifier := func(suffix string) func(*ast.Node) {
+		return func(node *ast.Node) {
+			events = append(events, "identifier:"+node.AsIdentifier().Text+suffix)
+		}
+	}
+
+	runPatternTraversalTest(t, `({ key: target } = source);`, rule.RuleListeners{
+		ast.KindIdentifier: recordIdentifier(":enter"),
+		rule.ListenerOnAllowPattern(ast.KindIdentifier):                      recordIdentifier(":pattern-enter"),
+		rule.ListenerOnExit(rule.ListenerOnAllowPattern(ast.KindIdentifier)): recordIdentifier(":pattern-exit"),
+		rule.ListenerOnExit(ast.KindIdentifier):                              recordIdentifier(":exit"),
+	})
+
+	want := []string{
+		"identifier:key:enter",
+		"identifier:key:exit",
+		"identifier:target:enter",
+		"identifier:target:pattern-enter",
+		"identifier:target:pattern-exit",
+		"identifier:target:exit",
+		"identifier:source:enter",
+		"identifier:source:exit",
+	}
+	if !reflect.DeepEqual(events, want) {
+		t.Fatalf("listener events = %#v, want %#v", events, want)
+	}
+}
+
+func TestPatternTraversalVisitsLiteralAssignmentKeys(t *testing.T) {
+	strings := 0
+	numbers := 0
+
+	runPatternTraversalTest(t, `({ "stringKey": first, 2: second } = source);`, rule.RuleListeners{
+		ast.KindStringLiteral:  func(*ast.Node) { strings++ },
+		ast.KindNumericLiteral: func(*ast.Node) { numbers++ },
+	})
+
+	if strings != 1 || numbers != 1 {
+		t.Fatalf("literal key visits = (%d string, %d numeric), want (1, 1)", strings, numbers)
+	}
+}
+
 func TestPatternTraversalVisitsNestedComputedAssignmentKeysOnce(t *testing.T) {
 	ordinary := make(map[string]int)
 	patterns := make(map[string]int)

@@ -15,8 +15,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
+	"github.com/web-infra-dev/rslint/internal/rules/func_names"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/id_length"
 	"github.com/web-infra-dev/rslint/internal/rules/id_match"
 	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/max_classes_per_file"
@@ -79,6 +81,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_lone_blocks"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
+	"github.com/web-infra-dev/rslint/internal/rules/no_magic_numbers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_misleading_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
@@ -189,8 +192,10 @@ func GetAllRules() []rule.Rule {
 		default_case_last.DefaultCaseLastRule,
 		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
+		func_names.FuncNamesRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
+		id_length.IdLengthRule,
 		id_match.IdMatchRule,
 		init_declarations.InitDeclarationsRule,
 		max_classes_per_file.MaxClassesPerFileRule,
@@ -247,6 +252,7 @@ func GetAllRules() []rule.Rule {
 		no_lone_blocks.NoLoneBlocksRule,
 		no_loop_func.NoLoopFuncRule,
 		no_loss_of_precision.NoLossOfPrecisionRule,
+		no_magic_numbers.NoMagicNumbersRule,
 		no_misleading_character_class.NoMisleadingCharacterClassRule,
 		no_new.NoNewRule,
 		no_new_func.NoNewFuncRule,

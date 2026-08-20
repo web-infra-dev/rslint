@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -238,12 +239,12 @@ func getCommentDefaultCase(
 		return nil
 	}
 
-	text := strings.TrimSpace(ctx.SourceFile.Text()[lastComment.Pos():lastComment.End()])
+	text := ecmascript.StringTrim(ctx.SourceFile.Text()[lastComment.Pos():lastComment.End()])
 	switch {
 	case strings.HasPrefix(text, "//"):
-		text = strings.TrimSpace(text[2:])
+		text = ecmascript.StringTrim(text[2:])
 	case strings.HasPrefix(text, "/*") && strings.HasSuffix(text, "*/"):
-		text = strings.TrimSpace(text[2 : len(text)-2])
+		text = ecmascript.StringTrim(text[2 : len(text)-2])
 	}
 
 	if commentPattern.TestOrTimeout(text) {

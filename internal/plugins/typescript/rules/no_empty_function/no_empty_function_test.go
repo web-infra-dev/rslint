@@ -161,7 +161,7 @@ class Foo {
 			Code: `const foo = function() { // comment
 };`,
 		},
-	}, []rule_tester.InvalidTestCase{
+	}, withNoEmptySuggestions([]rule_tester.InvalidTestCase{
 		// Invalid cases - exactly mirroring TypeScript tests
 		{
 			Code: `
@@ -364,5 +364,5 @@ class Foo {
 				},
 			},
 		},
-	})
+	}))
 }
