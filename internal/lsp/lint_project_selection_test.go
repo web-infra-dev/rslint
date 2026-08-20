@@ -216,10 +216,14 @@ func TestRunConfiguredLintForContentDirectRootSkipsEarlierImportProgram(t *testi
 		uri,
 		context.Background(),
 		targetContent,
-		config.RslintConfig{{}},
+		config.RslintConfig{{
+			LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+				Project: []string{importConfig, directConfig},
+			}},
+		}},
 		dir,
 		false,
-		[]string{importConfig, directConfig},
+		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +274,7 @@ func TestLintSessionProjectRootCacheUsesCommandLineGeneration(t *testing.T) {
 	}
 }
 
-func TestResolveTsConfigPathsPreservesSymlinkDeclarationPath(t *testing.T) {
+func TestProjectPathResolverPreservesSymlinkDeclarationPath(t *testing.T) {
 	root := t.TempDir()
 	realDir := filepath.Join(root, "real")
 	aliasDir := filepath.Join(root, "alias")
@@ -296,14 +300,24 @@ func TestResolveTsConfigPathsPreservesSymlinkDeclarationPath(t *testing.T) {
 	}
 
 	fs := bundled.WrapFS(osvfs.FS())
-	paths, err := resolveTsConfigPathsWithFS(config.RslintConfig{{
+	resolver, err := config.NewProjectPathResolver(nil, config.RslintConfig{{
 		LanguageOptions: &config.LanguageOptions{
 			ParserOptions: &config.ParserOptions{Project: []string{"./tsconfig.json"}},
 		},
-	}}, aliasDir, fs)
+	}}, aliasDir, fs, false)
 	if err != nil {
 		t.Fatal(err)
 	}
+	aliasSource = tspath.NormalizePath(aliasSource)
+	planned, err := resolver.ResolveLintTarget(config.DiscoveredLintTarget{
+		Path:            aliasSource,
+		CanonicalPath:   aliasSource,
+		ConfigDirectory: tspath.NormalizePath(aliasDir),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := planned.ProjectPaths
 	if len(paths) != 1 || paths[0] != tspath.NormalizePath(aliasConfig) {
 		t.Fatalf("resolved project paths = %v, want lexical %q", paths, aliasConfig)
 	}

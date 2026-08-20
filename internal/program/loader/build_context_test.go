@@ -567,13 +567,13 @@ func TestSessionRejectsNilFilesystemBeforeLoading(t *testing.T) {
 			if session.FS() != nil {
 				t.Fatal("invalid session unexpectedly exposed a filesystem")
 			}
-			if _, err := session.BuildProjects(nil, true); err == nil {
+			if _, err := session.SelectProjects(rslintconfig.LintProjectPlan{}, nil, false, true); err == nil {
 				t.Fatal("BuildProjects accepted an invalid session")
 			}
-			if _, err := session.LoadCLI(ProjectSet{}, rslintconfig.LintTargetPlan{}, "/repo", true); err == nil {
+			if _, err := session.LoadCLI(ProjectSet{}, rslintconfig.LintProjectPlan{}, "/repo", true); err == nil {
 				t.Fatal("LoadCLI accepted an invalid session")
 			}
-			if _, err := session.LoadAPI(ProjectSet{}, rslintconfig.LintTargetPlan{}, "/repo", true); err == nil {
+			if _, err := session.LoadAPI(ProjectSet{}, rslintconfig.LintProjectPlan{}, "/repo", true); err == nil {
 				t.Fatal("LoadAPI accepted an invalid session")
 			}
 		})

@@ -85,21 +85,43 @@ func TestRootFileIndexUsesDirectAndPhysicalIdentity(t *testing.T) {
 	workers.Wait()
 }
 
-func TestRootFileIndexUsesFilesystemCaseSensitivity(t *testing.T) {
+func TestRootFileIndexUsesAuthoritativeIdentityForCaseAliases(t *testing.T) {
 	const (
 		root  = "/repo/Source/Index.ts"
 		query = "/REPO/source/index.ts"
 	)
-	base := &rootFileAliasFS{
-		FS:            osvfs.FS(),
-		realPaths:     make(map[string]string),
-		realpathCalls: make(map[string]int),
-	}
-	index := lintprogram.NewRootFileIndex([]string{root}, &caseInsensitiveRootFS{base})
-	if !index.Contains(query, query) {
-		t.Fatal("case-insensitive direct root was not recognized")
-	}
-	if got := base.realpathCallCount(query); got != 0 {
-		t.Fatalf("case-insensitive exact lookup resolved the path %d time(s)", got)
-	}
+
+	t.Run("same physical file", func(t *testing.T) {
+		const physical = "/physical/Source/Index.ts"
+		base := &rootFileAliasFS{
+			FS: osvfs.FS(),
+			realPaths: map[string]string{
+				root:  physical,
+				query: physical,
+			},
+			realpathCalls: make(map[string]int),
+		}
+		index := lintprogram.NewRootFileIndex([]string{root}, &caseInsensitiveRootFS{base})
+		if !index.Contains(query, "") {
+			t.Fatal("filesystem-proven case alias was not recognized")
+		}
+		if got := base.realpathCallCount(query); got != 1 {
+			t.Fatalf("query Realpath calls = %d, want 1", got)
+		}
+	})
+
+	t.Run("distinct physical files", func(t *testing.T) {
+		base := &rootFileAliasFS{
+			FS: osvfs.FS(),
+			realPaths: map[string]string{
+				root:  "/physical/Source/Index.ts",
+				query: "/physical/source/index.ts",
+			},
+			realpathCalls: make(map[string]int),
+		}
+		index := lintprogram.NewRootFileIndex([]string{root}, &caseInsensitiveRootFS{base})
+		if index.Contains(query, "") {
+			t.Fatal("case-folded but physically distinct file was recognized")
+		}
+	})
 }

@@ -50,52 +50,36 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 	return s.eslintPluginDispatch
 }
 
-// buildPluginFileInput assembles the single-file eslint-plugin dispatch input
-// for uri, or returns ok=false when the file has no plugin rules (so the
-// caller skips the reverse request entirely).
+// buildPluginFileInput assembles one eslint-plugin dispatch input from the
+// exact target plan already used by native lint. It never discovers a config
+// owner or matches flat-config entries again.
 //
 // The plugin rules are the IsEslintPluginRule subset of the file's enabled
 // rules — exactly the rules the native pass treats as no-op placeholders.
-// Per-file languageOptions / settings come from GetConfigForFile (the same
-// merged config the native pass resolves). configKey is the owning config
-// directory's catalog identity: the absolute filesystem path discovered by Go.
-// The worker routes tasks by matching it byte-for-byte.
+// Per-file languageOptions / settings and enabled rules come from the same
+// EffectiveFileConfig. configKey is the owning JS-config catalog identity that
+// the native pass recorded; the worker matches it byte-for-byte.
 //
 // textOverride forces the text the worker lints: the diagnostics path passes
 // nil (use the s.documents overlay), while the multi-pass fixAll path passes
 // the in-progress fixed content of the current pass so plugin fix byte offsets
 // stay aligned with that content.
 //
-// Must be called from the main dispatch loop: it reads s.jsConfigs (lock-free)
-// and the s.documents overlay.
-func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *string) (linter.EslintPluginFileInput, bool) {
-	if s.isUnavailableConfigForURI(uri) {
-		return linter.EslintPluginFileInput{}, false
-	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	return s.buildPluginFileInputWithConfig(uri, textOverride, rslintConfig, configCwd, isJSConfig)
-}
-
-func (s *Server) buildPluginFileInputWithConfig(
+// Must be called from the main dispatch loop: it reads the documents overlay.
+func (s *Server) buildPluginFileInput(
 	uri lsproto.DocumentUri,
 	textOverride *string,
-	rslintConfig config.RslintConfig,
-	configCwd string,
-	isJSConfig bool,
+	plannedTarget *config.PlannedLintTarget,
+	configKey string,
 ) (linter.EslintPluginFileInput, bool) {
-	configKey := s.pluginConfigKeyForURI(uri)
-	filePath := uriToPath(uri)
-	configFilePath, matchConfigDir := config.ResolveConfigPathSpace(filePath, configCwd, s.fs)
-	if isDefaultExcludedLintPath(configFilePath, matchConfigDir, s.fs) {
+	if plannedTarget == nil || plannedTarget.Effective == nil {
 		return linter.EslintPluginFileInput{}, false
 	}
-
-	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, matchConfigDir, isJSConfig)
-	enabledRules, merged := fileConfigResolver.EnabledRulesForFile(configFilePath)
+	merged := plannedTarget.Effective.MergedConfig()
 	if merged == nil {
-		// File is globally ignored — no plugin (or native) diagnostics.
 		return linter.EslintPluginFileInput{}, false
 	}
+	enabledRules := plannedTarget.Effective.EnabledRules()
 
 	// Text is the content the worker lints. An explicit override (fixAll's
 	// in-progress fixed content) wins; otherwise use the editor overlay
@@ -113,7 +97,15 @@ func (s *Server) buildPluginFileInputWithConfig(
 	// linted that same string). Shared filter/assembly with the CLI (F1).
 	enabledRules = s.pluginRulesForCurrentGeneration(enabledRules)
 	languageOptions, settings := config.PluginMergedMaps(merged)
-	return linter.BuildEslintPluginFileInput(filePath, configKey, enabledRules, languageOptions, settings, text, nil)
+	return linter.BuildEslintPluginFileInput(
+		plannedTarget.Target.Path,
+		configKey,
+		enabledRules,
+		languageOptions,
+		settings,
+		text,
+		nil,
+	)
 }
 
 // eslintPluginRuleSet expands activation metadata into the exact rule names
@@ -152,21 +144,6 @@ func (s *Server) pluginRulesForCurrentGeneration(rules []rule.ConfiguredRule) []
 	return filtered
 }
 
-// pluginConfigKeyForURI returns the owning config directory's absolute path.
-// It uses the same resolver as getConfigForURI and preserves the catalog key
-// byte-for-byte for the Node worker.
-//
-// For the JSON-config fallback there is no JS config directory, so the key is
-// empty — the worker has no plugins registered for that path anyway (JSON
-// configs cannot mount object-form plugins), and a file with no plugin rules never
-// reaches dispatch.
-func (s *Server) pluginConfigKeyForURI(uri lsproto.DocumentUri) string {
-	if configKey, ok := s.nearestJSConfigKey(uri); ok {
-		return configKey
-	}
-	return ""
-}
-
 // dispatchPluginLint runs the eslint-plugin lint for uri in a goroutine and
 // delivers the rebuilt diagnostics back to the main dispatch loop via
 // pluginResultCh, tagged with generation. It is the concurrent companion to
@@ -178,23 +155,13 @@ func (s *Server) pluginConfigKeyForURI(uri lsproto.DocumentUri) string {
 // pluginResultCh. The generation stamp lets the main loop drop results that a
 // newer keystroke has superseded.
 //
-// Must be called from the main dispatch loop (it reads jsConfigs + documents
-// to build the input and the generation map).
-func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) {
-	if s.isUnavailableConfigForURI(uri) {
-		s.cancelInflightPluginDispatch(uri)
-		return
-	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	s.dispatchPluginLintWithConfig(uri, generation, rslintConfig, configCwd, isJSConfig)
-}
-
-func (s *Server) dispatchPluginLintWithConfig(
+// Must be called from the main dispatch loop so the planned config and plugin
+// host generation remain one committed snapshot while the input is built.
+func (s *Server) dispatchPluginLint(
 	uri lsproto.DocumentUri,
 	generation uint64,
-	rslintConfig config.RslintConfig,
-	configCwd string,
-	isJSConfig bool,
+	plannedTarget *config.PlannedLintTarget,
+	configKey string,
 ) {
 	// Supersede any prior in-flight dispatch for this URI FIRST — before the
 	// no-plugin-work early return below. Even a relint that yields no plugin
@@ -204,7 +171,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 	// a $/cancelRequest tells the client to stop the worker.
 	s.cancelInflightPluginDispatch(uri)
 
-	input, ok := s.buildPluginFileInputWithConfig(uri, nil, rslintConfig, configCwd, isJSConfig)
+	input, ok := s.buildPluginFileInput(uri, nil, plannedTarget, configKey)
 	if !ok {
 		return
 	}
@@ -360,26 +327,18 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 // cannot stall the dispatch loop: on expiry DispatchEslintPluginRules returns a
 // context error and this returns nil, leaving the pass native-only.
 //
-// Must be called from the main dispatch loop (it reads jsConfigs + documents).
-func (s *Server) lintPluginRulesSync(ctx context.Context, uri lsproto.DocumentUri, content string, fix bool, suggestionsMode string) []rule.RuleDiagnostic {
-	if s.isUnavailableConfigForURI(uri) {
-		return nil
-	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	return s.lintPluginRulesSyncWithConfig(ctx, uri, content, fix, suggestionsMode, rslintConfig, configCwd, isJSConfig)
-}
-
-func (s *Server) lintPluginRulesSyncWithConfig(
+// Must be called from the main dispatch loop so the planned config and plugin
+// host generation remain paired.
+func (s *Server) lintPluginRulesSync(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
 	content string,
 	fix bool,
 	suggestionsMode string,
-	rslintConfig config.RslintConfig,
-	configCwd string,
-	isJSConfig bool,
+	plannedTarget *config.PlannedLintTarget,
+	configKey string,
 ) []rule.RuleDiagnostic {
-	input, ok := s.buildPluginFileInputWithConfig(uri, &content, rslintConfig, configCwd, isJSConfig)
+	input, ok := s.buildPluginFileInput(uri, &content, plannedTarget, configKey)
 	if !ok {
 		return nil
 	}

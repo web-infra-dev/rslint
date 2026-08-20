@@ -290,7 +290,6 @@ func installLastGoodConfig(s *Server, root string) {
 	s.jsConfigs = map[string]config.RslintConfig{root: entries}
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
-	s.tsConfigPathsByConfig = map[string][]string{root: nil}
 	s.eslintPluginConfigGeneration = "last-good"
 	s.configDiscoveryHasLastGood = true
 	// Tests using this helper model a catalog committed by an earlier automatic
@@ -348,7 +347,8 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 		t.Fatalf("filesystem-path catalog was not committed: %+v", s.jsConfigs)
 	}
 	fileURI := documentURIFromPath(filepath.Join(root, "src", "index.ts"))
-	if got := s.pluginConfigKeyForURI(fileURI); got != root {
+	_, got := plannedPluginTargetForTest(t, s, fileURI)
+	if got != root {
 		t.Fatalf("plugin configKey = %q, want exact catalog path %q", got, root)
 	}
 	if _, active := s.eslintPluginRules[pluginRuleName]; !active {
@@ -1024,7 +1024,6 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 	installLastGoodConfig(s, root)
 	s.jsConfigs[nested] = config.RslintConfig{{Rules: config.Rules{"old-nested": "error"}}}
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
-	s.tsConfigPathsByConfig[nested] = nil
 
 	result := startConfigRefreshForTest(s, "config-change")
 	rootLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)

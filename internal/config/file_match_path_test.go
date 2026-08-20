@@ -322,11 +322,11 @@ func TestFileConfigResolverMatchesDirectResolutionAcrossShapes(t *testing.T) {
 		}
 	}
 
-	first := resolver.planForFile("/repo/src/a.ts")
-	if second := resolver.planForFile("/repo/src/b.ts"); first == nil || second != first {
+	first := resolver.PlanForFile("/repo/src/a.ts")
+	if second := resolver.PlanForFile("/repo/src/b.ts"); first == nil || second != first {
 		t.Fatal("files with the same exact config shape did not share one effective plan")
 	}
-	if special := resolver.planForFile("/repo/src/special.ts"); special == nil || special == first {
+	if special := resolver.PlanForFile("/repo/src/special.ts"); special == nil || special == first {
 		t.Fatal("files with different config shapes shared an effective plan")
 	}
 }
@@ -374,7 +374,7 @@ func TestFileConfigResolverShapeKeyPreservesEntriesBeyond64(t *testing.T) {
 		"/repo/component.vue",
 		"/repo/component.unsupported",
 	}
-	plans := make(map[string]*effectiveConfigPlan, len(paths))
+	plans := make(map[string]*EffectiveFileConfig, len(paths))
 	for _, filePath := range paths {
 		resolvedRules, resolvedMerged := resolver.EnabledRulesForFile(filePath)
 		directMerged := config.GetConfigForFile(filePath, "/repo")
@@ -383,7 +383,7 @@ func TestFileConfigResolverShapeKeyPreservesEntriesBeyond64(t *testing.T) {
 			!reflect.DeepEqual(configuredRuleViews(resolvedRules), configuredRuleViews(directRules)) {
 			t.Fatalf("resolution mismatch for %s", filePath)
 		}
-		plans[filePath] = resolver.planForFile(filePath)
+		plans[filePath] = resolver.PlanForFile(filePath)
 	}
 	if plans["/repo/src/ordinary.ts"] == plans["/repo/src/low.ts"] ||
 		plans["/repo/src/ordinary.ts"] == plans["/repo/src/tail.ts"] ||
@@ -430,19 +430,19 @@ func TestFileConfigResolverConcurrentShapePublication(t *testing.T) {
 		},
 	}}
 	resolver := NewFileConfigResolver(config, "/repo", false)
-	plans := make(chan *effectiveConfigPlan, 128)
+	plans := make(chan *EffectiveFileConfig, 128)
 	var waitGroup sync.WaitGroup
 	for index := range 128 {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			plans <- resolver.planForFile(fmt.Sprintf("/repo/src/file-%d.ts", index))
+			plans <- resolver.PlanForFile(fmt.Sprintf("/repo/src/file-%d.ts", index))
 		}()
 	}
 	waitGroup.Wait()
 	close(plans)
 
-	var first *effectiveConfigPlan
+	var first *EffectiveFileConfig
 	for plan := range plans {
 		if plan == nil {
 			t.Fatal("matching file resolved to a nil plan")

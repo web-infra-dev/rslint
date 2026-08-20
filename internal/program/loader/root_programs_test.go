@@ -296,7 +296,7 @@ func TestLoadCLIMatchesCompatibilityRootAdmission(t *testing.T) {
 			})
 			directContext := newContext()
 			direct := runRootProgramBind(func() (LoadResult, error) {
-				return sessionForTest(directContext).LoadCLI(ProjectSet{}, plan, configDir, true)
+				return loadCLIForTest(ProjectSet{}, plan, configDir, directContext, true)
 			})
 
 			legacyError, directError := "", ""
@@ -379,7 +379,7 @@ func TestRootProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 		t.Fatalf("loadAPIForTest: %v", err)
 	}
 	directContext := newBuildContext(newFS())
-	direct, err := sessionForTest(directContext).LoadCLI(ProjectSet{}, plan, configDir, true)
+	direct, err := loadCLIForTest(ProjectSet{}, plan, configDir, directContext, true)
 	if err != nil {
 		t.Fatalf("prepareCLIForTest: %v", err)
 	}
@@ -438,11 +438,9 @@ func TestSourceOnlyProgramSyntaxDeduplicatesAgainstNonGoverningTypeCheckProgram(
 		t.Fatalf("buildProjectsForConfigs: %v", err)
 	}
 	targetPath := tspath.ResolvePath(childDir, "target.ts")
-	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{testLintTarget(fsys, childDir, targetPath)}}
-	binding, err := sessionForTest(buildContext).LoadCLI(set, plan, rootDir, true)
-	if err != nil {
-		t.Fatalf("prepareCLIForTest: %v", err)
-	}
+	plan, binding := resolveAndBindTestTargetsForConfigs(
+		t, set, configMap, rootDir, fsys, []string{targetPath}, nil, buildContext, true,
+	)
 	if len(binding.compilerPrograms) != 1 || len(binding.Programs) != 2 {
 		t.Fatalf("fixture did not create a non-governing Program plus source-only Program: compiler=%d Programs=%d", len(binding.compilerPrograms), len(binding.Programs))
 	}
@@ -475,7 +473,16 @@ func buildProjectsForConfigs(
 	singleThreaded bool,
 	context *buildContext,
 ) (ProjectSet, error) {
-	return sessionForTest(context).BuildProjects(configs, singleThreaded)
+	resolver, err := rslintconfig.NewProjectPathResolver(configs, nil, "", context.FS(), false)
+	if err != nil {
+		return ProjectSet{}, err
+	}
+	return sessionForTest(context).SelectProjects(
+		rslintconfig.LintProjectPlan{},
+		resolver.CatalogProjectPaths(),
+		false,
+		singleThreaded,
+	)
 }
 
 func buildProjectsForConfig(
@@ -484,7 +491,16 @@ func buildProjectsForConfig(
 	singleThreaded bool,
 	context *buildContext,
 ) (ProjectSet, error) {
-	return sessionForTest(context).BuildProject(configDirectory, config, singleThreaded)
+	resolver, err := rslintconfig.NewProjectPathResolver(nil, config, configDirectory, context.FS(), false)
+	if err != nil {
+		return ProjectSet{}, err
+	}
+	return sessionForTest(context).SelectProjects(
+		rslintconfig.LintProjectPlan{},
+		resolver.CatalogProjectPaths(),
+		false,
+		singleThreaded,
+	)
 }
 
 func executeProjectPlanForTest(
@@ -492,7 +508,16 @@ func executeProjectPlanForTest(
 	singleThreaded bool,
 	context *buildContext,
 ) (ProjectSet, error) {
-	return sessionForTest(context).executeProjectPlan(plan, singleThreaded)
+	paths := make([]string, len(plan.specs))
+	for index, spec := range plan.specs {
+		paths[index] = spec.tsconfigPath
+	}
+	return sessionForTest(context).SelectProjects(
+		rslintconfig.LintProjectPlan{},
+		paths,
+		false,
+		singleThreaded,
+	)
 }
 
 func resolveTargetPlanForTest(
@@ -535,7 +560,50 @@ func loadAPIForTest(
 	context *buildContext,
 	singleThreaded bool,
 ) (LoadResult, error) {
-	return sessionForTest(context).LoadAPI(projects, plan, currentDirectory, singleThreaded)
+	projects, lintPlan := prepareProjectLoadForTest(projects, plan, context.FS())
+	return sessionForTest(context).LoadAPI(projects, lintPlan, currentDirectory, singleThreaded)
+}
+
+func loadCLIForTest(
+	projects ProjectSet,
+	plan rslintconfig.LintTargetPlan,
+	currentDirectory string,
+	context *buildContext,
+	singleThreaded bool,
+) (LoadResult, error) {
+	projects, lintPlan := prepareProjectLoadForTest(projects, plan, context.FS())
+	return sessionForTest(context).LoadCLI(projects, lintPlan, currentDirectory, singleThreaded)
+}
+
+func prepareProjectLoadForTest(
+	projects ProjectSet,
+	plan rslintconfig.LintTargetPlan,
+	fsys vfs.FS,
+) (ProjectSet, rslintconfig.LintProjectPlan) {
+	if projects.targetBinding != nil {
+		bindingMatchesPlan := len(projects.targetBinding.targets) == len(plan.Targets)
+		for index := 0; bindingMatchesPlan && index < len(plan.Targets); index++ {
+			bindingMatchesPlan = projects.targetBinding.targets[index].Target == plan.Targets[index]
+		}
+		if bindingMatchesPlan {
+			return projects, rslintconfig.LintProjectPlan{
+				Targets: append([]rslintconfig.PlannedLintTarget(nil), projects.targetBinding.targets...),
+			}
+		}
+	}
+	lintPlan := rslintconfig.LintProjectPlan{Targets: make([]rslintconfig.PlannedLintTarget, len(plan.Targets))}
+	owners := make([]int, len(plan.Targets))
+	for index, target := range plan.Targets {
+		lintPlan.Targets[index] = rslintconfig.PlannedLintTarget{
+			Target:    target,
+			MatchPath: target.MatchPath(fsys),
+		}
+		owners[index] = -1
+	}
+	if projects.targetBinding == nil {
+		projects.targetBinding = &projectTargetBinding{targets: lintPlan.Targets, owners: owners}
+	}
+	return projects, lintPlan
 }
 
 func createCompatibilityProgramForTest(
@@ -563,7 +631,22 @@ func buildRootProgramsForTest(
 	singleThreaded bool,
 ) ([]*lintprogram.Program, []rule.RuleDiagnostic, error) {
 	result := LoadResult{}
-	if err := sessionForTest(context).appendRootPrograms(&result, groups, currentDirectory, singleThreaded); err != nil {
+	plannedGroups := make([][]plannedTargetRef, len(groups))
+	targetIndex := 0
+	for groupIndex, group := range groups {
+		plannedGroups[groupIndex] = make([]plannedTargetRef, len(group))
+		for index, target := range group {
+			plannedGroups[groupIndex][index] = plannedTargetRef{
+				index: targetIndex,
+				target: rslintconfig.PlannedLintTarget{
+					Target:    target,
+					MatchPath: target.MatchPath(context.FS()),
+				},
+			}
+			targetIndex++
+		}
+	}
+	if err := sessionForTest(context).appendRootPrograms(&result, plannedGroups, currentDirectory, singleThreaded); err != nil {
 		return nil, nil, err
 	}
 	diagnostics := collectTargetSyntacticDiagnostics(result.Programs, result.TargetsByProgram, false, false)
@@ -672,32 +755,30 @@ func deduplicateTypeScriptDiagnostics(
 	return result
 }
 
-type lintConfigResolverOptions struct {
-	Config                     rslintconfig.RslintConfig
-	CurrentDirectory           string
-	ConfigPathBySourcePath     map[string]string
-	OwnerConfigDirBySourcePath map[string]string
-	FS                         vfs.FS
-}
-
-type testLintConfigResolver struct {
-	resolver   *rslintconfig.FileConfigResolver
-	pathByFile map[string]string
-}
-
-func newLintConfigResolver(opts lintConfigResolverOptions) *testLintConfigResolver {
-	return &testLintConfigResolver{
-		resolver:   rslintconfig.NewFileConfigResolver(opts.Config, authoritativePath(opts.CurrentDirectory, opts.FS), false),
-		pathByFile: opts.ConfigPathBySourcePath,
+func plannedTargetForBoundSourceForTest(
+	t *testing.T,
+	binding LoadResult,
+	targetPlan rslintconfig.LintTargetPlan,
+	configs map[string]rslintconfig.RslintConfig,
+	config rslintconfig.RslintConfig,
+	currentDirectory string,
+	fsys vfs.FS,
+	sourcePath string,
+) rslintconfig.PlannedLintTarget {
+	t.Helper()
+	resolver, err := rslintconfig.NewProjectPathResolver(configs, config, currentDirectory, fsys, false)
+	if err != nil {
+		t.Fatalf("NewProjectPathResolver: %v", err)
 	}
-}
-
-func (resolver *testLintConfigResolver) EnabledRulesForFile(fileName string) []rule.ConfiguredRule {
-	if mapped := resolver.pathByFile[fileName]; mapped != "" {
-		fileName = mapped
+	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan)
+	if err != nil {
+		t.Fatalf("ResolveLintProjectPlan: %v", err)
 	}
-	rules, _ := resolver.resolver.EnabledRulesForFile(fileName)
-	return rules
+	targetIndex, ok := binding.TargetIndexForSourcePath(sourcePath)
+	if !ok || targetIndex < 0 || targetIndex >= len(lintPlan.Targets) {
+		t.Fatalf("bound source %q has invalid target index %d (ok=%t)", sourcePath, targetIndex, ok)
+	}
+	return lintPlan.Targets[targetIndex]
 }
 
 func configuredRuleNameSet(rules []rule.ConfiguredRule) map[string]struct{} {

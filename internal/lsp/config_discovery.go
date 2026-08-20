@@ -297,12 +297,12 @@ func decodeConfigTransactionResult(raw any, target any, method string) error {
 
 type lspDiscoveredConfigSnapshot struct {
 	configs             map[string]config.RslintConfig
-	tsConfigPaths       map[string][]string
+	jsProjectResolver   *config.ProjectPathResolver
 	ownerResolver       *config.ConfigOwnerResolver
 	unavailableConfigs  map[string]struct{}
 	jsonConfig          config.RslintConfig
 	jsonConfigPath      string
-	jsonTsConfigPaths   []string
+	jsonProjectResolver *config.ProjectPathResolver
 	transactionID       string
 	eslintPluginEntries []config.EslintPluginEntry
 	usableLastGood      bool
@@ -578,7 +578,6 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	}
 	snapshot := &lspDiscoveredConfigSnapshot{
 		configs:            make(map[string]config.RslintConfig, len(catalog.Configs)),
-		tsConfigPaths:      make(map[string][]string, len(catalog.Configs)),
 		unavailableConfigs: make(map[string]struct{}),
 		transactionID:      catalog.TransactionID,
 		// An empty catalog is a successfully committed absence of JavaScript
@@ -607,12 +606,7 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 			)
 		}
 		seenConfigDirs[configID] = configDir
-		paths, err := resolveTsConfigPathsWithFS(entries, configDir, fsys)
-		if err != nil {
-			return nil, fmt.Errorf("resolve tsconfig paths for %q: %w", configDir, err)
-		}
 		snapshot.configs[configDir] = append(config.RslintConfig(nil), entries...)
-		snapshot.tsConfigPaths[configDir] = paths
 	}
 
 	// A failed candidate still blocks the JSON fallback when no usable JS
@@ -626,7 +620,6 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 			continue
 		}
 		snapshot.configs[configDir] = config.RslintConfig{}
-		snapshot.tsConfigPaths[configDir] = nil
 		snapshot.unavailableConfigs[configDir] = struct{}{}
 	}
 	// ConfigOwnerResolver snapshots both the path index and config values. Build
@@ -635,6 +628,11 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	// by their discovery generation; unavailable boundaries intentionally remain
 	// empty and only stop JSON fallback ownership.
 	snapshot.ownerResolver = config.NewConfigOwnerResolver(snapshot.configs, fsys)
+	projectResolver, err := config.NewProjectPathResolver(snapshot.configs, nil, s.cwd, fsys, true)
+	if err != nil {
+		return nil, err
+	}
+	snapshot.jsProjectResolver = projectResolver
 	if catalog.Explicit {
 		// An explicit JS/TS config is invocation-wide and owns the cwd. JSON is
 		// not part of this mode, so an unrelated JSON file must not make the
@@ -642,7 +640,7 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		return snapshot, nil
 	}
 
-	jsonConfig, jsonPath, jsonTsConfigs, err := loadJSONConfigFallbackWithFS(s.cwd, fsys)
+	jsonConfig, jsonPath, err := loadJSONConfigFallbackWithFS(s.cwd, fsys)
 	if err != nil {
 		return nil, err
 	}
@@ -664,7 +662,13 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		jsonBoundaryResolver.ChildConfigDirs(jsonCWD),
 	)
 	snapshot.jsonConfigPath = jsonPath
-	snapshot.jsonTsConfigPaths = jsonTsConfigs
+	if jsonPath != "" {
+		jsonProjectResolver, err := config.NewProjectPathResolver(nil, snapshot.jsonConfig, jsonCWD, fsys, false)
+		if err != nil {
+			return nil, err
+		}
+		snapshot.jsonProjectResolver = jsonProjectResolver
+	}
 	return snapshot, nil
 }
 
@@ -744,12 +748,12 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.invalidateOpenDocumentDiagnostics()
 	s.invalidateLintProjectCaches()
 	s.jsConfigs = snapshot.configs
-	s.tsConfigPathsByConfig = snapshot.tsConfigPaths
+	s.jsProjectResolver = snapshot.jsProjectResolver
 	s.jsConfigOwnerResolver = snapshot.ownerResolver
 	s.jsUnavailableConfigs = snapshot.unavailableConfigs
 	s.jsonConfig = snapshot.jsonConfig
 	s.rslintConfigPath = snapshot.jsonConfigPath
-	s.tsConfigPaths = snapshot.jsonTsConfigPaths
+	s.jsonProjectResolver = snapshot.jsonProjectResolver
 	s.eslintPluginConfigGeneration = snapshot.transactionID
 	s.eslintPluginRules = eslintPluginRuleSet(snapshot.eslintPluginEntries)
 	s.configDiscoveryHasLastGood = snapshot.usableLastGood
@@ -764,30 +768,15 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 func loadJSONConfigFallbackWithFS(
 	cwd string,
 	fsys vfs.FS,
-) (config.RslintConfig, string, []string, error) {
+) (config.RslintConfig, string, error) {
 	configPath, found := findRslintConfig(fsys, cwd)
 	if !found {
-		return config.RslintConfig{}, "", nil, nil
+		return config.RslintConfig{}, "", nil
 	}
 	loader := config.NewConfigLoader(fsys, cwd)
 	rslintConfig, _, err := loader.LoadRslintConfig(configPath)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("load JSON fallback %q: %w", configPath, err)
+		return nil, "", fmt.Errorf("load JSON fallback %q: %w", configPath, err)
 	}
-	paths, err := resolveTsConfigPathsWithFS(rslintConfig, cwd, fsys)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("resolve tsconfig paths for JSON fallback %q: %w", configPath, err)
-	}
-	return rslintConfig, configPath, paths, nil
-}
-
-func resolveTsConfigPathsWithFS(cfg config.RslintConfig, cwd string, fsys vfs.FS) ([]string, error) {
-	paths, err := config.ResolveTsConfigPaths(cfg, cwd, fsys)
-	if err != nil {
-		return nil, err
-	}
-	for index, projectPath := range paths {
-		paths[index] = tspath.NormalizePath(projectPath)
-	}
-	return paths, nil
+	return rslintConfig, configPath, nil
 }

@@ -608,6 +608,13 @@ func lintProgramLexicalPathID(fileName string, fs vfs.FS) tspath.Path {
 	return tspath.Path(lspLexicalPathID(fileName, caseSensitive))
 }
 
+// TypeScript config declarations are exact lexical identities. Realpath and
+// filesystem-wide case folding cannot merge two authored declarations because
+// their relative include/extends path spaces may differ.
+func lintProjectDeclarationPathID(fileName string) tspath.Path {
+	return tspath.ToPath(tspath.NormalizePath(fileName), "", true)
+}
+
 func sortedLintProgramPaths(values map[tspath.Path]struct{}) []tspath.Path {
 	return slices.Sorted(maps.Keys(values))
 }

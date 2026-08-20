@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -38,6 +39,78 @@ func pluginDiag(text, ruleName, message string, start, end int) rule.RuleDiagnos
 		Message:    rule.RuleMessage{Description: message},
 		SourceFile: textOnlySourceFile{text: text},
 	}
+}
+
+func plannedPluginTargetForTest(
+	t *testing.T,
+	s *Server,
+	uri lsproto.DocumentUri,
+) (*config.PlannedLintTarget, string) {
+	t.Helper()
+	if s.isUnavailableConfigForURI(uri) {
+		return nil, ""
+	}
+	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	matchPath, matchDirectory := config.ResolveConfigPathSpace(filePath, configCwd, s.fs)
+	if isDefaultExcludedLintPath(matchPath, matchDirectory, s.fs) ||
+		rslintConfig.IsFileIgnored(matchPath, matchDirectory) {
+		return nil, ""
+	}
+	resolver, err := config.NewProjectPathResolver(nil, rslintConfig, configCwd, s.fs, isJSConfig)
+	if err != nil {
+		t.Fatalf("NewProjectPathResolver: %v", err)
+	}
+	canonicalPath := filePath
+	if s.fs != nil {
+		if realPath := s.fs.Realpath(filePath); realPath != "" {
+			canonicalPath = tspath.NormalizePath(realPath)
+		}
+	}
+	planned, err := resolver.ResolveLintTarget(config.DiscoveredLintTarget{
+		Path:            filePath,
+		CanonicalPath:   canonicalPath,
+		ConfigDirectory: configCwd,
+	})
+	if err != nil {
+		t.Fatalf("ResolveLintTarget: %v", err)
+	}
+	configKey := ""
+	if isJSConfig {
+		configKey = planned.Target.ConfigDirectory
+	}
+	return &planned, configKey
+}
+
+func buildPluginFileInputForTest(
+	t *testing.T,
+	s *Server,
+	uri lsproto.DocumentUri,
+	textOverride *string,
+) (linter.EslintPluginFileInput, bool) {
+	t.Helper()
+	planned, configKey := plannedPluginTargetForTest(t, s, uri)
+	return s.buildPluginFileInput(uri, textOverride, planned, configKey)
+}
+
+func lintPluginRulesSyncForTest(
+	t *testing.T,
+	s *Server,
+	ctx context.Context,
+	uri lsproto.DocumentUri,
+	content string,
+	fix bool,
+	suggestionsMode string,
+) []rule.RuleDiagnostic {
+	t.Helper()
+	planned, configKey := plannedPluginTargetForTest(t, s, uri)
+	return s.lintPluginRulesSync(ctx, uri, content, fix, suggestionsMode, planned, configKey)
+}
+
+func dispatchPluginLintForTest(t *testing.T, s *Server, uri lsproto.DocumentUri, generation uint64) {
+	t.Helper()
+	planned, configKey := plannedPluginTargetForTest(t, s, uri)
+	s.dispatchPluginLint(uri, generation, planned, configKey)
 }
 
 // ======== mergePluginDiagnostics tests ========
@@ -202,9 +275,9 @@ func TestDispatchLoop_PluginResultMerged(t *testing.T) {
 	}
 }
 
-// ======== pluginConfigKeyForURI tests ========
+// ======== planned plugin target tests ========
 
-func TestPluginConfigKeyForURI(t *testing.T) {
+func TestPlannedPluginTargetUsesOwningConfigKey(t *testing.T) {
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/project": {{}},
@@ -221,16 +294,18 @@ func TestPluginConfigKeyForURI(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := s.pluginConfigKeyForURI(tt.uri); got != tt.want {
-				t.Errorf("pluginConfigKeyForURI(%q) = %q, want %q", tt.uri, got, tt.want)
+			_, got := plannedPluginTargetForTest(t, s, tt.uri)
+			if got != tt.want {
+				t.Errorf("planned config key for %q = %q, want %q", tt.uri, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestPluginConfigKeyForURI_NoJSConfigs(t *testing.T) {
+func TestPlannedPluginTargetHasNoKeyForJSONConfig(t *testing.T) {
 	s := newTestServer() // no jsConfigs → JSON fallback path, empty key
-	if got := s.pluginConfigKeyForURI("file:///project/a.ts"); got != "" {
+	_, got := plannedPluginTargetForTest(t, s, "file:///project/a.ts")
+	if got != "" {
 		t.Errorf("expected empty configKey with no JS configs, got %q", got)
 	}
 }
@@ -259,7 +334,7 @@ func TestBuildPluginFileInput_TextOverridePrecedence(t *testing.T) {
 	s.documents[uri] = "overlay buffer"
 
 	// nil override → editor overlay (the diagnostics path).
-	in, ok := s.buildPluginFileInput(uri, nil)
+	in, ok := buildPluginFileInputForTest(t, s, uri, nil)
 	if !ok {
 		t.Fatal("expected ok=true (file has a plugin rule)")
 	}
@@ -275,7 +350,7 @@ func TestBuildPluginFileInput_TextOverridePrecedence(t *testing.T) {
 
 	// Explicit override must win over the stale overlay.
 	override := "fixed pass content"
-	in2, ok := s.buildPluginFileInput(uri, &override)
+	in2, ok := buildPluginFileInputForTest(t, s, uri, &override)
 	if !ok {
 		t.Fatal("expected ok=true with override")
 	}
@@ -302,13 +377,13 @@ func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
 	s.documents["file:///proj/matched.ts"] = "foo();"
 	s.documents["file:///proj/outside.js"] = "foo();"
 
-	if in, ok := s.buildPluginFileInput("file:///proj/matched.ts", nil); !ok {
+	if in, ok := buildPluginFileInputForTest(t, s, "file:///proj/matched.ts", nil); !ok {
 		t.Fatal("expected matching TS file to produce plugin input")
 	} else if len(in.Rules) != 1 || in.Rules[0].Name != "tplfiles/no-foo" {
 		t.Fatalf("expected tplfiles/no-foo for matching file, got %+v", in.Rules)
 	}
 
-	if in, ok := s.buildPluginFileInput("file:///proj/outside.js", nil); ok {
+	if in, ok := buildPluginFileInputForTest(t, s, "file:///proj/outside.js", nil); ok {
 		t.Fatalf("files-scope miss must not dispatch plugin lint, got input %+v", in)
 	}
 }
@@ -336,7 +411,7 @@ func TestBuildPluginFileInput_RespectsGitignore(t *testing.T) {
 	}}
 	uri := documentURIFromPath(target)
 	s.documents[uri] = "foo();\n"
-	if input, ok := s.buildPluginFileInput(uri, nil); ok {
+	if input, ok := buildPluginFileInputForTest(t, s, uri, nil); ok {
 		t.Fatalf("gitignored file produced plugin input %+v", input)
 	}
 }
@@ -361,16 +436,16 @@ func TestBuildPluginFileInput_UsesEffectiveConfigSnapshot(t *testing.T) {
 	uri := documentURIFromPath(target)
 	s.documents[uri] = "foo();\n"
 
-	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
+	planned, configKey := plannedPluginTargetForTest(t, s, uri)
 	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("source.ts\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if input, ok := s.buildPluginFileInputWithConfig(uri, nil, effective, configCwd, isJSConfig); !ok {
+	if input, ok := s.buildPluginFileInput(uri, nil, planned, configKey); !ok {
 		t.Fatal("captured effective config changed after .gitignore update")
 	} else if len(input.Rules) != 1 || input.Rules[0].Name != "tpsnapshot/no-foo" {
 		t.Fatalf("captured effective config produced unexpected input: %+v", input)
 	}
-	if input, ok := s.buildPluginFileInput(uri, nil); ok {
+	if input, ok := buildPluginFileInputForTest(t, s, uri, nil); ok {
 		t.Fatalf("fresh effective config did not observe .gitignore update: %+v", input)
 	}
 }
@@ -424,7 +499,7 @@ func TestBuildPluginFileInput_RespectsDefaultExcludedDirectories(t *testing.T) {
 		"file:///proj/.git/hooks/pre-commit.ts",
 	} {
 		s.documents[uri] = "foo();"
-		if input, ok := s.buildPluginFileInput(uri, nil); ok {
+		if input, ok := buildPluginFileInputForTest(t, s, uri, nil); ok {
 			t.Fatalf("default-excluded file %q produced plugin input %+v", uri, input)
 		}
 	}
@@ -456,7 +531,7 @@ func TestBuildPluginFileInput_NestedEncodedConfigKeyAndCwd(t *testing.T) {
 	uri := lsproto.DocumentUri("file:///Users/John%20Doe/my%20project/packages/foo/src/index.ts")
 	s.documents[uri] = "foo();"
 
-	in, ok := s.buildPluginFileInput(uri, nil)
+	in, ok := buildPluginFileInputForTest(t, s, uri, nil)
 	if !ok {
 		t.Fatal("expected nested encoded config to produce plugin input")
 	}
@@ -511,7 +586,7 @@ func TestLintPluginRulesSync_RebuildsWithFixes(t *testing.T) {
 		}, nil
 	}
 
-	diags := s.lintPluginRulesSync(context.Background(), uri, content, true, "off")
+	diags := lintPluginRulesSyncForTest(t, s, context.Background(), uri, content, true, "off")
 	if len(diags) != 1 {
 		t.Fatalf("expected 1 plugin diagnostic, got %d", len(diags))
 	}
@@ -531,7 +606,7 @@ func TestLintPluginRulesSync_RebuildsWithFixes(t *testing.T) {
 
 	// A file with no plugin rules → nil (caller proceeds native-only).
 	other := lsproto.DocumentUri("file:///elsewhere/x.ts")
-	if got := s.lintPluginRulesSync(context.Background(), other, "x", true, "off"); got != nil {
+	if got := lintPluginRulesSyncForTest(t, s, context.Background(), other, "x", true, "off"); got != nil {
 		t.Errorf("expected nil for a file with no plugin rules, got %v", got)
 	}
 }
@@ -559,6 +634,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	const original = "const bar = 1;" // "bar" at [6,9], "1" at [12,13]
 	s.documents[uri] = original
+	plannedTarget, pluginConfigKey := plannedPluginTargetForTest(t, s, uri)
 
 	// Mocked plugin dispatcher: fix "bar" → "baz" wherever it appears in the
 	// content the worker was handed (req file text == the current pass content).
@@ -586,11 +662,11 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	// Injected native lint: fix the first "1" → "2" wherever it appears. Returns
 	// no fix once the digit is gone (so the loop converges).
 	var nativePasses int
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ *config.ProjectPathResolver) (lintPassResult, error) {
 		nativePasses++
 		idx := strings.Index(content, "1")
 		if idx < 0 {
-			return lintPassResult{}, nil
+			return lintPassResult{PlannedTarget: plannedTarget, PluginConfigKey: pluginConfigKey}, nil
 		}
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
 			RuleName:   "native/prefer-2",
@@ -598,7 +674,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 			Message:    rule.RuleMessage{Description: "use 2"},
 			SourceFile: textOnlySourceFile{text: content},
 			FixesPtr:   &[]rule.RuleFix{{Text: "2", Range: core.NewTextRange(idx, idx+1)}},
-		}}}, nil
+		}}, PlannedTarget: plannedTarget, PluginConfigKey: pluginConfigKey}, nil
 	}
 
 	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
@@ -636,6 +712,7 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	const original = "const bar = 1;"
 	s.documents[uri] = original
+	plannedTarget, pluginConfigKey := plannedPluginTargetForTest(t, s, uri)
 
 	// Wedged dispatcher: never answers, blocks until the deadline cancels ctx.
 	var dispatchCalls int
@@ -645,10 +722,10 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 		return nil, ctx.Err()
 	}
 	// Injected native lint: fix the first "1" → "2", nothing once it is gone.
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ *config.ProjectPathResolver) (lintPassResult, error) {
 		idx := strings.Index(content, "1")
 		if idx < 0 {
-			return lintPassResult{}, nil
+			return lintPassResult{PlannedTarget: plannedTarget, PluginConfigKey: pluginConfigKey}, nil
 		}
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
 			RuleName:   "native/prefer-2",
@@ -656,7 +733,7 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 			Message:    rule.RuleMessage{Description: "use 2"},
 			SourceFile: textOnlySourceFile{text: content},
 			FixesPtr:   &[]rule.RuleFix{{Text: "2", Range: core.NewTextRange(idx, idx+1)}},
-		}}}, nil
+		}}, PlannedTarget: plannedTarget, PluginConfigKey: pluginConfigKey}, nil
 	}
 
 	start := time.Now()
@@ -694,7 +771,7 @@ func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
 		pluginCalls++
 		return &linter.EslintPluginLintResult{}, nil
 	}
-	s.fixAllNativeLint = func(context.Context, lsproto.DocumentUri, int, string, config.RslintConfig, string, bool, []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(context.Context, lsproto.DocumentUri, int, string, config.RslintConfig, string, bool, *config.ProjectPathResolver) (lintPassResult, error) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}, HasSyntaxErrors: true}, nil
 	}
 
@@ -736,7 +813,7 @@ func TestLintPluginRulesSync_ExpiredCtxReturnsNil(t *testing.T) {
 	cancel() // already expired before the call
 
 	start := time.Now()
-	diags := s.lintPluginRulesSync(ctx, uri, content, true, "off")
+	diags := lintPluginRulesSyncForTest(t, s, ctx, uri, content, true, "off")
 	elapsed := time.Since(start)
 
 	if diags != nil {
@@ -912,7 +989,7 @@ func TestDispatchPluginLint_TimesOutWedgedClient(t *testing.T) {
 		return nil, ctx.Err()
 	}
 
-	s.dispatchPluginLint(uri, 1)
+	dispatchPluginLintForTest(t, s, uri, 1)
 
 	select {
 	case err := <-released:
@@ -986,7 +1063,7 @@ func TestDispatchPluginLint_DeliversSuccessResultNotRacedAway(t *testing.T) {
 		}}}, nil
 	}
 
-	s.dispatchPluginLint(uri, 7)
+	dispatchPluginLintForTest(t, s, uri, 7)
 
 	select {
 	case r := <-s.pluginResultCh:
@@ -1046,7 +1123,7 @@ func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 
 	// First dispatch queues a reverse request, then blocks on a response that
 	// never comes.
-	s.dispatchPluginLint(uri, 1)
+	dispatchPluginLintForTest(t, s, uri, 1)
 
 	var firstID *jsonrpc.ID
 	select {
@@ -1062,7 +1139,7 @@ func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 
 	// Supersede: a newer keystroke dispatches again — must cancel the first.
 	s.docGeneration[uri] = 2
-	s.dispatchPluginLint(uri, 2)
+	dispatchPluginLintForTest(t, s, uri, 2)
 
 	// The supersede must $/cancelRequest the prior reverse request, and it must
 	// be the FIRST thing queued after the supersede — cancel runs synchronously
@@ -1098,7 +1175,7 @@ func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T)
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 1
 
-	s.dispatchPluginLint(uri, 1)
+	dispatchPluginLintForTest(t, s, uri, 1)
 
 	var firstID *jsonrpc.ID
 	select {
@@ -1125,7 +1202,7 @@ func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T)
 		},
 	})
 	s.docGeneration[uri] = 2
-	s.dispatchPluginLint(uri, 2)
+	dispatchPluginLintForTest(t, s, uri, 2)
 
 	select {
 	case msg := <-queue:
@@ -1166,7 +1243,7 @@ func TestHandleDidClose_CancelsInflightDispatch(t *testing.T) {
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 1
 
-	s.dispatchPluginLint(uri, 1)
+	dispatchPluginLintForTest(t, s, uri, 1)
 
 	var firstID *jsonrpc.ID
 	select {

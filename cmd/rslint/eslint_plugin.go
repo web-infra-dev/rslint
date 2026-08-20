@@ -12,32 +12,31 @@ import (
 )
 
 // pluginConfigResolver resolves the eslint-plugin wire configKey plus the
-// cached merged config for a file. lintResolver uses the target binding's
-// owning config when available. The low-level API may supply a distinct opaque
-// plugin routing identity through pluginConfigDirByOwner; CLI discovery already
-// uses its Go-owned config directory as that identity and leaves the map nil.
+// already-planned merged config for a file. The low-level API may supply a
+// distinct opaque plugin routing identity through pluginConfigDirByOwner.
 type pluginConfigResolver struct {
-	lintResolver           *lintConfigResolver
+	lintResolver           pluginLintConfigResolver
 	pluginConfigDirByOwner map[string]string
+}
+
+type pluginLintConfigResolver interface {
+	OwnerForFile(filePath string) string
+	ConfigForFile(filePath string) *rslintconfig.MergedConfig
 }
 
 // resolve returns the worker wire configKey + merged config for filePath. Go
 // resolves the file against its owning-config key, then substitutes the
 // low-level API's opaque plugin routing identity when one was supplied.
 func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *rslintconfig.MergedConfig) {
-	if r.lintResolver == nil {
-		return "", nil
-	}
-	configPath := r.lintResolver.configPathFor(filePath)
-	cfgDir, resolver, ok := r.lintResolver.resolverForFile(filePath, configPath)
-	if !ok {
+	cfgDir := r.lintResolver.OwnerForFile(filePath)
+	if cfgDir == "" {
 		return "", nil
 	}
 	wireKey = cfgDir
 	if pluginConfigDir, ok := r.pluginConfigDirByOwner[cfgDir]; ok {
 		wireKey = pluginConfigDir
 	}
-	return wireKey, resolver.ConfigForFile(configPath)
+	return wireKey, r.lintResolver.ConfigForFile(filePath)
 }
 
 // buildPluginFileInputs projects third-party plugin inputs from the same

@@ -44,6 +44,18 @@ func newTestServer() *Server {
 	}
 }
 
+func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []rule.ConfiguredRule {
+	planned := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).PlanForFile(filePath)
+	if planned == nil {
+		return nil
+	}
+	rules := planned.EnabledRules()
+	if !hasTypeInfo {
+		return rule.FilterNonTypeAwareRules(rules)
+	}
+	return rules
+}
+
 func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) {
 	s.jsConfigs = configs
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(configs, s.fs)
@@ -1364,9 +1376,28 @@ func TestCloseAndReopen(t *testing.T) {
 	}
 }
 
-// ======== tsConfigPaths lifecycle tests ========
+// ======== effective project-plan lifecycle tests ========
 
-func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
+func plannedProjectPathsForURI(t *testing.T, s *Server, uri lsproto.DocumentUri) []string {
+	t.Helper()
+	resolver := s.projectResolverForURI(uri)
+	if resolver == nil {
+		return nil
+	}
+	_, configDirectory, _ := s.getLintConfigForURI(uri)
+	path := tspath.NormalizePath(uriToPath(uri))
+	planned, err := resolver.ResolveLintTarget(config.DiscoveredLintTarget{
+		Path:            path,
+		CanonicalPath:   path,
+		ConfigDirectory: configDirectory,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return planned.ProjectPaths
+}
+
+func TestRebuildProjectPathResolvers_MixedConfigsWithAndWithoutProject(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{"/project-a/tsconfig.json": true}}
 
@@ -1390,21 +1421,20 @@ func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 		},
 	})
 
-	s.rebuildTsConfigPaths()
+	if err := s.rebuildProjectPathResolvers(); err != nil {
+		t.Fatal(err)
+	}
 
-	entryA := s.tsConfigPathsByConfig["/project-a"]
+	entryA := plannedProjectPathsForURI(t, s, "file:///project-a/a.ts")
 	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
 		t.Errorf("expected project-a to resolve to its tsconfig, got %v", entryA)
 	}
-	if entry, ok := s.tsConfigPathsByConfig["/project-b"]; !ok || entry != nil {
-		t.Errorf("expected project-b entry present and nil (no tsconfig), got present=%v value=%v", ok, entry)
-	}
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected JSON fallback tsConfigPaths nil in JS-config mode, got %v", s.tsConfigPaths)
+	if entry := plannedProjectPathsForURI(t, s, "file:///project-b/b.ts"); entry != nil {
+		t.Errorf("expected project-b to have no tsconfig, got %v", entry)
 	}
 }
 
-func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
+func TestRebuildProjectPathResolvers_AllConfigsHaveProject(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{
 		"/project-a/tsconfig.json": true,
@@ -1432,13 +1462,15 @@ func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
 		},
 	})
 
-	s.rebuildTsConfigPaths()
+	if err := s.rebuildProjectPathResolvers(); err != nil {
+		t.Fatal(err)
+	}
 
-	entryA := s.tsConfigPathsByConfig["/project-a"]
+	entryA := plannedProjectPathsForURI(t, s, "file:///project-a/a.ts")
 	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
 		t.Errorf("expected project-a → /project-a/tsconfig.json, got %v", entryA)
 	}
-	entryB := s.tsConfigPathsByConfig["/project-b"]
+	entryB := plannedProjectPathsForURI(t, s, "file:///project-b/b.ts")
 	if len(entryB) != 1 || entryB[0] != "/project-b/tsconfig.json" {
 		t.Errorf("expected project-b → /project-b/tsconfig.json, got %v", entryB)
 	}
@@ -1451,7 +1483,7 @@ func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
 // rslint.config.ts but no tsconfig.json, which used to flip the whole
 // workspace's type-aware rules without checking the governing config's
 // resolved tsconfigs.
-func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
+func TestEffectiveProjectPlan_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{"/project/tsconfig.json": true}}
 
@@ -1472,23 +1504,25 @@ func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T
 		},
 	})
 
-	s.rebuildTsConfigPaths()
+	if err := s.rebuildProjectPathResolvers(); err != nil {
+		t.Fatal(err)
+	}
 
 	// File under root config → root's resolved tsconfig.
-	rootPaths := s.tsConfigPathsForURI("file:///project/test/skills.test.ts")
+	rootPaths := plannedProjectPathsForURI(t, s, "file:///project/test/skills.test.ts")
 	if len(rootPaths) != 1 || rootPaths[0] != "/project/tsconfig.json" {
 		t.Errorf("expected root-config file to see [/project/tsconfig.json], got %v", rootPaths)
 	}
 
 	// File under nested template config -> nil (no type info), scoped to this
 	// config only; the root config's list above must remain unaffected.
-	nestedPaths := s.tsConfigPathsForURI("file:///project/template-rslint/foo.ts")
+	nestedPaths := plannedProjectPathsForURI(t, s, "file:///project/template-rslint/foo.ts")
 	if nestedPaths != nil {
 		t.Errorf("expected nested-config file to see nil tsconfig paths (no type info), got %v", nestedPaths)
 	}
 }
 
-func TestTsConfigPathsForURI_JSONFallbackRemainsTypedWithNestedJSConfig(t *testing.T) {
+func TestEffectiveProjectPlan_JSONFallbackRemainsTypedWithNestedJSConfig(t *testing.T) {
 	s := newTestServer()
 	s.cwd = "/workspace"
 	s.rslintConfigPath = "/workspace/rslint.json"
@@ -1509,13 +1543,15 @@ func TestTsConfigPathsForURI_JSONFallbackRemainsTypedWithNestedJSConfig(t *testi
 		}},
 	})
 
-	s.rebuildTsConfigPaths()
+	if err := s.rebuildProjectPathResolvers(); err != nil {
+		t.Fatal(err)
+	}
 
-	jsonPaths := s.tsConfigPathsForURI("file:///workspace/packages/lib/src/index.ts")
+	jsonPaths := plannedProjectPathsForURI(t, s, "file:///workspace/packages/lib/src/index.ts")
 	if len(jsonPaths) != 1 || jsonPaths[0] != "/workspace/tsconfig.json" {
 		t.Fatalf("expected JSON fallback tsconfig, got %v", jsonPaths)
 	}
-	jsPaths := s.tsConfigPathsForURI("file:///workspace/packages/app/src/index.ts")
+	jsPaths := plannedProjectPathsForURI(t, s, "file:///workspace/packages/app/src/index.ts")
 	if len(jsPaths) != 1 || jsPaths[0] != "/workspace/packages/app/tsconfig.json" {
 		t.Fatalf("expected nested JS config tsconfig, got %v", jsPaths)
 	}
@@ -1545,15 +1581,17 @@ func TestReloadJSONFallbackWhileJSConfigIsActive(t *testing.T) {
 	}
 }
 
-func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
+func TestRebuildProjectPathResolvers_NoConfig(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 
 	// No jsConfigs, no rslintConfigPath
-	s.rebuildTsConfigPaths()
+	if err := s.rebuildProjectPathResolvers(); err != nil {
+		t.Fatal(err)
+	}
 
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected tsConfigPaths nil when no config, got %v", s.tsConfigPaths)
+	if s.jsProjectResolver != nil || s.jsonProjectResolver != nil {
+		t.Error("expected no project resolver when no config is active")
 	}
 }
 
@@ -1856,10 +1894,12 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		toURI(sourcePath),
 		1,
 		"export const value = 2;\n",
-		config.RslintConfig{{}},
+		config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+			ParserOptions: &config.ParserOptions{Project: []string{secondConfig}},
+		}}},
 		dir,
 		false,
-		[]string{secondConfig},
+		nil,
 	); err != nil {
 		t.Fatalf("isolated fix pass: %v", err)
 	}
@@ -2146,10 +2186,13 @@ func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 		config.RslintConfig{{
 			Files: []string{"src/**/*.ts"},
 			Rules: config.Rules{"no-debugger": "error"},
+			LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+				Project: []string{tsConfigPath},
+			}},
 		}},
 		aliasRoot,
 		false,
-		[]string{tsConfigPath},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
@@ -2192,10 +2235,13 @@ func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *te
 		config.RslintConfig{{
 			Files: []string{"src/**/*.ts"},
 			Rules: config.Rules{"no-debugger": "error"},
+			LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+				Project: []string{filepath.Join(aliasRoot, "tsconfig.json")},
+			}},
 		}},
 		aliasRoot,
 		false,
-		[]string{filepath.Join(aliasRoot, "tsconfig.json")},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("run lint through symlinked root: %v", err)
@@ -2477,7 +2523,7 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 			}
 		}()
 
-		diags, err := runLintWithSession(ignoredURI, nil, ctx, cfg, cwd, false, nil, nil)
+		diags, err := runLintWithSession(ignoredURI, nil, ctx, cfg, cwd, false, nil)
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
@@ -2500,7 +2546,7 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 				t.Fatal("expected panic when non-ignored file is given a nil session, got none — the ignore short-circuit may be matching too broadly")
 			}
 		}()
-		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil)
+		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil)
 	})
 }
 
@@ -2517,7 +2563,7 @@ func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) 
 				}
 			}()
 
-			diagnostics, err := runLintWithSession(uri, nil, context.Background(), cfg, "/project", false, nil, nil)
+			diagnostics, err := runLintWithSession(uri, nil, context.Background(), cfg, "/project", false, nil)
 			if err != nil {
 				t.Fatalf("runLintWithSession returned an error: %v", err)
 			}

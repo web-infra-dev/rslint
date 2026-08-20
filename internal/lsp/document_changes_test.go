@@ -362,9 +362,10 @@ func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
 
 			cfg := config.RslintConfig{{Rules: config.Rules{"unicode-bom": test.option}}}
 			resolver := config.NewFileConfigResolver(cfg, dir, false)
+			effective := resolver.PlanForFile(file)
 
 			served := lintSingleFile(
-				program, sourceFile, file, dir, true, resolver, rule.EditDemandAll, context.Background(),
+				program, sourceFile, dir, true, effective, rule.EditDemandAll, context.Background(),
 			).Diagnostics
 
 			if len(served) != 0 {
@@ -408,9 +409,10 @@ func TestOtherRulesStillRunInTheEditor(t *testing.T) {
 		},
 	}}
 	resolver := config.NewFileConfigResolver(cfg, dir, false)
+	effective := resolver.PlanForFile(file)
 
 	served := lintSingleFile(
-		program, sourceFile, file, dir, true, resolver, rule.EditDemandAll, context.Background(),
+		program, sourceFile, dir, true, effective, rule.EditDemandAll, context.Background(),
 	).Diagnostics
 
 	byRule := make(map[string][]rule.RuleFix, len(served))

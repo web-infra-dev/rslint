@@ -17,6 +17,7 @@ type syntacticDiagnosticKey struct {
 
 func collectTargetSyntacticDiagnostics(
 	programs []*lintprogram.Program,
+	typeCheckPrograms []*lintprogram.Program,
 	targetsByProgram [][]string,
 	typeCheck bool,
 	typeCheckOnly bool,
@@ -26,12 +27,24 @@ func collectTargetSyntacticDiagnostics(
 	}
 
 	seen := make(map[syntacticDiagnosticKey]struct{})
+	var typeCheckProgramSet map[*lintprogram.Program]struct{}
+	if typeCheck && typeCheckPrograms != nil {
+		typeCheckProgramSet = make(map[*lintprogram.Program]struct{}, len(typeCheckPrograms))
+		for _, program := range typeCheckPrograms {
+			typeCheckProgramSet[program] = struct{}{}
+		}
+	}
 	var diagnostics []rule.RuleDiagnostic
 	for i, program := range programs {
 		// When --type-check runs, tsconfig-backed Programs surface syntactic
-		// diagnostics through the type-check phase. We still inspect every target
-		// here so the lint-rule phase can skip malformed files, matching ESLint.
-		coveredByTypeCheck := typeCheck && program.CanProvideProgramDiagnostics()
+		// diagnostics through the type-check phase only when they belong to its
+		// catalog. Lint-only effective projects still report target syntax here.
+		// We inspect every target so the lint-rule phase can skip malformed files,
+		// matching ESLint.
+		_, explicitlyCovered := typeCheckProgramSet[program]
+		coveredByTypeCheck := typeCheck &&
+			program.CanProvideProgramDiagnostics() &&
+			(typeCheckPrograms == nil || explicitlyCovered)
 		if i >= len(targetsByProgram) || len(targetsByProgram[i]) == 0 {
 			continue
 		}

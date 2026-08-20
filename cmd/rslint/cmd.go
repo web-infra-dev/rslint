@@ -20,13 +20,13 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -413,25 +413,58 @@ func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (in
 	return 0, ""
 }
 
-func isBroadProjectLoadScope(
-	allowFiles []string,
+// shouldPrefetchProjectCandidates reports whether the recursive directory
+// scope covers every active config owner. It changes only when candidate
+// Programs are scheduled; project candidates and ownership are still decided
+// by the same effective-config plan and selector.
+func shouldPrefetchProjectCandidates(
 	allowDirs []string,
-	currentDirectory string,
-	useCaseSensitive bool,
+	targetPlan rslintconfig.LintTargetPlan,
+	configScopes map[string]rslintconfig.LintDiscoveryScope,
+	fsys vfs.FS,
 ) bool {
-	if len(allowDirs) == 0 {
-		return len(allowFiles) == 0
+	if len(allowDirs) == 0 || len(targetPlan.Targets) == 0 {
+		return false
 	}
-	options := tspath.ComparePathsOptions{
-		CurrentDirectory:          currentDirectory,
-		UseCaseSensitiveFileNames: useCaseSensitive,
+	activeOwners := make(map[string]struct{})
+	for _, target := range targetPlan.Targets {
+		activeOwners[target.ConfigDirectory] = struct{}{}
 	}
-	for _, directory := range allowDirs {
-		if tspath.ContainsPath(directory, currentDirectory, options) {
-			return true
+	for owner := range activeOwners {
+		if configScopes[owner].ExplicitOnly {
+			return false
+		}
+		covered := false
+		for _, directory := range allowDirs {
+			if containsProjectOwner(directory, owner, fsys) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			return false
 		}
 	}
-	return false
+	return true
+}
+
+func containsProjectOwner(directory string, owner string, fsys vfs.FS) bool {
+	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}
+	directory = tspath.NormalizePath(directory)
+	owner = tspath.NormalizePath(owner)
+	if tspath.ContainsPath(directory, owner, options) {
+		return true
+	}
+	if fsys == nil {
+		return false
+	}
+	physicalDirectory := fsys.Realpath(directory)
+	physicalOwner := fsys.Realpath(owner)
+	return physicalDirectory != "" && physicalOwner != "" && tspath.ContainsPath(
+		tspath.NormalizePath(physicalDirectory),
+		tspath.NormalizePath(physicalOwner),
+		options,
+	)
 }
 
 func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]rslintconfig.RslintConfig {
@@ -488,42 +521,6 @@ func resolveStartTime(startTimeMs int64) time.Time {
 		return time.UnixMilli(startTimeMs)
 	}
 	return time.Now()
-}
-
-// loadGitignoreAndProjects overlaps two independent CLI preparation steps for
-// the single-config JSON path. Program construction itself belongs to the
-// loader; this small scheduling decision remains command orchestration.
-func loadGitignoreAndProjects(
-	config rslintconfig.RslintConfig,
-	configDirectory string,
-	targetFiles []string,
-	targetDirectories []string,
-	singleThreaded bool,
-	session *loader.Session,
-) (rslintconfig.RslintConfig, loader.ProjectSet, error) {
-	var (
-		configWithIgnores rslintconfig.RslintConfig
-		projects          loader.ProjectSet
-		programErr        error
-	)
-	work := core.NewWorkGroup(singleThreaded)
-	work.Queue(func() {
-		configWithIgnores = rslintconfig.ConfigWithGitignoreForTargets(
-			config,
-			configDirectory,
-			session.FS(),
-			targetFiles,
-			targetDirectories,
-		)
-	})
-	work.Queue(func() {
-		projects, programErr = session.BuildProject(configDirectory, config, singleThreaded)
-	})
-	work.RunAndWait()
-	if programErr != nil {
-		return config, loader.ProjectSet{}, programErr
-	}
-	return configWithIgnores, projects, nil
 }
 
 // parseLintFlags parses the lint CLI flags out of argv into a lintArgs.
@@ -753,10 +750,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	var configTargetScopes map[string]rslintconfig.LintDiscoveryScope
 
-	// Program-wide type checking builds every configured project. Plain linting
-	// waits for target discovery and builds only the projects owned by configs
-	// that govern at least one selected target.
-	var projectSet loader.ProjectSet
+	// Program-wide type checking consumes the full per-owner catalog. Plain
+	// linting uses only each target's effective project declarations. Both roles
+	// are materialized later through one loader provider.
 	buildAllPrograms := typeCheck || typeCheckOnly
 
 	if usesJSConfig {
@@ -768,13 +764,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 			currentDirectory = configDirectories[0]
 			rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
-			if buildAllPrograms {
-				projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return 1
-			}
 		} else {
 			configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
 			configTargetScopes = make(map[string]rslintconfig.LintDiscoveryScope, len(configCatalog.Scopes))
@@ -783,14 +772,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				if scope, ok := configCatalog.Scopes[configDir]; ok {
 					scope.Files = slices.Clone(scope.Files)
 					configTargetScopes[configDir] = scope
-				}
-			}
-
-			if buildAllPrograms {
-				projectSet, err = programSession.BuildProjects(configMap, singleThreaded)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error: %v\n", err)
-					return 1
 				}
 			}
 		}
@@ -809,13 +790,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			currentDirectory = workingDirectory
 		}
 
-		if typeCheckOnly {
-			projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-		} else if buildAllPrograms {
-			rslintConfig, projectSet, err = loadGitignoreAndProjects(
-				rslintConfig, currentDirectory, allowFiles, allowDirs, singleThreaded, programSession,
-			)
-		} else {
+		if !typeCheckOnly {
 			rslintConfig = rslintconfig.ConfigWithGitignoreForTargets(
 				rslintConfig,
 				currentDirectory,
@@ -823,10 +798,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				allowFiles,
 				allowDirs,
 			)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
 		}
 	}
 
@@ -836,7 +807,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Apply --rule CLI overrides by appending a synthetic ConfigEntry. Target
 	// discovery below intentionally uses the pre-override config snapshots
 	// above, so --rule overlays already-selected lint targets without widening
-	// discovery by itself.
+	// discovery by itself. The overlay remains an ordinary unscoped flat-config
+	// entry for those targets, including the established owner-local default
+	// tsconfig probe when no project declaration is effective.
 	if len(ruleFlags) > 0 {
 		cliEntry, err := rslintconfig.BuildCLIRuleEntry(ruleFlags)
 		if err != nil {
@@ -876,12 +849,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: true,
 	}
-	broadProjectLoad := isBroadProjectLoadScope(
-		allowFiles,
-		allowDirs,
-		cwd,
-		fs.UseCaseSensitiveFileNames(),
-	)
 
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
 	// This keeps an explicit --config outside the current directory from
@@ -890,20 +857,20 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		allowDirs = []string{cwd}
 	}
 
-	// --- Lint target discovery and Program loading ---
-	programs := projectSet.Programs()
-	programConfigMap := configMap
-	buildSingleConfigPrograms := buildAllPrograms
+	// --- Lint target/config planning and Program loading ---
 	var (
-		targetPlan                 rslintconfig.LintTargetPlan
-		loadedPrograms             loader.LoadResult
-		targetsByProgram           [][]string
-		targetPathBySourcePath     map[string]string
-		configPathBySourcePath     map[string]string
-		ownerConfigDirBySourcePath map[string]string
+		targetPlan             rslintconfig.LintTargetPlan
+		lintProjectPlan        rslintconfig.LintProjectPlan
+		projectSet             loader.ProjectSet
+		loadedPrograms         loader.LoadResult
+		programs               []*lintprogram.Program
+		typeCheckPrograms      []*lintprogram.Program
+		targetsByProgram       [][]string
+		targetPathBySourcePath map[string]string
 	)
-	// --type-check-only is program-wide and pays no lint-target discovery,
-	// target binding/parsing, config-resolution, or Program-loading cost.
+	enforcePlugins := usesJSConfig
+	// --type-check-only is program-wide and pays no lint-target discovery or
+	// effective file-config matching.
 	if !typeCheckOnly {
 		targetPlan, err = rslintconfig.ResolveLintTargetPlan(
 			targetConfigMap,
@@ -919,62 +886,83 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
-		if !buildAllPrograms {
-			if configMap != nil {
-				programConfigMap = targetPlan.ActiveConfigs(configMap)
-				if broadProjectLoad {
-					projectSet, err = programSession.BuildProjects(programConfigMap, singleThreaded)
-				} else {
-					projectSet, err = programSession.BuildTargetProjects(programConfigMap, targetPlan, singleThreaded)
-				}
-			} else if len(targetPlan.Targets) > 0 {
-				buildSingleConfigPrograms = true
-				if broadProjectLoad {
-					projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-				} else {
-					projectSet, err = programSession.BuildTargetProject(currentDirectory, rslintConfig, targetPlan, singleThreaded)
-				}
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return 1
-			}
+	}
+
+	var planner *rslintconfig.ProjectPathResolver
+	if buildAllPrograms || len(targetPlan.Targets) > 0 {
+		plannerConfigMap := configMap
+		if !buildAllPrograms && configMap != nil {
+			plannerConfigMap = targetPlan.ActiveConfigs(configMap)
 		}
-		loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
+		planner, err = rslintconfig.NewProjectPathResolver(
+			plannerConfigMap,
+			rslintConfig,
+			currentDirectory,
+			fs,
+			enforcePlugins,
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	}
+	if !typeCheckOnly && planner != nil {
+		lintProjectPlan, err = planner.ResolveLintProjectPlan(targetPlan)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	}
+	var catalogProjects []string
+	if buildAllPrograms && planner != nil {
+		// Preserve an explicit empty catalog. Nil means that program-wide
+		// type-checking was not requested; an empty non-nil slice means it was
+		// requested but this configuration generation admits no projects.
+		catalogProjects = append([]string{}, planner.CatalogProjectPaths()...)
+	}
+	prefetchCandidates := !typeCheckOnly && shouldPrefetchProjectCandidates(
+		allowDirs,
+		targetPlan,
+		configTargetScopes,
+		fs,
+	)
+	projectSet, err = programSession.SelectProjects(
+		lintProjectPlan,
+		catalogProjects,
+		prefetchCandidates,
+		singleThreaded,
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	programs = projectSet.Programs()
+	typeCheckPrograms = projectSet.TypeCheckPrograms()
+	if !typeCheckOnly {
+		loadedPrograms, err = programSession.LoadCLI(projectSet, lintProjectPlan, currentDirectory, singleThreaded)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
 		programs = loadedPrograms.Programs
+		typeCheckPrograms = loadedPrograms.TypeCheckPrograms
 		targetsByProgram = loadedPrograms.TargetsByProgram
 		targetPathBySourcePath = loadedPrograms.TargetPathBySourcePath
-		configPathBySourcePath = loadedPrograms.ConfigPathBySourcePath
-		ownerConfigDirBySourcePath = loadedPrograms.OwnerConfigDirBySourcePath
 	}
 
-	// Rebuild ts-go Programs and bind the original stable target plan again on
-	// every fix pass. A target can move between rslint Programs when fixes
-	// change the import graph.
+	// Rebuild one Program generation and re-run the same immutable selection
+	// plan after every fix pass. Import membership may change between passes.
 	createPrograms := func() (loader.LoadResult, error) {
-		var rebuilt loader.ProjectSet
-		var err error
-		if configMap != nil {
-			if buildAllPrograms || broadProjectLoad {
-				rebuilt, err = programSession.BuildProjects(programConfigMap, singleThreaded)
-			} else {
-				rebuilt, err = programSession.BuildTargetProjects(programConfigMap, targetPlan, singleThreaded)
-			}
-		} else if buildSingleConfigPrograms {
-			if buildAllPrograms || broadProjectLoad {
-				rebuilt, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-			} else {
-				rebuilt, err = programSession.BuildTargetProject(currentDirectory, rslintConfig, targetPlan, singleThreaded)
-			}
-		}
+		rebuilt, err := programSession.SelectProjects(
+			lintProjectPlan,
+			catalogProjects,
+			prefetchCandidates,
+			singleThreaded,
+		)
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
-		return programSession.LoadCLI(rebuilt, targetPlan, currentDirectory, singleThreaded)
+		return programSession.LoadCLI(rebuilt, lintProjectPlan, currentDirectory, singleThreaded)
 	}
 
 	// Phase 1: Collect all diagnostics (no printing yet).
@@ -994,17 +982,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}()
 
-	enforcePlugins := usesJSConfig
-	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:                  configMap,
-		Config:                     rslintConfig,
-		CurrentDirectory:           currentDirectory,
-		EnforcePlugins:             enforcePlugins,
-		ConfigPathBySourcePath:     configPathBySourcePath,
-		OwnerConfigDirBySourcePath: ownerConfigDirBySourcePath,
-		SourceMappingsCanonical:    true,
-		FS:                         fs,
-	})
+	fileConfigResolver := plannedLintConfigResolver{plan: &lintProjectPlan, binding: &loadedPrograms}
 	getRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 		return fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
 	}
@@ -1017,6 +995,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// through the common Program contract rather than a parallel skip mask.
 	syntaxDiagnostics := collectTargetSyntacticDiagnostics(
 		programs,
+		typeCheckPrograms,
 		targetsByProgram,
 		typeCheck,
 		typeCheckOnly,
@@ -1038,14 +1017,15 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		nativeEditDemand = rule.EditDemandAutofix
 	}
 	runOpts := linter.RunLinterOptions{
-		Programs:        programs,
-		SingleThreaded:  singleThreaded,
-		Cwd:             cwd,
-		Scope:           linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-		TargetFiles:     targetsByProgram,
-		GetRulesForFile: rulesForFile,
-		TypeCheck:       typeCheck,
-		Timing:          timingCollector,
+		Programs:          programs,
+		TypeCheckPrograms: typeCheckPrograms,
+		SingleThreaded:    singleThreaded,
+		Cwd:               cwd,
+		Scope:             linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+		TargetFiles:       targetsByProgram,
+		GetRulesForFile:   rulesForFile,
+		TypeCheck:         typeCheck,
+		Timing:            timingCollector,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: nativeEditDemand,
 			Report: func(d rule.RuleDiagnostic) {
@@ -1145,16 +1125,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// Re-lint using the fresh binding derived from the stable target plan.
 			fixTargetsByProgram := newBinding.TargetsByProgram
 			fixTargetPathBySourcePath := newBinding.TargetPathBySourcePath
-			fixConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-				ConfigMap:                  configMap,
-				Config:                     rslintConfig,
-				CurrentDirectory:           currentDirectory,
-				EnforcePlugins:             enforcePlugins,
-				ConfigPathBySourcePath:     newBinding.ConfigPathBySourcePath,
-				OwnerConfigDirBySourcePath: newBinding.OwnerConfigDirBySourcePath,
-				SourceMappingsCanonical:    true,
-				FS:                         fs,
-			})
+			fixConfigResolver := plannedLintConfigResolver{
+				plan:    &lintProjectPlan,
+				binding: &newBinding,
+			}
 			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 				return fixConfigResolver.EnabledRulesForFile(sourceFile.FileName())
 			}
@@ -1171,20 +1145,22 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			var passDiags []rule.RuleDiagnostic
 			fixSyntaxDiagnostics := collectTargetSyntacticDiagnostics(
 				newBinding.Programs,
+				newBinding.TypeCheckPrograms,
 				fixTargetsByProgram,
 				typeCheck,
 				typeCheckOnly,
 			)
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)
 			fixRunOpts := linter.RunLinterOptions{
-				Programs:        newBinding.Programs,
-				SingleThreaded:  singleThreaded,
-				Cwd:             cwd,
-				Scope:           linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-				TargetFiles:     fixTargetsByProgram,
-				GetRulesForFile: fixRulesForFile,
-				TypeCheck:       typeCheck,
-				Timing:          timingCollector,
+				Programs:          newBinding.Programs,
+				TypeCheckPrograms: newBinding.TypeCheckPrograms,
+				SingleThreaded:    singleThreaded,
+				Cwd:               cwd,
+				Scope:             linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+				TargetFiles:       fixTargetsByProgram,
+				GetRulesForFile:   fixRulesForFile,
+				TypeCheck:         typeCheck,
+				Timing:            timingCollector,
 				Consumer: rule.DiagnosticConsumer{
 					Demand: passEditDemand,
 					Report: func(d rule.RuleDiagnostic) {
@@ -1286,7 +1262,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		// Count compiler-capable Program root files (tsconfig include/files),
 		// not transitive declarations, for every summary that includes type-check.
 		seen := make(map[string]struct{})
-		for _, prog := range programs {
+		for _, prog := range typeCheckPrograms {
 			if !prog.CanProvideProgramDiagnostics() {
 				continue
 			}

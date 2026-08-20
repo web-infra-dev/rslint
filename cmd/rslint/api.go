@@ -434,46 +434,41 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
 	}
-	// A plain API lint only needs type information when at least one target is
-	// selected. Resolve the target plan before project paths so an ignored or
-	// empty request cannot fail on an inactive project declaration.
-	var projectSet loader.ProjectSet
+	// Resolve one effective config/project plan for the exact API targets. An
+	// empty request does not validate or construct an inactive project catalog.
+	var lintProjectPlan rslintconfig.LintProjectPlan
 	if len(targetPlan.Targets) > 0 {
+		plannerConfigMap := configMap
 		if configMap != nil {
-			projectSet, err = programSession.BuildTargetProjects(
-				targetPlan.ActiveConfigs(configMap),
-				targetPlan,
-				false,
-			)
-		} else {
-			projectSet, err = programSession.BuildTargetProject(
-				configDirectory,
-				rslintConfig,
-				targetPlan,
-				false,
-			)
+			plannerConfigMap = targetPlan.ActiveConfigs(configMap)
 		}
+		planner, planErr := rslintconfig.NewProjectPathResolver(
+			plannerConfigMap,
+			rslintConfig,
+			configDirectory,
+			fs,
+			true,
+		)
+		if planErr != nil {
+			return nil, planErr
+		}
+		lintProjectPlan, err = planner.ResolveLintProjectPlan(targetPlan)
 		if err != nil {
 			return nil, err
 		}
 	}
-	binding, err := programSession.LoadAPI(projectSet, targetPlan, configDirectory, false)
+	projectSet, err := programSession.SelectProjects(lintProjectPlan, nil, false, false)
+	if err != nil {
+		return nil, err
+	}
+	binding, err := programSession.LoadAPI(projectSet, lintProjectPlan, configDirectory, false)
 	if err != nil {
 		return nil, err
 	}
 	programs := binding.Programs
 	targetsByProgram := binding.TargetsByProgram
 	targetPathBySourcePath := binding.TargetPathBySourcePath
-	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:                  configMap,
-		Config:                     rslintConfig,
-		CurrentDirectory:           configDirectory,
-		EnforcePlugins:             true,
-		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
-		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
-		SourceMappingsCanonical:    true,
-		FS:                         fs,
-	})
+	fileConfigResolver := plannedLintConfigResolver{plan: &lintProjectPlan, binding: &binding}
 	targetPathForSourcePath := func(sourcePath string) string {
 		if targetPath := targetPathBySourcePath[sourcePath]; targetPath != "" {
 			return targetPath
@@ -609,7 +604,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 
 	// Every selected target is parsed even when no config entry contributes
 	// rules. Global ignores were already removed during target discovery.
-	syntaxDiagnostics := collectTargetSyntacticDiagnostics(programs, targetsByProgram, false, false)
+	syntaxDiagnostics := collectTargetSyntacticDiagnostics(programs, nil, targetsByProgram, false, false)
 	for _, diagnostic := range syntaxDiagnostics {
 		diagnosticCollector(diagnostic)
 	}

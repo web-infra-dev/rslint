@@ -150,3 +150,20 @@ func (config RslintConfig) mergeConfigEntries(key configMatchKey) *MergedConfig 
 
 	return merged
 }
+
+// effectiveProjectEntry returns the last matched entry that explicitly
+// supplied parserOptions.project. A nil project inherits the earlier value;
+// a non-nil empty project deliberately clears it. The caller keeps the entry
+// identity so project globs resolved during owner validation can be reused.
+func (config RslintConfig) effectiveProjectEntry(key configMatchKey) int {
+	projectEntry := -1
+	for index, entry := range config {
+		if !key.contains(index) || entry.LanguageOptions == nil ||
+			entry.LanguageOptions.ParserOptions == nil ||
+			entry.LanguageOptions.ParserOptions.Project == nil {
+			continue
+		}
+		projectEntry = index
+	}
+	return projectEntry
+}

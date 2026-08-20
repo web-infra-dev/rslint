@@ -280,14 +280,70 @@ func TestHandleLint_FirstContainingProgramReportsFileOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
 	}
-	// shared.ts belongs to both programs → linted (and diagnosed) twice, but it
-	// is ONE physical file: LintedFiles dedupes it and FileCount mirrors that.
-	// Reverting FileCount to lintResult.LintedFileCount makes this report 2.
+	// shared.ts belongs to both projects, but declaration order selects one
+	// owner. The caller-visible file and diagnostic stream must remain singular.
 	if len(response.LintedFiles) != 1 {
 		t.Fatalf("expected 1 unique linted file, got %d: %v", len(response.LintedFiles), response.LintedFiles)
 	}
 	if response.FileCount != 1 {
 		t.Fatalf("expected FileCount=1 (deduped across programs), got %d — the per-program visit count must not leak into FileCount", response.FileCount)
+	}
+}
+
+func TestHandleLint_UsesEachTargetsEffectiveProject(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, content string) {
+		t.Helper()
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	write("src/base.ts", "value.safe;\n")
+	write("tests/target.ts", "value.safe;\n")
+	write("types-any.d.ts", "declare const value: any;\n")
+	write("types-safe.d.ts", "declare const value: { safe: number };\n")
+	write("tsconfig.base.json", `{
+		"files":["types-any.d.ts","src/base.ts","tests/target.ts"],
+		"compilerOptions":{"noLib":true}
+	}`)
+	write("tsconfig.tests.json", `{
+		"files":["types-safe.d.ts","tests/target.ts"],
+		"compilerOptions":{"noLib":true}
+	}`)
+
+	config := json.RawMessage(`[
+		{
+			"files":["**/*.ts"],
+			"languageOptions":{"parserOptions":{"project":["./tsconfig.base.json"]}},
+			"plugins":["@typescript-eslint"],
+			"rules":{"@typescript-eslint/no-unsafe-member-access":"error"}
+		},
+		{
+			"files":["tests/**"],
+			"languageOptions":{"parserOptions":{"project":["./tsconfig.tests.json"]}}
+		}
+	]`)
+	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files: []string{
+			filepath.Join(dir, "src/base.ts"),
+			filepath.Join(dir, "tests/target.ts"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 2 {
+		t.Fatalf("FileCount = %d, want 2", response.FileCount)
+	}
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "src/base.ts" {
+		t.Fatalf("effective project diagnostics = %+v, want only src/base.ts", response.Diagnostics)
 	}
 }
 

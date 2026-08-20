@@ -10,6 +10,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/projectselection"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -117,20 +119,20 @@ func TestLoadProgramsPreservesExactAndProjectOrder(t *testing.T) {
 	t.Run("earlier alias beats later exact", func(t *testing.T) {
 		aliasProgram := createBindingIndexTestProgram(t, fsys, aliasPath)
 		exactProgram := createBindingIndexTestProgram(t, fsys, targetPath)
+		plannedTarget := rslintconfig.PlannedLintTarget{
+			Target: rslintconfig.DiscoveredLintTarget{
+				Path: targetPath, CanonicalPath: targetPath, ConfigDirectory: configDir,
+			},
+			MatchPath: targetPath,
+		}
 		set := ProjectSet{
 			compilerPrograms: []*compiler.Program{aliasProgram, exactProgram},
-			configOrders: []configOrders{
-				{configDir: 0},
-				{configDir: 1},
-			},
+			programs:         lintprogram.NewFromCompilers([]*compiler.Program{aliasProgram, exactProgram}),
+			targetBinding:    &projectTargetBinding{targets: []rslintconfig.PlannedLintTarget{plannedTarget}, owners: []int{0}},
 		}
-		plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
-			Path:            targetPath,
-			CanonicalPath:   targetPath,
-			ConfigDirectory: configDir,
-		}}}
+		plan := rslintconfig.LintProjectPlan{Targets: []rslintconfig.PlannedLintTarget{plannedTarget}}
 
-		binding, err := loadAPIForTest(set, plan, configDir, newBuildContext(fsys), true)
+		binding, err := sessionForTest(newBuildContext(fsys)).LoadAPI(set, plan, configDir, true)
 		if err != nil {
 			t.Fatalf("loadAPIForTest: %v", err)
 		}
@@ -144,18 +146,21 @@ func TestLoadProgramsPreservesExactAndProjectOrder(t *testing.T) {
 
 	t.Run("exact beats alias within one Program", func(t *testing.T) {
 		program := createBindingIndexTestProgram(t, fsys, aliasPath, targetPath)
+		plannedTarget := rslintconfig.PlannedLintTarget{
+			Target: rslintconfig.DiscoveredLintTarget{
+				Path: targetPath, CanonicalPath: targetPath, ConfigDirectory: configDir,
+			},
+			MatchPath: targetPath,
+		}
 		set := ProjectSet{
 			compilerPrograms: []*compiler.Program{program},
-			configOrders:     []configOrders{{configDir: 0}},
+			programs:         lintprogram.NewFromCompilers([]*compiler.Program{program}),
+			targetBinding:    &projectTargetBinding{targets: []rslintconfig.PlannedLintTarget{plannedTarget}, owners: []int{0}},
 		}
-		plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
-			Path:            targetPath,
-			CanonicalPath:   targetPath,
-			ConfigDirectory: configDir,
-		}}}
+		plan := rslintconfig.LintProjectPlan{Targets: []rslintconfig.PlannedLintTarget{plannedTarget}}
 		fsys.resetCalls()
 
-		binding, err := loadAPIForTest(set, plan, configDir, newBuildContext(fsys), true)
+		binding, err := sessionForTest(newBuildContext(fsys)).LoadAPI(set, plan, configDir, true)
 		if err != nil {
 			t.Fatalf("loadAPIForTest: %v", err)
 		}
@@ -164,6 +169,65 @@ func TestLoadProgramsPreservesExactAndProjectOrder(t *testing.T) {
 		}
 		if calls := fsys.callCount(aliasPath); calls != 0 {
 			t.Fatalf("exact hit unexpectedly built the alias index: alias realpath calls=%d", calls)
+		}
+	})
+}
+
+func TestLoadConsumesCompleteProjectBindingWithoutReselection(t *testing.T) {
+	const (
+		configDir  = "/repo"
+		targetPath = "/repo/target.ts"
+	)
+	fsys := newBindingIndexTestFS([]string{targetPath}, nil)
+	first := createBindingIndexTestProgram(t, fsys, targetPath)
+	second := createBindingIndexTestProgram(t, fsys, targetPath)
+	plannedTarget := rslintconfig.PlannedLintTarget{
+		Target: rslintconfig.DiscoveredLintTarget{
+			Path: targetPath, CanonicalPath: targetPath, ConfigDirectory: configDir,
+		},
+		MatchPath:    targetPath,
+		ProjectPaths: []string{"/repo/first.json", "/repo/second.json"},
+	}
+	plan := rslintconfig.LintProjectPlan{Targets: []rslintconfig.PlannedLintTarget{plannedTarget}}
+	newSet := func(owner int) ProjectSet {
+		return ProjectSet{
+			compilerPrograms: []*compiler.Program{first, second},
+			programs:         lintprogram.NewFromCompilers([]*compiler.Program{first, second}),
+			targetBinding: &projectTargetBinding{
+				targets: plan.Targets,
+				owners:  []int{owner},
+			},
+		}
+	}
+	session := sessionForTest(newBuildContext(fsys))
+
+	t.Run("selected owner is authoritative", func(t *testing.T) {
+		binding, err := session.LoadAPI(newSet(1), plan, configDir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(binding.TargetsByProgram) != 2 || len(binding.TargetsByProgram[0]) != 0 || len(binding.TargetsByProgram[1]) != 1 {
+			t.Fatalf("Load reselected an earlier containing Program: %v", binding.TargetsByProgram)
+		}
+	})
+
+	t.Run("no owner remains source only", func(t *testing.T) {
+		binding, err := session.LoadAPI(newSet(projectselection.NoProject), plan, configDir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(binding.TargetsByProgram) != 3 || len(binding.TargetsByProgram[0]) != 0 ||
+			len(binding.TargetsByProgram[1]) != 0 || len(binding.TargetsByProgram[2]) != 1 {
+			t.Fatalf("Load rebound an authoritative gap target: %v", binding.TargetsByProgram)
+		}
+	})
+
+	t.Run("stale plan is rejected", func(t *testing.T) {
+		stale := plan
+		stale.Targets = append([]rslintconfig.PlannedLintTarget(nil), plan.Targets...)
+		stale.Targets[0].MatchPath = "/repo/other.ts"
+		if _, err := session.LoadAPI(newSet(1), stale, configDir, true); err == nil {
+			t.Fatal("stale project binding was silently reselected")
 		}
 	})
 }

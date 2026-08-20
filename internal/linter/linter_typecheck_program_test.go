@@ -226,6 +226,51 @@ func TestTypeCheck_DedupsAcrossPrograms(t *testing.T) {
 	}
 }
 
+func TestTypeCheck_UsesOnlyCatalogProgramsWhenProvided(t *testing.T) {
+	root := t.TempDir()
+	a := filepath.Join(root, "a")
+	b := filepath.Join(root, "b")
+	pathsA := writeFiles(t, a, map[string]string{
+		"a.ts":          `export const a: number = "wrong";`,
+		"tsconfig.json": `{"files":["a.ts"]}`,
+	})
+	pathsB := writeFiles(t, b, map[string]string{
+		"b.ts":          `export const b: number = "wrong";`,
+		"tsconfig.json": `{"files":["b.ts"]}`,
+	})
+	programs := wrapTestPrograms(
+		createProgramFromTsconfigDir(t, a),
+		createProgramFromTsconfigDir(t, b),
+	)
+
+	var diagnostics []rule.RuleDiagnostic
+	_, err := RunLinter(RunLinterOptions{
+		Programs:          programs,
+		TypeCheckPrograms: programs[:1],
+		SingleThreaded:    true,
+		TypeCheck:         true,
+		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sawCatalogDiagnostic := false
+	for _, diagnostic := range diagnostics {
+		diagnosticPath := tspath.NormalizePath(diagnostic.FilePath)
+		if diagnosticPath == pathsB["b.ts"] {
+			t.Fatalf("lint-only Program entered type-check diagnostics: %+v", diagnostic)
+		}
+		if diagnosticPath == pathsA["a.ts"] {
+			sawCatalogDiagnostic = true
+		}
+	}
+	if !sawCatalogDiagnostic {
+		t.Fatalf("catalog Program did not produce its type diagnostic: %+v", diagnostics)
+	}
+}
+
 // (5) Source-only Programs expose no type-check phase.
 func TestTypeCheck_SourceOnlyProgramSkipped(t *testing.T) {
 	dir := t.TempDir()

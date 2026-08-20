@@ -202,16 +202,13 @@ type Server struct {
 	jsUnavailableConfigs map[string]struct{}
 	jsonConfig           config.RslintConfig // fallback JSON config (rslint.json/rslint.jsonc)
 	rslintConfigPath     string              // path to rslint.json/rslint.jsonc, empty if not found
-	// tsConfigPaths holds resolved parserOptions.project tsconfig paths.
-	// For the JSON-config path this is a single global list.
-	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
-	// which keys per-config-directory so a nested config with no tsconfig
-	// does not disable filtering for files under other configs.
-	tsConfigPaths []string
-	// A nil map value means the corresponding config has no type information.
-	tsConfigPathsByConfig map[string][]string
-	documents             map[lsproto.DocumentUri]string                // URI -> content
-	diagnostics           map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
+	// Project-path resolvers freeze the effective config and target-specific
+	// project candidates for the committed config generation. Program and
+	// watcher lifetime remain owned by the LSP adapters below.
+	jsProjectResolver   *config.ProjectPathResolver
+	jsonProjectResolver *config.ProjectPathResolver
+	documents           map[lsproto.DocumentUri]string                // URI -> content
+	diagnostics         map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
 	// refreshCh receives signals from RefreshDiagnostics (called by Session's
 	// background goroutine) and is consumed by the main dispatch loop so that
@@ -247,7 +244,7 @@ type Server struct {
 	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
 	// used, driving an isolated overlay Program); tests inject a mock to exercise the
 	// plugin-fix fold loop without spinning up a language service.
-	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) (lintPassResult, error)
+	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, projectResolver *config.ProjectPathResolver) (lintPassResult, error)
 
 	// pluginReverseTimeout bounds each eslint-plugin reverse request to the
 	// client (rslint/pluginLint) on BOTH paths: source.fixAll (summed across

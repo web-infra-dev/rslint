@@ -8,11 +8,13 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -29,13 +31,21 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 	fs = utils.NewOverlayVFS(fs, map[string]string{targetFile: "let a: any = 10;\na.b = 20;\n"})
 
 	programSession := loader.NewSession(fs)
-	loaded, err := programSession.LoadCLI(
-		loader.ProjectSet{},
-		rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
+	lintProjectPlan := rslintconfig.LintProjectPlan{Targets: []rslintconfig.PlannedLintTarget{{
+		Target: rslintconfig.DiscoveredLintTarget{
 			Path:            targetFile,
 			CanonicalPath:   targetFile,
 			ConfigDirectory: tmpDir,
-		}}},
+		},
+		MatchPath: targetFile,
+	}}}
+	projectSet, err := programSession.SelectProjects(lintProjectPlan, nil, false, false)
+	if err != nil {
+		t.Fatalf("select source-only target: %v", err)
+	}
+	loaded, err := programSession.LoadCLI(
+		projectSet,
+		lintProjectPlan,
 		tmpDir,
 		false,
 	)
@@ -106,4 +116,44 @@ func createTestProgram(t *testing.T, files map[string]string) *compiler.Program 
 		t.Fatalf("create Program: %v", err)
 	}
 	return program
+}
+
+func createLenientSyntacticProgram(t *testing.T) (*lintprogram.Program, string) {
+	t.Helper()
+	directory := t.TempDir()
+	target := tspath.NormalizePath(filepath.Join(directory, "target.ts"))
+	writeProgramTestFiles(t, directory, map[string]string{"target.ts": "export const broken = ;\n"})
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	program, err := utils.CreateProgramFromOptionsLenient(
+		true,
+		&core.CompilerOptions{NoLib: core.TSTrue},
+		[]string{target},
+		utils.CreateCompilerHost(directory, fsys),
+	)
+	if err != nil {
+		t.Fatalf("create lenient Program: %v", err)
+	}
+	return lintprogram.NewFromCompiler(program), target
+}
+
+func TestCollectTargetSyntacticDiagnosticsDefersOnlyCatalogPrograms(t *testing.T) {
+	catalogProgram, catalogTarget := createLenientSyntacticProgram(t)
+	lintOnlyProgram, lintOnlyTarget := createLenientSyntacticProgram(t)
+	programs := []*lintprogram.Program{catalogProgram, lintOnlyProgram}
+	targets := [][]string{{catalogTarget}, {lintOnlyTarget}}
+
+	diagnostics := collectTargetSyntacticDiagnostics(
+		programs,
+		programs[:1],
+		targets,
+		true,
+		false,
+	)
+	if len(diagnostics) != 1 || diagnostics[0].FilePath != lintOnlyTarget {
+		t.Fatalf("lint-only syntax diagnostics = %+v, want only %q", diagnostics, lintOnlyTarget)
+	}
+
+	if diagnostics := collectTargetSyntacticDiagnostics(programs, nil, targets, true, false); len(diagnostics) != 0 {
+		t.Fatalf("nil catalog must preserve all-program type-check coverage, got %+v", diagnostics)
+	}
 }

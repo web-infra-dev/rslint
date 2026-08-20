@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/projectselection"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -71,6 +72,14 @@ func (metadata *lintProjectMetadata) Contains(
 		metadata.rootFiles.Contains(fileName, canonicalFileName)
 }
 
+func (metadata *lintProjectMetadata) DirectRoot(target projectselection.Target) bool {
+	return metadata.Contains(target.Path, target.CanonicalPath)
+}
+
+func (metadata *lintProjectMetadata) Supports(target projectselection.Target) bool {
+	return metadata.supportsFileName(target.Path)
+}
+
 func parseStandaloneLintProject(
 	tsConfigPath string,
 	parseFS vfs.FS,
@@ -125,76 +134,88 @@ type selectedLintProject struct {
 }
 
 func selectConfiguredLintProject(
-	tsConfigPaths []string,
+	projectPaths []string,
 	targetPath string,
 	loaders lintProjectLoaders,
 ) (selectedLintProject, bool, error) {
-	metadataByProject := make([]*lintProjectMetadata, len(tsConfigPaths))
-	if loaders.metadata != nil {
-		for index, tsConfigPath := range tsConfigPaths {
-			metadata, available, err := loaders.metadata(tsConfigPath)
-			if err != nil {
-				return selectedLintProject{}, false, fmt.Errorf(
-					"load configured project roots %q: %w",
-					tsConfigPath,
-					err,
-				)
-			}
-			if !available {
-				continue
-			}
-			metadataByProject[index] = metadata
-			if metadata == nil || metadata.rootFiles == nil ||
-				!metadata.rootFiles.Contains(targetPath, "") {
-				continue
-			}
-			if loaders.program == nil {
-				return selectedLintProject{}, false, fmt.Errorf("configured project root %q cannot load %q", targetPath, tsConfigPath)
-			}
-			program, sourceFile, err := loaders.program(tsConfigPath)
-			if err != nil {
-				return selectedLintProject{}, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
-			}
-			if program == nil || sourceFile == nil {
-				return selectedLintProject{}, false, fmt.Errorf(
-					"configured project root %q was absent from %q",
-					targetPath,
-					tsConfigPath,
-				)
-			}
-			return selectedLintProject{
-				program:    program,
-				sourceFile: sourceFile,
-				configPath: tsConfigPath,
-				directRoot: true,
-			}, true, nil
-		}
-	}
-
-	if loaders.program == nil {
+	if len(projectPaths) == 0 {
 		return selectedLintProject{}, false, nil
 	}
-	for index, tsConfigPath := range tsConfigPaths {
-		metadata := metadataByProject[index]
-		if metadata != nil && !metadata.supportsFileName(targetPath) {
-			continue
-		}
-		program, sourceFile, err := loaders.program(tsConfigPath)
-		if err != nil {
-			return selectedLintProject{}, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
-		}
-		if sourceFile != nil {
-			if program == nil {
-				return selectedLintProject{}, false, fmt.Errorf("configured project %q returned a source without a Program", tsConfigPath)
-			}
-			return selectedLintProject{
-				program:    program,
-				sourceFile: sourceFile,
-				configPath: tsConfigPath,
-			}, true, nil
-		}
+	projects := make([]int, len(projectPaths))
+	for index := range projects {
+		projects[index] = index
 	}
-	return selectedLintProject{}, false, nil
+	target := projectselection.Target{Path: tspath.NormalizePath(targetPath), Projects: projects}
+	if loaders.metadata == nil {
+		return selectedLintProject{}, false, nil
+	}
+	programByProject := make([]*compiler.Program, len(projectPaths))
+	sourceByProject := make([]*ast.SourceFile, len(projectPaths))
+	loadedProjects := make([]bool, len(projectPaths))
+	loadMetadata := func(project int) (projectselection.Metadata, bool, error) {
+		metadata, available, err := loaders.metadata(projectPaths[project])
+		if err != nil {
+			return nil, false, fmt.Errorf("load configured project roots %q: %w", projectPaths[project], err)
+		}
+		return metadata, available && metadata != nil, nil
+	}
+	loadProject := func(project int) (bool, error) {
+		if loadedProjects[project] {
+			return programByProject[project] != nil, nil
+		}
+		loadedProjects[project] = true
+		if loaders.program == nil {
+			return false, nil
+		}
+		program, sourceFile, err := loaders.program(projectPaths[project])
+		if err != nil {
+			return false, fmt.Errorf("load configured project %q: %w", projectPaths[project], err)
+		}
+		if sourceFile != nil && program == nil {
+			return false, fmt.Errorf("configured project %q returned a source without a Program", projectPaths[project])
+		}
+		programByProject[project] = program
+		sourceByProject[project] = sourceFile
+		return program != nil, nil
+	}
+	contains := func(project int, _ projectselection.Target) bool {
+		return sourceByProject[project] != nil
+	}
+	bindings, err := projectselection.Resolve(
+		projectselection.Plan{Targets: []projectselection.Target{target}},
+		loadMetadata,
+		loadProject,
+		contains,
+	)
+	if err != nil {
+		var absent *projectselection.DirectRootAbsentError
+		if errors.As(err, &absent) {
+			return selectedLintProject{}, false, fmt.Errorf(
+				"configured project root %q was absent from %q",
+				targetPath,
+				projectPaths[absent.Project],
+			)
+		}
+		var unavailable *projectselection.DirectProjectUnavailableError
+		if errors.As(err, &unavailable) {
+			return selectedLintProject{}, false, fmt.Errorf(
+				"configured project root %q was absent from %q",
+				targetPath,
+				projectPaths[unavailable.Project],
+			)
+		}
+		return selectedLintProject{}, false, err
+	}
+	if len(bindings) == 0 || bindings[0].Project == projectselection.NoProject {
+		return selectedLintProject{}, false, nil
+	}
+	project := bindings[0].Project
+	return selectedLintProject{
+		program:    programByProject[project],
+		sourceFile: sourceByProject[project],
+		configPath: projectPaths[project],
+		directRoot: bindings[0].Tier == projectselection.TierDirect,
+	}, true, nil
 }
 
 // standaloneLintProjectRequest gives one isolated lint pass a stable parsed
@@ -306,7 +327,7 @@ func (cache *lintSessionProjectRootCache) metadata(
 	if cache == nil {
 		return newLintProjectMetadata(configPath, commandLine, fs)
 	}
-	key := string(lintProgramLexicalPathID(configPath, fs))
+	key := string(lintProjectDeclarationPathID(configPath))
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	entry := cache.entries[key]

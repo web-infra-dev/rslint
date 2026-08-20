@@ -40,6 +40,21 @@ type commandReadCountingFS struct {
 	reads map[string]int
 }
 
+type projectOwnerIdentityFS struct {
+	vfs.FS
+	realPaths map[string]string
+}
+
+func (fsys *projectOwnerIdentityFS) UseCaseSensitiveFileNames() bool { return false }
+
+func (fsys *projectOwnerIdentityFS) Realpath(path string) string {
+	path = tspath.NormalizePath(path)
+	if realPath := fsys.realPaths[path]; realPath != "" {
+		return tspath.NormalizePath(realPath)
+	}
+	return path
+}
+
 func (fsys *commandReadCountingFS) ReadFile(fileName string) (string, bool) {
 	fileName = tspath.NormalizePath(fileName)
 	fsys.mu.Lock()
@@ -820,25 +835,163 @@ func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
 	}
 }
 
-func TestIsBroadProjectLoadScope(t *testing.T) {
-	const cwd = "/repo"
+func TestShouldPrefetchProjectCandidates(t *testing.T) {
 	tests := []struct {
-		name       string
-		allowFiles []string
-		allowDirs  []string
-		want       bool
+		name      string
+		allowDirs []string
+		owners    []string
+		scopes    map[string]rslintconfig.LintDiscoveryScope
+		want      bool
 	}{
-		{name: "implicit cwd", want: true},
-		{name: "explicit cwd", allowDirs: []string{"/repo"}, want: true},
-		{name: "cwd plus file", allowFiles: []string{"/repo/a.ts"}, allowDirs: []string{"/repo"}, want: true},
-		{name: "ancestor", allowDirs: []string{"/"}, want: true},
-		{name: "focused directory", allowDirs: []string{"/repo/packages/a"}},
-		{name: "focused file", allowFiles: []string{"/repo/packages/a/index.ts"}},
+		{name: "local owner is covered", allowDirs: []string{"/repo/packages/a"}, owners: []string{"/repo/packages/a"}, want: true},
+		{name: "parent owner is not covered", allowDirs: []string{"/repo/packages/a"}, owners: []string{"/repo"}},
+		{name: "multiple directories cover multiple owners", allowDirs: []string{"/repo/a", "/repo/b"}, owners: []string{"/repo/a", "/repo/b"}, want: true},
+		{name: "one owner is uncovered", allowDirs: []string{"/repo/a"}, owners: []string{"/repo/a", "/repo/b"}},
+		{name: "file only has no recursive directory", owners: []string{"/repo"}},
+		{name: "literal-only owner vetoes prefetch", allowDirs: []string{"/repo"}, owners: []string{"/repo"}, scopes: map[string]rslintconfig.LintDiscoveryScope{
+			"/repo": {ExplicitOnly: true},
+		}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := isBroadProjectLoadScope(test.allowFiles, test.allowDirs, cwd, true); got != test.want {
-				t.Fatalf("isBroadProjectLoadScope() = %t, want %t", got, test.want)
+			targets := make([]rslintconfig.DiscoveredLintTarget, len(test.owners))
+			for index, owner := range test.owners {
+				targets[index] = rslintconfig.DiscoveredLintTarget{Path: owner + "/target.ts", ConfigDirectory: owner}
+			}
+			if got := shouldPrefetchProjectCandidates(
+				test.allowDirs,
+				rslintconfig.LintTargetPlan{Targets: targets},
+				test.scopes,
+				nil,
+			); got != test.want {
+				t.Fatalf("shouldPrefetchProjectCandidates() = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
+
+func TestContainsProjectOwnerUsesExactAndPhysicalPathIdentity(t *testing.T) {
+	fsys := &projectOwnerIdentityFS{
+		FS: osvfs.FS(),
+		realPaths: map[string]string{
+			"c:/repo/packages/a":            "C:/Repo/Packages/A",
+			"C:/REPO/PACKAGES/A":            "C:/Repo/Packages/A",
+			"//server/share/repo/a":         "//Server/Share/Repo/A",
+			"//SERVER/SHARE/REPO/A":         "//Server/Share/Repo/A",
+			"/aliases/work/packages/a":      "/physical/work/packages/a",
+			"/physical/work/packages/a":     "/physical/work/packages/a",
+			"/repo/Foo":                     "/physical/Foo",
+			"/repo/foo":                     "/physical/foo",
+			"/aliases/work/packages/nested": "/physical/work/packages/nested",
+		},
+	}
+	tests := []struct {
+		name      string
+		directory string
+		owner     string
+		want      bool
+	}{
+		{name: "Windows drive root is case insensitive", directory: "c:/Repo", owner: "C:/Repo/packages/a", want: true},
+		{name: "Windows component casing uses Realpath", directory: "c:/repo/packages/a", owner: "C:/REPO/PACKAGES/A", want: true},
+		{name: "different Windows drives", directory: "C:/Repo", owner: "D:/Repo/packages/a"},
+		{name: "UNC casing uses Realpath", directory: "//server/share/repo/a", owner: "//SERVER/SHARE/REPO/A", want: true},
+		{name: "different UNC share", directory: "//server/share/repo", owner: "//server/share-other/repo"},
+		{name: "different UNC server", directory: "//server/share/repo", owner: "//other/share/repo"},
+		{name: "directory boundary", directory: "/repo/a", owner: "/repo/ab"},
+		{name: "physical alias", directory: "/aliases/work/packages/a", owner: "/physical/work/packages/a", want: true},
+		{name: "nested alias does not cover parent owner", directory: "/aliases/work/packages/nested", owner: "/physical/work"},
+		{name: "case-folding does not merge distinct physical owners", directory: "/repo/Foo", owner: "/repo/foo"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := containsProjectOwner(test.directory, test.owner, fsys); got != test.want {
+				t.Fatalf("containsProjectOwner(%q, %q) = %t, want %t", test.directory, test.owner, got, test.want)
+			}
+		})
+	}
+}
+
+func TestExecuteLintPipelinePrefetchesOnlyWhenDirectoryCoversConfigOwner(t *testing.T) {
+	root := t.TempDir()
+	packageA := filepath.Join(root, "packages", "a")
+	packageB := filepath.Join(root, "packages", "b")
+	for _, dir := range []string{packageA, packageB} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	targetPath := filepath.Join(packageA, "target.ts")
+	unrelatedPath := filepath.Join(packageB, "unrelated.ts")
+	files := map[string]string{
+		targetPath:                               "let value: any = {}; value.member;\n",
+		unrelatedPath:                            "export const unrelated = 1;\n",
+		filepath.Join(packageA, "tsconfig.json"): `{"files":["target.ts"],"compilerOptions":{"noLib":true}}`,
+		filepath.Join(packageB, "tsconfig.json"): `{"files":["unrelated.ts"],"compilerOptions":{"noLib":true}}`,
+	}
+	for path, content := range files {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root = tspath.NormalizePath(root)
+	packageA = tspath.NormalizePath(packageA)
+	packageB = tspath.NormalizePath(packageB)
+	unrelatedPath = tspath.NormalizePath(unrelatedPath)
+
+	configForOwner := func(owner string) rslintconfig.RslintConfig {
+		projectA := tspath.ResolvePath(packageA, "tsconfig.json")
+		projectB := tspath.ResolvePath(packageB, "tsconfig.json")
+		pathOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}
+		return rslintconfig.RslintConfig{{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"@typescript-eslint"},
+			Rules:   rslintconfig.Rules{"@typescript-eslint/no-unsafe-member-access": "error"},
+			LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+				Project: []string{
+					tspath.GetRelativePathFromDirectory(owner, projectA, pathOptions),
+					tspath.GetRelativePathFromDirectory(owner, projectB, pathOptions),
+				},
+			}},
+		}}
+	}
+	tests := []struct {
+		name          string
+		owner         string
+		cwd           string
+		implicitScope bool
+		wantBRead     bool
+	}{
+		{name: "explicit child directory with local owner", owner: packageA, cwd: root, wantBRead: true},
+		{name: "explicit child directory with parent owner", owner: root, cwd: root},
+		{name: "nested cwd dot with parent owner", owner: root, cwd: packageA},
+		{name: "nested cwd implicit scope with parent owner", owner: root, cwd: packageA, implicitScope: true},
+		{name: "nested cwd implicit scope owns local config", owner: packageA, cwd: packageA, implicitScope: true, wantBRead: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fsys := &commandReadCountingFS{
+				FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+				reads: make(map[string]int),
+			}
+			args := lintArgs{
+				ConfigCatalog: &discovery.ConfigCatalog{Configs: map[string]rslintconfig.RslintConfig{
+					test.owner: configForOwner(test.owner),
+				}},
+				Format:         "jsonline",
+				NoColor:        true,
+				SingleThreaded: true,
+				FS:             fsys,
+			}
+			if !test.implicitScope {
+				args.AllowDirs = []string{packageA}
+			}
+			code, stdout, stderr := runLintPipelineForTest(t, test.cwd, args)
+			if code != 1 || !strings.Contains(stdout, "@typescript-eslint/no-unsafe-member-access") {
+				t.Fatalf("target did not run with type info: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			}
+			gotBRead := fsys.readCount(unrelatedPath) > 0
+			if gotBRead != test.wantBRead {
+				t.Fatalf("unrelated sibling Program read = %t, want %t (count=%d)", gotBRead, test.wantBRead, fsys.readCount(unrelatedPath))
 			}
 		})
 	}
@@ -932,7 +1085,7 @@ func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
 	})
 }
 
-func TestExecuteLintPipelineFocusedFileBuildsOnlyDirectProject(t *testing.T) {
+func TestExecuteLintPipelineFileScopeBuildsOnlyDirectProject(t *testing.T) {
 	dir := t.TempDir()
 	files := map[string]string{
 		"target.ts":            `export const target = 1;`,
@@ -975,7 +1128,7 @@ func TestExecuteLintPipelineFocusedFileBuildsOnlyDirectProject(t *testing.T) {
 		FS:             fsys,
 	})
 	if code != 0 {
-		t.Fatalf("focused lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+		t.Fatalf("file-scoped lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if got := fsys.readCount(tspath.ResolvePath(dir, "import-main.ts")); got != 0 {
 		t.Fatalf("earlier import-only project source was read %d time(s)", got)
@@ -1420,6 +1573,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	}
 	write("a.ts", "debugger;\n")
 	write("b.js", "debugger;\n")
+	write("tsconfig.json", `{"compilerOptions":{"allowJs":true},"files":["b.js"]}`)
 
 	baseConfig := rslintconfig.RslintConfig{{
 		Files: []string{"**/*.ts"},
@@ -1434,15 +1588,23 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	programSession := loader.NewSession(fs)
-	programSet, err := programSession.BuildProject(dir, activeConfig, true)
-	if err != nil {
-		t.Fatalf("BuildProject: %v", err)
-	}
 	targetPlan, err := rslintconfig.ResolveLintTargetPlan(nil, targetConfig, dir, nil, fs, nil, []string{tspath.NormalizePath(dir)}, true)
 	if err != nil {
 		t.Fatalf("ResolveLintTargetPlan: %v", err)
 	}
-	binding, err := programSession.LoadAPI(programSet, targetPlan, dir, true)
+	planner, err := rslintconfig.NewProjectPathResolver(nil, activeConfig, dir, fs, false)
+	if err != nil {
+		t.Fatalf("NewProjectPathResolver: %v", err)
+	}
+	lintProjectPlan, err := planner.ResolveLintProjectPlan(targetPlan)
+	if err != nil {
+		t.Fatalf("ResolveLintProjectPlan: %v", err)
+	}
+	programSet, err := programSession.SelectProjects(lintProjectPlan, nil, true, true)
+	if err != nil {
+		t.Fatalf("SelectProjects: %v", err)
+	}
+	binding, err := programSession.LoadAPI(programSet, lintProjectPlan, dir, true)
 	if err != nil {
 		t.Fatalf("LoadAPI: %v", err)
 	}
@@ -1453,6 +1615,11 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	}
 	if len(targetFiles) != 2 || !strings.HasSuffix(targetFiles[0], "/a.ts") || !strings.HasSuffix(targetFiles[1], "/b.js") {
 		t.Fatalf("target discovery should retain the default baseline despite --rule overlay, got %v", targetFiles)
+	}
+	if programSet.Len() != 1 || len(targetsByProgram) != 2 ||
+		len(targetsByProgram[0]) != 1 || !strings.HasSuffix(targetsByProgram[0][0], "/b.js") ||
+		len(targetsByProgram[1]) != 1 || !strings.HasSuffix(targetsByProgram[1][0], "/a.ts") {
+		t.Fatalf("--rule must use ordinary effective-config project semantics, projects=%d targets=%v", programSet.Len(), targetsByProgram)
 	}
 
 	rslintconfig.RegisterAllRules()
@@ -1557,6 +1724,53 @@ func TestCLIExplicitJSONConfigNoArgsScopesToInvocationCWD(t *testing.T) {
 	}
 	if strings.Contains(stdout, "parent.js") {
 		t.Fatalf("explicit --config must not widen no-args scope to config dir, stdout=%q", stdout)
+	}
+}
+
+func TestCLIExplicitConfigUsesInvocationCWDForFilesAndProjects(t *testing.T) {
+	root := t.TempDir()
+	child := filepath.Join(root, "child")
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configContent := `[{
+		"files":["target.ts"],
+		"plugins":["@typescript-eslint"],
+		"rules":{"@typescript-eslint/no-unsafe-member-access":"error"},
+		"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}}
+	}]`
+	for path, content := range map[string]string{
+		filepath.Join(root, "outside.json"):   configContent,
+		filepath.Join(child, "local.json"):    configContent,
+		filepath.Join(root, "parent.ts"):      `export const parent = 1;`,
+		filepath.Join(root, "tsconfig.json"):  `{"files":["parent.ts"],"compilerOptions":{"noLib":true}}`,
+		filepath.Join(child, "target.ts"):     `let value: any = {}; value.member;`,
+		filepath.Join(child, "tsconfig.json"): `{"files":["target.ts"],"compilerOptions":{"noLib":true}}`,
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	target := tspath.NormalizePath(filepath.Join(child, "target.ts"))
+	for _, test := range []struct {
+		name   string
+		config string
+	}{
+		{name: "config in cwd", config: "local.json"},
+		{name: "config outside cwd", config: "../outside.json"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			code, stdout, stderr := runLintPipelineForTest(t, child, lintArgs{
+				Config:         test.config,
+				AllowFiles:     []string{target},
+				Format:         "jsonline",
+				NoColor:        true,
+				SingleThreaded: true,
+			})
+			if code != 1 || !strings.Contains(stdout, "@typescript-eslint/no-unsafe-member-access") {
+				t.Fatalf("explicit config did not use invocation CWD: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			}
+		})
 	}
 }
 

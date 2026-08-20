@@ -549,6 +549,11 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		if err := validatePrograms(opts.Programs); err != nil {
 			return nil, err
 		}
+		if opts.TypeCheck && opts.TypeCheckPrograms != nil {
+			if err := validatePrograms(opts.TypeCheckPrograms); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	executedRules := make(map[string]struct{})
@@ -602,8 +607,12 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 
 	// Phase 2: program-level type-check (tsc-aligned).
 	if opts.TypeCheck {
+		typeCheckPrograms := opts.TypeCheckPrograms
+		if typeCheckPrograms == nil {
+			typeCheckPrograms = opts.Programs
+		}
 		runTypeCheckAcrossPrograms(typeCheckRequest{
-			Programs:       opts.Programs,
+			Programs:       typeCheckPrograms,
 			SingleThreaded: opts.SingleThreaded,
 			OnDiagnostic:   consumer.Report,
 		})

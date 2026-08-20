@@ -101,14 +101,14 @@ func TestReloadConfigAndRelint_RecomputesTypeInfoCapability(t *testing.T) {
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"
 	s.rslintConfigPath = "/project/rslint.json"
-	// Set stale tsConfigPaths
-	s.tsConfigPaths = []string{"/project/old-tsconfig.json"}
+	// Set a stale project-plan generation.
+	s.jsonProjectResolver = &config.ProjectPathResolver{}
 
 	s.reloadConfigAndRelint()
 
-	// Config deleted → tsConfigPaths should be cleared
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected tsConfigPaths cleared, got %v", s.tsConfigPaths)
+	// Config deleted → the project-plan generation should be cleared.
+	if s.jsonProjectResolver != nil {
+		t.Error("expected JSON project resolver to be cleared")
 	}
 }
 
@@ -210,8 +210,8 @@ func TestHandleDidChangeWatchedFiles_TsConfigChangeRecomputesTypeInfoCapability(
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"
-	// Set stale tsConfigPaths
-	s.tsConfigPaths = []string{"/project/old-tsconfig.json"}
+	// Set a stale project-plan generation.
+	s.jsonProjectResolver = &config.ProjectPathResolver{}
 
 	ctx := context.Background()
 	err := s.handleDidChangeWatchedFiles(ctx, &lsproto.DidChangeWatchedFilesParams{
@@ -223,9 +223,9 @@ func TestHandleDidChangeWatchedFiles_TsConfigChangeRecomputesTypeInfoCapability(
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// rebuildTsConfigPaths should have run → no config → tsConfigPaths cleared
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected tsConfigPaths cleared after tsconfig change, got %v", s.tsConfigPaths)
+	// The rebuild should have run; with no config, the resolver is cleared.
+	if s.jsonProjectResolver != nil {
+		t.Error("expected JSON project resolver cleared after tsconfig change")
 	}
 }
 
@@ -233,7 +233,7 @@ func TestHandleDidChangeWatchedFiles_TsConfigVariantDetected(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"
-	s.tsConfigPaths = []string{"/project/old-tsconfig.json"}
+	s.jsonProjectResolver = &config.ProjectPathResolver{}
 
 	ctx := context.Background()
 	// tsconfig.build.json should also trigger rebuild
@@ -246,8 +246,8 @@ func TestHandleDidChangeWatchedFiles_TsConfigVariantDetected(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected tsConfigPaths cleared after tsconfig.build.json change")
+	if s.jsonProjectResolver != nil {
+		t.Error("expected JSON project resolver cleared after tsconfig.build.json change")
 	}
 }
 

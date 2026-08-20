@@ -6,25 +6,35 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+type testPluginConfigPlan struct {
+	owners  map[string]string
+	configs map[string]*rslintconfig.MergedConfig
+}
+
+func (plan testPluginConfigPlan) OwnerForFile(filePath string) string {
+	return plan.owners[filePath]
+}
+
+func (plan testPluginConfigPlan) ConfigForFile(filePath string) *rslintconfig.MergedConfig {
+	return plan.configs[filePath]
+}
 
 // TestPluginConfigResolver_UsesGoOwnedCatalogKey proves the routing identity is
 // the same normalized key Go published in its typed discovery catalog. Node
 // treats that key as opaque when activating the matching plugin host.
 func TestPluginConfigResolver_UsesGoOwnedCatalogKey(t *testing.T) {
-	configDir := tspath.NormalizePath(`C:\proj`)
-	configMap := map[string]rslintconfig.RslintConfig{
-		configDir: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-	}
+	configDir := "C:/proj"
+	merged := new(rslintconfig.MergedConfig)
 	r := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
+		lintResolver: testPluginConfigPlan{
+			owners:  map[string]string{configDir + "/src/a.ts": configDir},
+			configs: map[string]*rslintconfig.MergedConfig{configDir + "/src/a.ts": merged},
+		},
 	}
 	wireKey, merged := r.resolve(configDir + "/src/a.ts")
 	if wireKey != configDir {
@@ -36,9 +46,10 @@ func TestPluginConfigResolver_UsesGoOwnedCatalogKey(t *testing.T) {
 
 	// With no low-level API routing override, the owner key is used directly.
 	posix := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
-			ConfigMap: map[string]rslintconfig.RslintConfig{"/posix/proj": configMap[configDir]},
-		}),
+		lintResolver: testPluginConfigPlan{
+			owners:  map[string]string{"/posix/proj/a.ts": "/posix/proj"},
+			configs: map[string]*rslintconfig.MergedConfig{"/posix/proj/a.ts": merged},
+		},
 	}
 	if wk, m := posix.resolve("/posix/proj/a.ts"); wk != "/posix/proj" || m == nil {
 		t.Errorf("POSIX fallback: wireKey=%q merged-nil=%v, want /posix/proj + non-nil", wk, m == nil)
@@ -103,13 +114,9 @@ func TestDispatchPluginLintAsync_NoInputsNoDiagnostic(t *testing.T) {
 // TestPluginConfigResolver_Branches covers resolve()'s non-match and
 // single-config (configMap==nil) fallback branches.
 func TestPluginConfigResolver_Branches(t *testing.T) {
-	configMap := map[string]rslintconfig.RslintConfig{
-		"/proj": {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-	}
-
 	// Multi-config, file under no config -> ("", nil).
 	r := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
+		lintResolver: testPluginConfigPlan{},
 	}
 	if wk, m := r.resolve("/elsewhere/a.ts"); wk != "" || m != nil {
 		t.Errorf("no-match -> (\"\",nil), got (%q, nil=%v)", wk, m == nil)
@@ -117,150 +124,12 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 
 	// Single-config (configMap==nil): wireKey is currentDirectory; merged from rslintConfig.
 	single := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
-			Config:           configMap["/proj"],
-			CurrentDirectory: "/proj",
-		}),
+		lintResolver: testPluginConfigPlan{
+			owners:  map[string]string{"/proj/a.ts": "/proj"},
+			configs: map[string]*rslintconfig.MergedConfig{"/proj/a.ts": new(rslintconfig.MergedConfig)},
+		},
 	}
 	if wk, m := single.resolve("/proj/a.ts"); wk != "/proj" || m == nil {
 		t.Errorf("single-config -> (currentDirectory, merged), got (%q, nil=%v)", wk, m == nil)
 	}
-}
-
-func TestLintConfigResolver_NearestConfigWithoutProgramPolicy(t *testing.T) {
-	rslintconfig.RegisterAllRules()
-
-	configMap := map[string]rslintconfig.RslintConfig{
-		"/repo": {{
-			Files: []string{"**/*.ts"},
-			Rules: rslintconfig.Rules{"no-console": "error"},
-		}},
-		"/repo/packages/app": {{
-			Files: []string{"**/*.ts"},
-			Rules: rslintconfig.Rules{
-				"@typescript-eslint/require-await": "error",
-				"no-debugger":                      "error",
-			},
-		}},
-	}
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap: configMap,
-	})
-
-	gapRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/packages/app/src/gap.ts"))
-	if !gapRules["@typescript-eslint/require-await"] || !gapRules["no-debugger"] {
-		t.Fatal("expected config resolution to return both nearest app rules")
-	}
-	if gapRules["no-console"] {
-		t.Fatal("did not expect parent config rule for file owned by nearest app config")
-	}
-
-	typedRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/packages/app/src/typed.ts"))
-	if !typedRules["@typescript-eslint/require-await"] || !typedRules["no-debugger"] {
-		t.Fatalf("expected typed app file to keep both app rules, got %v", typedRules)
-	}
-
-	rootRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/root.ts"))
-	if !rootRules["no-console"] || rootRules["no-debugger"] {
-		t.Fatalf("expected root file to use root config only, got %v", rootRules)
-	}
-
-	if rules := resolver.EnabledRulesForFile("/outside/a.ts"); len(rules) != 0 {
-		t.Fatalf("expected file outside every config to have no rules, got %v", rules)
-	}
-}
-
-func TestLintConfigResolver_UsesBoundOwnerForAliasedSource(t *testing.T) {
-	rslintconfig.RegisterAllRules()
-
-	configMap := map[string]rslintconfig.RslintConfig{
-		"/repo": {{
-			Files: []string{"packages/app/*.ts"},
-			Rules: rslintconfig.Rules{"no-console": "error"},
-		}},
-		"/repo/packages/app": {{
-			Rules: rslintconfig.Rules{"no-debugger": "error"},
-		}},
-	}
-	sourcePath := "/repo/packages/app/a.ts"
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:                  configMap,
-		OwnerConfigDirBySourcePath: map[string]string{sourcePath: "/repo"},
-	})
-
-	rules := configuredRuleNameSet(resolver.EnabledRulesForFile(sourcePath))
-	if !rules["no-console"] || rules["no-debugger"] {
-		t.Fatalf("expected the binding's root owner to win over source-path inference, got %v", rules)
-	}
-}
-
-func TestLintConfigResolver_UsesConfigPathAliasForRulesAndGlobals(t *testing.T) {
-	rslintconfig.RegisterAllRules()
-
-	cfg := rslintconfig.RslintConfig{{
-		Files: []string{"src/**/*.ts"},
-		LanguageOptions: &rslintconfig.LanguageOptions{Raw: map[string]any{
-			"globals": map[string]any{
-				"aliasedGlobal": "readonly",
-			},
-		}},
-		Rules: rslintconfig.Rules{"no-console": "error"},
-	}}
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		Config:                 cfg,
-		CurrentDirectory:       "/repo",
-		ConfigPathBySourcePath: map[string]string{"/outside/real-a.ts": "/repo/src/a.ts"},
-	})
-
-	rules := resolver.EnabledRulesForFile("/outside/real-a.ts")
-	if len(rules) != 1 || rules[0].Name != "no-console" {
-		t.Fatalf("expected aliased source path to use config path rules, got %v", configuredRuleNameSet(rules))
-	}
-	if access := rules[0].Environment.Globals["aliasedGlobal"]; access != utils.GlobalAccessReadonly {
-		t.Fatalf("expected aliased source path to carry globals from config path, got %v", access)
-	}
-	if resolver.ConfigForFile("/outside/real-a.ts") == nil {
-		t.Fatalf("expected aliased source path to resolve merged config")
-	}
-}
-
-type caseInsensitiveResolverFS struct {
-	vfs.FS
-}
-
-func (f *caseInsensitiveResolverFS) UseCaseSensitiveFileNames() bool { return false }
-func (f *caseInsensitiveResolverFS) Realpath(filePath string) string {
-	return strings.ToLower(tspath.NormalizePath(filePath))
-}
-
-func TestLintConfigResolver_SourceMappingsUseCanonicalFilesystemIdentity(t *testing.T) {
-	rslintconfig.RegisterAllRules()
-	fsys := &caseInsensitiveResolverFS{FS: osvfs.FS()}
-	sourcePath := "c:/repo/src/a.ts"
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap: map[string]rslintconfig.RslintConfig{
-			"C:/Repo": {{
-				Files: []string{"src/**/*.ts"},
-				Rules: rslintconfig.Rules{"no-console": "error"},
-			}},
-		},
-		ConfigPathBySourcePath: map[string]string{"C:/REPO/SRC/A.ts": "c:/repo/src/a.ts"},
-		OwnerConfigDirBySourcePath: map[string]string{
-			"C:/REPO/SRC/A.ts": "c:/repo",
-		},
-		FS: fsys,
-	})
-
-	rules := resolver.EnabledRulesForFile(sourcePath)
-	if len(rules) != 1 || rules[0].Name != "no-console" {
-		t.Fatalf("expected case-equivalent source mapping to retain config rules, got %v", configuredRuleNameSet(rules))
-	}
-}
-
-func configuredRuleNameSet(rules []linter.ConfiguredRule) map[string]bool {
-	names := make(map[string]bool, len(rules))
-	for _, r := range rules {
-		names[r.Name] = true
-	}
-	return names
 }

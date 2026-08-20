@@ -81,8 +81,12 @@ type LintResult struct {
 type RunLinterOptions struct {
 	// Programs contains immutable rslint source universes. Their construction
 	// strategy is encapsulated by Program and is not part of lint semantics.
-	Programs       []*program.Program
-	SingleThreaded bool
+	Programs []*program.Program
+	// TypeCheckPrograms optionally narrows Phase 2 to the program-wide catalog.
+	// nil preserves the historical behavior of checking Programs. CLI combined
+	// lint+type-check uses this to exclude lint-only effective candidates.
+	TypeCheckPrograms []*program.Program
+	SingleThreaded    bool
 	// Cwd is the working directory of the linting run, forwarded verbatim to
 	// every RuleContext. See RuleContext.ProcessCurrentDirectory for what rules
 	// may assume of it.

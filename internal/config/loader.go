@@ -122,67 +122,35 @@ func (loader *ConfigLoader) LoadDefaultRslintConfig() (RslintConfig, string, err
 	return nil, "", errors.New("no rslint config file found. Expected rslint.json or rslint.jsonc")
 }
 
-// LoadTsConfigsFromRslintConfig extracts and validates TypeScript configuration paths from rslint config.
-// Returns an empty slice (no error) when no parserOptions.project is specified — this is valid
-// for pure JS projects that don't need explicit TypeScript configuration.
-func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintConfig, configDirectory string) ([]string, error) {
-	tsConfigs := []string{}
+// resolveProjectPaths resolves one effective parserOptions.project value. It
+// performs path/glob validation but does not parse a tsconfig or build a
+// Program. The authored lexical path is preserved because TypeScript resolves
+// includes and extends relative to that declaration location.
+func (loader *ConfigLoader) resolveProjectPaths(projects ProjectPaths, configDirectory string) ([]string, error) {
+	paths := make([]string, 0, len(projects))
 	seenPaths := make(map[string]struct{})
-
-	for _, entry := range rslintConfig {
-		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
+	for _, project := range projects {
+		if containsGlobPattern(project) {
+			matches, err := loader.expandProjectGlob(configDirectory, project)
+			if err != nil {
+				return nil, err
+			}
+			if len(matches) == 0 {
+				return nil, fmt.Errorf("glob pattern %q matched no files", project)
+			}
+			for _, match := range matches {
+				paths = appendUniqueConfigPath(paths, seenPaths, match)
+			}
 			continue
 		}
 
-		for _, config := range entry.LanguageOptions.ParserOptions.Project {
-			if containsGlobPattern(config) {
-				matches, err := loader.expandProjectGlob(configDirectory, config)
-				if err != nil {
-					return nil, err
-				}
-				if len(matches) == 0 {
-					return nil, fmt.Errorf("glob pattern %q matched no files", config)
-				}
-				for _, match := range matches {
-					tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, match)
-				}
-				continue
-			}
-
-			tsconfigPath := tspath.ResolvePath(configDirectory, config)
-
-			if !loader.fs.FileExists(tsconfigPath) {
-				return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
-			}
-
-			tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, tsconfigPath)
+		tsconfigPath := tspath.ResolvePath(configDirectory, project)
+		if !loader.fs.FileExists(tsconfigPath) {
+			return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
 		}
+		paths = appendUniqueConfigPath(paths, seenPaths, tsconfigPath)
 	}
-
-	return tsConfigs, nil
-}
-
-// ResolveTsConfigPaths extracts tsconfig paths from a rslint config's parserOptions.project,
-// with an auto-detection fallback to tsconfig.json in the config directory.
-// Returns (nil, nil) when no tsconfigs are found. Returns (nil, err) when
-// config validation fails (e.g. glob matched no files, tsconfig doesn't exist).
-func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]string, error) {
-	if fs == nil {
-		return nil, nil
-	}
-	loader := NewConfigLoader(fs, cwd)
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, cwd)
-	if err != nil {
-		return nil, err
-	}
-	if len(tsConfigs) == 0 {
-		defaultTsConfig := tspath.ResolvePath(cwd, "tsconfig.json")
-		if fs.FileExists(defaultTsConfig) {
-			return []string{defaultTsConfig}, nil
-		}
-		return nil, nil
-	}
-	return tsConfigs, nil
+	return paths, nil
 }
 
 func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, configPath string) []string {
@@ -281,19 +249,4 @@ func (loader *ConfigLoader) LoadRslintConfiguration(configPath string) (RslintCo
 		return loader.LoadRslintConfig(configPath)
 	}
 	return loader.LoadDefaultRslintConfig()
-}
-
-// LoadConfiguration is a convenience method that loads both rslint and tsconfig configurations.
-func (loader *ConfigLoader) LoadConfiguration(configPath string) (RslintConfig, []string, string, error) {
-	rslintConfig, configDirectory, err := loader.LoadRslintConfiguration(configPath)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	return rslintConfig, tsConfigs, configDirectory, nil
 }

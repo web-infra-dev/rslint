@@ -41,6 +41,20 @@ const ancestorJSConfigWatcherID project.WatcherID = "rslint-ancestor-js-config"
 type lintPassResult struct {
 	Diagnostics     []rule.RuleDiagnostic
 	HasSyntaxErrors bool
+	PlannedTarget   *config.PlannedLintTarget
+	PluginConfigKey string
+}
+
+func bindLintPassToTarget(
+	result lintPassResult,
+	target config.PlannedLintTarget,
+	pluginsEnabled bool,
+) lintPassResult {
+	result.PlannedTarget = &target
+	if pluginsEnabled {
+		result.PluginConfigKey = target.Target.ConfigDirectory
+	}
+	return result
 }
 
 // ruleFixToTextEdit converts a rule fix into an LSP TextEdit using the
@@ -253,12 +267,12 @@ func (s *Server) reloadConfig() error {
 	if err != nil {
 		return fmt.Errorf("could not load rslint config: %w", err)
 	}
-	paths, err := s.resolveTsConfigPaths(rslintConfig, s.cwd)
+	projectResolver, err := config.NewProjectPathResolver(nil, rslintConfig, s.cwd, s.fs, false)
 	if err != nil {
 		return fmt.Errorf("could not resolve tsconfig paths for %q: %w", s.rslintConfigPath, err)
 	}
 	s.jsonConfig = rslintConfig
-	s.tsConfigPaths = paths
+	s.jsonProjectResolver = projectResolver
 	s.invalidateLintProjectCaches()
 	return nil
 }
@@ -370,10 +384,10 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		return nil
 	}
 	if needsTypeInfoRebuild {
-		// tsconfig changed — rebuild tsConfigPaths so type-aware rule filtering
-		// stays in sync. Session already handles the project state update and
+		// tsconfig changed — rebuild the config-generation project resolver so
+		// type-aware rule filtering stays in sync. Session already handles the project state update and
 		// triggers RefreshDiagnostics for relinting.
-		if err := s.rebuildTsConfigPaths(); err != nil {
+		if err := s.rebuildProjectPathResolvers(); err != nil {
 			log.Printf("[rslint] Failed to rebuild tsconfig paths: %v", err)
 		}
 	}
@@ -444,47 +458,31 @@ func isTsConfigURI(uri string) bool {
 		strings.HasSuffix(name, ".json")
 }
 
-// resolveTsConfigPaths resolves parserOptions.project from a config while
-// preserving each declared path. TypeScript resolves relative includes from
-// that lexical location, so a symlinked tsconfig is not interchangeable with
-// its physical target.
-func (s *Server) resolveTsConfigPaths(cfg config.RslintConfig, cwd string) ([]string, error) {
-	return resolveTsConfigPathsWithFS(cfg, cwd, s.fs)
-}
-
-// rebuildTsConfigPaths resolves parserOptions.project from the current config.
+// rebuildProjectPathResolvers snapshots effective project declarations from
+// the current config generation.
 // Called when a tsconfig or rslint config changes so that type-aware rule
 // filtering stays in sync.
-//
-// For JS/TS configs we resolve per-config directory into tsConfigPathsByConfig.
-// A config whose parserOptions.project is empty and has no auto-detected
-// tsconfig resolves to nil. Files governed by that config have no type info,
-// without affecting files governed by other configs. A nested template or
-// fixture config without a tsconfig must not change sibling config behavior.
-func (s *Server) rebuildTsConfigPaths() error {
-	var tsConfigPaths []string
+func (s *Server) rebuildProjectPathResolvers() error {
+	var jsonProjectResolver *config.ProjectPathResolver
 	if s.rslintConfigPath != "" {
 		var err error
-		tsConfigPaths, err = s.resolveTsConfigPaths(s.jsonConfig, s.cwd)
+		jsonProjectResolver, err = config.NewProjectPathResolver(nil, s.jsonConfig, s.cwd, s.fs, false)
 		if err != nil {
 			return fmt.Errorf("resolve tsconfig paths for %q: %w", s.rslintConfigPath, err)
 		}
 	}
 
-	var byConfig map[string][]string
+	var jsProjectResolver *config.ProjectPathResolver
 	if len(s.jsConfigs) > 0 {
-		byConfig = make(map[string][]string, len(s.jsConfigs))
-		for dir, entries := range s.jsConfigs {
-			paths, err := s.resolveTsConfigPaths(entries, dir)
-			if err != nil {
-				return fmt.Errorf("resolve tsconfig paths for %q: %w", dir, err)
-			}
-			byConfig[dir] = paths
+		var err error
+		jsProjectResolver, err = config.NewProjectPathResolver(s.jsConfigs, nil, s.cwd, s.fs, true)
+		if err != nil {
+			return err
 		}
 	}
 
-	s.tsConfigPaths = tsConfigPaths
-	s.tsConfigPathsByConfig = byConfig
+	s.jsonProjectResolver = jsonProjectResolver
+	s.jsProjectResolver = jsProjectResolver
 	s.invalidateLintProjectCaches()
 	return nil
 }
@@ -501,7 +499,7 @@ func (s *Server) reloadConfigAndRelint() {
 		log.Printf("rslint config file no longer exists, clearing config")
 		s.jsonConfig = config.RslintConfig{}
 		s.rslintConfigPath = ""
-		s.tsConfigPaths = nil
+		s.jsonProjectResolver = nil
 		s.invalidateLintProjectCaches()
 	} else {
 		previousPath := s.rslintConfigPath
@@ -771,10 +769,10 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 	}
 
 	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	tsConfigPaths := s.tsConfigPathsForURI(uri)
+	projectResolver := s.projectResolverForURI(uri)
 	originalContent := s.documents[uri]
 
-	currentContent := s.computeFixAllContent(ctx, uri, originalContent, rslintConfig, configCwd, isJSConfig, tsConfigPaths)
+	currentContent := s.computeFixAllContent(ctx, uri, originalContent, rslintConfig, configCwd, isJSConfig, projectResolver)
 
 	if currentContent == originalContent {
 		return empty, nil
@@ -816,7 +814,7 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 // the SAME content (so their byte offsets align with ApplyRuleFixes's input).
 // The per-pass native lint goes through s.fixAllNativeLint, which tests override
 // to drive the fold loop without a real TS session.
-func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentUri, originalContent string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) string {
+func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentUri, originalContent string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, projectResolver *config.ProjectPathResolver) string {
 	nativeLint := s.fixAllNativeLint
 	if nativeLint == nil {
 		nativeLint = s.defaultFixAllNativeLint
@@ -839,7 +837,7 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 
 	currentContent := originalContent
 	for pass := range maxFixPasses {
-		lintResult, err := nativeLint(ctx, uri, pass, currentContent, rslintConfig, configCwd, isJSConfig, tsConfigPaths)
+		lintResult, err := nativeLint(ctx, uri, pass, currentContent, rslintConfig, configCwd, isJSConfig, projectResolver)
 		if err != nil {
 			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
 			break
@@ -857,15 +855,14 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 		// already-expired pluginCtx would still enqueue a (wasted) reverse request
 		// to the client before returning nil.
 		if pluginCtx.Err() == nil {
-			if pluginDiags := s.lintPluginRulesSyncWithConfig(
+			if pluginDiags := s.lintPluginRulesSync(
 				pluginCtx,
 				uri,
 				currentContent,
 				true,
 				linter.SuggestionsModeOff,
-				rslintConfig,
-				configCwd,
-				isJSConfig,
+				lintResult.PlannedTarget,
+				lintResult.PluginConfigKey,
 			); len(pluginDiags) > 0 {
 				ruleDiags = append(ruleDiags, pluginDiags...)
 			}
@@ -886,8 +883,8 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 // defaultFixAllNativeLint builds each pass from an isolated editor overlay.
 // The pass number is intentionally unused: speculative content never enters
 // the real TypeScript Session, regardless of how many fix cycles run.
-func (s *Server) defaultFixAllNativeLint(ctx context.Context, uri lsproto.DocumentUri, _ int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) (lintPassResult, error) {
-	return s.runConfiguredLintForContent(uri, ctx, content, rslintConfig, configCwd, isJSConfig, tsConfigPaths)
+func (s *Server) defaultFixAllNativeLint(ctx context.Context, uri lsproto.DocumentUri, _ int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, projectResolver *config.ProjectPathResolver) (lintPassResult, error) {
+	return s.runConfiguredLintForContent(uri, ctx, content, rslintConfig, configCwd, isJSConfig, projectResolver)
 }
 
 // computeEndPosition returns the line and UTF-16 character offset of the end
@@ -978,7 +975,7 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
+func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
 	result, err := runLintWithProgramLoader(
 		uri,
 		session,
@@ -987,7 +984,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		cwd,
 		cwd,
 		enforcePlugins,
-		tsConfigPaths,
+		nil,
 		fs,
 		lintProjectLoaders{},
 		nil,
@@ -1007,7 +1004,7 @@ func runLintWithProgramLoader(
 	cwd string,
 	processCwd string,
 	enforcePlugins bool,
-	tsConfigPaths []string,
+	projectResolver *config.ProjectPathResolver,
 	fs vfs.FS,
 	loaders lintProjectLoaders,
 	sessionRoots *lintSessionProjectRootCache,
@@ -1023,13 +1020,33 @@ func runLintWithProgramLoader(
 	if rslintConfig.IsFileIgnored(configFilePath, configCwd) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}, nil
 	}
-	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, configCwd, enforcePlugins)
+	if projectResolver == nil {
+		var err error
+		projectResolver, err = config.NewProjectPathResolver(nil, rslintConfig, cwd, fs, enforcePlugins)
+		if err != nil {
+			return lintPassResult{}, err
+		}
+	}
+	canonicalPath := tspath.NormalizePath(filename)
+	if fs != nil {
+		if realPath := fs.Realpath(canonicalPath); realPath != "" {
+			canonicalPath = tspath.NormalizePath(realPath)
+		}
+	}
+	plannedTarget, err := projectResolver.ResolveLintTarget(config.DiscoveredLintTarget{
+		Path:            tspath.NormalizePath(filename),
+		CanonicalPath:   canonicalPath,
+		ConfigDirectory: cwd,
+	})
+	if err != nil {
+		return lintPassResult{}, err
+	}
 
 	program, sourceFile, hasTypeInfo, err := selectLintProgram(
 		uri,
 		session,
 		ctx,
-		tsConfigPaths,
+		plannedTarget.ProjectPaths,
 		fs,
 		loaders,
 		sessionRoots,
@@ -1037,16 +1054,15 @@ func runLintWithProgramLoader(
 	if err != nil {
 		return lintPassResult{}, err
 	}
-	return lintSingleFile(
+	return bindLintPassToTarget(lintSingleFile(
 		program,
 		sourceFile,
-		configFilePath,
 		processCwd,
 		hasTypeInfo,
-		fileConfigResolver,
+		plannedTarget.Effective,
 		rule.EditDemandAll,
 		ctx,
-	), nil
+	), plannedTarget, enforcePlugins), nil
 }
 
 // rulesSkippedInEditors names the rules the language server never runs. A rule
@@ -1084,10 +1100,9 @@ func rulesServedToEditors(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
 func lintSingleFile(
 	program *compiler.Program,
 	sourceFile *ast.SourceFile,
-	configFilePath string,
 	processCwd string,
 	hasTypeInfo bool,
-	fileConfigResolver *config.FileConfigResolver,
+	effectiveConfig *config.EffectiveFileConfig,
 	editDemand rule.EditDemand,
 	ctx context.Context,
 ) lintPassResult {
@@ -1129,8 +1144,7 @@ func lintSingleFile(
 		Cwd:         processCwd,
 		HasTypeInfo: hasTypeInfo,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
-			rules, _ := fileConfigResolver.EnabledRulesForFile(configFilePath)
-			return rulesServedToEditors(rules)
+			return rulesServedToEditors(effectiveConfig.EnabledRules())
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: editDemand,
@@ -1148,7 +1162,7 @@ func selectLintProgram(
 	uri lsproto.DocumentUri,
 	session *project.Session,
 	ctx context.Context,
-	tsConfigPaths []string,
+	projectPaths []string,
 	fs vfs.FS,
 	fallbackLoaders lintProjectLoaders,
 	sessionRoots *lintSessionProjectRootCache,
@@ -1179,24 +1193,33 @@ func selectLintProgram(
 			continue
 		}
 		candidateProgram := candidate.GetProgram()
-		configPath := string(candidate.Id())
-		if configPath == "" {
-			continue
-		}
 		commandLine := candidateProgram.CommandLine()
 		if sessionProject, ok := candidate.(*project.Project); ok && sessionProject.CommandLine != nil {
 			// The Program command line may include automatic type-acquisition
 			// roots. Project.CommandLine is the authored tsconfig root set.
 			commandLine = sessionProject.CommandLine
 		}
-		loadedByConfig[lintProgramLexicalPathID(configPath, fs)] = loadedLintProject{
+		configPath := ""
+		if commandLine != nil && commandLine.CompilerOptions() != nil {
+			configPath = commandLine.CompilerOptions().ConfigFilePath
+		}
+		if configPath == "" {
+			configPath = candidateProgram.Options().ConfigFilePath
+		}
+		if configPath == "" {
+			configPath = string(candidate.Id())
+		}
+		if configPath == "" {
+			continue
+		}
+		loadedByConfig[lintProjectDeclarationPathID(configPath)] = loadedLintProject{
 			program:     candidateProgram,
 			commandLine: commandLine,
 		}
 	}
 	loaders := lintProjectLoaders{
 		metadata: func(tsConfigPath string) (*lintProjectMetadata, bool, error) {
-			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
+			if loadedProject, ok := loadedByConfig[lintProjectDeclarationPathID(tsConfigPath)]; ok {
 				metadata := sessionRoots.metadata(tsConfigPath, loadedProject.commandLine, fs)
 				return metadata, metadata != nil, nil
 			}
@@ -1206,7 +1229,7 @@ func selectLintProgram(
 			return fallbackLoaders.metadata(tsConfigPath)
 		},
 		program: func(tsConfigPath string) (*compiler.Program, *ast.SourceFile, error) {
-			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
+			if loadedProject, ok := loadedByConfig[lintProjectDeclarationPathID(tsConfigPath)]; ok {
 				return loadedProject.program, sourceFileForPath(loadedProject.program, filename, fs), nil
 			}
 			if fallbackLoaders.program == nil {
@@ -1215,7 +1238,7 @@ func selectLintProgram(
 			return fallbackLoaders.program(tsConfigPath)
 		},
 	}
-	selected, found, err := selectConfiguredLintProject(tsConfigPaths, filename, loaders)
+	selected, found, err := selectConfiguredLintProject(projectPaths, filename, loaders)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -1313,7 +1336,7 @@ func (s *Server) runConfiguredLint(
 	rslintConfig config.RslintConfig,
 	cwd string,
 	enforcePlugins bool,
-	tsConfigPaths []string,
+	projectResolver *config.ProjectPathResolver,
 ) (lintPassResult, error) {
 	request := newStandaloneLintProjectRequest(
 		uriToPath(uri),
@@ -1338,7 +1361,7 @@ func (s *Server) runConfiguredLint(
 		cwd,
 		s.cwd,
 		enforcePlugins,
-		tsConfigPaths,
+		projectResolver,
 		s.fs,
 		loaders,
 		s.lintSessionRoots,
@@ -1355,7 +1378,7 @@ func (s *Server) runConfiguredLintForContent(
 	rslintConfig config.RslintConfig,
 	cwd string,
 	enforcePlugins bool,
-	tsConfigPaths []string,
+	projectResolver *config.ProjectPathResolver,
 ) (lintPassResult, error) {
 	filename := tspath.NormalizePath(uriToPath(uri))
 	configFilePath, configCwd := config.ResolveConfigPathSpace(filename, cwd, s.fs)
@@ -1365,17 +1388,36 @@ func (s *Server) runConfiguredLintForContent(
 	if rslintConfig.IsFileIgnored(configFilePath, configCwd) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}, nil
 	}
-	resolver := config.NewFileConfigResolver(rslintConfig, configCwd, enforcePlugins)
-
 	files := s.currentEditorOverlayFiles()
 	// Apply the speculative target last so it wins over every open URI alias
 	// that resolves to the same physical file.
 	s.addEditorOverlayFile(files, filename, content)
 	overlayFS := utils.NewOverlayVFS(s.fs, files)
+	if projectResolver == nil {
+		var err error
+		projectResolver, err = config.NewProjectPathResolver(nil, rslintConfig, cwd, s.fs, enforcePlugins)
+		if err != nil {
+			return lintPassResult{}, err
+		}
+	}
+	canonicalPath := tspath.NormalizePath(filename)
+	if s.fs != nil {
+		if realPath := s.fs.Realpath(canonicalPath); realPath != "" {
+			canonicalPath = tspath.NormalizePath(realPath)
+		}
+	}
+	plannedTarget, err := projectResolver.ResolveLintTarget(config.DiscoveredLintTarget{
+		Path:            filename,
+		CanonicalPath:   canonicalPath,
+		ConfigDirectory: cwd,
+	})
+	if err != nil {
+		return lintPassResult{}, err
+	}
 
 	request := newStandaloneLintProjectRequestWithFS(filename, overlayFS)
 	selected, found, err := selectConfiguredLintProject(
-		tsConfigPaths,
+		plannedTarget.ProjectPaths,
 		filename,
 		request.loaders(),
 	)
@@ -1383,32 +1425,30 @@ func (s *Server) runConfiguredLintForContent(
 		return lintPassResult{}, err
 	}
 	if found {
-		return lintSingleFile(
+		return bindLintPassToTarget(lintSingleFile(
 			selected.program,
 			selected.sourceFile,
-			configFilePath,
 			s.cwd,
 			true,
-			resolver,
+			plannedTarget.Effective,
 			rule.EditDemandAutofix,
 			ctx,
-		), nil
+		), plannedTarget, enforcePlugins), nil
 	}
 
 	program, err := createStandaloneFallbackProgram(filename, configCwd, overlayFS)
 	if err != nil {
 		return lintPassResult{}, fmt.Errorf("create fallback lint program: %w", err)
 	}
-	return lintSingleFile(
+	return bindLintPassToTarget(lintSingleFile(
 		program,
 		sourceFileForPath(program, filename, overlayFS),
-		configFilePath,
 		s.cwd,
 		false,
-		resolver,
+		plannedTarget.Effective,
 		rule.EditDemandAutofix,
 		ctx,
-	), nil
+	), plannedTarget, enforcePlugins), nil
 }
 
 func lspFilesystemPathID(filePath string, fs vfs.FS) string {
@@ -1429,14 +1469,6 @@ func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {
 		useCaseSensitive = fs.UseCaseSensitiveFileNames()
 	}
 	return config.IsDefaultExcludedPath(filePath, cwd, useCaseSensitive)
-}
-
-func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []rule.ConfiguredRule {
-	rules, _ := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).EnabledRulesForFile(filePath)
-	if !hasTypeInfo {
-		return rule.FilterNonTypeAwareRules(rules)
-	}
-	return rules
 }
 
 // Helper function to check if two ranges overlap
@@ -1662,17 +1694,11 @@ func (s *Server) nearestJSConfigKey(uri lsproto.DocumentUri) (string, bool) {
 	return configDir, active
 }
 
-// tsConfigPathsForURI returns parserOptions.project paths from the config owner
-// selected by getConfigForURI. A nested config with no tsconfig therefore does
-// not affect type-info decisions for sibling configs.
-//
-// A nil return means the governing config has no resolved tsconfig, so callers
-// must disable type-aware rules for this file.
-func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
-	if configKey, ok := s.nearestJSConfigKey(uri); ok {
-		return s.tsConfigPathsByConfig[configKey]
+func (s *Server) projectResolverForURI(uri lsproto.DocumentUri) *config.ProjectPathResolver {
+	if _, ok := s.nearestJSConfigKey(uri); ok {
+		return s.jsProjectResolver
 	}
-	return s.tsConfigPaths
+	return s.jsonProjectResolver
 }
 
 // pushDiagnostics runs the linter for the given URI and pushes results to the client.
@@ -1707,8 +1733,8 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	}
 
 	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	tsConfigPaths := s.tsConfigPathsForURI(uri)
-	lintResult, err := s.runConfiguredLint(uri, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths)
+	projectResolver := s.projectResolverForURI(uri)
+	lintResult, err := s.runConfiguredLint(uri, ctx, rslintConfig, configCwd, isJSConfig, projectResolver)
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		delete(s.diagnostics, uri)
@@ -1742,7 +1768,12 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	// thus all editor interaction) until the Node worker replies. Results merge
 	// back via pluginResultCh on the main loop (s.diagnostics is lock-free).
 	if !lintResult.HasSyntaxErrors {
-		s.dispatchPluginLintWithConfig(uri, generation, rslintConfig, configCwd, isJSConfig)
+		s.dispatchPluginLint(
+			uri,
+			generation,
+			lintResult.PlannedTarget,
+			lintResult.PluginConfigKey,
+		)
 	}
 
 	// The pacer cannot see that the lint just dropped what it derived.
