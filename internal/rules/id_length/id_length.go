@@ -93,11 +93,10 @@ var schemaJSON []byte
 //     ESTree's PropertyDefinition.value is a direct child just like .key.
 //     tsgo's PropertyDeclaration has the same direct-child shape (Name and
 //     Initializer both direct fields), so this rule matches either field
-//     unconditionally, reproducing the quirk. ClassDeclaration's superclass
-//     expression, by contrast, sits under tsgo's HeritageClauseList /
-//     ExpressionWithTypeArguments wrapper rather than as a direct child, so
-//     `class C extends B {}` does not flag `B` here even though upstream's
-//     ESTree-flat shape does — see id_length.md's "Differences from ESLint".
+//     unconditionally, reproducing the quirk. ClassDeclaration's other
+//     Identifier child is its superclass expression, which tsgo hides under a
+//     HeritageClause / ExpressionWithTypeArguments pair — see
+//     isClassExtendsExpression.
 var IdLengthRule = rule.Rule{
 	Name:   "id-length",
 	Schema: rule.NewSchema(schemaJSON),
@@ -388,6 +387,14 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 	case ast.KindClassDeclaration:
 		return effectiveParent.Name() == wrapped
 
+	case ast.KindExpressionWithTypeArguments:
+		// ESTree hangs a class's superclass expression off the
+		// ClassDeclaration as directly as its name, and that entry is
+		// unconditional, so a bare-identifier superclass is checked just like
+		// the name. tsgo routes it through a HeritageClause /
+		// ExpressionWithTypeArguments pair instead.
+		return isClassExtendsExpression(effectiveParent, wrapped)
+
 	case ast.KindFunctionDeclaration:
 		// A body-less function declaration — an overload signature or an
 		// ambient `declare function` — is a TSDeclareFunction in ESTree, not
@@ -528,6 +535,25 @@ func isPatternAssignmentTarget(node *ast.Node) bool {
 		}
 	}
 	return true
+}
+
+// isClassExtendsExpression reports whether wrapped is the superclass
+// expression of a class declaration — the one identifier position under
+// tsgo's heritage-clause wrapper that ESTree exposes as a direct child of a
+// supported node. An `implements` clause and an interface's own `extends`
+// become TSClassImplements / TSInterfaceHeritage upstream, and a class
+// expression's superclass hangs off ClassExpression; none of those three is a
+// supported parent.
+func isClassExtendsExpression(expressionWithTypeArguments, wrapped *ast.Node) bool {
+	if expressionWithTypeArguments.AsExpressionWithTypeArguments().Expression != wrapped {
+		return false
+	}
+	clause := expressionWithTypeArguments.Parent
+	if clause == nil || clause.Kind != ast.KindHeritageClause ||
+		clause.AsHeritageClause().Token != ast.KindExtendsKeyword {
+		return false
+	}
+	return clause.Parent != nil && clause.Parent.Kind == ast.KindClassDeclaration
 }
 
 // isValidBindingElement handles a destructuring binding element (var/let/

@@ -64,7 +64,23 @@ func TestIdLengthExtras(t *testing.T) {
 			// first one it crosses ----
 			{Code: `([[x]!] = source);`},
 			{Code: `([([x]!)] = source);`},
+			{Code: `(([x]!)! = source);`},
+			{Code: `([...[x]]! = source);`},
+
+			// ---- ...and the value side of a genuine pattern is just as
+			// opaque: the wrapper, not the identifier inside it, is what the
+			// Property/ArrayPattern entry would have to match ----
 			{Code: `({ key: [x]! } = source);`},
+			{Code: `({ key: x! } = source);`},
+
+			// ---- A member expression under a rest element is neither a
+			// direct assignment target nor an ObjectPattern property value ----
+			{Code: `({ ...obj.x } = source);`},
+
+			// ---- A string-literal key has no `name` for upstream's
+			// non-pattern Property branch to compare the value against ----
+			{Code: `const obj = { 'x': x };`},
+			{Code: `const obj = { 1: x };`},
 
 			// ---- Dimension 4: the same wrapper around the destructuring
 			// value side of an ObjectPattern-equivalent member-expression
@@ -282,6 +298,22 @@ func TestIdLengthExtras(t *testing.T) {
 			{Code: `abstract class Cc { abstract get x(): number }`},
 			{Code: `abstract class Cc { abstract [y]: number }`},
 			{Code: `class Cc { accessor x = 1; }`},
+
+			// ---- Only a class declaration's own `extends` clause is a
+			// direct ClassDeclaration child upstream: `implements` becomes a
+			// TSClassImplements, an interface's `extends` a TSInterfaceHeritage,
+			// and a class expression's superclass hangs off the unsupported
+			// ClassExpression ----
+			{Code: `class Cc implements x {}`},
+			{Code: `interface Ii extends x {}`},
+			{Code: `const Cc = class extends x {};`},
+			{Code: `const Cc = class Dd extends x {};`},
+
+			// ---- ...and a superclass that is not a bare identifier puts an
+			// unsupported node between the two either way ----
+			{Code: `class Cc extends x! {}`},
+			{Code: `class Cc extends (x as any) {}`},
+			{Code: `class Cc extends obj.x {}`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: (X).y parenthesized receiver — both the
@@ -810,6 +842,117 @@ function q(xx: any) { return xx; }`,
 				Code: `([q, [q]!] = source);`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 3},
+				},
+			},
+
+			// ---- ...and everything below the wrapper reverts to ordinary
+			// object-literal semantics, nested members included ----
+			{
+				Code: `({ key: { x } }! = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 11},
+				},
+			},
+
+			// ---- A string-literal key in a destructuring pattern can never
+			// equal the value's name, so the value is what gets reported ----
+			{
+				Code: `({ 'x': x } = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 9},
+				},
+			},
+			{
+				Code: `let { 'x': x } = source;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 12},
+				},
+			},
+
+			// ---- A private member is checked at its use site too, since
+			// upstream's MemberExpression entry takes PrivateIdentifier
+			// properties like any other ----
+			{
+				Code: `class Cc { #x; mm() { this.#x = 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShortPrivate", Message: "Identifier name '#x' is too short (< 2).", Line: 1, Column: 12},
+					{MessageId: "tooShortPrivate", Message: "Identifier name '#x' is too short (< 2).", Line: 1, Column: 28},
+				},
+			},
+
+			// ---- `this` and `super` receivers are keywords rather than
+			// identifiers, so only the property side is left to check ----
+			{
+				Code: `this.x = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 6},
+				},
+			},
+			{
+				Code: `class Cc { mm() { super.x = 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 25},
+				},
+			},
+
+			// ---- A logical or compound assignment is an AssignmentExpression
+			// like any other, so its member target still matches ----
+			{
+				Code: `obj.x ??= 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 5},
+				},
+			},
+
+			// ---- A class declaration's superclass expression is as direct a
+			// ClassDeclaration child as its name upstream, and that entry is
+			// unconditional, so a bare-identifier superclass is checked ----
+			{
+				Code: `class Cc extends x {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 18},
+				},
+			},
+
+			// ---- ...through parentheses, past type arguments, and alongside
+			// an `implements` clause that stays exempt ----
+			{
+				Code: `class Cc extends (x) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 19},
+				},
+			},
+			{
+				Code: `class Cc extends x<number> {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 18, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code: `class Cc extends x implements yy {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 18},
+				},
+			},
+
+			// ---- ...and for every shape tsgo still parses as a class
+			// declaration ----
+			{
+				Code: `abstract class Aa extends x {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 27},
+				},
+			},
+			{
+				Code: `declare class Dd extends x {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 26},
+				},
+			},
+			{
+				Code: `export default class extends x {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 30},
 				},
 			},
 

@@ -157,7 +157,6 @@ function S() {
 
 ## Differences from ESLint
 
-- `class Foo extends B {}` does not flag `B`, even when too short/long: this rule only checks a class's own name, never its superclass expression.
 - In a destructuring assignment (not a `var`/`let`/`const` declaration) where a property's key and value are written out identically, e.g. `({ a: a } = {})`, the key is not checked — only the value would be, and here it's the same text either way. `var { a: a } = {}` (a real declaration) is unaffected and still checks the key as usual.
 
 ## Original Documentation
