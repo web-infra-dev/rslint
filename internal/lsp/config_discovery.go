@@ -742,6 +742,7 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	// The serialized dispatch loop makes this map swap atomic to every document
 	// and code-action handler.
 	s.invalidateOpenDocumentDiagnostics()
+	s.invalidateLintProjectCaches()
 	s.jsConfigs = snapshot.configs
 	s.tsConfigPathsByConfig = snapshot.tsConfigPaths
 	s.jsConfigOwnerResolver = snapshot.ownerResolver
@@ -786,9 +787,6 @@ func resolveTsConfigPathsWithFS(cfg config.RslintConfig, cwd string, fsys vfs.FS
 		return nil, err
 	}
 	for index, projectPath := range paths {
-		if realPath := fsys.Realpath(projectPath); realPath != "" {
-			projectPath = realPath
-		}
 		paths[index] = tspath.NormalizePath(projectPath)
 	}
 	return paths, nil

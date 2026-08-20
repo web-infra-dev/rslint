@@ -6,11 +6,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_restricted_imports.schema.json
@@ -61,13 +62,13 @@ type restrictedPathEntry struct {
 // restrictedPatternGroup represents one entry from the "patterns" config option.
 // It matches import sources via either gitignore-style globs or regex.
 type restrictedPatternGroup struct {
-	matcher                *ignoreMatcher  // gitignore-style matcher (from "group")
-	regexMatcher           *regexp2.Regexp // regex matcher (from "regex"); uses regexp2 for JS-compatible lookahead/lookbehind
+	matcher                *ignoreMatcher   // gitignore-style matcher (from "group")
+	regexMatcher           *esregexp.RegExp // regex matcher (from "regex"); uses regexp2 for JS-compatible lookahead/lookbehind
 	customMessage          string
 	importNames            []string
-	importNamePattern      *regexp2.Regexp
+	importNamePattern      *esregexp.RegExp
 	allowImportNames       []string
-	allowImportNamePattern *regexp2.Regexp
+	allowImportNamePattern *esregexp.RegExp
 	allowTypeImports       bool
 }
 
@@ -135,8 +136,8 @@ func (m *ignoreMatcher) ignores(path string) bool {
 		glob := p.glob
 		testPath := path
 		if !m.caseSensitive {
-			glob = strings.ToLower(glob)
-			testPath = strings.ToLower(testPath)
+			glob = ecmascript.StringToLowerCase(glob)
+			testPath = ecmascript.StringToLowerCase(testPath)
 		}
 		if matchIgnore(glob, testPath) {
 			ignored = !p.negated
@@ -394,11 +395,11 @@ func parseOptions(arr []any) (groupedPaths map[string][]restrictedPathEntry, pat
 					pg.matcher = newIgnoreMatcher(group, caseSensitive)
 				}
 				if regexStr, ok := obj["regex"].(string); ok {
-					opts := regexp2.RegexOptions(regexp2.IgnoreCase | regexp2.Unicode)
+					flags := "iu"
 					if caseSensitive {
-						opts = regexp2.Unicode
+						flags = "u"
 					}
-					if re, err := regexp2.Compile(regexStr, opts); err == nil {
+					if re, err := esregexp.Compile(regexStr, flags); err == nil {
 						pg.regexMatcher = re
 					}
 				}
@@ -408,12 +409,12 @@ func parseOptions(arr []any) (groupedPaths map[string][]restrictedPathEntry, pat
 				pg.importNames = utils.ToStringSlice(obj["importNames"])
 				pg.allowImportNames = utils.ToStringSlice(obj["allowImportNames"])
 				if pattern, ok := obj["importNamePattern"].(string); ok && pattern != "" {
-					if re, err := regexp2.Compile(pattern, regexp2.Unicode); err == nil {
+					if re, err := esregexp.Compile(pattern, "u"); err == nil {
 						pg.importNamePattern = re
 					}
 				}
 				if pattern, ok := obj["allowImportNamePattern"].(string); ok && pattern != "" {
-					if re, err := regexp2.Compile(pattern, regexp2.Unicode); err == nil {
+					if re, err := esregexp.Compile(pattern, "u"); err == nil {
 						pg.allowImportNamePattern = re
 					}
 				}
@@ -454,7 +455,7 @@ var NoRestrictedImportsRule = rule.Rule{
 				if importDecl.ModuleSpecifier == nil {
 					return
 				}
-				importSource := strings.TrimSpace(utils.GetStaticStringValue(importDecl.ModuleSpecifier))
+				importSource := ecmascript.StringTrim(utils.GetStaticStringValue(importDecl.ModuleSpecifier))
 				if importSource == "" {
 					return
 				}
@@ -465,7 +466,7 @@ var NoRestrictedImportsRule = rule.Rule{
 				if exportDecl.ModuleSpecifier == nil {
 					return
 				}
-				importSource := strings.TrimSpace(utils.GetStaticStringValue(exportDecl.ModuleSpecifier))
+				importSource := ecmascript.StringTrim(utils.GetStaticStringValue(exportDecl.ModuleSpecifier))
 				if importSource == "" {
 					return
 				}
@@ -486,7 +487,7 @@ var NoRestrictedImportsRule = rule.Rule{
 				// ESLint base does NOT trim require() source, but in practice nobody
 				// writes whitespace inside require('...') so the divergence is moot
 				// and the consistency is worth more.
-				importSource := strings.TrimSpace(utils.GetStaticStringValue(extRef.Expression))
+				importSource := ecmascript.StringTrim(utils.GetStaticStringValue(extRef.Expression))
 				if importSource == "" {
 					return
 				}
@@ -728,7 +729,7 @@ func reportNameForPath(ctx *rule.RuleContext, node *ast.Node, specifiers []speci
 
 func isRestrictedPattern(importSource string, group *restrictedPatternGroup) bool {
 	if group.regexMatcher != nil {
-		return utils.Regexp2MatchString(group.regexMatcher, importSource)
+		return group.regexMatcher.Test(importSource)
 	}
 	if group.matcher != nil {
 		return group.matcher.ignores(importSource)
@@ -770,7 +771,7 @@ func reportPathForPatterns(
 
 		// Check restricted import names (by name list or regex pattern)
 		if (len(group.importNames) > 0 && slices.Contains(group.importNames, e.name)) ||
-			(group.importNamePattern != nil && utils.Regexp2MatchString(group.importNamePattern, e.name)) {
+			(group.importNamePattern != nil && group.importNamePattern.Test(e.name)) {
 			reportSpecifiersForPattern(ctx, node, e.specifiers, group, e.name, importSource,
 				"patternAndImportName", "patternAndImportNameWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted from being used by a pattern.", e.name, importSource))
@@ -781,7 +782,7 @@ func reportPathForPatterns(
 				"allowedImportName", "allowedImportNameWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted because only %s %s allowed.",
 					e.name, importSource, formatEnglishList(group.allowImportNames), isOrAre(group.allowImportNames)))
-		} else if group.allowImportNamePattern != nil && !utils.Regexp2MatchString(group.allowImportNamePattern, e.name) {
+		} else if group.allowImportNamePattern != nil && !group.allowImportNamePattern.TestOrTimeout(e.name) {
 			reportSpecifiersForPattern(ctx, node, e.specifiers, group, e.name, importSource,
 				"allowedImportNamePattern", "allowedImportNamePatternWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted because only imports that match the pattern '%s' are allowed from '%s'.",
@@ -950,11 +951,12 @@ func formatEnglishList(names []string) string {
 	}
 }
 
-// jsRegexString formats a Go regexp pattern in JavaScript RegExp.toString() notation: /pattern/u.
-// ESLint creates these patterns with `new RegExp(pattern, "u")` and interpolates them via toString().
-// jsRegexString formats a regex pattern in JavaScript RegExp.toString() notation: /pattern/u.
-func jsRegexString(re *regexp2.Regexp) string {
-	return "/" + re.String() + "/u"
+// jsRegexString renders a pattern the way JavaScript's RegExp.toString() does,
+// which is how ESLint interpolates one into a message. Source rather than
+// String, because the pattern reaches regexp2 rewritten and the message has to
+// show what its author wrote.
+func jsRegexString(re *esregexp.RegExp) string {
+	return "/" + re.Source() + "/u"
 }
 
 func isOrAre(names []string) string {

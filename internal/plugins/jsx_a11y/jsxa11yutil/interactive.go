@@ -30,6 +30,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // elementSchema mirrors aria-query's elementSchema entries. `Attributes`
@@ -383,7 +384,7 @@ func IsInteractiveRole(_ string, attrs []*ast.Node) bool {
 	// double-space input produces an empty entry that filters out at the
 	// `allRolesSet` check below. Use raw Split rather than Fields so the
 	// boundary cases match upstream byte-for-byte.
-	for _, part := range strings.Split(strings.ToLower(value), " ") {
+	for _, part := range strings.Split(ecmascript.StringToLowerCase(value), " ") {
 		if _, isRole := allRolesSet[part]; !isRole {
 			continue
 		}
@@ -448,7 +449,7 @@ func IsNonInteractiveRole(tagName string, attrs []*ast.Node) bool {
 	if !ok {
 		return false
 	}
-	for _, part := range strings.Split(strings.ToLower(value), " ") {
+	for _, part := range strings.Split(ecmascript.StringToLowerCase(value), " ") {
 		if _, isRole := allRolesSet[part]; !isRole {
 			continue
 		}

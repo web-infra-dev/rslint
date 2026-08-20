@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed first.schema.json
@@ -329,7 +330,7 @@ func buildFix(sourceText string, body []*ast.Node, lastLegalImp *ast.Node, sortN
 		// If the extracted text starts with a non-whitespace character (e.g.
 		// the import immediately follows a `}` with no line break), prepend a
 		// newline so the moved import appears on its own line.
-		if r, _ := utf8.DecodeRuneInString(nodeText); r != utf8.RuneError && !utils.IsStrWhiteSpace(r) {
+		if r, _ := utf8.DecodeRuneInString(nodeText); r != utf8.RuneError && !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			nodeText = "\n" + nodeText
 		}
 		insertParts = append(insertParts, nodeText)
@@ -339,9 +340,9 @@ func buildFix(sourceText string, body []*ast.Node, lastLegalImp *ast.Node, sortN
 	if lastLegalImp == nil {
 		// No preceding legal import: place the imports at the very top and
 		// preserve the original leading whitespace pattern after them.
-		trimmed := strings.TrimSpace(insertSourceCode)
+		trimmed := ecmascript.StringTrim(insertSourceCode)
 		leadingWSEnd := strings.IndexFunc(insertSourceCode, func(r rune) bool {
-			return !utils.IsStrWhiteSpace(r)
+			return !ecmascript.IsWhiteSpaceOrLineTerminator(r)
 		})
 		if leadingWSEnd < 0 {
 			leadingWSEnd = len(insertSourceCode)

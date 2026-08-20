@@ -13,20 +13,21 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed valid_title.schema.json
 var schemaJSON []byte
 
 type matcherEntry struct {
-	re *regexp2.Regexp
+	re *esregexp.RegExp
 	// customText non-empty ⇒ use mustMatchCustom / mustNotMatchCustom
 	customText string
 }
@@ -41,7 +42,7 @@ type compiledOptions struct {
 	ignoreSpaces             bool
 	ignoreTypeOfDescribeName bool
 	ignoreTypeOfTestName     bool
-	disallowedConcat         *regexp2.Regexp
+	disallowedConcat         *esregexp.RegExp
 	invalidPatterns          []invalidPattern
 	mustNotMatch             matchersByFn
 	mustMatch                matchersByFn
@@ -75,8 +76,8 @@ func boolFromMap(m map[string]interface{}, key string, def bool) bool {
 	return def
 }
 
-func compileRE2(pat string) (*regexp2.Regexp, error) {
-	re, err := utils.CompileRegexp2(pat, utils.JSUnicodeRegexOptions)
+func compileRE2(pat string) (*esregexp.RegExp, error) {
+	re, err := esregexp.Compile(pat, "u")
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +226,7 @@ func parseCompiledOptions(options []any) compiledOptions {
 	return co
 }
 
-func compileDisallowedWords(raw interface{}, invalids []invalidPattern) (*regexp2.Regexp, []invalidPattern) {
+func compileDisallowedWords(raw interface{}, invalids []invalidPattern) (*esregexp.RegExp, []invalidPattern) {
 	items, ok := raw.([]interface{})
 	if !ok || len(items) == 0 {
 		return nil, invalids
@@ -240,8 +241,9 @@ func compileDisallowedWords(raw interface{}, invalids []invalidPattern) (*regexp
 	if len(parts) == 0 {
 		return nil, invalids
 	}
-	pattern := "(?i)\\b(" + strings.Join(parts, "|") + ")\\b"
-	re, err := compileRE2(pattern)
+	// Upstream: new RegExp(`\\b(${words.join("|")})\\b`, "iu").
+	pattern := "\\b(" + strings.Join(parts, "|") + ")\\b"
+	re, err := esregexp.Compile(pattern, "iu")
 	if err != nil {
 		invalids = append(invalids, invalidPattern{
 			optionPath: "disallowedWords",
@@ -379,17 +381,19 @@ func duplicatePrefixReplacement(rawSrc string, fnName string) (string, bool) {
 	default:
 		return "", false
 	}
-	if rawSrc[prefixEnd] != ' ' || !strings.EqualFold(rawSrc[1:prefixEnd], fnName) {
+	if rawSrc[prefixEnd] != ' ' || !ecmascript.EqualsWhenLowercased(rawSrc[1:prefixEnd], fnName) {
 		return "", false
 	}
 	return rawSrc[:1] + rawSrc[prefixEnd+1:], true
 }
 
-func regexpToMessagePattern(re *regexp2.Regexp) string {
+func regexpToMessagePattern(re *esregexp.RegExp) string {
 	if re == nil {
 		return ""
 	}
-	src := re.String()
+	// Source rather than String: the pattern reaches regexp2 rewritten, and
+	// the message has to show what its author wrote.
+	src := re.Source()
 	return "/" + strings.ReplaceAll(src, "/", "\\/") + "/u"
 }
 
@@ -486,7 +490,7 @@ var ValidTitleRule = rule.Rule{
 				}
 
 				if co.disallowedConcat != nil {
-					m, err := co.disallowedConcat.FindStringMatch(title)
+					m, err := co.disallowedConcat.Unwrap().FindStringMatch(title)
 					if err == nil && m != nil {
 						g := m.GroupByNumber(1)
 						if g != nil && g.String() != "" {
@@ -505,7 +509,7 @@ var ValidTitleRule = rule.Rule{
 				// title like ' describe foo' reports twice. That is upstream
 				// behaviour (valid-title.ts:304-333).
 				if !co.ignoreSpaces {
-					trimmed := strings.TrimFunc(title, utils.IsStrWhiteSpace)
+					trimmed := ecmascript.StringTrim(title)
 					if len(trimmed) != len(title) {
 						raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 						fix := accidentalSpaceReplacement(raw)
@@ -536,7 +540,7 @@ var ValidTitleRule = rule.Rule{
 				if i := strings.IndexByte(title, ' '); i >= 0 {
 					firstTok = title[:i]
 				}
-				if strings.EqualFold(firstTok, fnName) {
+				if ecmascript.EqualsWhenLowercased(firstTok, fnName) {
 					raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 					msg := rule.RuleMessage{
 						Id:          "duplicatePrefix",
@@ -549,13 +553,13 @@ var ValidTitleRule = rule.Rule{
 					}
 				}
 
-				if me := matcherFor(fnName, co.mustNotMatch); utils.Regexp2MatchString(me.re, title) {
+				if me := matcherFor(fnName, co.mustNotMatch); me.re.Test(title) {
 					buildMustNotReport(ctx, arg, fnName, me)
 					return
 				}
 
 				me := matcherFor(fnName, co.mustMatch)
-				if me.re != nil && !utils.Regexp2MatchString(me.re, title) {
+				if me.re != nil && !me.re.TestOrTimeout(title) {
 					buildMustMatchReport(ctx, arg, fnName, me)
 				}
 			},

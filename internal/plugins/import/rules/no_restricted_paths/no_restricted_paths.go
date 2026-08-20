@@ -3,7 +3,6 @@ package no_restricted_paths
 import (
 	_ "embed"
 	"fmt"
-	"regexp"
 	"runtime"
 	"strings"
 
@@ -11,7 +10,9 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/isglob"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 //go:embed no_restricted_paths.schema.json
@@ -180,8 +181,8 @@ func isMatchingZone(z zone, basePath string, currentFilename string, windows boo
 }
 
 func isMatchingTargetPath(fileName string, targetPath string, windows bool) bool {
-	if isGlob(targetPath) {
-		return utils.MatchGlob(escapeExtglob(targetPath), fileName)
+	if isglob.Is(targetPath) {
+		return minimatch3.Match(targetPath, fileName, minimatch3.Options{})
 	}
 	return containsPath(fileName, targetPath, windows)
 }
@@ -190,7 +191,7 @@ func makePathValidators(fromPaths []string, except []string, basePath string, wi
 	anyGlob := false
 	anyNonGlob := false
 	for _, from := range fromPaths {
-		if isGlob(from) {
+		if isglob.Is(from) {
 			anyGlob = true
 		} else {
 			anyNonGlob = true
@@ -225,10 +226,10 @@ func makePathValidators(fromPaths []string, except []string, basePath string, wi
 // resolving them against `basePath` first, so only absolute exception patterns
 // can ever match a resolved import path.
 func computeGlobPatternPathValidator(absoluteFrom string, except []string, windows bool) pathValidator {
-	fromPattern := escapeExtglob(absoluteFrom)
+	fromMatcher := minimatch3.New(absoluteFrom, minimatch3.Options{})
 	validator := pathValidator{
 		isPathRestricted: func(absoluteImportPath string) bool {
-			return utils.MatchGlob(fromPattern, absoluteImportPath)
+			return fromMatcher.Match(absoluteImportPath)
 		},
 		hasValidExceptions: true,
 		invalidException: rule.RuleMessage{
@@ -238,7 +239,7 @@ func computeGlobPatternPathValidator(absoluteFrom string, except []string, windo
 	}
 
 	for _, exception := range except {
-		if !isGlob(exception) {
+		if !isglob.Is(exception) {
 			validator.hasValidExceptions = false
 			return validator
 		}
@@ -247,19 +248,18 @@ func computeGlobPatternPathValidator(absoluteFrom string, except []string, windo
 	// The exception patterns stay unresolved, so a Windows-native one such as
 	// `C:\repo\server\allowed\**\*` still carries its backslashes. Upstream's
 	// Minimatch constructor rewrites the platform separator to `/` before it
-	// compiles a pattern; without the same rewrite the backslashes would reach
-	// doublestar as escapes and could never match an import path normalized
-	// to `/`.
-	exceptions := make([]string, 0, len(except))
+	// compiles a pattern; without the same rewrite the backslashes would be
+	// read as escapes and could never match an import path normalized to `/`.
+	matchers := make([]*minimatch3.Matcher, 0, len(except))
 	for _, exception := range except {
 		if windows {
 			exception = strings.ReplaceAll(exception, `\`, "/")
 		}
-		exceptions = append(exceptions, escapeExtglob(exception))
+		matchers = append(matchers, minimatch3.New(exception, minimatch3.Options{}))
 	}
 	validator.isPathException = func(absoluteImportPath string) bool {
-		for _, exception := range exceptions {
-			if utils.MatchGlob(exception, absoluteImportPath) {
+		for _, matcher := range matchers {
+			if matcher.Match(absoluteImportPath) {
 				return true
 			}
 		}
@@ -354,7 +354,7 @@ func isPathWithin(filePath string, target string, windows bool) bool {
 // up reading filePath as inside target. Two shares on one UNC server still
 // share that first segment and keep the ordinary component comparison.
 func rootsDiverge(filePath string, target string, windows bool) bool {
-	return windows && !strings.EqualFold(firstPathSegment(filePath), firstPathSegment(target))
+	return windows && !ecmascript.EqualsWhenLowercased(firstPathSegment(filePath), firstPathSegment(target))
 }
 
 // firstPathSegment returns the leading segment `path.win32.relative` compares
@@ -370,7 +370,7 @@ func firstPathSegment(p string) string {
 
 func equalPathComponent(a string, b string, windows bool) bool {
 	if windows {
-		return strings.EqualFold(a, b)
+		return ecmascript.EqualsWhenLowercased(a, b)
 	}
 	return a == b
 }
@@ -394,220 +394,4 @@ func unexpectedPathMessage(importPath string, customMessage string) rule.RuleMes
 		Id:          "unexpectedPath",
 		Description: description,
 	}
-}
-
-// globMetaEscaper escapes the characters doublestar reads as base wildcard
-// syntax, so the run of text it is applied to matches only itself.
-var globMetaEscaper = strings.NewReplacer(
-	`\`, `\\`,
-	`*`, `\*`,
-	`?`, `\?`,
-	`[`, `\[`,
-	`]`, `\]`,
-	`{`, `\{`,
-	`}`, `\}`,
-)
-
-// escapeExtglob rewrites every extended glob construct — `!(a)`, `@(a|b)`,
-// `+(a)`, `?(a)`, `*(a)` — into the literal text it is written as. doublestar
-// implements no extended glob syntax, so without this the leading `?` and `*`
-// of a list would go on acting as base wildcards and match paths that merely
-// happen to carry a parenthesized segment.
-func escapeExtglob(pattern string) string {
-	var escaped strings.Builder
-	for index := 0; index < len(pattern); {
-		if pattern[index] == '\\' {
-			end := min(index+2, len(pattern))
-			escaped.WriteString(pattern[index:end])
-			index = end
-			continue
-		}
-		end, ok := extglobEnd(pattern, index)
-		if !ok {
-			escaped.WriteByte(pattern[index])
-			index++
-			continue
-		}
-		escaped.WriteString(globMetaEscaper.Replace(pattern[index:end]))
-		index = end
-	}
-	return escaped.String()
-}
-
-// extglobEnd returns the offset just past the extended glob construct starting
-// at index, if one starts there: one of `@?!+*` followed by a parenthesized
-// body.
-func extglobEnd(pattern string, index int) (int, bool) {
-	if strings.IndexByte("@?!+*", pattern[index]) < 0 || charAt(pattern, index+1) != '(' {
-		return 0, false
-	}
-	depth := 0
-	for i := index + 1; i < len(pattern); i++ {
-		switch pattern[i] {
-		case '\\':
-			i++
-		case '(':
-			depth++
-		case ')':
-			depth--
-			if depth == 0 {
-				return i + 1, true
-			}
-		}
-	}
-	return 0, false
-}
-
-var extglobPattern = regexp.MustCompile(`(\\).|([@?!+*]\(.*\))`)
-
-// isGlob ports is-glob@4.0.3 in its default strict mode, which upstream uses to
-// decide whether a zone path is a glob pattern or a plain directory path.
-func isGlob(str string) bool {
-	if str == "" {
-		return false
-	}
-	if isExtglob(str) {
-		return true
-	}
-	return strictCheck(str)
-}
-
-func isExtglob(str string) bool {
-	for str != "" {
-		match := extglobPattern.FindStringSubmatchIndex(str)
-		if match == nil {
-			return false
-		}
-		if match[4] != -1 {
-			return true
-		}
-		str = str[match[1]:]
-	}
-	return false
-}
-
-func strictCheck(str string) bool {
-	if str[0] == '!' {
-		return true
-	}
-
-	index := 0
-	pipeIndex := -2
-	closeSquareIndex := -2
-	closeCurlyIndex := -2
-	closeParenIndex := -2
-	backSlashIndex := -2
-
-	for index < len(str) {
-		if str[index] == '*' {
-			return true
-		}
-
-		if charAt(str, index+1) == '?' && strings.IndexByte("].+)", str[index]) >= 0 {
-			return true
-		}
-
-		if closeSquareIndex != -1 && str[index] == '[' && charAt(str, index+1) != ']' {
-			if closeSquareIndex < index {
-				closeSquareIndex = indexOfFrom(str, ']', index)
-			}
-			if closeSquareIndex > index {
-				if backSlashIndex == -1 || backSlashIndex > closeSquareIndex {
-					return true
-				}
-				backSlashIndex = indexOfFrom(str, '\\', index)
-				if backSlashIndex == -1 || backSlashIndex > closeSquareIndex {
-					return true
-				}
-			}
-		}
-
-		if closeCurlyIndex != -1 && str[index] == '{' && charAt(str, index+1) != '}' {
-			closeCurlyIndex = indexOfFrom(str, '}', index)
-			if closeCurlyIndex > index {
-				backSlashIndex = indexOfFrom(str, '\\', index)
-				if backSlashIndex == -1 || backSlashIndex > closeCurlyIndex {
-					return true
-				}
-			}
-		}
-
-		if closeParenIndex != -1 && str[index] == '(' && charAt(str, index+1) == '?' &&
-			strings.IndexByte(":!=", charAt(str, index+2)) >= 0 && charAt(str, index+3) != ')' {
-			closeParenIndex = indexOfFrom(str, ')', index)
-			if closeParenIndex > index {
-				backSlashIndex = indexOfFrom(str, '\\', index)
-				if backSlashIndex == -1 || backSlashIndex > closeParenIndex {
-					return true
-				}
-			}
-		}
-
-		if pipeIndex != -1 && str[index] == '(' && charAt(str, index+1) != '|' {
-			if pipeIndex < index {
-				pipeIndex = indexOfFrom(str, '|', index)
-			}
-			if pipeIndex != -1 && charAt(str, pipeIndex+1) != ')' {
-				closeParenIndex = indexOfFrom(str, ')', pipeIndex)
-				if closeParenIndex > pipeIndex {
-					backSlashIndex = indexOfFrom(str, '\\', pipeIndex)
-					if backSlashIndex == -1 || backSlashIndex > closeParenIndex {
-						return true
-					}
-				}
-			}
-		}
-
-		if str[index] == '\\' {
-			open := charAt(str, index+1)
-			index += 2
-			if closer, ok := closingChar(open); ok {
-				if n := indexOfFrom(str, closer, index); n != -1 {
-					index = n + 1
-				}
-			}
-			if charAt(str, index) == '!' {
-				return true
-			}
-		} else {
-			index++
-		}
-	}
-
-	return false
-}
-
-// charAt returns 0 for out-of-range positions, standing in for the `undefined`
-// JavaScript reads past the end of a string.
-func charAt(str string, index int) byte {
-	if index < 0 || index >= len(str) {
-		return 0
-	}
-	return str[index]
-}
-
-func indexOfFrom(str string, char byte, from int) int {
-	if from < 0 {
-		from = 0
-	}
-	if from > len(str) {
-		return -1
-	}
-	offset := strings.IndexByte(str[from:], char)
-	if offset == -1 {
-		return -1
-	}
-	return from + offset
-}
-
-func closingChar(open byte) (byte, bool) {
-	switch open {
-	case '{':
-		return '}', true
-	case '(':
-		return ')', true
-	case '[':
-		return ']', true
-	}
-	return 0, false
 }

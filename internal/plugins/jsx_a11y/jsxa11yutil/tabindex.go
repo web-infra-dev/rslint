@@ -3,10 +3,10 @@ package jsxa11yutil
 import (
 	"math"
 	"strconv"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // IsNonLiteralProperty mirrors upstream's `isNonLiteralProperty(attributes,
@@ -400,7 +400,7 @@ func tabIndexStringHasUpstreamValue(s string) bool {
 	if s == "" {
 		return false
 	}
-	switch strings.ToLower(s) {
+	switch ecmascript.StringToLowerCase(s) {
 	case "true", "false":
 		// jsxAstUtilsLiteralCoerce → boolean → step-1 boolean arm → undefined.
 		return false
@@ -423,7 +423,7 @@ func classifyTabIndexString(s string) (float64, bool, bool) {
 	// jsx-ast-utils' Literal extractor coerces case-insensitive "true" /
 	// "false" string values to actual booleans, which upstream's
 	// getTabIndex then routes to its boolean arm → undefined.
-	switch strings.ToLower(s) {
+	switch ecmascript.StringToLowerCase(s) {
 	case "true", "false":
 		return 0, false, false
 	}
@@ -476,7 +476,7 @@ func unaryStringToTabIndex(node *ast.Node) (float64, bool, bool) {
 // (`Number("-0x10")` is NaN), so we never strip a sign before the prefix
 // dispatch.
 func parseLiteralTabIndexString(s string) (float64, bool) {
-	s = strings.TrimSpace(s)
+	s = ecmascript.StringTrim(s)
 	if s == "" {
 		// ECMA-262 StringToNumber("") → 0, and `0 >= 0` triggers the
 		// rule's report. Important: literalPropValue's caller already
@@ -559,7 +559,7 @@ func staticEvalToTabIndex(v jsValue) (float64, bool) {
 		// Mirror JS ToNumber(string): trim whitespace, return 0 for empty
 		// (upstream's `"" >= 0` is true via ToNumber), accept hex / oct /
 		// bin prefixes, parse decimal otherwise.
-		s := strings.TrimSpace(v.Str)
+		s := ecmascript.StringTrim(v.Str)
 		if s == "" {
 			return 0, true
 		}

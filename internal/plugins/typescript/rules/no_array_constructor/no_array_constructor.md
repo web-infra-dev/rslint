@@ -21,7 +21,7 @@ Array(0, 1, 2);
 
 Examples of **correct** code for this rule:
 
-```javascript
+```typescript
 [];
 [x, y];
 [0, 1, 2];

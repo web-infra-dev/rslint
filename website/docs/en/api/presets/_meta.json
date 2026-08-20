@@ -1,0 +1,52 @@
+[
+  {
+    "type": "file",
+    "name": "js",
+    "label": "js"
+  },
+  {
+    "type": "file",
+    "name": "ts",
+    "label": "ts"
+  },
+  {
+    "type": "file",
+    "name": "react-plugin",
+    "label": "reactPlugin"
+  },
+  {
+    "type": "file",
+    "name": "react-hooks-plugin",
+    "label": "reactHooksPlugin"
+  },
+  {
+    "type": "file",
+    "name": "import-plugin",
+    "label": "importPlugin"
+  },
+  {
+    "type": "file",
+    "name": "promise-plugin",
+    "label": "promisePlugin"
+  },
+  {
+    "type": "file",
+    "name": "jest-plugin",
+    "label": "jestPlugin"
+  },
+  {
+    "type": "file",
+    "name": "rstest-plugin",
+    "label": "rstestPlugin"
+  },
+  {
+    "type": "file",
+    "name": "unicorn-plugin",
+    "label": "unicornPlugin"
+  },
+  {
+    "type": "file",
+    "name": "jsx-a11y-plugin",
+    "label": "jsxA11yPlugin"
+  }
+]

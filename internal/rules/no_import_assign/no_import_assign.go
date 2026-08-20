@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 // importedBinding holds information about a single imported binding.
@@ -80,6 +81,120 @@ func checkerImportBindingSymbol(nameNode *ast.Node, ctx *rule.RuleContext) *ast.
 		return nil
 	}
 	return ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+}
+
+type importedBindingReferenceMatcher struct {
+	sourceFile             *ast.SourceFile
+	resolveReferenceSymbol func(*ast.Node) *ast.Symbol
+	authoredScopes         *scope.Manager
+}
+
+type authoredJavaScriptScopeCacheKey struct{}
+
+func isOnlySynthesizedJSDocSymbol(symbol *ast.Symbol) bool {
+	if symbol == nil || len(symbol.Declarations) == 0 ||
+		symbol.Flags&(ast.SymbolFlagsAlias|ast.SymbolFlagsTypeAlias) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if !isSynthesizedJSDocDeclaration(declaration) {
+			return false
+		}
+	}
+	return true
+}
+
+func isSynthesizedJSDocDeclaration(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current.Flags&ast.NodeFlagsReparsed != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func resolvesToFunctionBodyFromParameter(
+	node *ast.Node,
+	symbol *ast.Symbol,
+) bool {
+	if symbol == nil || len(symbol.Declarations) == 0 {
+		return false
+	}
+	for current := node; current != nil; current = current.Parent {
+		if current.Kind != ast.KindParameter || current.Parent == nil ||
+			!ast.IsFunctionLike(current.Parent) {
+			continue
+		}
+		body := current.Parent.Body()
+		if body == nil {
+			return false
+		}
+		for _, declaration := range symbol.Declarations {
+			if declaration.Pos() < body.Pos() || declaration.End() > body.End() {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func (m *importedBindingReferenceMatcher) matches(
+	node *ast.Node,
+	binding *importedBinding,
+) bool {
+	if binding.symbol == nil || m.resolveReferenceSymbol == nil {
+		return true
+	}
+	return m.matchesResolved(
+		node,
+		binding,
+		m.resolveReferenceSymbol(node),
+	)
+}
+
+func (m *importedBindingReferenceMatcher) matchesResolved(
+	node *ast.Node,
+	binding *importedBinding,
+	referenceSymbol *ast.Symbol,
+) bool {
+	if referenceSymbol == binding.symbol {
+		return true
+	}
+	if (!isOnlySynthesizedJSDocSymbol(referenceSymbol) &&
+		!resolvesToFunctionBodyFromParameter(node, referenceSymbol)) ||
+		m.sourceFile == nil {
+		return false
+	}
+	return m.matchesAuthoredScope(node, binding)
+}
+
+func (m *importedBindingReferenceMatcher) matchesAuthoredScope(
+	node *ast.Node,
+	binding *importedBinding,
+) bool {
+	if m.sourceFile == nil {
+		return false
+	}
+	// JSDoc declarations are comments to ESLint, but tsgo turns them into
+	// synthetic bindings. Its resolver also lets parameter initializers see
+	// declarations from the function body. Build the authored ESLint-like scope
+	// model only for those two rare mismatches.
+	if m.authoredScopes == nil {
+		m.authoredScopes = scope.Build(m.sourceFile, scope.Options{CollectReferences: true})
+	}
+	for _, reference := range m.authoredScopes.References {
+		if reference.Identifier != node {
+			continue
+		}
+		for _, declaration := range reference.Declarations {
+			if declaration.ID == binding.nameNode {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 // wellKnownMutationMethods maps global object names to their mutation method names.
@@ -538,6 +653,10 @@ func walkImportedBindingGroups(
 			)
 		}
 	}
+	matcher := importedBindingReferenceMatcher{
+		sourceFile:             ctx.SourceFile,
+		resolveReferenceSymbol: resolveReferenceSymbol,
+	}
 
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
@@ -549,27 +668,31 @@ func walkImportedBindingGroups(
 			targets := targetsByName[node.Text()]
 			if len(targets) != 0 && !isImportBindingName(node) {
 				var referenceSymbol *ast.Symbol
-				if resolveReferenceSymbol != nil {
-					referenceSymbol = resolveReferenceSymbol(node)
-				}
+				referenceSymbolResolved := false
 				for _, target := range targets {
 					binding := &groups[target.groupIndex].bindings[target.bindingIndex]
+					kind := classifyImportedBindingViolation(node, binding, ctx)
+					if kind == importedBindingViolationNone {
+						continue
+					}
 					if binding.symbol != nil && resolveReferenceSymbol != nil &&
-						referenceSymbol != binding.symbol {
+						!referenceSymbolResolved {
+						referenceSymbol = resolveReferenceSymbol(node)
+						referenceSymbolResolved = true
+					}
+					if binding.symbol != nil && resolveReferenceSymbol != nil &&
+						!matcher.matchesResolved(node, binding, referenceSymbol) {
 						continue
 					}
 
-					kind := classifyImportedBindingViolation(node, binding, ctx)
-					if kind != importedBindingViolationNone {
-						groups[target.groupIndex].violations = append(
-							groups[target.groupIndex].violations,
-							importedBindingViolation{
-								node:         node,
-								bindingIndex: target.bindingIndex,
-								kind:         kind,
-							},
-						)
-					}
+					groups[target.groupIndex].violations = append(
+						groups[target.groupIndex].violations,
+						importedBindingViolation{
+							node:         node,
+							bindingIndex: target.bindingIndex,
+							kind:         kind,
+						},
+					)
 				}
 			}
 		}
@@ -605,6 +728,10 @@ func walkImportedBindingReferences(
 		return
 	}
 
+	matcher := importedBindingReferenceMatcher{
+		sourceFile:             ctx.SourceFile,
+		resolveReferenceSymbol: resolveReferenceSymbol,
+	}
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
 		if node == nil {
@@ -618,23 +745,24 @@ func walkImportedBindingReferences(
 					continue
 				}
 
-				if binding.symbol != nil && resolveReferenceSymbol != nil &&
-					resolveReferenceSymbol(node) != binding.symbol {
+				// Most same-named identifiers are reads. Reject them before the
+				// comparatively expensive symbol lookup.
+				kind := classifyImportedBindingViolation(node, binding, ctx)
+				if kind == importedBindingViolationNone {
 					continue
 				}
-
-				kind := classifyImportedBindingViolation(node, binding, ctx)
-				if kind != importedBindingViolationNone {
-					reportImportedBindingViolation(
-						ctx,
-						binding,
-						importedBindingViolation{
-							node: node,
-							kind: kind,
-						},
-						nil,
-					)
+				if !matcher.matches(node, binding) {
+					continue
 				}
+				reportImportedBindingViolation(
+					ctx,
+					binding,
+					importedBindingViolation{
+						node: node,
+						kind: kind,
+					},
+					nil,
+				)
 			}
 		}
 
@@ -814,6 +942,7 @@ func collectImportedBindingViolation(
 	targets importedBindingTargets,
 	node *ast.Node,
 	resolveReferenceSymbol func(*ast.Node) *ast.Symbol,
+	usesCheckerReferenceResolution bool,
 ) {
 	if isImportBindingName(node) {
 		return
@@ -855,7 +984,25 @@ func collectImportedBindingViolation(
 		}
 		if binding.symbol != nil && resolveReferenceSymbol != nil &&
 			referenceSymbol != binding.symbol {
-			continue
+			if !isOnlySynthesizedJSDocSymbol(referenceSymbol) &&
+				(!usesCheckerReferenceResolution ||
+					!resolvesToFunctionBodyFromParameter(node, referenceSymbol)) {
+				continue
+			}
+			authoredScopes := rule.CachedByFile(
+				*ctx,
+				authoredJavaScriptScopeCacheKey{},
+				func() *scope.Manager {
+					return scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true})
+				},
+			)
+			matcher := importedBindingReferenceMatcher{
+				sourceFile:     ctx.SourceFile,
+				authoredScopes: authoredScopes,
+			}
+			if !matcher.matchesAuthoredScope(node, binding) {
+				continue
+			}
 		}
 		groups[target.groupIndex].violations = append(
 			groups[target.groupIndex].violations,
@@ -910,6 +1057,7 @@ func noImportAssignIntegratedListeners(
 	resolveReferenceSymbol func(*ast.Node) *ast.Symbol,
 	checkerReferenceSymbol func(*ast.Node) *ast.Symbol,
 ) rule.RuleListeners {
+	usesCheckerReferenceResolution := ctx.Refs == nil && resolveReferenceSymbol != nil
 	if ctx.Refs != nil && ctx.TypeChecker != nil &&
 		!allBindingGroupsHaveSymbols(groups) {
 		replaceImportedBindingSymbolsWithChecker(groups, &ctx)
@@ -917,6 +1065,7 @@ func noImportAssignIntegratedListeners(
 			return checkerImportBindingSymbol(nameNode, &ctx)
 		}
 		resolveReferenceSymbol = checkerReferenceSymbol
+		usesCheckerReferenceResolution = true
 	}
 
 	targetsByName := make(map[string]importedBindingTargets, bindingCount)
@@ -937,7 +1086,6 @@ func noImportAssignIntegratedListeners(
 			targetsByName[binding.name] = targets
 		}
 	}
-
 	needsFallbackScan := false
 	needsViolationSort := false
 	checkIdentifier := func(node *ast.Node) {
@@ -954,6 +1102,7 @@ func noImportAssignIntegratedListeners(
 			targets,
 			node,
 			resolveReferenceSymbol,
+			usesCheckerReferenceResolution,
 		)
 	}
 	checkWriteTarget := func(node *ast.Node) {

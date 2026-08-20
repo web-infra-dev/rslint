@@ -3,9 +3,9 @@ package reactutil
 import (
 	"regexp"
 	"strings"
-	"unicode"
-
 	"unicode/utf8"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // hookNameRegex matches the React hook naming convention `^use[A-Z0-9].*$`.
@@ -25,7 +25,8 @@ func IsHookName(name string) bool {
 
 // IsFirstLetterCapitalized is the exported alias for the package-private
 // helper. Mirrors eslint-plugin-react's `lib/util/isFirstLetterCapitalized.js`
-// — strips leading underscores then compares `unicode.ToUpper(r) == r`.
+// — strips leading underscores then compares the first character against
+// its `toUpperCase`.
 // Non-cased characters (CJK, digits, emoji) count as "capitalized" because
 // they have no upper/lower mapping. Use this for any parent-name / binding
 // capitalization check that needs to align with upstream's component
@@ -50,11 +51,14 @@ func IsLowercaseFirstLetter(s string) bool {
 	if s == "" {
 		return false
 	}
-	r, _ := utf8.DecodeRuneInString(s)
-	if r == utf8.RuneError {
+	first, ok := firstCharacter(s)
+	if !ok {
 		return false
 	}
-	return unicode.ToLower(r) == r
+	if !isBMP(first) {
+		return true
+	}
+	return ecmascript.StringToLowerCase(first) == first
 }
 
 // IsCasedLowercaseFirstLetter mirrors upstream's
@@ -68,11 +72,14 @@ func IsCasedLowercaseFirstLetter(s string) bool {
 	if s == "" {
 		return false
 	}
-	r, _ := utf8.DecodeRuneInString(s)
-	if r == utf8.RuneError {
+	first, ok := firstCharacter(s)
+	if !ok {
 		return false
 	}
-	return unicode.ToLower(r) == r && unicode.ToUpper(r) != r
+	if !isBMP(first) {
+		return false
+	}
+	return ecmascript.StringToLowerCase(first) == first && ecmascript.StringToUpperCase(first) != first
 }
 
 // isFirstLetterCapitalized mirrors eslint-plugin-react's helper of the same
@@ -80,8 +87,9 @@ func IsCasedLowercaseFirstLetter(s string) bool {
 //
 //  1. Strip leading underscores: `_Foo` → "Foo" (so `_Foo` is treated the
 //     same as `Foo`, matching upstream's `word.replace(/^_+/, ”)`).
-//  2. A character is "capitalized" iff `unicode.ToUpper(r) == r` —
-//     equivalent to upstream's `firstLetter.toUpperCase() === firstLetter`.
+//  2. A character is "capitalized" iff it is its own uppercase, which is
+//     upstream's `firstLetter.toUpperCase() === firstLetter` run through the
+//     port of String.prototype.toUpperCase.
 //
 // Step 2 means non-cased characters (CJK, digits, emoji, symbols) all
 // count as "capitalized" because they have no upper/lower mapping. This
@@ -93,9 +101,32 @@ func isFirstLetterCapitalized(s string) bool {
 	if stripped == "" {
 		return false
 	}
-	r, _ := utf8.DecodeRuneInString(stripped)
-	if r == utf8.RuneError {
+	first, ok := firstCharacter(stripped)
+	if !ok {
 		return false
 	}
-	return unicode.ToUpper(r) == r
+	if !isBMP(first) {
+		return true
+	}
+	return ecmascript.StringToUpperCase(first) == first
+}
+
+// isBMP reports whether c is a character upstream reads as one UTF-16 code
+// unit. A character outside the BMP is two of them, and a lone surrogate has no
+// case, so every predicate here answers for it the way it answers for a
+// character with no case of its own.
+func isBMP(c string) bool {
+	r, _ := utf8.DecodeRuneInString(c)
+	return r <= 0xFFFF
+}
+
+// firstCharacter returns the first character of s as a string, reporting false
+// when s is empty or does not start with one — which is what the predicates
+// above answer no to rather than reading a byte as a character.
+func firstCharacter(s string) (string, bool) {
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return "", false
+	}
+	return s[:size], true
 }

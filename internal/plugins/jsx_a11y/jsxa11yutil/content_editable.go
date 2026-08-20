@@ -1,10 +1,10 @@
 package jsxa11yutil
 
 import (
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // IsContentEditable mirrors upstream `isContentEditable(_, attributes)`
@@ -46,7 +46,7 @@ func IsContentEditable(attrs []*ast.Node) bool {
 			// not produce. Skip rather than walk into spread.
 			continue
 		}
-		if !strings.EqualFold(reactutil.GetJsxPropName(attr), "contentEditable") {
+		if !ecmascript.EqualsWhenUppercased(reactutil.GetJsxPropName(attr), "contentEditable") {
 			continue
 		}
 		// upstream returns immediately on the FIRST matching getProp result;

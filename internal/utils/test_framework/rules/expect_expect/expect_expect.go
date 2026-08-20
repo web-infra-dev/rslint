@@ -18,12 +18,12 @@ package expect_expect
 
 import (
 	_ "embed"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -112,15 +112,15 @@ func stringList(raw []interface{}) []string {
 	return out
 }
 
-func compileAssertPatterns(patterns []string) []*regexp.Regexp {
-	out := make([]*regexp.Regexp, 0, len(patterns))
+func compileAssertPatterns(patterns []string) []*esregexp.RegExp {
+	out := make([]*esregexp.RegExp, 0, len(patterns))
 	for _, p := range patterns {
 		out = append(out, compileAssertPattern(p))
 	}
 	return out
 }
 
-func compileAssertPattern(pattern string) *regexp.Regexp {
+func compileAssertPattern(pattern string) *esregexp.RegExp {
 	segs := strings.Split(pattern, ".")
 	parts := make([]string, 0, len(segs))
 	for _, s := range segs {
@@ -134,19 +134,19 @@ func compileAssertPattern(pattern string) *regexp.Regexp {
 	// Segments follow eslint-plugin-jest: only `*` is expanded; other characters
 	// (e.g. `\$`) are copied into the Regexp source like JavaScript's RegExp
 	// constructor. A malformed pattern compiles to nil and never matches.
-	re, err := regexp.Compile(`(?i)^(?:` + joined + `)(?:\.|$)`)
+	re, err := esregexp.Compile(`^(?:`+joined+`)(?:\.|$)`, "iu")
 	if err != nil {
 		return nil
 	}
 	return re
 }
 
-func matchesAssertName(name string, compiled []*regexp.Regexp) bool {
+func matchesAssertName(name string, compiled []*esregexp.RegExp) bool {
 	if name == "" {
 		return false
 	}
 	for _, re := range compiled {
-		if re != nil && re.MatchString(name) {
+		if re != nil && re.TestOrTimeout(name) {
 			return true
 		}
 	}
