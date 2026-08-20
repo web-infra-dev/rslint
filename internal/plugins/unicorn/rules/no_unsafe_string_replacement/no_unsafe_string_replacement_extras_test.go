@@ -87,6 +87,11 @@ router.replace("/about", options);`),
 			// Boolean literals have intrinsic names upstream and are known non-string.
 			tsValid(`declare const value: {flag: true}; value.flag.replace("x", replacement)`),
 			tsValid(`declare function getFlag(): true; getFlag().replace("x", replacement)`),
+			// A no-substitution template literal type is a TSLiteralType whose
+			// literal is a TemplateLiteral upstream, so it is known non-string.
+			tsValid("declare const value: `x`; value.replace(\"x\", replacement)"),
+			tsValid("declare const value: `x` | 1; value.replace(\"x\", replacement)"),
+			tsValid("declare const value: `x` & {}; value.replace(\"x\", replacement)"),
 			// Locks in upstream type-parameter constraint recursion.
 			tsValid(`function run<T extends number>(value: T) { value.replace("x", replacement); }`),
 			// Locks in upstream class-heritage recursion: String wrapper subclasses are non-string receivers.
@@ -168,6 +173,9 @@ router.replace("/about", options);`),
 			tsInvalid(`(1n).replace("x", replacement)`, `replacement`, "replace"),
 			// The literal-type rule also applies recursively after control-flow narrowing.
 			tsInvalid(`function run(value: 1 | 2 | string) { if (typeof value === "number") { value.replace("x", replacement) } }`, `replacement`, "replace"),
+			// Template literal types with substitutions are not TSLiteralType and
+			// remain string targets.
+			tsInvalid("declare const value: `a${string}`; value.replace(\"x\", replacement)", `replacement`, "replace"),
 			// A merged type/value name has multiple definitions and must remain unknown.
 			tsInvalid(`type Sep = number; const Sep = "-"; Sep.replace("x", replacement)`, `replacement`, "replace"),
 			tsInvalid(`type T = {a: 1}; const T = "x"; T.replace("x", replacement)`, `replacement`, "replace"),
@@ -199,6 +207,15 @@ function constrained<T extends number>(value: T) {
 
 function functionValue(): number { return 1; }
 functionValue.replace("x", options);
+
+declare const objectValue: object;
+objectValue.replace("x", options);
+
+declare const objectUnion: object | number;
+objectUnion.replace("x", options);
+
+declare const objectIntersection: object & {a: 1};
+objectIntersection.replace("x", options);
 `
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{filePath: code})
 	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
@@ -239,7 +256,7 @@ functionValue.replace("x", options);
 		func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
 		nil,
 	)
-	if len(diagnostics) != 1 {
-		t.Fatalf("source-only syntax classification produced %d diagnostics, want 1: %+v", len(diagnostics), diagnostics)
+	if len(diagnostics) != 4 {
+		t.Fatalf("source-only syntax classification produced %d diagnostics, want 4: %+v", len(diagnostics), diagnostics)
 	}
 }

@@ -245,12 +245,12 @@ func classifyStringTypeSyntax(ctx rule.RuleContext, node *ast.Node, visiting map
 		return unicornutil.TypeTarget
 	case ast.KindLiteralType:
 		literal := node.AsLiteralTypeNode().Literal
-		if literal != nil && ast.IsStringLiteralLike(literal) {
+		if literal != nil && literal.Kind == ast.KindStringLiteral {
 			return unicornutil.TypeTarget
 		}
 		return unicornutil.TypeNonTarget
 	case ast.KindBigIntKeyword, ast.KindBooleanKeyword, ast.KindNeverKeyword,
-		ast.KindNumberKeyword, ast.KindObjectKeyword, ast.KindSymbolKeyword,
+		ast.KindNumberKeyword, ast.KindSymbolKeyword,
 		ast.KindUndefinedKeyword, ast.KindVoidKeyword, ast.KindArrayType, ast.KindTupleType,
 		ast.KindTypeLiteral, ast.KindFunctionType, ast.KindConstructorType:
 		return unicornutil.TypeNonTarget
