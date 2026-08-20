@@ -105,6 +105,15 @@ func TestNoArrayFillWithReferenceTypeExtras(t *testing.T) {
 			{Code: "`value`.fill({})", FileName: "file.js"},
 			{Code: `class Items extends Array<object> {} const items = new Items(); items.fill({});`, FileName: "file.ts", Tsx: false},
 			{Code: `function f(foo: Set<object> | Map<object, object>) { foo.fill({}); }`, FileName: "file.ts", Tsx: false},
+			// Interface heritage is followed only through an explicit binding
+			// annotation. Type information for other receiver shapes must not
+			// widen through the interface's base types.
+			{Code: `interface Items extends Array<object> {} declare function get(): Items; get().fill({})`, FileName: "file.ts", Tsx: false},
+			{Code: `interface Items extends Array<object> {} declare const o: {items: Items}; o.items.fill({})`, FileName: "file.ts", Tsx: false},
+			{Code: `namespace N { export interface Items extends Array<object> {} } declare const i: N.Items; i.fill({})`, FileName: "file.ts", Tsx: false},
+			// A function declaration's return type is not a type annotation on
+			// the function binding itself.
+			{Code: `function items(): object[] { return [] } items.fill({})`, FileName: "file.ts", Tsx: false},
 
 			// Uninformative assertions fall through to the wrapped receiver, while
 			// local type definitions named like built-ins take precedence over the
@@ -153,11 +162,14 @@ func TestNoArrayFillWithReferenceTypeExtras(t *testing.T) {
 			// TS wrappers around both the reference and its initializer.
 			{Code: `const value = (({} as Foo)); array.fill((value!))`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 42, 1, 48)}},
 
-			// Locks in upstream isKnownNonArray(): nullish array unions remain arrays
-			// after the nullish branch is filtered, while mixed array/non-array
-			// unions are unknown and therefore still reported.
+			// Nullish normalizes to a non-target and participates in the union
+			// vote. This rule reports both target and unknown receivers, as it does
+			// for mixed unions.
 			{Code: `function f(foo: object[] | undefined) { foo!.fill({}); }`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 51, 1, 53)}},
 			{Code: `function f(foo: object[] | Set<object>) { foo.fill({}); }`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 52, 1, 54)}},
+			// The type-information path classifies by symbol name, even when a
+			// module-local declaration shadows the standard Array interface.
+			{Code: `export {}; interface Array<T> { fill(v: object): void } declare function get(): Array<object>; get().fill({})`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 107, 1, 109)}},
 			{Code: `function f(foo: Uint8Array) { (foo as object[]).fill({}); }`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 54, 1, 56)}},
 			{Code: `Array.of(1, 2, 3).fill({})`, FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{extraError(1, 24, 1, 26)}},
 			{Code: `const array = []; array.fill({})`, FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{extraError(1, 30, 1, 32)}},
@@ -196,6 +208,49 @@ func TestNoArrayFillWithReferenceTypeSourceOnlyReceiverClassification(t *testing
 				t.Fatalf("diagnostic count = %d, want %d: %+v", len(got), test.diagnostics, got)
 			}
 		})
+	}
+}
+
+func TestNoArrayFillWithReferenceTypeDoesNotResolveConstAcrossFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := tspath.NormalizePath(t.TempDir())
+	declarationFile := tspath.NormalizePath(filepath.Join(dir, "declaration.ts"))
+	usageFile := tspath.NormalizePath(filepath.Join(dir, "usage.ts"))
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		declarationFile: `const value = {}`,
+		usageFile:       `array.fill(value)`,
+	})
+	host := utils.CreateCompilerHost(dir, fs)
+	program, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{
+		Target: core.ScriptTargetESNext,
+	}, []string{declarationFile, usageFile}, host)
+	if err != nil {
+		t.Fatalf("create typed program: %v", err)
+	}
+
+	diagnostics := make([]rule.RuleDiagnostic, 0, 1)
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:     lintprogram.NewFromCompiler(program),
+		File:        usageFile,
+		HasTypeInfo: true,
+		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+			return []linter.ConfiguredRule{{
+				Name:     no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule.Run(ctx, nil)
+				},
+			}}
+		},
+		ExcludePaths: []string{},
+		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		}},
+	})
+
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostic count = %d, want 0: %+v", len(diagnostics), diagnostics)
 	}
 }
 

@@ -185,8 +185,10 @@ func classifyArrayIdentifier(
 	if declaration == nil {
 		return arrayClassUnknown
 	}
-	if class := classifyArrayTypeNode(ctx, declaration.Type(), targetNames, nonTargetNames, map[*ast.Symbol]bool{}); class != arrayClassUnknown {
-		return class
+	if annotation := arrayBindingTypeAnnotation(declaration); annotation != nil {
+		if class := classifyArrayTypeNode(ctx, annotation, targetNames, nonTargetNames, map[*ast.Symbol]bool{}); class != arrayClassUnknown {
+			return class
+		}
 	}
 	if !ast.IsVariableDeclaration(declaration) {
 		return arrayClassUnknown
@@ -199,6 +201,23 @@ func classifyArrayIdentifier(
 		return arrayClassUnknown
 	}
 	return classifyArrayReceiverInner(ctx, variable.Initializer, targetNames, nonTargetNames, visitedSymbols)
+}
+
+// arrayBindingTypeAnnotation mirrors definition.name?.typeAnnotation in
+// @typescript-eslint/scope-manager. Function-like declarations are excluded:
+// Node.Type() exposes their return type, but that is not an annotation on the
+// identifier binding.
+func arrayBindingTypeAnnotation(declaration *ast.Node) *ast.Node {
+	if declaration == nil {
+		return nil
+	}
+	switch declaration.Kind {
+	case ast.KindVariableDeclaration, ast.KindParameter,
+		ast.KindPropertyDeclaration, ast.KindPropertySignature:
+		return declaration.Type()
+	default:
+		return nil
+	}
 }
 
 func classifyArrayTypeNode(
@@ -489,38 +508,15 @@ func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames, nonTa
 		}
 		return arrayClassUnknown
 	}
-	if targetNames.Has(symbol.Name) && isDefaultLibraryArrayTarget(ctx, symbol) {
-		return arrayClassTarget
-	}
-	if targetNames.Has("Array") && classifyArrayHeritage(ctx, t, targetNames, nonTargetNames) == arrayClassTarget {
+	if targetNames.Has(symbol.Name) {
 		return arrayClassTarget
 	}
 	return arrayClassNonTarget
 }
 
-func classifyArrayHeritage(ctx rule.RuleContext, t *checker.Type, targetNames, nonTargetNames *utils.Set[string]) arrayClass {
-	symbol := checker.Type_symbol(t)
-	if symbol == nil || symbol.Flags&ast.SymbolFlagsInterface == 0 {
-		return arrayClassUnknown
-	}
-	declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)
-	if declared == nil {
-		return arrayClassUnknown
-	}
-	for _, base := range checker.Checker_getBaseTypes(ctx.TypeChecker, declared) {
-		if classifyArrayType(ctx, base, targetNames, nonTargetNames) == arrayClassTarget {
-			return arrayClassTarget
-		}
-	}
-	return arrayClassUnknown
-}
-
 func combineArrayUnion(ctx rule.RuleContext, parts []*checker.Type, targetNames, nonTargetNames *utils.Set[string]) arrayClass {
 	classes := make([]arrayClass, 0, len(parts))
 	for _, part := range parts {
-		if utils.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-			continue
-		}
 		classes = append(classes, classifyArrayType(ctx, part, targetNames, nonTargetNames))
 	}
 	if len(classes) == 0 {
@@ -573,8 +569,4 @@ func arrayTypeSymbol(t *checker.Type) *ast.Symbol {
 		}
 	}
 	return nil
-}
-
-func isDefaultLibraryArrayTarget(ctx rule.RuleContext, symbol *ast.Symbol) bool {
-	return ctx.Program() != nil && utils.IsSymbolFromDefaultLibrary(ctx.Program(), symbol)
 }

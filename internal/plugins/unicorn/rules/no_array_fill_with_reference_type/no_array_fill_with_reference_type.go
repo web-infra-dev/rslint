@@ -102,7 +102,7 @@ func getConstVariableInitializer(ctx rule.RuleContext, node *ast.Node) *ast.Node
 		return nil
 	}
 
-	symbol := ctx.Refs.Resolve(node)
+	symbol := ctx.Refs.ResolveInFile(node)
 	if symbol == nil || len(symbol.Declarations) != 1 {
 		return nil
 	}
