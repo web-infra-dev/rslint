@@ -20,12 +20,11 @@ The `rule-manifest.json` file provides a machine-readable manifest of all implem
   "rules": [
     {
       "name": "array_type",
-      "status": "full" | "partial-impl" | "partial-test" | "none",
+      "status": "partial-impl",
       "failing_case": [
         { "name": "caseName", "url": "relative/path/to/test.ts#L123" }
       ]
-    },
-    // ...
+    }
   ]
 }
 ```
