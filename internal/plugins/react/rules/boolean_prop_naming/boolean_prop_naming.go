@@ -3,12 +3,12 @@ package boolean_prop_naming
 import (
 	_ "embed"
 	"regexp"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -82,7 +82,7 @@ var templatePlaceholder = regexp.MustCompile(`\{\{([^{}]+?)\}\}`)
 func renderTemplate(tmpl string, data map[string]string) string {
 	return templatePlaceholder.ReplaceAllStringFunc(tmpl, func(match string) string {
 		m := templatePlaceholder.FindStringSubmatch(match)
-		key := strings.TrimSpace(m[1])
+		key := ecmascript.StringTrim(m[1])
 		if v, ok := data[key]; ok {
 			return v
 		}

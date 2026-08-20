@@ -117,16 +117,34 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 	}
 }
 
-func TestLintProgramStoreDoesNotPersistUnselectedProjectRoots(t *testing.T) {
+func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
-	_, loadRoots, finalize := fixture.store.Request(context.Background(), fixture.sourceURI)
-	roots, err := loadRoots(fixture.configPath)
+	_, loadMetadata, finalize := fixture.store.Request(context.Background(), fixture.sourceURI)
+	metadata, available, err := loadMetadata(fixture.configPath)
 	if err != nil {
-		t.Fatalf("load roots: %v", err)
+		t.Fatalf("load metadata: %v", err)
+	}
+	if !available {
+		t.Fatal("project metadata was unavailable")
 	}
 	finalize()
-	if roots == nil || !roots.Contains(fixture.sourcePath, fixture.sourcePath) {
-		t.Fatalf("root metadata did not contain the configured source: %v", roots)
+	if metadata == nil || !metadata.Contains(fixture.sourcePath, fixture.sourcePath) {
+		t.Fatalf("project metadata did not contain the configured source: %v", metadata)
+	}
+	_, loadMetadata, finalize = fixture.store.Request(context.Background(), fixture.sourceURI)
+	reused, available, err := loadMetadata(fixture.configPath)
+	if err != nil {
+		t.Fatalf("reuse metadata: %v", err)
+	}
+	if !available {
+		t.Fatal("reused project metadata was unavailable")
+	}
+	finalize()
+	if reused != metadata {
+		t.Fatal("unchanged watcher-protected root metadata was reparsed")
+	}
+	if fixture.watchCalls == 0 {
+		t.Fatal("resident root metadata has no watcher coverage")
 	}
 	if !fixture.store.Invalidate() {
 		t.Fatal("a project-root change would not trigger diagnostics refresh")
@@ -135,14 +153,132 @@ func TestLintProgramStoreDoesNotPersistUnselectedProjectRoots(t *testing.T) {
 	if err := os.WriteFile(fixture.configPath, []byte(`{"files":[]}`), 0o644); err != nil {
 		t.Fatalf("rewrite config: %v", err)
 	}
-	_, loadRoots, finalize = fixture.store.Request(context.Background(), fixture.sourceURI)
-	roots, err = loadRoots(fixture.configPath)
+	_, loadMetadata, finalize = fixture.store.Request(context.Background(), fixture.sourceURI)
+	metadata, available, err = loadMetadata(fixture.configPath)
 	if err != nil {
-		t.Fatalf("reload roots: %v", err)
+		t.Fatalf("reload metadata: %v", err)
+	}
+	if !available {
+		t.Fatal("reloaded project metadata was unavailable")
 	}
 	finalize()
-	if roots == nil || roots.Contains(fixture.sourcePath, fixture.sourcePath) {
-		t.Fatalf("unselected root metadata leaked across requests: %v", roots)
+	if metadata == nil || metadata.Contains(fixture.sourcePath, fixture.sourcePath) {
+		t.Fatalf("invalidated project metadata leaked across requests: %v", metadata)
+	}
+}
+
+func TestLintProgramStoreOpeningNewIncludedFileInvalidatesProjectMetadata(t *testing.T) {
+	const content = "export const value = 1;\n"
+	fixture := newLintProgramStoreFixture(t, content)
+	_, loadMetadata, finalize := fixture.store.Request(
+		context.Background(),
+		fixture.sourceURI,
+	)
+	before, available, err := loadMetadata(fixture.configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !available {
+		t.Fatal("initial project metadata was unavailable")
+	}
+	finalize()
+
+	newPath := filepath.Join(filepath.Dir(fixture.sourcePath), "new.ts")
+	if err := os.WriteFile(newPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	newURI := documentURIFromPath(newPath)
+	fixture.server.documents[newURI] = content
+	fixture.store.DidOpen(newURI, content, true)
+	if len(fixture.store.projectMetadata) != 0 {
+		t.Fatal("newly included source retained stale project metadata")
+	}
+
+	_, loadMetadata, finalize = fixture.store.Request(context.Background(), newURI)
+	after, available, err := loadMetadata(fixture.configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !available {
+		t.Fatal("refreshed project metadata was unavailable")
+	}
+	finalize()
+	if after == before || !after.Contains(newPath, "") {
+		t.Fatal("newly included source was absent from refreshed project metadata")
+	}
+}
+
+func TestLintProgramStoreDoesNotRetainNonContainingFallbackProgram(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+	outsidePath := filepath.Join(filepath.Dir(filepath.Dir(fixture.sourcePath)), "outside.ts")
+	const outsideContent = "export const outside = 1;\n"
+	if err := os.WriteFile(outsidePath, []byte(outsideContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	outsideURI := documentURIFromPath(outsidePath)
+	fixture.server.documents[outsideURI] = outsideContent
+
+	loadProgram, loadMetadata, finalize := fixture.store.Request(
+		context.Background(),
+		outsideURI,
+	)
+	metadata, available, err := loadMetadata(fixture.configPath)
+	if err != nil {
+		t.Fatalf("load metadata: %v", err)
+	}
+	if !available {
+		t.Fatal("project metadata was unavailable")
+	}
+	if metadata.Contains(outsidePath, "") {
+		t.Fatal("outside target unexpectedly became a direct project root")
+	}
+	_, sourceFile, err := loadProgram(fixture.configPath)
+	if err != nil {
+		t.Fatalf("probe fallback Program: %v", err)
+	}
+	finalize()
+	if sourceFile != nil {
+		t.Fatalf("outside target unexpectedly entered the Program: %v", sourceFile)
+	}
+	if len(fixture.store.programs) != 0 {
+		t.Fatal("non-containing fallback Program became resident")
+	}
+	if len(fixture.store.projectMetadata) != 1 {
+		t.Fatalf("lightweight project metadata was not retained: %d", len(fixture.store.projectMetadata))
+	}
+}
+
+func TestLintProgramStoreDoesNotRetainProgramWithTransientProjectMetadata(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+	metadata, err := parseStandaloneLintProject(
+		fixture.configPath,
+		fixture.server.fs,
+		fixture.server.fs,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configPath := tspath.NormalizePath(fixture.configPath)
+	request := &lintProgramRequest{
+		store: fixture.store,
+		ctx:   context.Background(),
+		uri:   fixture.sourceURI,
+		projectMetadata: map[string]*lintProjectMetadata{
+			configPath: metadata,
+		},
+		transientMetadata: map[string]struct{}{
+			configPath: {},
+		},
+	}
+
+	if _, sourceFile, err := request.load(configPath); err != nil {
+		t.Fatal(err)
+	} else if sourceFile == nil {
+		t.Fatal("transient Program did not contain its direct root")
+	}
+	request.finalize()
+	if len(fixture.store.programs) != 0 {
+		t.Fatal("Program built from metadata predating watcher coverage became resident")
 	}
 }
 

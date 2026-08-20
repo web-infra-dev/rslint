@@ -2,11 +2,11 @@ package jsx_no_duplicate_props
 
 import (
 	_ "embed"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_no_duplicate_props.schema.json
@@ -49,7 +49,7 @@ var JsxNoDuplicatePropsRule = rule.Rule{
 				}
 				name := nameNode.AsIdentifier().Text
 				if ignoreCase {
-					name = strings.ToLower(name)
+					name = ecmascript.StringToLowerCase(name)
 				}
 				if _, dup := seen[name]; dup {
 					ctx.ReportNode(attr, rule.RuleMessage{

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // NodeMatchesPath mirrors unicorn's isNodeMatchesNameOrPath helper. It accepts
@@ -12,7 +13,7 @@ import (
 // super, or a meta property. ast.IsDottedName is intentionally not used
 // because it also accepts property accesses containing optional-chain links.
 func NodeMatchesPath(node *ast.Node, path string) bool {
-	parts := strings.Split(strings.TrimSpace(path), ".")
+	parts := strings.Split(ecmascript.StringTrim(path), ".")
 	return nodeMatchesPathParts(ast.SkipParentheses(node), parts)
 }
 

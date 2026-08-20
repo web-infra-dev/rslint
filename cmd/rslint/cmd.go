@@ -497,6 +497,7 @@ func loadGitignoreAndProjects(
 	config rslintconfig.RslintConfig,
 	configDirectory string,
 	targetFiles []string,
+	targetDirectories []string,
 	singleThreaded bool,
 	session *loader.Session,
 ) (rslintconfig.RslintConfig, loader.ProjectSet, error) {
@@ -507,11 +508,12 @@ func loadGitignoreAndProjects(
 	)
 	work := core.NewWorkGroup(singleThreaded)
 	work.Queue(func() {
-		configWithIgnores = rslintconfig.ConfigWithGitignore(
+		configWithIgnores = rslintconfig.ConfigWithGitignoreForTargets(
 			config,
 			configDirectory,
 			session.FS(),
 			targetFiles,
+			targetDirectories,
 		)
 	})
 	work.Queue(func() {
@@ -807,18 +809,20 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			currentDirectory = workingDirectory
 		}
 
-		var exactTargetFiles []string
-		if len(allowFiles) > 0 && len(allowDirs) == 0 {
-			exactTargetFiles = allowFiles
-		}
 		if typeCheckOnly {
 			projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
 		} else if buildAllPrograms {
 			rslintConfig, projectSet, err = loadGitignoreAndProjects(
-				rslintConfig, currentDirectory, exactTargetFiles, singleThreaded, programSession,
+				rslintConfig, currentDirectory, allowFiles, allowDirs, singleThreaded, programSession,
 			)
 		} else {
-			rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, currentDirectory, fs, exactTargetFiles)
+			rslintConfig = rslintconfig.ConfigWithGitignoreForTargets(
+				rslintConfig,
+				currentDirectory,
+				fs,
+				allowFiles,
+				allowDirs,
+			)
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)

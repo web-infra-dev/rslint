@@ -486,22 +486,22 @@ func discoverCLIConfigCatalog(
 	loader := &ipcConfigModuleLoader{channel: channel}
 	var catalog *discovery.ConfigCatalog
 	if payload.ConfigDiscovery.ExplicitConfigPath != "" {
-		var targetFiles []discovery.DiscoveryFile
-		switch {
-		case args.TypeCheckOnly:
+		targetFiles := append([]discovery.DiscoveryFile(nil), request.Files...)
+		targetDirectories := append([]string(nil), request.Directories...)
+		if args.TypeCheckOnly {
 			targetFiles = []discovery.DiscoveryFile{}
-		case len(args.AllowFiles) > 0 && len(args.AllowDirs) == 0:
-			targetFiles = append([]discovery.DiscoveryFile(nil), request.Files...)
+			targetDirectories = nil
 		}
 		catalog, err = discovery.LoadExplicitConfig(
 			ctx,
 			args.FS,
 			loader,
 			discovery.ExplicitConfigRequest{
-				CWD:            cwd,
-				ConfigPath:     payload.ConfigDiscovery.ExplicitConfigPath,
-				TargetFiles:    targetFiles,
-				SingleThreaded: args.SingleThreaded,
+				CWD:               cwd,
+				ConfigPath:        payload.ConfigDiscovery.ExplicitConfigPath,
+				TargetFiles:       targetFiles,
+				TargetDirectories: targetDirectories,
+				SingleThreaded:    args.SingleThreaded,
 			},
 		)
 	} else {

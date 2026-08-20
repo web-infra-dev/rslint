@@ -4,13 +4,13 @@ import (
 	_ "embed"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed prefer_readonly.schema.json
@@ -354,7 +354,7 @@ func getNameDisplayText(ctx rule.RuleContext, nameNode *ast.Node) string {
 	if nameNode == nil {
 		return ""
 	}
-	text := strings.TrimSpace(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
+	text := ecmascript.StringTrim(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
 	return text
 }
 

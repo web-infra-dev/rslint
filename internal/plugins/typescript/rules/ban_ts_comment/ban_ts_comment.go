@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/rivo/uniseg"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -356,7 +357,7 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 	fullDirectiveName := directiveName(directive)
 
 	// Trimmed description for length check; raw description for format check
-	trimmedDescription := strings.TrimSpace(rawDescription)
+	trimmedDescription := ecmascript.StringTrim(rawDescription)
 
 	// Check minimum length using grapheme cluster count on the trimmed description
 	descLength := graphemeLength(trimmedDescription)

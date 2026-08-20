@@ -1,6 +1,6 @@
 # rstestPlugin
 
-`rstestPlugin` contains Rslint's bundled Rstest preset.
+`rstestPlugin` is Rslint's [built-in Rstest-specific plugin](/rules/?group=rstest).
 
 ```ts
 import { defineConfig, rstestPlugin } from '@rslint/core';
