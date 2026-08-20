@@ -52,8 +52,18 @@ func TestYodaExtras(t *testing.T) {
 			// ---- Dimension 4: optional chain member as the non-literal side ----
 			{Code: `if (foo?.bar === "red") {}`, Options: "never"},
 
+			// ---- Documented divergence: a TypeScript-only wrapper has no runtime
+			// effect, so the two comparisons still hold the same operand and the
+			// range test stays exempt. ESLint's isSameReference has no case for
+			// TSNonNullExpression/TSAsExpression/TSSatisfiesExpression, so it reads
+			// none of these as a range test and reports every one of them ----
+			{Code: `if (0 <= x! && x! < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 <= (x as number) && (x as number) < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 <= (x satisfies number) && (x satisfies number) < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 <= x! && x < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
 			// ---- Dimension 4: PrivateIdentifier access in a range test ----
-			{Code: `if (0 <= this.#x && this.#x < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `class C { #x = 0; m() { if (0 <= this.#x && this.#x < 1) {} } }`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 
 			// ---- Dimension 4: a literal shared between the two comparisons is still
 			// the same reference, whatever kind of literal it is and however it is

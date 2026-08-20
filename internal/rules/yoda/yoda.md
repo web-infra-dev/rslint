@@ -106,6 +106,10 @@ if ("blue" == color) {
 }
 ```
 
+## Differences from ESLint
+
+- TypeScript-only wrappers with no runtime effect — `x!`, `x as T`, `x satisfies T` — are read through when deciding whether the two comparisons of a range test hold the same operand. With `{ "exceptRange": true }`, `if (0 <= x! && x! < 1) {}` reads as one range comparison and stays exempt.
+
 ## Original Documentation
 
 - [ESLint: yoda](https://eslint.org/docs/latest/rules/yoda)

@@ -48,18 +48,18 @@ func parseOptions(options []any) yodaOptions {
 	return opts
 }
 
-// comparisonOperators are the operators yoda cares about; `in`/`instanceof`
-// share the BinaryExpression kind in tsgo but are excluded, matching
-// ESLint's isComparisonOperator.
-var comparisonOperators = map[ast.Kind]bool{
-	ast.KindEqualsEqualsToken:            true,
-	ast.KindEqualsEqualsEqualsToken:      true,
-	ast.KindExclamationEqualsToken:       true,
-	ast.KindExclamationEqualsEqualsToken: true,
-	ast.KindLessThanToken:                true,
-	ast.KindGreaterThanToken:             true,
-	ast.KindLessThanEqualsToken:          true,
-	ast.KindGreaterThanEqualsToken:       true,
+// isComparisonOperator matches ESLint's isComparisonOperator: the operators
+// yoda cares about. `in`/`instanceof` share the BinaryExpression kind in tsgo
+// but are excluded, as they are there.
+func isComparisonOperator(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindEqualsEqualsToken, ast.KindEqualsEqualsEqualsToken,
+		ast.KindExclamationEqualsToken, ast.KindExclamationEqualsEqualsToken,
+		ast.KindLessThanToken, ast.KindGreaterThanToken,
+		ast.KindLessThanEqualsToken, ast.KindGreaterThanEqualsToken:
+		return true
+	}
+	return false
 }
 
 // isEqualityOperator matches ESLint's isEqualityOperator: only `==`/`===`.
@@ -450,7 +450,7 @@ var YodaRule = rule.Rule{
 					return
 				}
 				opKind := bin.OperatorToken.Kind
-				if !comparisonOperators[opKind] {
+				if !isComparisonOperator(opKind) {
 					return
 				}
 				if opts.onlyEquality && !isEqualityOperator(opKind) {
