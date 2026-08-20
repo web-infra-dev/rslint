@@ -232,6 +232,60 @@ func TestLoadConsumesCompleteProjectBindingWithoutReselection(t *testing.T) {
 	})
 }
 
+func TestLoadCanonicalBindingIndexesOnlySelectedOwner(t *testing.T) {
+	const (
+		configDir    = "/repo"
+		targetPath   = "/physical/target.ts"
+		ownerAlias   = "/owner/target.ts"
+		catalogOnly  = "/catalog/unrelated.ts"
+		catalogMatch = "/physical/unrelated.ts"
+	)
+	fsys := newBindingIndexTestFS(
+		[]string{ownerAlias, catalogOnly},
+		map[string]string{
+			ownerAlias:  targetPath,
+			catalogOnly: catalogMatch,
+		},
+	)
+	catalogProgram := createBindingIndexTestProgram(t, fsys, catalogOnly)
+	ownerProgram := createBindingIndexTestProgram(t, fsys, ownerAlias)
+	plannedTarget := rslintconfig.PlannedLintTarget{
+		Target: rslintconfig.DiscoveredLintTarget{
+			Path: targetPath, CanonicalPath: targetPath, ConfigDirectory: configDir,
+		},
+		MatchPath:    targetPath,
+		ProjectPaths: []string{"/repo/owner.json"},
+	}
+	programs := lintprogram.NewFromCompilers([]*compiler.Program{catalogProgram, ownerProgram})
+	set := ProjectSet{
+		compilerPrograms:  []*compiler.Program{catalogProgram, ownerProgram},
+		programs:          programs,
+		typeCheckPrograms: []*lintprogram.Program{programs[0]},
+		targetBinding: &projectTargetBinding{
+			targets: []rslintconfig.PlannedLintTarget{plannedTarget},
+			owners:  []int{1},
+		},
+	}
+	fsys.resetCalls()
+
+	binding, err := sessionForTest(newBuildContext(fsys)).LoadAPI(
+		set,
+		rslintconfig.LintProjectPlan{Targets: []rslintconfig.PlannedLintTarget{plannedTarget}},
+		configDir,
+		true,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := binding.TargetsByProgram; len(got) != 2 || len(got[0]) != 0 ||
+		len(got[1]) != 1 || got[1][0] != ownerAlias {
+		t.Fatalf("selected owner projection = %v", got)
+	}
+	if calls := fsys.callCount(catalogOnly); calls != 0 {
+		t.Fatalf("catalog-only source participated in lint binding: Realpath calls=%d", calls)
+	}
+}
+
 func TestProgramFileIndex_IsTargetAwareAndLazyPerGoverningGroup(t *testing.T) {
 	const (
 		targetPath     = "/physical/target.ts"

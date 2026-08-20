@@ -1202,7 +1202,8 @@ goroutines remain outside that guarantee.
   flat-config entry bitset, and merges/prepares enabled rules once per unique
   bitset. The prepared lint plan references these published immutable rule
   slices without moving per-file runtime state into the config cache. LSP keeps
-  its existing per-document resolver lifetime.
+  one resolver for each committed config generation and replaces it when that
+  generation changes.
 
 ### Caching Strategy
 
@@ -1217,10 +1218,12 @@ goroutines remain outside that guarantee.
 - **Resolver-Scoped Effective Config Plans**: each `FileConfigResolver` owns
   exact-path file entries and exact matched-entry shape entries. Both caches use
   publish-once values so concurrent readers of the same resolver wait for
-  complete initialization. They are discarded with the resolver; CLI fix
-  generations, API requests, LSP lint passes, and config reloads never share a
-  plan cache. Merged config maps and configured-rule slices returned by the
-  resolver are immutable shared state.
+  complete initialization. CLI fix passes reuse the invocation's frozen target
+  and effective plan while rebuilding Program generations. Each API request
+  owns a fresh resolver, while LSP lint passes share the resolver from their
+  committed config generation until a config or project refresh replaces it. Merged config
+  maps and configured-rule slices returned by a resolver are immutable shared
+  state.
 - **Program Loader Session Boundary**: one CLI invocation or API lint request owns one `program/loader.Session`, created only after the request's overlay/canonical VFS wrappers are complete. The session privately composes compiler construction, source snapshots, metadata caches, project loading, target binding, and fix-generation invalidation. It is never global, never shared across API requests, and is not used by LSP, whose project session has a different invalidation model.
 - **Run/Request-Scoped Program Metadata**: successful `package.json` reads and explicitly registered root, project-reference, and extended tsconfig reads are snapshotted for the context lifetime. Keys remain exact caller paths—no cleaning, case folding, resolving real paths, or symlink merging—and failed reads are retried. Per-key read single-flight avoids duplicate concurrent I/O; generation swaps make future VFS writes safe without clearing a live map. Arbitrary JSON and non-metadata reads bypass this layer.
 - **Extended Config Parse Reuse**: the context implements ts-go's `ExtendedConfigCache` shim contract and shares common `extends` parse results across Programs. Parsing occurs outside map locks and publishes with `LoadOrStore`, avoiding recursive cross-cycle lock ordering; rare concurrent misses may duplicate parsing but share the winning immutable result and still single-flight raw bytes. Root `ParsedCommandLine` values and parsed `package.json` objects are not cached.

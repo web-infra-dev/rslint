@@ -55,7 +55,6 @@ func bindTargetToProgram(
 	binding *LoadResult,
 	set ProjectSet,
 	programFiles *programFileIndex,
-	programIndexes []int,
 	programIndex int,
 	targetIndex int,
 	target rslintconfig.PlannedLintTarget,
@@ -66,7 +65,7 @@ func bindTargetToProgram(
 	sourceFile := exactProgramSourceFile(set.compilerPrograms[programIndex], target.Target.Path)
 	if sourceFile == nil {
 		canonicalPath := programFiles.canonicalPath(target.Target.Path, target.Target.CanonicalPath)
-		sourceFile = programFiles.sourceFile(programIndexes, programIndex, canonicalPath)
+		sourceFile = programFiles.sourceFile([]int{programIndex}, programIndex, canonicalPath)
 	}
 	if sourceFile == nil {
 		return false
@@ -110,10 +109,6 @@ func (s *Session) bindTargetsToProjects(
 	if err != nil {
 		return LoadResult{}, nil, err
 	}
-	programIndexes := make([]int, len(set.compilerPrograms))
-	for index := range programIndexes {
-		programIndexes[index] = index
-	}
 	var programFiles *programFileIndex
 	if set.pathIdentities != nil {
 		programFiles = newProgramFileIndexWithResolver(
@@ -137,7 +132,6 @@ func (s *Session) bindTargetsToProjects(
 			&binding,
 			set,
 			programFiles,
-			programIndexes,
 			owner,
 			targetIndex,
 			target,
