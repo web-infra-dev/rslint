@@ -246,14 +246,15 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			environment = *filePlan.environment
 		}
 		baseContext := (rule.RuleContext{
-			SourceFile:     file,
-			Settings:       environment.Settings,
-			Globals:        rule.NewGlobals(environment.LanguageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
-			Comments:       comments,
-			Refs:           refs,
-			BOM:            sourceBOM,
-			TypeChecker:    fileChecker,
-			DisableManager: disableManager,
+			SourceFile:      file,
+			Settings:        environment.Settings,
+			LanguageOptions: environment.LanguageOptions,
+			Globals:         rule.NewGlobals(environment.LanguageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
+			Comments:        comments,
+			Refs:            refs,
+			BOM:             sourceBOM,
+			TypeChecker:     fileChecker,
+			DisableManager:  disableManager,
 		}).WithProgram(sourceProgram).WithFileCache(fileCache)
 
 		for ruleIndex, r := range rules {

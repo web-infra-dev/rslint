@@ -180,6 +180,9 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 		t.Fatalf("captured context = %v, linted files = %d; want one", captured != nil, result.LintedFileCount)
 		return
 	}
+	if got := captured.LanguageOptions; got != languageOptions {
+		t.Fatalf("RuleContext.LanguageOptions = %#v, want %#v", got, languageOptions)
+	}
 
 	for name, want := range configGlobals {
 		if got := captured.Globals.ConfigOverride(name); got != want {
