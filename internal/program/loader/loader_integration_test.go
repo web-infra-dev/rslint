@@ -57,13 +57,24 @@ type streamingTargetProjectFS struct {
 type unreadableProjectConfigFS struct {
 	vfs.FS
 	configPath string
+	mu         sync.Mutex
+	reads      int
 }
 
 func (fsys *unreadableProjectConfigFS) ReadFile(filePath string) (string, bool) {
 	if tspath.NormalizePath(filePath) == fsys.configPath {
+		fsys.mu.Lock()
+		fsys.reads++
+		fsys.mu.Unlock()
 		return "", false
 	}
 	return fsys.FS.ReadFile(filePath)
+}
+
+func (fsys *unreadableProjectConfigFS) readCount() int {
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	return fsys.reads
 }
 
 func (fsys *streamingTargetProjectFS) ReadFile(filePath string) (string, bool) {
@@ -1297,33 +1308,48 @@ func TestBuildTargetProjectKeepsEarlierDirectRoot(t *testing.T) {
 }
 
 func TestBuildTargetProjectIgnoresUnreachedPredictedConfigError(t *testing.T) {
+	previousGOMAXPROCS := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previousGOMAXPROCS) })
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
 		"nested/target.ts":       `export const target = 1;`,
 		"nested/unreadable.json": `{}`,
 		"tsconfig-first.json":    `{"files":["nested/target.ts"],"compilerOptions":{"noLib":true}}`,
 	})
-	configPath := tspath.ResolvePath(dir, "nested/unreadable.json")
-	fsys := &unreadableProjectConfigFS{
-		FS:         bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-		configPath: configPath,
-	}
-	context := newBuildContext(fsys)
-	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
-		testLintTarget(fsys, dir, filepath.Join(dir, "nested/target.ts")),
-	}}
-
-	set, err := sessionForTest(context).buildTargetProjectForTest(
-		dir,
-		projectConfig("./tsconfig-first.json", "./nested/unreadable.json"),
-		plan,
-		false,
-	)
-	if err != nil {
-		t.Fatalf("unreached speculative parse became observable: %v", err)
-	}
-	if set.Len() != 1 {
-		t.Fatalf("selected Programs = %d, want one", set.Len())
+	for _, prefetch := range []bool{false, true} {
+		name := "direct hint"
+		if prefetch {
+			name = "full prefetch"
+		}
+		t.Run(name, func(t *testing.T) {
+			configPath := tspath.ResolvePath(dir, "nested/unreadable.json")
+			fsys := &unreadableProjectConfigFS{
+				FS:         bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+				configPath: configPath,
+			}
+			config := projectConfig("./tsconfig-first.json", "./nested/unreadable.json")
+			resolver, err := rslintconfig.NewProjectPathResolver(nil, config, dir, fsys, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
+				testLintTarget(fsys, dir, filepath.Join(dir, "nested/target.ts")),
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			readsBeforeSelection := fsys.readCount()
+			set, err := NewSession(fsys).SelectProjects(lintPlan, nil, prefetch, false)
+			if err != nil {
+				t.Fatalf("unreached speculative parse became observable: %v", err)
+			}
+			if set.Len() != 1 {
+				t.Fatalf("selected Programs = %d, want one", set.Len())
+			}
+			if got := fsys.readCount(); got <= readsBeforeSelection {
+				t.Fatalf("unreadable later config reads = %d, want more than pre-selection %d", got, readsBeforeSelection)
+			}
+		})
 	}
 }
 

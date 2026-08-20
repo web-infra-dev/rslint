@@ -125,3 +125,47 @@ func TestRootFileIndexUsesAuthoritativeIdentityForCaseAliases(t *testing.T) {
 		}
 	})
 }
+
+func TestRootFileIndexesResolvePhysicalRootsAsOneLazyBatch(t *testing.T) {
+	const (
+		firstRoot      = "/repo/first.ts"
+		secondRoot     = "/repo/second.ts"
+		firstPhysical  = "/physical/first.ts"
+		secondPhysical = "/physical/second.ts"
+	)
+	fsys := &rootFileAliasFS{
+		FS: osvfs.FS(),
+		realPaths: map[string]string{
+			firstRoot:  firstPhysical,
+			secondRoot: secondPhysical,
+		},
+		realpathCalls: make(map[string]int),
+	}
+	resolver := lintprogram.NewPathIdentityResolver(fsys, false, nil)
+	indexes := lintprogram.NewRootFileIndexes(
+		[][]string{{firstRoot}, {secondRoot}},
+		resolver,
+	)
+
+	if !indexes[0].Contains(firstRoot, firstPhysical) {
+		t.Fatal("exact root was not recognized")
+	}
+	if got := fsys.realpathCallCount(firstRoot) + fsys.realpathCallCount(secondRoot); got != 0 {
+		t.Fatalf("exact lookup resolved %d physical root(s), want none", got)
+	}
+	if !indexes[0].Contains(firstPhysical, firstPhysical) {
+		t.Fatal("physical alias of the first root was not recognized")
+	}
+	if got := fsys.realpathCallCount(firstRoot); got != 1 {
+		t.Fatalf("first root Realpath calls = %d, want 1", got)
+	}
+	if got := fsys.realpathCallCount(secondRoot); got != 1 {
+		t.Fatalf("second root Realpath calls = %d, want shared batch to resolve it once", got)
+	}
+	if !indexes[1].Contains(secondPhysical, secondPhysical) {
+		t.Fatal("physical alias of the second root was not recognized")
+	}
+	if got := fsys.realpathCallCount(secondRoot); got != 1 {
+		t.Fatalf("second root was resolved %d times after the shared batch", got)
+	}
+}

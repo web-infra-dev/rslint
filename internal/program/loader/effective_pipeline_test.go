@@ -1,16 +1,278 @@
 package loader
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
+
+func TestSelectProjectsPrefetchPreservesPhysicalRootOrder(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	physicalPath := tspath.ResolvePath(dir, "physical.ts")
+	aliasPath := tspath.ResolvePath(dir, "alias.ts")
+	writeProgramTestFiles(t, dir, map[string]string{
+		"physical.ts":         `export const value = 1;`,
+		"tsconfig-alias.json": `{"files":["alias.ts"],"compilerOptions":{"noLib":true}}`,
+		"tsconfig-exact.json": `{"files":["physical.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	if err := os.Symlink(physicalPath, aliasPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	baseFS := cachedvfs.From(osvfs.FS())
+	fsys := bundled.WrapFS(baseFS)
+	canonicalPath := tspath.NormalizePath(fsys.Realpath(physicalPath))
+	if aliasPath == physicalPath || canonicalPath == "" ||
+		tspath.NormalizePath(fsys.Realpath(aliasPath)) != canonicalPath {
+		t.Fatalf("fixture must expose distinct lexical paths for one physical file")
+	}
+	config := rslintconfig.RslintConfig{lintProjectEntry(
+		[]string{"**/*.ts"},
+		"./tsconfig-alias.json",
+		"./tsconfig-exact.json",
+	)}
+	resolver, err := rslintconfig.NewProjectPathResolver(nil, config, dir, fsys, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
+		Path:            physicalPath,
+		CanonicalPath:   canonicalPath,
+		ConfigDirectory: dir,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := NewSession(fsys)
+	set, err := session.SelectProjects(lintPlan, nil, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Len() != 1 {
+		t.Fatalf("selected Programs = %d, want one", set.Len())
+	}
+	wantConfig := tspath.ResolvePath(dir, "tsconfig-alias.json")
+	if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath); got != wantConfig {
+		t.Fatalf("prefetched physical owner = %q, want earlier alias %q", got, wantConfig)
+	}
+	loaded, err := session.LoadAPI(set, lintPlan, dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.TargetsByProgram) != 1 || len(loaded.TargetsByProgram[0]) != 1 {
+		t.Fatalf("physical target projection = %v", loaded.TargetsByProgram)
+	}
+}
+
+func TestSelectProjectsPrefetchResolvesMissingTargetCanonicalPath(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	physicalPath := tspath.ResolvePath(dir, "physical.ts")
+	aliasPath := tspath.ResolvePath(dir, "alias.ts")
+	writeProgramTestFiles(t, dir, map[string]string{
+		"physical.ts":   `export const value = 1;`,
+		"tsconfig.json": `{"files":["alias.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	if err := os.Symlink(physicalPath, aliasPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	if tspath.NormalizePath(fsys.Realpath(aliasPath)) != tspath.NormalizePath(fsys.Realpath(physicalPath)) {
+		t.Fatal("fixture aliases do not resolve to one physical file")
+	}
+	lintPlan := rslintconfig.LintProjectPlan{Targets: []rslintconfig.PlannedLintTarget{{
+		Target: rslintconfig.DiscoveredLintTarget{
+			Path:            physicalPath,
+			ConfigDirectory: dir,
+		},
+		ProjectPaths: []string{tspath.ResolvePath(dir, "tsconfig.json")},
+	}}}
+
+	session := NewSession(fsys)
+	set, err := session.SelectProjects(lintPlan, nil, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Len() != 1 || set.targetBinding == nil ||
+		!slices.Equal(set.targetBinding.owners, []int{0}) {
+		t.Fatalf("missing-canonical alias binding: set=%d binding=%+v", set.Len(), set.targetBinding)
+	}
+	loaded, err := session.LoadAPI(set, lintPlan, dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.TargetsByProgram) != 1 ||
+		!slices.Equal(loaded.TargetsByProgram[0], []string{aliasPath}) {
+		t.Fatalf("missing-canonical alias projection = %v", loaded.TargetsByProgram)
+	}
+	if got := loaded.TargetPathBySourcePath[aliasPath]; got != physicalPath {
+		t.Fatalf("missing-canonical caller path = %q, want %q", got, physicalPath)
+	}
+}
+
+func TestSelectProjectsPrefetchKeepsDistinctCanonicalCaseIdentities(t *testing.T) {
+	const (
+		dir        = "/repo"
+		upper      = "/repo/Source.ts"
+		lower      = "/repo/source.ts"
+		configPath = "/repo/tsconfig.json"
+	)
+	fsys := &exactCaseProgramFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			upper:      "export const upper = 1;\n",
+			lower:      "export const lower = 2;\n",
+			configPath: `{"files":["Source.ts"],"compilerOptions":{"noLib":true}}`,
+		},
+	}
+	config := rslintconfig.RslintConfig{lintProjectEntry([]string{"**/*.ts"}, "./tsconfig.json")}
+	resolver, err := rslintconfig.NewProjectPathResolver(nil, config, dir, fsys, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
+		Path:            lower,
+		CanonicalPath:   lower,
+		ConfigDirectory: dir,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := NewSession(fsys)
+	set, err := session.SelectProjects(lintPlan, nil, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Len() != 0 || set.targetBinding == nil || !slices.Equal(set.targetBinding.owners, []int{-1}) {
+		t.Fatalf("case-distinct source was claimed by prefetched project: set=%d binding=%+v", set.Len(), set.targetBinding)
+	}
+	loaded, err := session.LoadAPI(set, lintPlan, dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Programs) != 1 || len(loaded.TargetsByProgram) != 1 ||
+		!slices.Equal(loaded.TargetsByProgram[0], []string{lower}) {
+		t.Fatalf("case-distinct target did not remain source-only: %v", loaded.TargetsByProgram)
+	}
+}
+
+func TestSelectProjectsDirectHintIsBoundedAndCannotChooseOwner(t *testing.T) {
+	previousGOMAXPROCS := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previousGOMAXPROCS) })
+	dir := tspath.NormalizePath(t.TempDir())
+	targetPath := tspath.ResolvePath(dir, "nested/target.ts")
+	laterOnlyPath := tspath.ResolvePath(dir, "nested/later-only.ts")
+	writeProgramTestFiles(t, dir, map[string]string{
+		"nested/target.ts":     `export const target = 1;`,
+		"nested/later-only.ts": `export const later = 1;`,
+		"tsconfig-first.json":  `{"files":["nested/target.ts"],"compilerOptions":{"noLib":true}}`,
+		"nested/tsconfig.json": `{"files":["target.ts","later-only.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	config := rslintconfig.RslintConfig{lintProjectEntry(
+		[]string{"**/*.ts"},
+		"./tsconfig-first.json",
+		"./nested/tsconfig.json",
+	)}
+
+	for _, test := range []struct {
+		name           string
+		singleThreaded bool
+		wantHintRead   bool
+	}{
+		{name: "parallel", wantHintRead: true},
+		{name: "single threaded", singleThreaded: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			counting := &programReadCountingFS{
+				FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+				reads: make(map[string]int),
+			}
+			fsys := vfs.FS(counting)
+			resolver, err := rslintconfig.NewProjectPathResolver(nil, config, dir, fsys, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
+				testLintTarget(fsys, dir, targetPath),
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			set, err := NewSession(fsys).SelectProjects(lintPlan, nil, false, test.singleThreaded)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if set.Len() != 1 {
+				t.Fatalf("selected Programs = %d, want one", set.Len())
+			}
+			wantConfig := tspath.ResolvePath(dir, "tsconfig-first.json")
+			if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath); got != wantConfig {
+				t.Fatalf("hint chose owner %q, want earlier declaration %q", got, wantConfig)
+			}
+			if got := counting.readCount(laterOnlyPath); (got > 0) != test.wantHintRead {
+				t.Fatalf("hint-only source reads = %d, want hint read %t", got, test.wantHintRead)
+			}
+		})
+	}
+}
+
+func TestSelectProjectsDirectHintDoesNotPrefetchMultipleProjects(t *testing.T) {
+	previousGOMAXPROCS := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previousGOMAXPROCS) })
+	dir := tspath.NormalizePath(t.TempDir())
+	aTarget := tspath.ResolvePath(dir, "a/target.ts")
+	bTarget := tspath.ResolvePath(dir, "b/target.ts")
+	aOnly := tspath.ResolvePath(dir, "a/hint-only.ts")
+	bOnly := tspath.ResolvePath(dir, "b/hint-only.ts")
+	writeProgramTestFiles(t, dir, map[string]string{
+		"a/target.ts":        `export const a = 1;`,
+		"b/target.ts":        `export const b = 1;`,
+		"a/hint-only.ts":     `export const ah = 1;`,
+		"b/hint-only.ts":     `export const bh = 1;`,
+		"tsconfig-root.json": `{"files":["a/target.ts","b/target.ts"],"compilerOptions":{"noLib":true}}`,
+		"a/tsconfig.json":    `{"files":["target.ts","hint-only.ts"],"compilerOptions":{"noLib":true}}`,
+		"b/tsconfig.json":    `{"files":["target.ts","hint-only.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	counting := &programReadCountingFS{
+		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		reads: make(map[string]int),
+	}
+	fsys := vfs.FS(counting)
+	config := rslintconfig.RslintConfig{lintProjectEntry(
+		[]string{"**/*.ts"},
+		"./tsconfig-root.json",
+		"./a/tsconfig.json",
+		"./b/tsconfig.json",
+	)}
+	resolver, err := rslintconfig.NewProjectPathResolver(nil, config, dir, fsys, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
+		testLintTarget(fsys, dir, aTarget),
+		testLintTarget(fsys, dir, bTarget),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := NewSession(fsys).SelectProjects(lintPlan, nil, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Len() != 1 {
+		t.Fatalf("selected Programs = %d, want one umbrella owner", set.Len())
+	}
+	if got := counting.readCount(aOnly) + counting.readCount(bOnly); got != 0 {
+		t.Fatalf("distinct hints prefetched %d unrelated source(s)", got)
+	}
+}
 
 func lintProjectEntry(files []string, projects ...string) rslintconfig.ConfigEntry {
 	if projects == nil {
@@ -220,19 +482,27 @@ func TestSelectProjectsPreservesPerOwnerProjectOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	session := NewSession(fsys)
-	set, err := session.SelectProjects(lintPlan, nil, false, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if set.targetBinding == nil || !slices.Equal(set.targetBinding.owners, []int{0, 1}) {
-		t.Fatalf("per-owner binding = %+v, want owners [0 1]", set.targetBinding)
-	}
-	loaded, err := session.LoadAPI(set, lintPlan, root, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(loaded.TargetsByProgram) != 2 || len(loaded.TargetsByProgram[0]) != 1 || len(loaded.TargetsByProgram[1]) != 1 {
-		t.Fatalf("per-owner target projection = %v", loaded.TargetsByProgram)
+	for _, prefetch := range []bool{false, true} {
+		name := "focused"
+		if prefetch {
+			name = "prefetched"
+		}
+		t.Run(name, func(t *testing.T) {
+			session := NewSession(fsys)
+			set, err := session.SelectProjects(lintPlan, nil, prefetch, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if set.targetBinding == nil || !slices.Equal(set.targetBinding.owners, []int{0, 1}) {
+				t.Fatalf("per-owner binding = %+v, want owners [0 1]", set.targetBinding)
+			}
+			loaded, err := session.LoadAPI(set, lintPlan, root, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(loaded.TargetsByProgram) != 2 || len(loaded.TargetsByProgram[0]) != 1 || len(loaded.TargetsByProgram[1]) != 1 {
+				t.Fatalf("per-owner target projection = %v", loaded.TargetsByProgram)
+			}
+		})
 	}
 }

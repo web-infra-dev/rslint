@@ -3,7 +3,6 @@ package program
 import (
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
@@ -12,39 +11,79 @@ import (
 // project resolution are deliberately absent.
 type RootFileIndex struct {
 	fileNames      []string
-	fsys           vfs.FS
+	resolver       *PathIdentityResolver
+	batch          *rootFileIndexBatch
 	exactRoots     map[string]struct{}
 	canonicalOnce  sync.Once
 	canonicalRoots map[string]struct{}
 }
 
 func NewRootFileIndex(fileNames []string, fsys vfs.FS) *RootFileIndex {
+	var resolver *PathIdentityResolver
+	if fsys != nil {
+		resolver = NewPathIdentityResolver(fsys, true, nil)
+	}
+	return newRootFileIndex(fileNames, resolver, nil)
+}
+
+// NewRootFileIndexWithResolver shares one generation-local physical identity
+// cache with other root or Program source indexes.
+func NewRootFileIndexWithResolver(
+	fileNames []string,
+	resolver *PathIdentityResolver,
+) *RootFileIndex {
+	return newRootFileIndex(fileNames, resolver, nil)
+}
+
+// NewRootFileIndexes constructs root indexes that preserve exact-first lookup.
+// Their first physical miss lazily resolves all supplied roots as one batch.
+func NewRootFileIndexes(
+	fileNamesByProject [][]string,
+	resolver *PathIdentityResolver,
+) []*RootFileIndex {
+	rootPaths := make([]string, 0)
+	for _, fileNames := range fileNamesByProject {
+		rootPaths = append(rootPaths, fileNames...)
+	}
+	batch := &rootFileIndexBatch{resolver: resolver, rootPaths: rootPaths}
+	indexes := make([]*RootFileIndex, len(fileNamesByProject))
+	for project, fileNames := range fileNamesByProject {
+		indexes[project] = newRootFileIndex(fileNames, resolver, batch)
+	}
+	return indexes
+}
+
+type rootFileIndexBatch struct {
+	once      sync.Once
+	resolver  *PathIdentityResolver
+	rootPaths []string
+}
+
+func (batch *rootFileIndexBatch) resolve() {
+	if batch == nil || batch.resolver == nil {
+		return
+	}
+	batch.once.Do(func() {
+		batch.resolver.CanonicalPathIDs(batch.rootPaths)
+		batch.rootPaths = nil
+	})
+}
+
+func newRootFileIndex(
+	fileNames []string,
+	resolver *PathIdentityResolver,
+	batch *rootFileIndexBatch,
+) *RootFileIndex {
 	exactRoots := make(map[string]struct{}, len(fileNames))
 	for _, rootFileName := range fileNames {
-		exactRoots[rootFilePathID(rootFileName)] = struct{}{}
+		exactRoots[pathIdentityID(rootFileName)] = struct{}{}
 	}
 	return &RootFileIndex{
 		fileNames:  append([]string(nil), fileNames...),
-		fsys:       fsys,
+		resolver:   resolver,
+		batch:      batch,
 		exactRoots: exactRoots,
 	}
-}
-
-func rootFilePathID(filePath string) string {
-	// A filesystem-wide case flag cannot prove that two overlay paths identify
-	// one file. Keep lexical and canonical identities exact; Realpath is the
-	// only authority allowed to merge native case aliases.
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
-}
-
-func rootFileCanonicalPathID(filePath string, fsys vfs.FS) string {
-	filePath = tspath.NormalizePath(filePath)
-	if fsys != nil {
-		if realPath := fsys.Realpath(filePath); realPath != "" {
-			filePath = tspath.NormalizePath(realPath)
-		}
-	}
-	return rootFilePathID(filePath)
 }
 
 // Contains reports whether fileName is a direct config root. canonicalFileName
@@ -54,25 +93,31 @@ func (index *RootFileIndex) Contains(fileName string, canonicalFileName string) 
 	if index == nil || fileName == "" {
 		return false
 	}
-	if _, ok := index.exactRoots[rootFilePathID(fileName)]; ok {
+	if _, ok := index.exactRoots[pathIdentityID(fileName)]; ok {
 		return true
 	}
-	if index.fsys == nil {
+	if index.resolver == nil {
 		return false
 	}
 	index.canonicalOnce.Do(func() {
+		index.batch.resolve()
 		index.canonicalRoots = make(map[string]struct{}, len(index.fileNames))
-		for _, rootFileName := range index.fileNames {
-			index.canonicalRoots[rootFileCanonicalPathID(rootFileName, index.fsys)] = struct{}{}
+		for _, canonicalID := range index.resolver.CanonicalPathIDs(index.fileNames) {
+			if canonicalID != "" {
+				index.canonicalRoots[canonicalID] = struct{}{}
+			}
 		}
 	})
 	canonicalID := ""
 	if canonicalFileName != "" {
 		// Discovery already paid for this physical identity. Do not resolve it
 		// again for every project probed during broad target binding.
-		canonicalID = rootFilePathID(canonicalFileName)
+		canonicalID = pathIdentityID(canonicalFileName)
 	} else {
-		canonicalID = rootFileCanonicalPathID(fileName, index.fsys)
+		canonicalIDs := index.resolver.CanonicalPathIDs([]string{fileName})
+		if len(canonicalIDs) > 0 {
+			canonicalID = canonicalIDs[0]
+		}
 	}
 	_, ok := index.canonicalRoots[canonicalID]
 	return ok

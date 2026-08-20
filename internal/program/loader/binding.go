@@ -101,16 +101,14 @@ func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.S
 // consulting the filesystem, and unknown source paths are resolved at most once
 // across all Programs in the pass.
 type programFileIndex struct {
-	programs              []*compiler.Program
-	targets               []rslintconfig.DiscoveredLintTarget
-	fsys                  vfs.FS
-	singleThreaded        bool
-	initialized           bool
-	builtByProgram        []bool
-	sourcesByProgram      []map[string]*ast.SourceFile
-	targetCanonicalIDs    map[string]struct{}
-	canonicalBySourcePath map[string]string
-	directoryIdentities   map[string]programDirectoryIdentity
+	programs           []*compiler.Program
+	targets            []rslintconfig.DiscoveredLintTarget
+	fsys               vfs.FS
+	identities         *lintprogram.PathIdentityResolver
+	initialized        bool
+	builtByProgram     []bool
+	sourcesByProgram   []map[string]*ast.SourceFile
+	targetCanonicalIDs map[string]struct{}
 }
 
 func newProgramFileIndex(
@@ -119,11 +117,32 @@ func newProgramFileIndex(
 	fsys vfs.FS,
 	singleThreaded bool,
 ) *programFileIndex {
+	known := make([]lintprogram.PathIdentity, len(targets))
+	for index, target := range targets {
+		known[index] = lintprogram.PathIdentity{
+			Path:          target.Path,
+			CanonicalPath: target.CanonicalPath,
+		}
+	}
+	return newProgramFileIndexWithResolver(
+		programs,
+		targets,
+		fsys,
+		lintprogram.NewPathIdentityResolver(fsys, singleThreaded, known),
+	)
+}
+
+func newProgramFileIndexWithResolver(
+	programs []*compiler.Program,
+	targets []rslintconfig.DiscoveredLintTarget,
+	fsys vfs.FS,
+	identities *lintprogram.PathIdentityResolver,
+) *programFileIndex {
 	return &programFileIndex{
-		programs:       programs,
-		targets:        targets,
-		fsys:           fsys,
-		singleThreaded: singleThreaded,
+		programs:   programs,
+		targets:    targets,
+		fsys:       fsys,
+		identities: identities,
 	}
 }
 
@@ -135,24 +154,17 @@ func (index *programFileIndex) initialize() {
 	index.builtByProgram = make([]bool, len(index.programs))
 	index.sourcesByProgram = make([]map[string]*ast.SourceFile, len(index.programs))
 	index.targetCanonicalIDs = make(map[string]struct{}, len(index.targets))
-	index.canonicalBySourcePath = make(map[string]string, len(index.targets)*2)
-	// Seed physical identities first so a lexical hint cannot overwrite a path
-	// that is itself the canonical identity of another target.
+	var unresolvedPaths []string
 	for _, target := range index.targets {
-		if target.CanonicalPath == "" {
-			continue
+		if target.CanonicalPath != "" {
+			index.targetCanonicalIDs[exactPathID(target.CanonicalPath)] = struct{}{}
+		} else if target.Path != "" {
+			unresolvedPaths = append(unresolvedPaths, target.Path)
 		}
-		canonicalID := exactPathID(target.CanonicalPath)
-		index.targetCanonicalIDs[canonicalID] = struct{}{}
-		index.canonicalBySourcePath[canonicalID] = canonicalID
 	}
-	for _, target := range index.targets {
-		if target.Path == "" || target.CanonicalPath == "" {
-			continue
-		}
-		sourcePathID := exactPathID(target.Path)
-		if _, isCanonicalTarget := index.targetCanonicalIDs[sourcePathID]; !isCanonicalTarget {
-			index.canonicalBySourcePath[sourcePathID] = exactPathID(target.CanonicalPath)
+	for _, canonicalID := range index.identities.CanonicalPathIDs(unresolvedPaths) {
+		if canonicalID != "" {
+			index.targetCanonicalIDs[canonicalID] = struct{}{}
 		}
 	}
 	index.targets = nil
@@ -174,134 +186,25 @@ func (index *programFileIndex) sourceFile(
 	return index.sourcesByProgram[programIndex][exactPathID(canonicalTarget)]
 }
 
+func (index *programFileIndex) canonicalPath(path string, canonicalPath string) string {
+	if canonicalPath != "" || index == nil || path == "" {
+		return canonicalPath
+	}
+	canonicalIDs := index.identities.CanonicalPathIDs([]string{path})
+	if len(canonicalIDs) == 0 {
+		return ""
+	}
+	return canonicalIDs[0]
+}
+
 type programSourceMembership struct {
 	programIndex int
 	sourceIndex  int
-	canonicalID  string
 	sourceFile   *ast.SourceFile
-}
-
-type programDirectoryIdentity struct {
-	canonicalPath string
-	entries       vfs.Entries
-}
-
-func regularFileNameFromEntries(entries vfs.Entries, fileName string, useCaseSensitive bool) (string, bool) {
-	if entries.Symlinks == nil {
-		return "", false
-	}
-	canonicalFileName := tspath.GetCanonicalFileName(fileName, useCaseSensitive)
-	match := ""
-	for _, entryName := range entries.Files {
-		if tspath.GetCanonicalFileName(entryName, useCaseSensitive) != canonicalFileName {
-			continue
-		}
-		if match != "" && match != entryName {
-			return "", false
-		}
-		match = entryName
-	}
-	if match == "" {
-		return "", false
-	}
-	if _, isSymlink := entries.Symlinks[match]; isSymlink {
-		return "", false
-	}
-	// GetAccessibleEntries supplies the filesystem's actual casing. Once its
-	// complete metadata proves this entry is regular, realpath(file) is exactly
-	// realpath(parent) joined with this name.
-	return match, true
-}
-
-func (index *programFileIndex) canonicalSourcePathIDs(sourcePaths []string) []string {
-	canonicalIDs := make([]string, len(sourcePaths))
-	if len(sourcePaths) == 0 {
-		return canonicalIDs
-	}
-	if index.directoryIdentities == nil {
-		index.directoryIdentities = make(map[string]programDirectoryIdentity)
-	}
-
-	sourceIndexesByDirectoryID := make(map[string][]int)
-	directoryPathByID := make(map[string]string)
-	for i, sourcePath := range sourcePaths {
-		directoryPath := tspath.GetDirectoryPath(sourcePath)
-		directoryID := exactPathID(directoryPath)
-		directoryPathByID[directoryID] = directoryPath
-		sourceIndexesByDirectoryID[directoryID] = append(sourceIndexesByDirectoryID[directoryID], i)
-	}
-
-	directoryIDs := make([]string, 0, len(sourceIndexesByDirectoryID))
-	for directoryID := range sourceIndexesByDirectoryID {
-		directoryIDs = append(directoryIDs, directoryID)
-	}
-	sort.Strings(directoryIDs)
-	pendingIdentities := make([]programDirectoryIdentity, len(directoryIDs))
-	hasPendingIdentity := make([]bool, len(directoryIDs))
-	useCaseSensitive := index.fsys.UseCaseSensitiveFileNames()
-	work := core.NewWorkGroup(index.singleThreaded)
-	queueSource := func(sourceIndex int, directory programDirectoryIdentity) {
-		work.Queue(func() {
-			sourcePath := sourcePaths[sourceIndex]
-			fileName, regular := regularFileNameFromEntries(
-				directory.entries,
-				tspath.GetBaseFileName(sourcePath),
-				useCaseSensitive,
-			)
-			if regular {
-				canonicalIDs[sourceIndex] = exactPathID(
-					tspath.CombinePaths(directory.canonicalPath, fileName),
-				)
-			} else {
-				canonicalIDs[sourceIndex] = canonicalPathID(sourcePath, index.fsys)
-			}
-		})
-	}
-	for directoryIndex, directoryID := range directoryIDs {
-		sourceIndexes := sourceIndexesByDirectoryID[directoryID]
-		directory, cached := index.directoryIdentities[directoryID]
-		if len(sourceIndexes) == 1 && !cached {
-			sourceIndex := sourceIndexes[0]
-			work.Queue(func() {
-				canonicalIDs[sourceIndex] = canonicalPathID(sourcePaths[sourceIndex], index.fsys)
-			})
-			continue
-		}
-		if cached {
-			for _, sourceIndex := range sourceIndexes {
-				queueSource(sourceIndex, directory)
-			}
-		} else {
-			work.Queue(func() {
-				directoryPath := directoryPathByID[directoryID]
-				directory = programDirectoryIdentity{
-					canonicalPath: authoritativePath(directoryPath, index.fsys),
-					entries:       index.fsys.GetAccessibleEntries(directoryPath),
-				}
-				pendingIdentities[directoryIndex] = directory
-				hasPendingIdentity[directoryIndex] = true
-				// Queue per-file work before the directory task returns. A
-				// WorkGroup permits nested Queue calls until RunAndWait has
-				// returned, retaining file-level parallelism without a second
-				// directory-to-file barrier.
-				for _, sourceIndex := range sourceIndexes {
-					queueSource(sourceIndex, directory)
-				}
-			})
-		}
-	}
-	work.RunAndWait()
-	for i, resolved := range hasPendingIdentity {
-		if resolved {
-			index.directoryIdentities[directoryIDs[i]] = pendingIdentities[i]
-		}
-	}
-	return canonicalIDs
 }
 
 func (index *programFileIndex) buildPrograms(programIndexes []int) {
 	sourceIndexByPath := make(map[string]int)
-	var sourcePathIDs []string
 	var sourcePaths []string
 	var memberships []programSourceMembership
 
@@ -319,37 +222,24 @@ func (index *programFileIndex) buildPrograms(programIndexes []int) {
 		for _, sourceFile := range program.GetSourceFiles() {
 			sourcePath := tspath.NormalizePath(sourceFile.FileName())
 			sourcePathID := exactPathID(sourcePath)
-			canonicalID, known := index.canonicalBySourcePath[sourcePathID]
-			sourceIndex := -1
-			if !known {
-				var pending bool
-				sourceIndex, pending = sourceIndexByPath[sourcePathID]
-				if !pending {
-					sourceIndex = len(sourcePaths)
-					sourceIndexByPath[sourcePathID] = sourceIndex
-					sourcePathIDs = append(sourcePathIDs, sourcePathID)
-					sourcePaths = append(sourcePaths, sourcePath)
-				}
+			sourceIndex, exists := sourceIndexByPath[sourcePathID]
+			if !exists {
+				sourceIndex = len(sourcePaths)
+				sourceIndexByPath[sourcePathID] = sourceIndex
+				sourcePaths = append(sourcePaths, sourcePath)
 			}
 			memberships = append(memberships, programSourceMembership{
 				programIndex: programIndex,
 				sourceIndex:  sourceIndex,
-				canonicalID:  canonicalID,
 				sourceFile:   sourceFile,
 			})
 		}
 	}
 
-	canonicalIDs := index.canonicalSourcePathIDs(sourcePaths)
-	for i, sourcePathID := range sourcePathIDs {
-		index.canonicalBySourcePath[sourcePathID] = canonicalIDs[i]
-	}
+	canonicalIDs := index.identities.CanonicalPathIDs(sourcePaths)
 
 	for _, membership := range memberships {
-		canonicalID := membership.canonicalID
-		if membership.sourceIndex >= 0 {
-			canonicalID = canonicalIDs[membership.sourceIndex]
-		}
+		canonicalID := canonicalIDs[membership.sourceIndex]
 		if _, isTarget := index.targetCanonicalIDs[canonicalID]; !isTarget {
 			continue
 		}

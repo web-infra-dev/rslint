@@ -65,7 +65,8 @@ func bindTargetToProgram(
 	}
 	sourceFile := exactProgramSourceFile(set.compilerPrograms[programIndex], target.Target.Path)
 	if sourceFile == nil {
-		sourceFile = programFiles.sourceFile(programIndexes, programIndex, target.Target.CanonicalPath)
+		canonicalPath := programFiles.canonicalPath(target.Target.Path, target.Target.CanonicalPath)
+		sourceFile = programFiles.sourceFile(programIndexes, programIndex, canonicalPath)
 	}
 	if sourceFile == nil {
 		return false

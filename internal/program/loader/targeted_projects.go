@@ -39,7 +39,7 @@ func (metadata *targetedProjectMetadata) Supports(target projectselection.Target
 type targetedProjectSlot struct {
 	parseOnce sync.Once
 	config    *tsoptions.ParsedCommandLine
-	metadata  *targetedProjectMetadata
+	rootFiles *lintprogram.RootFileIndex
 	parseErr  error
 
 	buildOnce sync.Once
@@ -53,18 +53,73 @@ type targetedProjectSlot struct {
 }
 
 type targetedProjectExecution struct {
-	session        *Session
-	plan           projectPlan
-	singleThreaded bool
-	slots          []targetedProjectSlot
+	session         *Session
+	plan            projectPlan
+	singleThreaded  bool
+	slots           []targetedProjectSlot
+	identities      *lintprogram.PathIdentityResolver
+	prefetchedFiles *programFileIndex
 }
 
-func newTargetedProjectExecution(session *Session, plan projectPlan, singleThreaded bool) *targetedProjectExecution {
+func (execution *targetedProjectExecution) preparePrefetchedEvidence(
+	targets []projectselection.Target,
+	candidateIndexes []int,
+) {
+	programs := make([]*compiler.Program, len(execution.slots))
+	discoveredTargets := make([]rslintconfig.DiscoveredLintTarget, len(targets))
+	for targetIndex, target := range targets {
+		discoveredTargets[targetIndex] = rslintconfig.DiscoveredLintTarget{
+			Path:          target.Path,
+			CanonicalPath: target.CanonicalPath,
+		}
+	}
+	for project := range execution.slots {
+		programs[project] = execution.slots[project].program
+	}
+	execution.prefetchedFiles = newProgramFileIndexWithResolver(
+		programs,
+		discoveredTargets,
+		execution.session.FS(),
+		execution.identities,
+	)
+	rootFilesByCandidate := make([][]string, len(candidateIndexes))
+	for candidate, project := range candidateIndexes {
+		if config := execution.slots[project].config; config != nil {
+			rootFilesByCandidate[candidate] = config.FileNames()
+		}
+	}
+	rootIndexes := lintprogram.NewRootFileIndexes(
+		rootFilesByCandidate,
+		execution.prefetchedFiles.identities,
+	)
+	for candidate, project := range candidateIndexes {
+		execution.slots[project].rootFiles = rootIndexes[candidate]
+	}
+}
+
+func newTargetedProjectExecution(
+	session *Session,
+	plan projectPlan,
+	targets []projectselection.Target,
+	singleThreaded bool,
+) *targetedProjectExecution {
+	known := make([]lintprogram.PathIdentity, len(targets))
+	for index, target := range targets {
+		known[index] = lintprogram.PathIdentity{
+			Path:          target.Path,
+			CanonicalPath: target.CanonicalPath,
+		}
+	}
 	execution := &targetedProjectExecution{
 		session:        session,
 		plan:           plan,
 		singleThreaded: singleThreaded,
 		slots:          make([]targetedProjectSlot, len(plan.specs)),
+		identities: lintprogram.NewPathIdentityResolver(
+			session.FS(),
+			singleThreaded,
+			known,
+		),
 	}
 	for index := range execution.slots {
 		execution.slots[index].buildDone = make(chan struct{})
@@ -96,16 +151,27 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 			slot.parseErr = errors.New("no parsed config returned")
 		}
 		if slot.parseErr == nil {
-			slot.metadata = &targetedProjectMetadata{
-				config:    slot.config,
-				rootFiles: lintprogram.NewRootFileIndex(slot.config.FileNames(), execution.session.FS()),
-			}
+			slot.rootFiles = lintprogram.NewRootFileIndexWithResolver(
+				slot.config.FileNames(),
+				execution.identities,
+			)
 		}
 	})
 	if slot.parseErr != nil {
 		return nil, fmt.Errorf("parse TypeScript config %q: %w", spec.tsconfigPath, slot.parseErr)
 	}
 	return slot, nil
+}
+
+func (execution *targetedProjectExecution) metadata(index int) (*targetedProjectMetadata, error) {
+	slot, err := execution.parse(index)
+	if err != nil {
+		return nil, err
+	}
+	return &targetedProjectMetadata{
+		config:    slot.config,
+		rootFiles: slot.rootFiles,
+	}, nil
 }
 
 func (execution *targetedProjectExecution) build(index int) error {
@@ -140,6 +206,16 @@ func (execution *targetedProjectExecution) buildError(index int) error {
 }
 
 func (execution *targetedProjectExecution) containsTarget(index int, target projectselection.Target) bool {
+	if files := execution.prefetchedFiles; files != nil {
+		if index < 0 || index >= len(files.programs) {
+			return false
+		}
+		if exactProgramSourceFile(files.programs[index], target.Path) != nil {
+			return true
+		}
+		canonicalPath := files.canonicalPath(target.Path, target.CanonicalPath)
+		return files.sourceFile(target.Projects, index, canonicalPath) != nil
+	}
 	slot := &execution.slots[index]
 	if slot.program == nil {
 		return false
@@ -207,11 +283,65 @@ func (queue *targetedProjectBuildQueue) await(index int) error {
 	return queue.execution.buildError(index)
 }
 
+func (queue *targetedProjectBuildQueue) awaitCompletion(index int) {
+	queue.enqueue(index)
+	<-queue.execution.slots[index].buildDone
+}
+
 func (queue *targetedProjectBuildQueue) wait() {
 	if queue.parallel && queue.jobs != nil {
 		close(queue.jobs)
 		queue.workers.Wait()
 	}
+}
+
+// scheduleDirectHint overlaps one provably-direct Program with the ordered
+// metadata frontier. Proximity is only a bounded scheduling hint: the shared
+// selector still scans every earlier candidate and alone commits ownership or
+// observes errors. Requiring one request-wide project avoids turning a focused
+// multi-project request into eager construction.
+func (execution *targetedProjectExecution) scheduleDirectHint(
+	targets []projectselection.Target,
+	builds *targetedProjectBuildQueue,
+) {
+	if builds == nil || !builds.parallel || len(targets) == 0 {
+		return
+	}
+	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}
+	hintedProject := -1
+	for _, target := range targets {
+		project := -1
+		bestDirectoryLength := -1
+		for _, candidate := range target.Projects {
+			if candidate < 0 || candidate >= len(execution.plan.specs) {
+				continue
+			}
+			directory := execution.plan.specs[candidate].programCwd
+			if !tspath.ContainsPath(directory, target.Path, options) ||
+				len(directory) <= bestDirectoryLength {
+				continue
+			}
+			project = candidate
+			bestDirectoryLength = len(directory)
+		}
+		if project < 0 || hintedProject >= 0 && hintedProject != project {
+			return
+		}
+		hintedProject = project
+	}
+	if hintedProject < 0 {
+		return
+	}
+	slot, err := execution.parse(hintedProject)
+	if err != nil || slot.rootFiles == nil {
+		return
+	}
+	for _, target := range targets {
+		if !slot.rootFiles.Contains(target.Path, target.CanonicalPath) {
+			return
+		}
+	}
+	builds.enqueue(hintedProject)
 }
 
 func buildProjectPathPlan(paths ...[]string) (projectPlan, [][]int) {
@@ -292,7 +422,7 @@ func (s *Session) SelectProjects(
 	if len(plan.specs) == 0 {
 		return projectSetWithoutProjects(lintPlan, catalogRequested), nil
 	}
-	execution := newTargetedProjectExecution(s, plan, singleThreaded)
+	execution := newTargetedProjectExecution(s, plan, selectionTargets, singleThreaded)
 	builds := newTargetedProjectBuildQueue(execution)
 	defer builds.wait()
 
@@ -307,20 +437,36 @@ func (s *Session) SelectProjects(
 			return ProjectSet{}, err
 		}
 	}
+	if !prefetchCandidates {
+		execution.scheduleDirectHint(selectionTargets, builds)
+	}
 	if prefetchCandidates {
+		candidateIndexes := make([]int, 0, len(plan.specs))
+		candidateSeen := make([]bool, len(plan.specs))
 		for _, target := range selectionTargets {
 			for _, project := range target.Projects {
 				builds.enqueue(project)
+				if !candidateSeen[project] {
+					candidateSeen[project] = true
+					candidateIndexes = append(candidateIndexes, project)
+				}
 			}
 		}
+		// Prefetch is a provider scheduling policy: complete the bounded build
+		// phase without observing its errors, then expose batched root/source
+		// evidence to the same selector used by focused requests.
+		for _, project := range candidateIndexes {
+			builds.awaitCompletion(project)
+		}
+		execution.preparePrefetchedEvidence(selectionTargets, candidateIndexes)
 	}
 
 	loadMetadata := func(project int) (projectselection.Metadata, bool, error) {
-		slot, err := execution.parse(project)
+		metadata, err := execution.metadata(project)
 		if err != nil {
 			return nil, false, err
 		}
-		return slot.metadata, slot.metadata != nil, nil
+		return metadata, metadata != nil, nil
 	}
 	loadProject := func(project int) (bool, error) {
 		if err := builds.await(project); err != nil {
