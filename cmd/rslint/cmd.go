@@ -413,58 +413,15 @@ func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (in
 	return 0, ""
 }
 
-// shouldPrefetchProjectCandidates reports whether the recursive directory
-// scope covers every active config owner. It changes only when candidate
-// Programs are scheduled; project candidates and ownership are still decided
-// by the same effective-config plan and selector.
+// shouldPrefetchProjectCandidates reports whether this is a recursive
+// directory batch with at least one admitted lint target. It changes only
+// candidate scheduling; effective config still defines each target's
+// candidates and the shared selector still decides ownership and errors.
 func shouldPrefetchProjectCandidates(
 	allowDirs []string,
 	targetPlan rslintconfig.LintTargetPlan,
-	configScopes map[string]rslintconfig.LintDiscoveryScope,
-	fsys vfs.FS,
 ) bool {
-	if len(allowDirs) == 0 || len(targetPlan.Targets) == 0 {
-		return false
-	}
-	activeOwners := make(map[string]struct{})
-	for _, target := range targetPlan.Targets {
-		activeOwners[target.ConfigDirectory] = struct{}{}
-	}
-	for owner := range activeOwners {
-		if configScopes[owner].ExplicitOnly {
-			return false
-		}
-		covered := false
-		for _, directory := range allowDirs {
-			if containsProjectOwner(directory, owner, fsys) {
-				covered = true
-				break
-			}
-		}
-		if !covered {
-			return false
-		}
-	}
-	return true
-}
-
-func containsProjectOwner(directory string, owner string, fsys vfs.FS) bool {
-	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}
-	directory = tspath.NormalizePath(directory)
-	owner = tspath.NormalizePath(owner)
-	if tspath.ContainsPath(directory, owner, options) {
-		return true
-	}
-	if fsys == nil {
-		return false
-	}
-	physicalDirectory := fsys.Realpath(directory)
-	physicalOwner := fsys.Realpath(owner)
-	return physicalDirectory != "" && physicalOwner != "" && tspath.ContainsPath(
-		tspath.NormalizePath(physicalDirectory),
-		tspath.NormalizePath(physicalOwner),
-		options,
-	)
+	return len(allowDirs) > 0 && len(targetPlan.Targets) > 0
 }
 
 func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]rslintconfig.RslintConfig {
@@ -923,8 +880,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	prefetchCandidates := !typeCheckOnly && shouldPrefetchProjectCandidates(
 		allowDirs,
 		targetPlan,
-		configTargetScopes,
-		fs,
 	)
 	projectSet, err = programSession.SelectProjects(
 		lintProjectPlan,

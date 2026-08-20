@@ -40,21 +40,6 @@ type commandReadCountingFS struct {
 	reads map[string]int
 }
 
-type projectOwnerIdentityFS struct {
-	vfs.FS
-	realPaths map[string]string
-}
-
-func (fsys *projectOwnerIdentityFS) UseCaseSensitiveFileNames() bool { return false }
-
-func (fsys *projectOwnerIdentityFS) Realpath(path string) string {
-	path = tspath.NormalizePath(path)
-	if realPath := fsys.realPaths[path]; realPath != "" {
-		return tspath.NormalizePath(realPath)
-	}
-	return path
-}
-
 func (fsys *commandReadCountingFS) ReadFile(fileName string) (string, bool) {
 	fileName = tspath.NormalizePath(fileName)
 	fsys.mu.Lock()
@@ -839,30 +824,23 @@ func TestShouldPrefetchProjectCandidates(t *testing.T) {
 	tests := []struct {
 		name      string
 		allowDirs []string
-		owners    []string
-		scopes    map[string]rslintconfig.LintDiscoveryScope
+		targets   int
 		want      bool
 	}{
-		{name: "local owner is covered", allowDirs: []string{"/repo/packages/a"}, owners: []string{"/repo/packages/a"}, want: true},
-		{name: "parent owner is not covered", allowDirs: []string{"/repo/packages/a"}, owners: []string{"/repo"}},
-		{name: "multiple directories cover multiple owners", allowDirs: []string{"/repo/a", "/repo/b"}, owners: []string{"/repo/a", "/repo/b"}, want: true},
-		{name: "one owner is uncovered", allowDirs: []string{"/repo/a"}, owners: []string{"/repo/a", "/repo/b"}},
-		{name: "file only has no recursive directory", owners: []string{"/repo"}},
-		{name: "literal-only owner vetoes prefetch", allowDirs: []string{"/repo"}, owners: []string{"/repo"}, scopes: map[string]rslintconfig.LintDiscoveryScope{
-			"/repo": {ExplicitOnly: true},
-		}},
+		{name: "file only", targets: 1},
+		{name: "empty directory batch", allowDirs: []string{"/repo"}},
+		{name: "one directory", allowDirs: []string{"/repo/packages/a"}, targets: 1, want: true},
+		{name: "multiple directories", allowDirs: []string{"/repo/a", "/repo/b"}, targets: 2, want: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			targets := make([]rslintconfig.DiscoveredLintTarget, len(test.owners))
-			for index, owner := range test.owners {
-				targets[index] = rslintconfig.DiscoveredLintTarget{Path: owner + "/target.ts", ConfigDirectory: owner}
+			targets := make([]rslintconfig.DiscoveredLintTarget, test.targets)
+			for index := range targets {
+				targets[index] = rslintconfig.DiscoveredLintTarget{Path: fmt.Sprintf("/repo/target-%d.ts", index)}
 			}
 			if got := shouldPrefetchProjectCandidates(
 				test.allowDirs,
 				rslintconfig.LintTargetPlan{Targets: targets},
-				test.scopes,
-				nil,
 			); got != test.want {
 				t.Fatalf("shouldPrefetchProjectCandidates() = %t, want %t", got, test.want)
 			}
@@ -870,48 +848,7 @@ func TestShouldPrefetchProjectCandidates(t *testing.T) {
 	}
 }
 
-func TestContainsProjectOwnerUsesExactAndPhysicalPathIdentity(t *testing.T) {
-	fsys := &projectOwnerIdentityFS{
-		FS: osvfs.FS(),
-		realPaths: map[string]string{
-			"c:/repo/packages/a":            "C:/Repo/Packages/A",
-			"C:/REPO/PACKAGES/A":            "C:/Repo/Packages/A",
-			"//server/share/repo/a":         "//Server/Share/Repo/A",
-			"//SERVER/SHARE/REPO/A":         "//Server/Share/Repo/A",
-			"/aliases/work/packages/a":      "/physical/work/packages/a",
-			"/physical/work/packages/a":     "/physical/work/packages/a",
-			"/repo/Foo":                     "/physical/Foo",
-			"/repo/foo":                     "/physical/foo",
-			"/aliases/work/packages/nested": "/physical/work/packages/nested",
-		},
-	}
-	tests := []struct {
-		name      string
-		directory string
-		owner     string
-		want      bool
-	}{
-		{name: "Windows drive root is case insensitive", directory: "c:/Repo", owner: "C:/Repo/packages/a", want: true},
-		{name: "Windows component casing uses Realpath", directory: "c:/repo/packages/a", owner: "C:/REPO/PACKAGES/A", want: true},
-		{name: "different Windows drives", directory: "C:/Repo", owner: "D:/Repo/packages/a"},
-		{name: "UNC casing uses Realpath", directory: "//server/share/repo/a", owner: "//SERVER/SHARE/REPO/A", want: true},
-		{name: "different UNC share", directory: "//server/share/repo", owner: "//server/share-other/repo"},
-		{name: "different UNC server", directory: "//server/share/repo", owner: "//other/share/repo"},
-		{name: "directory boundary", directory: "/repo/a", owner: "/repo/ab"},
-		{name: "physical alias", directory: "/aliases/work/packages/a", owner: "/physical/work/packages/a", want: true},
-		{name: "nested alias does not cover parent owner", directory: "/aliases/work/packages/nested", owner: "/physical/work"},
-		{name: "case-folding does not merge distinct physical owners", directory: "/repo/Foo", owner: "/repo/foo"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := containsProjectOwner(test.directory, test.owner, fsys); got != test.want {
-				t.Fatalf("containsProjectOwner(%q, %q) = %t, want %t", test.directory, test.owner, got, test.want)
-			}
-		})
-	}
-}
-
-func TestExecuteLintPipelinePrefetchesOnlyWhenDirectoryCoversConfigOwner(t *testing.T) {
+func TestExecuteLintPipelineUsesDirectProjectHintForDirectoryBatch(t *testing.T) {
 	root := t.TempDir()
 	packageA := filepath.Join(root, "packages", "a")
 	packageB := filepath.Join(root, "packages", "b")
@@ -959,13 +896,12 @@ func TestExecuteLintPipelinePrefetchesOnlyWhenDirectoryCoversConfigOwner(t *test
 		owner         string
 		cwd           string
 		implicitScope bool
-		wantBRead     bool
 	}{
-		{name: "explicit child directory with local owner", owner: packageA, cwd: root, wantBRead: true},
+		{name: "explicit child directory with local owner", owner: packageA, cwd: root},
 		{name: "explicit child directory with parent owner", owner: root, cwd: root},
 		{name: "nested cwd dot with parent owner", owner: root, cwd: packageA},
 		{name: "nested cwd implicit scope with parent owner", owner: root, cwd: packageA, implicitScope: true},
-		{name: "nested cwd implicit scope owns local config", owner: packageA, cwd: packageA, implicitScope: true, wantBRead: true},
+		{name: "nested cwd implicit scope owns local config", owner: packageA, cwd: packageA, implicitScope: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -989,9 +925,87 @@ func TestExecuteLintPipelinePrefetchesOnlyWhenDirectoryCoversConfigOwner(t *test
 			if code != 1 || !strings.Contains(stdout, "@typescript-eslint/no-unsafe-member-access") {
 				t.Fatalf("target did not run with type info: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 			}
-			gotBRead := fsys.readCount(unrelatedPath) > 0
-			if gotBRead != test.wantBRead {
-				t.Fatalf("unrelated sibling Program read = %t, want %t (count=%d)", gotBRead, test.wantBRead, fsys.readCount(unrelatedPath))
+			if got := fsys.readCount(unrelatedPath); got != 0 {
+				t.Fatalf("complete direct hint still prefetched unrelated sibling Program %d time(s)", got)
+			}
+		})
+	}
+}
+
+func TestExecuteLintPipelinePrefetchesDistinctRecursiveDirectoryCandidates(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	packageA := tspath.ResolvePath(root, "packages/a")
+	packageB := tspath.ResolvePath(root, "packages/b")
+	aTarget := tspath.ResolvePath(packageA, "target.ts")
+	bTarget := tspath.ResolvePath(packageB, "target.ts")
+	aOnly := tspath.ResolvePath(packageA, "prefetch-only.ts")
+	bOnly := tspath.ResolvePath(packageB, "prefetch-only.ts")
+	files := map[string]string{
+		"packages/a/target.ts":        "export const value: any = {}; value.member;\n",
+		"packages/b/target.ts":        "export const value: any = {}; value.member;\n",
+		"packages/a/prefetch-only.ts": "export const a = 1;\n",
+		"packages/b/prefetch-only.ts": "export const b = 1;\n",
+		"tsconfig-root.json":          `{"files":["packages/a/target.ts","packages/b/target.ts"],"compilerOptions":{"noLib":true}}`,
+		"packages/a/tsconfig.json":    `{"files":["target.ts","prefetch-only.ts"],"compilerOptions":{"noLib":true}}`,
+		"packages/b/tsconfig.json":    `{"files":["target.ts","prefetch-only.ts"],"compilerOptions":{"noLib":true}}`,
+	}
+	for relativePath, content := range files {
+		path := filepath.FromSlash(filepath.Join(root, relativePath))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	config := rslintconfig.RslintConfig{{
+		Files:   []string{"**/target.ts"},
+		Plugins: []string{"@typescript-eslint"},
+		Rules:   rslintconfig.Rules{"@typescript-eslint/no-unsafe-member-access": "error"},
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+			Project: []string{
+				"./tsconfig-root.json",
+				"./packages/a/tsconfig.json",
+				"./packages/b/tsconfig.json",
+			},
+		}},
+	}}
+	tests := []struct {
+		name         string
+		allowFiles   []string
+		allowDirs    []string
+		wantPrefetch bool
+	}{
+		{name: "multiple files", allowFiles: []string{aTarget, bTarget}},
+		{name: "explicit dot", allowDirs: []string{root}, wantPrefetch: true},
+		{name: "implicit no args", wantPrefetch: true},
+		{name: "multiple directories", allowDirs: []string{packageA, packageB}, wantPrefetch: true},
+		{name: "mixed file and directory", allowFiles: []string{aTarget}, allowDirs: []string{packageB}, wantPrefetch: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fsys := &commandReadCountingFS{
+				FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+				reads: make(map[string]int),
+			}
+			code, stdout, stderr := runLintPipelineForTest(t, root, lintArgs{
+				AllowFiles: test.allowFiles,
+				AllowDirs:  test.allowDirs,
+				ConfigCatalog: &discovery.ConfigCatalog{Configs: map[string]rslintconfig.RslintConfig{
+					root: config,
+				}},
+				Format:         "jsonline",
+				NoColor:        true,
+				SingleThreaded: true,
+				FS:             fsys,
+			})
+			if code != 1 || !strings.Contains(stdout, "@typescript-eslint/no-unsafe-member-access") {
+				t.Fatalf("targets did not run with type info: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			}
+			for _, source := range []string{aOnly, bOnly} {
+				if got := fsys.readCount(source); (got > 0) != test.wantPrefetch {
+					t.Fatalf("candidate source %q reads = %d, want prefetch %t", source, got, test.wantPrefetch)
+				}
 			}
 		})
 	}

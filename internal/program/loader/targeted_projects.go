@@ -295,17 +295,17 @@ func (queue *targetedProjectBuildQueue) wait() {
 	}
 }
 
-// scheduleDirectHint overlaps one provably-direct Program with the ordered
-// metadata frontier. Proximity is only a bounded scheduling hint: the shared
-// selector still scans every earlier candidate and alone commits ownership or
-// observes errors. Requiring one request-wide project avoids turning a focused
-// multi-project request into eager construction.
+// scheduleDirectHint proves that one proximity candidate directly contains
+// every request target. In parallel demand mode it overlaps that Program with
+// the ordered metadata frontier; for a directory batch the same proof avoids
+// broader candidate prefetch. The selector still scans every earlier candidate
+// and alone commits ownership or observes errors.
 func (execution *targetedProjectExecution) scheduleDirectHint(
 	targets []projectselection.Target,
 	builds *targetedProjectBuildQueue,
-) {
-	if builds == nil || !builds.parallel || len(targets) == 0 {
-		return
+) bool {
+	if builds == nil || len(targets) == 0 {
+		return false
 	}
 	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}
 	hintedProject := -1
@@ -325,23 +325,26 @@ func (execution *targetedProjectExecution) scheduleDirectHint(
 			bestDirectoryLength = len(directory)
 		}
 		if project < 0 || hintedProject >= 0 && hintedProject != project {
-			return
+			return false
 		}
 		hintedProject = project
 	}
 	if hintedProject < 0 {
-		return
+		return false
 	}
 	slot, err := execution.parse(hintedProject)
 	if err != nil || slot.rootFiles == nil {
-		return
+		return false
 	}
 	for _, target := range targets {
 		if !slot.rootFiles.Contains(target.Path, target.CanonicalPath) {
-			return
+			return false
 		}
 	}
-	builds.enqueue(hintedProject)
+	if builds.parallel {
+		builds.enqueue(hintedProject)
+	}
+	return true
 }
 
 func buildProjectPathPlan(paths ...[]string) (projectPlan, [][]int) {
@@ -437,10 +440,11 @@ func (s *Session) SelectProjects(
 			return ProjectSet{}, err
 		}
 	}
-	if !prefetchCandidates {
-		execution.scheduleDirectHint(selectionTargets, builds)
+	completeDirectHint := false
+	if builds.parallel || prefetchCandidates {
+		completeDirectHint = execution.scheduleDirectHint(selectionTargets, builds)
 	}
-	if prefetchCandidates {
+	if prefetchCandidates && !completeDirectHint {
 		candidateIndexes := make([]int, 0, len(plan.specs))
 		candidateSeen := make([]bool, len(plan.specs))
 		for _, target := range selectionTargets {
@@ -454,7 +458,7 @@ func (s *Session) SelectProjects(
 		}
 		// Prefetch is a provider scheduling policy: complete the bounded build
 		// phase without observing its errors, then expose batched root/source
-		// evidence to the same selector used by focused requests.
+		// evidence to the same selector used by demand-driven requests.
 		for _, project := range candidateIndexes {
 			builds.awaitCompletion(project)
 		}

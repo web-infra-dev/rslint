@@ -169,25 +169,31 @@ func TestSelectProjectsDirectHintIsBoundedAndCannotChooseOwner(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	targetPath := tspath.ResolvePath(dir, "nested/target.ts")
 	laterOnlyPath := tspath.ResolvePath(dir, "nested/later-only.ts")
+	unrelatedPath := tspath.ResolvePath(dir, "unrelated.ts")
 	writeProgramTestFiles(t, dir, map[string]string{
 		"nested/target.ts":     `export const target = 1;`,
 		"nested/later-only.ts": `export const later = 1;`,
+		"unrelated.ts":         `export const unrelated = 1;`,
 		"tsconfig-first.json":  `{"files":["nested/target.ts"],"compilerOptions":{"noLib":true}}`,
 		"nested/tsconfig.json": `{"files":["target.ts","later-only.ts"],"compilerOptions":{"noLib":true}}`,
+		"tsconfig-unused.json": `{"files":["unrelated.ts"],"compilerOptions":{"noLib":true}}`,
 	})
 	config := rslintconfig.RslintConfig{lintProjectEntry(
 		[]string{"**/*.ts"},
 		"./tsconfig-first.json",
 		"./nested/tsconfig.json",
+		"./tsconfig-unused.json",
 	)}
 
 	for _, test := range []struct {
 		name           string
+		prefetch       bool
 		singleThreaded bool
 		wantHintRead   bool
 	}{
-		{name: "parallel", wantHintRead: true},
-		{name: "single threaded", singleThreaded: true},
+		{name: "demand parallel", wantHintRead: true},
+		{name: "directory prefetch parallel", prefetch: true, wantHintRead: true},
+		{name: "directory prefetch single threaded", prefetch: true, singleThreaded: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			counting := &programReadCountingFS{
@@ -205,7 +211,7 @@ func TestSelectProjectsDirectHintIsBoundedAndCannotChooseOwner(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			set, err := NewSession(fsys).SelectProjects(lintPlan, nil, false, test.singleThreaded)
+			set, err := NewSession(fsys).SelectProjects(lintPlan, nil, test.prefetch, test.singleThreaded)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -219,11 +225,14 @@ func TestSelectProjectsDirectHintIsBoundedAndCannotChooseOwner(t *testing.T) {
 			if got := counting.readCount(laterOnlyPath); (got > 0) != test.wantHintRead {
 				t.Fatalf("hint-only source reads = %d, want hint read %t", got, test.wantHintRead)
 			}
+			if got := counting.readCount(unrelatedPath); got != 0 {
+				t.Fatalf("complete direct hint prefetched unrelated source %d time(s)", got)
+			}
 		})
 	}
 }
 
-func TestSelectProjectsDirectHintDoesNotPrefetchMultipleProjects(t *testing.T) {
+func TestSelectProjectsUsesFullPrefetchForDistinctDirectHints(t *testing.T) {
 	previousGOMAXPROCS := runtime.GOMAXPROCS(2)
 	t.Cleanup(func() { runtime.GOMAXPROCS(previousGOMAXPROCS) })
 	dir := tspath.NormalizePath(t.TempDir())
@@ -240,37 +249,57 @@ func TestSelectProjectsDirectHintDoesNotPrefetchMultipleProjects(t *testing.T) {
 		"a/tsconfig.json":    `{"files":["target.ts","hint-only.ts"],"compilerOptions":{"noLib":true}}`,
 		"b/tsconfig.json":    `{"files":["target.ts","hint-only.ts"],"compilerOptions":{"noLib":true}}`,
 	})
-	counting := &programReadCountingFS{
-		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-		reads: make(map[string]int),
-	}
-	fsys := vfs.FS(counting)
 	config := rslintconfig.RslintConfig{lintProjectEntry(
 		[]string{"**/*.ts"},
 		"./tsconfig-root.json",
 		"./a/tsconfig.json",
 		"./b/tsconfig.json",
 	)}
-	resolver, err := rslintconfig.NewProjectPathResolver(nil, config, dir, fsys, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
-		testLintTarget(fsys, dir, aTarget),
-		testLintTarget(fsys, dir, bTarget),
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	set, err := NewSession(fsys).SelectProjects(lintPlan, nil, false, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if set.Len() != 1 {
-		t.Fatalf("selected Programs = %d, want one umbrella owner", set.Len())
-	}
-	if got := counting.readCount(aOnly) + counting.readCount(bOnly); got != 0 {
-		t.Fatalf("distinct hints prefetched %d unrelated source(s)", got)
+	for _, test := range []struct {
+		name         string
+		prefetch     bool
+		wantHintRead bool
+	}{
+		{name: "demand"},
+		{name: "directory prefetch", prefetch: true, wantHintRead: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			counting := &programReadCountingFS{
+				FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+				reads: make(map[string]int),
+			}
+			fsys := vfs.FS(counting)
+			resolver, err := rslintconfig.NewProjectPathResolver(nil, config, dir, fsys, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
+				testLintTarget(fsys, dir, aTarget),
+				testLintTarget(fsys, dir, bTarget),
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			set, err := NewSession(fsys).SelectProjects(lintPlan, nil, test.prefetch, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if set.Len() != 1 {
+				t.Fatalf("selected Programs = %d, want one umbrella owner", set.Len())
+			}
+			wantConfig := tspath.ResolvePath(dir, "tsconfig-root.json")
+			if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath); got != wantConfig {
+				t.Fatalf("selected config = %q, want umbrella %q", got, wantConfig)
+			}
+			if set.targetBinding == nil || !slices.Equal(set.targetBinding.owners, []int{0, 0}) {
+				t.Fatalf("umbrella binding = %+v, want owners [0 0]", set.targetBinding)
+			}
+			for _, source := range []string{aOnly, bOnly} {
+				if got := counting.readCount(source); (got > 0) != test.wantHintRead {
+					t.Fatalf("distinct hint source %q reads = %d, want reads %t", source, got, test.wantHintRead)
+				}
+			}
+		})
 	}
 }
 
