@@ -36,6 +36,13 @@ var eslintDirectivePattern = esregexp.MustCompile(`^(?:eslint[- ]|(?:globals?|ex
 // directive if its trimmed text matches eslintDirectivePattern. Both forms
 // also accept the "rslint-" prefix this linter recognizes alongside "eslint-".
 //
+// "rslint-" is checked outside eslintDirectivePattern rather than added to it:
+// the pattern's other alternatives — "eslint " (space), "global "/"globals ",
+// "exported " — have no rslint-prefixed counterpart. rslint-disable and
+// rslint-enable, with their -line and -next-line forms, are the whole of what
+// this linter recognizes on top of upstream's set, and all of them carry the
+// dash.
+//
 // trimmedValue is what [CommentValue] returns, run through
 // ecmascript.StringTrim.
 func IsDirectiveComment(kind ast.Kind, trimmedValue string) bool {
