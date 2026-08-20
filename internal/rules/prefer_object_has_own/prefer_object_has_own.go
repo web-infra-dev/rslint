@@ -49,16 +49,33 @@ func isMemberAccess(node *ast.Node) bool {
 		(node.Kind == ast.KindPropertyAccessExpression || node.Kind == ast.KindElementAccessExpression)
 }
 
-// memberObject returns the receiver of a member access with parentheses
-// removed. Only parentheses: a TypeScript wrapper such as `(Object as any)` or
+// unwrapParens removes the parentheses around an expression, and returns nil
+// when those parentheses end an optional chain.
+//
+// Only parentheses come off: a TypeScript wrapper such as `(Object as any)` or
 // `Object!` is an expression of its own, and the receiver it wraps no longer
 // counts as `Object` itself.
-func memberObject(node *ast.Node) *ast.Node {
-	object := utils.AccessExpressionObject(node)
-	if object == nil {
+//
+// Parentheses end an optional chain, and ESTree marks that with a
+// `ChainExpression` node wrapping the chain — a node kind this rule matches
+// nowhere, so `(a?.b).c` reads as a different shape from `a?.b.c` and goes
+// unreported. tsgo has no such node: it flags the chain on each access, which
+// is why the flag is read only where a parenthesis actually came off.
+func unwrapParens(node *ast.Node) *ast.Node {
+	if node == nil {
 		return nil
 	}
-	return ast.SkipParentheses(object)
+	inner := ast.SkipParentheses(node)
+	if inner != node && ast.IsOptionalChain(inner) {
+		return nil
+	}
+	return inner
+}
+
+// memberObject returns the receiver of a member access, read through
+// parentheses by [unwrapParens].
+func memberObject(node *ast.Node) *ast.Node {
+	return unwrapParens(utils.AccessExpressionObject(node))
 }
 
 // hasLeftHandObject reports whether the receiver of `.hasOwnProperty` is an
@@ -97,7 +114,7 @@ var PreferObjectHasOwnRule = rule.Rule{
 			ast.KindCallExpression: func(node *ast.Node) {
 				// ESTree drops parentheses, so a callee wrapped in them is the
 				// member access itself; tsgo keeps them as nodes of their own.
-				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+				callee := unwrapParens(node.AsCallExpression().Expression)
 				if !isMemberAccess(callee) {
 					return
 				}
@@ -119,8 +136,12 @@ var PreferObjectHasOwnRule = rule.Rule{
 				// `Object` has to be the global one for `Object.hasOwn` to be
 				// the same call: a local binding of that name, or a config
 				// `/* global Object: off */` entry that un-declares it, means
-				// the name resolves elsewhere and the rule stays silent.
-				if utils.IsShadowed(node, "Object") || !ctx.Globals.Access("Object").IsDeclared() {
+				// the name resolves elsewhere and the rule stays silent. A call
+				// in a parameter default sees the body's bindings as well, one
+				// scope wider than the runtime lookup.
+				if utils.IsShadowed(node, "Object") ||
+					utils.IsShadowedFromParameterInitializer(node, "Object") ||
+					!ctx.Globals.Access("Object").IsDeclared() {
 					return
 				}
 
@@ -131,10 +152,18 @@ var PreferObjectHasOwnRule = rule.Rule{
 					if utils.HasCommentInSpan(ctx.Comments.All(), calleeRange.Pos(), calleeRange.End()) {
 						return nil
 					}
-					return []rule.RuleFix{rule.RuleFixReplaceRange(
-						calleeRange,
-						utils.SafeReplacementText(ctx.SourceFile, callee, hasOwnReplacement),
-					)}
+					// The replacement opens with an identifier, so it needs a
+					// space when the character in front of it closes one —
+					// otherwise `return{}.hasOwnProperty.call(a, b)` fuses into
+					// `returnObject.hasOwn(a, b)`. Nothing that can sit against
+					// the callee ends in an identifier character except an
+					// identifier or a keyword, so that character decides it on
+					// its own.
+					replacement := hasOwnReplacement
+					if utils.NeedsLeadingSpaceForReplacement(ctx.SourceFile.Text(), calleeRange.Pos(), replacement) {
+						replacement = " " + replacement
+					}
+					return []rule.RuleFix{rule.RuleFixReplaceRange(calleeRange, replacement)}
 				})
 			},
 		}

@@ -41,6 +41,24 @@ func TestPreferObjectHasOwnExtras(t *testing.T) {
 			{Code: `Object.prototype.hasOwnProperty!.call(a, b);`},
 			{Code: `(Object.prototype.hasOwnProperty as any).call(a, b);`},
 
+			// ---- Dimension 4: parentheses that end an optional chain ----
+			// ESTree records the end of a chain as a node of its own, and the rule
+			// matches neither a chain-terminated callee nor a chain-terminated
+			// receiver — unlike the same code without the parentheses.
+			{Code: `(Object.prototype.hasOwnProperty?.call)(a, b);`},
+			{Code: `(Object.prototype.hasOwnProperty?.['call'])(a, b);`},
+			{Code: `(Object.prototype?.hasOwnProperty).call(a, b);`},
+			{Code: `(Object.prototype?.['hasOwnProperty']).call(a, b);`},
+			{Code: `((Object.prototype?.hasOwnProperty)).call(a, b);`},
+			{Code: `(Object.prototype?.hasOwnProperty).call?.(a, b);`},
+			{Code: `(Object?.prototype.hasOwnProperty).call(a, b);`},
+			{Code: `(Object?.prototype).hasOwnProperty.call(a, b);`},
+			{Code: `(Object?.hasOwnProperty).call(a, b);`},
+			{Code: `(Object?.foo).prototype.hasOwnProperty.call(a, b);`},
+			{Code: `({}?.hasOwnProperty).call(a, b);`},
+			{Code: `(({}?.hasOwnProperty)).call(a, b);`},
+			{Code: `({}?.hasOwnProperty).call?.(a, b);`},
+
 			// ---- Dimension 4: computed keys that name nothing statically ----
 			{Code: "Object[`${'prototype'}`].hasOwnProperty.call(a, b);"},
 			{Code: `Object[('prototype' as any)].hasOwnProperty.call(a, b);`},
@@ -82,6 +100,23 @@ func TestPreferObjectHasOwnExtras(t *testing.T) {
 ({}).hasOwnProperty.call(a, b);`},
 			{Code: `function Object() {}
 ({}).hasOwnProperty.call(a, b);`},
+
+			// ---- Dimension 4: `var` hoisted inside a class static block ----
+			// The static block holds the `var`, so it shadows `Object` for the
+			// whole block however deeply the declaration is nested in it.
+			{Code: `class C { static { { var Object; } ({}).hasOwnProperty.call(a, b); } }`},
+			{Code: `class C { static { if (x) { var Object; } ({}).hasOwnProperty.call(a, b); } }`},
+			{Code: `class C { static { for (var Object of x) {} ({}).hasOwnProperty.call(a, b); } }`},
+			{Code: `class C { static { const g = () => ({}).hasOwnProperty.call(a, b); { var Object; } } }`},
+
+			// ---- Dimension 4: a parameter default sees the body's bindings ----
+			{Code: `function f(a = Object.prototype.hasOwnProperty.call(x, y)) { var Object; }`},
+			{Code: `function f(a = Object.prototype.hasOwnProperty.call(x, y)) { let Object; }`},
+			{Code: `function f(a = Object.prototype.hasOwnProperty.call(x, y)) { class Object {} }`},
+			{Code: `class D { m(a = Object.prototype.hasOwnProperty.call(x, y)) { var Object; } }`},
+			{Code: `function f({ k = ({}).hasOwnProperty.call(x, y) }) { var Object; }`},
+			{Code: `function f(a = (() => ({}).hasOwnProperty.call(x, y))()) { var Object; }`},
+			{Code: `function f(a = ({}).hasOwnProperty.call(x, y)) { { var Object; } }`},
 
 			// ---- Dimension 4: `Object` un-declared through config globals ----
 			{
@@ -330,6 +365,22 @@ func TestPreferObjectHasOwnExtras(t *testing.T) {
 				},
 			},
 
+			// A regular expression earlier in the file must not disturb the
+			// space the replacement needs in front of it.
+			{
+				Code:   `function f(s) { if (/^https?:\/\//.test(s)) return{}.hasOwnProperty.call(a, b); }`,
+				Output: []string{`function f(s) { if (/^https?:\/\//.test(s)) return Object.hasOwn(a, b); }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useHasOwn", Line: 1, Column: 51, EndLine: 1, EndColumn: 79},
+				},
+			},
+			{
+				Code:   `const t = /don't/.test(s) ? typeof{}.hasOwnProperty.call(a, b) : 0;`,
+				Output: []string{`const t = /don't/.test(s) ? typeof Object.hasOwn(a, b) : 0;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useHasOwn", Line: 1, Column: 35, EndLine: 1, EndColumn: 63},
+				},
+			},
 			// ---- Real-user: the shape the rule was reported not to fix cleanly —
 			// a returned call with no space in front of it ----
 			{
@@ -357,6 +408,22 @@ Object.hasOwn(a, b);`},
 				Output: []string{`function f<Object>() { return Object.hasOwn(a, b); }`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useHasOwn", Line: 1, Column: 31, EndLine: 1, EndColumn: 59},
+				},
+			},
+			{
+				Code: `interface Object { z(): void }
+({}).hasOwnProperty.call(a, b);`,
+				Output: []string{`interface Object { z(): void }
+Object.hasOwn(a, b);`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useHasOwn", Line: 2, Column: 1, EndLine: 2, EndColumn: 31},
+				},
+			},
+			{
+				Code:   `class C<Object> { m() { return {}.hasOwnProperty.call(a, b); } }`,
+				Output: []string{`class C<Object> { m() { return Object.hasOwn(a, b); } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useHasOwn", Line: 1, Column: 32, EndLine: 1, EndColumn: 60},
 				},
 			},
 		},
