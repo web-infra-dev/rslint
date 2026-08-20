@@ -5,7 +5,7 @@ exports[`no-invalid-void-type > invalid 1`] = `
   "code": "type GenericVoid = Generic<void>;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -31,7 +31,7 @@ exports[`no-invalid-void-type > invalid 2`] = `
   "code": "function takeVoid(thing: void) {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -57,7 +57,7 @@ exports[`no-invalid-void-type > invalid 3`] = `
   "code": "let voidPromise: Promise<void> = new Promise<void>(() => {});",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -72,7 +72,7 @@ exports[`no-invalid-void-type > invalid 3`] = `
       "ruleName": "@typescript-eslint/no-invalid-void-type",
     },
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -98,7 +98,7 @@ exports[`no-invalid-void-type > invalid 4`] = `
   "code": "let voidMap: Map<string, void> = new Map<string, void>();",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -113,7 +113,7 @@ exports[`no-invalid-void-type > invalid 4`] = `
       "ruleName": "@typescript-eslint/no-invalid-void-type",
     },
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -139,7 +139,7 @@ exports[`no-invalid-void-type > invalid 5`] = `
   "code": "type invalidVoidUnion = void | number;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -167,7 +167,7 @@ interface Base<T> {}
 interface Foo extends Base<void> {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -196,7 +196,7 @@ interface B<T> {}
 interface C extends A<void>, B<void> {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -211,7 +211,7 @@ interface C extends A<void>, B<void> {}",
       "ruleName": "@typescript-eslint/no-invalid-void-type",
     },
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -239,7 +239,7 @@ interface A<T> {}
 class Foo implements A<void> {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -265,7 +265,7 @@ exports[`no-invalid-void-type > invalid 9`] = `
   "code": "type Foo = Promise<void>;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -291,7 +291,7 @@ exports[`no-invalid-void-type > invalid 10`] = `
   "code": "type Foo = Map<string, void>;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type.",
+      "message": "void is only valid as a return type.",
       "messageId": "invalidVoidNotReturn",
       "range": {
         "end": {
@@ -317,7 +317,7 @@ exports[`no-invalid-void-type > invalid 11`] = `
   "code": "function takeVoid(thing: void) {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -343,7 +343,7 @@ exports[`no-invalid-void-type > invalid 12`] = `
   "code": "const arrowGeneric = <T extends void>(arg: T) => {};",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -369,7 +369,7 @@ exports[`no-invalid-void-type > invalid 13`] = `
   "code": "const arrowGeneric2 = <T extends void = void>(arg: T) => {};",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -395,7 +395,7 @@ exports[`no-invalid-void-type > invalid 14`] = `
   "code": "function functionGeneric<T extends void>(arg: T) {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -421,7 +421,7 @@ exports[`no-invalid-void-type > invalid 15`] = `
   "code": "function functionGeneric2<T extends void = void>(arg: T) {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -447,7 +447,7 @@ exports[`no-invalid-void-type > invalid 16`] = `
   "code": "declare function functionDeclaration<T extends void>(arg: T): void;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -473,7 +473,7 @@ exports[`no-invalid-void-type > invalid 17`] = `
   "code": "declare function functionDeclaration2<T extends void = void>(arg: T): void;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -499,7 +499,7 @@ exports[`no-invalid-void-type > invalid 18`] = `
   "code": "functionGeneric<void>(undefined);",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -525,7 +525,7 @@ exports[`no-invalid-void-type > invalid 19`] = `
   "code": "let letVoid: void;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -553,7 +553,7 @@ exports[`no-invalid-void-type > invalid 20`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -579,7 +579,7 @@ exports[`no-invalid-void-type > invalid 21`] = `
   "code": "type UnionType2 = string | number | void;",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -605,7 +605,7 @@ exports[`no-invalid-void-type > invalid 22`] = `
   "code": "type IntersectionType = string & number & void;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -636,7 +636,7 @@ exports[`no-invalid-void-type > invalid 23`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -666,7 +666,7 @@ exports[`no-invalid-void-type > invalid 24`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -692,7 +692,7 @@ exports[`no-invalid-void-type > invalid 25`] = `
   "code": "type invalidVoidUnion = void | Map<string, number>;",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -718,7 +718,7 @@ exports[`no-invalid-void-type > invalid 26`] = `
   "code": "type invalidVoidUnion = void | Map;",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -744,7 +744,7 @@ exports[`no-invalid-void-type > invalid 27`] = `
   "code": "interface Foo { (arg: void): string; }",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -770,7 +770,7 @@ exports[`no-invalid-void-type > invalid 28`] = `
   "code": "type BannedVoid = Banned<void>;",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a type argument for \`Banned\`.",
+      "message": "Banned may not have void as a type argument.",
       "messageId": "invalidVoidForGeneric",
       "range": {
         "end": {
@@ -796,7 +796,7 @@ exports[`no-invalid-void-type > invalid 29`] = `
   "code": "function takeVoid(thing: void) {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -824,8 +824,8 @@ interface Base<T> {}
 interface Foo extends Base<void> {}",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a type argument for \`Base\`.",
-      "messageId": "invalidVoidForGeneric",
+      "message": "void is only valid as a return type or generic type argument.",
+      "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
           "column": 32,
@@ -848,21 +848,20 @@ interface Foo extends Base<void> {}",
 exports[`no-invalid-void-type > invalid 31`] = `
 {
   "code": "
-interface Allowed<T> {}
-interface Banned<T> {}
-interface Foo extends Allowed<void>, Banned<void> {}",
+interface Base<T> {}
+interface Foo extends Base<void> {}",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a type argument for \`Banned\`.",
-      "messageId": "invalidVoidForGeneric",
+      "message": "void is only valid as a return type or generic type argument.",
+      "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
-          "column": 49,
-          "line": 4,
+          "column": 32,
+          "line": 3,
         },
         "start": {
-          "column": 45,
-          "line": 4,
+          "column": 28,
+          "line": 3,
         },
       },
       "ruleName": "@typescript-eslint/no-invalid-void-type",
@@ -876,10 +875,98 @@ interface Foo extends Allowed<void>, Banned<void> {}",
 
 exports[`no-invalid-void-type > invalid 32`] = `
 {
+  "code": "
+interface Allowed<T> {}
+interface Banned<T> {}
+interface Foo extends Allowed<void>, Banned<void> {}",
+  "diagnostics": [
+    {
+      "message": "void is only valid as a return type or generic type argument.",
+      "messageId": "invalidVoidNotReturnOrGeneric",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 31,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-void-type",
+    },
+    {
+      "message": "void is only valid as a return type or generic type argument.",
+      "messageId": "invalidVoidNotReturnOrGeneric",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 4,
+        },
+        "start": {
+          "column": 45,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-void-type",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-void-type > invalid 33`] = `
+{
+  "code": "
+interface A<T> {}
+interface B<T> {}
+interface Foo extends A<void>, B<void> {}",
+  "diagnostics": [
+    {
+      "message": "void is only valid as a return type or generic type argument.",
+      "messageId": "invalidVoidNotReturnOrGeneric",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-void-type",
+    },
+    {
+      "message": "void is only valid as a return type or generic type argument.",
+      "messageId": "invalidVoidNotReturnOrGeneric",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 4,
+        },
+        "start": {
+          "column": 34,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-void-type",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-void-type > invalid 34`] = `
+{
   "code": "type alias = void;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type, generic type argument, or \`this\` parameter type.",
+      "message": "void is only valid as a return type or generic type argument or the type of a \`this\` parameter.",
       "messageId": "invalidVoidNotReturnOrThisParamOrGeneric",
       "range": {
         "end": {
@@ -900,12 +987,12 @@ exports[`no-invalid-void-type > invalid 32`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 33`] = `
+exports[`no-invalid-void-type > invalid 35`] = `
 {
   "code": "type alias = void;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or \`this\` parameter type.",
+      "message": "void is only valid as return type or type of \`this\` parameter.",
       "messageId": "invalidVoidNotReturnOrThisParam",
       "range": {
         "end": {
@@ -926,12 +1013,12 @@ exports[`no-invalid-void-type > invalid 33`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 34`] = `
+exports[`no-invalid-void-type > invalid 36`] = `
 {
   "code": "type alias = Array<void>;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or \`this\` parameter type.",
+      "message": "void is only valid as return type or type of \`this\` parameter.",
       "messageId": "invalidVoidNotReturnOrThisParam",
       "range": {
         "end": {
@@ -952,12 +1039,12 @@ exports[`no-invalid-void-type > invalid 34`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 35`] = `
+exports[`no-invalid-void-type > invalid 37`] = `
 {
   "code": "declare function voidArray(args: void[]): void[];",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -972,7 +1059,7 @@ exports[`no-invalid-void-type > invalid 35`] = `
       "ruleName": "@typescript-eslint/no-invalid-void-type",
     },
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -993,12 +1080,12 @@ exports[`no-invalid-void-type > invalid 35`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 36`] = `
+exports[`no-invalid-void-type > invalid 38`] = `
 {
   "code": "let value = undefined as void;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1019,12 +1106,12 @@ exports[`no-invalid-void-type > invalid 36`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 37`] = `
+exports[`no-invalid-void-type > invalid 39`] = `
 {
   "code": "let value = <void>undefined;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1045,12 +1132,12 @@ exports[`no-invalid-void-type > invalid 37`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 38`] = `
+exports[`no-invalid-void-type > invalid 40`] = `
 {
   "code": "function takesThings(...things: void[]): void {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1071,12 +1158,12 @@ exports[`no-invalid-void-type > invalid 38`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 39`] = `
+exports[`no-invalid-void-type > invalid 41`] = `
 {
   "code": "type KeyofVoid = keyof void;",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1097,7 +1184,7 @@ exports[`no-invalid-void-type > invalid 39`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 40`] = `
+exports[`no-invalid-void-type > invalid 42`] = `
 {
   "code": "
 class ClassName {
@@ -1105,7 +1192,7 @@ class ClassName {
 }",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1126,7 +1213,7 @@ class ClassName {
 }
 `;
 
-exports[`no-invalid-void-type > invalid 41`] = `
+exports[`no-invalid-void-type > invalid 43`] = `
 {
   "code": "
 type VoidType = void;
@@ -1135,7 +1222,7 @@ class OtherClassName {
 }",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1156,12 +1243,12 @@ class OtherClassName {
 }
 `;
 
-exports[`no-invalid-void-type > invalid 42`] = `
+exports[`no-invalid-void-type > invalid 44`] = `
 {
   "code": "type UnionType3 = string | ((number & any) | (string | void));",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -1182,12 +1269,12 @@ exports[`no-invalid-void-type > invalid 42`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 43`] = `
+exports[`no-invalid-void-type > invalid 45`] = `
 {
   "code": "declare function test(): number | void;",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -1208,12 +1295,12 @@ exports[`no-invalid-void-type > invalid 43`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 44`] = `
+exports[`no-invalid-void-type > invalid 46`] = `
 {
   "code": "declare function test<T extends number | void>(): T;",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -1234,7 +1321,7 @@ exports[`no-invalid-void-type > invalid 44`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 45`] = `
+exports[`no-invalid-void-type > invalid 47`] = `
 {
   "code": "
 type MappedType<T> = {
@@ -1242,7 +1329,7 @@ type MappedType<T> = {
 };",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1263,7 +1350,7 @@ type MappedType<T> = {
 }
 `;
 
-exports[`no-invalid-void-type > invalid 46`] = `
+exports[`no-invalid-void-type > invalid 48`] = `
 {
   "code": "
 type ConditionalType<T> = {
@@ -1271,7 +1358,7 @@ type ConditionalType<T> = {
 };",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1292,12 +1379,12 @@ type ConditionalType<T> = {
 }
 `;
 
-exports[`no-invalid-void-type > invalid 47`] = `
+exports[`no-invalid-void-type > invalid 49`] = `
 {
   "code": "type ManyVoid = readonly void[];",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1318,12 +1405,12 @@ exports[`no-invalid-void-type > invalid 47`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 48`] = `
+exports[`no-invalid-void-type > invalid 50`] = `
 {
   "code": "function foo(arr: readonly void[]) {}",
   "diagnostics": [
     {
-      "message": "\`void\` is only valid as a return type or generic type argument.",
+      "message": "void is only valid as a return type or generic type argument.",
       "messageId": "invalidVoidNotReturnOrGeneric",
       "range": {
         "end": {
@@ -1344,7 +1431,7 @@ exports[`no-invalid-void-type > invalid 48`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 49`] = `
+exports[`no-invalid-void-type > invalid 51`] = `
 {
   "code": "
 class SomeClass {
@@ -1354,7 +1441,7 @@ class SomeClass {
 }",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -1375,12 +1462,12 @@ class SomeClass {
 }
 `;
 
-exports[`no-invalid-void-type > invalid 50`] = `
+exports[`no-invalid-void-type > invalid 52`] = `
 {
   "code": "export default function (x?: string): string | void {}",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -1401,12 +1488,12 @@ exports[`no-invalid-void-type > invalid 50`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 51`] = `
+exports[`no-invalid-void-type > invalid 53`] = `
 {
   "code": "export function f(x?: string): string | void {}",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -1427,7 +1514,7 @@ exports[`no-invalid-void-type > invalid 51`] = `
 }
 `;
 
-exports[`no-invalid-void-type > invalid 52`] = `
+exports[`no-invalid-void-type > invalid 54`] = `
 {
   "code": "
 function f(): void;
@@ -1437,7 +1524,7 @@ function f(x?: string): string | void {
 }",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -1458,7 +1545,7 @@ function f(x?: string): string | void {
 }
 `;
 
-exports[`no-invalid-void-type > invalid 53`] = `
+exports[`no-invalid-void-type > invalid 55`] = `
 {
   "code": "
 class SomeClass {
@@ -1470,7 +1557,7 @@ class SomeClass {
 }",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a constituent in a union type.",
+      "message": "void is not valid as a constituent in a union type",
       "messageId": "invalidVoidUnionConstituent",
       "range": {
         "end": {
@@ -1491,12 +1578,12 @@ class SomeClass {
 }
 `;
 
-exports[`no-invalid-void-type > invalid 54`] = `
+exports[`no-invalid-void-type > invalid 56`] = `
 {
   "code": "type BannedVoid = Ex.Mx.Tx<void>;",
   "diagnostics": [
     {
-      "message": "\`void\` is not valid as a type argument for \`Ex.Mx.Tx\`.",
+      "message": "Ex.Mx.Tx may not have void as a type argument.",
       "messageId": "invalidVoidForGeneric",
       "range": {
         "end": {
