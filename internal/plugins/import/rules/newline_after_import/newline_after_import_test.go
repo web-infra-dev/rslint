@@ -96,6 +96,9 @@ func TestNewlineAfterImportRule(t *testing.T) {
 			{Code: "var foo = require('foo-module');\n\n\n\n\nvar foo = 'bar';", Options: map[string]interface{}{"count": 4.0, "exactCount": true}},
 			// Bare require + code
 			{Code: "require('foo-module');\n\nvar foo = 'bar';"},
+			// A template literal is not an ESTree string Literal and therefore is
+			// not a static require for this rule.
+			{Code: "const foo = require(`foo-module`);\nvar bar = 1;"},
 			// Require groups separated by code
 			{Code: "var foo = require('foo-module');\n\nvar a = 123;\n\nvar bar = require('bar-lib');"},
 			// Require with considerComments
@@ -269,6 +272,23 @@ func TestNewlineAfterImportRule(t *testing.T) {
 			{
 				Code:   "var foo = require('foo-module');\nvar something = 123;",
 				Output: []string{"var foo = require('foo-module');\n\nvar something = 123;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "newlineAfterRequire", Line: 1, Column: 1,
+				}},
+			},
+			// ESTree erases parentheses around the require callee and argument.
+			{
+				Code:   "var foo = ((require))((('foo-module')));\nvar something = 123;",
+				Output: []string{"var foo = ((require))((('foo-module')));\n\nvar something = 123;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "newlineAfterRequire", Line: 1, Column: 1,
+				}},
+			},
+			// Upstream staticRequire leaves optional-call policy to its caller; the
+			// CallExpression is still visible to this rule's listener.
+			{
+				Code:   "var foo = require?.('foo-module');\nvar something = 123;",
+				Output: []string{"var foo = require?.('foo-module');\n\nvar something = 123;"},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "newlineAfterRequire", Line: 1, Column: 1,
 				}},

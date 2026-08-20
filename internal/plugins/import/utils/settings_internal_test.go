@@ -19,3 +19,16 @@ func TestModuleSettingsKeySeparatesListElements(t *testing.T) {
 		t.Fatalf("moduleSettingsKey separated equal settings: %q vs %q", typed, split)
 	}
 }
+
+func TestCompiledModuleSettingsCacheKeyIncludesInternalRegex(t *testing.T) {
+	t.Parallel()
+
+	left := map[string]interface{}{"import/internal-regex": "^@left/"}
+	right := map[string]interface{}{"import/internal-regex": "^@right/"}
+	if moduleSettingsKey(left) != moduleSettingsKey(right) {
+		t.Fatal("module-index key should ignore classification-only settings")
+	}
+	if compiledModuleSettingsCacheKey(left) == compiledModuleSettingsCacheKey(right) {
+		t.Fatal("compiled settings cache reused a different internal regexp")
+	}
+}

@@ -15,8 +15,9 @@
 // because a negated list needs the lookahead RE2 has no syntax for.
 //
 // The port covers matching only: brace expansion, extended glob syntax, `**`,
-// character classes and negated patterns. Partial matching and the filesystem
-// traversal helpers are left out.
+// character classes, negated patterns, and the partial-prefix mode exposed by
+// matcher options. Filesystem traversal and list-expansion helpers are left
+// out.
 //
 // A `**` walks the path by recursion, remembering the pairs of path part and
 // pattern part it has already failed at so that a pattern carrying several of
@@ -71,6 +72,10 @@ type Options struct {
 	MatchBase bool
 	// FlipNegate returns the result of a negated pattern unnegated.
 	FlipNegate bool
+	// Partial accepts a path that matches the beginning of a pattern even when
+	// the path runs out first. minimatch uses this while walking a filesystem;
+	// eslint-plugin-import also exposes it through pathGroups.patternOptions.
+	Partial bool
 }
 
 var plTypes = map[byte]struct{ open, close string }{
@@ -687,6 +692,9 @@ func (m *Matcher) Match(path string) bool {
 	if m.empty {
 		return path == ""
 	}
+	if m.options.Partial && path == "/" {
+		return true
+	}
 
 	parts := splitSlashes(path)
 
@@ -767,10 +775,15 @@ func (m *Matcher) matchOneFrom(file []string, row []patternPart, fi int, pi int,
 				// `.` and `..` are never swallowed, and a dot-name only when
 				// explicitly asked for.
 				if m.isDotPart(file[fr]) {
-					break
+					return false
 				}
 			}
-			return false
+			// In partial mode, consuming every remaining safe path part means
+			// the file can still grow into the rest of the pattern. minimatch 3
+			// uses this while walking a filesystem (for example, `a/x` is a
+			// partial match for `a/**/b`). A dot part returns above because `**`
+			// is not allowed to consume it under the current options.
+			return m.options.Partial
 		}
 
 		if !part.match(file[fi]) {
@@ -784,7 +797,7 @@ func (m *Matcher) matchOneFrom(file []string, row []patternPart, fi int, pi int,
 		return true
 	case fi == fl:
 		// ran out of file with pattern left over.
-		return false
+		return m.options.Partial
 	default:
 		// Ran out of pattern with file left over. That is only acceptable on
 		// the very last empty part of a path written with a trailing slash, so

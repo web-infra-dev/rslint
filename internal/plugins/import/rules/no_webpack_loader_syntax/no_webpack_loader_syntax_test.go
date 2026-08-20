@@ -26,6 +26,8 @@ func TestNoWebpackLoaderSyntaxRule(t *testing.T) {
 			{Code: `var foo = require("foo")`},
 			{Code: `var foo = require("./")`},
 			{Code: `var foo = require("@scope/foo")`},
+			// moduleVisitor requires exactly one CommonJS argument.
+			{Code: `var data = require("json!data", options)`},
 			{Code: `var foo = fn("babel!lodash")`},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -99,6 +101,14 @@ func TestNoWebpackLoaderSyntaxRule(t *testing.T) {
 					{
 						MessageId: "import/no-webpack-loader-syntax",
 					},
+				},
+			},
+			{
+				// Parentheses are absent from ESTree around the callee and argument.
+				Code:     `var data = ((require))((("json!data")))`,
+				FileName: "foo.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "import/no-webpack-loader-syntax"},
 				},
 			},
 		},

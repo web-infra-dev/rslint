@@ -293,6 +293,48 @@ func TestMatchOptions(t *testing.T) {
 			options: minimatch3.Options{},
 			want:    true,
 		},
+		{
+			name:    "Partial accepts a matching prefix",
+			pattern: "a/b",
+			path:    "a",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial rejects a mismatched prefix",
+			pattern: "a/b",
+			path:    "x",
+			options: minimatch3.Options{Partial: true},
+			want:    false,
+		},
+		{
+			name:    "Partial treats the filesystem root as every pattern prefix",
+			pattern: "a/b",
+			path:    "/",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial lets globstar consume the current path suffix",
+			pattern: "a/**/b",
+			path:    "a/x/y",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
+		{
+			name:    "Partial rejects a hidden suffix globstar cannot consume",
+			pattern: "a/**/b",
+			path:    "a/.hidden",
+			options: minimatch3.Options{Partial: true},
+			want:    false,
+		},
+		{
+			name:    "Partial traverses multiple globstars",
+			pattern: "a/**/b/**/c",
+			path:    "a/x/b/y",
+			options: minimatch3.Options{Partial: true},
+			want:    true,
+		},
 	}
 
 	for _, test := range tests {

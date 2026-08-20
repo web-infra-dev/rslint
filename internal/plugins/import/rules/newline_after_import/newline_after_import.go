@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	importutil "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -118,8 +119,8 @@ func checkImportDeclarations(ctx rule.RuleContext, statements []*ast.Node, lineS
 // Returns nil if no top-level require is found.
 // This mirrors ESLint's level-tracking for require detection.
 func findLastTopLevelRequire(node *ast.Node) *ast.Node {
-	if ast.IsRequireCall(node, true /* requireStringLiteralLikeArgument */) {
-		return node
+	if call := importutil.GetRequireCallWithStringLiteralArgument(node); call != nil {
+		return call.AsNode()
 	}
 	var result *ast.Node
 	node.ForEachChild(func(child *ast.Node) bool {
