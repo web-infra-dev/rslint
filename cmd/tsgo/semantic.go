@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
 // sanitizeSymbolName replaces the internal symbol name prefix (\xFE) with "__"
@@ -62,6 +63,46 @@ type TypeInfo struct {
 }
 type SymbolTable = map[NodeReference]SymbolInfo
 type TypeTable = map[NodeReference]TypeInfo
+
+// getChildren is equivalent to TypeScript's token-inclusive node.getChildren.
+// TypeScript-Go exposes the structural children through ForEachChild, so scan
+// the gaps between them to materialize keyword and punctuation token nodes.
+func getChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
+	var childNodes []*ast.Node
+	node.ForEachChild(func(child *ast.Node) bool {
+		childNodes = append(childNodes, child)
+		return false
+	})
+	if len(childNodes) == 0 {
+		return nil
+	}
+
+	var children []*ast.Node
+	pos := node.Pos()
+	appendTokensBefore := func(end int) {
+		scanner := scanner.GetScannerForSourceFile(sourceFile, pos)
+		for pos < end {
+			token := sourceFile.GetOrCreateToken(
+				scanner.Token(),
+				scanner.TokenFullStart(),
+				scanner.TokenEnd(),
+				node,
+				scanner.TokenFlags(),
+			)
+			children = append(children, token)
+			pos = scanner.TokenEnd()
+			scanner.Scan()
+		}
+	}
+
+	for _, child := range childNodes {
+		appendTokensBefore(child.Pos())
+		children = append(children, child)
+		pos = child.End()
+	}
+	appendTokensBefore(node.End())
+	return children
+}
 
 // collect_symbol_table walks every AST node in the program once and records the
 // symbol (if any) associated with that node keyed by its file/span tuple.
@@ -358,10 +399,9 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			}
 		}
 
-		node.ForEachChild(func(child *ast.Node) bool {
+		for _, child := range getChildren(node, file) {
 			visit(child)
-			return false
-		})
+		}
 	}
 
 	visit(file.AsNode())
