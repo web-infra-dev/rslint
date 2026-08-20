@@ -164,6 +164,33 @@ tsgo uses `BinaryExpression` for the entire family of binary operators, includin
 
 For a rule that registers separate ESTree listeners for `AssignmentExpression` / `SequenceExpression`, collapse into one `BinaryExpression` listener and switch on `OperatorToken.Kind`. Do not rely on `IsBinaryExpression` alone to exclude assignments.
 
+### VariableDeclaration in Statements and Loop Headers
+
+ESTree uses one `VariableDeclaration` node for both a declaration statement
+(`var x = 1;`) and a declaration in a `for` / `for-in` / `for-of` header. tsgo
+uses two shapes:
+
+| Source                                  | tsgo shape                                                                       |
+| --------------------------------------- | -------------------------------------------------------------------------------- |
+| `var x = 1;`                            | `VariableStatement` → `VariableDeclarationList`                                  |
+| `for (var x = 1; ; )`                   | `ForStatement` → bare `VariableDeclarationList` initializer                      |
+| `for (var x in y)` / `for (var x of y)` | `ForInStatement` / `ForOfStatement` → bare `VariableDeclarationList` initializer |
+
+When translating an ESTree `VariableDeclaration` listener, listen on
+`KindVariableDeclarationList` so loop headers are not missed. If ESLint reports
+the declaration node itself, report the `VariableStatement` parent for a normal
+statement and the declaration list for a loop header:
+
+```go
+reportNode := declarationList
+if declarationList.Parent != nil && declarationList.Parent.Kind == ast.KindVariableStatement {
+    reportNode = declarationList.Parent
+}
+```
+
+This preserves ESLint's range in both shapes and avoids registering both kinds,
+which would otherwise double-report ordinary declaration statements.
+
 ### Node Text and Positions
 
 Raw `node.Pos()` and `node.End()` include leading trivia (whitespace, comments, line breaks). This is almost never what a rule wants — reading source text across `node.Pos()..node.End()` yields leading blanks, and reporting at `node.Pos()` positions the diagnostic on the trivia.
