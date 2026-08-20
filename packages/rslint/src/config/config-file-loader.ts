@@ -10,13 +10,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function configJSONReplacer(_key: string, value: unknown): unknown {
-  if (value instanceof RegExp) {
-    return { source: value.source, flags: value.flags };
-  }
-  return value;
-}
-
 /**
  * Load a selected JS/TS config file.
  * TypeScript modules use native import when Node.js supports type stripping

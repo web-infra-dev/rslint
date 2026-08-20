@@ -1,7 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import { Socket } from 'node:net';
 import { RSLintService } from '../service/service.js';
-import { configJSONReplacer } from '../config/config-file-loader.js';
 import { resolveRslintBinary } from './resolve-binary.js';
 import type {
   RslintServiceInterface,
@@ -171,10 +170,7 @@ export class NodeRslintService implements RslintServiceInterface {
 
   private writeMessage(message: IpcMessage): void {
     if (this.dead) return;
-    const jsonBuffer = Buffer.from(
-      JSON.stringify(message, configJSONReplacer),
-      'utf8',
-    );
+    const jsonBuffer = Buffer.from(JSON.stringify(message), 'utf8');
     const length = Buffer.alloc(4);
     length.writeUInt32LE(jsonBuffer.length, 0);
     this.process.stdin!.write(Buffer.concat([length, jsonBuffer]));

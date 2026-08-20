@@ -4,7 +4,6 @@ import path from 'node:path';
 
 import {
   collectPluginMeta,
-  configJSONReplacer,
   loadConfigFile,
   loadConfigFileFresh,
   normalizeConfig,
@@ -569,7 +568,7 @@ export class ConfigModuleHost {
       // This is the cross-process serialization boundary. Keeping the canonical
       // JSON also prevents a caller mutating a response from corrupting session
       // state used later by #summarizeEffectiveConfigs.
-      const entriesJSON = JSON.stringify(normalized, configJSONReplacer);
+      const entriesJSON = JSON.stringify(normalized);
       const afterFingerprint = await this.#fingerprint(candidate.configPath);
       if (sourceFingerprint !== afterFingerprint) {
         throw new ConfigSourceChangedError(candidate.configPath);

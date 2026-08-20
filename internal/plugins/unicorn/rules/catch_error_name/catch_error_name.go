@@ -55,39 +55,25 @@ func parseOptions(raw []any) options {
 	}
 	if patterns, ok := values["ignore"].([]any); ok {
 		for _, value := range patterns {
-			pattern, regexOptions, hasPattern := "", utils.JSUnicodeRegexOptions, false
-			switch value := value.(type) {
-			case string:
-				pattern, hasPattern = value, true
-			case map[string]any:
-				pattern, hasPattern = value["source"].(string)
-				flags, _ := value["flags"].(string)
-				regexOptions = utils.JSRegexOptions
-				if strings.Contains(flags, "i") {
-					regexOptions |= regexp2.IgnoreCase
-				}
-				if strings.Contains(flags, "m") {
-					regexOptions |= regexp2.Multiline
-				}
-				if strings.Contains(flags, "s") {
-					regexOptions |= regexp2.Singleline
-				}
-				if strings.ContainsAny(flags, "uv") {
-					regexOptions |= regexp2.Unicode
-				}
+			pattern, ok := value.(string)
+			if !ok {
+				continue
 			}
-			if hasPattern {
-				if re, err := utils.CompileRegexp2(pattern, regexOptions); err == nil {
-					result.ignore = append(result.ignore, re)
-				}
+			if re, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+				result.ignore = append(result.ignore, re)
 			}
 		}
 	}
 	return result
 }
 
-func jsxNamespaceReferences(body *ast.Node, name string) []*ast.Node {
+func jsxNamespaceReferences(identifier *ast.Node, body *ast.Node, name string) []*ast.Node {
 	var references []*ast.Node
+	declaration := bindingDeclaration(identifier)
+	var boundary *ast.Node
+	if declaration != nil {
+		boundary = declaration.Parent
+	}
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
 		if node == nil {
@@ -95,7 +81,9 @@ func jsxNamespaceReferences(body *ast.Node, name string) []*ast.Node {
 		}
 		if node.Kind == ast.KindJsxNamespacedName {
 			namespacedName := node.AsJsxNamespacedName()
-			if namespacedName != nil && namespacedName.Namespace != nil && namespacedName.Namespace.Text() == name {
+			if namespacedName != nil && namespacedName.Namespace != nil && ast.IsJsxTagName(node) &&
+				namespacedName.Namespace.Text() == name &&
+				!utils.IsNameShadowedBetween(namespacedName.Namespace, boundary, name) {
 				references = append(references, namespacedName.Namespace)
 			}
 		}
@@ -213,6 +201,7 @@ func bodyHasExternalReference(ctx rule.RuleContext, body *ast.Node, originalSymb
 			return
 		}
 		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == candidate &&
+			!(node.Parent != nil && node.Parent.Kind == ast.KindJsxNamespacedName && !ast.IsJsxTagName(node.Parent)) &&
 			!(ast.IsJsxTagName(node) && scanner.IsIntrinsicJsxName(node.Text())) &&
 			!utils.IsNonReferenceIdentifier(node) {
 			symbol := ctx.Refs.Resolve(node)
@@ -397,7 +386,7 @@ var CatchErrorNameRule = rule.Rule{
 					return
 				}
 				references := append([]*ast.Node(nil), ctx.Refs.References(declaration.Symbol())...)
-				references = append(references, jsxNamespaceReferences(handlerBody(identifier), originalName)...)
+				references = append(references, jsxNamespaceReferences(identifier, handlerBody(identifier), originalName)...)
 				sort.Slice(references, func(i, j int) bool { return references[i].Pos() < references[j].Pos() })
 				if originalName == "_" && len(references) == 0 {
 					return
