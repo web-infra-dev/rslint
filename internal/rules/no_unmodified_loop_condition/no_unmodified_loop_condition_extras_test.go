@@ -1,3 +1,6 @@
+// TestNoUnmodifiedLoopConditionExtras locks in branches and edge shapes that
+// the upstream test suite doesn't exercise. The full pinned ESLint main suite
+// lives in no_unmodified_loop_condition_upstream_test.go.
 package no_unmodified_loop_condition
 
 import (
@@ -7,7 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
+func TestNoUnmodifiedLoopConditionExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
@@ -22,6 +25,14 @@ func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
 			{Code: `var foo = 0; while (foo < 10) { foo++; }`},
 			{Code: `var foo = 0; while (foo < 10) { --foo; }`},
 			{Code: `var foo = 0; while (foo < 10) { foo -= 1; }`},
+
+			// ---- Real-user: decrement/compound-assignment conditions from the supplied report ----
+			{Code: `var foo = 0; while (foo++) { }`},
+			{Code: `var foo = 0; while (--foo) { }`},
+			{Code: `var foo = 0; while (foo = next()) { }`},
+			{Code: `var foo = 0; while ((foo -= 1) > 0) { }`},
+			{Code: `var foo = 0; do { } while (foo++);`},
+			{Code: `for (var foo = 10; foo--; ) { }`},
 
 			// === Do-while ===
 			{Code: `var foo = 0; do { foo++; } while (foo < 10)`},
@@ -44,6 +55,7 @@ func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
 			{Code: "while (tag`template`) { }"},
 			{Code: `while (a.b.c) { }`},
 			{Code: `for (var i = 0; f(i) < 10; ) { }`},
+			{Code: `var x = "./module.js"; while (import(x)) { x = next(); }`},
 
 			// === Comparison group semantics ===
 			// a < b is one group: if a is modified, b is OK too
@@ -122,11 +134,21 @@ func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
 			// TypeChecker fallback can) modified in the body ===
 			{Code: `while (window) { window = window; }`},
 
-			// === Default-exported function modifies the condition variable and
-			// is called in the loop. n.Symbol() on the FunctionDeclaration node
-			// is the export symbol, which never matches a call site's resolved
-			// symbol — the check must compare against n.LocalSymbol() instead. ===
+			// === A default-exported named function still resolves to the same
+			// local binding when it is called from the loop. ===
 			{Code: `export default function inc() { x++; } var x = 0; while (x < 10) { inc(); }`},
+
+			// === Function references and writes matched by ESLint's loop range ===
+			{Code: `var x = 0; function f(y = (x = 1)) { } while (x < 10) { f(2); }`},
+			{Code: `var x = 0; function update() { x++; } while (x && update()) { }`},
+			{Code: `var x = 0; while (x) { var x = 1; }`},
+			{Code: `var x = 0; while (x) { for (var x of xs) { } }`},
+
+			// === References inside function expressions are not loop conditions ===
+			{Code: `var x = 0, guard = 1; while (x || (() => guard)) { x++; }`},
+			{Code: `var x = 0, guard = 1; while (x || function () { return guard; }) { x++; }`},
+			{Code: `var x = 0, guard = 1; while (x || class { field = guard }) { x++; }`},
+			{Code: `var x = 0, guard = 1; while (x || ({ method() { return guard; } })) { x++; }`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -196,6 +218,15 @@ func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
 				},
 			},
 
+			// === ESLint issue #20844: main intentionally keeps LogicalExpression
+			// operands independent; PR #21175 only added ternary checking. ===
+			{
+				Code: `function testFunction(filter) { let obj = { value: 1 }; do { obj = Object.getPrototypeOf(obj); } while (obj && !filter); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 113, EndLine: 1, EndColumn: 119},
+				},
+			},
+
 			// === || partial: only a modified, b should be reported ===
 			{
 				Code: `var a = 0, b = 0; while (a || b) { a++; }`,
@@ -261,6 +292,15 @@ func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
 				},
 			},
 
+			// === A write in a nested FunctionDeclaration belongs only to that
+			// nearest function, not to a referenced outer function. ===
+			{
+				Code: `var x = 0; function outer() { function inner() { x++; } } while (x) { outer(); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 66},
+				},
+			},
+
 			// === Ambient/lib global (declared in lib.dom.d.ts, not this file —
 			// RefStore's per-file binder walk can't resolve it, only the
 			// TypeChecker fallback can) never modified in the body ===
@@ -271,15 +311,62 @@ func TestNoUnmodifiedLoopConditionRule(t *testing.T) {
 				},
 			},
 
-			// === Write only in a parameter's default-value initializer, but the
-			// call site passes an explicit argument, so the default never runs —
-			// the write must not count, so x is still reported as unmodified.
-			// (The modification check must scan n.Body() only, not the whole
-			// FunctionDeclaration including its parameter list.) ===
+			// === AssignmentExpression is not a BinaryExpression group upstream ===
 			{
-				Code: `var x = 0; function f(y = (x = 1)) { } while (x < 10) { f(2); }`,
+				Code: `var x = 0, y = 1; while (x = y) { }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "loopConditionNotModified", Line: 1, Column: 47},
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 30},
+				},
+			},
+
+			// === SequenceExpression operands are checked independently upstream ===
+			{
+				Code: `var x = 0, y = 1; while ((x++, y)) { }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 32},
+				},
+			},
+
+			// === Repeated references are reported individually ===
+			{
+				Code: `var x = 0; while (x < x) { }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 19},
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 23},
+				},
+			},
+
+			// === A condition reference to a modifying function modifies x, but the
+			// function binding itself remains an independent condition reference. ===
+			{
+				Code: `var x = 0; function update() { x++; } while (x && update) { }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 51},
+				},
+			},
+
+			// === A standalone tagged template is not a dynamic group upstream ===
+			{
+				Code: "var tag = value; while (tag`value`) { }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 25},
+				},
+			},
+
+			// === ESTree ImportExpression is not a dynamic sentinel upstream ===
+			{
+				Code: `var x = "./module.js"; while (import(x)) { }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 38},
+				},
+			},
+
+			// === A var initializer does not count when the variable's first
+			// definition is a function parameter. ===
+			{
+				Code: `function f(x) { while (x) { var x = 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Line: 1, Column: 24},
 				},
 			},
 		},
