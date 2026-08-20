@@ -38,6 +38,16 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 		{Code: `class C { foo = -42; }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": true}},
 		{Code: `class C { readonly x = 100n; }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
 		{Code: `var x = {[42]: true}`},
+
+		// ---- Computed keys of object binding patterns (ESTree makes them the
+		// key of a Property, like an object literal's) ----
+		{Code: `const { [42]: value } = source;`},
+		{Code: `const { [-42]: value } = source;`},
+		{Code: `function f({ [42]: value }) {}`},
+		{Code: `for (const { [42]: value } of sources) {}`},
+		{Code: `const { a: { [42]: value } } = source;`},
+		{Code: `const { [42]: [value] } = source;`},
+		{Code: `let { [42]: value } = source;`, Options: map[string]interface{}{"enforceConst": true}},
 		{Code: `var one; ({one = 1} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var a, b; ({a = 1, b = 2} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var x; ({a: x = 42} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
@@ -181,6 +191,28 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 		{
 			Code:   `class C { readonly [1] = foo; }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 21, EndColumn: 22}},
+		},
+		{
+			Code:   `const { [42]: value = 7 } = source;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 7.", Line: 1, Column: 23, EndColumn: 24}},
+		},
+		{
+			Code:    `const { [42]: value } = source;`,
+			Options: map[string]interface{}{"detectObjects": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 10, EndColumn: 12}},
+		},
+		{
+			Code:    `class C { readonly accessor x = 1; }`,
+			Options: map[string]interface{}{"ignoreReadonlyClassProperties": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 33, EndColumn: 34}},
+		},
+		{
+			Code:    `class C { readonly accessor [1] = 2; }`,
+			Options: map[string]interface{}{"ignoreReadonlyClassProperties": true},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 30, EndColumn: 31},
+				{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 35, EndColumn: 36},
+			},
 		},
 		{
 			Code: `f(/* leading trivia */ 42, /* unary */ -(7), /* bigint */ 9n);`,

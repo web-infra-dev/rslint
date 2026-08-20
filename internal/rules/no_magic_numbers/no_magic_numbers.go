@@ -372,7 +372,9 @@ func isOkParent(parent *ast.Node, detectObjects bool) bool {
 		return isObjectLiteralMember(parent)
 	case ast.KindComputedPropertyName:
 		gp := parent.Parent
-		if gp != nil && (gp.Kind == ast.KindPropertyAssignment || gp.Kind == ast.KindShorthandPropertyAssignment || isObjectLiteralMember(gp)) {
+		// A computed key in an object binding pattern (`const { [42]: value } = source`)
+		// is the key of an ESTree Property, just like the object-literal cases.
+		if gp != nil && (gp.Kind == ast.KindPropertyAssignment || gp.Kind == ast.KindShorthandPropertyAssignment || gp.Kind == ast.KindBindingElement || isObjectLiteralMember(gp)) {
 			return true
 		}
 		return false
@@ -483,6 +485,12 @@ func isParentTSReadonlyPropertyDefinition(node *ast.Node) bool {
 		parent = parent.Parent
 	}
 	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
+		return false
+	}
+	// ESTree gives an auto-accessor an AccessorProperty parent rather than a
+	// PropertyDefinition, so `readonly accessor x = 1` is not a readonly class
+	// property here.
+	if ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
 		return false
 	}
 	return ast.HasSyntacticModifier(parent, ast.ModifierFlagsReadonly)
