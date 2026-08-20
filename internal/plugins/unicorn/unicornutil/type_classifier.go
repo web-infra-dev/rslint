@@ -26,6 +26,7 @@ type TypeClassifierOptions struct {
 	NonTargetTypeNames         *utils.Set[string]
 	IsTargetType               func(*checker.Type) bool
 	HeritageSymbolFlags        ast.SymbolFlags
+	UnknownSymbolLessTypeFlags checker.TypeFlags
 	AllowNullishInMixedUnion   bool
 	TreatMixedUnionAsTarget    bool
 	TreatMixedUnionAsNonTarget bool
@@ -70,6 +71,10 @@ func ClassifyType(ctx rule.RuleContext, t *checker.Type, options TypeClassifierO
 
 	name, ok := TypeSymbolName(t)
 	if !ok {
+		if options.UnknownSymbolLessTypeFlags != 0 &&
+			utils.IsTypeFlagSet(t, options.UnknownSymbolLessTypeFlags) {
+			return TypeUnknown
+		}
 		if utils.IsTypeFlagSet(t, checker.TypeFlagsPrimitive|checker.TypeFlagsIntrinsic) {
 			return TypeNonTarget
 		}

@@ -84,6 +84,9 @@ router.replace("/about", options);`),
 			jsValid(`const options = {locale: value}; template.replace("x", options)`),
 			// Locks in upstream union combination: an all-non-string union is skipped.
 			tsValid(`declare const value: number | boolean; value.replace("x", replacement)`),
+			// Boolean literals have intrinsic names upstream and are known non-string.
+			tsValid(`declare const value: {flag: true}; value.flag.replace("x", replacement)`),
+			tsValid(`declare function getFlag(): true; getFlag().replace("x", replacement)`),
 			// Locks in upstream type-parameter constraint recursion.
 			tsValid(`function run<T extends number>(value: T) { value.replace("x", replacement); }`),
 			// Locks in upstream class-heritage recursion: String wrapper subclasses are non-string receivers.
@@ -162,6 +165,9 @@ router.replace("/about", options);`),
 			invalid(`(1).replace("x", replacement)`, `replacement`, "replace"),
 			// TypeScript literal types have no intrinsicName upstream and remain unknown.
 			tsInvalid(`(1).replace("x", replacement)`, `replacement`, "replace"),
+			tsInvalid(`(1n).replace("x", replacement)`, `replacement`, "replace"),
+			// The literal-type rule also applies recursively after control-flow narrowing.
+			tsInvalid(`function run(value: 1 | 2 | string) { if (typeof value === "number") { value.replace("x", replacement) } }`, `replacement`, "replace"),
 			// A merged type/value name has multiple definitions and must remain unknown.
 			tsInvalid(`type Sep = number; const Sep = "-"; Sep.replace("x", replacement)`, `replacement`, "replace"),
 			tsInvalid(`type T = {a: 1}; const T = "x"; T.replace("x", replacement)`, `replacement`, "replace"),

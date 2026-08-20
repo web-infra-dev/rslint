@@ -162,15 +162,9 @@ func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
 	}
 
 	t := ctx.TypeChecker.GetTypeAtLocation(node)
-	// Unicorn only treats primitive types as non-target through intrinsicName.
-	// TypeScript literal types have neither that name nor a symbol upstream, so
-	// keep them unknown rather than suppressing this rule's diagnostic.
-	if checker.Type_symbol(t) == nil && checker.Type_alias(t) == nil &&
-		utils.IsTypeFlagSet(t, checker.TypeFlagsNumberLiteral|checker.TypeFlagsBooleanLiteral|checker.TypeFlagsBigIntLiteral) {
-		return false
-	}
 	return unicornutil.ClassifyType(ctx, t, unicornutil.TypeClassifierOptions{
-		HeritageSymbolFlags: ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
+		HeritageSymbolFlags:        ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
+		UnknownSymbolLessTypeFlags: checker.TypeFlagsNumberLiteral | checker.TypeFlagsBigIntLiteral,
 		IsTargetType: func(t *checker.Type) bool {
 			return utils.IsTypeFlagSet(t, checker.TypeFlagsStringLike)
 		},
