@@ -247,6 +247,7 @@ type Foo = {
 		{Code: `const { [42]: value } = source;`},
 		{Code: `function f({ [42]: value }) {}`},
 		{Code: `for (const { [42]: value } of sources) {}`},
+		{Code: `const { 1: a } = source;`},
 		{Code: `var one; ({one = 1} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var a, b; ({a = 1, b = 2} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var x; ({a: x = 42} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
@@ -562,6 +563,10 @@ class Foo {
 		{
 			Code:   `const { [42]: value = 7 } = source;`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 7.", Line: 1, Column: 23, EndColumn: 24}},
+		},
+		{
+			Code:   `const { 1: a = 2 } = source;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 16, EndColumn: 17}},
 		},
 		{
 			Code:    `for (const x of [a = 1]) {}`,

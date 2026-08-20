@@ -48,6 +48,9 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 		{Code: `const { a: { [42]: value } } = source;`},
 		{Code: `const { [42]: [value] } = source;`},
 		{Code: `let { [42]: value } = source;`, Options: map[string]interface{}{"enforceConst": true}},
+		{Code: `const { 1: a } = source;`},
+		{Code: `function f({ 1: a }) {}`},
+		{Code: `const { 1: a, [2]: b } = source;`},
 		{Code: `var one; ({one = 1} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var a, b; ({a = 1, b = 2} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var x; ({a: x = 42} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
@@ -200,6 +203,15 @@ func TestNoMagicNumbersExtras(t *testing.T) {
 			Code:    `const { [42]: value } = source;`,
 			Options: map[string]interface{}{"detectObjects": true},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 10, EndColumn: 12}},
+		},
+		{
+			Code:    `const { 1: a } = source;`,
+			Options: map[string]interface{}{"detectObjects": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 9, EndColumn: 10}},
+		},
+		{
+			Code:   `const { 1: a = 2 } = source;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 16, EndColumn: 17}},
 		},
 		{
 			Code:    `class C { readonly accessor x = 1; }`,

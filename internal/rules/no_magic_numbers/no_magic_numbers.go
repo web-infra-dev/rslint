@@ -337,7 +337,7 @@ func run(ctx rule.RuleContext, rawOptions []any, tsExtension bool) rule.RuleList
 					ctx.ReportRange(fullNumberRange, useConstMessage)
 				}
 			}
-		} else if !isOkParent(parent, opts.detectObjects) {
+		} else if !isOkParent(fullNumberNode, parent, opts.detectObjects) {
 			ctx.ReportRange(fullNumberRange, noMagicNumberMessage(fullRaw))
 		}
 	}
@@ -353,7 +353,7 @@ func run(ctx rule.RuleContext, rawOptions []any, tsExtension bool) rule.RuleList
 }
 
 // isOkParent checks if the parent node type is one that allows numbers without reporting.
-func isOkParent(parent *ast.Node, detectObjects bool) bool {
+func isOkParent(node *ast.Node, parent *ast.Node, detectObjects bool) bool {
 	if detectObjects {
 		return false
 	}
@@ -370,6 +370,11 @@ func isOkParent(parent *ast.Node, detectObjects bool) bool {
 		return true
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		return isObjectLiteralMember(parent)
+	case ast.KindBindingElement:
+		// An object binding pattern's property name is the key of an ESTree
+		// Property; its default value is a separate AssignmentPattern child
+		// and stays reportable.
+		return parent.AsBindingElement().PropertyName == node
 	case ast.KindComputedPropertyName:
 		gp := parent.Parent
 		// A computed key in an object binding pattern (`const { [42]: value } = source`)
