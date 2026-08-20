@@ -176,6 +176,7 @@ fieldset
 figcaption
 fileless
 finalizer
+firstname
 fixability
 fixall
 flaggable
@@ -280,6 +281,7 @@ koblas
 Kore
 labelledby
 Laoo
+Larcher
 ldflags
 ldquo
 libc
@@ -309,6 +311,7 @@ marginx
 marginy
 materialise
 materialised
+Matthieu
 McCabe
 memfs
 menuitemcheckbox
