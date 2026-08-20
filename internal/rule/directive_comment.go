@@ -2,14 +2,14 @@ package rule
 
 import (
 	"strings"
-	"unicode"
 	"unicode/utf8"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // Scanning shared by ESLint's block directive comments (`/* global */`,
 // `/* exported */`). Each directive owns its own value syntax; what they share
-// is locating the label, dropping a `-- justification` tail, and ESLint's exact
-// whitespace class.
+// is locating the label and dropping a `-- justification` tail.
 
 // mayContainDirective reports whether text could contain a block comment whose
 // content starts with one of keywords. It is a cheap source-text scan that lets
@@ -33,7 +33,7 @@ func mayContainDirective(text string, keywords []string) bool {
 				return true
 			}
 			r, _ := utf8.DecodeRuneInString(text[restStart:])
-			if isECMAScriptWhitespace(r) {
+			if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 				return true
 			}
 		}
@@ -57,7 +57,7 @@ func matchDirectiveLabelRange(text string, start int, end int, keywords []string
 			return restStart, true
 		}
 		r, _ := utf8.DecodeRuneInString(text[restStart:end])
-		if isECMAScriptWhitespace(r) {
+		if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			return restStart, true
 		}
 	}
@@ -70,7 +70,7 @@ func matchDirectiveLabelRange(text string, start int, end int, keywords []string
 func findDirectiveJustification(text string, start int, end int) int {
 	for index := start; index < end; {
 		r, size := utf8.DecodeRuneInString(text[index:end])
-		if !isECMAScriptWhitespace(r) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			index += size
 			continue
 		}
@@ -82,7 +82,7 @@ func findDirectiveJustification(text string, start int, end int) int {
 		}
 		if afterHyphens-hyphenStart >= 2 && afterHyphens < end {
 			next, _ := utf8.DecodeRuneInString(text[afterHyphens:end])
-			if isECMAScriptWhitespace(next) {
+			if ecmascript.IsWhiteSpaceOrLineTerminator(next) {
 				return index
 			}
 		}
@@ -94,33 +94,17 @@ func findDirectiveJustification(text string, start int, end int) int {
 func trimECMAScriptWhitespaceRange(text string, start int, end int) (int, int) {
 	for start < end {
 		r, size := utf8.DecodeRuneInString(text[start:end])
-		if !isECMAScriptWhitespace(r) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			break
 		}
 		start += size
 	}
 	for end > start {
 		r, size := utf8.DecodeLastRuneInString(text[start:end])
-		if !isECMAScriptWhitespace(r) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			break
 		}
 		end -= size
 	}
 	return start, end
-}
-
-// ECMAScript's \s set is Unicode Zs plus ASCII spacing/line terminators,
-// U+2028/U+2029, and BOM. unicode.IsSpace is not exact: it includes U+0085 and
-// excludes BOM. TypeScript's internal stringutil helper also accepts U+0085
-// and U+200B, so it cannot model ESLint's JavaScript regexp semantics here.
-func isECMAScriptWhitespace(r rune) bool {
-	if unicode.Is(unicode.Zs, r) {
-		return true
-	}
-	switch r {
-	case '\t', '\v', '\f', '\n', '\r', '\u2028', '\u2029', '\uFEFF':
-		return true
-	default:
-		return false
-	}
 }

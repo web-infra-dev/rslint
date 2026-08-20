@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // inlineGlobalsKeywords lists the directive keywords that introduce a
@@ -177,7 +178,7 @@ func parseGlobalNameListEntries(text string, start int, end int) []inlineGlobalN
 	var entries []inlineGlobalName
 
 	for index := 0; index < len(runes); {
-		for index < len(runes) && (runes[index].value == ',' || isECMAScriptWhitespace(runes[index].value)) {
+		for index < len(runes) && (runes[index].value == ',' || ecmascript.IsWhiteSpaceOrLineTerminator(runes[index].value)) {
 			index++
 		}
 		if index == len(runes) {
@@ -185,7 +186,7 @@ func parseGlobalNameListEntries(text string, start int, end int) []inlineGlobalN
 		}
 
 		tokenStart := index
-		for index < len(runes) && runes[index].value != ',' && !isECMAScriptWhitespace(runes[index].value) {
+		for index < len(runes) && runes[index].value != ',' && !ecmascript.IsWhiteSpaceOrLineTerminator(runes[index].value) {
 			index++
 		}
 		tokenEnd := index
@@ -242,14 +243,14 @@ func normalizeGlobalConfigRunes(text string, start int, end int) []globalConfigR
 
 	normalized := make([]globalConfigRune, 0, len(raw))
 	for index := 0; index < len(raw); {
-		if !isECMAScriptWhitespace(raw[index].value) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(raw[index].value) {
 			normalized = append(normalized, raw[index])
 			index++
 			continue
 		}
 
 		whitespaceEnd := index + 1
-		for whitespaceEnd < len(raw) && isECMAScriptWhitespace(raw[whitespaceEnd].value) {
+		for whitespaceEnd < len(raw) && ecmascript.IsWhiteSpaceOrLineTerminator(raw[whitespaceEnd].value) {
 			whitespaceEnd++
 		}
 		previousIsDelimiter := len(normalized) > 0 && (normalized[len(normalized)-1].value == ':' || normalized[len(normalized)-1].value == ',')
