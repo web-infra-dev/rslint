@@ -285,6 +285,7 @@ instead of re-exporting aliases.
 type RuleContext struct {
     SourceFile     *ast.SourceFile
     Settings       map[string]interface{}
+    LanguageOptions LanguageOptions
     Globals        Globals
     Comments       *CommentStore
     Refs           *RefStore
@@ -366,8 +367,11 @@ supports scope rules whose query location is not itself an identifier
 reference. `HasNonGlobalTopLevelScope` exposes the corresponding scope fact
 without exposing a language mode or requiring rules to parse paths.
 Config resolution normalizes the per-file `ecmaVersion` into `LanguageOptions`;
-its zero value means the moving `latest` edition. The linter uses it to build
-one `Globals` value for each native rule context. `Globals` owns the
+its zero value means the moving `latest` edition. The linter exposes the
+normalized value through `RuleContext.LanguageOptions` and also uses it to
+build one `Globals` value for each native rule context. Rules read
+`LanguageOptions` when upstream behavior depends on language configuration;
+they use `Globals` for variable-availability decisions. `Globals` owns the
 ESLint-versioned language-global set, resolved language defaults, the authored
 `languageOptions.globals` source, inline `/* global */` settings and ranges,
 and the effective access after applying their precedence. Rules use
@@ -376,9 +380,8 @@ accessors only when upstream behavior depends on provenance, instead of
 rebuilding the merge. A rule whose upstream semantics add another source, such
 as TypeScript library globals, applies this view last so `ecmaVersion` and
 authored overrides remain authoritative. This keeps the language-global
-composition point extensible for future language options such as `sourceType`
-without exposing those options directly to every rule; non-global wrapper
-bindings remain a `RefStore` initialization concern.
+composition point extensible for future language options such as `sourceType`;
+non-global wrapper bindings remain a `RefStore` initialization concern.
 
 Before constructing rule contexts, the linter calls `ResolveLanguageDefaults`
 once and passes its concrete `GlobalsInit` and `RefStoreInit` results to their
