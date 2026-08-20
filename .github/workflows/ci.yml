@@ -98,7 +98,6 @@ jobs:
           }
 
       # Fallback for any runner without a dedicated step above.
-      # Uses the runner's own nprocs.
       - name: Unit Test
         if: matrix.runner != 'rspack-ubuntu-22.04-large' && matrix.runner != 'rspack-windows-2022-large'
         run: go test -count=1 ./cmd/... ./internal/...
