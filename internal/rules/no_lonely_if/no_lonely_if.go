@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // NoLonelyIfRule disallows `if` statements as the only statement in `else`
@@ -68,8 +69,8 @@ func buildLonelyIfFix(sf *ast.SourceFile, elseBlock, ifNode *ast.Node) (rule.Rul
 	nodeRange := utils.TrimNodeTextRange(sf, ifNode)
 
 	// Don't fix if there are any non-whitespace characters interfering (e.g. comments).
-	if strings.TrimSpace(text[innerRange.Pos():nodeRange.Pos()]) != "" ||
-		strings.TrimSpace(text[nodeRange.End():innerRange.End()]) != "" {
+	if !ecmascript.IsBlank(text[innerRange.Pos():nodeRange.Pos()]) ||
+		!ecmascript.IsBlank(text[nodeRange.End():innerRange.End()]) {
 		return rule.RuleFix{}, false
 	}
 

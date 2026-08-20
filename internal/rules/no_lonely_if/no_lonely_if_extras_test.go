@@ -172,6 +172,26 @@ func TestNoLonelyIfExtras(t *testing.T) {
 				},
 			},
 
+			// ---- Dimension 4 (graceful degradation): the whitespace the fixer ----
+			// scans for interference is ECMAScript's, not Go's. U+FEFF is
+			// whitespace to JavaScript, so the braces come off…
+			{
+				Code:   "if (a) {} else {\uFEFFif (b) c();\uFEFF}",
+				Output: []string{"if (a) {} else if (b) c();"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedLonelyIf", Line: 1, Column: 18},
+				},
+			},
+
+			// …and U+0085 is not, so the interference check sees a character
+			// between the brace and the `if` and the diagnostic carries no fix.
+			{
+				Code: "if (a) {} else {\u0085if (b) c();\u0085}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedLonelyIf", Line: 1, Column: 18},
+				},
+			},
+
 			// ---- Dimension 3: `else{` with no space before the opening brace; ----
 			// the fixer must insert a leading space so `else` and the replacement
 			// `if` text don't fuse into `elseif`.
