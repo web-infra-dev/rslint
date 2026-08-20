@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 var rstestRootCandidate = regexp.MustCompile(`(?m)^[\t ]*[;(]*[\t ]*(test|it|describe)\b`)
@@ -205,7 +206,7 @@ func rootStartsLogicalLine(text string, offset int) bool {
 		return false
 	}
 	lineStart := strings.LastIndexByte(text[:offset], '\n') + 1
-	prefix := strings.TrimSpace(text[lineStart:offset])
+	prefix := ecmascript.StringTrim(text[lineStart:offset])
 	for _, char := range prefix {
 		if char != '(' && char != ';' {
 			return false
@@ -215,7 +216,7 @@ func rootStartsLogicalLine(text string, offset int) bool {
 }
 
 func opensMarkdownFence(line string) bool {
-	trimmed := strings.TrimSpace(line)
+	trimmed := ecmascript.StringTrim(line)
 	return strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")
 }
 
@@ -305,7 +306,7 @@ func registrationHasCleanLineEnd(text string, end int) bool {
 	if newline := strings.IndexByte(text[end:], '\n'); newline >= 0 {
 		lineEnd = end + newline
 	}
-	trailing := strings.TrimSpace(text[end:lineEnd])
+	trailing := ecmascript.StringTrim(text[end:lineEnd])
 	return trailing == "" ||
 		strings.HasPrefix(trailing, ";") ||
 		strings.HasPrefix(trailing, "//") ||

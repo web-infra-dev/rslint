@@ -1,0 +1,23 @@
+{
+  "definitions": {
+    "value": {
+      "enum": ["always", "as-needed", "never"]
+    }
+  },
+  "type": "array",
+  "items": [
+    {
+      "$ref": "#/definitions/value"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "generators": {
+          "$ref": "#/definitions/value"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "additionalItems": false
+}

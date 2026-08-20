@@ -42,6 +42,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // errorMessage mirrors upstream's `errorMessage(name, type, permittedValues)`
@@ -150,7 +151,7 @@ func validityCheck(value jsxa11yutil.AriaLiteralValue, expectedType string, perm
 			return false
 		}
 		for _, tok := range strings.Split(value.Str, " ") {
-			lower := strings.ToLower(tok)
+			lower := ecmascript.StringToLowerCase(tok)
 			if !permittedValuesContainsString(permittedValues, lower) {
 				return false
 			}
@@ -182,7 +183,7 @@ func validityCheck(value jsxa11yutil.AriaLiteralValue, expectedType string, perm
 func tokenMatch(value jsxa11yutil.AriaLiteralValue, permittedValues []any) bool {
 	switch value.Kind {
 	case jsxa11yutil.AriaLiteralString:
-		lower := strings.ToLower(value.Str)
+		lower := ecmascript.StringToLowerCase(value.Str)
 		return permittedValuesContainsString(permittedValues, lower)
 	case jsxa11yutil.AriaLiteralBool:
 		for _, v := range permittedValues {
@@ -222,7 +223,7 @@ var AriaProptypesRule = rule.Rule{
 				// all resolve to `aria-hidden` for purposes of this rule.
 				// This differs from jsx-a11y/aria-props which uses a
 				// CASE-SENSITIVE prefix check — same plugin, different gate.
-				normalized := strings.ToLower(rawName)
+				normalized := ecmascript.StringToLowerCase(rawName)
 				if !strings.HasPrefix(normalized, "aria-") {
 					return
 				}

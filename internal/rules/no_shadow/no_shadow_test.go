@@ -484,6 +484,21 @@ function bar() { }`},
 	}
   }
 		`},
+			// ---- A string-literal enum member binds its name but declares no
+			// identifier, so it is neither reported nor reported against ----
+			{Code: `
+			const A = 2;
+			enum Test {
+				"A" = 1,
+				B = A,
+			}
+		`},
+			{Code: `
+			enum Test {
+				"A" = 1,
+				B = ((): number => { const A = 2; return A; })(),
+			}
+		`},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -1315,6 +1330,14 @@ function bar() { }`},
 				Code: `const a = 1; class C { m(x: string): void; m(x: number): void; m(a: any): void { void a; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noShadow"},
+				},
+			},
+
+			// ---- Function overload definitions form one shadowing variable ----
+			{
+				Code: `const f = 0; { function f(x: string): void; function f(x: any) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadow", Line: 1, Column: 25},
 				},
 			},
 

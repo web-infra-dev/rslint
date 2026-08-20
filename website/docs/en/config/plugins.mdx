@@ -1,0 +1,49 @@
+import PluginPrefixTable from '@/theme/components/PluginPrefixTable.tsx';
+
+# plugins
+
+- **Type:** `string[] | Record<string, ESLintPlugin>`
+
+Enables plugins for a config entry. Rslint accepts either an array of built-in plugin names or an object containing third-party ESLint plugin instances.
+
+## Built-in plugins
+
+Use the array form for plugins whose rules are implemented natively by Rslint. A name declares a rule namespace; its rules become available under the `<plugin>/<rule>` prefix inside [`rules`](/config/rules).
+
+<PluginPrefixTable />
+
+```ts
+{
+  files: ['**/*.ts'],
+  plugins: ['@typescript-eslint'],
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'error',
+  },
+}
+```
+
+ESLint core rules, such as `no-unused-vars` or `prefer-const`, are not part of a plugin. Enable them directly in `rules` without listing anything here.
+
+Presets such as `ts.configs.recommended` already include their own `plugins` entry, so this field is only needed when configuring plugin rules outside a preset.
+
+## Third-party ESLint plugins
+
+Use the object form to map a prefix to an imported plugin object. These JavaScript rules run in the Node plugin worker and are routed through the same per-file flat config as native rules. This form requires a JS/TS config because JSON cannot carry a live plugin object.
+
+```ts
+import examplePlugin from 'eslint-plugin-example';
+
+export default defineConfig([
+  {
+    files: ['**/*.ts'],
+    plugins: { example: examplePlugin },
+    rules: {
+      'example/some-rule': 'error',
+    },
+  },
+]);
+```
+
+A single entry uses one plugin form. To combine built-in and third-party plugins, declare them in separate config entries; matching entries are merged before linting. A third-party prefix may not collide with a built-in plugin name.
+
+See [ESLint plugin compatibility](/guide/eslint-plugins) for the supported and unsupported ESLint APIs.

@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed consistent_type_definitions.schema.json
@@ -108,7 +109,7 @@ func (f consistentTypeDefinitionsFixer) typeAliasFix(node *ast.Node, typeAlias *
 	if index := strings.Index(betweenText, "/*"); index >= 0 {
 		endIndex := strings.Index(betweenText, "*/")
 		if endIndex >= 0 {
-			commentText = " " + strings.TrimSpace(betweenText[index:endIndex+2]) + " "
+			commentText = " " + ecmascript.StringTrim(betweenText[index:endIndex+2]) + " "
 		}
 	}
 

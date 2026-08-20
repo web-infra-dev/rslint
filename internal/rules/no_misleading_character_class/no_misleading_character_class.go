@@ -17,14 +17,14 @@ package no_misleading_character_class
 import (
 	_ "embed"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 //go:embed no_misleading_character_class.schema.json
@@ -1352,7 +1352,7 @@ func isSurrogatePair(hi, lo uint32) bool {
 }
 func isSurrogateValue(v uint32) bool { return v >= 0xD800 && v <= 0xDFFF }
 func isCombiningCharacter(cp uint32) bool {
-	return cp <= 0x10FFFF && unicode.Is(unicode.M, rune(cp))
+	return cp <= 0x10FFFF && unicode17.IsMark(rune(cp))
 }
 func isEmojiModifier(cp uint32) bool { return cp >= 0x1F3FB && cp <= 0x1F3FF }
 func isRegionalIndicatorSymbol(cp uint32) bool {
@@ -1469,7 +1469,7 @@ func messageDescriptionFor(kind string) string {
 // This combination catches all the cases in ESLint's test suite that should
 // suppress the suggestion without special-casing.
 func patternValidWithUFlag(pattern string) bool {
-	if _, err := regexp2.Compile(pattern, regexp2.ECMAScript|regexp2.Unicode); err != nil {
+	if _, err := esregexp.Compile(pattern, "u"); err != nil {
 		return false
 	}
 	return !hasInvalidIdentityEscapeForUFlag(pattern)

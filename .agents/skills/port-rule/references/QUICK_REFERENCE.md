@@ -113,6 +113,23 @@ import (
     // Utility functions
     "github.com/web-infra-dev/rslint/internal/utils"
 
+    // JavaScript semantics — trim/blank/case/number, never strings.TrimSpace
+    // or strings.ToLower
+    "github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+
+    // A general category (\p{Lu}, \p{L}, \p{M}) on the edition of Unicode Node
+    // reads — never the standard library's unicode package
+    "github.com/web-infra-dev/rslint/internal/utils/unicode17"
+
+    // A JavaScript RegExp — never the standard library's regexp, which is RE2
+    esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+
+    // Globs the way a plugin reads them (minimatch 3.x); minimatch 10 is NOT ported
+    "github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+
+    // "Is this a glob or a plain path?" (is-glob 4.0.3)
+    "github.com/web-infra-dev/rslint/internal/utils/isglob"
+
     // Test framework
     "github.com/web-infra-dev/rslint/internal/rule_tester"
 
@@ -134,6 +151,10 @@ import (
 - [ ] ESLint `variable.references` usage maps to `ctx.Refs` with a binder symbol
 - [ ] Whole-file comment scans use `ctx.Comments.All()`
 - [ ] Cross-file source/module queries use `ctx.Program()` without backend-kind branches
+- [ ] Regexps go through `esregexp`, globs through `minimatch3`/`isglob`, and JS string/number semantics through `ecmascript` — no `strings.TrimSpace`, `strings.ToLower`/`ToUpper`, stdlib `regexp`, or `doublestar` on a value that came from JavaScript
+- [ ] A character question goes to `ecmascript` (case, whitespace), `esregexp` (`/i` comparison), `unicode17` (a general category) or tsgo's `scanner` (identifier) — never to the standard library's `unicode`
+- [ ] Grep the change for `"regexp"` and account for every hit: a stdlib pattern is allowed only when it is written here, RE2 and JavaScript read it the same way, and no user input reaches it — otherwise it takes `esregexp`
+- [ ] If the upstream rule reads globs with anything but minimatch 3 or is-glob — `minimatch@10` included — it was reported to the user rather than silently ported onto `minimatch3`/`doublestar` or hand-rolled
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
 - [ ] Spell check passes (`pnpm -w run check-spell`)

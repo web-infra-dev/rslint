@@ -1,12 +1,12 @@
 package utils
 
 import (
-	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // SourceToken is a source-backed token with its kind, byte span, and text.
@@ -172,8 +172,8 @@ func SafeReplacementText(sourceFile *ast.SourceFile, node *ast.Node, replacement
 // astUtils.canTokensBeAdjacent. It returns false for token pairs that would
 // merge into a different token if printed without whitespace.
 func CanTokenTextsBeAdjacent(left string, right string) bool {
-	left = strings.TrimSpace(left)
-	right = strings.TrimSpace(right)
+	left = ecmascript.StringTrim(left)
+	right = ecmascript.StringTrim(right)
 	if left == "" || right == "" {
 		return true
 	}
@@ -190,7 +190,7 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 	if (leftRune == '+' && rightRune == '+') || (leftRune == '-' && rightRune == '-') {
 		return false
 	}
-	if leftRune == '/' && (rightRune == '/' || rightRune == '*' || scanner.IsIdentifierPart(rightRune)) {
+	if leftRune == '/' && (rightRune == '/' || rightRune == '*') {
 		return false
 	}
 	return true

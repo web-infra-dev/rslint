@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"unicode"
 	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 //go:embed filename_case.schema.json
@@ -61,8 +62,6 @@ func isIgnoredByDefault(basename string) bool {
 	}
 }
 
-const reOpts = regexp2.ECMAScript | regexp2.Unicode
-
 // invalidIgnore captures a single user-supplied `ignore` pattern that failed
 // to compile. The rule reports each one as its own diagnostic so the user can
 // see which configuration entry is broken.
@@ -78,7 +77,7 @@ type invalidIgnore struct {
 type options struct {
 	cases                  [caseStyleCount]caseStyle
 	caseCount              int
-	ignores                []*regexp2.Regexp
+	ignores                []*esregexp.RegExp
 	invalidIgnores         []invalidIgnore
 	multipleFileExtensions bool
 }
@@ -136,15 +135,15 @@ func (o *options) selectedCases() []caseStyle {
 	return o.cases[:o.caseCount]
 }
 
-// regexp2 compilation is considerably more expensive than matching, while a
+// Compiling is considerably more expensive than matching, while a
 // configured ignore list is shared by every file. Cache compiled patterns at
 // rule scope so parallel files reuse them. The fixed-size FIFO bound prevents
 // long-lived API/LSP processes from retaining an unbounded stream of config
-// values; regexp2.Regexp is documented as safe for concurrent use.
+// values; a compiled pattern is safe for concurrent use.
 const ignoreRegexpCacheCapacity = 128
 
 type compiledIgnoreRegexp struct {
-	regexp *regexp2.Regexp
+	regexp *esregexp.RegExp
 	err    error
 }
 
@@ -156,7 +155,7 @@ var ignoreRegexpCache = struct {
 	next    int
 }{}
 
-func compileIgnoreRegexp(pattern string) (*regexp2.Regexp, error) {
+func compileIgnoreRegexp(pattern string) (*esregexp.RegExp, error) {
 	ignoreRegexpCache.Lock()
 	defer ignoreRegexpCache.Unlock()
 
@@ -164,7 +163,7 @@ func compileIgnoreRegexp(pattern string) (*regexp2.Regexp, error) {
 		return cached.regexp, cached.err
 	}
 
-	re, err := regexp2.Compile(pattern, reOpts)
+	re, err := esregexp.Compile(pattern, "u")
 	if ignoreRegexpCache.entries == nil {
 		ignoreRegexpCache.entries = make(map[string]compiledIgnoreRegexp, ignoreRegexpCacheCapacity)
 	}
@@ -233,7 +232,7 @@ func splitWords(s string) []string {
 	wordStart := -1
 	var previous rune
 	for pos, current := range s {
-		if !unicode.IsLetter(current) && !isASCIIDigit(current) {
+		if !unicode17.IsLetter(current) && !isASCIIDigit(current) {
 			if wordStart >= 0 {
 				words = append(words, s[wordStart:pos])
 				wordStart = -1
@@ -244,11 +243,11 @@ func splitWords(s string) []string {
 		if wordStart < 0 {
 			wordStart = pos
 		} else {
-			boundary := (unicode.IsLower(previous) || isASCIIDigit(previous)) && unicode.IsUpper(current)
-			if !boundary && unicode.IsUpper(previous) && unicode.IsUpper(current) {
+			boundary := (unicode17.IsLower(previous) || isASCIIDigit(previous)) && unicode17.IsUpper(current)
+			if !boundary && unicode17.IsUpper(previous) && unicode17.IsUpper(current) {
 				_, size := utf8.DecodeRuneInString(s[pos:])
 				next, _ := utf8.DecodeRuneInString(s[pos+size:])
-				boundary = unicode.IsLower(next)
+				boundary = unicode17.IsLower(next)
 			}
 			if boundary {
 				words = append(words, s[wordStart:pos])
@@ -276,11 +275,11 @@ func pascalLikeTransform(word string, index int) string {
 	}
 	char0, size := utf8.DecodeRuneInString(word)
 	first := word[:size]
-	rest := strings.ToLower(word[size:])
+	rest := ecmascript.StringToLowerCase(word[size:])
 	if index > 0 && isASCIIDigit(char0) {
 		return "_" + first + rest
 	}
-	return strings.ToUpper(first) + rest
+	return ecmascript.StringToUpperCase(first) + rest
 }
 
 func toCamelCase(s string) string {
@@ -290,7 +289,7 @@ func toCamelCase(s string) string {
 	}
 	var sb strings.Builder
 	sb.Grow(len(s) + len(words))
-	sb.WriteString(strings.ToLower(words[0]))
+	sb.WriteString(ecmascript.StringToLowerCase(words[0]))
 	for i := 1; i < len(words); i++ {
 		sb.WriteString(pascalLikeTransform(words[i], i))
 	}
@@ -327,7 +326,7 @@ func joinNoCase(words []string, delim string) string {
 		if i > 0 {
 			sb.WriteString(delim)
 		}
-		sb.WriteString(strings.ToLower(w))
+		sb.WriteString(ecmascript.StringToLowerCase(w))
 	}
 	return sb.String()
 }
@@ -624,7 +623,7 @@ var FilenameCaseRule = rule.Rule{
 			return nil
 		}
 		for _, re := range opts.ignores {
-			if matched, _ := re.MatchString(basename); matched {
+			if re.TestOrTimeout(basename) {
 				return nil
 			}
 		}
@@ -642,7 +641,7 @@ var FilenameCaseRule = rule.Rule{
 		leading, words := splitFilename(filename)
 		cases := opts.selectedCases()
 		valid, invalidWord, invalidCandidates := validateFilename(words, cases)
-		lowerExt := strings.ToLower(ext)
+		lowerExt := ecmascript.StringToLowerCase(ext)
 		if valid {
 			if ext != lowerExt {
 				if ctx.DisableManager.IsRuleDisabled(filenameCaseRuleName, reportRange.Pos()) {

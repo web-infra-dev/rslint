@@ -9,6 +9,7 @@ acking
 acks
 activedescendant
 addl
+aeiou
 affordances
 afoob
 agen
@@ -38,6 +39,7 @@ autofixers
 autofocus
 auvred
 axobject
+Azeri
 backgrounded
 backlink
 backpressure
@@ -69,6 +71,7 @@ brefs
 Buttom
 butwhy
 cachedvfs
+caféx
 callbackify
 callees
 callsite
@@ -77,6 +80,8 @@ cand
 canonicalise
 canonicalised
 canonicalises
+caser
+caseless
 catchable
 categorisation
 Cbar
@@ -124,6 +129,7 @@ deboucne
 dedup
 dedupe
 dedups
+depguard
 deprec
 Deque
 describedby
@@ -131,6 +137,7 @@ destabilising
 destructures
 desugars
 desync
+dialytika
 dirxml
 disqualifier
 disqualifiers
@@ -138,6 +145,7 @@ dlclark
 Dmts
 dobedo
 dont
+dotless
 doublestar
 DPUB
 dropeffect
@@ -147,6 +155,7 @@ embertest
 endline
 englishish
 enochian
+Erfe
 errchkjson
 errgroup
 errrr
@@ -155,7 +164,9 @@ escope
 ESLint
 esmodule
 espree
+esregexp
 estree
+eszett
 Ethi
 exclam
 execdir
@@ -171,6 +182,7 @@ fieldset
 figcaption
 fileless
 finalizer
+fixability
 fixall
 flaggable
 flowto
@@ -192,6 +204,7 @@ footgun
 Foox
 foox
 fooz
+forbidigo
 forcetypeassert
 forinstatement
 formedness
@@ -203,6 +216,7 @@ fsys
 fullwidth
 funcs
 funcw
+Garay
 gcflags
 GDSFP
 Geor
@@ -248,6 +262,7 @@ interrobang
 iovfs
 IPC
 isatty
+isglob
 isnan
 Isnt
 jakebailey
@@ -266,6 +281,7 @@ kase
 keygen
 keyshortcuts
 keytar
+keyup
 Khmr
 Knda
 koblas
@@ -283,6 +299,7 @@ lintable
 lintedfile
 lintprogram
 listitem
+litera
 llms
 lockdown
 lockdowns
@@ -313,6 +330,7 @@ middot
 minimatch
 misalign
 miscategorise
+misparsed
 misrefactored
 Mlym
 mmap
@@ -321,6 +339,7 @@ Modns
 modns
 morestack
 mousein
+mouseout
 mousemove
 msvc
 multibyte
@@ -337,6 +356,7 @@ napi
 nashorn
 native
 nbsp
+ndefined
 neighbour
 neighbouring
 nend
@@ -355,6 +375,7 @@ nomatch
 nonconstructor
 noninteractive
 nonoctal
+nonspacing
 noopener
 noopenernoreferrer
 noreferrer
@@ -582,6 +603,7 @@ tsoptions
 tsparser
 tspath
 tsutils
+tttodo
 txtar
 txtarfs
 typeparam
@@ -615,15 +637,18 @@ unrepresentable
 unrooted
 unshadowed
 unshift
+unspaced
 unstarted
 unstrict
 unstub
+unsuggested
 untest
 unvalidated
 Unwatch
 unwinded
 uppercased
 uppercases
+uppercasing
 useeffectevent
 usemap
 USERPROFILE
@@ -653,6 +678,7 @@ xjavascript
 xlink
 xoff
 xtest
+Xopenport
 yutil
 zeebo
 zigbuild

@@ -1,12 +1,11 @@
 package aria_unsupported_elements
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // reservedElements mirrors the `reserved: true` entries in aria-query's
@@ -63,7 +62,7 @@ var AriaUnsupportedElementsRule = rule.Rule{
 				if attr.Kind != ast.KindJsxAttribute {
 					continue
 				}
-				name := strings.ToLower(reactutil.GetJsxPropName(attr))
+				name := ecmascript.StringToLowerCase(reactutil.GetJsxPropName(attr))
 				if _, bad := invalidAttributes[name]; bad {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "unsupported",

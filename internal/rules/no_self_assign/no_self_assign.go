@@ -3,12 +3,12 @@ package no_self_assign
 import (
 	_ "embed"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_self_assign.schema.json
@@ -73,7 +73,7 @@ func parseOptions(options []any) selfAssignOptions {
 
 // removeWhitespace normalizes node text such as "a . b" to "a.b" without
 // allocating when the usual compact spelling contains no whitespace. Source
-// text is overwhelmingly ASCII, so only non-ASCII bytes enter unicode.IsSpace.
+// text is overwhelmingly ASCII, so only non-ASCII bytes are read as characters.
 func removeWhitespace(text string) string {
 	firstWhitespace := -1
 	for i := 0; i < len(text); {
@@ -86,7 +86,7 @@ func removeWhitespace(text string) string {
 			continue
 		}
 		r, size := utf8.DecodeRuneInString(text[i:])
-		if unicode.IsSpace(r) {
+		if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			firstWhitespace = i
 			break
 		}
@@ -108,7 +108,7 @@ func removeWhitespace(text string) string {
 			continue
 		}
 		r, size := utf8.DecodeRuneInString(text[i:])
-		if !unicode.IsSpace(r) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			// Copy the original bytes so malformed UTF-8 is preserved instead of
 			// being rewritten as the replacement rune.
 			result.WriteString(text[i : i+size])
@@ -216,7 +216,7 @@ func eachSelfAssignment(left *ast.Node, right *ast.Node, props bool, report func
 	// Unlike destructuring patterns above, member expressions are compared as a whole
 	// reference chain using utils.IsSameReference, matching ESLint's isSameReference approach.
 	case props && ast.IsAccessExpression(left) && ast.IsAccessExpression(right):
-		if utils.IsSameReference(left, right) {
+		if utils.IsSameReference(left, right, false) {
 			report(right)
 		}
 

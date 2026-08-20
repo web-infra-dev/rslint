@@ -23,12 +23,12 @@ package no_restricted_imports
 
 import (
 	_ "embed"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	core "github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_restricted_imports.schema.json
@@ -50,7 +50,7 @@ var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
 				if d.ModuleSpecifier == nil {
 					return
 				}
-				source := strings.TrimSpace(utils.GetStaticStringValue(d.ModuleSpecifier))
+				source := ecmascript.StringTrim(utils.GetStaticStringValue(d.ModuleSpecifier))
 				if source == "" {
 					return
 				}
@@ -65,7 +65,7 @@ var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
 				if d.ModuleSpecifier == nil {
 					return
 				}
-				source := strings.TrimSpace(utils.GetStaticStringValue(d.ModuleSpecifier))
+				source := ecmascript.StringTrim(utils.GetStaticStringValue(d.ModuleSpecifier))
 				if source == "" {
 					return
 				}
@@ -89,7 +89,7 @@ var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
 				if ext.Expression == nil {
 					return
 				}
-				source := strings.TrimSpace(utils.GetStaticStringValue(ext.Expression))
+				source := ecmascript.StringTrim(utils.GetStaticStringValue(ext.Expression))
 				if source == "" {
 					return
 				}

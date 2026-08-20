@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // modifierFlagsDisqualifying captures the TS-only modifiers that exclude a
@@ -287,7 +288,7 @@ func trimmedTextBetween(text string, start, end int) string {
 	if start >= end || end > len(text) {
 		return ""
 	}
-	return strings.TrimSpace(text[start:end])
+	return ecmascript.StringTrim(text[start:end])
 }
 
 // buildFix walks the class members and produces the list of fixes. Returns

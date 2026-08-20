@@ -33,7 +33,7 @@ function b() {
 Shadowing a built-in global (for example `Object`, `Array`) is reported when
 this option is `true`. Default: `false`.
 
-Configured [`languageOptions.globals`](/config/#languageoptionsglobals) and
+Configured [`languageOptions.globals`](/config/language-options#languageoptionsglobals) and
 active `/* global */` directives participate as built-in globals; an explicit
 `"off"` setting un-declares the name, so shadowing it is no longer reported.
 Use the `globals` catalog exported by `@rslint/core` to add browser, Node.js,
