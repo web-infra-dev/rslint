@@ -821,26 +821,145 @@ func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
 }
 
 func TestShouldPrefetchProjectCandidates(t *testing.T) {
+	plannedTarget := func(path string, projects ...string) rslintconfig.PlannedLintTarget {
+		return rslintconfig.PlannedLintTarget{
+			Target:       rslintconfig.DiscoveredLintTarget{Path: path},
+			ProjectPaths: projects,
+		}
+	}
 	tests := []struct {
 		name      string
 		allowDirs []string
-		targets   int
+		targets   []rslintconfig.PlannedLintTarget
 		want      bool
 	}{
-		{name: "file only", targets: 1},
+		{
+			name:    "file only",
+			targets: []rslintconfig.PlannedLintTarget{plannedTarget("/repo/a/src/a.ts", "/repo/a/tsconfig.json")},
+		},
 		{name: "empty directory batch", allowDirs: []string{"/repo"}},
-		{name: "one directory", allowDirs: []string{"/repo/packages/a"}, targets: 1, want: true},
-		{name: "multiple directories", allowDirs: []string{"/repo/a", "/repo/b"}, targets: 2, want: true},
+		{
+			name:      "project root",
+			allowDirs: []string{"/repo/a"},
+			targets:   []rslintconfig.PlannedLintTarget{plannedTarget("/repo/a/src/a.ts", "/repo/a/tsconfig.json")},
+			want:      true,
+		},
+		{
+			name:      "ancestor of project root",
+			allowDirs: []string{"/repo"},
+			targets:   []rslintconfig.PlannedLintTarget{plannedTarget("/repo/a/src/a.ts", "/repo/a/tsconfig.json")},
+			want:      true,
+		},
+		{
+			name:      "directory inside one project",
+			allowDirs: []string{"/repo/a/src"},
+			targets:   []rslintconfig.PlannedLintTarget{plannedTarget("/repo/a/src/a.ts", "/repo/a/tsconfig.json")},
+		},
+		{
+			name:      "multiple directories inside one project",
+			allowDirs: []string{"/repo/a/src", "/repo/a/tests"},
+			targets: []rslintconfig.PlannedLintTarget{
+				plannedTarget("/repo/a/src/a.ts", "/repo/a/tsconfig.json"),
+				plannedTarget("/repo/a/tests/a.ts", "/repo/a/tsconfig.json"),
+			},
+		},
+		{
+			name:      "multiple project directories",
+			allowDirs: []string{"/repo/a/src", "/repo/b/src"},
+			targets: []rslintconfig.PlannedLintTarget{
+				plannedTarget("/repo/a/src/a.ts", "/repo/a/tsconfig.json", "/repo/b/tsconfig.json"),
+				plannedTarget("/repo/b/src/b.ts", "/repo/a/tsconfig.json", "/repo/b/tsconfig.json"),
+			},
+			want: true,
+		},
+		{
+			name:      "same-directory projects are ambiguous",
+			allowDirs: []string{"/repo/a/src"},
+			targets: []rslintconfig.PlannedLintTarget{plannedTarget(
+				"/repo/a/src/a.ts",
+				"/repo/a/tsconfig.app.json",
+				"/repo/a/tsconfig.test.json",
+			)},
+			want: true,
+		},
+		{
+			name:      "reverse same-directory orders remain ambiguous",
+			allowDirs: []string{"/repo/a/src"},
+			targets: []rslintconfig.PlannedLintTarget{
+				plannedTarget("/repo/a/src/a.ts", "/repo/a/tsconfig.app.json", "/repo/a/tsconfig.test.json"),
+				plannedTarget("/repo/a/src/b.ts", "/repo/a/tsconfig.test.json", "/repo/a/tsconfig.app.json"),
+			},
+			want: true,
+		},
+		{
+			name:      "no project candidates",
+			allowDirs: []string{"/repo/a"},
+			targets:   []rslintconfig.PlannedLintTarget{plannedTarget("/repo/a/a.ts")},
+		},
+		{
+			name:      "Windows strict child",
+			allowDirs: []string{"C:/Repo/a/src"},
+			targets:   []rslintconfig.PlannedLintTarget{plannedTarget("C:/Repo/a/src/a.ts", "C:/Repo/a/tsconfig.json")},
+		},
+		{
+			name:      "Windows project root",
+			allowDirs: []string{"C:/Repo/a"},
+			targets:   []rslintconfig.PlannedLintTarget{plannedTarget("C:/Repo/a/src/a.ts", "C:/Repo/a/tsconfig.json")},
+			want:      true,
+		},
+		{
+			name:      "Windows different drive",
+			allowDirs: []string{"D:/Repo/a/src"},
+			targets:   []rslintconfig.PlannedLintTarget{plannedTarget("C:/Repo/a/src/a.ts", "C:/Repo/a/tsconfig.json")},
+			want:      true,
+		},
+		{
+			name:      "Windows component-case alias is conservative",
+			allowDirs: []string{"C:/Repo/a/src"},
+			targets:   []rslintconfig.PlannedLintTarget{plannedTarget("C:/Repo/A/src/a.ts", "C:/Repo/A/tsconfig.json")},
+			want:      true,
+		},
+		{
+			name:      "UNC strict child",
+			allowDirs: []string{"//server/share/repo/a/src"},
+			targets: []rslintconfig.PlannedLintTarget{plannedTarget(
+				"//server/share/repo/a/src/a.ts",
+				"//server/share/repo/a/tsconfig.json",
+			)},
+		},
+		{
+			name:      "UNC project root",
+			allowDirs: []string{"//server/share/repo/a"},
+			targets: []rslintconfig.PlannedLintTarget{plannedTarget(
+				"//server/share/repo/a/src/a.ts",
+				"//server/share/repo/a/tsconfig.json",
+			)},
+			want: true,
+		},
+		{
+			name:      "UNC different share",
+			allowDirs: []string{"//server/other/repo/a/src"},
+			targets: []rslintconfig.PlannedLintTarget{plannedTarget(
+				"//server/share/repo/a/src/a.ts",
+				"//server/share/repo/a/tsconfig.json",
+			)},
+			want: true,
+		},
+		{
+			name:      "UNC component-case alias is conservative",
+			allowDirs: []string{"//server/share/repo/a/src"},
+			targets: []rslintconfig.PlannedLintTarget{plannedTarget(
+				"//server/share/Repo/A/src/a.ts",
+				"//server/share/Repo/A/tsconfig.json",
+			)},
+			want: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			targets := make([]rslintconfig.DiscoveredLintTarget, test.targets)
-			for index := range targets {
-				targets[index] = rslintconfig.DiscoveredLintTarget{Path: fmt.Sprintf("/repo/target-%d.ts", index)}
-			}
 			if got := shouldPrefetchProjectCandidates(
 				test.allowDirs,
-				rslintconfig.LintTargetPlan{Targets: targets},
+				rslintconfig.LintProjectPlan{Targets: test.targets},
 			); got != test.want {
 				t.Fatalf("shouldPrefetchProjectCandidates() = %t, want %t", got, test.want)
 			}
@@ -848,21 +967,22 @@ func TestShouldPrefetchProjectCandidates(t *testing.T) {
 	}
 }
 
-func TestExecuteLintPipelineUsesDirectProjectHintForDirectoryBatch(t *testing.T) {
+func TestExecuteLintPipelineKeepsFocusedDirectoryDemandDriven(t *testing.T) {
 	root := t.TempDir()
 	packageA := filepath.Join(root, "packages", "a")
+	targetDir := filepath.Join(packageA, "src")
 	packageB := filepath.Join(root, "packages", "b")
-	for _, dir := range []string{packageA, packageB} {
+	for _, dir := range []string{targetDir, packageB} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	targetPath := filepath.Join(packageA, "target.ts")
+	targetPath := filepath.Join(targetDir, "target.ts")
 	unrelatedPath := filepath.Join(packageB, "unrelated.ts")
 	files := map[string]string{
 		targetPath:                               "let value: any = {}; value.member;\n",
 		unrelatedPath:                            "export const unrelated = 1;\n",
-		filepath.Join(packageA, "tsconfig.json"): `{"files":["target.ts"],"compilerOptions":{"noLib":true}}`,
+		filepath.Join(packageA, "tsconfig.json"): `{"files":["src/target.ts"],"compilerOptions":{"noLib":true}}`,
 		filepath.Join(packageB, "tsconfig.json"): `{"files":["unrelated.ts"],"compilerOptions":{"noLib":true}}`,
 	}
 	for path, content := range files {
@@ -872,6 +992,7 @@ func TestExecuteLintPipelineUsesDirectProjectHintForDirectoryBatch(t *testing.T)
 	}
 	root = tspath.NormalizePath(root)
 	packageA = tspath.NormalizePath(packageA)
+	targetDir = tspath.NormalizePath(targetDir)
 	packageB = tspath.NormalizePath(packageB)
 	unrelatedPath = tspath.NormalizePath(unrelatedPath)
 
@@ -897,11 +1018,11 @@ func TestExecuteLintPipelineUsesDirectProjectHintForDirectoryBatch(t *testing.T)
 		cwd           string
 		implicitScope bool
 	}{
-		{name: "explicit child directory with local owner", owner: packageA, cwd: root},
-		{name: "explicit child directory with parent owner", owner: root, cwd: root},
-		{name: "nested cwd dot with parent owner", owner: root, cwd: packageA},
-		{name: "nested cwd implicit scope with parent owner", owner: root, cwd: packageA, implicitScope: true},
-		{name: "nested cwd implicit scope owns local config", owner: packageA, cwd: packageA, implicitScope: true},
+		{name: "explicit focused directory with local owner", owner: packageA, cwd: root},
+		{name: "explicit focused directory with parent owner", owner: root, cwd: root},
+		{name: "nested focused cwd dot with parent owner", owner: root, cwd: targetDir},
+		{name: "nested focused cwd implicit scope with parent owner", owner: root, cwd: targetDir, implicitScope: true},
+		{name: "nested focused cwd implicit scope owns local config", owner: packageA, cwd: targetDir, implicitScope: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -919,14 +1040,14 @@ func TestExecuteLintPipelineUsesDirectProjectHintForDirectoryBatch(t *testing.T)
 				FS:             fsys,
 			}
 			if !test.implicitScope {
-				args.AllowDirs = []string{packageA}
+				args.AllowDirs = []string{targetDir}
 			}
 			code, stdout, stderr := runLintPipelineForTest(t, test.cwd, args)
 			if code != 1 || !strings.Contains(stdout, "@typescript-eslint/no-unsafe-member-access") {
 				t.Fatalf("target did not run with type info: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 			}
 			if got := fsys.readCount(unrelatedPath); got != 0 {
-				t.Fatalf("complete direct hint still prefetched unrelated sibling Program %d time(s)", got)
+				t.Fatalf("focused directory prefetched unrelated sibling Program %d time(s)", got)
 			}
 		})
 	}

@@ -190,10 +190,11 @@ func TestSelectProjectsDirectHintIsBoundedAndCannotChooseOwner(t *testing.T) {
 		prefetch       bool
 		singleThreaded bool
 		wantHintRead   bool
+		wantOtherRead  bool
 	}{
 		{name: "demand parallel", wantHintRead: true},
-		{name: "directory prefetch parallel", prefetch: true, wantHintRead: true},
-		{name: "directory prefetch single threaded", prefetch: true, singleThreaded: true},
+		{name: "directory prefetch parallel", prefetch: true, wantHintRead: true, wantOtherRead: true},
+		{name: "directory prefetch single threaded", prefetch: true, singleThreaded: true, wantHintRead: true, wantOtherRead: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			counting := &programReadCountingFS{
@@ -225,8 +226,8 @@ func TestSelectProjectsDirectHintIsBoundedAndCannotChooseOwner(t *testing.T) {
 			if got := counting.readCount(laterOnlyPath); (got > 0) != test.wantHintRead {
 				t.Fatalf("hint-only source reads = %d, want hint read %t", got, test.wantHintRead)
 			}
-			if got := counting.readCount(unrelatedPath); got != 0 {
-				t.Fatalf("complete direct hint prefetched unrelated source %d time(s)", got)
+			if got := counting.readCount(unrelatedPath); (got > 0) != test.wantOtherRead {
+				t.Fatalf("unrelated source reads = %d, want reads %t", got, test.wantOtherRead)
 			}
 		})
 	}

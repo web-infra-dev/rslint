@@ -413,15 +413,57 @@ func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (in
 	return 0, ""
 }
 
-// shouldPrefetchProjectCandidates reports whether this is a recursive
-// directory batch with at least one admitted lint target. It changes only
-// candidate scheduling; effective config still defines each target's
-// candidates and the shared selector still decides ownership and errors.
+// shouldPrefetchProjectCandidates reports whether a recursive directory scope
+// is broad relative to its targets' nearest project declarations. Directories
+// strictly inside one common project stay demand-driven; project roots,
+// ancestors, and multi-project scopes use bounded candidate prefetch.
 func shouldPrefetchProjectCandidates(
 	allowDirs []string,
-	targetPlan rslintconfig.LintTargetPlan,
+	lintProjectPlan rslintconfig.LintProjectPlan,
 ) bool {
-	return len(allowDirs) > 0 && len(targetPlan.Targets) > 0
+	if len(allowDirs) == 0 || len(lintProjectPlan.Targets) == 0 {
+		return false
+	}
+	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}
+	commonProject := ""
+	for _, target := range lintProjectPlan.Targets {
+		nearestProject := ""
+		nearestDirectoryLength := -1
+		ambiguousNearestProject := false
+		for _, project := range target.ProjectPaths {
+			directory := tspath.GetDirectoryPath(project)
+			if !tspath.ContainsPath(directory, target.Target.Path, options) {
+				continue
+			}
+			if len(directory) > nearestDirectoryLength {
+				nearestProject = project
+				nearestDirectoryLength = len(directory)
+				ambiguousNearestProject = false
+			} else if len(directory) == nearestDirectoryLength && project != nearestProject {
+				ambiguousNearestProject = true
+			}
+		}
+		if len(target.ProjectPaths) == 0 {
+			continue
+		}
+		if nearestProject == "" || ambiguousNearestProject ||
+			commonProject != "" && commonProject != nearestProject {
+			return true
+		}
+		commonProject = nearestProject
+	}
+	if commonProject == "" {
+		return false
+	}
+	projectDirectory := tspath.GetDirectoryPath(commonProject)
+	for _, directory := range allowDirs {
+		directory = tspath.NormalizePath(directory)
+		if !tspath.ContainsPath(projectDirectory, directory, options) ||
+			tspath.ComparePaths(projectDirectory, directory, options) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]rslintconfig.RslintConfig {
@@ -879,7 +921,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 	prefetchCandidates := !typeCheckOnly && shouldPrefetchProjectCandidates(
 		allowDirs,
-		targetPlan,
+		lintProjectPlan,
 	)
 	projectSet, err = programSession.SelectProjects(
 		lintProjectPlan,
