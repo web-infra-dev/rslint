@@ -68,6 +68,13 @@ func buildLonelyIfFix(sf *ast.SourceFile, elseBlock, ifNode *ast.Node) (rule.Rul
 	innerRange := utils.BracedNodeInnerRange(sf, elseBlock)
 	nodeRange := utils.TrimNodeTextRange(sf, ifNode)
 
+	// An unterminated `else {` recovers as a Block without a closing brace, so
+	// the inner if reaches past the brace pair's interior and there is no pair
+	// to unwrap.
+	if nodeRange.Pos() < innerRange.Pos() || nodeRange.End() > innerRange.End() {
+		return rule.RuleFix{}, false
+	}
+
 	// Don't fix if there are any non-whitespace characters interfering (e.g. comments).
 	if !ecmascript.IsBlank(text[innerRange.Pos():nodeRange.Pos()]) ||
 		!ecmascript.IsBlank(text[nodeRange.End():innerRange.End()]) {
@@ -80,11 +87,14 @@ func buildLonelyIfFix(sf *ast.SourceFile, elseBlock, ifNode *ast.Node) (rule.Rul
 		tokenAfterElseBlock, hasTokenAfter := utils.TokenAtOrAfter(sf, blockRange.End())
 
 		if hasLastIfToken && lastIfToken.Kind != ast.KindSemicolonToken && hasTokenAfter {
-			thenEnd := utils.TrimNodeTextRange(sf, thenStatement).End()
 			r, _ := utf8.DecodeRuneInString(tokenAfterElseBlock.Text)
 
-			if utils.IsSameLine(sf, thenEnd, tokenAfterElseBlock.Start) ||
-				strings.ContainsRune("([/+`-", r) ||
+			// `<` is absent from ESLint's set because no JavaScript statement can
+			// start with it. A TypeScript one can (`<T>x;`), and it continues the
+			// preceding expression across a line break, so an unbraced if body
+			// would swallow the statement that follows the else block.
+			if utils.IsSameLine(sf, thenStatement.End(), tokenAfterElseBlock.Start) ||
+				strings.ContainsRune("([/+`-<", r) ||
 				lastIfToken.Kind == ast.KindPlusPlusToken ||
 				lastIfToken.Kind == ast.KindMinusMinusToken {
 				// Fixing would change the semantics of the code due to ASI.
@@ -101,6 +111,6 @@ func buildLonelyIfFix(sf *ast.SourceFile, elseBlock, ifNode *ast.Node) (rule.Rul
 
 	return rule.RuleFixReplaceRange(
 		core.NewTextRange(blockRange.Pos(), blockRange.End()),
-		prefix+utils.TrimmedNodeText(sf, ifNode),
+		prefix+text[nodeRange.Pos():nodeRange.End()],
 	), true
 }

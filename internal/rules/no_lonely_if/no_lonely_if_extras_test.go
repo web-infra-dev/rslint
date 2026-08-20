@@ -172,6 +172,21 @@ func TestNoLonelyIfExtras(t *testing.T) {
 				},
 			},
 
+			// ---- Dimension 3: `<` is a TypeScript-only ASI hazard. ESLint's ----
+			// character set omits it because no JavaScript statement can begin
+			// with `<`, but a TypeScript type assertion can, and it continues the
+			// unbraced consequent across the line break; not fixed.
+			{
+				Code: "if (foo) {\n" +
+					"} else {\n" +
+					"  if (bar) baz()\n" +
+					"}\n" +
+					"<any>qux;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedLonelyIf", Line: 3, Column: 3},
+				},
+			},
+
 			// ---- Dimension 4 (graceful degradation): the whitespace the fixer ----
 			// scans for interference is ECMAScript's, not Go's. U+FEFF is
 			// whitespace to JavaScript, so the braces come off…
@@ -204,6 +219,55 @@ func TestNoLonelyIfExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+// TestNoLonelyIfUnterminatedElseBlock covers the graceful-degradation shape
+// the rule tester cannot express, because it rejects sources with syntactic
+// errors: an unterminated `else {` recovers as a Block with no closing brace,
+// so the inner if reaches past the brace pair's interior. The diagnostic still
+// lands, and since there is no brace pair to unwrap it carries no fix.
+func TestNoLonelyIfUnterminatedElseBlock(t *testing.T) {
+	for _, code := range []string{
+		"if (a) {} else { if (b) c();",
+		"if (a) {} else { if (b) c()",
+		"if (a) {} else { if (b) c(); ",
+		"if (a) {} else {",
+	} {
+		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: "/no-lonely-if-unterminated.ts",
+			Path:     tspath.Path("/no-lonely-if-unterminated.ts"),
+		}, code, core.ScriptKindTS)
+
+		comments := rule.NewCommentStore(sourceFile)
+		var diagnostics []rule.RuleDiagnostic
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       comments,
+			DisableManager: rule.NewDisableManager(sourceFile, comments),
+		}.WithDiagnosticConsumer(NoLonelyIfRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAutofix,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		})
+
+		listener := NoLonelyIfRule.Run(ctx, nil)[ast.KindIfStatement]
+		var visit func(node *ast.Node) bool
+		visit = func(node *ast.Node) bool {
+			if node.Kind == ast.KindIfStatement {
+				listener(node)
+			}
+			node.ForEachChild(visit)
+			return false
+		}
+		sourceFile.AsNode().ForEachChild(visit)
+
+		for _, diagnostic := range diagnostics {
+			if fixes := diagnostic.Fixes(); len(fixes) != 0 {
+				t.Errorf("%q: fixes = %#v, want none", code, fixes)
+			}
+		}
+	}
 }
 
 // TestNoLonelyIfEditDemand verifies that the diagnostic (range, message) is

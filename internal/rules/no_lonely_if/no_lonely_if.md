@@ -4,7 +4,7 @@
 
 If an `if` statement is the only statement in the `else` block, it is often clearer to use an `else if` form.
 
-```js
+```javascript
 if (foo) {
     // ...
 } else {
@@ -16,7 +16,7 @@ if (foo) {
 
 should be rewritten as
 
-```js
+```javascript
 if (foo) {
     // ...
 } else if (bar) {
