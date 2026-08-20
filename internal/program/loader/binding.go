@@ -475,7 +475,10 @@ func (s *Session) LoadAPI(
 	if err := s.validate(); err != nil {
 		return LoadResult{}, err
 	}
-	binding, unbound := s.bindTargetsToProjects(set, plan, singleThreaded)
+	binding, unbound, err := s.bindTargetsToProjects(set, plan, singleThreaded)
+	if err != nil {
+		return LoadResult{}, err
+	}
 	if err := s.appendCompatibilityPrograms(&binding, unbound, currentDirectory, singleThreaded); err != nil {
 		return LoadResult{}, err
 	}
@@ -551,7 +554,10 @@ func (s *Session) LoadCLI(
 	if err := s.validate(); err != nil {
 		return LoadResult{}, err
 	}
-	binding, unbound := s.bindTargetsToProjects(set, plan, singleThreaded)
+	binding, unbound, err := s.bindTargetsToProjects(set, plan, singleThreaded)
+	if err != nil {
+		return LoadResult{}, err
+	}
 	useCaseSensitive := true
 	if fsys := s.FS(); fsys != nil {
 		useCaseSensitive = fsys.UseCaseSensitiveFileNames()

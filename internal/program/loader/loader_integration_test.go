@@ -1372,6 +1372,203 @@ func TestBuildTargetProjectKeepsDirectAndImportFallbackTiersPerTarget(t *testing
 	}
 }
 
+func TestBuildTargetProjectCarriesCompleteSelectionIntoLoad(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"direct.ts":     `export const direct = 1;`,
+		"imported.ts":   `export const imported = 1;`,
+		"gap.ts":        `export const gap = 1;`,
+		"main.ts":       `import "./imported";`,
+		"tsconfig.json": `{"files":["main.ts","direct.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	context := newBuildContext(fsys)
+	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
+		testLintTarget(fsys, dir, filepath.Join(dir, "direct.ts")),
+		testLintTarget(fsys, dir, filepath.Join(dir, "imported.ts")),
+		testLintTarget(fsys, dir, filepath.Join(dir, "gap.ts")),
+	}}
+
+	set, err := sessionForTest(context).BuildTargetProject(
+		dir,
+		projectConfig("./tsconfig.json"),
+		plan,
+		true,
+	)
+	if err != nil {
+		t.Fatalf("BuildTargetProject: %v", err)
+	}
+	if set.Len() != 1 || set.targetBinding == nil {
+		t.Fatalf("targeted build = %d Programs with binding %v, want one configured Program and complete binding", set.Len(), set.targetBinding)
+	}
+	if got, want := set.targetBinding.owners, []int{0, 0, -1}; !slices.Equal(got, want) {
+		t.Fatalf("target owners = %v, want %v", got, want)
+	}
+
+	binding, err := sessionForTest(context).LoadAPI(set, plan, dir, true)
+	if err != nil {
+		t.Fatalf("LoadAPI: %v", err)
+	}
+	if len(binding.TargetsByProgram) != 2 {
+		t.Fatalf("loaded Programs = %d, want configured plus source-only", len(binding.TargetsByProgram))
+	}
+	configured := append([]string(nil), binding.TargetsByProgram[0]...)
+	for index := range configured {
+		configured[index] = tspath.GetBaseFileName(configured[index])
+	}
+	slices.Sort(configured)
+	if want := []string{"direct.ts", "imported.ts"}; !slices.Equal(configured, want) {
+		t.Fatalf("configured targets = %v, want %v", configured, want)
+	}
+	if got := binding.TargetsByProgram[1]; len(got) != 1 || tspath.GetBaseFileName(got[0]) != "gap.ts" {
+		t.Fatalf("source-only targets = %v, want gap.ts", got)
+	}
+
+	broadContext := newBuildContext(fsys)
+	broadSet, err := sessionForTest(broadContext).BuildProject(
+		dir,
+		projectConfig("./tsconfig.json"),
+		true,
+	)
+	if err != nil {
+		t.Fatalf("BuildProject: %v", err)
+	}
+	broadBinding, err := sessionForTest(broadContext).LoadAPI(broadSet, plan, dir, true)
+	if err != nil {
+		t.Fatalf("broad LoadAPI: %v", err)
+	}
+	if len(broadBinding.TargetsByProgram) != 2 {
+		t.Fatalf("broad Programs = %d, want configured plus source-only", len(broadBinding.TargetsByProgram))
+	}
+	broadConfigured := append([]string(nil), broadBinding.TargetsByProgram[0]...)
+	for index := range broadConfigured {
+		broadConfigured[index] = tspath.GetBaseFileName(broadConfigured[index])
+	}
+	slices.Sort(broadConfigured)
+	if !slices.Equal(broadConfigured, configured) ||
+		len(broadBinding.TargetsByProgram[1]) != 1 ||
+		tspath.GetBaseFileName(broadBinding.TargetsByProgram[1][0]) != "gap.ts" {
+		t.Fatalf(
+			"eager and focused selection differ: eager=%v focused=%v",
+			broadBinding.TargetsByProgram,
+			binding.TargetsByProgram,
+		)
+	}
+}
+
+func TestPrebuiltProjectMetadataPreservesCanonicalTargetIdentity(t *testing.T) {
+	canonicalTarget := "/physical/target.ts"
+	otherPhysical := "/physical/other.ts"
+	fsys := &canonicalIdentityTestFS{
+		FS: osvfs.FS(),
+		realPaths: map[string]string{
+			canonicalTarget: otherPhysical,
+		},
+	}
+	programFiles := newProgramFileIndex(
+		nil,
+		[]rslintconfig.DiscoveredLintTarget{
+			{Path: "/alias/target.ts", CanonicalPath: canonicalTarget},
+			{Path: canonicalTarget, CanonicalPath: otherPhysical},
+		},
+		fsys,
+		true,
+	)
+	metadata := &prebuiltProjectMetadata{}
+	provider := &prebuiltProjectMetadataProvider{
+		metadata:     []*prebuiltProjectMetadata{metadata},
+		rootPaths:    []string{canonicalTarget},
+		memberships:  []prebuiltProjectRootMembership{{project: 0, root: 0}},
+		programFiles: programFiles,
+		fsys:         fsys,
+	}
+	metadata.provider = provider
+
+	provider.ensureCanonicalRoots()
+	canonicalTargetID := exactPathID(canonicalTarget)
+	if got := programFiles.canonicalBySourcePath[canonicalTargetID]; got != canonicalTargetID {
+		t.Fatalf("canonical target identity was overwritten with %q", got)
+	}
+	if _, exists := metadata.canonicalRoots[canonicalTargetID]; !exists {
+		t.Fatalf("project roots = %v, want preserved target identity %q", metadata.canonicalRoots, canonicalTargetID)
+	}
+	if _, exists := metadata.canonicalRoots[exactPathID(otherPhysical)]; exists {
+		t.Fatalf("project roots unexpectedly contain colliding lexical target identity %q", otherPhysical)
+	}
+}
+
+func TestLoadAPIConsumesCompleteProjectBinding(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"target.ts":       `export const target = 1;`,
+		"first-main.ts":   `import "./target";`,
+		"second-main.ts":  `import "./target";`,
+		"tsconfig-a.json": `{"files":["first-main.ts"],"compilerOptions":{"noLib":true}}`,
+		"tsconfig-b.json": `{"files":["second-main.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
+		testLintTarget(fsys, dir, filepath.Join(dir, "target.ts")),
+	}}
+	config := projectConfig("./tsconfig-a.json", "./tsconfig-b.json")
+
+	for _, test := range []struct {
+		name           string
+		owner          int
+		wantPrograms   int
+		wantTargetSlot int
+	}{
+		{name: "declared owner wins over a rescan", owner: 1, wantPrograms: 2, wantTargetSlot: 1},
+		{name: "declared none remains source-only", owner: -1, wantPrograms: 3, wantTargetSlot: 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			context := newBuildContext(fsys)
+			set, err := sessionForTest(context).BuildProject(dir, config, true)
+			if err != nil {
+				t.Fatalf("BuildProject: %v", err)
+			}
+			set.targetBinding = &projectTargetBinding{
+				targets: append([]rslintconfig.DiscoveredLintTarget(nil), plan.Targets...),
+				owners:  []int{test.owner},
+			}
+
+			binding, err := sessionForTest(context).LoadAPI(set, plan, dir, true)
+			if err != nil {
+				t.Fatalf("LoadAPI: %v", err)
+			}
+			if len(binding.TargetsByProgram) != test.wantPrograms {
+				t.Fatalf("Programs = %d, want %d", len(binding.TargetsByProgram), test.wantPrograms)
+			}
+			for programIndex, targets := range binding.TargetsByProgram {
+				wantTargets := 0
+				if programIndex == test.wantTargetSlot {
+					wantTargets = 1
+				}
+				if len(targets) != wantTargets {
+					t.Fatalf("targets by Program = %v, want only slot %d", binding.TargetsByProgram, test.wantTargetSlot)
+				}
+			}
+		})
+	}
+
+	context := newBuildContext(fsys)
+	set, err := sessionForTest(context).BuildProject(dir, config, true)
+	if err != nil {
+		t.Fatalf("BuildProject for stale binding: %v", err)
+	}
+	set.targetBinding = &projectTargetBinding{
+		targets: append([]rslintconfig.DiscoveredLintTarget(nil), plan.Targets...),
+		owners:  []int{0},
+	}
+	stalePlan := plan
+	stalePlan.Targets = append([]rslintconfig.DiscoveredLintTarget(nil), plan.Targets...)
+	stalePlan.Targets[0].Path = tspath.ResolvePath(dir, "other.ts")
+	if _, err := sessionForTest(context).LoadAPI(set, stalePlan, dir, true); err == nil ||
+		!strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("stale target binding error = %v, want plan mismatch", err)
+	}
+}
+
 func TestBuildTargetProjectBuildsMultipleDirectWinnersInParallel(t *testing.T) {
 	dir := t.TempDir()
 	writeProgramTestFiles(t, dir, map[string]string{
@@ -1463,6 +1660,67 @@ func TestBuildTargetProjectsDeduplicatesSharedDirectWinnerAcrossOwners(t *testin
 	}
 	if len(binding.TargetsByProgram) != 1 || len(binding.TargetsByProgram[0]) != 2 {
 		t.Fatalf("shared direct winner lost an owner's target: %v", binding.TargetsByProgram)
+	}
+}
+
+func TestBuildTargetProjectsPreservesIndependentImportOrderAcrossOwners(t *testing.T) {
+	rootDir := tspath.NormalizePath(t.TempDir())
+	childDir := tspath.ResolvePath(rootDir, "child")
+	writeProgramTestFiles(t, rootDir, map[string]string{
+		"root-target.ts":        `export const rootTarget = 1;`,
+		"child/child-target.ts": `export const childTarget = 1;`,
+		"a-main.ts":             `import "./root-target"; import "./child/child-target";`,
+		"b-main.ts":             `import "./root-target"; import "./child/child-target";`,
+		"tsconfig-a.json":       `{"files":["a-main.ts"],"compilerOptions":{"noLib":true}}`,
+		"tsconfig-b.json":       `{"files":["b-main.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	readCounter := &programReadCountingFS{
+		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		reads: make(map[string]int),
+	}
+	fsys := vfs.FS(readCounter)
+	context := newBuildContext(fsys)
+	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
+		testLintTarget(fsys, rootDir, filepath.Join(rootDir, "root-target.ts")),
+		testLintTarget(fsys, childDir, filepath.Join(childDir, "child-target.ts")),
+	}}
+
+	set, err := sessionForTest(context).BuildTargetProjects(
+		map[string]rslintconfig.RslintConfig{
+			rootDir:  projectConfig("./tsconfig-a.json", "./tsconfig-b.json"),
+			childDir: projectConfig("../tsconfig-b.json", "../tsconfig-a.json"),
+		},
+		plan,
+		false,
+	)
+	if err != nil {
+		t.Fatalf("BuildTargetProjects: %v", err)
+	}
+	if set.Len() != 2 || set.targetBinding == nil {
+		t.Fatalf("selected Programs = %d with binding %v, want two independently ordered owners", set.Len(), set.targetBinding)
+	}
+	if got, want := set.targetBinding.owners, []int{0, 1}; !slices.Equal(got, want) {
+		t.Fatalf("target owners = %v, want %v", got, want)
+	}
+	for _, mainPath := range []string{
+		tspath.ResolvePath(rootDir, "a-main.ts"),
+		tspath.ResolvePath(rootDir, "b-main.ts"),
+	} {
+		if got := readCounter.readCount(mainPath); got != 1 {
+			t.Fatalf("shared project root %q was read %d times, want one build", mainPath, got)
+		}
+	}
+
+	binding, err := sessionForTest(context).LoadAPI(set, plan, rootDir, false)
+	if err != nil {
+		t.Fatalf("LoadAPI: %v", err)
+	}
+	if len(binding.TargetsByProgram) != 2 ||
+		len(binding.TargetsByProgram[0]) != 1 ||
+		len(binding.TargetsByProgram[1]) != 1 ||
+		tspath.GetBaseFileName(binding.TargetsByProgram[0][0]) != "root-target.ts" ||
+		tspath.GetBaseFileName(binding.TargetsByProgram[1][0]) != "child-target.ts" {
+		t.Fatalf("owner-local import order was lost during LoadAPI: %v", binding.TargetsByProgram)
 	}
 }
 

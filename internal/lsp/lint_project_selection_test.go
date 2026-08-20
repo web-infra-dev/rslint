@@ -120,6 +120,40 @@ func TestSelectConfiguredLintProjectFallbackOrderAndExtensionFilter(t *testing.T
 	}
 }
 
+func TestLintProjectDeclarationPathIDPreservesLexicalIdentity(t *testing.T) {
+	upper := "C:/Repo/TSConfig.json"
+	lower := "c:/repo/tsconfig.json"
+	if lintProjectDeclarationPathID(upper) == lintProjectDeclarationPathID(lower) {
+		t.Fatal("case-distinct tsconfig declarations were merged")
+	}
+
+	upperRoot := "C:/Repo/Source.ts"
+	lowerRoot := "c:/repo/source.ts"
+	fsys := &exactCaseLSPProgramFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			upperRoot: "export const upper = 1;\n",
+			lowerRoot: "export const lower = 2;\n",
+		},
+	}
+	cache := newLintSessionProjectRootCache()
+	upperMetadata := cache.metadata(
+		upper,
+		tsoptions.NewParsedCommandLine(&core.CompilerOptions{}, []string{upperRoot}, tspath.ComparePathsOptions{}),
+		fsys,
+	)
+	lowerMetadata := cache.metadata(
+		lower,
+		tsoptions.NewParsedCommandLine(&core.CompilerOptions{}, []string{lowerRoot}, tspath.ComparePathsOptions{}),
+		fsys,
+	)
+	if upperMetadata == lowerMetadata ||
+		!upperMetadata.Contains(upperRoot, "") || upperMetadata.Contains(lowerRoot, "") ||
+		!lowerMetadata.Contains(lowerRoot, "") || lowerMetadata.Contains(upperRoot, "") {
+		t.Fatal("case-distinct tsconfig declarations shared root metadata")
+	}
+}
+
 type configReadCountingFS struct {
 	vfs.FS
 	target string

@@ -1179,24 +1179,31 @@ func selectLintProgram(
 			continue
 		}
 		candidateProgram := candidate.GetProgram()
-		configPath := string(candidate.Id())
-		if configPath == "" {
-			continue
-		}
 		commandLine := candidateProgram.CommandLine()
 		if sessionProject, ok := candidate.(*project.Project); ok && sessionProject.CommandLine != nil {
 			// The Program command line may include automatic type-acquisition
 			// roots. Project.CommandLine is the authored tsconfig root set.
 			commandLine = sessionProject.CommandLine
 		}
-		loadedByConfig[lintProgramLexicalPathID(configPath, fs)] = loadedLintProject{
+		configPath := candidateProgram.Options().ConfigFilePath
+		if commandLine != nil && commandLine.CompilerOptions() != nil &&
+			commandLine.CompilerOptions().ConfigFilePath != "" {
+			configPath = commandLine.CompilerOptions().ConfigFilePath
+		}
+		if configPath == "" {
+			configPath = string(candidate.Id())
+		}
+		if configPath == "" {
+			continue
+		}
+		loadedByConfig[tspath.Path(lintProjectDeclarationPathID(configPath))] = loadedLintProject{
 			program:     candidateProgram,
 			commandLine: commandLine,
 		}
 	}
 	loaders := lintProjectLoaders{
 		metadata: func(tsConfigPath string) (*lintProjectMetadata, bool, error) {
-			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
+			if loadedProject, ok := loadedByConfig[tspath.Path(lintProjectDeclarationPathID(tsConfigPath))]; ok {
 				metadata := sessionRoots.metadata(tsConfigPath, loadedProject.commandLine, fs)
 				return metadata, metadata != nil, nil
 			}
@@ -1206,7 +1213,7 @@ func selectLintProgram(
 			return fallbackLoaders.metadata(tsConfigPath)
 		},
 		program: func(tsConfigPath string) (*compiler.Program, *ast.SourceFile, error) {
-			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
+			if loadedProject, ok := loadedByConfig[tspath.Path(lintProjectDeclarationPathID(tsConfigPath))]; ok {
 				return loadedProject.program, sourceFileForPath(loadedProject.program, filename, fs), nil
 			}
 			if fallbackLoaders.program == nil {

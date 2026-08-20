@@ -438,6 +438,7 @@ progressbar
 promiseutil
 promisify
 promisifying
+projectselection
 propertyassignment
 proptypes
 prototypejs
@@ -479,6 +480,7 @@ reparser
 repoint
 repoints
 reqs
+rescan
 rescanning
 resolv
 respawn

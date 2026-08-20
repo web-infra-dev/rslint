@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -85,21 +86,91 @@ func TestRootFileIndexUsesDirectAndPhysicalIdentity(t *testing.T) {
 	workers.Wait()
 }
 
-func TestRootFileIndexUsesFilesystemCaseSensitivity(t *testing.T) {
+func TestRootFileIndexUsesCanonicalFilesystemIdentity(t *testing.T) {
 	const (
-		root  = "/repo/Source/Index.ts"
-		query = "/REPO/source/index.ts"
+		root     = "/repo/Source/Index.ts"
+		query    = "/REPO/source/index.ts"
+		physical = "/repo/source/Index.ts"
 	)
 	base := &rootFileAliasFS{
 		FS:            osvfs.FS(),
-		realPaths:     make(map[string]string),
+		realPaths:     map[string]string{root: physical, query: physical},
 		realpathCalls: make(map[string]int),
 	}
 	index := lintprogram.NewRootFileIndex([]string{root}, &caseInsensitiveRootFS{base})
-	if !index.Contains(query, query) {
-		t.Fatal("case-insensitive direct root was not recognized")
+	if !index.Contains(query, "") {
+		t.Fatal("paths with the same canonical identity were not matched")
 	}
-	if got := base.realpathCallCount(query); got != 0 {
-		t.Fatalf("case-insensitive exact lookup resolved the path %d time(s)", got)
+	if got := base.realpathCallCount(query); got != 1 {
+		t.Fatalf("canonical target was resolved %d time(s), want one", got)
+	}
+
+	distinct := &rootFileAliasFS{
+		FS:            osvfs.FS(),
+		realPaths:     map[string]string{root: root, query: query},
+		realpathCalls: make(map[string]int),
+	}
+	index = lintprogram.NewRootFileIndex([]string{root}, &caseInsensitiveRootFS{distinct})
+	if index.Contains(query, "") {
+		t.Fatal("case-folded paths with distinct canonical identities were merged")
+	}
+}
+
+func TestRootFileIndexCanonicalIdentityAcrossPathForms(t *testing.T) {
+	tests := []struct {
+		name      string
+		root      string
+		query     string
+		rootReal  string
+		queryReal string
+		want      bool
+	}{
+		{
+			name:      "Windows drive casing",
+			root:      `C:\Repo\Src\Index.ts`,
+			query:     `c:\repo\src\index.ts`,
+			rootReal:  "C:/Repo/Src/Index.ts",
+			queryReal: "C:/Repo/Src/Index.ts",
+			want:      true,
+		},
+		{
+			name:      "UNC server and share casing",
+			root:      `\\SERVER\SHARE\Repo\Index.ts`,
+			query:     `\\server\share\repo\index.ts`,
+			rootReal:  "//SERVER/SHARE/Repo/Index.ts",
+			queryReal: "//SERVER/SHARE/Repo/Index.ts",
+			want:      true,
+		},
+		{
+			name:      "different Windows drives",
+			root:      "C:/Repo/Index.ts",
+			query:     "D:/Repo/Index.ts",
+			rootReal:  "C:/Repo/Index.ts",
+			queryReal: "D:/Repo/Index.ts",
+		},
+		{
+			name:      "different UNC shares",
+			root:      "//server/share-a/Repo/Index.ts",
+			query:     "//server/share-b/Repo/Index.ts",
+			rootReal:  "//server/share-a/Repo/Index.ts",
+			queryReal: "//server/share-b/Repo/Index.ts",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fsys := &rootFileAliasFS{
+				FS: osvfs.FS(),
+				realPaths: map[string]string{
+					tspath.NormalizePath(test.root):  test.rootReal,
+					tspath.NormalizePath(test.query): test.queryReal,
+				},
+				realpathCalls: make(map[string]int),
+			}
+			index := lintprogram.NewRootFileIndex([]string{test.root}, fsys)
+			if got := index.Contains(test.query, ""); got != test.want {
+				t.Fatalf("Contains(%q) = %t, want %t", test.query, got, test.want)
+			}
+		})
 	}
 }

@@ -1,195 +1,254 @@
 package loader
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/projectselection"
 )
 
-type projectRootMembership struct {
-	exactID   string
-	pathIndex int
-}
-
-// directRootProgramOwners returns the first declared project that selects each
-// target as a tsconfig root. A targeted build supplies this result directly;
-// an eager build derives it in batches after all Programs are ready.
-func directRootProgramOwners(
+func targetBindingOwners(
 	set ProjectSet,
 	targets []rslintconfig.DiscoveredLintTarget,
-	fsys vfs.FS,
-	singleThreaded bool,
-) []int {
-	owners := make([]int, len(targets))
-	for index := range owners {
-		owners[index] = -1
+) ([]int, bool, error) {
+	binding := set.targetBinding
+	if binding == nil {
+		return nil, false, nil
 	}
-	if binding := set.targetBinding; binding != nil &&
-		len(binding.targets) == len(targets) &&
-		len(binding.owners) == len(targets) {
-		matchesPlan := true
-		for targetIndex, target := range targets {
-			if binding.targets[targetIndex] != target {
-				matchesPlan = false
-				break
-			}
-		}
-		if matchesPlan {
-			copy(owners, binding.owners)
-			return owners
-		}
+	if len(binding.targets) != len(targets) || len(binding.owners) != len(targets) {
+		return nil, false, errors.New("targeted project binding does not match the lint target plan")
 	}
-
-	rootPaths := make([]string, 0)
-	rootPathIndexByID := make(map[string]int)
-	membershipsByProgram := make([][]projectRootMembership, len(set.compilerPrograms))
-	for programIndex, program := range set.compilerPrograms {
-		if program == nil || program.CommandLine() == nil {
-			continue
+	for targetIndex, target := range targets {
+		if binding.targets[targetIndex] != target {
+			return nil, false, errors.New("targeted project binding does not match the lint target plan")
 		}
-		for _, rootFileName := range program.CommandLine().FileNames() {
-			rootFileName = tspath.NormalizePath(rootFileName)
-			exactID := exactPathID(rootFileName)
-			rootPathIndex, ok := rootPathIndexByID[exactID]
-			if !ok {
-				rootPathIndex = len(rootPaths)
-				rootPathIndexByID[exactID] = rootPathIndex
-				rootPaths = append(rootPaths, rootFileName)
-			}
-			membershipsByProgram[programIndex] = append(
-				membershipsByProgram[programIndex],
-				projectRootMembership{exactID: exactID, pathIndex: rootPathIndex},
+		owner := binding.owners[targetIndex]
+		if owner < projectselection.NoProject || owner >= len(set.compilerPrograms) {
+			return nil, false, fmt.Errorf(
+				"targeted project binding contains invalid owner %d for %q",
+				owner,
+				target.Path,
 			)
 		}
 	}
+	return append([]int(nil), binding.owners...), true, nil
+}
 
+type prebuiltProjectMetadata struct {
+	program        *compiler.Program
+	exactRoots     map[string]struct{}
+	canonicalRoots map[string]struct{}
+	provider       *prebuiltProjectMetadataProvider
+}
+
+type prebuiltProjectRootMembership struct {
+	project int
+	root    int
+}
+
+type prebuiltProjectMetadataProvider struct {
+	metadata     []*prebuiltProjectMetadata
+	rootPaths    []string
+	memberships  []prebuiltProjectRootMembership
+	programFiles *programFileIndex
+	fsys         vfs.FS
+	canonical    bool
+}
+
+func newPrebuiltProjectMetadataProvider(
+	programs []*compiler.Program,
+	programFiles *programFileIndex,
+	fsys vfs.FS,
+) *prebuiltProjectMetadataProvider {
+	provider := &prebuiltProjectMetadataProvider{
+		metadata:     make([]*prebuiltProjectMetadata, len(programs)),
+		programFiles: programFiles,
+		fsys:         fsys,
+	}
+	rootIndexByPath := make(map[string]int)
+	for project, program := range programs {
+		if program == nil || program.CommandLine() == nil {
+			continue
+		}
+		metadata := &prebuiltProjectMetadata{
+			program:    program,
+			exactRoots: make(map[string]struct{}, len(program.CommandLine().FileNames())),
+			provider:   provider,
+		}
+		provider.metadata[project] = metadata
+		for _, rootPath := range program.CommandLine().FileNames() {
+			rootPath = tspath.NormalizePath(rootPath)
+			rootID := exactPathID(rootPath)
+			metadata.exactRoots[rootID] = struct{}{}
+			rootIndex, exists := rootIndexByPath[rootID]
+			if !exists {
+				rootIndex = len(provider.rootPaths)
+				rootIndexByPath[rootID] = rootIndex
+				provider.rootPaths = append(provider.rootPaths, rootPath)
+			}
+			provider.memberships = append(provider.memberships, prebuiltProjectRootMembership{
+				project: project,
+				root:    rootIndex,
+			})
+		}
+	}
+	return provider
+}
+
+func (provider *prebuiltProjectMetadataProvider) ensureCanonicalRoots() {
+	if provider == nil || provider.canonical {
+		return
+	}
+	provider.canonical = true
+	canonicalIDs := make([]string, len(provider.rootPaths))
+	provider.programFiles.initialize()
+	pendingPaths := make([]string, 0, len(provider.rootPaths))
+	pendingIndexes := make([]int, 0, len(provider.rootPaths))
+	for index, rootPath := range provider.rootPaths {
+		rootID := exactPathID(rootPath)
+		if canonicalID, known := provider.programFiles.canonicalBySourcePath[rootID]; known {
+			canonicalIDs[index] = canonicalID
+			continue
+		}
+		if provider.fsys == nil {
+			canonicalIDs[index] = rootID
+			continue
+		}
+		pendingPaths = append(pendingPaths, rootPath)
+		pendingIndexes = append(pendingIndexes, index)
+	}
+	resolvedIDs := provider.programFiles.canonicalSourcePathIDs(pendingPaths)
+	for pendingIndex, canonicalID := range resolvedIDs {
+		rootIndex := pendingIndexes[pendingIndex]
+		canonicalIDs[rootIndex] = canonicalID
+		provider.programFiles.canonicalBySourcePath[exactPathID(provider.rootPaths[rootIndex])] = canonicalID
+	}
+	for _, membership := range provider.memberships {
+		metadata := provider.metadata[membership.project]
+		if metadata.canonicalRoots == nil {
+			metadata.canonicalRoots = make(map[string]struct{})
+		}
+		metadata.canonicalRoots[canonicalIDs[membership.root]] = struct{}{}
+	}
+}
+
+func (metadata *prebuiltProjectMetadata) DirectRoot(target projectselection.Target) bool {
+	if metadata == nil {
+		return false
+	}
+	if _, exists := metadata.exactRoots[exactPathID(target.Path)]; exists {
+		return true
+	}
+	metadata.provider.ensureCanonicalRoots()
+	canonicalPath := target.CanonicalPath
+	if canonicalPath == "" {
+		canonicalPath = authoritativePath(target.Path, metadata.provider.fsys)
+	}
+	_, exists := metadata.canonicalRoots[exactPathID(canonicalPath)]
+	return exists
+}
+
+func (metadata *prebuiltProjectMetadata) Supports(target projectselection.Target) bool {
+	return metadata != nil && metadata.program != nil && metadata.program.CommandLine() != nil &&
+		lintprogram.CompilerOptionsSupportFileName(
+			metadata.program.CommandLine().CompilerOptions(),
+			target.Path,
+		)
+}
+
+func selectedTarget(
+	target rslintconfig.DiscoveredLintTarget,
+) projectselection.Target {
+	return projectselection.Target{
+		Path:          target.Path,
+		CanonicalPath: target.CanonicalPath,
+	}
+}
+
+// selectPrebuiltProjectOwners applies the same ownership state machine used by
+// focused CLI/API requests and LSP. Eager construction changes only the
+// provider: every configured Program is already available before selection.
+func selectPrebuiltProjectOwners(
+	set ProjectSet,
+	targets []rslintconfig.DiscoveredLintTarget,
+	programFiles *programFileIndex,
+	fsys vfs.FS,
+) ([]int, error) {
+	owners := make([]int, len(targets))
+	for index := range owners {
+		owners[index] = projectselection.NoProject
+	}
+	if len(targets) == 0 || len(set.compilerPrograms) == 0 {
+		return owners, nil
+	}
+
+	metadataProvider := newPrebuiltProjectMetadataProvider(
+		set.compilerPrograms,
+		programFiles,
+		fsys,
+	)
 	targetIndexesByConfig := make(map[string][]int)
+	configDirs := make([]string, 0)
 	for targetIndex, target := range targets {
+		if _, exists := targetIndexesByConfig[target.ConfigDirectory]; !exists {
+			configDirs = append(configDirs, target.ConfigDirectory)
+		}
 		targetIndexesByConfig[target.ConfigDirectory] = append(
 			targetIndexesByConfig[target.ConfigDirectory],
 			targetIndex,
 		)
 	}
-	orderedProgramsByConfig := make(map[string][]int, len(targetIndexesByConfig))
-	exactOwnerPositionByTarget := make([]int, len(targets))
-	for index := range exactOwnerPositionByTarget {
-		exactOwnerPositionByTarget[index] = -1
-	}
-	for configDirectory, targetIndexes := range targetIndexesByConfig {
-		orderedPrograms := orderedProgramIndexesForConfig(set, configDirectory)
-		orderedProgramsByConfig[configDirectory] = orderedPrograms
-		targetsByExactID := make(map[string][]int, len(targetIndexes))
-		for _, targetIndex := range targetIndexes {
-			exactID := exactPathID(targets[targetIndex].Path)
-			targetsByExactID[exactID] = append(targetsByExactID[exactID], targetIndex)
-		}
 
-		unresolved := len(targetIndexes)
-		for position, programIndex := range orderedPrograms {
-			for _, membership := range membershipsByProgram[programIndex] {
-				for _, targetIndex := range targetsByExactID[membership.exactID] {
-					if owners[targetIndex] >= 0 {
-						continue
-					}
-					owners[targetIndex] = programIndex
-					exactOwnerPositionByTarget[targetIndex] = position
-					unresolved--
+	for _, configDir := range configDirs {
+		targetIndexes := targetIndexesByConfig[configDir]
+		projectIndexes := orderedProgramIndexesForConfig(set, configDir)
+		selectionTargets := make([]projectselection.Target, len(targetIndexes))
+		for index, targetIndex := range targetIndexes {
+			selectionTargets[index] = selectedTarget(targets[targetIndex])
+		}
+		bindings, err := projectselection.Resolve(
+			projectselection.Plan{
+				Targets:  selectionTargets,
+				Projects: projectIndexes,
+			},
+			func(project int) (projectselection.Metadata, bool, error) {
+				if project < 0 || project >= len(metadataProvider.metadata) {
+					return nil, false, nil
 				}
-			}
-			if unresolved == 0 {
-				break
-			}
-		}
-	}
-
-	// Only an alias in a project before the exact winner can change ownership.
-	// Resolve those root identities once per path, in directory batches.
-	canonicalLimitByTarget := make([]int, len(targets))
-	needsCanonicalRoots := make([]bool, len(set.compilerPrograms))
-	for configDirectory, targetIndexes := range targetIndexesByConfig {
-		orderedPrograms := orderedProgramsByConfig[configDirectory]
-		for _, targetIndex := range targetIndexes {
-			limit := exactOwnerPositionByTarget[targetIndex]
-			if limit < 0 {
-				limit = len(orderedPrograms)
-			}
-			canonicalLimitByTarget[targetIndex] = limit
-			for position := range limit {
-				needsCanonicalRoots[orderedPrograms[position]] = true
-			}
-		}
-	}
-
-	identityResolver := newProgramFileIndex(nil, targets, fsys, singleThreaded)
-	identityResolver.initialize()
-	canonicalRootPaths := make([]string, 0)
-	canonicalRootPathIndexes := make([]int, 0)
-	seenRootPathIndexes := make(map[int]struct{})
-	canonicalIDsByRootPathIndex := make(map[int]string)
-	for programIndex, needed := range needsCanonicalRoots {
-		if !needed {
-			continue
-		}
-		for _, membership := range membershipsByProgram[programIndex] {
-			if canonicalID, known := identityResolver.canonicalBySourcePath[membership.exactID]; known {
-				canonicalIDsByRootPathIndex[membership.pathIndex] = canonicalID
-				continue
-			}
-			if _, seen := seenRootPathIndexes[membership.pathIndex]; seen {
-				continue
-			}
-			seenRootPathIndexes[membership.pathIndex] = struct{}{}
-			canonicalRootPathIndexes = append(canonicalRootPathIndexes, membership.pathIndex)
-			canonicalRootPaths = append(canonicalRootPaths, rootPaths[membership.pathIndex])
-		}
-	}
-	if fsys == nil {
-		for index, rootPath := range canonicalRootPaths {
-			canonicalIDsByRootPathIndex[canonicalRootPathIndexes[index]] = exactPathID(rootPath)
-		}
-	} else {
-		canonicalIDs := identityResolver.canonicalSourcePathIDs(canonicalRootPaths)
-		for index, canonicalID := range canonicalIDs {
-			canonicalIDsByRootPathIndex[canonicalRootPathIndexes[index]] = canonicalID
-		}
-	}
-
-	canonicalOwnerFound := make([]bool, len(targets))
-	for configDirectory, targetIndexes := range targetIndexesByConfig {
-		targetsByCanonicalID := make(map[string][]int, len(targetIndexes))
-		for _, targetIndex := range targetIndexes {
-			target := targets[targetIndex]
-			canonicalPath := target.CanonicalPath
-			if canonicalPath == "" {
-				canonicalPath = target.Path
-			}
-			canonicalID := exactPathID(canonicalPath)
-			targetsByCanonicalID[canonicalID] = append(
-				targetsByCanonicalID[canonicalID],
-				targetIndex,
-			)
-		}
-
-		for position, programIndex := range orderedProgramsByConfig[configDirectory] {
-			if !needsCanonicalRoots[programIndex] {
-				continue
-			}
-			for _, membership := range membershipsByProgram[programIndex] {
-				canonicalID := canonicalIDsByRootPathIndex[membership.pathIndex]
-				for _, targetIndex := range targetsByCanonicalID[canonicalID] {
-					if canonicalOwnerFound[targetIndex] ||
-						position >= canonicalLimitByTarget[targetIndex] {
-						continue
-					}
-					owners[targetIndex] = programIndex
-					canonicalOwnerFound[targetIndex] = true
+				metadata := metadataProvider.metadata[project]
+				return metadata, metadata != nil, nil
+			},
+			func(project int) (bool, error) {
+				return project >= 0 && project < len(set.compilerPrograms) &&
+					set.compilerPrograms[project] != nil, nil
+			},
+			func(project int, target projectselection.Target) bool {
+				if project < 0 || project >= len(set.compilerPrograms) {
+					return false
 				}
-			}
+				if exactProgramSourceFile(set.compilerPrograms[project], target.Path) != nil {
+					return true
+				}
+				return programFiles.sourceFile(
+					projectIndexes,
+					project,
+					target.CanonicalPath,
+				) != nil
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		for index, binding := range bindings {
+			owners[targetIndexes[index]] = binding.Project
 		}
 	}
-	return owners
+	return owners, nil
 }
 
 func bindTargetToProgram(
@@ -225,7 +284,7 @@ func (s *Session) bindTargetsToProjects(
 	set ProjectSet,
 	plan rslintconfig.LintTargetPlan,
 	singleThreaded bool,
-) (LoadResult, []rslintconfig.DiscoveredLintTarget) {
+) (LoadResult, []rslintconfig.DiscoveredLintTarget, error) {
 	fsys := s.FS()
 	binding := LoadResult{
 		compilerPrograms:           append([]*compiler.Program(nil), set.compilerPrograms...),
@@ -236,48 +295,49 @@ func (s *Session) bindTargetsToProjects(
 		OwnerConfigDirBySourcePath: make(map[string]string),
 	}
 
+	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Targets, fsys, singleThreaded)
+	owners, completeTargetBinding, err := targetBindingOwners(set, plan.Targets)
+	if err != nil {
+		return LoadResult{}, nil, err
+	}
+	if !completeTargetBinding {
+		owners, err = selectPrebuiltProjectOwners(set, plan.Targets, programFiles, fsys)
+		if err != nil {
+			return LoadResult{}, nil, err
+		}
+	}
+
 	var unbound []rslintconfig.DiscoveredLintTarget
 	programIndexesByConfig := make(map[string][]int)
-	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Targets, fsys, singleThreaded)
-	directOwners := directRootProgramOwners(set, plan.Targets, fsys, singleThreaded)
 	for targetIndex, target := range plan.Targets {
 		programIndexes, cached := programIndexesByConfig[target.ConfigDirectory]
 		if !cached {
 			programIndexes = orderedProgramIndexesForConfig(set, target.ConfigDirectory)
 			programIndexesByConfig[target.ConfigDirectory] = programIndexes
 		}
+		owner := owners[targetIndex]
 		if bindTargetToProgram(
 			&binding,
 			set,
 			programFiles,
 			programIndexes,
-			directOwners[targetIndex],
+			owner,
 			target,
 			fsys,
 		) {
 			continue
 		}
+		if owner >= 0 {
+			return LoadResult{}, nil, fmt.Errorf(
+				"selected project %d did not contain lint target %q during binding",
+				owner,
+				target.Path,
+			)
+		}
 
-		bound := false
-		for _, programIndex := range programIndexes {
-			if bindTargetToProgram(
-				&binding,
-				set,
-				programFiles,
-				programIndexes,
-				programIndex,
-				target,
-				fsys,
-			) {
-				bound = true
-				break
-			}
-		}
-		if !bound {
-			unbound = append(unbound, target)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, target.Path, target.CanonicalPath, target.ConfigDirectory)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, target.Path, target.CanonicalPath, target.MatchPath(fsys))
-		}
+		unbound = append(unbound, target)
+		storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, target.Path, target.CanonicalPath, target.ConfigDirectory)
+		storeSourcePathMapping(binding.ConfigPathBySourcePath, target.Path, target.CanonicalPath, target.MatchPath(fsys))
 	}
-	return binding, unbound
+	return binding, unbound, nil
 }

@@ -12,18 +12,20 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/projectselection"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type projectTargetBinding struct {
 	targets []rslintconfig.DiscoveredLintTarget
-	owners  []int
+	// owners is complete: direct-root owner, import-fallback owner, or -1.
+	owners []int
 }
 
 type targetedProjectSlot struct {
 	parseOnce sync.Once
 	config    *tsoptions.ParsedCommandLine
-	rootFiles *lintprogram.RootFileIndex
+	metadata  *targetedProjectMetadata
 	parseErr  error
 
 	buildOnce sync.Once
@@ -33,6 +35,24 @@ type targetedProjectSlot struct {
 	lookupOnce sync.Once
 	lookupMu   sync.Mutex
 	lookup     *utils.ProgramSourceLookup
+}
+
+type targetedProjectMetadata struct {
+	config    *tsoptions.ParsedCommandLine
+	rootFiles *lintprogram.RootFileIndex
+}
+
+func (metadata *targetedProjectMetadata) DirectRoot(target projectselection.Target) bool {
+	return metadata != nil && metadata.rootFiles != nil &&
+		metadata.rootFiles.Contains(target.Path, target.CanonicalPath)
+}
+
+func (metadata *targetedProjectMetadata) Supports(target projectselection.Target) bool {
+	return metadata != nil && metadata.config != nil &&
+		lintprogram.CompilerOptionsSupportFileName(
+			metadata.config.CompilerOptions(),
+			target.Path,
+		)
 }
 
 type targetedProjectExecution struct {
@@ -50,14 +70,12 @@ type targetedProjectBuildQueue struct {
 	workers   sync.WaitGroup
 	mu        sync.Mutex
 	enqueued  []bool
-	errs      []error
 }
 
 func newTargetedProjectBuildQueue(execution *targetedProjectExecution) *targetedProjectBuildQueue {
 	queue := &targetedProjectBuildQueue{
 		execution: execution,
 		enqueued:  make([]bool, len(execution.plan.specs)),
-		errs:      make([]error, len(execution.plan.specs)),
 	}
 	workerCount := min(runtime.GOMAXPROCS(0), len(execution.plan.specs))
 	queue.parallel = !execution.singleThreaded && workerCount > 1
@@ -65,11 +83,11 @@ func newTargetedProjectBuildQueue(execution *targetedProjectExecution) *targeted
 	return queue
 }
 
-func (queue *targetedProjectBuildQueue) enqueue(index int) error {
+func (queue *targetedProjectBuildQueue) enqueue(index int) {
 	queue.mu.Lock()
 	if queue.enqueued[index] {
 		queue.mu.Unlock()
-		return nil
+		return
 	}
 	queue.enqueued[index] = true
 	if queue.parallel && queue.jobs == nil {
@@ -80,7 +98,7 @@ func (queue *targetedProjectBuildQueue) enqueue(index int) error {
 			go func() {
 				defer queue.workers.Done()
 				for index := range queue.jobs {
-					queue.errs[index] = queue.execution.build(index)
+					_ = queue.execution.build(index)
 				}
 			}()
 		}
@@ -88,11 +106,10 @@ func (queue *targetedProjectBuildQueue) enqueue(index int) error {
 	jobs := queue.jobs
 	queue.mu.Unlock()
 	if !queue.parallel {
-		queue.errs[index] = queue.execution.build(index)
-		return nil
+		_ = queue.execution.build(index)
+		return
 	}
 	jobs <- index
-	return nil
 }
 
 func (queue *targetedProjectBuildQueue) wait() {
@@ -139,10 +156,13 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 			slot.parseErr = errors.New("no parsed config returned")
 		}
 		if slot.parseErr == nil {
-			slot.rootFiles = lintprogram.NewRootFileIndex(
-				slot.config.FileNames(),
-				execution.session.FS(),
-			)
+			slot.metadata = &targetedProjectMetadata{
+				config: slot.config,
+				rootFiles: lintprogram.NewRootFileIndex(
+					slot.config.FileNames(),
+					execution.session.FS(),
+				),
+			}
 		}
 	})
 	if slot.parseErr != nil {
@@ -174,7 +194,7 @@ func (execution *targetedProjectExecution) build(index int) error {
 
 func (execution *targetedProjectExecution) containsTarget(
 	index int,
-	target rslintconfig.DiscoveredLintTarget,
+	targetPath string,
 ) bool {
 	slot := &execution.slots[index]
 	if slot.program == nil {
@@ -185,21 +205,7 @@ func (execution *targetedProjectExecution) containsTarget(
 	})
 	slot.lookupMu.Lock()
 	defer slot.lookupMu.Unlock()
-	return slot.lookup.SourceFileForPath(target.Path) != nil
-}
-
-func (execution *targetedProjectExecution) supportsTarget(
-	index int,
-	target rslintconfig.DiscoveredLintTarget,
-) (bool, error) {
-	parsed, err := execution.parse(index)
-	if err != nil {
-		return false, err
-	}
-	return lintprogram.CompilerOptionsSupportFileName(
-		parsed.config.CompilerOptions(),
-		target.Path,
-	), nil
+	return slot.lookup.SourceFileForPath(targetPath) != nil
 }
 
 func (execution *targetedProjectExecution) parseConcurrent(indexes []int) {
@@ -305,7 +311,7 @@ func runTargetConfigTasks(
 
 func (execution *targetedProjectExecution) projectSet(
 	keep []bool,
-	directProjectByTarget []int,
+	ownerProjectByTarget []int,
 	targets []rslintconfig.DiscoveredLintTarget,
 ) ProjectSet {
 	binding := &projectTargetBinding{
@@ -335,7 +341,7 @@ func (execution *targetedProjectExecution) projectSet(
 		set.configOrders = append(set.configOrders, execution.plan.specs[index].configOrders)
 		projectSetIndexByPlanIndex[index] = len(set.compilerPrograms) - 1
 	}
-	for targetIndex, projectIndex := range directProjectByTarget {
+	for targetIndex, projectIndex := range ownerProjectByTarget {
 		if projectIndex < 0 || targetIndex >= len(targets) {
 			continue
 		}
@@ -392,10 +398,6 @@ func (s *Session) BuildTargetProjects(
 
 	execution := newTargetedProjectExecution(s, plan, singleThreaded)
 	directBuilds := newTargetedProjectBuildQueue(execution)
-	directProjectByTarget := make([]int, len(targetPlan.Targets))
-	for index := range directProjectByTarget {
-		directProjectByTarget[index] = -1
-	}
 	targetIndexesByConfig := make(map[string][]int)
 	for targetIndex, target := range targetPlan.Targets {
 		targetIndexesByConfig[target.ConfigDirectory] = append(
@@ -408,37 +410,52 @@ func (s *Session) BuildTargetProjects(
 		configDirs = append(configDirs, configDir)
 	}
 	sort.Strings(configDirs)
+	configIndexByDirectory := make(map[string]int, len(configDirs))
+	for index, configDir := range configDirs {
+		configIndexByDirectory[configDir] = index
+	}
+	selections := make([]*projectselection.Selection, len(configDirs))
+	directTargets := make([]projectselection.DirectTarget, len(targetPlan.Targets))
+	loadMetadata := func(projectIndex int) (projectselection.Metadata, bool, error) {
+		parsed, parseErr := execution.parse(projectIndex)
+		if parseErr != nil {
+			return nil, false, parseErr
+		}
+		return parsed.metadata, parsed.metadata != nil, nil
+	}
+	loadProject := func(projectIndex int) (bool, error) {
+		if buildErr := execution.build(projectIndex); buildErr != nil {
+			return false, buildErr
+		}
+		return true, nil
+	}
+	containsTarget := func(projectIndex int, target projectselection.Target) bool {
+		return execution.containsTarget(projectIndex, target.Path)
+	}
+	selectionError := func(selectionErr error) error {
+		var absent *projectselection.DirectRootAbsentError
+		if errors.As(selectionErr, &absent) {
+			return fmt.Errorf(
+				"project root %q from %q was absent from its TypeScript Program",
+				absent.Target.Path,
+				plan.specs[absent.Project].tsconfigPath,
+			)
+		}
+		var unavailable *projectselection.DirectProjectUnavailableError
+		if errors.As(selectionErr, &unavailable) {
+			return fmt.Errorf(
+				"project root %q from %q was absent from its TypeScript Program",
+				unavailable.Target.Path,
+				plan.specs[unavailable.Project].tsconfigPath,
+			)
+		}
+		return selectionErr
+	}
 
 	err := runTargetConfigTasks(configDirs, singleThreaded, func(configDir string) error {
 		targetIndexes := targetIndexesByConfig[configDir]
-		unresolved := len(targetIndexes)
 		orderedProjectIndexes := orderedProjectIndexesForConfig(plan, configDir)
-		scanProject := func(projectIndex int) error {
-			parsed, err := execution.parse(projectIndex)
-			if err != nil {
-				return err
-			}
-			selected := false
-			for _, targetIndex := range targetIndexes {
-				if directProjectByTarget[targetIndex] >= 0 {
-					continue
-				}
-				target := targetPlan.Targets[targetIndex]
-				if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
-					directProjectByTarget[targetIndex] = projectIndex
-					unresolved--
-					selected = true
-				}
-			}
-			if selected {
-				if err := directBuilds.enqueue(projectIndex); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
 
-		nextPosition := 0
 		if !singleThreaded {
 			predictedTargetsByProject := make(map[int][]int)
 			maxPredictedPosition := -1
@@ -472,11 +489,8 @@ func (s *Session) BuildTargetProjects(
 						continue
 					}
 					for _, targetIndex := range predictedTargetsByProject[projectIndex] {
-						target := targetPlan.Targets[targetIndex]
-						if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
-							if err := directBuilds.enqueue(projectIndex); err != nil {
-								return err
-							}
+						if parsed.metadata.DirectRoot(selectedTarget(targetPlan.Targets[targetIndex])) {
+							directBuilds.enqueue(projectIndex)
 							break
 						}
 					}
@@ -487,20 +501,30 @@ func (s *Session) BuildTargetProjects(
 				// earlier config owns the target; results are still committed in
 				// order and no speculative Program can win by finishing first.
 				execution.parseConcurrent(orderedProjectIndexes[:maxPredictedPosition+1])
-				for nextPosition <= maxPredictedPosition && unresolved > 0 {
-					if err := scanProject(orderedProjectIndexes[nextPosition]); err != nil {
-						return err
-					}
-					nextPosition++
-				}
 			}
 		}
 
-		for nextPosition < len(orderedProjectIndexes) && unresolved > 0 {
-			if err := scanProject(orderedProjectIndexes[nextPosition]); err != nil {
-				return err
+		targets := make([]projectselection.Target, len(targetIndexes))
+		for index, targetIndex := range targetIndexes {
+			targets[index] = selectedTarget(targetPlan.Targets[targetIndex])
+		}
+		selection, selectionErr := projectselection.ResolveDirect(
+			projectselection.Plan{
+				Targets:  targets,
+				Projects: orderedProjectIndexes,
+			},
+			loadMetadata,
+			directBuilds.enqueue,
+		)
+		if selectionErr != nil {
+			return selectionError(selectionErr)
+		}
+		selections[configIndexByDirectory[configDir]] = selection
+		for localIndex, targetIndex := range targetIndexes {
+			directTargets[targetIndex] = projectselection.DirectTarget{
+				Selection: selection,
+				Index:     localIndex,
 			}
-			nextPosition++
 		}
 		return nil
 	})
@@ -508,34 +532,12 @@ func (s *Session) BuildTargetProjects(
 	if err != nil {
 		return ProjectSet{}, err
 	}
-	validatedDirectBuilds := make(map[int]struct{})
-	for _, projectIndex := range directProjectByTarget {
-		if projectIndex < 0 {
-			continue
-		}
-		if _, validated := validatedDirectBuilds[projectIndex]; validated {
-			continue
-		}
-		if err := execution.build(projectIndex); err != nil {
-			return ProjectSet{}, err
-		}
-		validatedDirectBuilds[projectIndex] = struct{}{}
-	}
-
-	keep := make([]bool, len(plan.specs))
-	for _, projectIndex := range directProjectByTarget {
-		if projectIndex >= 0 {
-			keep[projectIndex] = true
-		}
-	}
-	for targetIndex, projectIndex := range directProjectByTarget {
-		if projectIndex >= 0 && !execution.containsTarget(projectIndex, targetPlan.Targets[targetIndex]) {
-			return ProjectSet{}, fmt.Errorf(
-				"project root %q from %q was absent from its TypeScript Program",
-				targetPlan.Targets[targetIndex].Path,
-				plan.specs[projectIndex].tsconfigPath,
-			)
-		}
+	if selectionErr := projectselection.ValidateDirectTargets(
+		directTargets,
+		loadProject,
+		containsTarget,
+	); selectionErr != nil {
+		return ProjectSet{}, selectionError(selectionErr)
 	}
 
 	// Direct ownership has been decided for every target before this fallback
@@ -544,50 +546,19 @@ func (s *Session) BuildTargetProjects(
 	if !singleThreaded && len(configDirs) > 1 {
 		s.context.enableConcurrentProgramQueries()
 	}
-	var keepMu sync.Mutex
+	ownerProjectByTarget := make([]int, len(targetPlan.Targets))
+	for index := range ownerProjectByTarget {
+		ownerProjectByTarget[index] = projectselection.NoProject
+	}
 	err = runTargetConfigTasks(configDirs, singleThreaded, func(configDir string) error {
-		pending := make(map[int]struct{})
-		for _, targetIndex := range targetIndexesByConfig[configDir] {
-			if directProjectByTarget[targetIndex] < 0 {
-				pending[targetIndex] = struct{}{}
-			}
+		selection := selections[configIndexByDirectory[configDir]]
+		bindings, selectionErr := selection.Complete(loadProject, containsTarget)
+		if selectionErr != nil {
+			return selectionError(selectionErr)
 		}
-		orderedProjectIndexes := orderedProjectIndexesForConfig(plan, configDir)
-		fallbackProjectIndexes := make([]int, 0, len(orderedProjectIndexes))
-		for _, projectIndex := range orderedProjectIndexes {
-			for targetIndex := range pending {
-				supported, supportErr := execution.supportsTarget(
-					projectIndex,
-					targetPlan.Targets[targetIndex],
-				)
-				if supportErr != nil {
-					return supportErr
-				}
-				if supported {
-					fallbackProjectIndexes = append(fallbackProjectIndexes, projectIndex)
-					break
-				}
-			}
-		}
-		for _, projectIndex := range fallbackProjectIndexes {
-			if len(pending) == 0 {
-				break
-			}
-			if err := execution.build(projectIndex); err != nil {
-				return err
-			}
-			selected := false
-			for targetIndex := range pending {
-				if execution.containsTarget(projectIndex, targetPlan.Targets[targetIndex]) {
-					delete(pending, targetIndex)
-					selected = true
-				}
-			}
-			if selected {
-				keepMu.Lock()
-				keep[projectIndex] = true
-				keepMu.Unlock()
-			}
+		targetIndexes := targetIndexesByConfig[configDir]
+		for targetIndex, binding := range bindings {
+			ownerProjectByTarget[targetIndexes[targetIndex]] = binding.Project
 		}
 		return nil
 	})
@@ -595,7 +566,13 @@ func (s *Session) BuildTargetProjects(
 		return ProjectSet{}, err
 	}
 
-	return execution.projectSet(keep, directProjectByTarget, targetPlan.Targets), nil
+	keep := make([]bool, len(plan.specs))
+	for _, projectIndex := range ownerProjectByTarget {
+		if projectIndex >= 0 {
+			keep[projectIndex] = true
+		}
+	}
+	return execution.projectSet(keep, ownerProjectByTarget, targetPlan.Targets), nil
 }
 
 func (s *Session) BuildTargetProject(

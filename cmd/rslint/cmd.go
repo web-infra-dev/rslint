@@ -414,24 +414,57 @@ func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (in
 }
 
 func isBroadProjectLoadScope(
-	allowFiles []string,
 	allowDirs []string,
-	currentDirectory string,
-	useCaseSensitive bool,
+	activeConfigDirectories []string,
+	configTargetScopes map[string]rslintconfig.LintDiscoveryScope,
+	fsys vfs.FS,
 ) bool {
-	if len(allowDirs) == 0 {
-		return len(allowFiles) == 0
+	if len(allowDirs) == 0 || len(activeConfigDirectories) == 0 {
+		return false
 	}
 	options := tspath.ComparePathsOptions{
-		CurrentDirectory:          currentDirectory,
-		UseCaseSensitiveFileNames: useCaseSensitive,
+		UseCaseSensitiveFileNames: true,
 	}
-	for _, directory := range allowDirs {
-		if tspath.ContainsPath(directory, currentDirectory, options) {
-			return true
+	physicalDirectories := make([]string, len(allowDirs))
+	if fsys != nil {
+		for index, directory := range allowDirs {
+			if realPath := fsys.Realpath(directory); realPath != "" {
+				physicalDirectories[index] = tspath.NormalizePath(realPath)
+			}
 		}
 	}
-	return false
+	for _, configDirectory := range activeConfigDirectories {
+		if configTargetScopes[configDirectory].ExplicitOnly {
+			return false
+		}
+		covered := false
+		for _, directory := range allowDirs {
+			if tspath.ContainsPath(directory, configDirectory, options) {
+				covered = true
+				break
+			}
+		}
+		if !covered && fsys != nil {
+			configRealPath := fsys.Realpath(configDirectory)
+			if configRealPath != "" {
+				configRealPath = tspath.NormalizePath(configRealPath)
+				for _, directoryRealPath := range physicalDirectories {
+					if directoryRealPath != "" && tspath.ContainsPath(
+						directoryRealPath,
+						configRealPath,
+						options,
+					) {
+						covered = true
+						break
+					}
+				}
+			}
+		}
+		if !covered {
+			return false
+		}
+	}
+	return true
 }
 
 func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]rslintconfig.RslintConfig {
@@ -876,12 +909,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: true,
 	}
-	broadProjectLoad := isBroadProjectLoadScope(
-		allowFiles,
-		allowDirs,
-		cwd,
-		fs.UseCaseSensitiveFileNames(),
-	)
 
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
 	// This keeps an explicit --config outside the current directory from
@@ -894,6 +921,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	programs := projectSet.Programs()
 	programConfigMap := configMap
 	buildSingleConfigPrograms := buildAllPrograms
+	broadProjectLoad := false
 	var (
 		targetPlan                 rslintconfig.LintTargetPlan
 		loadedPrograms             loader.LoadResult
@@ -922,6 +950,16 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if !buildAllPrograms {
 			if configMap != nil {
 				programConfigMap = targetPlan.ActiveConfigs(configMap)
+				activeConfigDirectories := make([]string, 0, len(programConfigMap))
+				for configDirectory := range programConfigMap {
+					activeConfigDirectories = append(activeConfigDirectories, configDirectory)
+				}
+				broadProjectLoad = isBroadProjectLoadScope(
+					allowDirs,
+					activeConfigDirectories,
+					configTargetScopes,
+					fs,
+				)
 				if broadProjectLoad {
 					projectSet, err = programSession.BuildProjects(programConfigMap, singleThreaded)
 				} else {
@@ -929,6 +967,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				}
 			} else if len(targetPlan.Targets) > 0 {
 				buildSingleConfigPrograms = true
+				broadProjectLoad = isBroadProjectLoadScope(
+					allowDirs,
+					[]string{currentDirectory},
+					nil,
+					fs,
+				)
 				if broadProjectLoad {
 					projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
 				} else {
