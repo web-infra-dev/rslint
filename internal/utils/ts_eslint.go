@@ -1710,10 +1710,11 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 // normalized string representation, matching ESLint's String(node.value) behavior.
 // e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
 func NormalizeNumericLiteral(text string) string {
-	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
-	// Use big.Int to handle arbitrary precision, then convert to float64
-	// to match JavaScript's String(Number(...)) behavior.
-	if len(text) > 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
+	// ParseFloat doesn't handle JS hex (0x), octal (0o) or binary (0b)
+	// prefixes — it only reads hexadecimal floats, which require a `p`
+	// exponent. Use big.Int to handle arbitrary precision, then convert to
+	// float64 to match JavaScript's String(Number(...)) behavior.
+	if len(text) > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X' || text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
 		if n, ok := new(big.Int).SetString(text, 0); ok {
 			f, _ := new(big.Float).SetInt(n).Float64()
 			return strconv.FormatFloat(f, 'f', -1, 64)

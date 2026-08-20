@@ -174,6 +174,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
+	"github.com/web-infra-dev/rslint/internal/rules/yoda"
 )
 
 func GetAllRules() []rule.Rule {
@@ -350,5 +351,6 @@ func GetAllRules() []rule.Rule {
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
 		unicode_bom.UnicodeBomRule,
 		operator_assignment.OperatorAssignmentRule,
+		yoda.YodaRule,
 	}
 }
