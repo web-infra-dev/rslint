@@ -155,10 +155,6 @@ function S() {
 }
 ```
 
-## Differences from ESLint
-
-- In a destructuring assignment (not a `var`/`let`/`const` declaration) where a property's key and value are written out identically, e.g. `({ a: a } = {})`, the key is not checked — only the value would be, and here it's the same text either way. `var { a: a } = {}` (a real declaration) is unaffected and still checks the key as usual.
-
 ## Original Documentation
 
 - [ESLint: id-length](https://eslint.org/docs/latest/rules/id-length)

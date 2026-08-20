@@ -310,16 +310,6 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		return isValidBindingElement(opts, effectiveParent, node)
 
 	case ast.KindPropertyAssignment:
-		// NOTE: Unlike ESLint, a non-computed PropertyAssignment key inside an
-		// object literal that is itself a destructuring-assignment target
-		// (e.g. the first `a` in `({ a: a } = {})`) is never handed to this
-		// listener at all: the linter's traversal, when propagating
-		// "allow pattern" context into an assignment target (mirroring
-		// ESLint's own internal pattern-conversion walk), only visits such a
-		// key when it is computed. This only matters for the isSame branch
-		// below (`{ a: a }` with identical key/value text) — the differing
-		// case only ever needs the value side, which is always visited. See
-		// id_length.md's "Differences from ESLint".
 		return isValidPropertyAssignmentChild(opts, effectiveParent, node, wrapped)
 
 	case ast.KindShorthandPropertyAssignment:

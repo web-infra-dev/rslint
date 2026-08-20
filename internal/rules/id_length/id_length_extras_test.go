@@ -156,15 +156,9 @@ func TestIdLengthExtras(t *testing.T) {
 			// `properties` enabled; only the key side is reported ----
 			{Code: `var { a: a } = {};`, Options: map[string]any{"properties": "never"}},
 
-			// ---- Differences from ESLint: a non-computed PropertyAssignment
-			// key inside an object literal used as a destructuring-assignment
-			// target is never visited by the linter's traversal unless the
-			// key and value differ (see id_length.go's KindPropertyAssignment
-			// case comment) — so unlike ESLint, `{ a: a }` here is not
-			// flagged even with the default `properties: "always"`. The
-			// equivalent real declaration (`var { a: a } = {}`, covered in
-			// the upstream suite) is unaffected and still flags the key ----
-			{Code: `({ a: a } = {});`},
+			// ---- ...and the same arm reached through an assignment
+			// destructuring's PropertyAssignment rather than a binding ----
+			{Code: `({ a: a } = {});`, Options: map[string]any{"properties": "never"}},
 			{Code: `({ longName: longName } = {});`},
 
 			// ---- Branch lock-in: computed key on a BindingElement (real
@@ -892,6 +886,36 @@ function q(xx: any) { return xx; }`,
 				Code: `class Cc { mm() { super.x = 1; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 25},
+				},
+			},
+
+			// ---- An assignment destructuring's key is an ordinary
+			// expression the linter visits like any other, so a key spelled
+			// like its value is reported on the key side — the same arm
+			// `var { a: a } = {}` takes ----
+			{
+				Code: `({ a: a } = {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'a' is too short (< 2).", Line: 1, Column: 4},
+				},
+			},
+			{
+				Code: `({ a: a, b: c } = {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'a' is too short (< 2).", Line: 1, Column: 4},
+					{MessageId: "tooShort", Message: "Identifier name 'c' is too short (< 2).", Line: 1, Column: 13},
+				},
+			},
+			{
+				Code: `([{ a: a }] = {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'a' is too short (< 2).", Line: 1, Column: 5},
+				},
+			},
+			{
+				Code: `for ({ a: a } of s) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'a' is too short (< 2).", Line: 1, Column: 8},
 				},
 			},
 
