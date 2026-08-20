@@ -1188,6 +1188,8 @@ func selectLintProgram(
 		commandLine *tsoptions.ParsedCommandLine
 	}
 	loadedByConfig := make(map[tspath.Path]loadedLintProject, len(loadedProjects))
+	loadedBySessionTransport := make(map[tspath.Path]loadedLintProject, len(loadedProjects))
+	ambiguousSessionTransport := make(map[tspath.Path]struct{})
 	for _, candidate := range loadedProjects {
 		if candidate == nil || candidate.GetProgram() == nil {
 			continue
@@ -1221,15 +1223,37 @@ func selectLintProgram(
 		if configPath == "" {
 			continue
 		}
-		loadedByConfig[lintProjectDeclarationPathID(configPath)] = loadedLintProject{
+		loaded := loadedLintProject{
 			program:     candidateProgram,
 			commandLine: commandLine,
 		}
+		loadedByConfig[lintProjectDeclarationPathID(configPath)] = loaded
+		transportID := lintSessionTransportPathID(configPath)
+		if _, ambiguous := ambiguousSessionTransport[transportID]; ambiguous {
+			continue
+		}
+		if existing, ok := loadedBySessionTransport[transportID]; ok && existing.program != candidateProgram {
+			delete(loadedBySessionTransport, transportID)
+			ambiguousSessionTransport[transportID] = struct{}{}
+			continue
+		}
+		loadedBySessionTransport[transportID] = loaded
+	}
+	loadedProject := func(tsConfigPath string) (loadedLintProject, bool) {
+		if loaded, ok := loadedByConfig[lintProjectDeclarationPathID(tsConfigPath)]; ok {
+			return loaded, true
+		}
+		transportID := lintSessionTransportPathID(tsConfigPath)
+		if _, ambiguous := ambiguousSessionTransport[transportID]; ambiguous {
+			return loadedLintProject{}, false
+		}
+		loaded, ok := loadedBySessionTransport[transportID]
+		return loaded, ok
 	}
 	loaders := lintProjectLoaders{
 		metadata: func(tsConfigPath string) (*lintProjectMetadata, bool, error) {
-			if loadedProject, ok := loadedByConfig[lintProjectDeclarationPathID(tsConfigPath)]; ok {
-				metadata := sessionRoots.metadata(tsConfigPath, loadedProject.commandLine, fs)
+			if loaded, ok := loadedProject(tsConfigPath); ok {
+				metadata := sessionRoots.metadata(tsConfigPath, loaded.commandLine, fs)
 				return metadata, metadata != nil, nil
 			}
 			if fallbackLoaders.metadata == nil {
@@ -1238,8 +1262,8 @@ func selectLintProgram(
 			return fallbackLoaders.metadata(tsConfigPath)
 		},
 		program: func(tsConfigPath string) (*compiler.Program, *ast.SourceFile, error) {
-			if loadedProject, ok := loadedByConfig[lintProjectDeclarationPathID(tsConfigPath)]; ok {
-				return loadedProject.program, sourceFileForPath(loadedProject.program, filename, fs), nil
+			if loaded, ok := loadedProject(tsConfigPath); ok {
+				return loaded.program, sourceFileForPath(loaded.program, filename, fs), nil
 			}
 			if fallbackLoaders.program == nil {
 				return nil, nil, nil
@@ -1255,6 +1279,18 @@ func selectLintProgram(
 		return selected.program, selected.sourceFile, true, nil
 	}
 	return program, sourceFileForPath(program, filename, fs), false, nil
+}
+
+// The TypeScript LSP URI adapter lowercases only a Windows drive volume when
+// converting file:///C:/... to a file name. Match that adapter detail without
+// case-folding the rest of an authored config declaration: component casing and
+// symlink spelling can change a tsconfig's relative include/extends path space.
+func lintSessionTransportPathID(fileName string) tspath.Path {
+	fileName = tspath.NormalizePath(fileName)
+	if volume, rest, ok := tspath.SplitVolumePath(fileName); ok {
+		fileName = volume + rest
+	}
+	return lintProjectDeclarationPathID(fileName)
 }
 
 func sourceFileForPath(program *compiler.Program, filename string, fs vfs.FS) *ast.SourceFile {

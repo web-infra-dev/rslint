@@ -1692,6 +1692,44 @@ func TestLSPFilesystemPathID_UsesCanonicalFilesystemIdentity(t *testing.T) {
 	}
 }
 
+func TestLintSessionTransportPathIDNormalizesOnlyWindowsVolume(t *testing.T) {
+	uri := lsproto.DocumentUri("file:///C:/Repo/src/index.ts")
+	declaredPath := uriToPath(uri)
+	sessionPath := uri.FileName()
+	if declaredPath != "C:/Repo/src/index.ts" || sessionPath != "c:/Repo/src/index.ts" {
+		t.Fatalf("unexpected URI adapters: declared=%q session=%q", declaredPath, sessionPath)
+	}
+	if lintProjectDeclarationPathID(declaredPath) == lintProjectDeclarationPathID(sessionPath) {
+		t.Fatal("exact declaration identity must retain the Windows drive spelling")
+	}
+	if lintSessionTransportPathID(declaredPath) != lintSessionTransportPathID(sessionPath) {
+		t.Fatal("Session lookup must normalize the TypeScript URI adapter's drive spelling")
+	}
+
+	tests := []struct {
+		name  string
+		left  string
+		right string
+		want  bool
+	}{
+		{name: "drive volume", left: `C:\Repo\tsconfig.json`, right: "c:/Repo/tsconfig.json", want: true},
+		{name: "component casing", left: "C:/Repo/tsconfig.json", right: "c:/repo/tsconfig.json", want: false},
+		{name: "case-distinct declaration", left: "C:/Repo/TSConfig.json", right: "c:/Repo/tsconfig.json", want: false},
+		{name: "symlink spelling", left: "C:/alias/tsconfig.json", right: "c:/real/tsconfig.json", want: false},
+		{name: "UNC exact", left: "//Server/Share/Repo/tsconfig.json", right: `\\Server\Share\Repo\tsconfig.json`, want: true},
+		{name: "UNC casing", left: "//Server/Share/Repo/tsconfig.json", right: "//server/share/Repo/tsconfig.json", want: false},
+		{name: "POSIX casing", left: "/Repo/tsconfig.json", right: "/repo/tsconfig.json", want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := lintSessionTransportPathID(test.left) == lintSessionTransportPathID(test.right)
+			if got != test.want {
+				t.Fatalf("lookup equality = %v, want %v (%q, %q)", got, test.want, test.left, test.right)
+			}
+		})
+	}
+}
+
 type exactCaseLSPProgramFS struct {
 	vfs.FS
 	files map[string]string
