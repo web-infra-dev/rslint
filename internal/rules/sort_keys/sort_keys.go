@@ -193,6 +193,7 @@ func hasBlankLineBetween(sf *ast.SourceFile, comments []*ast.CommentRange, start
 // enter and popped on exit so nested object literals get independent state,
 // exactly like upstream's stack of { upper, prevNode, prevName, ... } frames.
 type objectState struct {
+	isPattern     bool
 	prevNode      *ast.Node
 	prevName      string
 	hasPrevName   bool
@@ -224,6 +225,13 @@ var SortKeysRule = rule.Rule{
 				return
 			}
 			st := stack[len(stack)-1]
+			// A destructuring assignment target is an ObjectPattern of its own
+			// in ESTree, which upstream returns early on; tsgo spells it with
+			// the same ObjectLiteralExpression it uses for a value, so the
+			// distinction is drawn here instead.
+			if st.isPattern {
+				return
+			}
 
 			nameNode := prop.Name()
 			if nameNode == nil {
@@ -239,17 +247,23 @@ var SortKeysRule = rule.Rule{
 			oldPrevName, oldHasPrevName := st.prevName, st.hasPrevName
 			thisName, thisOk := propertyStaticName(nameNode)
 
-			isBlankLineBetweenNodes := st.prevBlankLine
-			if st.prevNode != nil && hasBlankLineBetween(ctx.SourceFile, ctx.Comments.All(), st.prevNode.End(), utils.TrimNodeTextRange(ctx.SourceFile, prop).Pos()) {
-				isBlankLineBetweenNodes = true
+			// Nothing below reads a blank line unless the option asking about
+			// one is on, and the scan for one has the whole file's comment
+			// list to materialize first, so it waits to be asked.
+			isBlankLineBetweenNodes := false
+			if opts.AllowLineSeparatedGroups {
+				isBlankLineBetweenNodes = st.prevBlankLine
+				if st.prevNode != nil && hasBlankLineBetween(ctx.SourceFile, ctx.Comments.All(), st.prevNode.End(), utils.TrimNodeTextRange(ctx.SourceFile, prop).Pos()) {
+					isBlankLineBetweenNodes = true
+				}
+				st.prevNode = prop
 			}
-			st.prevNode = prop
 
 			if thisOk {
 				st.prevName, st.hasPrevName = thisName, true
 			}
 
-			if opts.AllowLineSeparatedGroups && isBlankLineBetweenNodes {
+			if isBlankLineBetweenNodes {
 				st.prevBlankLine = !thisOk
 				return
 			}
@@ -269,7 +283,7 @@ var SortKeysRule = rule.Rule{
 				if objLit := node.AsObjectLiteralExpression(); objLit != nil && objLit.Properties != nil {
 					numKeys = len(objLit.Properties.Nodes)
 				}
-				stack = append(stack, &objectState{numKeys: numKeys})
+				stack = append(stack, &objectState{numKeys: numKeys, isPattern: ast.IsAssignmentTarget(node)})
 			},
 			rule.ListenerOnExit(ast.KindObjectLiteralExpression): func(node *ast.Node) {
 				stack = stack[:len(stack)-1]

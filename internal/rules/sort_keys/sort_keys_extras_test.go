@@ -45,6 +45,22 @@ func TestSortKeysExtras(t *testing.T) {
 			{Code: "var { b, a } = obj;"},
 			// ---- Dimension 4: destructuring pattern with renamed bindings ----
 			{Code: "var { b: x, a: y } = obj;"},
+			// ---- Dimension 4: destructuring assignment target, shorthand names ----
+			{Code: "({ b, a } = obj);"},
+			// ---- Dimension 4: destructuring assignment target with renamed bindings ----
+			{Code: "({ b: x, a: y } = obj);"},
+			// ---- Dimension 4: destructuring assignment target with default values ----
+			{Code: "({ b = 1, a = 2 } = obj);"},
+			// ---- Dimension 4: destructuring assignment target with a rest property ----
+			{Code: "({ b, a, ...rest } = obj);"},
+			// ---- Dimension 4: destructuring assignment target with a computed key ----
+			{Code: "({ [b]: x, a: y } = obj);"},
+			// ---- Dimension 4: destructuring assignment target nested in another one ----
+			{Code: "({ p: { b, a } } = obj);"},
+			// ---- Dimension 4: destructuring assignment target inside an array pattern ----
+			{Code: "[{ b, a }] = arr;"},
+			// ---- Dimension 4: destructuring assignment target as a for-of initializer ----
+			{Code: "for ({ b, a } of list) {}"},
 			// ---- Real-user: eslint/eslint#18000 — computed member-access key is non-simple ----
 			{Code: "var obj = { z: 1, [Foo.identifier]: 2, [Bar.identifier]: 3 };"},
 			// ---- Locks in upstream Property(): a blank line before two prevNode-preserving skips (spread, then an ignored computed key) still forms a group boundary for the next real comparison ----
@@ -248,6 +264,34 @@ func TestSortKeysExtras(t *testing.T) {
 				Code: "var obj = { 1e21: 1, '1a': 2 };",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '1a' should be before '1e+21'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
+				},
+			},
+			// ---- A BigInt key is named by its decimal digits, the same as the equivalent number ----
+			{
+				Code: "var obj = { z: 1, 2n: 2, a: 3 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '2' should be before 'z'.", Line: 1, Column: 19, EndLine: 1, EndColumn: 21},
+				},
+			},
+			// ---- A BigInt key is compared against the keys around it, not skipped as non-static ----
+			{
+				Code: "var obj = { 2n: 1, 0: 2 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '0' should be before '2'.", Line: 1, Column: 20, EndLine: 1, EndColumn: 21},
+				},
+			},
+			// ---- Only the assignment target is a pattern; an object literal on the other side of it is still checked ----
+			{
+				Code: "({ b, a } = { d: 1, c: 2 });",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. 'c' should be before 'd'.", Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
+				},
+			},
+			// ---- An object literal standing as a default value inside a pattern is a value, not part of the pattern ----
+			{
+				Code: "({ p: { b, a } = { d: 1, c: 2 } } = obj);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. 'c' should be before 'd'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 27},
 				},
 			},
 		},

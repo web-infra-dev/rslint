@@ -1678,6 +1678,8 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 		return nameNode.AsStringLiteral().Text, true
 	case ast.KindNumericLiteral:
 		return NormalizeNumericLiteral(nameNode.AsNumericLiteral().Text), true
+	case ast.KindBigIntLiteral:
+		return NormalizeBigIntLiteral(nameNode.AsBigIntLiteral().Text), true
 	case ast.KindComputedPropertyName:
 		// ESLint's AST has no parenthesized-expression node, so `[('a')]`
 		// names the same static property as `['a']`.
