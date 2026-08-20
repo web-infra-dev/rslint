@@ -4,7 +4,8 @@ package id_match
 // the upstream test suite doesn't exercise. Each case carries an inline comment
 // naming the Dimension 4 row or tsgo AST quirk it covers, so future refactors
 // can't silently regress them without breaking a named lock-in. Its siblings
-// are id_match_extras_branches_test.go and id_match_extras_realuser_test.go.
+// are id_match_extras_branches_test.go,
+// id_match_extras_realuser_test.go and id_match_extras_typescript_test.go.
 //
 // N/A: Dimension 3 (autofix boundaries) — the rule emits neither fixes nor
 // suggestions.
@@ -95,6 +96,11 @@ func TestIdMatchExtrasDim4(t *testing.T) {
 				Code:    `<foo_1.bar_1 />;`,
 				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
 				Tsx:     true,
+			},
+			// ---- Dimension 4: ancestor walk crosses a class static block ----
+			{
+				Code:    `class C { static { const { a_1 } = o; } }`,
+				Options: []any{`^[^_]+$`, map[string]any{"ignoreDestructuring": true}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -681,6 +687,89 @@ function o_1(a: any): void {}`,
 						Column:    11,
 						EndLine:   1,
 						EndColumn: 16,
+					},
+				},
+			},
+			// ---- Dimension 4: ancestor walk crosses a class static block ----
+			{
+				Code:    `class C { static { const { a_1 } = o; } }`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    28,
+						EndLine:   1,
+						EndColumn: 31,
+					},
+				},
+			},
+			// ---- Dimension 4: TypeScript-only declaration forms ----
+			{
+				Code:    `type X_1 = number;`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'X_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    6,
+						EndLine:   1,
+						EndColumn: 9,
+					},
+				},
+			},
+			// ---- Dimension 4: TypeScript-only declaration forms ----
+			{
+				Code:    `enum E_1 { A_1 }`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'E_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    6,
+						EndLine:   1,
+						EndColumn: 9,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'A_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    12,
+						EndLine:   1,
+						EndColumn: 15,
+					},
+				},
+			},
+			// ---- Dimension 4: TypeScript-only declaration forms ----
+			{
+				Code:    `namespace N_1 { export const a = 1; }`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'N_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    11,
+						EndLine:   1,
+						EndColumn: 14,
+					},
+				},
+			},
+			// ---- Dimension 4: TypeScript-only declaration forms ----
+			{
+				Code:    `function f<T_1>(): void {}`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'T_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    12,
+						EndLine:   1,
+						EndColumn: 15,
 					},
 				},
 			},

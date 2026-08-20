@@ -2,8 +2,8 @@ package id_match
 
 // TestIdMatchExtrasBranches locks in every reachable branch of the upstream
 // rule source, including the ones upstream itself never tests. Each case names
-// the branch it pins. Its siblings are id_match_extras_dim4_test.go and
-// id_match_extras_realuser_test.go.
+// the branch it pins. Its siblings are id_match_extras_dim4_test.go,
+// id_match_extras_realuser_test.go and id_match_extras_typescript_test.go.
 
 import (
 	"testing"
@@ -64,7 +64,10 @@ func TestIdMatchExtrasBranches(t *testing.T) {
 				Code:    `obj.a_1 === 1;`,
 				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
 			},
-			// ---- Locks in upstream Identifier() MemberExpression arm 3: right side is a member access ----
+			// ---- Locks in upstream Identifier() MemberExpression arm 3: the arm only ever declines ----
+			// Arm 3 reports nothing reachable: for the assignment to be the
+			// effective parent the access has to be one of its two sides, and
+			// arms 1 and 2 already claim every identifier on the left.
 			{
 				Code:    `obj.x = obj.y_1;`,
 				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
@@ -168,6 +171,66 @@ func TestIdMatchExtrasBranches(t *testing.T) {
 			{
 				Code:    `class C { #a_1 = 1; }`,
 				Options: []any{`^[^_]+$`},
+			},
+			// ---- Locks in upstream Identifier() arm 1: a property value is a reference and is left alone ----
+			{
+				Code:    `var o = { k: Array };`,
+				Options: []any{`^[a-z]+$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in upstream Identifier() arm 1: an aliased export only reads the binding ----
+			{
+				Code:    `export { Array as foo };`,
+				Options: []any{`^[a-z]+$`},
+			},
+			// ---- Locks in upstream Identifier() AssignmentPattern arm: an object-literal default is checked where it is declared ----
+			{
+				Code:    `({ a = b_c } = o);`,
+				Options: []any{`^[a-z]+$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in upstream Identifier() AssignmentPattern arm: an array-pattern default value ----
+			{
+				Code:    `const [a = b_c] = x;`,
+				Options: []any{`^[a-z]+$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in upstream Identifier() AssignmentPattern arm: a parameter default value ----
+			{
+				Code:    `function f(a = b_c) {}`,
+				Options: []any{`^[a-z]+$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in upstream Identifier() AssignmentPattern arm: a destructuring-assignment default value ----
+			{
+				Code:    `[a = b_c] = x;`,
+				Options: []any{`^[a-z]+$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in upstream isImportAttributeKey() arm 2: a method key is still an attribute key ----
+			{
+				Code:    `import("m", { type() { return 1; } });`,
+				Options: []any{`^zzz$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in upstream isImportAttributeKey() arm 2: so is an accessor key ----
+			{
+				Code:    `import("m", { get type() { return 1; } });`,
+				Options: []any{`^zzz$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in upstream isImportAttributeKey() arm 2: the outer key may be any name ----
+			{
+				Code:    `import("m", { outer: { type: "json" } });`,
+				Options: []any{`^zzz$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in upstream isImportAttributeKey() arm 2: the walk recurses to any depth ----
+			{
+				Code:    `import("m", { a: { b: { type: "json" } } });`,
+				Options: []any{`^zzz$`, map[string]any{"properties": true}},
+			},
+			// ---- Locks in the default pattern: with no options at all every name matches ----
+			{
+				Code: `var noOptionsAtAll = 1;
+var __weird_$name = 2;`,
+			},
+			// ---- Locks in the rule's own guard: a pattern that is not a regexp checks nothing ----
+			{
+				Code:    `var __foo = 1;`,
+				Options: []any{`(`},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -322,7 +385,7 @@ func TestIdMatchExtrasBranches(t *testing.T) {
 					},
 				},
 			},
-			// ---- Locks in upstream Identifier() MemberExpression arm 3: right side is not a member access ----
+			// ---- Locks in upstream Identifier() MemberExpression arm 1: an object read on the right of an assignment ----
 			{
 				Code:    `obj.x = y_1.z;`,
 				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
@@ -728,6 +791,181 @@ function b_1() {}`,
 						Column:    20,
 						EndLine:   1,
 						EndColumn: 24,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() arm 1: a shorthand key is not a reference to the global it spells ----
+			{
+				Code:    `var o = { Array };`,
+				Options: []any{`^[a-z]+$`, map[string]any{"properties": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Array' does not match the pattern '^[a-z]+$'.`,
+						Line:      1,
+						Column:    11,
+						EndLine:   1,
+						EndColumn: 16,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() arm 1: the same holds in a destructuring assignment ----
+			{
+				Code:    `({ Array } = obj);`,
+				Options: []any{`^[a-z]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Array' does not match the pattern '^[a-z]+$'.`,
+						Line:      1,
+						Column:    4,
+						EndLine:   1,
+						EndColumn: 9,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() arm 1: an un-aliased export names the binding as well as reading it ----
+			{
+				Code:    `export { Array };`,
+				Options: []any{`^[a-z]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Array' does not match the pattern '^[a-z]+$'.`,
+						Line:      1,
+						Column:    10,
+						EndLine:   1,
+						EndColumn: 15,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() arm 1: a re-export names the other module's export ----
+			{
+				Code:    `export { Array as foo } from './m';`,
+				Options: []any{`^[a-z]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Array' does not match the pattern '^[a-z]+$'.`,
+						Line:      1,
+						Column:    10,
+						EndLine:   1,
+						EndColumn: 15,
+					},
+				},
+			},
+			// ---- Locks in upstream isReferenceToGlobalVariable() arm 2: a file-level redeclaration is not a global ----
+			{
+				Code: `var Object = 1;
+Object.keys(x);`,
+				Options: []any{`^zzz$`, map[string]any{"properties": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Object' does not match the pattern '^zzz$'.`,
+						Line:      1,
+						Column:    5,
+						EndLine:   1,
+						EndColumn: 11,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Object' does not match the pattern '^zzz$'.`,
+						Line:      2,
+						Column:    1,
+						EndLine:   2,
+						EndColumn: 7,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() AssignmentPattern arm: the bound name still is ----
+			{
+				Code:    `({ a_1 = b_c } = o);`,
+				Options: []any{`^[a-z]+$`, map[string]any{"properties": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[a-z]+$'.`,
+						Line:      1,
+						Column:    4,
+						EndLine:   1,
+						EndColumn: 7,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() import arm: upstream compares the two halves by name ----
+			{
+				Code:    `import { a_b as a_b } from "m";`,
+				Options: []any{`^[a-z]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_b' does not match the pattern '^[a-z]+$'.`,
+						Line:      1,
+						Column:    10,
+						EndLine:   1,
+						EndColumn: 13,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_b' does not match the pattern '^[a-z]+$'.`,
+						Line:      1,
+						Column:    17,
+						EndLine:   1,
+						EndColumn: 20,
+					},
+				},
+			},
+			// ---- Locks in upstream isImportAttributeKey() arm 2: a computed outer key stops the walk ----
+			{
+				Code:    `import("m", { [w]: { type: "json" } });`,
+				Options: []any{`^zzz$`, map[string]any{"properties": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'w' does not match the pattern '^zzz$'.`,
+						Line:      1,
+						Column:    16,
+						EndLine:   1,
+						EndColumn: 17,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'type' does not match the pattern '^zzz$'.`,
+						Line:      1,
+						Column:    22,
+						EndLine:   1,
+						EndColumn: 26,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() PropertyDefinition arm: onlyDeclarations does not reach a class field ----
+			{
+				Code:    `class C { a_1 = 1; }`,
+				Options: []any{`^[^_]+$`, map[string]any{"classFields": true, "onlyDeclarations": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    11,
+						EndLine:   1,
+						EndColumn: 14,
+					},
+				},
+			},
+			// ---- Locks in upstream Identifier() ObjectPattern arm 3: ignoreDestructuring off is the default ----
+			{
+				Code:    `const { a_1 } = o;`,
+				Options: []any{`^[^_]+$`, map[string]any{"ignoreDestructuring": false}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    9,
+						EndLine:   1,
+						EndColumn: 12,
 					},
 				},
 			},

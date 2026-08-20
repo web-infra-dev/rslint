@@ -49,6 +49,16 @@ func TestIdMatchExtrasTypescript(t *testing.T) {
 				Code:    `try {} catch (error_1) {}`,
 				Options: []any{`^[^_]+$`, map[string]any{"onlyDeclarations": true}},
 			},
+			// ---- A string-literal-named constructor is a Literal to ESLint, not an identifier ----
+			{
+				Code:    `class foo { 'constructor'() {} }`,
+				Options: []any{`^foo$`},
+			},
+			// ---- A string-literal-named constructor is a Literal to ESLint, not an identifier ----
+			{
+				Code:    `class foo { "constructor"() {} }`,
+				Options: []any{`^foo$`},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- A class constructor is checked like any other name ----
@@ -180,6 +190,39 @@ let x: Foo_1;`,
 						Column:    8,
 						EndLine:   2,
 						EndColumn: 13,
+					},
+				},
+			},
+			// ---- A parameter is reported over its name, not over its type annotation ----
+			{
+				Code:    `function f(a_1: string) {}`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    12,
+						EndLine:   1,
+						EndColumn: 15,
+					},
+				},
+			},
+			// ---- A name written in a JSDoc comment is not a name in the file ----
+			{
+				Code: `/** @typedef {{a_x: number}} T_x */
+let w_x;`,
+				Options:  []any{`^[^_]+$`},
+				FileName: "jsdoc-id-match.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'w_x' does not match the pattern '^[^_]+$'.`,
+						Line:      2,
+						Column:    5,
+						EndLine:   2,
+						EndColumn: 8,
 					},
 				},
 			},

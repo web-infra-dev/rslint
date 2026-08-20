@@ -1,8 +1,8 @@
 package id_match
 
 // TestIdMatchExtrasRealuser locks in code shapes taken from the upstream rule's
-// issue tracker. Its siblings are id_match_extras_dim4_test.go and
-// id_match_extras_branches_test.go.
+// issue tracker. Its siblings are id_match_extras_branches_test.go,
+// id_match_extras_dim4_test.go and id_match_extras_typescript_test.go.
 
 import (
 	"testing"

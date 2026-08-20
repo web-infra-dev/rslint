@@ -16,6 +16,9 @@ import (
 //go:embed id_match.schema.json
 var schemaJSON []byte
 
+// constructorKeyword is the name ESLint's AST gives a class constructor.
+const constructorKeyword = "constructor"
+
 // IdMatchRule requires identifiers to match a specified regular expression.
 // https://eslint.org/docs/latest/rules/id-match
 var IdMatchRule = rule.Rule{
@@ -101,7 +104,8 @@ func (r *idMatch) isInvalid(name string) bool {
 // report emits the diagnostic unless the name belongs to something the author
 // does not declare. Upstream decides that before dispatching on the parent
 // shape; every branch it dispatches to does nothing but report, so asking here
-// gives the same answer and only asks about names that are already invalid.
+// gives the same answer and only asks about names that are already invalid,
+// which keeps the scope lookup off the path every identifier takes.
 func (r *idMatch) report(node *ast.Node, name string) {
 	if r.isReferenceToGlobalVariable(node, name) || r.isExternallyDeclaredType(node) {
 		return
@@ -142,6 +146,11 @@ func (r *idMatch) checkIdentifier(node *ast.Node) {
 	if isJsxNamePosition(node) {
 		return
 	}
+	// A name written inside a JSDoc comment stays a comment to ESLint; tsgo
+	// clones it into the tree of a checked JavaScript file.
+	if utils.IsInJSDocSyntax(node) {
+		return
+	}
 	// `x as const` reads `const` as a type name, but it names no declaration.
 	if parent.Kind == ast.KindTypeReference && ast.IsConstTypeReference(parent) {
 		return
@@ -150,7 +159,7 @@ func (r *idMatch) checkIdentifier(node *ast.Node) {
 		return
 	}
 
-	if isMemberAccess(parent) {
+	if ast.IsAccessExpression(parent) {
 		r.checkMemberAccess(node, name, parent)
 		return
 	}
@@ -178,8 +187,10 @@ func (r *idMatch) checkIdentifier(node *ast.Node) {
 	switch {
 	case isImportBinding(parent):
 		// Only the local imported identifier is checked; the name the module
-		// exports it under is not the reader's to choose.
-		if local := parent.Name(); local == node {
+		// exports it under is not the reader's to choose. Upstream compares the
+		// two by name, so `import { a as a }` reports both halves.
+		if local := parent.Name(); local != nil && local.Kind == ast.KindIdentifier &&
+			local.Text() == name {
 			r.reportIfInvalid(node, name)
 		}
 	case parent.Kind == ast.KindPropertyDeclaration && !ast.HasAccessorModifier(parent):
@@ -200,8 +211,8 @@ func (r *idMatch) checkMemberAccess(node *ast.Node, name string, member *ast.Nod
 	if !r.opts.properties {
 		return
 	}
-	if object := ast.SkipParentheses(memberObject(member)); object != nil &&
-		object.Kind == ast.KindIdentifier && object.Text() == name {
+	if object := ast.SkipParentheses(member.Expression()); object.Kind == ast.KindIdentifier &&
+		object.Text() == name {
 		r.reportIfInvalid(node, name)
 		return
 	}
@@ -213,13 +224,13 @@ func (r *idMatch) checkMemberAccess(node *ast.Node, name string, member *ast.Nod
 	}
 	assignment := effective.AsBinaryExpression()
 
-	if left := ast.SkipParentheses(assignment.Left); left != nil && isMemberAccess(left) {
+	if left := ast.SkipParentheses(assignment.Left); ast.IsAccessExpression(left) {
 		if property, ok := memberPropertyName(left); ok && property == name {
 			r.reportIfInvalid(node, name)
 			return
 		}
 	}
-	if right := ast.SkipParentheses(assignment.Right); right == nil || !isMemberAccess(right) {
+	if !ast.IsAccessExpression(ast.SkipParentheses(assignment.Right)) {
 		r.reportIfInvalid(node, name)
 	}
 }
@@ -279,9 +290,38 @@ func (r *idMatch) shouldReport(node *ast.Node, effectiveParent *ast.Node, name s
 // linted file does not declare. Those names are outside the author's control,
 // so upstream leaves them alone.
 func (r *idMatch) isReferenceToGlobalVariable(node *ast.Node, name string) bool {
-	return r.ctx.Globals.Access(name).IsDeclared() &&
-		!utils.IsNonReferenceIdentifier(node) &&
-		!utils.IsShadowed(node, name)
+	if !r.ctx.Globals.Access(name).IsDeclared() || isNonReferenceIdentifier(node) {
+		return false
+	}
+	if r.ctx.Refs == nil {
+		return !utils.IsShadowed(node, name)
+	}
+	// A name this file declares is the author's, however global the spelling.
+	// Asking the reference index costs a scope-chain lookup, where scanning
+	// for a shadowing declaration costs a walk of the whole file — and this
+	// question is asked of every unmatched occurrence of a global name.
+	return r.ctx.Refs.ResolveInFile(node) == nil
+}
+
+// isNonReferenceIdentifier reports whether an identifier names something rather
+// than reading it. It extends utils.IsNonReferenceIdentifier with the two
+// places tsgo writes one identifier where ESLint's AST writes two over the same
+// range: a shorthand property, whose key half is no reference, and an
+// un-aliased export specifier, whose exported half is no reference. Upstream
+// dedupes such a pair by range, so the half that is not a reference is the one
+// that decides.
+func isNonReferenceIdentifier(node *ast.Node) bool {
+	if parent := node.Parent; parent != nil && parent.Name() == node {
+		switch parent.Kind {
+		case ast.KindShorthandPropertyAssignment:
+			return true
+		case ast.KindExportSpecifier:
+			if parent.AsExportSpecifier().PropertyName == nil {
+				return true
+			}
+		}
+	}
+	return utils.IsNonReferenceIdentifier(node)
 }
 
 // isExternallyDeclaredType reports whether a name used in a type position is
@@ -309,17 +349,24 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node) bool {
 // keyword and gives it no name node, where ESLint's AST holds an `Identifier`
 // named `constructor` that its `Identifier` listener visits like any other.
 func (r *idMatch) checkConstructor(node *ast.Node) {
-	if r.opts.onlyDeclarations || !r.isInvalid("constructor") {
+	if r.opts.onlyDeclarations || !r.isInvalid(constructorKeyword) {
 		return
 	}
 	start := node.Pos()
 	if modifiers := node.ModifierNodes(); len(modifiers) > 0 {
 		start = modifiers[len(modifiers)-1].End()
 	}
-	start = scanner.SkipTrivia(r.ctx.SourceFile.Text(), start)
+	text := r.ctx.SourceFile.Text()
+	start = scanner.SkipTrivia(text, start)
+	end := start + len(constructorKeyword)
+	// `class A { 'constructor'() {} }` is a constructor too, but its name is a
+	// string literal, which ESLint's AST holds as a `Literal` and never visits.
+	if end > len(text) || text[start:end] != constructorKeyword {
+		return
+	}
 	r.ctx.ReportRange(
-		core.NewTextRange(start, start+len("constructor")),
-		messageNotMatch("constructor", r.opts.pattern),
+		core.NewTextRange(start, end),
+		messageNotMatch(constructorKeyword, r.opts.pattern),
 	)
 }
 
@@ -352,18 +399,6 @@ func isComputedKey(node *ast.Node) bool {
 	return parent != nil && parent.Kind == ast.KindComputedPropertyName
 }
 
-func isMemberAccess(node *ast.Node) bool {
-	return node.Kind == ast.KindPropertyAccessExpression ||
-		node.Kind == ast.KindElementAccessExpression
-}
-
-func memberObject(member *ast.Node) *ast.Node {
-	if member.Kind == ast.KindPropertyAccessExpression {
-		return member.AsPropertyAccessExpression().Expression
-	}
-	return member.AsElementAccessExpression().Expression
-}
-
 // memberPropertyName returns the value ESTree exposes as
 // `MemberExpression.property.name`, which exists only for an identifier-shaped
 // property.
@@ -373,9 +408,6 @@ func memberPropertyName(member *ast.Node) (string, bool) {
 		property = member.AsPropertyAccessExpression().Name()
 	} else {
 		property = ast.SkipParentheses(member.AsElementAccessExpression().ArgumentExpression)
-	}
-	if property == nil {
-		return "", false
 	}
 	switch property.Kind {
 	case ast.KindIdentifier:
@@ -441,16 +473,18 @@ func isPlainParameter(parameter *ast.Node) bool {
 
 // isJsxNamePosition reports whether node names a JSX element or attribute.
 func isJsxNamePosition(node *ast.Node) bool {
-	current := node
-	for parent := current.Parent; parent != nil; parent = parent.Parent {
-		switch parent.Kind {
-		case ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement, ast.KindJsxClosingElement:
-			return parent.TagName() == current
-		case ast.KindJsxAttribute:
+	for current := node; current.Parent != nil; current = current.Parent {
+		if ast.IsJsxTagName(current) {
+			return true
+		}
+		parent := current.Parent
+		if parent.Kind == ast.KindJsxAttribute {
 			return parent.Name() == current
-		case ast.KindPropertyAccessExpression, ast.KindJsxNamespacedName:
-			current = parent
-		default:
+		}
+		// A member or namespaced tag name is spelled with ordinary nodes, so
+		// keep climbing while the identifier can still be part of one.
+		if parent.Kind != ast.KindPropertyAccessExpression &&
+			parent.Kind != ast.KindJsxNamespacedName {
 			return false
 		}
 	}
@@ -474,14 +508,18 @@ func isImportAttributeKey(node *ast.Node) bool {
 		if parent == nil {
 			return false
 		}
+		// Upstream gates only the shorthand-value alternative on `!method`, so
+		// a method or accessor key counts like any other.
 		switch parent.Kind {
-		case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment:
+		case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
+			ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		default:
 			return false
 		}
 		// A computed key is wrapped in a `ComputedPropertyName`, so this also
-		// rejects the `computed: true` form upstream rejects.
-		if parent.Name() != key {
+		// rejects the `computed: true` form upstream rejects — on the outer key
+		// the walk steps up to as well as on the one it started from.
+		if parent.Name() != key || key.Kind == ast.KindComputedPropertyName {
 			return false
 		}
 		object := parent.Parent
@@ -614,6 +652,14 @@ func objectLiteralRoles(node *ast.Node, member *ast.Node) ([]role, bool) {
 		ast.SkipParentheses(member.AsPropertyAssignment().Initializer) == node {
 		return []role{property}, true
 	}
+	// `({ a = b } = o)` — `b` is the right-hand side of ESTree's
+	// AssignmentPattern, which the rule checks where it is declared instead.
+	if member.Kind == ast.KindShorthandPropertyAssignment {
+		if def := member.AsShorthandPropertyAssignment().ObjectAssignmentInitializer; def != nil &&
+			ast.SkipParentheses(def) == node {
+			return []role{{kind: roleAssignPattern, isDefaultValue: true}}, true
+		}
+	}
 	return nil, false
 }
 
@@ -623,9 +669,6 @@ func objectLiteralValue(member *ast.Node) (string, bool) {
 	switch member.Kind {
 	case ast.KindPropertyAssignment:
 		value := ast.SkipParentheses(member.AsPropertyAssignment().Initializer)
-		if value == nil {
-			return "", false
-		}
 		if isAssignmentPattern(value) {
 			return "", true
 		}
@@ -744,9 +787,6 @@ func propertyKeyName(name *ast.Node) string {
 	}
 	if name.Kind == ast.KindComputedPropertyName {
 		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
-		if name == nil {
-			return ""
-		}
 	}
 	if name.Kind == ast.KindIdentifier {
 		return name.Text()

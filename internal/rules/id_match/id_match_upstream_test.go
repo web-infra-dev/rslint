@@ -3,7 +3,9 @@ package id_match
 // TestIdMatchUpstream migrates the full valid/invalid suite from upstream
 // tests/lib/rules/id-match.js 1:1. Position assertions cover line/column for
 // every invalid case. rslint-specific lock-in cases live in the
-// id_match_extras_test.go file.
+// id_match_extras_branches_test.go, id_match_extras_dim4_test.go,
+// id_match_extras_realuser_test.go and id_match_extras_typescript_test.go
+// files.
 
 import (
 	"testing"
