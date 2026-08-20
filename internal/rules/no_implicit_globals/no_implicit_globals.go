@@ -250,7 +250,7 @@ func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode 
 // unreported, while the leak is collected from the global scope's implicit
 // variables, which the directive never touches.
 func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLevel bool) {
-	root := findPureAssignmentRoot(node)
+	root, writes := findPureAssignmentRoot(node)
 	if root == nil {
 		return
 	}
@@ -263,12 +263,16 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 		if ctx.Exported.Has(name) {
 			return
 		}
-		ctx.ReportNode(root, assignmentToReadonlyGlobalMessage)
+		for range writes {
+			ctx.ReportNode(root, assignmentToReadonlyGlobalMessage)
+		}
 	case utils.GlobalAccessWritable:
 		// Writable globals may be freely assigned.
 	default:
 		if !strictTopLevel && !utils.IsInStrictMode(node, ctx.SourceFile) {
-			ctx.ReportNode(root, globalVariableLeakMessage)
+			for range writes {
+				ctx.ReportNode(root, globalVariableLeakMessage)
+			}
 		}
 	}
 }
@@ -277,7 +281,12 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 // through destructuring containers and transparent TS wrappers (parens,
 // non-null assertions) to the enclosing pure `=` assignment or for-in/for-of
 // statement, mirroring upstream's ASSIGNMENT_NODES walk of
-// reference.identifier.parent. It returns nil for anything that isn't a pure
+// reference.identifier.parent. Alongside the root it returns how many write
+// references the scope manager records for the identifier: the assignment
+// itself, plus one for every destructuring default the identifier sits under,
+// since eslint-scope adds a write per enclosing AssignmentPattern before the
+// one for the assignment. `[[foo = 1] = []] = arr` therefore reports three
+// times over the whole assignment. It returns nil for anything that isn't a pure
 // write target: compound/logical assignment operators and update expressions
 // read as well as write, so ESLint's scope analysis (and this walk) does not
 // treat them as leak/readonly-assignment candidates. It also returns nil when
@@ -287,8 +296,9 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 // AssignmentExpression's Left through one of those wrappers is treated as a
 // plain read-write reference instead, the same reasoning behind
 // no_global_assign's isWriteThroughTypeAssertion exclusion.
-func findPureAssignmentRoot(node *ast.Node) *ast.Node {
+func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 	current := node
+	writes := 1
 	for current != nil && current.Parent != nil {
 		parent := current.Parent
 		switch parent.Kind {
@@ -296,38 +306,45 @@ func findPureAssignmentRoot(node *ast.Node) *ast.Node {
 			binary := parent.AsBinaryExpression()
 			if binary == nil || binary.OperatorToken == nil ||
 				binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Left != current {
-				return nil
+				return nil, 0
 			}
 			if utils.IsDefaultValueInDestructuringAssignment(parent) {
+				writes++
 				current = parent
 				continue
 			}
-			return parent
+			return parent, writes
 
 		case ast.KindForInStatement, ast.KindForOfStatement:
 			stmt := parent.AsForInOrOfStatement()
 			if stmt == nil || stmt.Initializer != current {
-				return nil
+				return nil, 0
 			}
-			return parent
+			return parent, writes
 
 		case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
 			if !utils.IsInDestructuringAssignment(parent) {
-				return nil
+				return nil, 0
 			}
 			current = parent
 
 		case ast.KindShorthandPropertyAssignment:
 			shorthand := parent.AsShorthandPropertyAssignment()
 			if shorthand == nil || shorthand.Name() != current {
-				return nil
+				return nil, 0
+			}
+			// `{ foo = 1 } = obj` keeps its default on the shorthand rather
+			// than in a nested assignment, but the scope manager still sees an
+			// AssignmentPattern and records its extra write.
+			if shorthand.ObjectAssignmentInitializer != nil {
+				writes++
 			}
 			current = parent
 
 		case ast.KindPropertyAssignment:
 			propAssignment := parent.AsPropertyAssignment()
 			if propAssignment == nil || propAssignment.Initializer != current {
-				return nil
+				return nil, 0
 			}
 			current = parent
 
@@ -336,8 +353,8 @@ func findPureAssignmentRoot(node *ast.Node) *ast.Node {
 			current = parent
 
 		default:
-			return nil
+			return nil, 0
 		}
 	}
-	return nil
+	return nil, 0
 }

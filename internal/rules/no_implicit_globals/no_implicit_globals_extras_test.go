@@ -192,14 +192,59 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// Locks in findPureAssignmentRoot's IsDefaultValueInDestructuringAssignment
 			// branch: `foo`'s own `= 1` is a pattern default, not a real
 			// assignment, so the walk must continue past it to the enclosing
-			// `[foo = 1] = arr` to find the true leak root.
+			// `[foo = 1] = arr` to find the true leak root. The default also
+			// carries a scope write of its own, so upstream reports the root
+			// once per default plus once for the assignment.
 			{
-				Code:   `[foo = 1] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+				Code: `[foo = 1] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+				},
 			},
 			{
-				Code:   `({x: foo = 1} = obj);`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+				Code: `({x: foo = 1} = obj);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak"},
+					{MessageId: "globalVariableLeak"},
+				},
+			},
+			// A shorthand property keeps its default on the property itself
+			// rather than in a nested assignment, and still counts.
+			{
+				Code: `({foo = 1} = obj);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak"},
+					{MessageId: "globalVariableLeak"},
+				},
+			},
+			// Nested defaults stack: `foo` sits under both `foo = 1` and
+			// `[foo = 1] = []`, so the write count reaches three.
+			{
+				Code: `[[foo = 1] = []] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak"},
+					{MessageId: "globalVariableLeak"},
+					{MessageId: "globalVariableLeak"},
+				},
+			},
+			// A read-only global assigned through a default duplicates the
+			// same way.
+			{
+				Code: `/*global foo:readonly*/ [foo = 1] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "assignmentToReadonlyGlobal", Line: 1, Column: 25, EndLine: 1, EndColumn: 40},
+					{MessageId: "assignmentToReadonlyGlobal", Line: 1, Column: 25, EndLine: 1, EndColumn: 40},
+				},
+			},
+			// Only the pattern side counts: the two diagnostics both belong to
+			// `bar`, since `foo` in the default's value is a read.
+			{
+				Code: `[bar = foo] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak"},
+					{MessageId: "globalVariableLeak"},
+				},
 			},
 
 			// ---- Diagnostic contract: full Line/Column/EndLine/EndColumn per container, including a multi-line case ----
