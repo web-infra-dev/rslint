@@ -22,6 +22,7 @@ type ProjectSet struct {
 	compilerPrograms []*compiler.Program
 	programs         []*lintprogram.Program
 	configOrders     []configOrders
+	targetBinding    *projectTargetBinding
 }
 
 // Programs returns the configured rslint Programs in stable declaration order.

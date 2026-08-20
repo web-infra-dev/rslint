@@ -26,23 +26,34 @@ The rule accepts either an array of strings/objects or an object with `paths` an
 ### String format
 
 ```json
-"no-restricted-imports": ["error", "fs", "path"]
+{
+  "no-restricted-imports": ["error", "fs", "path"]
+}
 ```
 
 ### Object format with paths and patterns
 
 ```json
-"no-restricted-imports": ["error", {
-  "paths": [{
-    "name": "import-foo",
-    "importNames": ["Bar"],
-    "message": "Please use Bar from /import-bar/ instead."
-  }],
-  "patterns": [{
-    "group": ["import1/private/*"],
-    "message": "usage of import1 private modules not allowed."
-  }]
-}]
+{
+  "no-restricted-imports": [
+    "error",
+    {
+      "paths": [
+        {
+          "name": "import-foo",
+          "importNames": ["Bar"],
+          "message": "Please use Bar from /import-bar/ instead."
+        }
+      ],
+      "patterns": [
+        {
+          "group": ["import1/private/*"],
+          "message": "usage of import1 private modules not allowed."
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ### Path options

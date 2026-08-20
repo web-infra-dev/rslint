@@ -281,6 +281,7 @@ kase
 keygen
 keyshortcuts
 keytar
+keyup
 Khmr
 Knda
 koblas
@@ -337,6 +338,7 @@ Modns
 modns
 morestack
 mousein
+mouseout
 mousemove
 msvc
 multibyte
