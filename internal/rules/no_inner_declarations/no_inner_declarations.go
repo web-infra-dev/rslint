@@ -23,10 +23,19 @@ var NoInnerDeclarationsRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		allowBlockScopedFunctions := opts.blockScopedFunctions == "allow" &&
+			ctx.LanguageOptions.EffectiveECMAVersion() >= 2015
 
 		listeners := rule.RuleListeners{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
-				if opts.blockScopedFunctions == "allow" && utils.IsInStrictMode(node, ctx.SourceFile) {
+				// @typescript-eslint/parser represents overload and ambient
+				// signatures as TSDeclareFunction, which the upstream
+				// FunctionDeclaration listener never receives. tsgo represents
+				// those signatures as body-less FunctionDeclaration nodes.
+				if node.Body() == nil {
+					return
+				}
+				if allowBlockScopedFunctions && utils.IsInStrictMode(node, ctx.SourceFile) {
 					return
 				}
 				check(node, "function", &ctx)
@@ -34,19 +43,23 @@ var NoInnerDeclarationsRule = rule.Rule{
 		}
 
 		if opts.both {
-			listeners[ast.KindVariableStatement] = func(node *ast.Node) {
-				varStmt := node.AsVariableStatement()
-				if varStmt == nil || varStmt.DeclarationList == nil {
+			listeners[ast.KindVariableDeclarationList] = func(node *ast.Node) {
+				if !utils.IsVarKeyword(node) {
 					return
 				}
 
-				// Only check var declarations, not let/const/using
-				// BlockScoped = Let | Const | Using
-				if varStmt.DeclarationList.Flags&ast.NodeFlagsBlockScoped != 0 {
-					return
+				// ESTree uses VariableDeclaration for both declaration
+				// statements and for-loop initializers. tsgo wraps statement
+				// declarations in VariableStatement but leaves loop initializers
+				// as a bare VariableDeclarationList. Preserve ESLint's report
+				// range by selecting the corresponding outer node only when it
+				// exists.
+				reportNode := node
+				if node.Parent != nil && node.Parent.Kind == ast.KindVariableStatement {
+					reportNode = node.Parent
 				}
 
-				check(node, "variable", &ctx)
+				check(reportNode, "variable", &ctx)
 			}
 		}
 
@@ -85,8 +98,6 @@ func isValidParent(parent *ast.Node) bool {
 	}
 	switch parent.Kind {
 	case ast.KindSourceFile:
-		return true
-	case ast.KindModuleBlock:
 		return true
 	case ast.KindBlock:
 		// A block is valid only if its parent is a function-like node or
