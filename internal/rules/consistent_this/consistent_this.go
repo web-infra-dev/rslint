@@ -116,23 +116,6 @@ var ConsistentThisRule = rule.Rule{
 			}
 		}
 
-		// isThisAssignmentTarget reports whether ref is a target of a plain `=`
-		// assignment whose right-hand side is `this`, matching upstream's
-		// `write.type === "ThisExpression" && write.parent.operator === "="`.
-		// eslint-scope hands every name in a destructuring target the whole
-		// assignment's right-hand side as its write expression, so
-		// `({ self } = this)` and `[self] = this` count exactly as
-		// `self = this` does.
-		isThisAssignmentTarget := func(ref *ast.Node) bool {
-			root := rootAssignmentOfTarget(ref)
-			if root == nil {
-				return false
-			}
-			bin := root.AsBinaryExpression()
-			return bin.OperatorToken.Kind == ast.KindEqualsToken &&
-				ast.SkipParentheses(bin.Right).Kind == ast.KindThisKeyword
-		}
-
 		// aliasDeclarations indexes every declaration named after one of the
 		// aliases, keyed by the scope that name binds in, as the walk reaches
 		// it. A scope's own declarations are all in by the time its exit
@@ -237,7 +220,7 @@ var ConsistentThisRule = rule.Rule{
 						if referenceScopeNode(ref) != scopeNode {
 							continue
 						}
-						if isThisAssignmentTarget(ref) {
+						if isThisWriteTarget(ref) {
 							return
 						}
 					}
@@ -286,7 +269,7 @@ var ConsistentThisRule = rule.Rule{
 				// default value, which ESTree parses as an AssignmentPattern
 				// rather than an AssignmentExpression: `[self = 1] = this`
 				// assigns `this`, not `1`.
-				if rootAssignmentOfTarget(node) != nil {
+				if isDestructuringDefault(node) {
 					return
 				}
 				left := ast.SkipParentheses(bin.Left)
@@ -349,7 +332,10 @@ var ConsistentThisRule = rule.Rule{
 // ExportDefaultDeclaration whose inner declaration begins past the `export`
 // and `default` keywords, while tsgo keeps both as modifiers of the
 // declaration itself, so they are skipped here. Every other modifier
-// (`declare`, `abstract`, ...) is part of ESTree's node and is kept.
+// (`declare`, `abstract`, ...) is part of ESTree's node and is kept — as is a
+// decorator, which tsgo also files among the modifiers and which therefore
+// counts only when it is written after the keywords (`export @dec class C {}`)
+// rather than before them (`@dec export class C {}`).
 func declarationTextRange(sourceFile *ast.SourceFile, decl *ast.Node) core.TextRange {
 	// eslint-scope records a parameter's definition node as the function the
 	// parameter belongs to rather than the parameter itself, so that is what
@@ -379,10 +365,9 @@ func declarationTextRange(sourceFile *ast.SourceFile, decl *ast.Node) core.TextR
 	pos := decl.Pos()
 	if modifiers := decl.Modifiers(); modifiers != nil {
 		for _, modifier := range modifiers.Nodes {
-			if modifier.Kind != ast.KindExportKeyword && modifier.Kind != ast.KindDefaultKeyword {
-				break
+			if modifier.Kind == ast.KindExportKeyword || modifier.Kind == ast.KindDefaultKeyword {
+				pos = modifier.End()
 			}
-			pos = modifier.End()
 		}
 	}
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, pos).WithEnd(decl.End())
@@ -505,61 +490,62 @@ func memberSignatureStart(sourceFile *ast.SourceFile, member *ast.Node) int {
 	}
 }
 
-// targetPath records what a walk from a name out to the assignment it is
-// written by passed through. Which of those steps eslint-scope descends
-// decides whether it records the name as that assignment's write target at
-// all, so the walk keeps the steps and rootAssignmentOfTarget rules on them.
-type targetPath struct {
-	// wrappers counts the TypeScript type-only expressions — `x!`, `x as T`,
-	// `<T>x`, `x satisfies T` — enclosing the name.
-	wrappers int
-	// opaqueWrapper is set once one of those wrappers is a `satisfies`, the
-	// one kind typescript-eslint's assignment-target unwrapping never peels.
-	opaqueWrapper bool
-	// viaPattern is set once the walk leaves the name's own wrappers for a
-	// destructuring pattern holding it.
-	viaPattern bool
+// isThisWriteTarget reports whether eslint-scope records ref as written `this`
+// by a plain `=` assignment, matching upstream's `write.type ===
+// "ThisExpression" && write.parent.operator === "="`. Every assignment ref is a
+// target of writes it: the outermost hands its right-hand side to every name in
+// the pattern below it, and each assignment nested in that pattern hands its own
+// right-hand side to the name it defaults — as long as ESTree kept it an
+// assignment, since the AssignmentPattern it is otherwise rewritten into has no
+// operator for upstream's check to read.
+func isThisWriteTarget(ref *ast.Node) bool {
+	assignments := enclosingAssignmentsOfTarget(ref)
+	// eslint-scope reaches an assignment's targets by handing its left-hand
+	// side to a pattern visitor that then descends through anything, so once an
+	// enclosing assignment's left is a pattern every assignment below it is
+	// reached whatever its own left looks like.
+	enclosingIsPattern := false
+	for i := len(assignments) - 1; i >= 0; i-- {
+		assignment := assignments[i]
+		bin := assignment.AsBinaryExpression()
+		isPattern := isVisitedPatternTarget(bin.Left)
+		if (isPattern || enclosingIsPattern) &&
+			!isDestructuringDefault(assignment) &&
+			bin.OperatorToken.Kind == ast.KindEqualsToken &&
+			ast.SkipParentheses(bin.Right).Kind == ast.KindThisKeyword {
+			return true
+		}
+		if isPattern {
+			enclosingIsPattern = true
+		}
+	}
+	return false
 }
 
-// writesTarget reports whether eslint-scope records a write reference for a
-// name reached along this path. A name written as an assignment's own
-// left-hand side is unwrapped exactly once, and only out of the three wrappers
-// `visitExpressionTarget` knows, so `self!! = this` and `(self! as any) = this`
-// write nothing. A name inside a destructuring pattern is instead reached by a
-// visitor that descends through every node kind it has no handler for, so no
-// number of wrappers hides it there.
-func (p targetPath) writesTarget() bool {
-	return p.viaPattern || (p.wrappers <= 1 && !p.opaqueWrapper)
-}
-
-// rootAssignmentOfTarget returns the assignment ref is a target of, or nil if
-// ref is not an assignment target at all. A destructured name reaches its
-// assignment through the pattern it is written in, and an assignment nested
-// inside that pattern is a default value rather than the assignment itself
-// (`[self = 1] = this`), so the walk keeps going and the outermost assignment
-// found wins — the one eslint-scope records as the write. Parenthesized
-// wrappers, which ESTree has no node for but tsgo does, are walked past on the
-// way, and so are the TypeScript wrappers writesTarget accepts.
-func rootAssignmentOfTarget(ref *ast.Node) *ast.Node {
-	var root *ast.Node
-	var path, rootPath targetPath
+// enclosingAssignmentsOfTarget returns every assignment ref is written by the
+// left-hand side of, innermost first. A destructured name reaches its
+// assignment through the pattern it is written in, and an assignment met on the
+// way (`[self = 1] = this`) is one more assignment ref is a target of, so the
+// walk collects it and keeps climbing. The parentheses and TypeScript wrappers
+// ESTree either drops or descends through are climbed past the same way.
+func enclosingAssignmentsOfTarget(ref *ast.Node) []*ast.Node {
+	var assignments []*ast.Node
 walk:
 	for node := ref; node.Parent != nil; node = node.Parent {
 		parent := node.Parent
 		switch parent.Kind {
-		case ast.KindParenthesizedExpression:
-		case ast.KindNonNullExpression,
+		case ast.KindParenthesizedExpression,
+			ast.KindNonNullExpression,
 			ast.KindAsExpression,
-			ast.KindTypeAssertionExpression:
-			path.wrappers++
-		case ast.KindSatisfiesExpression:
-			path.wrappers++
-			path.opaqueWrapper = true
-		case ast.KindArrayLiteralExpression,
+			ast.KindTypeAssertionExpression,
+			ast.KindSatisfiesExpression,
+			ast.KindArrayLiteralExpression,
 			ast.KindObjectLiteralExpression,
 			ast.KindSpreadElement,
 			ast.KindSpreadAssignment:
-			path.viaPattern = true
+			// Once eslint-scope has a pattern to visit it descends through
+			// every node kind it has no handler for, so nothing written
+			// between the pattern and a name inside it hides that name.
 		case ast.KindShorthandPropertyAssignment:
 			// A shorthand property's initializer is the pattern's default
 			// value, an expression evaluated on its own rather than a part of
@@ -568,32 +554,77 @@ walk:
 			if parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == node {
 				break walk
 			}
-			path.viaPattern = true
 		case ast.KindPropertyAssignment:
 			// `({ self: x } = this)` writes to x, not to the key `self`.
 			if parent.AsPropertyAssignment().Initializer != node {
 				break walk
 			}
-			path.viaPattern = true
 		case ast.KindBinaryExpression:
 			bin := parent.AsBinaryExpression()
 			if !ast.IsAssignmentOperator(bin.OperatorToken.Kind) ||
 				ast.SkipParentheses(bin.Left) != ast.SkipParentheses(node) {
 				break walk
 			}
-			root = parent
-			// Only the steps below the assignment stand between it and ref;
-			// anything the walk crosses further out wraps the assignment
-			// itself, which cannot hide its own target.
-			rootPath = path
+			assignments = append(assignments, parent)
 		default:
 			break walk
 		}
 	}
-	if root == nil || !rootPath.writesTarget() {
-		return nil
+	return assignments
+}
+
+// isVisitedPatternTarget reports whether eslint-scope hands left to its pattern
+// visitor, which is what decides whether any name below left is written at all.
+// ESTree has no parenthesized node, so parentheses around a name simply vanish
+// and it stays an Identifier — but an object or array literal is only rewritten
+// into a pattern where it is the assignment's own left-hand side, so a single
+// parenthesis or wrapper around it (`([self]) = this`, `([self] as any) = this`)
+// leaves it an ordinary expression. A name is additionally unwrapped out of one
+// `!`, `as` or `<T>` — out of no second one, and out of no `satisfies`.
+func isVisitedPatternTarget(left *ast.Node) bool {
+	unwrapped := ast.SkipParentheses(left)
+	switch unwrapped.Kind {
+	case ast.KindIdentifier:
+		return true
+	case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+		return unwrapped == left
+	case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		return ast.SkipParentheses(unwrapped.Expression()).Kind == ast.KindIdentifier
 	}
-	return root
+	return false
+}
+
+// isDestructuringDefault reports whether node, an assignment expression, is
+// written where ESTree rewrites it into an AssignmentPattern — a default value
+// of the destructuring pattern holding it, so that `[self = 1] = this` assigns
+// `this` rather than `1` — instead of leaving it the assignment it looks like.
+// The rewrite reaches exactly what it converts: an object or array literal
+// standing as an assignment's own left-hand side, and the elements, property
+// values and spread arguments below it. One parenthesis or wrapper anywhere on
+// the way and the assignment stays an assignment, defaulting nothing:
+// `[(self = 1)] = this` really does assign `1` to self.
+func isDestructuringDefault(node *ast.Node) bool {
+	for cur := node; cur.Parent != nil; cur = cur.Parent {
+		parent := cur.Parent
+		switch parent.Kind {
+		case ast.KindArrayLiteralExpression,
+			ast.KindObjectLiteralExpression,
+			ast.KindSpreadElement,
+			ast.KindSpreadAssignment:
+		case ast.KindPropertyAssignment:
+			if parent.AsPropertyAssignment().Initializer != cur {
+				return false
+			}
+		case ast.KindBinaryExpression:
+			bin := parent.AsBinaryExpression()
+			return ast.IsAssignmentOperator(bin.OperatorToken.Kind) && bin.Left == cur
+		default:
+			// A shorthand property's initializer, everything a wrapper holds,
+			// and everything outside a pattern altogether all land here.
+			return false
+		}
+	}
+	return false
 }
 
 // scopeAlias keys the declaration index by the binding it belongs to: one

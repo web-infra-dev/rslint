@@ -167,6 +167,34 @@ func TestConsistentThisExtras(t *testing.T) {
 			{Code: "var obj: any; var x; var self; ({ x = self = this } = obj);", Options: []any{"self"}},
 			{Code: "var obj: any; var x; var self; ({ x = self! = this } = obj);", Options: []any{"self"}},
 
+			// ---- An object or array literal is only rewritten into a pattern
+			// where it is an assignment's own left-hand side, so a parenthesis
+			// or a wrapper around the pattern leaves the names inside it
+			// unwritten — but one inside the pattern is descended through ----
+			{Code: "var self; ([self] = this);", Options: []any{"self"}},
+			{Code: "var self; [(([self]))] = this;", Options: []any{"self"}},
+			{Code: "var self; [([self] as any)] = this;", Options: []any{"self"}},
+			{Code: "var self; ({ a: ([self]) } = this);", Options: []any{"self"}},
+
+			// ---- The pattern rewrite reaches an assignment nested in a
+			// pattern the same way, turning it into that pattern's default
+			// value rather than an assignment of its own ----
+			{Code: "var self; [[self = 1] = 1] = this;", Options: []any{"self"}},
+			{Code: "var self; [self = this] = obj;", Options: []any{"that"}},
+
+			// ---- An assignment ESTree keeps an assignment writes its own
+			// right-hand side to the name it defaults, whether it is reached
+			// through a pattern or visited as the plain expression it is ----
+			{Code: "var self; [(self = this)] = obj;", Options: []any{"self"}},
+			{Code: "var self; [...([self = this])] = obj;", Options: []any{"self"}},
+			{Code: "var self; ([self = this] as any) = obj;", Options: []any{"self"}},
+			{Code: "var self; [(self = this) = 1] = obj;", Options: []any{"self"}},
+
+			// ---- Once an enclosing assignment's left is a pattern, the
+			// visitor descends through anything below it, so a wrapper there
+			// hides nothing ----
+			{Code: "var self; [(self!! = this)] = obj;", Options: []any{"self"}},
+
 			// ---- A signature with no body is a TSDeclareFunction or a
 			// TSEmptyBodyFunctionExpression upstream, and neither of those is
 			// a FunctionDeclaration or a FunctionExpression, so the exit
@@ -706,6 +734,161 @@ func TestConsistentThisExtras(t *testing.T) {
 				Code: "var obj: any; var x; var self; ({ x = self = this } = obj);",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedAlias", Line: 1, Column: 39, EndLine: 1, EndColumn: 50},
+				},
+			},
+
+			// ---- A parenthesis or a wrapper between the pattern and the
+			// assignment leaves it an ordinary expression, which writes
+			// nothing ----
+			{
+				Code:    "var self; (([self]) = this);",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; (({ self }) = this);",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; ([self] as any) = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; [self]! = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+
+			// ---- A decorator is a modifier of the declaration in tsgo, but in
+			// ESTree it only belongs to the exported declaration's own range
+			// when it is written after the keywords the range starts past ----
+			{
+				Code:    "@dec export class self {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 13, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "export @dec class self {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "@dec @dec2 export default class self {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 27, EndLine: 1, EndColumn: 40},
+				},
+			},
+			{
+				Code:    "@dec export declare class self {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 13, EndLine: 1, EndColumn: 34},
+				},
+			},
+
+			// ---- A parenthesis or a wrapper between an assignment and the
+			// pattern holding it keeps it an assignment, so it is checked as
+			// one — while the names below it are still written by the outer
+			// assignment, which the pattern visitor reaches them through ----
+			{
+				Code:    "var self; [(self = 1)] = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 13, EndLine: 1, EndColumn: 21},
+				},
+			},
+			{
+				Code:    "var self; [...([self = 1])] = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 17, EndLine: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code:    "var self; [a, [self = 1]!] = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 16, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    "var self; ({ a: (self = 1) } = this);",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 18, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "var self; [(self = this)] = obj;",
+				Options: []any{"that"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedAlias", Line: 1, Column: 13, EndLine: 1, EndColumn: 24},
+				},
+			},
+
+			// ---- A wrapper around the whole pattern leaves it an ordinary
+			// expression, so nothing under it is written — while an assignment
+			// nested inside it is still rewritten into that pattern's default
+			// value by the literal directly holding it ----
+			{
+				Code:    "var self; ([[self = 1] = 1] as any) = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+
+			// ---- A default value ESTree rewrites into an AssignmentPattern
+			// has no operator for upstream's `write.parent.operator === "="`
+			// to read, so it never counts as the assignment of `this` ----
+			{
+				Code:    "var self; [self = this] = obj;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; ({ self = this } = obj);",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; [[self = this] = 1] = obj;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; ([{ self = this }] as any) = obj;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; [(self = this)] = obj;",
+				Options: []any{"that"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedAlias", Line: 1, Column: 13, EndLine: 1, EndColumn: 24},
 				},
 			},
 		},
