@@ -48,6 +48,19 @@ func TestNoInlineCommentsExtras(t *testing.T) {
 			// alternative that upstream never tests.
 			{Code: "var a = 1; /* eslint no-console: 0 */"},
 
+			// ---- This linter recognizes "rslint-" directives alongside
+			// "eslint-" ones, so the directive-comment exemption has to treat
+			// both prefixes alike in both comment kinds ----
+			{Code: "var a = 1; // rslint-disable-line no-console"},
+			{Code: "var a = 1; /* rslint-disable-line no-console */"},
+
+			// ---- Locks in upstream's `.trim()` on the text around the comment: JavaScript trims U+FEFF, Go's strings.TrimSpace does not ----
+			// A zero-width no-break space is the only code point where the
+			// two trims disagree, and it is legal JavaScript whitespace, so
+			// a comment preceded by one alone on its line has an empty
+			// preamble and stays unreported.
+			{Code: "var a = 1;\n\ufeff// comment\n"},
+
 			// ---- Dimension 4: graceful degradation — comment as the last bytes of the file (no trailing newline) ----
 			{Code: "// a solitary trailing comment, no newline after it"},
 

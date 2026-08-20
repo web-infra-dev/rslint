@@ -2,14 +2,13 @@ package no_inline_comments
 
 import (
 	_ "embed"
-	"regexp"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_inline_comments.schema.json
@@ -20,16 +19,13 @@ var unexpectedInlineCommentMessage = rule.RuleMessage{
 	Description: "Unexpected comment inline with code.",
 }
 
-// eslintDirectivePattern mirrors upstream astUtils.isDirectiveComment's
-// ESLINT_DIRECTIVE_PATTERN: a Block comment starting with "eslint-"/"eslint ",
-// "global "/"globals ", or "exported " is treated as an ESLint directive, not
-// a stray inline comment. Line comments only ever match the "eslint-" arm
-// (checked separately below), since upstream applies a narrower `.startsWith`
-// test to them instead of this regex.
-var eslintDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`)
+// eslintDirectivePattern ports astUtils.ESLINT_DIRECTIVE_PATTERN, used to
+// recognize block-comment directives (`/*eslint ...*/`, `/*global ...*/`,
+// `/*exported ...*/`) by their leading text.
+var eslintDirectivePattern = esregexp.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`, "u")
 
 type options struct {
-	ignorePattern *regexp2.Regexp
+	ignorePattern *esregexp.RegExp
 }
 
 func parseOptions(raw []any) options {
@@ -39,37 +35,45 @@ func parseOptions(raw []any) options {
 	}
 	m, _ := raw[0].(map[string]any)
 	if pattern, ok := m["ignorePattern"].(string); ok && pattern != "" {
-		// Mirrors upstream's `new RegExp(ignorePattern, "u")`.
-		if re, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+		if re, err := esregexp.Compile(pattern, "u"); err == nil {
 			opts.ignorePattern = re
 		}
 	}
 	return opts
 }
 
-// commentInnerText returns the comment's value the way ESTree exposes it on
-// Comment.value: the source text with the leading "//" / "/*" and (for block
-// comments) trailing "*/" delimiters stripped.
-func commentInnerText(sourceText string, comment *ast.CommentRange) string {
-	raw := sourceText[comment.Pos():comment.End()]
+// commentValue extracts the text between a comment's delimiters — the same
+// substring ESLint exposes as `comment.value` — without any trimming.
+func commentValue(text string, comment *ast.CommentRange) string {
 	switch comment.Kind {
 	case ast.KindSingleLineCommentTrivia:
-		return strings.TrimPrefix(raw, "//")
+		return text[comment.Pos()+2 : comment.End()]
 	case ast.KindMultiLineCommentTrivia:
-		return strings.TrimSuffix(strings.TrimPrefix(raw, "/*"), "*/")
+		// A block comment left unterminated at end of file still parses, and
+		// then has no closing delimiter to strip.
+		end := comment.End()
+		if end-comment.Pos() >= 4 && text[end-2:end] == "*/" {
+			end -= 2
+		}
+		return text[comment.Pos()+2 : end]
 	default:
-		return raw
+		return ""
 	}
 }
 
-// isDirectiveComment mirrors upstream astUtils.isDirectiveComment(node).
-func isDirectiveComment(comment *ast.CommentRange, value string) bool {
-	trimmed := strings.TrimSpace(value)
-	switch comment.Kind {
+// isDirectiveComment ports astUtils.isDirectiveComment: a Line comment is a
+// directive if its trimmed text starts with "eslint-"; a Block comment is a
+// directive if its trimmed text matches eslintDirectivePattern. Both forms
+// also accept the "rslint-" prefix this linter recognizes alongside "eslint-".
+func isDirectiveComment(kind ast.Kind, trimmedValue string) bool {
+	isLintDirective := strings.HasPrefix(trimmedValue, "eslint-") ||
+		strings.HasPrefix(trimmedValue, "rslint-")
+
+	switch kind {
 	case ast.KindSingleLineCommentTrivia:
-		return strings.HasPrefix(trimmed, "eslint-")
+		return isLintDirective
 	case ast.KindMultiLineCommentTrivia:
-		return eslintDirectivePattern.MatchString(trimmed)
+		return isLintDirective || eslintDirectivePattern.Test(trimmedValue)
 	default:
 		return false
 	}
@@ -112,8 +116,8 @@ var NoInlineCommentsRule = rule.Rule{
 				endCol = len(endLineText)
 			}
 
-			preamble := strings.TrimSpace(startLineText[:startCol])
-			postamble := strings.TrimSpace(endLineText[endCol:])
+			preamble := ecmascript.StringTrim(startLineText[:startCol])
+			postamble := ecmascript.StringTrim(endLineText[endCol:])
 			isPreambleEmpty := preamble == ""
 			isPostambleEmpty := postamble == ""
 
@@ -122,10 +126,10 @@ var NoInlineCommentsRule = rule.Rule{
 				return
 			}
 
-			value := commentInnerText(text, comment)
+			value := commentValue(text, comment)
 
 			// Matches the ignore pattern.
-			if utils.Regexp2MatchString(opts.ignorePattern, value) {
+			if opts.ignorePattern != nil && opts.ignorePattern.TestOrTimeout(value) {
 				return
 			}
 
@@ -141,7 +145,7 @@ var NoInlineCommentsRule = rule.Rule{
 			}
 
 			// Don't report ESLint directive comments.
-			if isDirectiveComment(comment, value) {
+			if isDirectiveComment(comment.Kind, ecmascript.StringTrim(value)) {
 				return
 			}
 
