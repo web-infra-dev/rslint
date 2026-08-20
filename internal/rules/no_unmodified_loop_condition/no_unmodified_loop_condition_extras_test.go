@@ -67,6 +67,8 @@ func TestNoUnmodifiedLoopConditionExtras(t *testing.T) {
 			{Code: `var a = 0, b = 0; while (a === b) { a++; }`},
 			{Code: `var a = 0, b = 0; while (a != b) { a++; }`},
 			{Code: `var a = 0, b = 0; while (a !== b) { a++; }`},
+			// The outer === group owns references from both nested comparisons.
+			{Code: `let a = 0, b = 1, c = 2, d = 3; while ((a < b) === (c < d)) { c++; }`},
 
 			// === Logical literals / no identifiers ===
 			{Code: `while (true) { break; }`},
@@ -113,6 +115,8 @@ func TestNoUnmodifiedLoopConditionExtras(t *testing.T) {
 
 			// === Complex nesting: (a < b) || c — group a<b OK, c independent ===
 			{Code: `var a = 0, b = 10, c = 0; while ((a < b) || c) { a++; c++; }`},
+			// Repeated symbols in groups separated by logical operands stay independent.
+			{Code: `let a = 0, b = 1, c = 2; while ((a < b) && a && (a < c)) { a++; }`},
 
 			// === Compound assignment operators ===
 			{Code: `var x = 0; while (x < 10) { x *= 2; }`},
@@ -257,6 +261,36 @@ func TestNoUnmodifiedLoopConditionExtras(t *testing.T) {
 				Code: `var a = 0, b = 10, c = 0; while ((a < b) && c) { a++; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "loopConditionNotModified", Line: 1, Column: 45},
+				},
+			},
+
+			// === Dynamic expressions inside a skipped function expression do not
+			// make the surrounding binary group dynamic. ===
+			{
+				Code: `declare function sideEffect(): number; let x = 0; while (x < (() => sideEffect())) { }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Message: "'x' is not modified in this loop."},
+				},
+			},
+
+			// === With conditional checking enabled, the ternary is split while
+			// the nested comparison remains one group. ===
+			{
+				Code:    `let choose = true, left = 1, right = 2, other = 3; while (choose ? left < right : other) { choose = false; left++; }`,
+				Options: map[string]any{"checkConditionalExpressions": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Message: "'other' is not modified in this loop."},
+				},
+			},
+
+			// === A modified first group does not swallow later independent groups,
+			// whose diagnostics remain in source order. ===
+			{
+				Code: `let a = 0, b = 1, c = 2, d = 3, e = 4; while ((a < b) && c && (d < e)) { a++; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "loopConditionNotModified", Message: "'c' is not modified in this loop."},
+					{MessageId: "loopConditionNotModified", Message: "'d' is not modified in this loop."},
+					{MessageId: "loopConditionNotModified", Message: "'e' is not modified in this loop."},
 				},
 			},
 
