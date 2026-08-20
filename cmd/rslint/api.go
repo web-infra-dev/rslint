@@ -452,7 +452,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		if planErr != nil {
 			return nil, planErr
 		}
-		lintProjectPlan, err = planner.ResolveLintProjectPlan(targetPlan)
+		lintProjectPlan, err = planner.ResolveLintProjectPlan(targetPlan, false)
 		if err != nil {
 			return nil, err
 		}

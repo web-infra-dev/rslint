@@ -4,14 +4,72 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
+
+type projectPlanBarrierFS struct {
+	vfs.FS
+	path    string
+	enabled atomic.Bool
+	entered chan struct{}
+	release chan struct{}
+}
+
+type projectPlanOrderedErrorFS struct {
+	vfs.FS
+	firstPath     string
+	secondPath    string
+	thirdPath     string
+	firstEntered  chan struct{}
+	secondEntered chan struct{}
+	thirdEntered  chan struct{}
+	releaseFirst  chan struct{}
+	firstOnce     sync.Once
+	secondOnce    sync.Once
+	thirdOnce     sync.Once
+}
+
+func (fsys *projectPlanBarrierFS) Realpath(path string) string {
+	if fsys.enabled.Load() && tspath.NormalizePath(path) == fsys.path {
+		fsys.entered <- struct{}{}
+		<-fsys.release
+	}
+	return fsys.FS.Realpath(path)
+}
+
+func (fsys *projectPlanOrderedErrorFS) Realpath(path string) string {
+	switch tspath.NormalizePath(path) {
+	case fsys.firstPath:
+		fsys.firstOnce.Do(func() { close(fsys.firstEntered) })
+		<-fsys.releaseFirst
+	case fsys.secondPath:
+		fsys.secondOnce.Do(func() { close(fsys.secondEntered) })
+	case fsys.thirdPath:
+		fsys.thirdOnce.Do(func() { close(fsys.thirdEntered) })
+	}
+	return fsys.FS.Realpath(path)
+}
+
+func awaitProjectPlanEvent(t *testing.T, events <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-events:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for project-plan worker")
+	}
+}
 
 func writeProjectPlanFile(t *testing.T, path string, content string) {
 	t.Helper()
@@ -185,4 +243,157 @@ func TestProjectPathResolverBuildsTypeCheckCatalogPerOwner(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Fatalf("catalog projects = %v, want %v", got, want)
 	}
+}
+
+func TestResolveLintProjectPlanHonorsParallelismAndTargetOrder(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	config := RslintConfig{{Files: []string{"**/*.ts"}}}
+	targetPlan := LintTargetPlan{Targets: []DiscoveredLintTarget{
+		{Path: tspath.ResolvePath(dir, "first.ts"), CanonicalPath: tspath.ResolvePath(dir, "first.ts"), ConfigDirectory: dir},
+		{Path: tspath.ResolvePath(dir, "second.ts"), CanonicalPath: tspath.ResolvePath(dir, "second.ts"), ConfigDirectory: dir},
+		{Path: tspath.ResolvePath(dir, "third.ts"), CanonicalPath: tspath.ResolvePath(dir, "third.ts"), ConfigDirectory: dir},
+	}}
+	oldProcs := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(oldProcs) })
+
+	newBarrierResolver := func(t *testing.T) (*ProjectPathResolver, *projectPlanBarrierFS) {
+		t.Helper()
+		fsys := &projectPlanBarrierFS{
+			FS:      bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+			path:    dir,
+			entered: make(chan struct{}, len(targetPlan.Targets)),
+			release: make(chan struct{}),
+		}
+		resolver, err := NewProjectPathResolver(nil, config, dir, fsys, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fsys.enabled.Store(true)
+		return resolver, fsys
+	}
+
+	t.Run("parallel", func(t *testing.T) {
+		resolver, fsys := newBarrierResolver(t)
+		type result struct {
+			plan LintProjectPlan
+			err  error
+		}
+		done := make(chan result, 1)
+		go func() {
+			plan, err := resolver.ResolveLintProjectPlan(targetPlan, false)
+			done <- result{plan: plan, err: err}
+		}()
+		awaitProjectPlanEvent(t, fsys.entered)
+		awaitProjectPlanEvent(t, fsys.entered)
+		select {
+		case <-fsys.entered:
+			t.Fatal("planning exceeded the GOMAXPROCS worker bound")
+		default:
+		}
+		close(fsys.release)
+		resolved := <-done
+		if resolved.err != nil {
+			t.Fatal(resolved.err)
+		}
+		for index, target := range targetPlan.Targets {
+			if got := resolved.plan.Targets[index].Target.Path; got != target.Path {
+				t.Fatalf("target %d path = %q, want %q", index, got, target.Path)
+			}
+		}
+		awaitProjectPlanEvent(t, fsys.entered)
+	})
+
+	t.Run("single threaded", func(t *testing.T) {
+		resolver, fsys := newBarrierResolver(t)
+		done := make(chan error, 1)
+		go func() {
+			_, err := resolver.ResolveLintProjectPlan(targetPlan, true)
+			done <- err
+		}()
+		awaitProjectPlanEvent(t, fsys.entered)
+		select {
+		case <-fsys.entered:
+			t.Fatal("single-threaded planning started a second target before the first completed")
+		default:
+		}
+		close(fsys.release)
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("errors retain target order", func(t *testing.T) {
+		firstOwner := tspath.ResolvePath(dir, "missing-owner-first")
+		secondOwner := tspath.ResolvePath(dir, "missing-owner-second")
+		thirdOwner := tspath.ResolvePath(dir, "missing-owner-third")
+		fsys := &projectPlanOrderedErrorFS{
+			FS:            osvfs.FS(),
+			firstPath:     firstOwner,
+			secondPath:    secondOwner,
+			thirdPath:     thirdOwner,
+			firstEntered:  make(chan struct{}),
+			secondEntered: make(chan struct{}),
+			thirdEntered:  make(chan struct{}),
+			releaseFirst:  make(chan struct{}),
+		}
+		resolver, err := NewProjectPathResolver(nil, config, dir, fsys, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		first := tspath.ResolvePath(dir, "missing-first.ts")
+		second := tspath.ResolvePath(dir, "missing-second.ts")
+		third := tspath.ResolvePath(dir, "missing-third.ts")
+		result := make(chan error, 1)
+		go func() {
+			_, resolveErr := resolver.ResolveLintProjectPlan(LintTargetPlan{Targets: []DiscoveredLintTarget{
+				{Path: first, CanonicalPath: first, ConfigDirectory: firstOwner},
+				{Path: second, CanonicalPath: second, ConfigDirectory: secondOwner},
+				{Path: third, CanonicalPath: third, ConfigDirectory: thirdOwner},
+			}}, false)
+			result <- resolveErr
+		}()
+		awaitProjectPlanEvent(t, fsys.firstEntered)
+		awaitProjectPlanEvent(t, fsys.secondEntered)
+		// With the first worker blocked, reaching the third target proves the
+		// second target completed before the first error was released.
+		awaitProjectPlanEvent(t, fsys.thirdEntered)
+		close(fsys.releaseFirst)
+		err = <-result
+		if err == nil || !strings.Contains(err.Error(), first) {
+			t.Fatalf("error = %v, want first target %q", err, first)
+		}
+	})
+
+	t.Run("single threaded stops at first error", func(t *testing.T) {
+		firstOwner := tspath.ResolvePath(dir, "serial-missing-owner-first")
+		secondOwner := tspath.ResolvePath(dir, "serial-missing-owner-second")
+		fsys := &projectPlanOrderedErrorFS{
+			FS:            osvfs.FS(),
+			firstPath:     firstOwner,
+			secondPath:    secondOwner,
+			firstEntered:  make(chan struct{}),
+			secondEntered: make(chan struct{}),
+			thirdEntered:  make(chan struct{}),
+			releaseFirst:  make(chan struct{}),
+		}
+		close(fsys.releaseFirst)
+		resolver, err := NewProjectPathResolver(nil, config, dir, fsys, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		first := tspath.ResolvePath(dir, "serial-missing-first.ts")
+		second := tspath.ResolvePath(dir, "serial-missing-second.ts")
+		_, err = resolver.ResolveLintProjectPlan(LintTargetPlan{Targets: []DiscoveredLintTarget{
+			{Path: first, CanonicalPath: first, ConfigDirectory: firstOwner},
+			{Path: second, CanonicalPath: second, ConfigDirectory: secondOwner},
+		}}, true)
+		if err == nil || !strings.Contains(err.Error(), first) {
+			t.Fatalf("error = %v, want first target %q", err, first)
+		}
+		select {
+		case <-fsys.secondEntered:
+			t.Fatal("single-threaded planning reached a target after the first error")
+		default:
+		}
+	})
 }

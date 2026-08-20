@@ -770,7 +770,7 @@ func plannedTargetForBoundSourceForTest(
 	if err != nil {
 		t.Fatalf("NewProjectPathResolver: %v", err)
 	}
-	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan)
+	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan, true)
 	if err != nil {
 		t.Fatalf("ResolveLintProjectPlan: %v", err)
 	}

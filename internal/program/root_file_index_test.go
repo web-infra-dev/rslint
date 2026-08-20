@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -14,6 +15,10 @@ type rootFileAliasFS struct {
 	realPaths     map[string]string
 	realpathMu    sync.Mutex
 	realpathCalls map[string]int
+}
+
+func rootPathID(path string) string {
+	return string(tspath.ToPath(tspath.NormalizePath(path), "", true))
 }
 
 type caseInsensitiveRootFS struct {
@@ -147,13 +152,13 @@ func TestRootFileIndexesResolvePhysicalRootsAsOneLazyBatch(t *testing.T) {
 		resolver,
 	)
 
-	if !indexes[0].Contains(firstRoot, firstPhysical) {
+	if !indexes[0].ContainsPathIDs(rootPathID(firstRoot), rootPathID(firstPhysical)) {
 		t.Fatal("exact root was not recognized")
 	}
 	if got := fsys.realpathCallCount(firstRoot) + fsys.realpathCallCount(secondRoot); got != 0 {
 		t.Fatalf("exact lookup resolved %d physical root(s), want none", got)
 	}
-	if !indexes[0].Contains(firstPhysical, firstPhysical) {
+	if !indexes[0].ContainsPathIDs(rootPathID(firstPhysical), rootPathID(firstPhysical)) {
 		t.Fatal("physical alias of the first root was not recognized")
 	}
 	if got := fsys.realpathCallCount(firstRoot); got != 1 {
@@ -162,10 +167,39 @@ func TestRootFileIndexesResolvePhysicalRootsAsOneLazyBatch(t *testing.T) {
 	if got := fsys.realpathCallCount(secondRoot); got != 1 {
 		t.Fatalf("second root Realpath calls = %d, want shared batch to resolve it once", got)
 	}
-	if !indexes[1].Contains(secondPhysical, secondPhysical) {
+	if !indexes[1].ContainsPathIDs(rootPathID(secondPhysical), rootPathID(secondPhysical)) {
 		t.Fatal("physical alias of the second root was not recognized")
 	}
 	if got := fsys.realpathCallCount(secondRoot); got != 1 {
 		t.Fatalf("second root was resolved %d times after the shared batch", got)
+	}
+}
+
+func TestRootFileIndexContainsPrecomputedPathIDs(t *testing.T) {
+	const (
+		rootAlias = "/repo-link/src/index.ts"
+		target    = "/repo/src/index.ts"
+		other     = "/repo/src/other.ts"
+	)
+	fsys := &rootFileAliasFS{
+		FS:            osvfs.FS(),
+		realPaths:     map[string]string{rootAlias: target},
+		realpathCalls: make(map[string]int),
+	}
+	index := lintprogram.NewRootFileIndex([]string{rootAlias}, fsys)
+	if !index.ContainsPathIDs(rootPathID(rootAlias), rootPathID(target)) {
+		t.Fatal("precomputed exact root identity was not recognized")
+	}
+	if got := fsys.realpathCallCount(rootAlias); got != 0 {
+		t.Fatalf("exact lookup resolved the root %d time(s), want none", got)
+	}
+	if !index.ContainsPathIDs(rootPathID(target), rootPathID(target)) {
+		t.Fatal("precomputed canonical root identity was not recognized")
+	}
+	if got := fsys.realpathCallCount(rootAlias); got != 1 {
+		t.Fatalf("canonical lookup resolved the root %d time(s), want once", got)
+	}
+	if index.ContainsPathIDs(rootPathID(other), rootPathID(other)) {
+		t.Fatal("precomputed non-root identity was recognized")
 	}
 }

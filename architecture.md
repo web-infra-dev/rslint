@@ -1050,14 +1050,20 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      represented configs. `--type-check` and `--type-check-only` construct
      every Program in the effective reachable catalog; the latter skips the
      lint-target walk.
+   - After target discovery, `ProjectPathResolver` freezes effective config and
+     candidate slots with at most `min(GOMAXPROCS, target count)` workers.
+     Results and errors are committed in original target order. With
+     `--singleThreaded`, it resolves that order directly and stops at the first
+     error.
    - The request provider interns exact lexical project identities in stable
      target/candidate order. Confirmed direct winners, type-check catalog
      projects, and optional recursive-directory candidate unions use one bounded
      Program-construction queue with at most `min(GOMAXPROCS, project count)`
      workers. Fully prefetched root and Program source indexes share one
-     generation-local `program.PathIdentityResolver`; they lazily batch exact,
-     authoritative physical identity work across the completed candidate set
-     on the first exact miss. A focused request may schedule one
+     generation-local `program.PathIdentityResolver`; the selected ProjectSet
+     carries that same resolver into final source projection. Physical identity
+     work is authoritative, exact-first, and lazily batched across the completed
+     candidate set on the first exact miss. A focused request may schedule one
      request-wide proximity hint early only after its metadata proves every
      target direct. Recursive scopes at or above a candidate tsconfig directory,
      or across distinct nearest candidates, instead use the bounded union path. Parse/build

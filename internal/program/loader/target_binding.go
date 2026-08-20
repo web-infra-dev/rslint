@@ -114,7 +114,22 @@ func (s *Session) bindTargetsToProjects(
 	for index := range programIndexes {
 		programIndexes[index] = index
 	}
-	programFiles := newProgramFileIndex(set.compilerPrograms, discoveredTargets, s.FS(), singleThreaded)
+	var programFiles *programFileIndex
+	if set.pathIdentities != nil {
+		programFiles = newProgramFileIndexWithResolver(
+			set.compilerPrograms,
+			discoveredTargets,
+			s.FS(),
+			set.pathIdentities,
+		)
+	} else {
+		programFiles = newProgramFileIndex(
+			set.compilerPrograms,
+			discoveredTargets,
+			s.FS(),
+			singleThreaded,
+		)
+	}
 	var unbound []plannedTargetRef
 	for targetIndex, target := range plan.Targets {
 		owner := owners[targetIndex]

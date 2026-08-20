@@ -93,7 +93,8 @@ func (index *RootFileIndex) Contains(fileName string, canonicalFileName string) 
 	if index == nil || fileName == "" {
 		return false
 	}
-	if _, ok := index.exactRoots[pathIdentityID(fileName)]; ok {
+	exactID := pathIdentityID(fileName)
+	if _, ok := index.exactRoots[exactID]; ok {
 		return true
 	}
 	if index.resolver == nil {
@@ -119,6 +120,32 @@ func (index *RootFileIndex) Contains(fileName string, canonicalFileName string) 
 			canonicalID = canonicalIDs[0]
 		}
 	}
+	_, ok := index.canonicalRoots[canonicalID]
+	return ok
+}
+
+// ContainsPathIDs is the pre-normalized form of Contains. Batch adapters use
+// it when target discovery already supplied exact lexical and canonical IDs,
+// avoiding the same path normalization for every candidate project probe.
+func (index *RootFileIndex) ContainsPathIDs(exactID string, canonicalID string) bool {
+	if index == nil || exactID == "" {
+		return false
+	}
+	if _, ok := index.exactRoots[exactID]; ok {
+		return true
+	}
+	if index.resolver == nil || canonicalID == "" {
+		return false
+	}
+	index.canonicalOnce.Do(func() {
+		index.batch.resolve()
+		index.canonicalRoots = make(map[string]struct{}, len(index.fileNames))
+		for _, resolvedID := range index.resolver.CanonicalPathIDs(index.fileNames) {
+			if resolvedID != "" {
+				index.canonicalRoots[resolvedID] = struct{}{}
+			}
+		}
+	})
 	_, ok := index.canonicalRoots[canonicalID]
 	return ok
 }

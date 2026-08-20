@@ -22,13 +22,27 @@ type projectTargetBinding struct {
 }
 
 type targetedProjectMetadata struct {
-	config    *tsoptions.ParsedCommandLine
-	rootFiles *lintprogram.RootFileIndex
+	config           *tsoptions.ParsedCommandLine
+	rootFiles        *lintprogram.RootFileIndex
+	targetIdentities map[string]targetedPathIdentity
+}
+
+type targetedPathIdentity struct {
+	exactID     string
+	canonicalID string
 }
 
 func (metadata *targetedProjectMetadata) DirectRoot(target projectselection.Target) bool {
-	return metadata != nil && metadata.rootFiles != nil &&
-		metadata.rootFiles.Contains(target.Path, target.CanonicalPath)
+	if metadata == nil || metadata.rootFiles == nil {
+		return false
+	}
+	if identity := metadata.targetIdentities[target.Path]; identity.canonicalID != "" {
+		return metadata.rootFiles.ContainsPathIDs(
+			identity.exactID,
+			identity.canonicalID,
+		)
+	}
+	return metadata.rootFiles.Contains(target.Path, target.CanonicalPath)
 }
 
 func (metadata *targetedProjectMetadata) Supports(target projectselection.Target) bool {
@@ -39,8 +53,10 @@ func (metadata *targetedProjectMetadata) Supports(target projectselection.Target
 type targetedProjectSlot struct {
 	parseOnce sync.Once
 	config    *tsoptions.ParsedCommandLine
-	rootFiles *lintprogram.RootFileIndex
 	parseErr  error
+
+	rootOnce  sync.Once
+	rootFiles *lintprogram.RootFileIndex
 
 	buildOnce sync.Once
 	buildDone chan struct{}
@@ -53,12 +69,13 @@ type targetedProjectSlot struct {
 }
 
 type targetedProjectExecution struct {
-	session         *Session
-	plan            projectPlan
-	singleThreaded  bool
-	slots           []targetedProjectSlot
-	identities      *lintprogram.PathIdentityResolver
-	prefetchedFiles *programFileIndex
+	session          *Session
+	plan             projectPlan
+	singleThreaded   bool
+	slots            []targetedProjectSlot
+	identities       *lintprogram.PathIdentityResolver
+	targetIdentities map[string]targetedPathIdentity
+	prefetchedFiles  *programFileIndex
 }
 
 func (execution *targetedProjectExecution) preparePrefetchedEvidence(
@@ -93,7 +110,10 @@ func (execution *targetedProjectExecution) preparePrefetchedEvidence(
 		execution.prefetchedFiles.identities,
 	)
 	for candidate, project := range candidateIndexes {
-		execution.slots[project].rootFiles = rootIndexes[candidate]
+		rootFiles := rootIndexes[candidate]
+		execution.slots[project].rootOnce.Do(func() {
+			execution.slots[project].rootFiles = rootFiles
+		})
 	}
 }
 
@@ -120,6 +140,14 @@ func newTargetedProjectExecution(
 			singleThreaded,
 			known,
 		),
+		targetIdentities: make(map[string]targetedPathIdentity, len(targets)),
+	}
+	for _, target := range targets {
+		identity := targetedPathIdentity{exactID: exactPathID(target.Path)}
+		if target.CanonicalPath != "" {
+			identity.canonicalID = exactPathID(target.CanonicalPath)
+		}
+		execution.targetIdentities[target.Path] = identity
 	}
 	for index := range execution.slots {
 		execution.slots[index].buildDone = make(chan struct{})
@@ -150,12 +178,6 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 		if slot.parseErr == nil && slot.config == nil {
 			slot.parseErr = errors.New("no parsed config returned")
 		}
-		if slot.parseErr == nil {
-			slot.rootFiles = lintprogram.NewRootFileIndexWithResolver(
-				slot.config.FileNames(),
-				execution.identities,
-			)
-		}
 	})
 	if slot.parseErr != nil {
 		return nil, fmt.Errorf("parse TypeScript config %q: %w", spec.tsconfigPath, slot.parseErr)
@@ -168,9 +190,16 @@ func (execution *targetedProjectExecution) metadata(index int) (*targetedProject
 	if err != nil {
 		return nil, err
 	}
+	slot.rootOnce.Do(func() {
+		slot.rootFiles = lintprogram.NewRootFileIndexWithResolver(
+			slot.config.FileNames(),
+			execution.identities,
+		)
+	})
 	return &targetedProjectMetadata{
-		config:    slot.config,
-		rootFiles: slot.rootFiles,
+		config:           slot.config,
+		rootFiles:        slot.rootFiles,
+		targetIdentities: execution.targetIdentities,
 	}, nil
 }
 
@@ -332,12 +361,12 @@ func (execution *targetedProjectExecution) scheduleDirectHint(
 	if hintedProject < 0 {
 		return
 	}
-	slot, err := execution.parse(hintedProject)
-	if err != nil || slot.rootFiles == nil {
+	metadata, err := execution.metadata(hintedProject)
+	if err != nil || metadata == nil {
 		return
 	}
 	for _, target := range targets {
-		if !slot.rootFiles.Contains(target.Path, target.CanonicalPath) {
+		if !metadata.DirectRoot(target) {
 			return
 		}
 	}
@@ -345,10 +374,25 @@ func (execution *targetedProjectExecution) scheduleDirectHint(
 }
 
 func buildProjectPathPlan(paths ...[]string) (projectPlan, [][]int) {
+	type listIdentity struct {
+		first  *string
+		length int
+	}
 	plan := projectPlan{}
 	indexesByList := make([][]int, len(paths))
 	projectByPath := make(map[string]int)
+	indexesByIdentity := make(map[listIdentity][]int)
 	for listIndex, projectPaths := range paths {
+		var identity listIdentity
+		if len(projectPaths) > 0 {
+			// ProjectPathResolver owns immutable candidate slices and shares their
+			// backing storage across targets with the same effective declaration.
+			identity = listIdentity{first: &projectPaths[0], length: len(projectPaths)}
+			if indexes, ok := indexesByIdentity[identity]; ok {
+				indexesByList[listIndex] = indexes
+				continue
+			}
+		}
 		indexes := make([]int, 0, len(projectPaths))
 		for _, projectPath := range projectPaths {
 			projectPath = tspath.NormalizePath(projectPath)
@@ -365,6 +409,9 @@ func buildProjectPathPlan(paths ...[]string) (projectPlan, [][]int) {
 			indexes = append(indexes, projectIndex)
 		}
 		indexesByList[listIndex] = indexes
+		if identity.first != nil {
+			indexesByIdentity[identity] = indexes
+		}
 	}
 	return plan, indexesByList
 }
@@ -445,11 +492,12 @@ func (s *Session) SelectProjects(
 		candidateSeen := make([]bool, len(plan.specs))
 		for _, target := range selectionTargets {
 			for _, project := range target.Projects {
-				builds.enqueue(project)
-				if !candidateSeen[project] {
-					candidateSeen[project] = true
-					candidateIndexes = append(candidateIndexes, project)
+				if candidateSeen[project] {
+					continue
 				}
+				candidateSeen[project] = true
+				candidateIndexes = append(candidateIndexes, project)
+				builds.enqueue(project)
 			}
 		}
 		// Prefetch is a provider scheduling policy: complete the bounded build
@@ -525,10 +573,13 @@ func (execution *targetedProjectExecution) projectSet(
 			keep[binding.Project] = true
 		}
 	}
-	set := ProjectSet{targetBinding: &projectTargetBinding{
-		targets: append([]rslintconfig.PlannedLintTarget(nil), lintPlan.Targets...),
-		owners:  make([]int, len(bindings)),
-	}}
+	set := ProjectSet{
+		targetBinding: &projectTargetBinding{
+			targets: append([]rslintconfig.PlannedLintTarget(nil), lintPlan.Targets...),
+			owners:  make([]int, len(bindings)),
+		},
+		pathIdentities: execution.identities,
+	}
 	if catalogRequested {
 		set.typeCheckPrograms = make([]*lintprogram.Program, 0, len(catalogIndexes))
 	}

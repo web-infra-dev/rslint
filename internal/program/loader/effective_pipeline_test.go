@@ -28,7 +28,10 @@ func TestSelectProjectsPrefetchPreservesPhysicalRootOrder(t *testing.T) {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	baseFS := cachedvfs.From(osvfs.FS())
-	fsys := bundled.WrapFS(baseFS)
+	fsys := &targetPlanRealpathCountingFS{
+		FS:    bundled.WrapFS(baseFS),
+		calls: make(map[string]int),
+	}
 	canonicalPath := tspath.NormalizePath(fsys.Realpath(physicalPath))
 	if aliasPath == physicalPath || canonicalPath == "" ||
 		tspath.NormalizePath(fsys.Realpath(aliasPath)) != canonicalPath {
@@ -47,7 +50,7 @@ func TestSelectProjectsPrefetchPreservesPhysicalRootOrder(t *testing.T) {
 		Path:            physicalPath,
 		CanonicalPath:   canonicalPath,
 		ConfigDirectory: dir,
-	}}})
+	}}}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,12 +66,27 @@ func TestSelectProjectsPrefetchPreservesPhysicalRootOrder(t *testing.T) {
 	if got := tspath.NormalizePath(set.compilerPrograms[0].Options().ConfigFilePath); got != wantConfig {
 		t.Fatalf("prefetched physical owner = %q, want earlier alias %q", got, wantConfig)
 	}
+	aliasRealpathCalls := fsys.callCount(aliasPath)
 	loaded, err := session.LoadAPI(set, lintPlan, dir, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(loaded.TargetsByProgram) != 1 || len(loaded.TargetsByProgram[0]) != 1 {
 		t.Fatalf("physical target projection = %v", loaded.TargetsByProgram)
+	}
+	if got := fsys.callCount(aliasPath); got != aliasRealpathCalls {
+		t.Fatalf("LoadAPI repeated selected-generation identity resolution: calls=%d, want %d", got, aliasRealpathCalls)
+	}
+}
+
+func TestBuildProjectPathPlanReusesImmutableCandidateIndexVector(t *testing.T) {
+	shared := []string{"/repo/tsconfig-a.json", "/repo/tsconfig-b.json"}
+	plan, indexes := buildProjectPathPlan(shared, shared)
+	if len(plan.specs) != 2 || len(indexes) != 2 || len(indexes[0]) != 2 || len(indexes[1]) != 2 {
+		t.Fatalf("project plan = %+v, indexes = %v", plan, indexes)
+	}
+	if &indexes[0][0] != &indexes[1][0] {
+		t.Fatal("shared immutable candidate list was expanded more than once")
 	}
 }
 
@@ -141,7 +159,7 @@ func TestSelectProjectsPrefetchKeepsDistinctCanonicalCaseIdentities(t *testing.T
 		Path:            lower,
 		CanonicalPath:   lower,
 		ConfigDirectory: dir,
-	}}})
+	}}}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +226,7 @@ func TestSelectProjectsDirectHintIsBoundedAndCannotChooseOwner(t *testing.T) {
 			}
 			lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
 				testLintTarget(fsys, dir, targetPath),
-			}})
+			}}, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -277,7 +295,7 @@ func TestSelectProjectsUsesFullPrefetchForDistinctDirectHints(t *testing.T) {
 			lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
 				testLintTarget(fsys, dir, aTarget),
 				testLintTarget(fsys, dir, bTarget),
-			}})
+			}}, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -335,7 +353,7 @@ func resolveEffectivePipelinePlan(
 			Path: target, CanonicalPath: target, ConfigDirectory: dir,
 		}
 	}
-	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan)
+	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -508,7 +526,7 @@ func TestSelectProjectsPreservesPerOwnerProjectOrder(t *testing.T) {
 		{Path: tspath.ResolvePath(root, "root-target.ts"), CanonicalPath: tspath.ResolvePath(root, "root-target.ts"), ConfigDirectory: root},
 		{Path: tspath.ResolvePath(child, "child-target.ts"), CanonicalPath: tspath.ResolvePath(child, "child-target.ts"), ConfigDirectory: child},
 	}}
-	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan)
+	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan, true)
 	if err != nil {
 		t.Fatal(err)
 	}

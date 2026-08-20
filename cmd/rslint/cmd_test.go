@@ -1731,7 +1731,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewProjectPathResolver: %v", err)
 	}
-	lintProjectPlan, err := planner.ResolveLintProjectPlan(targetPlan)
+	lintProjectPlan, err := planner.ResolveLintProjectPlan(targetPlan, true)
 	if err != nil {
 		t.Fatalf("ResolveLintProjectPlan: %v", err)
 	}

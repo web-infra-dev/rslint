@@ -906,7 +906,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}
 	if !typeCheckOnly && planner != nil {
-		lintProjectPlan, err = planner.ResolveLintProjectPlan(targetPlan)
+		lintProjectPlan, err = planner.ResolveLintProjectPlan(targetPlan, singleThreaded)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1

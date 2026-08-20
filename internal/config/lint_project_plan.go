@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -237,14 +239,44 @@ type LintProjectPlan struct {
 
 // ResolveLintProjectPlan resolves effective configs and project candidates for
 // exactly the already-discovered lint targets.
-func (resolver *ProjectPathResolver) ResolveLintProjectPlan(targetPlan LintTargetPlan) (LintProjectPlan, error) {
-	plan := LintProjectPlan{Targets: make([]PlannedLintTarget, 0, len(targetPlan.Targets))}
-	for _, target := range targetPlan.Targets {
-		planned, err := resolver.ResolveLintTarget(target)
+func (resolver *ProjectPathResolver) ResolveLintProjectPlan(
+	targetPlan LintTargetPlan,
+	singleThreaded bool,
+) (LintProjectPlan, error) {
+	plan := LintProjectPlan{Targets: make([]PlannedLintTarget, len(targetPlan.Targets))}
+	workerCount := min(runtime.GOMAXPROCS(0), len(targetPlan.Targets))
+	if singleThreaded || workerCount <= 1 {
+		for index := range targetPlan.Targets {
+			planned, err := resolver.ResolveLintTarget(targetPlan.Targets[index])
+			if err != nil {
+				return LintProjectPlan{}, err
+			}
+			plan.Targets[index] = planned
+		}
+		return plan, nil
+	}
+
+	errs := make([]error, len(targetPlan.Targets))
+	jobs := make(chan int, workerCount)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				plan.Targets[index], errs[index] = resolver.ResolveLintTarget(targetPlan.Targets[index])
+			}
+		}()
+	}
+	for index := range targetPlan.Targets {
+		jobs <- index
+	}
+	close(jobs)
+	workers.Wait()
+	for _, err := range errs {
 		if err != nil {
 			return LintProjectPlan{}, err
 		}
-		plan.Targets = append(plan.Targets, planned)
 	}
 	return plan, nil
 }

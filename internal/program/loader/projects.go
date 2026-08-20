@@ -14,6 +14,7 @@ type ProjectSet struct {
 	programs          []*lintprogram.Program
 	typeCheckPrograms []*lintprogram.Program
 	targetBinding     *projectTargetBinding
+	pathIdentities    *lintprogram.PathIdentityResolver
 }
 
 // Programs returns the configured rslint Programs in stable declaration order.

@@ -191,7 +191,7 @@ func (s *Session) buildTargetProjectForTest(
 	if err != nil {
 		return ProjectSet{}, err
 	}
-	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan)
+	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan, true)
 	if err != nil {
 		return ProjectSet{}, err
 	}
@@ -207,7 +207,7 @@ func (s *Session) buildTargetProjectsForTest(
 	if err != nil {
 		return ProjectSet{}, err
 	}
-	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan)
+	lintPlan, err := resolver.ResolveLintProjectPlan(targetPlan, true)
 	if err != nil {
 		return ProjectSet{}, err
 	}
@@ -233,7 +233,7 @@ func resolveAndBindTestTargets(
 	if err != nil {
 		t.Fatalf("NewProjectPathResolver: %v", err)
 	}
-	lintPlan, err := resolver.ResolveLintProjectPlan(plan)
+	lintPlan, err := resolver.ResolveLintProjectPlan(plan, true)
 	if err != nil {
 		t.Fatalf("ResolveLintProjectPlan: %v", err)
 	}
@@ -283,7 +283,7 @@ func resolveAndBindTestTargetsForConfigs(
 	if err != nil {
 		t.Fatalf("NewProjectPathResolver: %v", err)
 	}
-	lintPlan, err := resolver.ResolveLintProjectPlan(plan)
+	lintPlan, err := resolver.ResolveLintProjectPlan(plan, true)
 	if err != nil {
 		t.Fatalf("ResolveLintProjectPlan: %v", err)
 	}
@@ -1228,7 +1228,7 @@ func TestLoadProgramsPrefersLaterDirectRootOverEarlierImport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewProjectPathResolver: %v", err)
 	}
-	lintPlan, err := planner.ResolveLintProjectPlan(plan)
+	lintPlan, err := planner.ResolveLintProjectPlan(plan, true)
 	if err != nil {
 		t.Fatalf("ResolveLintProjectPlan: %v", err)
 	}
@@ -1334,7 +1334,7 @@ func TestBuildTargetProjectIgnoresUnreachedPredictedConfigError(t *testing.T) {
 			}
 			lintPlan, err := resolver.ResolveLintProjectPlan(rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
 				testLintTarget(fsys, dir, filepath.Join(dir, "nested/target.ts")),
-			}})
+			}}, true)
 			if err != nil {
 				t.Fatal(err)
 			}
