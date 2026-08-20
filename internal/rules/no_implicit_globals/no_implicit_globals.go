@@ -294,15 +294,25 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 // times over the whole assignment. It returns nil for anything that isn't a pure
 // write target: compound/logical assignment operators and update expressions
 // read as well as write, so ESLint's scope analysis (and this walk) does not
-// treat them as leak/readonly-assignment candidates. It also returns nil when
-// the write happens through a `satisfies` expression: the scope manager unwraps
-// an AssignmentExpression's Left through TSAsExpression, TSTypeAssertion and
-// TSNonNullExpression before deciding whether it is a pattern, but
-// TSSatisfiesExpression is absent from that list, so a write reaching Left
-// through it stays a plain read-write reference.
+// treat them as leak/readonly-assignment candidates.
+//
+// TypeScript expression wrappers are where the walk stops mirroring the AST and
+// starts mirroring the scope manager. An AssignmentExpression's Left is
+// unwrapped exactly once — a TSAsExpression, TSTypeAssertion or
+// TSNonNullExpression, never a TSSatisfiesExpression — and what remains has to
+// be a pattern, so `(foo as any) = 1` is a write while `(foo as any)! = 1` and
+// `foo!! = 1` are not. A wrapper around a destructuring target does not survive
+// that test either: `[foo]` is no longer a destructuring pattern once an
+// assertion wraps it, so `([foo] as any) = arr` is no write at all. Every other
+// path — a for-in/for-of head, anything nested inside a pattern — visits the
+// pattern directly and accepts a wrapped target however deeply it is nested.
 func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 	current := node
 	writes := 1
+	// wrappers counts the TS expression wrappers the walk has climbed since the
+	// last pattern node, which is what an AssignmentExpression's Left has to
+	// shed in its single unwrap.
+	wrappers := 0
 	for current != nil && current.Parent != nil {
 		parent := current.Parent
 		switch parent.Kind {
@@ -314,8 +324,12 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			}
 			if utils.IsDefaultValueInDestructuringAssignment(parent) {
 				writes++
+				wrappers = 0
 				current = parent
 				continue
+			}
+			if wrappers > 1 {
+				return nil, 0
 			}
 			return parent, writes
 
@@ -330,6 +344,7 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			if !utils.IsInDestructuringAssignment(parent) {
 				return nil, 0
 			}
+			wrappers = 0
 			current = parent
 
 		case ast.KindShorthandPropertyAssignment:
@@ -343,6 +358,7 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			if shorthand.ObjectAssignmentInitializer != nil {
 				writes++
 			}
+			wrappers = 0
 			current = parent
 
 		case ast.KindPropertyAssignment:
@@ -350,11 +366,18 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			if propAssignment == nil || propAssignment.Initializer != current {
 				return nil, 0
 			}
+			wrappers = 0
 			current = parent
 
-		case ast.KindSpreadElement, ast.KindSpreadAssignment,
-			ast.KindParenthesizedExpression, ast.KindNonNullExpression,
-			ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		case ast.KindSpreadElement, ast.KindSpreadAssignment:
+			wrappers = 0
+			current = parent
+
+		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression:
+			wrappers++
+			current = parent
+
+		case ast.KindParenthesizedExpression:
 			current = parent
 
 		default:

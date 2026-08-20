@@ -29,6 +29,17 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{Code: `(foo satisfies any) = 1;`},
 			{Code: `(Array satisfies any) = 1;`},
 
+			// An AssignmentExpression's Left is unwrapped exactly once, so a
+			// second wrapper leaves something that is no longer a pattern.
+			{Code: `(foo as any)! = 1;`},
+			{Code: `foo!! = 1;`},
+			{Code: `((foo as any) as any) = 1;`},
+			{Code: `(Array as any)! = 1;`},
+			// A wrapper around the destructuring target fails the same test:
+			// `[foo]` is no longer a destructuring pattern once an assertion
+			// wraps it.
+			{Code: `([foo] as any) = arr;`},
+
 			// ---- Dimension 4: declaration vs expression forms ----
 
 			// Class expressions never bind a name at the declaration site.
@@ -135,6 +146,35 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{
 				Code:   `(Array as any) = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			// Inside a pattern, and in a for-in/for-of head, the target is
+			// visited directly, so a wrapper is transparent at any depth.
+			{
+				Code:   `[foo!!] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `[(foo as any)!] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `({a: (foo as any)!} = obj);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `for ((foo as any)! of arr) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `for (foo! in obj) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code: `[foo! = 1] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak"},
+					{MessageId: "globalVariableLeak"},
+				},
 			},
 			{
 				Code:   `(Array) = 1;`,
