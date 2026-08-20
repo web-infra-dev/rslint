@@ -72,6 +72,14 @@ func TestNoInnerDeclarationsExtras(t *testing.T) {
 			noInnerValid(`namespace N { function overload(value: string): string; }`, []any{"functions", map[string]any{"blockScopedFunctions": "disallow"}}, 2022),
 			noInnerValid(`declare module "pkg" { function exported(): void; }`, []any{"functions", map[string]any{"blockScopedFunctions": "disallow"}}, 2022),
 			noInnerValid(`function empty() {}`, []any{"both"}, 2015),
+
+			// ---- Disable-directive boundaries ----
+			// RuleTester registers the rule as "test". Lock in both line forms;
+			// the diagnostic starts at the nested declaration, not at the outer
+			// control-flow statement that owns the disabled line.
+			noInnerValid(`// eslint-disable-next-line test
+if (test) { function nested() {} }`, []any{"functions", map[string]any{"blockScopedFunctions": "disallow"}}, 2015),
+			noInnerValid(`if (test) { var value; } // eslint-disable-line test`, []any{"both"}, 2015),
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Real-user: eslint/eslint#976 nested var loop headers ----
@@ -224,6 +232,20 @@ func TestNoInnerDeclarationsExtras(t *testing.T) {
 				[]any{"functions", map[string]any{"blockScopedFunctions": "disallow"}},
 				2022,
 				noInnerError("Move function declaration to program root.", 1, 27, 1, 47),
+			),
+
+			// A scoped disable must stop at eslint-enable, while a subsequent
+			// next-line directive suppresses only that one source line.
+			noInnerInvalid(
+				`/* eslint-disable test */
+if (hidden) { function hidden() {} }
+/* eslint-enable test */
+// eslint-disable-next-line test
+if (lineHidden) { var hidden; }
+if (shown) { var shown; }`,
+				[]any{"both", map[string]any{"blockScopedFunctions": "disallow"}},
+				2015,
+				noInnerError("Move variable declaration to program root.", 6, 14, 6, 24),
 			),
 		},
 	)
