@@ -3,12 +3,12 @@ package no_danger
 import (
 	_ "embed"
 	"path"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_danger.schema.json
@@ -91,5 +91,5 @@ func getTagNameText(sourceFile *ast.SourceFile, tagName *ast.Node) string {
 		return tagName.AsIdentifier().Text
 	}
 	trimmed := utils.TrimNodeTextRange(sourceFile, tagName)
-	return strings.TrimSpace(sourceFile.Text()[trimmed.Pos():trimmed.End()])
+	return ecmascript.StringTrim(sourceFile.Text()[trimmed.Pos():trimmed.End()])
 }

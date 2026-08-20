@@ -246,6 +246,21 @@ func TestNoWarningCommentsExtras(t *testing.T) {
 					},
 				},
 			},
+			// ---- Locks in truncateForDisplay()'s word-splitting boundary: JS
+			// `\s` also matches a LineTerminator, so the newlines of a multi-line
+			// block comment collapse into single spaces in the displayed text —
+			// verified against real ESLint ----
+			{
+				Code:    "/** \n *any block comment \n*with (TODO, FIXME's or XXX!) **/",
+				Options: map[string]any{"terms": []interface{}{"todo"}, "location": "anywhere"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "unexpectedComment",
+						Message:   "Unexpected 'todo' comment: '* *any block comment *with (TODO,...'.",
+						Line:      1, Column: 1,
+					},
+				},
+			},
 			// ---- Dimension 4: term boundary uses ASCII-only \w on both sides
 			// (matching JS `\w`, unaffected by the `u` flag), so a term ending in
 			// a non-ASCII letter is not word-boundary-checked against a directly

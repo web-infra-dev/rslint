@@ -7,7 +7,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -540,7 +539,7 @@ func canTokensBeAdjacent(left string, right string) bool {
 
 func startsIdentifierLike(text string) bool {
 	r, _ := utf8.DecodeRuneInString(text)
-	return r != utf8.RuneError && (scanner.IsIdentifierStart(r) || unicode.IsLetter(r))
+	return r != utf8.RuneError && scanner.IsIdentifierStart(r)
 }
 
 func endsIdentifierLike(text string) bool {

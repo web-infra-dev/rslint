@@ -11,12 +11,12 @@ package media_has_caption
 import (
 	_ "embed"
 	"slices"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed media_has_caption.schema.json
@@ -159,7 +159,7 @@ var MediaHasCaptionRule = rule.Rule{
 				trackAttrs := reactutil.GetJsxElementAttributes(trackOpening)
 				kindProp := jsxa11yutil.FindAttributeByName(trackAttrs, "kind")
 				if kind, ok := jsxa11yutil.LiteralPropStringValue(kindProp); ok {
-					if strings.EqualFold(kind, "captions") {
+					if ecmascript.EqualsWhenLowercased(kind, "captions") {
 						hasCaption = true
 						break
 					}

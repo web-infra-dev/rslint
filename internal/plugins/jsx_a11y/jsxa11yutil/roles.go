@@ -1,9 +1,8 @@
 package jsxa11yutil
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // AriaRoleNonAbstract is the list of every non-abstract ARIA role as defined
@@ -140,7 +139,7 @@ func GetExplicitRole(attrs []*ast.Node) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	lower := strings.ToLower(value)
+	lower := ecmascript.StringToLowerCase(value)
 	if _, ok := AriaRoleAllSet[lower]; !ok {
 		return "", false
 	}
