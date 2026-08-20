@@ -208,6 +208,12 @@ if nameNode.Kind == ast.KindComputedPropertyName {
 
 `utils.GetStaticPropertyName` already handles the wrapper and returns the static name for `[ 'a' ]` / `[ 1e2 ]` / `[ true ]` / `[ null ]` / `[ /re/ ]` / ``[`a`]`` forms — prefer it over hand-unwrapping.
 
+### Annotated Declaration Names
+
+typescript-eslint's `Identifier` node spans the type annotation that follows it, so a diagnostic ESLint reports on the name of `let x: SomeType` covers `x: SomeType`. tsgo keeps the annotation in a sibling node, so `ctx.ReportNode(nameNode, msg)` covers `x` alone. The same gap applies to every annotated declaration name — parameters (`function f(a: string)`), class properties, and so on.
+
+Reporting the name node is the right call: the narrower range points at what the diagnostic is about. Note the difference in the rule's `.md` when a port reports on such a name, since a reader comparing columns against ESLint will see it.
+
 ---
 
 ## AST Traversal Patterns
