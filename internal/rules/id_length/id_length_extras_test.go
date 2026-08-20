@@ -37,13 +37,21 @@ func TestIdLengthExtras(t *testing.T) {
 			{Code: `(long).yy = 1;`},
 			{Code: `((long)).yy = 1;`},
 
-			// ---- Dimension 4: X!.y non-null assertion receiver ----
-			{Code: `(long!).yy = 1;`},
+			// ---- Dimension 4: the TS-only receiver wrappers X!, X as T and
+			// X satisfies T survive into typescript-eslint's AST as
+			// TSNonNullExpression / TSAsExpression / TSSatisfiesExpression,
+			// none of them a supported parent, so the object identifier under
+			// one is never checked no matter how short it is ----
+			{Code: `(a!).yy = 1;`},
+			{Code: `(a as any).yy = 1;`},
+			{Code: `(a satisfies unknown).yy = 1;`},
+			{Code: `[...a!] = b;`},
 
-			// ---- Dimension 4: (X as any).y / X satisfies T type-expression
-			// receiver wrappers ----
-			{Code: `(long as any).yy = 1;`},
-			{Code: `(long satisfies unknown).yy = 1;`},
+			// ---- Dimension 4: the same wrapper around the destructuring
+			// value side of an ObjectPattern-equivalent member-expression
+			// target ----
+			{Code: `({ a: (obj.x as any) } = {});`},
+			{Code: `class Foo { value = x as unknown }`},
 
 			// ---- Dimension 4: element access X['y'] / X[`y`] / X[0] is
 			// never a match — element access is a distinct AST kind from the
@@ -170,6 +178,69 @@ func TestIdLengthExtras(t *testing.T) {
 			// still an import attribute key ----
 			{Code: `import('foo.json', { with: { a() {} } });`},
 
+			// ---- A plain parameter is a direct child of the function node
+			// upstream, so it is only checked when that node is one of the
+			// supported ones. Every TS signature-only function-like — function
+			// and constructor types, call/construct/method/index signatures,
+			// ambient and overload declarations, abstract methods — becomes a
+			// TS-specific ESTree node that is not in SUPPORTED_EXPRESSIONS ----
+			{Code: `type Fn = (x: number) => void;`},
+			{Code: `type Ct = new (x: number) => void;`},
+			{Code: `declare function fn(x: number): void;`},
+			{Code: `interface II { new (x: number): II }`},
+			{Code: `interface II { mm(x: number): void }`},
+			{Code: `interface II { (x: number): void }`},
+			{Code: `interface II { [x: string]: number }`},
+			{Code: `abstract class Foo { abstract mm(x: number): void; }`},
+			{Code: `declare class Foo { constructor(x: number); }`},
+
+			// ---- An arrow's concise body only matches when it is a bare
+			// identifier: a block body, a member expression and a TS wrapper
+			// all put an unsupported parent in between ----
+			{Code: `const fn = (arg) => { x };`},
+			{Code: `const fn = (arg) => x.y;`},
+			{Code: `const fn = (arg) => x as any;`},
+
+			// ---- A plain assignment expression is not a supported parent;
+			// only the AssignmentPattern a destructuring target turns it into
+			// is ----
+			{Code: `x = 0;`},
+
+			// ---- A computed key in a genuine object literal exempts both
+			// halves of the property: upstream's non-pattern Property branch
+			// guards on `!parent.computed` ----
+			{Code: `const obj = { [x]: x };`},
+
+			// ---- ...while a computed key in a destructuring pattern is
+			// compared against the value like any other key, so
+			// `properties: never` exempts the matching pair entirely ----
+			{Code: `const {[x]: x} = obj;`, Options: map[string]any{"properties": "never"}},
+
+			// ---- `obj.x = 0` inside a destructuring target is an
+			// AssignmentPattern holding a MemberExpression, not the
+			// AssignmentExpression upstream's MemberExpression entry requires ----
+			{Code: `({ key: obj.x = 0 } = source);`},
+			{Code: `([obj.x = 0] = source);`},
+			{Code: `for ({ key: obj.x = 1 } of source) {}`},
+
+			// ---- A for-in/of target that is a member expression on its own
+			// fails the same AssignmentExpression test... ----
+			{Code: `for (obj.x of source) {}`},
+
+			// ---- ...and an object pattern's member target is gated on
+			// `properties` like every other MemberExpression match ----
+			{Code: `for ({ key: obj.x } of source) {}`, Options: map[string]any{"properties": "never"}},
+
+			// ---- Parenthesizing the object literal stops upstream's parser
+			// from converting it to an ObjectPattern at all ----
+			{Code: `(({ key: obj.x }) = source);`},
+
+			// ---- Parentheses around a dynamic import's options object, or
+			// around the `with` value, are absent from ESLint's AST, so the
+			// attribute key stays exempt ----
+			{Code: `import("m", ({ with: { x: "json" } }));`},
+			{Code: `import("m", { with: ({ x: "json" }) });`},
+
 			// ---- Interface members are TSMethodSignature-shaped in ESTree,
 			// so neither a `constructor` member nor a short one is checked ----
 			{Code: `interface II { constructor(): void }`, Options: map[string]any{"min": 0, "max": 5}},
@@ -213,11 +284,12 @@ func TestIdLengthExtras(t *testing.T) {
 					{MessageId: "tooShort", Message: "Identifier name 'b' is too short (< 2).", Line: 1, Column: 7},
 				},
 			},
-			// ---- Dimension 4: X!.y non-null assertion receiver ----
+			// ---- Dimension 4: X!.y non-null assertion receiver — the
+			// property is still checked, but the object identifier now sits
+			// under a TSNonNullExpression, which is not a supported parent ----
 			{
 				Code: `(a!).b = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooShort", Message: "Identifier name 'a' is too short (< 2).", Line: 1, Column: 2},
 					{MessageId: "tooShort", Message: "Identifier name 'b' is too short (< 2).", Line: 1, Column: 6},
 				},
 			},
@@ -225,7 +297,6 @@ func TestIdLengthExtras(t *testing.T) {
 			{
 				Code: `(a as any).b = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooShort", Message: "Identifier name 'a' is too short (< 2).", Line: 1, Column: 2},
 					{MessageId: "tooShort", Message: "Identifier name 'b' is too short (< 2).", Line: 1, Column: 12},
 				},
 			},
@@ -233,17 +304,7 @@ func TestIdLengthExtras(t *testing.T) {
 			{
 				Code: `(a satisfies unknown).b = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooShort", Message: "Identifier name 'a' is too short (< 2).", Line: 1, Column: 2},
 					{MessageId: "tooShort", Message: "Identifier name 'b' is too short (< 2).", Line: 1, Column: 23},
-				},
-			},
-			// ---- Dimension 4: (X as any).y wrapping the destructuring
-			// value side of an ObjectPattern-equivalent member-expression
-			// target ----
-			{
-				Code: `({ a: (obj.x as any) } = {});`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 12},
 				},
 			},
 			// ---- Dimension 4: a parenthesized bare-identifier destructuring
@@ -538,6 +599,150 @@ function q(xx: any) { return xx; }`,
 				Options: map[string]any{"properties": "never"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 4},
+				},
+			},
+
+			// ---- A rest parameter keeps its own RestElement wrapper, an
+			// unconditional entry, so it is checked even in the TS
+			// signature-only function-likes whose plain parameters are not ----
+			{
+				Code: `type Fn = (...x: number[]) => void;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code: `declare function fn(...x: number[]): void;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 24},
+				},
+			},
+			{
+				Code: `interface II { mm(...x: number[]): void }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 22},
+				},
+			},
+
+			// ---- An overload signature is body-less (TSEmptyBodyFunction-
+			// Expression), so only the implementation's parameter is checked ----
+			{
+				Code: `class Foo { mm(x: number): void; mm(x: any) { return x; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 37},
+				},
+			},
+
+			// ---- The other half of upstream's unconditional
+			// ArrowFunctionExpression entry: a concise body that is a bare
+			// identifier is a direct child of the arrow ----
+			{
+				Code: `const fn = (arg) => x;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 21},
+				},
+			},
+			{
+				Code: `const fn = (arg) => (x);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 22},
+				},
+			},
+
+			// ---- An array literal that is a destructuring-assignment target
+			// is an ArrayPattern upstream, whose entry is unconditional ----
+			{
+				Code: `([x] = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `([x = 0] = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `for ([x] of source) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 7},
+				},
+			},
+
+			// ---- A default inside a destructuring target is an
+			// AssignmentPattern, an unconditional entry, so `properties` does
+			// not exempt it ----
+			{
+				Code: `({ key: x = 0 } = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 9},
+				},
+			},
+			{
+				Code:    `({ key: x = 0 } = source);`,
+				Options: map[string]any{"properties": "never"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 9},
+				},
+			},
+
+			// ---- A computed key in a destructuring pattern still goes
+			// through the ordinary key/value comparison, so a key matching the
+			// value reports the key... ----
+			{
+				Code: `const {[x]: x} = obj;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 9},
+				},
+			},
+			{
+				Code: `({[x]: x} = obj);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 4},
+				},
+			},
+
+			// ---- ...and a key that differs reports only the value, whether
+			// or not that value carries a default ----
+			{
+				Code: `const {[x]: y} = obj;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'y' is too short (< 2).", Line: 1, Column: 13},
+				},
+			},
+			{
+				Code: `const {[x]: y = 1} = obj;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'y' is too short (< 2).", Line: 1, Column: 13},
+				},
+			},
+
+			// ---- An object pattern's member target in a for-in/of head:
+			// upstream reads `parent.parent.parent.parent.left`, and
+			// ForInStatement/ForOfStatement carry a `left` just as
+			// AssignmentExpression does ----
+			{
+				Code: `for ({ key: obj.x } of source) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 17},
+				},
+			},
+			{
+				Code: `for ({ key: obj.x } in source) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 17},
+				},
+			},
+
+			// ---- A parenthesized property value in a genuine object literal
+			// is compared by the identifier's own text, not the wrapper's, so
+			// a value spelled like its key is reported alongside it ----
+			{
+				Code: `const obj = { x: (x) };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 15},
+					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 19},
 				},
 			},
 		},

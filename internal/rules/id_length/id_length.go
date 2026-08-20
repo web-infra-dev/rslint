@@ -34,9 +34,15 @@ var schemaJSON []byte
 //     ParameterDeclaration, so a single KindParameter case here subsumes
 //     upstream's AssignmentPattern (defaults), RestElement (rest params), and
 //     the parameter half of FunctionDeclaration/FunctionExpression/
-//     ArrowFunctionExpression. ArrowFunctionExpression never appears in the
-//     switch below: arrows can't be named, so upstream's entry for it only
-//     ever matched a plain param, which is already covered by KindParameter.
+//     ArrowFunctionExpression. Because a plain parameter is a direct child of
+//     the function itself upstream, it is only checked when that function is
+//     one of the supported nodes — see isCheckedParameterOwner. A rest or
+//     defaulted parameter keeps its own supported wrapper and is checked
+//     everywhere, TS signatures included.
+//   - tsgo's KindArrowFunction case carries only the other half of upstream's
+//     unconditional ArrowFunctionExpression entry: a concise body that is a
+//     bare identifier (`(arg) => x`) is a direct child of the arrow just like
+//     a plain parameter, so it matches too.
 //   - ESTree's ObjectPattern/Property duplicates a shorthand identifier as two
 //     nodes at the same range (`{ foo }` → `key: Identifier(foo), value:
 //     Identifier(foo)`), which is why upstream deduplicates via a
@@ -59,7 +65,14 @@ var schemaJSON []byte
 //     `.computed` flag in ESTree; tsgo wraps the key expression in a
 //     dedicated ComputedPropertyName node one level below the member. This
 //     rule dispatches on that wrapper's own parent to decide inclusion,
-//     rather than reading a computed flag.
+//     rather than reading a computed flag. Where the parent is a destructuring
+//     property the wrapper is peeled off instead, since upstream still runs the
+//     ordinary key/value comparison over the key expression itself.
+//   - tsgo keeps parentheses as ParenthesizedExpression nodes and ESTree drops
+//     them, so structural checks climb through them (skipParens). tsgo's
+//     TS-only wrappers `x!`, `x as T` and `x satisfies T` are NOT transparent:
+//     typescript-eslint keeps them as TSNonNullExpression / TSAsExpression /
+//     TSSatisfiesExpression, and none of those is a supported parent.
 //
 // Two upstream quirks are reproduced deliberately, verified against a local
 // ESLint 10.8.0 install rather than assumed from reading the source:
@@ -269,15 +282,17 @@ func (o idLengthOptions) matchesException(name string) bool {
 // reads). It mirrors upstream's SUPPORTED_EXPRESSIONS dispatch — see the
 // package doc comment above for the tsgo AST-shape translation.
 func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
-	// ESTree drops parentheses (and has no TS wrapper expressions) entirely,
-	// so every SUPPORTED_EXPRESSIONS check upstream is implicitly transparent
-	// to them. tsgo keeps them as real nodes, so climb through any receiver
-	// wrapper around the identifier itself before dispatching on its
-	// structural parent. `wrapped` (rather than the raw node) is what gets
-	// compared against sibling expression-position fields below (Initializer,
-	// Expression) — declaration-name positions (Name()) can never themselves
-	// be wrapped, so using `wrapped` there too is equivalent, not just safe.
-	wrapped := skipReceiverWrappers(node)
+	// ESTree drops parentheses entirely, so every SUPPORTED_EXPRESSIONS check
+	// upstream is implicitly transparent to them. tsgo keeps them as real
+	// nodes, so climb through any parentheses around the identifier itself
+	// before dispatching on its structural parent. `wrapped` (rather than the
+	// raw node) is what gets compared against sibling expression-position
+	// fields below (Initializer, Expression) — declaration-name positions
+	// (Name()) can never themselves be parenthesized, so using `wrapped` there
+	// too is equivalent, not just safe. Name comparisons, by contrast, always
+	// read through to the identifier itself, since ESTree has no wrapper for
+	// them to hide behind.
+	wrapped := skipParens(node)
 	effectiveParent := wrapped.Parent
 	if effectiveParent == nil {
 		return false
@@ -291,7 +306,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		return effectiveParent.Name() == wrapped
 
 	case ast.KindBindingElement:
-		return isValidBindingElement(opts, effectiveParent, wrapped)
+		return isValidBindingElement(opts, effectiveParent, node)
 
 	case ast.KindPropertyAssignment:
 		// NOTE: Unlike ESLint, a non-computed PropertyAssignment key inside an
@@ -304,12 +319,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		// below (`{ a: a }` with identical key/value text) — the differing
 		// case only ever needs the value side, which is always visited. See
 		// id_length.md's "Differences from ESLint".
-		pa := effectiveParent.AsPropertyAssignment()
-		container := effectiveParent.Parent
-		if ast.IsAssignmentTarget(container) {
-			return isValidPatternPropertyValue(opts, effectiveParent.Name(), pa.Initializer, wrapped)
-		}
-		return isValidPlainProperty(opts, effectiveParent.Name(), wrapped)
+		return isValidPropertyAssignmentChild(opts, effectiveParent, node, wrapped)
 
 	case ast.KindShorthandPropertyAssignment:
 		if effectiveParent.Name() != wrapped {
@@ -340,17 +350,38 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		if effectiveParent.Name() != wrapped {
 			return false
 		}
-		// A TS parameter property (`constructor(private x: number)`) has no
-		// supported ESTree parent: typescript-eslint wraps the parameter in a
-		// TSParameterProperty, which is absent from SUPPORTED_EXPRESSIONS, so
-		// upstream never checks the binding name. A default value puts an
-		// AssignmentPattern back between the two — and that entry is
-		// unconditional — so `constructor(private x = 1)` is checked again.
-		if effectiveParent.AsParameterDeclaration().Initializer == nil &&
-			ast.IsParameterPropertyDeclaration(effectiveParent, effectiveParent.Parent) {
+		param := effectiveParent.AsParameterDeclaration()
+		// A rest or defaulted parameter is a RestElement or an
+		// AssignmentPattern in ESTree — both unconditional entries — no matter
+		// what function-like node holds it, so neither of the two exclusions
+		// below applies to it.
+		if param.DotDotDotToken != nil || param.Initializer != nil {
+			return true
+		}
+		// A plain parameter is a direct child of the function node itself, so
+		// it is only checked when that node is one of the supported ones. TS's
+		// signature-only function-likes (`type Fn = (x) => void`, `declare
+		// function fn(x)`, `interface I { m(x) }`, an overload, an abstract or
+		// otherwise body-less method) become TSFunctionType,
+		// TSDeclareFunction, TSMethodSignature or TSEmptyBodyFunctionExpression
+		// instead, none of which is in SUPPORTED_EXPRESSIONS.
+		if !isCheckedParameterOwner(effectiveParent.Parent) {
 			return false
 		}
-		return true
+		// A TS parameter property (`constructor(private x: number)`) has no
+		// supported ESTree parent either: typescript-eslint wraps the parameter
+		// in a TSParameterProperty, which is absent from SUPPORTED_EXPRESSIONS,
+		// so upstream never checks the binding name. A default value puts an
+		// AssignmentPattern back between the two, which is why the rest/default
+		// branch above returns before this check.
+		return !ast.IsParameterPropertyDeclaration(effectiveParent, effectiveParent.Parent)
+
+	case ast.KindArrowFunction:
+		// SUPPORTED_EXPRESSIONS.ArrowFunctionExpression is unconditional, and
+		// an arrow has no name, so the only identifier that can be a direct
+		// child besides a plain parameter is a concise body that is a bare
+		// identifier (`(arg) => x`).
+		return effectiveParent.Body() == wrapped
 
 	case ast.KindClassDeclaration:
 		return effectiveParent.Name() == wrapped
@@ -381,7 +412,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		case ast.KindClassDeclaration, ast.KindClassExpression:
 			return isPlainClassMember(effectiveParent)
 		case ast.KindObjectLiteralExpression:
-			return isValidPlainProperty(opts, effectiveParent.Name(), wrapped)
+			return isValidPlainProperty(opts, effectiveParent.Name(), node)
 		}
 		// An interface or type-literal member is a TSMethodSignature, which is
 		// not a supported parent.
@@ -395,13 +426,45 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		return wrapped == effectiveParent.Name() || wrapped == pd.Initializer
 
 	case ast.KindComputedPropertyName:
-		return isValidComputedPropertyNameOwner(effectiveParent.Parent)
+		// ESTree keeps a computed key as the Property's own `key`, so a
+		// destructuring pattern's computed key still goes through the very same
+		// key/value comparison as a plain one (`const {[x]: x} = obj` reports
+		// the key, not the value). Route it there instead of treating the
+		// wrapper as a position of its own.
+		owner := effectiveParent.Parent
+		if owner == nil {
+			return false
+		}
+		switch owner.Kind {
+		case ast.KindBindingElement:
+			return isValidBindingElement(opts, owner, node)
+		case ast.KindPropertyAssignment:
+			return isValidPropertyAssignmentChild(opts, owner, node, wrapped)
+		}
+		return isValidComputedPropertyNameOwner(owner)
 
 	case ast.KindPropertyAccessExpression:
 		if !opts.properties {
 			return false
 		}
 		return isValidMemberExpressionTarget(effectiveParent)
+
+	case ast.KindArrayLiteralExpression:
+		// An array literal that is a destructuring-assignment target
+		// (`([x] = source)`, `for ([x] of source)`) is an ArrayPattern
+		// upstream, whose entry is unconditional.
+		return ast.IsAssignmentTarget(wrapped)
+
+	case ast.KindBinaryExpression:
+		// `x = 0` inside a destructuring-assignment target (`({ key: x = 0 } =
+		// source)`, `([x = 0] = source)`) is an AssignmentPattern upstream, not
+		// an AssignmentExpression, and that entry is unconditional — so
+		// `properties: "never"` does not exempt it either. A plain assignment
+		// expression is not a supported parent, hence the assignment-target
+		// test on the BinaryExpression itself.
+		be := effectiveParent.AsBinaryExpression()
+		return be.OperatorToken.Kind == ast.KindEqualsToken && be.Left == wrapped &&
+			ast.IsAssignmentTarget(effectiveParent)
 
 	case ast.KindSpreadElement:
 		// ast.IsAssignmentTarget is called on wrapped (not effectiveParent):
@@ -425,20 +488,18 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 	return false
 }
 
-// skipReceiverWrappers walks up from node through any chain of transparent
-// wrapper expressions (parentheses, and the TS-only non-null/as/satisfies
-// wrappers with no ESTree equivalent) and returns the outermost one — i.e.
-// the node whose own .Parent is the first structurally meaningful ancestor.
-// When node has no such wrapper immediately above it, it is returned
+// skipParens walks up from node through any chain of parentheses and returns
+// the outermost one — i.e. the node whose own .Parent is the first ancestor
+// ESTree would also see. When node is not parenthesized it is returned
 // unchanged.
-func skipReceiverWrappers(node *ast.Node) *ast.Node {
-	for node.Parent != nil {
-		switch node.Parent.Kind {
-		case ast.KindParenthesizedExpression, ast.KindNonNullExpression, ast.KindAsExpression, ast.KindSatisfiesExpression:
-			node = node.Parent
-			continue
-		}
-		break
+//
+// Only parentheses are transparent here. tsgo's TS-only wrapper expressions
+// (`x!`, `x as T`, `x satisfies T`) do survive into typescript-eslint's AST as
+// TSNonNullExpression / TSAsExpression / TSSatisfiesExpression, and none of
+// those is a supported parent, so an identifier under one is never checked.
+func skipParens(node *ast.Node) *ast.Node {
+	for node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
+		node = node.Parent
 	}
 	return node
 }
@@ -468,26 +529,51 @@ func isValidBindingElement(opts idLengthOptions, bindingElement *ast.Node, node 
 		if keyNode == nil {
 			keyNode = valueNode
 		}
-		return isValidPatternPropertyValueNodes(opts, keyNode, valueNode, node)
+		return isValidPatternPropertyValueNodes(opts, keyNode, valueNode, node, node)
 	case ast.KindArrayBindingPattern:
 		return bindingElement.Name() == node
 	}
 	return false
 }
 
-// isValidPatternPropertyValue handles a PropertyAssignment (`key: value`)
-// that upstream would see as ObjectPattern's Property branch — i.e. the
-// enclosing object literal is (transitively) a destructuring-assignment
-// target.
-func isValidPatternPropertyValue(opts idLengthOptions, keyNode, valueNode *ast.Node, node *ast.Node) bool {
-	return isValidPatternPropertyValueNodes(opts, keyNode, valueNode, node)
+// isValidPropertyAssignmentChild dispatches a PropertyAssignment's key or
+// value identifier to upstream's ObjectPattern or non-pattern Property branch,
+// depending on whether the enclosing object literal is (transitively) a
+// destructuring-assignment target. `node` is the identifier itself and
+// `wrapped` the outermost pair of parentheses around it, if any.
+func isValidPropertyAssignmentChild(opts idLengthOptions, propertyAssignment, node, wrapped *ast.Node) bool {
+	pa := propertyAssignment.AsPropertyAssignment()
+	if ast.IsAssignmentTarget(propertyAssignment.Parent) {
+		return isValidPatternPropertyValueNodes(opts, propertyAssignment.Name(), pa.Initializer, node, wrapped)
+	}
+	return isValidPlainProperty(opts, propertyAssignment.Name(), node)
 }
 
-func isValidPatternPropertyValueNodes(opts idLengthOptions, keyNode, valueNode *ast.Node, node *ast.Node) bool {
-	if sameIdentifierText(keyNode, valueNode) {
-		return node == keyNode && opts.properties
+// isValidPatternPropertyValueNodes ports upstream's Property/ObjectPattern
+// branch: when key and value spell the same name only the key is checked (and
+// only with `properties` enabled); otherwise only the value is.
+func isValidPatternPropertyValueNodes(opts idLengthOptions, keyNode, valueNode, node, wrapped *ast.Node) bool {
+	key := patternKeyNode(keyNode)
+	if sameIdentifierText(key, unwrapParens(valueNode)) {
+		return node == key && opts.properties
 	}
-	return node == valueNode
+	return wrapped == valueNode
+}
+
+// patternKeyNode returns the node ESTree exposes as a pattern Property's key:
+// a computed key's own expression, with parentheses dropped.
+func patternKeyNode(keyNode *ast.Node) *ast.Node {
+	for keyNode != nil && keyNode.Kind == ast.KindComputedPropertyName {
+		keyNode = keyNode.AsComputedPropertyName().Expression
+	}
+	return unwrapParens(keyNode)
+}
+
+func unwrapParens(node *ast.Node) *ast.Node {
+	for node != nil && node.Kind == ast.KindParenthesizedExpression {
+		node = node.AsParenthesizedExpression().Expression
+	}
+	return node
 }
 
 // isValidPlainProperty handles a PropertyAssignment used as a genuine object
@@ -498,6 +584,11 @@ func isValidPatternPropertyValueNodes(opts idLengthOptions, keyNode, valueNode *
 // object literal). isValidPlainProperty preserves that.
 func isValidPlainProperty(opts idLengthOptions, keyNode, node *ast.Node) bool {
 	if !opts.properties || isImportAttributeKey(node) {
+		return false
+	}
+	// Upstream's non-pattern branch guards on `!parent.computed`, so a computed
+	// key exempts both halves of the property.
+	if keyNode != nil && keyNode.Kind == ast.KindComputedPropertyName {
 		return false
 	}
 	keyText, keyOk := plainIdentifierText(keyNode)
@@ -599,15 +690,17 @@ func isPlainClassMember(member *ast.Node) bool {
 //     comment for why this asymmetric-looking behavior is intentional
 //     upstream parity, not a bug introduced here.
 //   - Destructuring-into-member-expression: the member expression is
-//     (through a wrapper) exactly the Initializer of a PropertyAssignment
-//     whose enclosing object literal is itself directly the left side of an
-//     assignment. This is a single hop only — upstream does not recurse
-//     through further nesting for this specific case (`({ a: { b: obj.z } }
-//     = {})` does not flag `z`), unlike the plain-identifier Property case
-//     which upstream's own ObjectPattern parse-time conversion makes
-//     recursive.
+//     (through parentheses) exactly the Initializer of a PropertyAssignment
+//     whose enclosing object literal is itself the left side of an assignment
+//     or the target of a `for-in`/`for-of` — upstream's check reads
+//     `parent.parent.parent.parent.left`, and ForInStatement/ForOfStatement
+//     carry a `left` just as AssignmentExpression does. This is a single hop
+//     only — upstream does not recurse through further nesting for this
+//     specific case (`({ a: { b: obj.z } } = {})` does not flag `z`), unlike
+//     the plain-identifier Property case which upstream's own ObjectPattern
+//     parse-time conversion makes recursive.
 func isValidMemberExpressionTarget(pae *ast.Node) bool {
-	outer := skipReceiverWrappers(pae)
+	outer := skipParens(pae)
 	gp := outer.Parent
 	if gp == nil {
 		return false
@@ -615,16 +708,32 @@ func isValidMemberExpressionTarget(pae *ast.Node) bool {
 	switch gp.Kind {
 	case ast.KindBinaryExpression:
 		be := gp.AsBinaryExpression()
-		return ast.IsAssignmentOperator(be.OperatorToken.Kind) && be.Left == outer
+		if !ast.IsAssignmentOperator(be.OperatorToken.Kind) || be.Left != outer {
+			return false
+		}
+		// Inside a destructuring target, `obj.x = 0` is an AssignmentPattern
+		// holding a MemberExpression, not an AssignmentExpression, so upstream's
+		// `parent.parent.type === "AssignmentExpression"` test fails and
+		// `({ key: obj.x = 0 } = source)` reports nothing.
+		return !ast.IsAssignmentTarget(gp)
 
 	case ast.KindPropertyAssignment:
 		pa := gp.AsPropertyAssignment()
 		if pa.Initializer != outer {
 			return false
 		}
-		container := skipReceiverWrappers(gp.Parent)
+		// The object literal must be the assignment target itself: parenthesizing
+		// it (`(({ key: obj.x }) = source)`) stops upstream's parser from
+		// converting it to an ObjectPattern at all.
+		container := gp.Parent
 		ggp := container.Parent
-		if ggp == nil || ggp.Kind != ast.KindBinaryExpression {
+		if ggp == nil {
+			return false
+		}
+		if ast.IsForInOrOfStatement(ggp) {
+			return ggp.Initializer() == container
+		}
+		if ggp.Kind != ast.KindBinaryExpression {
 			return false
 		}
 		be := ggp.AsBinaryExpression()
@@ -667,7 +776,11 @@ func isImportAttributeKey(node *ast.Node) bool {
 	if objectExpression == nil || objectExpression.Kind != ast.KindObjectLiteralExpression {
 		return false
 	}
-	objectExpressionParent := objectExpression.Parent
+	// ESLint's AST has no parentheses, so an options object written as
+	// `import("m", ({ with: ... }))` or `{ with: ({ ... }) }` still reaches the
+	// call / the outer property directly.
+	outer := skipParens(objectExpression)
+	objectExpressionParent := outer.Parent
 	if objectExpressionParent == nil {
 		return false
 	}
@@ -675,7 +788,7 @@ func isImportAttributeKey(node *ast.Node) bool {
 	if objectExpressionParent.Kind == ast.KindCallExpression {
 		call := objectExpressionParent.AsCallExpression()
 		if call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword &&
-			call.Arguments != nil && len(call.Arguments.Nodes) > 1 && call.Arguments.Nodes[1] == objectExpression {
+			call.Arguments != nil && len(call.Arguments.Nodes) > 1 && call.Arguments.Nodes[1] == outer {
 			return true
 		}
 	}
@@ -685,11 +798,34 @@ func isImportAttributeKey(node *ast.Node) bool {
 	// property's value.
 	if objectExpressionParent.Kind == ast.KindPropertyAssignment {
 		outerPa := objectExpressionParent.AsPropertyAssignment()
-		if outerPa.Initializer == objectExpression {
+		if outerPa.Initializer == outer {
 			return isImportAttributeKey(objectExpressionParent.Name())
 		}
 	}
 
+	return false
+}
+
+// isCheckedParameterOwner reports whether a plain (non-rest, non-defaulted)
+// parameter's owning function-like node is one of upstream's supported
+// parents. TS's signature-only forms — function/constructor types, call,
+// construct, method and index signatures, ambient or overload declarations,
+// abstract methods — all become TS-specific ESTree nodes that
+// SUPPORTED_EXPRESSIONS does not list, and a body-less function-like is
+// exactly how tsgo spells every one of them that is not already a distinct
+// kind.
+func isCheckedParameterOwner(owner *ast.Node) bool {
+	if owner == nil {
+		return false
+	}
+	switch owner.Kind {
+	case ast.KindArrowFunction:
+		return true
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
+		ast.KindMethodDeclaration, ast.KindConstructor,
+		ast.KindGetAccessor, ast.KindSetAccessor:
+		return owner.Body() != nil
+	}
 	return false
 }
 
