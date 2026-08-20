@@ -30,21 +30,17 @@ func symbolDeclaration(symbol *ast.Symbol) *ast.Node {
 	}
 
 	for _, declaration := range symbol.Declarations {
-		if declaration == nil {
-			continue
-		}
-		switch declaration.Kind {
-		case ast.KindImportSpecifier, ast.KindExportSpecifier:
-			if !ast.IsTypeOnlyImportOrExportDeclaration(declaration) {
-				return declaration
-			}
+		if declaration != nil &&
+			ast.IsAliasSymbolDeclaration(declaration) &&
+			!ast.IsTypeOnlyImportOrExportDeclaration(declaration) {
+			return declaration
 		}
 	}
 
 	return nil
 }
 
-//go:linkname getImmediateAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).getImmediateAliasedSymbol
+//go:linkname getImmediateAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetImmediateAliasedSymbol
 func getImmediateAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 
 type CString = []byte
