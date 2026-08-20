@@ -134,6 +134,36 @@ func TestConsistentThisExtras(t *testing.T) {
 			// scope, so an assignment written outside the body still counts as
 			// the enclosing function's ----
 			{Code: "function f() { var self; enum E { A = 1 } self = this; }", Options: []any{"self"}},
+
+			// ---- eslint-scope hands every name in a destructuring target the
+			// whole assignment's right-hand side as its write expression, so a
+			// pattern assigned `this` satisfies each alias it binds ----
+			{Code: "var self; ({ self } = this)", Options: []any{"self"}},
+			{Code: "var self; [self] = this", Options: []any{"self"}},
+			{Code: "var self; ({ a: { self } } = this)", Options: []any{"self"}},
+			{Code: "var self; ({ self = 1 } = this)", Options: []any{"self"}},
+			{Code: "var self; ({ ...self } = this)", Options: []any{"self"}},
+			{Code: "var self; [self = 1] = this", Options: []any{"self"}},
+			{Code: "function f() { var self; ({ self } = this); }", Options: []any{"self"}},
+
+			// ---- A signature with no body is a TSDeclareFunction or a
+			// TSEmptyBodyFunctionExpression upstream, and neither of those is
+			// a FunctionDeclaration or a FunctionExpression, so the exit
+			// listeners never fire for one and its parameters go unchecked ----
+			{Code: "declare function f(self: any): void", Options: []any{"self"}},
+			{Code: "abstract class C { abstract m(self: any): void }", Options: []any{"self"}},
+			{Code: "declare class C { m(self: any): void }", Options: []any{"self"}},
+			{Code: "interface I { m(self: any): void }", Options: []any{"self"}},
+
+			// ---- A class decorator is evaluated in the scope enclosing the
+			// class rather than in the class scope, so an assignment written
+			// there counts as the enclosing function's ----
+			{Code: "function f() { var self; @((self = this, dec)) class C {} }", Options: []any{"self"}},
+
+			// ---- A re-export binds no local name, so — unlike `export
+			// import` below — it is no variable of the module scope ----
+			{Code: "export { self } from './x'", Options: []any{"self"}},
+			{Code: "export * as self from './x'", Options: []any{"self"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Options contract: the schema declares no JSON Schema
@@ -227,31 +257,48 @@ func TestConsistentThisExtras(t *testing.T) {
 
 			// ---- Real-user: https://github.com/eslint/eslint/issues/1846 — a
 			// designated alias used as a function parameter that is never
-			// assigned `this` is still flagged. Differences from ESLint: ESLint
-			// reports the position of the whole enclosing function (an
-			// eslint-scope quirk where a Parameter def's `.node` is the
-			// function, not the parameter); rslint reports the parameter
-			// itself. ----
+			// assigned `this` is still flagged, at the whole enclosing
+			// function: eslint-scope makes a Parameter def's `.node` the
+			// function rather than the parameter. ----
 			{
 				Code:    "function decorate(er, code, self) {}",
 				Options: []any{"self"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 29, EndLine: 1, EndColumn: 33},
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 1, EndLine: 1, EndColumn: 37},
+				},
+			},
+
+			// ---- A class member's function is the FunctionExpression ESTree
+			// hangs off the member, so a parameter of one is reported from the
+			// signature on — the name and the modifiers belong to the member,
+			// not to the function ----
+			{
+				Code:    "class C { public static async *m<T>(self) {} }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 33, EndLine: 1, EndColumn: 45},
+				},
+			},
+
+			// ---- A destructured parameter's names are parameter definitions
+			// of the same shape, so they are reported at the function too ----
+			{
+				Code:    "function f({ a: [self] }) {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 1, EndLine: 1, EndColumn: 29},
 				},
 			},
 
 			// ---- Locks in upstream checkWasAssigned(): a default parameter
 			// value of `this` is not a "was assigned" write reference (default
 			// values aren't AssignmentExpressions), so it is flagged the same
-			// as an unassigned parameter above. Differences from ESLint: same
-			// class as the parameter case above — rslint reports the parameter
-			// node itself (here including its default-value initializer),
-			// while ESLint again reports the whole enclosing function. ----
+			// as an unassigned parameter above ----
 			{
 				Code:    "function f(self = this) {}",
 				Options: []any{"self"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 12, EndLine: 1, EndColumn: 23},
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
 				},
 			},
 
@@ -470,6 +517,122 @@ func TestConsistentThisExtras(t *testing.T) {
 				Code: "import * as that from './x';",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 17},
+				},
+			},
+
+			// ---- A destructuring assignment only satisfies the alias when
+			// the whole pattern is assigned a plain `this`: a `this` buried in
+			// the right-hand side, a compound operator, and a for-of header
+			// are all still misses ----
+			{
+				Code:    "var self; ({ self } = { self: this })",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; ({ self } ??= this)",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; for ({ self } of [this]) {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+
+			// ---- An overload signature is not checked, but the
+			// implementation it belongs to is ----
+			{
+				Code:    "function f(self: any): void; function f(self: any) { }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 30, EndLine: 1, EndColumn: 55},
+				},
+			},
+
+			// ---- Redeclaring a name with a conflicting meaning leaves the
+			// binder holding only one of the declarations, while eslint-scope
+			// keeps a single variable holding them all, so every one of them
+			// is reported ----
+			{
+				Code:    "var self; function self() {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 11, EndLine: 1, EndColumn: 29},
+				},
+			},
+			{
+				Code:    "let self; var self;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 15, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    "import self from './x'; var self;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 12},
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 29, EndLine: 1, EndColumn: 33},
+				},
+			},
+
+			// ---- ...and one initialized declaration among them silences the
+			// was-assigned check for the whole variable, leaving only the
+			// checkAssignment report on the bad initializer ----
+			{
+				Code:    "var self = 1; function self() {}",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 13},
+				},
+			},
+
+			// ---- eslint-scope opens a class scope spanning the heritage
+			// clauses, so a write there never satisfies a binding of the
+			// enclosing function ----
+			{
+				Code:    "function f() { var self; class C extends (self = this, Object) {} }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    "function f() { var self; (class extends (self = this, Object) {}); }",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+
+			// ---- `export import` binds a local name even though the binder
+			// files it under the module's exports and leaves it out of the
+			// module's locals ----
+			{
+				Code:    "export import self = require('./x')",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 8, EndLine: 1, EndColumn: 36},
+				},
+			},
+
+			// ---- A default import is reported at its name: the `type`
+			// keyword of a type-only import stays on the ImportDeclaration
+			// upstream, outside the specifier ----
+			{
+				Code:    "import type self from './x'",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 13, EndLine: 1, EndColumn: 17},
 				},
 			},
 		},
