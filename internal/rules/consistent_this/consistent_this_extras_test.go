@@ -146,6 +146,27 @@ func TestConsistentThisExtras(t *testing.T) {
 			{Code: "var self; [self = 1] = this", Options: []any{"self"}},
 			{Code: "function f() { var self; ({ self } = this); }", Options: []any{"self"}},
 
+			// ---- typescript-eslint unwraps one TypeScript wrapper off an
+			// assignment's own left-hand side, so a name written under a
+			// single `!`, `as` or `<T>` is still that assignment's write
+			// target ----
+			{Code: "var self; self! = this;", Options: []any{"self"}},
+			{Code: "var self; (self as any) = this;", Options: []any{"self"}},
+			{Code: "var self; (<any>self) = this;", Options: []any{"self"}},
+
+			// ---- Inside a destructuring pattern the name is instead reached
+			// by a visitor that descends through every node kind it has no
+			// handler for, so no number of wrappers hides it there ----
+			{Code: "var self; [self!!] = this;", Options: []any{"self"}},
+			{Code: "var self; [self satisfies any] = this;", Options: []any{"self"}},
+			{Code: "var self; ({ a: self! } = this);", Options: []any{"self"}},
+
+			// ---- A shorthand property's initializer is the pattern's default
+			// value, an expression of its own: the assignment written there is
+			// a real assignment of `this`, not a target of the outer one ----
+			{Code: "var obj: any; var x; var self; ({ x = self = this } = obj);", Options: []any{"self"}},
+			{Code: "var obj: any; var x; var self; ({ x = self! = this } = obj);", Options: []any{"self"}},
+
 			// ---- A signature with no body is a TSDeclareFunction or a
 			// TSEmptyBodyFunctionExpression upstream, and neither of those is
 			// a FunctionDeclaration or a FunctionExpression, so the exit
@@ -633,6 +654,58 @@ func TestConsistentThisExtras(t *testing.T) {
 				Options: []any{"self"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 13, EndLine: 1, EndColumn: 17},
+				},
+			},
+
+			// ---- Only one wrapper is unwrapped off an assignment's own
+			// left-hand side, and `satisfies` is not one of the kinds unwrapped
+			// at all, so none of these writes the alias ----
+			{
+				Code:    "var self; self!! = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; (self! as any) = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; (self satisfies any) = this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+
+			// ---- A wrapped target is still only a write of what the
+			// assignment's right-hand side holds, under the operator it holds
+			// it with ----
+			{
+				Code:    "var self; self! = 1;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+			{
+				Code:    "var self; self! += this;",
+				Options: []any{"self"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "aliasNotAssignedToThis", Line: 1, Column: 5, EndLine: 1, EndColumn: 9},
+				},
+			},
+
+			// ---- The assignment in a shorthand property's default value is
+			// checked as the plain assignment it is ----
+			{
+				Code: "var obj: any; var x; var self; ({ x = self = this } = obj);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedAlias", Line: 1, Column: 39, EndLine: 1, EndColumn: 50},
 				},
 			},
 		},

@@ -71,7 +71,6 @@ let vm = 42;
 
 ## Differences from ESLint
 
-- For a designated alias declared as a function parameter (instead of with `var`/`let`/`const`) that is never assigned `this`, rslint reports the position of the parameter itself; ESLint reports the position of the whole enclosing function.
 - rslint always treats a nested block (`if`, `for`, `try`, a bare `{}`, ...) as a different scope from its enclosing function, so an alias declared in the function and assigned `this` only inside such a block is still reported. ESLint's behavior here depends on the configured ECMAScript version: under `ecmaVersion: 5` it does not create a separate scope for the block, so the same code is accepted.
 
 ## Original Documentation

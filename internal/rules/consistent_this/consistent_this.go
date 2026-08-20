@@ -134,21 +134,29 @@ var ConsistentThisRule = rule.Rule{
 		}
 
 		// aliasDeclarations indexes every declaration named after one of the
-		// aliases, keyed by that name, as the walk reaches it. A scope's own
-		// declarations are all in by the time its exit fires, and the whole
-		// file's are in by the time flush runs. The binder's own tables stay
-		// the source of truth for which scope a declaration belongs to; this
-		// index only recovers the declarations those tables drop, which
+		// aliases, keyed by the scope that name binds in, as the walk reaches
+		// it. A scope's own declarations are all in by the time its exit
+		// fires, and the whole file's are in by the time flush runs. The
+		// binder's own tables stay the source of truth for which scope a
+		// declaration belongs to — they are what the key is read off — and
+		// this index only recovers the declarations those tables drop, which
 		// findScopeVariable explains.
-		aliasDeclarations := map[string][]*ast.Node{}
+		aliasDeclarations := map[scopeAlias][]*ast.Node{}
 		collectDeclaration := func(node *ast.Node) {
 			name := ast.GetNameOfDeclaration(node)
 			if name == nil || name.Kind != ast.KindIdentifier {
 				return
 			}
-			if text := name.Text(); slices.Contains(aliases, text) {
-				aliasDeclarations[text] = append(aliasDeclarations[text], node)
+			text := name.Text()
+			if !slices.Contains(aliases, text) {
+				return
 			}
+			scopeNode := declarationScopeNode(node, text)
+			if scopeNode == nil {
+				return
+			}
+			key := scopeAlias{scopeNode: scopeNode, alias: text}
+			aliasDeclarations[key] = append(aliasDeclarations[key], node)
 		}
 
 		// findScopeVariable collects what eslint-scope would hold in one
@@ -194,8 +202,8 @@ var ConsistentThisRule = rule.Rule{
 				addSymbol(sym)
 			}
 
-			for _, decl := range aliasDeclarations[alias] {
-				if slices.Contains(decls, decl) || declarationScopeNode(decl, alias) != scopeNode {
+			for _, decl := range aliasDeclarations[scopeAlias{scopeNode: scopeNode, alias: alias}] {
+				if slices.Contains(decls, decl) {
 					continue
 				}
 				decls = append(decls, decl)
@@ -497,6 +505,33 @@ func memberSignatureStart(sourceFile *ast.SourceFile, member *ast.Node) int {
 	}
 }
 
+// targetPath records what a walk from a name out to the assignment it is
+// written by passed through. Which of those steps eslint-scope descends
+// decides whether it records the name as that assignment's write target at
+// all, so the walk keeps the steps and rootAssignmentOfTarget rules on them.
+type targetPath struct {
+	// wrappers counts the TypeScript type-only expressions — `x!`, `x as T`,
+	// `<T>x`, `x satisfies T` — enclosing the name.
+	wrappers int
+	// opaqueWrapper is set once one of those wrappers is a `satisfies`, the
+	// one kind typescript-eslint's assignment-target unwrapping never peels.
+	opaqueWrapper bool
+	// viaPattern is set once the walk leaves the name's own wrappers for a
+	// destructuring pattern holding it.
+	viaPattern bool
+}
+
+// writesTarget reports whether eslint-scope records a write reference for a
+// name reached along this path. A name written as an assignment's own
+// left-hand side is unwrapped exactly once, and only out of the three wrappers
+// `visitExpressionTarget` knows, so `self!! = this` and `(self! as any) = this`
+// write nothing. A name inside a destructuring pattern is instead reached by a
+// visitor that descends through every node kind it has no handler for, so no
+// number of wrappers hides it there.
+func (p targetPath) writesTarget() bool {
+	return p.viaPattern || (p.wrappers <= 1 && !p.opaqueWrapper)
+}
+
 // rootAssignmentOfTarget returns the assignment ref is a target of, or nil if
 // ref is not an assignment target at all. A destructured name reaches its
 // assignment through the pattern it is written in, and an assignment nested
@@ -504,35 +539,69 @@ func memberSignatureStart(sourceFile *ast.SourceFile, member *ast.Node) int {
 // (`[self = 1] = this`), so the walk keeps going and the outermost assignment
 // found wins — the one eslint-scope records as the write. Parenthesized
 // wrappers, which ESTree has no node for but tsgo does, are walked past on the
-// way.
+// way, and so are the TypeScript wrappers writesTarget accepts.
 func rootAssignmentOfTarget(ref *ast.Node) *ast.Node {
 	var root *ast.Node
+	var path, rootPath targetPath
+walk:
 	for node := ref; node.Parent != nil; node = node.Parent {
 		parent := node.Parent
 		switch parent.Kind {
-		case ast.KindParenthesizedExpression,
-			ast.KindArrayLiteralExpression,
+		case ast.KindParenthesizedExpression:
+		case ast.KindNonNullExpression,
+			ast.KindAsExpression,
+			ast.KindTypeAssertionExpression:
+			path.wrappers++
+		case ast.KindSatisfiesExpression:
+			path.wrappers++
+			path.opaqueWrapper = true
+		case ast.KindArrayLiteralExpression,
 			ast.KindObjectLiteralExpression,
 			ast.KindSpreadElement,
-			ast.KindSpreadAssignment,
-			ast.KindShorthandPropertyAssignment:
+			ast.KindSpreadAssignment:
+			path.viaPattern = true
+		case ast.KindShorthandPropertyAssignment:
+			// A shorthand property's initializer is the pattern's default
+			// value, an expression evaluated on its own rather than a part of
+			// the target: `({ x = self = this } = obj)` writes `this` to self
+			// and `obj`'s `x` to x.
+			if parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == node {
+				break walk
+			}
+			path.viaPattern = true
 		case ast.KindPropertyAssignment:
 			// `({ self: x } = this)` writes to x, not to the key `self`.
 			if parent.AsPropertyAssignment().Initializer != node {
-				return root
+				break walk
 			}
+			path.viaPattern = true
 		case ast.KindBinaryExpression:
 			bin := parent.AsBinaryExpression()
 			if !ast.IsAssignmentOperator(bin.OperatorToken.Kind) ||
 				ast.SkipParentheses(bin.Left) != ast.SkipParentheses(node) {
-				return root
+				break walk
 			}
 			root = parent
+			// Only the steps below the assignment stand between it and ref;
+			// anything the walk crosses further out wraps the assignment
+			// itself, which cannot hide its own target.
+			rootPath = path
 		default:
-			return root
+			break walk
 		}
 	}
+	if root == nil || !rootPath.writesTarget() {
+		return nil
+	}
 	return root
+}
+
+// scopeAlias keys the declaration index by the binding it belongs to: one
+// scope's declarations of one alias, which is exactly the set eslint-scope
+// holds in a single variable.
+type scopeAlias struct {
+	scopeNode *ast.Node
+	alias     string
 }
 
 // declarationScopeNode is the scope decl's binding belongs to: the nearest
