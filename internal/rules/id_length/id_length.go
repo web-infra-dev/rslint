@@ -57,7 +57,7 @@ var schemaJSON []byte
 //     ObjectLiteralExpression/ArrayLiteralExpression (PropertyAssignment/
 //     ShorthandPropertyAssignment/SpreadAssignment/SpreadElement), the same
 //     nodes used for genuine object/array literals. Telling the two apart
-//     needs a structural check — ast.IsAssignmentTarget — mirroring
+//     needs a structural check — isPatternAssignmentTarget — mirroring
 //     upstream's own parse-time pattern-conversion grammar (recursive through
 //     parens/nested literals/spreads), for BOTH plain-identifier members
 //     (Property's ObjectPattern branch) and rest members (RestElement).
@@ -72,7 +72,9 @@ var schemaJSON []byte
 //     them, so structural checks climb through them (skipParens). tsgo's
 //     TS-only wrappers `x!`, `x as T` and `x satisfies T` are NOT transparent:
 //     typescript-eslint keeps them as TSNonNullExpression / TSAsExpression /
-//     TSSatisfiesExpression, and none of those is a supported parent.
+//     TSSatisfiesExpression, none of those is a supported parent, and none of
+//     them lets the pattern conversion reach the literal it wraps either —
+//     see isPatternAssignmentTarget.
 //
 // Two upstream quirks are reproduced deliberately, verified against a local
 // ESLint 10.8.0 install rather than assumed from reading the source:
@@ -135,7 +137,7 @@ var IdLengthRule = rule.Rule{
 				return
 			}
 
-			ctx.ReportNode(node, msg)
+			ctx.ReportRange(declarationNameRange(ctx.SourceFile, node), msg)
 		}
 
 		checkConstructor := func(node *ast.Node) {
@@ -453,7 +455,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		// An array literal that is a destructuring-assignment target
 		// (`([x] = source)`, `for ([x] of source)`) is an ArrayPattern
 		// upstream, whose entry is unconditional.
-		return ast.IsAssignmentTarget(wrapped)
+		return isPatternAssignmentTarget(wrapped)
 
 	case ast.KindBinaryExpression:
 		// `x = 0` inside a destructuring-assignment target (`({ key: x = 0 } =
@@ -464,25 +466,25 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		// test on the BinaryExpression itself.
 		be := effectiveParent.AsBinaryExpression()
 		return be.OperatorToken.Kind == ast.KindEqualsToken && be.Left == wrapped &&
-			ast.IsAssignmentTarget(effectiveParent)
+			isPatternAssignmentTarget(effectiveParent)
 
 	case ast.KindSpreadElement:
-		// ast.IsAssignmentTarget is called on wrapped (not effectiveParent):
-		// GetAssignmentTarget decides how to continue climbing by switching
-		// on node.Parent.Kind, so it must be invoked starting from the
+		// isPatternAssignmentTarget is called on wrapped (not
+		// effectiveParent): its climb decides how to continue by switching on
+		// node.Parent.Kind, so it must be invoked starting from the
 		// identifier itself, not from the SpreadElement/SpreadAssignment
-		// wrapper already one hop up. This also matters because
-		// GetAssignmentTarget only special-cases ArrayLiteralExpression as a
-		// "keep climbing" parent, not ObjectLiteralExpression — it is only
-		// reachable by first landing on the PropertyAssignment/
-		// ShorthandPropertyAssignment/SpreadAssignment case, which jumps
-		// straight past it to its own parent.
+		// wrapper already one hop up. This also matters because the climb
+		// only special-cases ArrayLiteralExpression as a "keep climbing"
+		// parent, not ObjectLiteralExpression — it is only reachable by first
+		// landing on the PropertyAssignment/ShorthandPropertyAssignment/
+		// SpreadAssignment case, which jumps straight past it to its own
+		// parent.
 		se := effectiveParent.AsSpreadElement()
-		return se.Expression == wrapped && ast.IsAssignmentTarget(wrapped)
+		return se.Expression == wrapped && isPatternAssignmentTarget(wrapped)
 
 	case ast.KindSpreadAssignment:
 		sa := effectiveParent.AsSpreadAssignment()
-		return sa.Expression == wrapped && ast.IsAssignmentTarget(wrapped)
+		return sa.Expression == wrapped && isPatternAssignmentTarget(wrapped)
 	}
 
 	return false
@@ -502,6 +504,30 @@ func skipParens(node *ast.Node) *ast.Node {
 		node = node.Parent
 	}
 	return node
+}
+
+// isPatternAssignmentTarget reports whether node sits inside the left-hand
+// side of a destructuring assignment — the object/array literals upstream's
+// parser has already turned into ObjectPattern/ArrayPattern by the time the
+// rule runs.
+//
+// ast.GetAssignmentTarget answers almost the same question, but it climbs
+// through a `!` non-null assertion (TS accepts `a! = b` as a target), and
+// typescript-eslint does not: it keeps the wrapper as a TSNonNullExpression
+// and hands its operand to the ordinary expression conversion, so the literal
+// inside `([x]! = source)` stays an ArrayExpression and nothing within it is a
+// pattern. Rejecting a path that crosses one restores that.
+func isPatternAssignmentTarget(node *ast.Node) bool {
+	target := ast.GetAssignmentTarget(node)
+	if target == nil {
+		return false
+	}
+	for n := node; n != nil && n != target; n = n.Parent {
+		if n.Kind == ast.KindNonNullExpression {
+			return false
+		}
+	}
+	return true
 }
 
 // isValidBindingElement handles a destructuring binding element (var/let/
@@ -543,7 +569,7 @@ func isValidBindingElement(opts idLengthOptions, bindingElement *ast.Node, node 
 // `wrapped` the outermost pair of parentheses around it, if any.
 func isValidPropertyAssignmentChild(opts idLengthOptions, propertyAssignment, node, wrapped *ast.Node) bool {
 	pa := propertyAssignment.AsPropertyAssignment()
-	if ast.IsAssignmentTarget(propertyAssignment.Parent) {
+	if isPatternAssignmentTarget(propertyAssignment.Parent) {
 		return isValidPatternPropertyValueNodes(opts, propertyAssignment.Name(), pa.Initializer, node, wrapped)
 	}
 	return isValidPlainProperty(opts, propertyAssignment.Name(), node)
@@ -715,7 +741,7 @@ func isValidMemberExpressionTarget(pae *ast.Node) bool {
 		// holding a MemberExpression, not an AssignmentExpression, so upstream's
 		// `parent.parent.type === "AssignmentExpression"` test fails and
 		// `({ key: obj.x = 0 } = source)` reports nothing.
-		return !ast.IsAssignmentTarget(gp)
+		return !isPatternAssignmentTarget(gp)
 
 	case ast.KindPropertyAssignment:
 		pa := gp.AsPropertyAssignment()
@@ -827,6 +853,44 @@ func isCheckedParameterOwner(owner *ast.Node) bool {
 		return owner.Body() != nil
 	}
 	return false
+}
+
+// declarationNameRange returns the span upstream reports for an identifier.
+// typescript-eslint hangs a variable declarator's or a parameter's type
+// annotation — and a parameter's `?` — off the name Identifier itself and
+// widens that node to cover it (converter.ts's fixParentLocation), so
+// `function fn(x: number) {}` is reported over `x: number` rather than over
+// `x` alone. A rest parameter carries the annotation on its RestElement
+// wrapper and a destructured one on the pattern, so neither widens an
+// identifier; the same goes for a class field, whose annotation stays on the
+// PropertyDefinition.
+func declarationNameRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	textRange := utils.TrimNodeTextRange(sourceFile, node)
+	parent := node.Parent
+	if parent == nil || parent.Name() != node {
+		return textRange
+	}
+
+	var last *ast.Node
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		// A definite-assignment `!` only ever appears alongside a type
+		// annotation (`let x!: number`), which already covers it.
+		last = parent.AsVariableDeclaration().Type
+	case ast.KindParameter:
+		param := parent.AsParameterDeclaration()
+		if param.DotDotDotToken != nil {
+			return textRange
+		}
+		last = param.Type
+		if last == nil {
+			last = param.QuestionToken
+		}
+	}
+	if last == nil {
+		return textRange
+	}
+	return textRange.WithEnd(utils.TrimNodeTextRange(sourceFile, last).End())
 }
 
 // constructorKeywordRange returns the range of the `constructor` token of a

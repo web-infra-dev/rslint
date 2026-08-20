@@ -47,6 +47,25 @@ func TestIdLengthExtras(t *testing.T) {
 			{Code: `(a satisfies unknown).yy = 1;`},
 			{Code: `[...a!] = b;`},
 
+			// ---- A `!` around a whole destructuring target is opaque to the
+			// pattern conversion too: typescript-eslint hands a
+			// TSNonNullExpression's operand to the ordinary expression
+			// conversion, so the literal stays an ArrayExpression /
+			// ObjectExpression and none of the unconditional ArrayPattern /
+			// AssignmentPattern / RestElement entries can match inside it ----
+			{Code: `([x]! = source);`},
+			{Code: `([x = 0]! = source);`},
+			{Code: `({ key: x = 0 }! = source);`},
+			{Code: `({ key: x }! = source);`},
+			{Code: `([...x]! = source);`},
+			{Code: `({ ...x }! = source);`},
+
+			// ---- ...at whatever depth it sits, since the climb stops at the
+			// first one it crosses ----
+			{Code: `([[x]!] = source);`},
+			{Code: `([([x]!)] = source);`},
+			{Code: `({ key: [x]! } = source);`},
+
 			// ---- Dimension 4: the same wrapper around the destructuring
 			// value side of an ObjectPattern-equivalent member-expression
 			// target ----
@@ -743,6 +762,173 @@ function q(xx: any) { return xx; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 15},
 					{MessageId: "tooShort", Message: "Identifier name 'x' is too short (< 2).", Line: 1, Column: 19},
+				},
+			},
+
+			// ---- The other side of the same `!` coin: what the wrapper
+			// leaves behind is a genuine object literal, so its property goes
+			// through the non-pattern Property branch, which compares the
+			// key's text against every identifier of the property ----
+			{
+				Code: `({ q: q }! = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 4},
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 7},
+				},
+			},
+
+			// ---- ...and `obj.q = 0` under one is an AssignmentExpression
+			// again rather than the AssignmentPattern a real pattern would
+			// have made of it, which is exactly what upstream's
+			// MemberExpression entry requires ----
+			{
+				Code: `({ key: obj.q = 0 }! = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 13},
+				},
+			},
+			{
+				Code: `([obj.q = 0]! = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 7},
+				},
+			},
+
+			// ---- A shorthand property is checked either way — the
+			// ObjectPattern and non-pattern branches converge on the same
+			// `properties` gate for it ----
+			{
+				Code: `({ q }! = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 4},
+				},
+			},
+
+			// ---- Only the target the `!` wraps is spared; a sibling
+			// element of the same pattern still matches ----
+			{
+				Code: `([q, [q]!] = source);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 3},
+				},
+			},
+
+			// ---- A variable declarator's or a parameter's type annotation
+			// is folded into the name Identifier's own range upstream, so the
+			// report spans `q: number`, not just `q` ----
+			{
+				Code: `function fn(q: number) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 13, EndLine: 1, EndColumn: 22},
+				},
+			},
+			{
+				Code: `const fn = function (q: number) {};`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 22, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code: `const fn = (q: number) => {};`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 13, EndLine: 1, EndColumn: 22},
+				},
+			},
+			{
+				Code: `class Cc { mm(q: number) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 15, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code: `class Cc { constructor(q: number) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 24, EndLine: 1, EndColumn: 33},
+				},
+			},
+			{
+				Code: `const fn = { mm(q?: number) {} };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 17, EndLine: 1, EndColumn: 27},
+				},
+			},
+
+			// ---- ...including a defaulted parameter, whose annotation stays
+			// on the AssignmentPattern's left ----
+			{
+				Code: `function fn(q: number = 1) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 13, EndLine: 1, EndColumn: 22},
+				},
+			},
+
+			// ---- An optional parameter absorbs its `?` the same way, with or
+			// without an annotation to follow it ----
+			{
+				Code: `function fn(q?) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 13, EndLine: 1, EndColumn: 15},
+				},
+			},
+
+			// ---- A declarator's annotation reaches past a definite
+			// assignment `!`, the only place that token can appear ----
+			{
+				Code: `const q: number = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 7, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: `let q!: number;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 5, EndLine: 1, EndColumn: 15},
+				},
+			},
+
+			// ---- A catch binding is a declarator upstream too ----
+			{
+				Code: `try {} catch (q: unknown) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 15, EndLine: 1, EndColumn: 25},
+				},
+			},
+
+			// ---- Trailing trivia is not part of the annotation's range, but
+			// trivia inside it is ----
+			{
+				Code: `function fn(q: /*c*/ number) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 13, EndLine: 1, EndColumn: 28},
+				},
+			},
+
+			// ---- ...while a rest parameter's annotation belongs to its
+			// RestElement wrapper, a destructured parameter's to the pattern,
+			// and a class field's to the PropertyDefinition, so none of those
+			// widens the identifier ----
+			{
+				Code: `function fn(...q: number[]) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 16, EndLine: 1, EndColumn: 17},
+				},
+			},
+			{
+				Code: `function fn({ q }: { q: number }) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: `class Cc { q: number = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShort", Message: "Identifier name 'q' is too short (< 2).", Line: 1, Column: 12, EndLine: 1, EndColumn: 13},
+				},
+			},
+			{
+				Code: `class Cc { #q: number = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "tooShortPrivate", Message: "Identifier name '#q' is too short (< 2).", Line: 1, Column: 12, EndLine: 1, EndColumn: 14},
 				},
 			},
 		},
