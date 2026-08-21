@@ -166,6 +166,17 @@ export class extends Example {}`, Options: []any{map[string]any{"restrictedNamed
 				},
 			},
 
+			// ---- Upstream reads a statement's declared names out of scope
+			// analysis, which knows one variable per name, so a name bound
+			// twice by one statement is reported once, on its first binding ----
+			{
+				Code:    `export var a, a;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"a"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("a"), Line: 1, Column: 12, EndLine: 1, EndColumn: 13},
+				},
+			},
+
 			// ---- Position assertions: full Line/Column/EndLine/EndColumn range
 			// on the VariableStatement declared-name container ----
 			{
@@ -288,6 +299,18 @@ export function foo(a: any) {}`,
 				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 15, EndLine: 1, EndColumn: 18},
+				},
+			},
+
+			// ---- Position assertions: a decorator written ahead of `export`
+			// belongs to the class it decorates in TSESTree, leaving the
+			// ExportDefaultDeclaration upstream reports to start at the
+			// `export` keyword, while tsgo keeps it inside the declaration ----
+			{
+				Code:    `declare const dec: any; @dec export default class Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 30, EndLine: 1, EndColumn: 57},
 				},
 			},
 

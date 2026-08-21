@@ -121,25 +121,6 @@ func (o options) checkNamedRange(ctx rule.RuleContext, nameNode *ast.Node, repor
 	}
 }
 
-// declaredNameRange is the range upstream reports for the declared name of a
-// variable. TSESTree hangs a declarator's definite-assignment token and type
-// annotation off the Identifier and folds both into its range, so
-// `export const foo: number = 1` is reported over `foo: number`; in tsgo they
-// sit on the VariableDeclaration beside the name instead. A binding pattern
-// carries the annotation itself and upstream reports the bound identifiers
-// inside it, which have none, so only an identifier name widens.
-func declaredNameRange(sourceFile *ast.SourceFile, decl *ast.VariableDeclaration) core.TextRange {
-	nameRange := utils.TrimNodeTextRange(sourceFile, decl.Name())
-	end := nameRange.End()
-	if decl.ExclamationToken != nil {
-		end = max(end, decl.ExclamationToken.End())
-	}
-	if decl.Type != nil {
-		end = max(end, utils.TrimNodeTextRange(sourceFile, decl.Type).End())
-	}
-	return nameRange.WithEnd(end)
-}
-
 // checkExportAllName handles the exported alias of `export * as name from
 // 'mod'`, where a "default" alias is governed by restrictDefaultExports.namespaceFrom.
 func (o options) checkExportAllName(ctx rule.RuleContext, nameNode *ast.Node) {
@@ -214,8 +195,27 @@ func checkNamedExportsClause(ctx rule.RuleContext, opts options, namedExports *a
 // as `export default function foo(): void;` is reported like any other.
 func checkDefaultExportedDeclaration(ctx rule.RuleContext, opts options, node *ast.Node) {
 	if opts.restrictDefaultExports != nil && opts.restrictDefaultExports.direct {
-		ctx.ReportNode(node, restrictedDefaultMessage)
+		ctx.ReportRange(defaultExportRange(ctx.SourceFile, node), restrictedDefaultMessage)
 	}
+}
+
+// defaultExportRange is the range upstream reports for a default export.
+// TSESTree hangs a decorator written ahead of `export` off the class it
+// decorates, leaving the ExportDefaultDeclaration to start at the `export`
+// keyword, while in tsgo the decorator sits inside the declaration node and
+// widens it to the left, so the range starts at the `export` modifier.
+func defaultExportRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
+	modifiers := node.Modifiers()
+	if modifiers == nil {
+		return nodeRange
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier.Kind == ast.KindExportKeyword {
+			return nodeRange.WithPos(utils.TrimNodeTextRange(sourceFile, modifier).Pos())
+		}
+	}
+	return nodeRange
 }
 
 // checkNamedExportedDeclaration handles `export function foo() {}` and
@@ -315,27 +315,18 @@ var NoRestrictedExportsRule = rule.Rule{
 				if node.ModifierFlags()&ast.ModifierFlagsExport == 0 {
 					return
 				}
-				declList := node.AsVariableStatement().DeclarationList
-				if declList == nil || !ast.IsVariableDeclarationList(declList) {
-					return
-				}
-				for _, decl := range declList.AsVariableDeclarationList().Declarations.Nodes {
-					if !ast.IsVariableDeclaration(decl) {
-						continue
+				// Upstream reads the statement's declared names out of scope
+				// analysis, which knows one variable per name, so a name bound
+				// twice by one statement — `export var a, a;` — is reported
+				// once, on its first binding.
+				seen := map[string]bool{}
+				utils.ForEachVariableDeclarationBinding(node.AsVariableStatement().DeclarationList, func(_ *ast.Node, ident *ast.Node, name string) {
+					if seen[name] {
+						return
 					}
-					varDecl := decl.AsVariableDeclaration()
-					name := varDecl.Name()
-					if name == nil {
-						continue
-					}
-					if ast.IsIdentifier(name) {
-						opts.checkNamedRange(ctx, name, declaredNameRange(ctx.SourceFile, varDecl))
-						continue
-					}
-					utils.CollectBindingNames(name, func(ident *ast.Node, _ string) {
-						opts.checkNamed(ctx, ident)
-					})
-				}
+					seen[name] = true
+					opts.checkNamedRange(ctx, ident, utils.GetESTreeBindingIdentifierRange(ctx.SourceFile, ident))
+				})
 			},
 		}
 	},
