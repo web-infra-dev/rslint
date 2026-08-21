@@ -122,6 +122,9 @@ func buildCallFix(ctx rule.RuleContext, refNode *ast.Node, flagsNode *ast.Node, 
 	}
 
 	if flagsNode != nil {
+		// ESTree has no parenthesis node, so upstream classifies `('gi')` by
+		// the literal inside and its fix keeps the parens in place.
+		flagsNode = ast.SkipParentheses(flagsNode)
 		fixable, hasSubstitutions := flagsNodeShape(flagsNode)
 		if !fixable {
 			// We intentionally don't suggest concatenating + "u"/"v" to non-literals.

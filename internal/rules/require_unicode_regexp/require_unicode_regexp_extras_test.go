@@ -222,6 +222,62 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 					},
 				},
 			},
+			// ---- A lone `]` or `}` outside a class is a literal without the flag
+			// but a SyntaxError with it, so no suggestion may be offered ----
+			{
+				Code: "/]/",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireUFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 4},
+				},
+			},
+			{
+				Code: "/}/",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireUFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 4},
+				},
+			},
+			// ---- Under `u` the inner `[` is literal, so the trailing `]` is
+			// stray and the pattern can't take the flag ----
+			{
+				Code: "/[[a][b]]/",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireUFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 11},
+				},
+			},
+			// ---- The same pattern nests cleanly under `v`, where the suggestion
+			// stays available ----
+			{
+				Code:            "/[[a][b]]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "requireVFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 11,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: "/[[a][b]]/v"}},
+					},
+				},
+			},
+			// ---- Braces closing a quantifier are structural, not stray ----
+			{
+				Code: "/a{1,2}/",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "requireUFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 9,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "/a{1,2}/u"}},
+					},
+				},
+			},
+			// ---- Dimension 4: parenthesized flags argument — ESTree has no
+			// parenthesis node, so the fix rewrites the literal inside ----
+			{
+				Code: "new RegExp('foo', ('gi'))",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "requireUFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 26,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "new RegExp('foo', ('giu'))"}},
+					},
+				},
+			},
 			// ---- Real-user: a Unicode property escape only becomes meaningful
 			// under the `u` flag (Annex B reads `\p{L}` as literal `p{L}` without
 			// it) — a common pattern for validating letters/digits ----

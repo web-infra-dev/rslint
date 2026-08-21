@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"strings"
-
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -18,8 +16,8 @@ import (
 //     `v`-flag token, so `v` validation reuses the `u` compile — the two
 //     flags share the same non-class grammar.
 //   - A narrow u-flag identity-escape check for the handful of escapes
-//     regexp2 accepts but ES-u-mode rejects (`\a`, `\9`, …), plus an
-//     unmatched-`{` check for a brace regexp2 reads as literal.
+//     regexp2 accepts but ES-u-mode rejects (`\a`, `\9`, …), plus a scan for
+//     the syntax characters regexp2 reads as literals.
 //
 // If ANY check fails the pattern is treated as unparsable — matching
 // JavaScript's own parse-or-reject behavior.
@@ -42,65 +40,57 @@ func IsValidRegexPattern(pattern string, flags RegexFlags) bool {
 		if hasInvalidIdentityEscapeForUFlag(pattern) {
 			return false
 		}
-		if hasUnmatchedBraceForUFlag(pattern) {
+		if hasInvalidSyntaxCharForUFlag(pattern, flags) {
 			return false
 		}
 	}
 	return true
 }
 
-// hasUnmatchedBraceForUFlag reports whether the pattern contains a literal `{`
-// that is not part of a valid `{n}` / `{n,}` / `{n,m}` quantifier or a
-// recognized `\u{...}` / `\p{...}` / `\q{...}` escape. Under the u/v flag this
-// is a SyntaxError per ECMAScript, but regexp2 accepts it (its .NET lineage
-// treats a bare `{` as literal). The scan is outside character classes only —
-// inside a class, `{` is always literal.
-func hasUnmatchedBraceForUFlag(pattern string) bool {
-	inClass := false
+// hasInvalidSyntaxCharForUFlag reports whether the pattern contains an
+// unescaped `{`, `}` or `]` outside a character class. Under the u/v flag all
+// three are SyntaxCharacters and legal only in their structural roles — `{`
+// and `}` as a `{n}` / `{n,}` / `{n,m}` quantifier, `]` as a class terminator
+// — but regexp2 accepts each as a literal (its .NET lineage). Escapes and
+// character classes are skipped wholesale through the flag-aware scanners, so
+// v-flag nested classes are not mistaken for a stray `]`.
+func hasInvalidSyntaxCharForUFlag(pattern string, flags RegexFlags) bool {
 	i := 0
 	for i < len(pattern) {
-		c := pattern[i]
-		if c == '\\' {
-			if i+1 >= len(pattern) {
+		switch pattern[i] {
+		case '\\':
+			step, ok := SkipPatternEscape(pattern, i, flags)
+			if !ok {
+				// Unterminated escape — let compile/scan report it.
 				return false
 			}
-			next := pattern[i+1]
-			if (next == 'u' || next == 'p' || next == 'P' || next == 'q') && i+2 < len(pattern) && pattern[i+2] == '{' {
-				if end := strings.IndexByte(pattern[i+2:], '}'); end != -1 {
-					i += 2 + end + 1
-					continue
-				}
-				// Unterminated brace escape — let compile/scan report it.
+			i += step
+		case '[':
+			end, ok := ClassEnd(pattern, i, flags)
+			if !ok {
+				// Unterminated class — let compile/scan report it.
 				return false
 			}
-			i += 2
-			continue
-		}
-		if c == '[' && !inClass {
-			inClass = true
-			i++
-			continue
-		}
-		if c == ']' && inClass {
-			inClass = false
-			i++
-			continue
-		}
-		if inClass {
-			i++
-			continue
-		}
-		if c == '{' && !looksLikeQuantifier(pattern, i) {
+			i = end
+		case '{':
+			end, ok := quantifierEnd(pattern, i)
+			if !ok {
+				return true
+			}
+			i = end
+		case '}', ']':
 			return true
+		default:
+			i++
 		}
-		i++
 	}
 	return false
 }
 
-// looksLikeQuantifier reports whether pattern[start] opens a valid
-// `{n}` / `{n,}` / `{n,m}` quantifier.
-func looksLikeQuantifier(pattern string, start int) bool {
+// quantifierEnd returns the byte index just past the `}` of the
+// `{n}` / `{n,}` / `{n,m}` quantifier opening at pattern[start], or ok=false
+// when the brace does not open one.
+func quantifierEnd(pattern string, start int) (int, bool) {
 	i := start + 1
 	digits := 0
 	for i < len(pattern) && pattern[i] >= '0' && pattern[i] <= '9' {
@@ -108,7 +98,7 @@ func looksLikeQuantifier(pattern string, start int) bool {
 		digits++
 	}
 	if digits == 0 {
-		return false
+		return start, false
 	}
 	if i < len(pattern) && pattern[i] == ',' {
 		i++
@@ -116,7 +106,10 @@ func looksLikeQuantifier(pattern string, start int) bool {
 			i++
 		}
 	}
-	return i < len(pattern) && pattern[i] == '}'
+	if i < len(pattern) && pattern[i] == '}' {
+		return i + 1, true
+	}
+	return start, false
 }
 
 // hasInvalidIdentityEscapeForUFlag scans for escapes that ECMAScript u/v mode
