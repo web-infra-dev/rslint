@@ -14,4 +14,31 @@ export default defineConfig([js.configs.recommended]);
 | ------------------------ | ---------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `js.configs.recommended` | JavaScript recommended rules | [View rules →](/rules/?preset=js.configs.recommended) | [`@eslint/js` `configs.recommended`](https://eslint.org/docs/v10.x/use/configure/migration-guide#predefined-and-shareable-configs) |
 
+## Differences from ESLint
+
+Unlike the upstream preset, `js.configs.recommended` intentionally omits `no-undef`.
+
+The rule is only accurate when all globals provided by browsers, Node.js, and other environments are declared in the configuration. Because a general-purpose preset cannot know which environments apply to each file, enabling the rule by default would report valid global references until users add the corresponding environment-specific configuration.
+
+To enable this check, declare the globals available to matching files first:
+
+```ts
+import { defineConfig, globals, js } from '@rslint/core';
+
+export default defineConfig([
+  js.configs.recommended,
+  {
+    files: ['src/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+    rules: {
+      'no-undef': 'error',
+    },
+  },
+]);
+```
+
 See [Rules & Presets](/config/rules-and-presets) for guidance on choosing and layering presets.
