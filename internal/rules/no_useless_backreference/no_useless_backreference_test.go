@@ -856,7 +856,6 @@ enum Pattern {
 	sourceFile := program.GetSourceFile(filePath)
 	if sourceFile == nil {
 		t.Fatalf("%s was not loaded", filePath)
-		return
 	}
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()
