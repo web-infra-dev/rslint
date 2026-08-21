@@ -457,7 +457,7 @@ func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 			t.Parallel()
 
 			ctx, specifier := contextForImportWithCompilerOptions(t, tc.source, &core.CompilerOptions{
-				ESModuleInterop: tc.esModuleInterop,
+				ESModuleInterop: tc.esModuleInterop, //nolint:staticcheck
 			})
 			gotDefaultExport, gotOK := import_utils.HasDefaultExport(ctx, specifier)
 			if gotDefaultExport != tc.wantDefaultExport || !gotOK {
@@ -624,7 +624,7 @@ func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.Rule
 
 	host := rslint_utils.CreateCompilerHost(fixtures.GetRootDir().Dir, fs)
 	program, err := rslint_utils.CreateProgramFromOptions(true, &core.CompilerOptions{
-		ESModuleInterop: core.TSFalse,
+		ESModuleInterop: core.TSFalse, //nolint:staticcheck
 		Module:          core.ModuleKindCommonJS,
 	}, []string{filePath}, host)
 	if err != nil {
