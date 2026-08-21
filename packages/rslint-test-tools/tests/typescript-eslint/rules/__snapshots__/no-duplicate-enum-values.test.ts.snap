@@ -14,7 +14,7 @@ enum E {
       "messageId": "duplicateValue",
       "range": {
         "end": {
-          "column": 4,
+          "column": 8,
           "line": 4,
         },
         "start": {
@@ -45,7 +45,7 @@ enum E {
       "messageId": "duplicateValue",
       "range": {
         "end": {
-          "column": 4,
+          "column": 10,
           "line": 4,
         },
         "start": {
@@ -78,7 +78,7 @@ enum E {
       "messageId": "duplicateValue",
       "range": {
         "end": {
-          "column": 4,
+          "column": 10,
           "line": 4,
         },
         "start": {
@@ -93,7 +93,7 @@ enum E {
       "messageId": "duplicateValue",
       "range": {
         "end": {
-          "column": 4,
+          "column": 8,
           "line": 6,
         },
         "start": {
@@ -124,7 +124,7 @@ enum E {
       "messageId": "duplicateValue",
       "range": {
         "end": {
-          "column": 4,
+          "column": 10,
           "line": 4,
         },
         "start": {
@@ -155,7 +155,7 @@ enum E {
       "messageId": "duplicateValue",
       "range": {
         "end": {
-          "column": 4,
+          "column": 10,
           "line": 4,
         },
         "start": {

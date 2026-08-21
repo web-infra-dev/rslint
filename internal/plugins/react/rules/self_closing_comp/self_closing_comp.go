@@ -3,12 +3,12 @@ package self_closing_comp
 import (
 	_ "embed"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed self_closing_comp.schema.json
@@ -92,7 +92,7 @@ func isChildrenEmpty(jsxElement *ast.JsxElement) bool {
 				continue
 			}
 			// Only treat as empty if whitespace contains a newline (matching ESLint behavior)
-			if strings.TrimSpace(text.Text) == "" && strings.Contains(text.Text, "\n") {
+			if ecmascript.StringTrim(text.Text) == "" && strings.Contains(text.Text, "\n") {
 				continue
 			}
 			return false
@@ -102,7 +102,10 @@ func isChildrenEmpty(jsxElement *ast.JsxElement) bool {
 	return true
 }
 
-// isComponent returns true if the tag name starts with uppercase or contains dots (member expression).
+// isComponent returns true if the tag name is not a DOM tag: upstream reads
+// `!jsxUtil.isDOMComponent(node)`, and that tests the name against `/^[a-z]/`,
+// so anything that does not start with an ASCII lowercase letter — a member
+// expression among them — is a component.
 func isComponent(sourceFile *ast.SourceFile, tagName *ast.Node) bool {
 	if tagName == nil {
 		return false
@@ -113,12 +116,11 @@ func isComponent(sourceFile *ast.SourceFile, tagName *ast.Node) bool {
 		return true
 	}
 
-	// For identifiers, check if first character is uppercase
+	// For identifiers, check whether the name reads as a DOM tag
 	if tagName.Kind == ast.KindIdentifier {
 		text := tagName.AsIdentifier().Text
 		if len(text) > 0 {
-			firstRune := rune(text[0])
-			return unicode.IsUpper(firstRune)
+			return !isDOMTagName(text)
 		}
 	}
 
@@ -130,8 +132,14 @@ func isComponent(sourceFile *ast.SourceFile, tagName *ast.Node) bool {
 		if strings.Contains(text, ".") {
 			return true
 		}
-		firstRune := rune(text[0])
-		return unicode.IsUpper(firstRune)
+		return !isDOMTagName(text)
 	}
 	return false
+}
+
+// isDOMTagName mirrors eslint-plugin-react's `COMPAT_TAG_REGEX`, which is
+// `/^[a-z]/` — ASCII only, so a name starting with `_`, a digit or a character
+// with no case of its own is not a DOM tag.
+func isDOMTagName(text string) bool {
+	return text[0] >= 'a' && text[0] <= 'z'
 }

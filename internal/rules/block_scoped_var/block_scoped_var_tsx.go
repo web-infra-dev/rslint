@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // blockScopedVarReferenceMeaning mirrors RefStore's declaration-space model.
@@ -542,7 +543,7 @@ func (state *blockScopedVarState) addTSXFactoryReferences() {
 
 func jsxFactoryRoot(factory string) string {
 	root, _, _ := strings.Cut(factory, ".")
-	return strings.TrimSpace(root)
+	return ecmascript.StringTrim(root)
 }
 
 func (timeline *jsxTimeline) activateChannel(channelIndex int, name string) {

@@ -3,7 +3,6 @@ package explicit_member_accessibility
 import (
 	_ "embed"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -108,29 +107,30 @@ func buildAddExplicitAccessibilityMessage(accessibility string) rule.RuleMessage
 
 // requiresQuoting reports whether the given name must be quoted to be a valid
 // JavaScript property identifier (e.g. contains spaces or special chars).
-// Mirrors the upstream `requiresQuoting` in @typescript-eslint/type-utils.
+// Mirrors the upstream `requiresQuoting` in @typescript-eslint/type-utils,
+// which asks the TypeScript compiler — `ts.isIdentifierStart` and
+// `ts.isIdentifierPart` — so this asks tsgo's scanner rather than deciding
+// what a letter is on its own.
 func requiresQuoting(s string) bool {
 	if s == "" {
 		return true
 	}
 	for index, r := range s {
+		// Upstream reads one UTF-16 code unit at a time, and neither half of a
+		// surrogate pair is an identifier character, so a name holding one has
+		// to be quoted.
+		if r > 0xFFFF {
+			return true
+		}
 		if index == 0 {
-			if !isIdentifierStart(r) {
+			if !scanner.IsIdentifierStart(r) {
 				return true
 			}
-		} else if !isIdentifierPart(r) {
+		} else if !scanner.IsIdentifierPart(r) {
 			return true
 		}
 	}
 	return false
-}
-
-func isIdentifierStart(r rune) bool {
-	return r == '$' || r == '_' || unicode.IsLetter(r)
-}
-
-func isIdentifierPart(r rune) bool {
-	return isIdentifierStart(r) || unicode.IsDigit(r)
 }
 
 // getMemberName returns the diagnostic-friendly member name, matching upstream

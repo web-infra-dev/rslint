@@ -26,8 +26,9 @@ type ValidTestCase struct {
 	Skip     bool                   `json:"skip"`
 	Options  any                    `json:"options"`
 	Settings map[string]interface{} `json:"settings"`
-	// LanguageOptions is the normalized per-file language configuration used
-	// to construct native rule globals. Its zero value means latest.
+	// LanguageOptions is the normalized per-file language configuration exposed
+	// through ctx.LanguageOptions and used to construct native rule globals. Its
+	// zero value means latest.
 	LanguageOptions rule.LanguageOptions `json:"languageOptions"`
 	// Globals simulates a config-declared `languageOptions.globals` for rules
 	// that read ctx.Globals (e.g. no-undef). Values are authored exactly as in
@@ -65,8 +66,9 @@ type InvalidTestCase struct {
 	Output   []string               `json:"output"`
 	Errors   []InvalidTestCaseError `json:"errors"`
 	Settings map[string]interface{} `json:"settings"`
-	// LanguageOptions is the normalized per-file language configuration used
-	// to construct native rule globals. Its zero value means latest.
+	// LanguageOptions is the normalized per-file language configuration exposed
+	// through ctx.LanguageOptions and used to construct native rule globals. Its
+	// zero value means latest.
 	LanguageOptions rule.LanguageOptions `json:"languageOptions"`
 	// Globals simulates a config-declared `languageOptions.globals` for rules
 	// that read ctx.Globals (e.g. no-undef). Values are authored exactly as in

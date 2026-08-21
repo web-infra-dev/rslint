@@ -12,7 +12,7 @@ x['priv_prop'] = 123;
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["priv_prop"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -53,7 +53,7 @@ x['pub_prop'] = 123;
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["pub_prop"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -87,7 +87,7 @@ exports[`dot-notation > invalid 3`] = `
   "code": "a['true'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["true"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -114,7 +114,7 @@ exports[`dot-notation > invalid 4`] = `
   "code": "a['time'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["time"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -141,7 +141,7 @@ exports[`dot-notation > invalid 5`] = `
   "code": "a[null];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "[null] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -168,7 +168,7 @@ exports[`dot-notation > invalid 6`] = `
   "code": "a[true];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "[true] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -195,7 +195,7 @@ exports[`dot-notation > invalid 7`] = `
   "code": "a[false];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "[false] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -222,7 +222,7 @@ exports[`dot-notation > invalid 8`] = `
   "code": "a['b'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["b"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -249,7 +249,7 @@ exports[`dot-notation > invalid 9`] = `
   "code": "a.b['c'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["c"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -276,7 +276,7 @@ exports[`dot-notation > invalid 10`] = `
   "code": "a['_dangle'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["_dangle"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -303,7 +303,7 @@ exports[`dot-notation > invalid 11`] = `
   "code": "a['SHOUT_CASE'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["SHOUT_CASE"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -333,7 +333,7 @@ a
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["SHOUT_CASE"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -367,7 +367,7 @@ exports[`dot-notation > invalid 13`] = `
     ["catch"](function(){});",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["catch"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -382,7 +382,7 @@ exports[`dot-notation > invalid 13`] = `
       "ruleName": "@typescript-eslint/dot-notation",
     },
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["catch"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -416,7 +416,7 @@ foo
       ",
   "diagnostics": [
     {
-      "message": "Property is a keyword - use bracket notation.",
+      "message": ".while is a syntax error.",
       "messageId": "useBrackets",
       "range": {
         "end": {
@@ -446,7 +446,7 @@ exports[`dot-notation > invalid 15`] = `
   "code": "foo[/* comment */ 'bar'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["bar"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -473,7 +473,7 @@ exports[`dot-notation > invalid 16`] = `
   "code": "foo['bar' /* comment */];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["bar"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -500,7 +500,7 @@ exports[`dot-notation > invalid 17`] = `
   "code": "foo['bar'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["bar"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -527,7 +527,7 @@ exports[`dot-notation > invalid 18`] = `
   "code": "foo./* comment */ while;",
   "diagnostics": [
     {
-      "message": "Property is a keyword - use bracket notation.",
+      "message": ".while is a syntax error.",
       "messageId": "useBrackets",
       "range": {
         "end": {
@@ -554,7 +554,7 @@ exports[`dot-notation > invalid 19`] = `
   "code": "foo[null];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "[null] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -581,7 +581,7 @@ exports[`dot-notation > invalid 20`] = `
   "code": "foo['bar'] instanceof baz;",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["bar"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -608,7 +608,7 @@ exports[`dot-notation > invalid 21`] = `
   "code": "let.if();",
   "diagnostics": [
     {
-      "message": "Property is a keyword - use bracket notation.",
+      "message": ".if is a syntax error.",
       "messageId": "useBrackets",
       "range": {
         "end": {
@@ -642,7 +642,7 @@ x['protected_prop'] = 123;
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["protected_prop"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -684,7 +684,7 @@ x['prop'] = 'hello';
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["prop"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -725,7 +725,7 @@ foo['key_baz'];
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["key_baz"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -769,7 +769,7 @@ function f<T extends Foo>(x: T) {
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["extraKey"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -811,7 +811,7 @@ m['foo'];
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["foo"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -846,7 +846,7 @@ m['bar'];
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["bar"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -877,7 +877,7 @@ exports[`dot-notation > invalid 28`] = `
   "code": "a['\\u0062'];",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["b"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -904,7 +904,7 @@ exports[`dot-notation > invalid 29`] = `
   "code": "a.null;",
   "diagnostics": [
     {
-      "message": "Property is a keyword - use bracket notation.",
+      "message": ".null is a syntax error.",
       "messageId": "useBrackets",
       "range": {
         "end": {
@@ -931,7 +931,7 @@ exports[`dot-notation > invalid 30`] = `
   "code": "a.true;",
   "diagnostics": [
     {
-      "message": "Property is a keyword - use bracket notation.",
+      "message": ".true is a syntax error.",
       "messageId": "useBrackets",
       "range": {
         "end": {
@@ -958,7 +958,7 @@ exports[`dot-notation > invalid 31`] = `
   "code": "a.false;",
   "diagnostics": [
     {
-      "message": "Property is a keyword - use bracket notation.",
+      "message": ".false is a syntax error.",
       "messageId": "useBrackets",
       "range": {
         "end": {
@@ -985,7 +985,7 @@ exports[`dot-notation > invalid 32`] = `
   "code": "a['foo'] = 1;",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["foo"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -1012,7 +1012,7 @@ exports[`dot-notation > invalid 33`] = `
   "code": "a['foo'] += 1;",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["foo"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -1039,7 +1039,7 @@ exports[`dot-notation > invalid 34`] = `
   "code": "a['foo']++;",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["foo"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -1069,7 +1069,7 @@ x['foo'];
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["foo"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -1104,7 +1104,7 @@ class X {
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["a"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -1141,7 +1141,7 @@ class X extends B {
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["foo"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -1176,7 +1176,7 @@ const el = <div>{p['foo']}</div>;
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["foo"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {
@@ -1211,7 +1211,7 @@ namespace N {
       ",
   "diagnostics": [
     {
-      "message": "Use dot notation instead of bracket notation.",
+      "message": "["foo"] is better written in dot notation.",
       "messageId": "useDot",
       "range": {
         "end": {

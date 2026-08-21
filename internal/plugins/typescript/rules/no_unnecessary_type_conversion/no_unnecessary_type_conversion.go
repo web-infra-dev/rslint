@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildUnnecessaryTypeConversionMessage(violation, typeName string) rule.RuleMessage {
@@ -413,7 +414,7 @@ var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 		}
 
 		reportCallConversion := func(callNode, calleeIdentifier, innerArg *ast.Node, fnName string) {
-			typeName := strings.ToLower(fnName)
+			typeName := ecmascript.StringToLowerCase(fnName)
 			violation := "Passing a " + typeName + " to " + fnName + "()"
 			calleeRange := utils.TrimNodeTextRange(sourceFile, calleeIdentifier)
 			ctx.ReportRangeWithDeferredSuggestions(
