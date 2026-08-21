@@ -128,7 +128,13 @@ Examples of **correct** code with the `"ignoreInlineComments"` option set to `tr
 function foo(/* ignored */ a) {}
 ```
 
-A line comment can never satisfy `ignoreInlineComments`, since it always consumes the rest of its line — there is no token left to end on the same line as the comment. A block comment that leads its own line is also not exempt, even when a token follows it on that same line, because no token precedes it on that same line either.
+The exemption applies to a block comment with a token on the same line as its start and a token on the same line as its end, which is what "in the middle of code" means here:
+
+```javascript
+foo(/* ignored */ bar);
+foo(/* ignored
+  still ignored */ bar);
+```
 
 ### `ignoreConsecutiveComments`
 

@@ -79,6 +79,27 @@ func TestCapitalizedCommentsExtras(t *testing.T) {
 
 			// ---- Contract: EndLine/EndColumn on a single-line report ----
 			{Code: "// https://github.com/eslint/eslint", Options: []any{"always"}},
+
+			// ---- Dimension 1: the preceding-token walk reaches tokens
+			// that only appear inside a JSX or template-literal body, so a
+			// comment sandwiched between them is inline ----
+			{
+				Code:     "var x = <div>a{/* lowercase */}b</div>;",
+				FileName: "src/virtual.tsx",
+				Options:  []any{"always", map[string]any{"ignoreInlineComments": true}},
+			},
+			{
+				Code:    "`a${/* lowercase */ 1}b`;",
+				Options: []any{"always", map[string]any{"ignoreInlineComments": true}},
+			},
+
+			// ---- Dimension 1: a regular-expression literal is one token,
+			// so the `//` inside it neither opens a comment nor moves the
+			// preceding-token boundary past the earlier comment ----
+			{
+				Code:    "var re = /a\\/\\/b/; /* This Comment Is Fine. */ /* lowercase */",
+				Options: []any{"always", map[string]any{"ignoreConsecutiveComments": true}},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: graceful degradation — a comment alone in

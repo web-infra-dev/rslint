@@ -37,8 +37,19 @@ var CapitalizedCommentsRule = rule.Rule{
 		text := ctx.SourceFile.Text()
 		comments := ctx.Comments.All()
 
+		// Only the inline and consecutive checks need the token stream, and
+		// only for a comment that gets as far as them, so the walk that
+		// answers it happens at most once per file and only on demand.
+		var precedingEnds []int
+		precedingEnd := func(index int) int {
+			if precedingEnds == nil {
+				precedingEnds = precedingTokenEnds(ctx.SourceFile, comments)
+			}
+			return precedingEnds[index]
+		}
+
 		for i := range comments {
-			checkComment(ctx, text, comments, i, opts)
+			checkComment(ctx, text, comments, i, opts, precedingEnd)
 		}
 
 		return rule.RuleListeners{}
@@ -102,7 +113,7 @@ func normalizeCommentOptions(raw map[string]any, which string) commentOptions {
 	return result
 }
 
-func checkComment(ctx rule.RuleContext, text string, comments []*ast.CommentRange, index int, opts ruleOptions) {
+func checkComment(ctx rule.RuleContext, text string, comments []*ast.CommentRange, index int, opts ruleOptions, precedingEnd func(int) int) {
 	comment := comments[index]
 	value := utils.CommentValue(text, comment)
 
@@ -111,9 +122,8 @@ func checkComment(ctx rule.RuleContext, text string, comments []*ast.CommentRang
 		commentOpts = opts.Block
 	}
 
-	before := tokenBefore{sourceFile: ctx.SourceFile, pos: comment.Pos()}
-	isInline := func() bool { return isInlineComment(ctx.SourceFile, comments, index, &before) }
-	isConsecutive := func() bool { return isConsecutiveComment(comments, index, &before) }
+	isInline := func() bool { return isInlineComment(ctx.SourceFile, comments, index, precedingEnd(index)) }
+	isConsecutive := func() bool { return isConsecutiveComment(comments, index, precedingEnd(index)) }
 
 	if isCommentValid(value, opts.Capitalize, commentOpts, isInline, isConsecutive) {
 		return
@@ -230,31 +240,40 @@ func buildFix(comment *ast.CommentRange, value string, capitalize string) []rule
 	return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(charStart, charEnd), replacement)}
 }
 
-// tokenBefore memoizes the nearest real token before pos. Resolving it scans
-// the source again from the start of the file, and the inline and consecutive
-// checks both need the same lookup.
-type tokenBefore struct {
-	sourceFile *ast.SourceFile
-	pos        int
-	resolved   bool
-	token      utils.SourceToken
-	ok         bool
-}
-
-func (t *tokenBefore) get() (utils.SourceToken, bool) {
-	if !t.resolved {
-		t.token, t.ok = utils.TokenBeforePosition(t.sourceFile, t.pos)
-		t.resolved = true
+// precedingTokenEnds returns, for each comment, the end of the last real token
+// that ends before the comment starts, or -1 when no token precedes it.
+// Tokens and comments both arrive in source order, so one walk of the token
+// tree answers it for every comment at once, where asking per comment would
+// read the file again for each one. Walking parser tokens rather than scanning
+// keeps a regular-expression literal whole, which a standalone scanner splits
+// into division punctuators.
+func precedingTokenEnds(sourceFile *ast.SourceFile, comments []*ast.CommentRange) []int {
+	ends := make([]int, len(comments))
+	cursor := 0
+	last := -1
+	utils.ForEachToken(sourceFile.AsNode(), func(token *ast.Node) {
+		tokenRange := utils.TrimNodeTextRange(sourceFile, token)
+		if tokenRange.Pos() >= tokenRange.End() {
+			return
+		}
+		for cursor < len(comments) && comments[cursor].Pos() < tokenRange.End() {
+			ends[cursor] = last
+			cursor++
+		}
+		last = tokenRange.End()
+	}, sourceFile)
+	for ; cursor < len(comments); cursor++ {
+		ends[cursor] = last
 	}
-	return t.token, t.ok
+	return ends
 }
 
 // isInlineComment ports isInlineComment: a comment is inline when both the
 // nearest preceding and following token-or-comment share its start/end line.
 // Only block comments can ever be inline — a line comment always consumes
 // the rest of its own line, so there can be no "next token on the same line".
-func isInlineComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int, before *tokenBefore) bool {
-	prevEnd, ok := nearestBeforeEnd(comments, index, comments[index].Pos(), before)
+func isInlineComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int, precedingEnd int) bool {
+	prevEnd, ok := nearestBeforeEnd(comments, index, precedingEnd)
 	if !ok {
 		return false
 	}
@@ -268,28 +287,21 @@ func isInlineComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, i
 
 // isConsecutiveComment ports isConsecutiveComment: true when the nearest
 // preceding token-or-comment is itself a comment.
-func isConsecutiveComment(comments []*ast.CommentRange, index int, before *tokenBefore) bool {
+func isConsecutiveComment(comments []*ast.CommentRange, index int, precedingEnd int) bool {
 	if index == 0 {
 		return false
 	}
-	prevCommentEnd := comments[index-1].End()
-	if tok, ok := before.get(); ok && tok.End > prevCommentEnd {
-		// A real token sits between the two comments.
-		return false
-	}
-	return true
+	// A real token past the previous comment's end sits between the two.
+	return precedingEnd <= comments[index-1].End()
 }
 
-// nearestBeforeEnd returns the End() of whichever is closer to pos: the
-// nearest real token before pos, or the immediately preceding sibling
-// comment (comments[index-1]) when no real token sits between them.
-func nearestBeforeEnd(comments []*ast.CommentRange, index int, pos int, before *tokenBefore) (int, bool) {
-	best := -1
-	if tok, ok := before.get(); ok {
-		best = tok.End
-	}
+// nearestBeforeEnd returns the End() of whichever comes later: the nearest
+// real token before the comment, or the immediately preceding sibling comment
+// (comments[index-1]) when no real token sits between them.
+func nearestBeforeEnd(comments []*ast.CommentRange, index int, precedingEnd int) (int, bool) {
+	best := precedingEnd
 	if index > 0 {
-		if prevEnd := comments[index-1].End(); prevEnd <= pos && prevEnd > best {
+		if prevEnd := comments[index-1].End(); prevEnd <= comments[index].Pos() && prevEnd > best {
 			best = prevEnd
 		}
 	}
