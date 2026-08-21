@@ -13,14 +13,41 @@ import (
 )
 
 // sourceMayContainPromiseChain reports whether the file contains a call accepted
-// by testFramework.IsPromiseChainCall. The text check avoids an AST walk for
-// the common negative case. A backslash keeps escaped static names
-// such as promise["\x74hen"]() in the exact AST scan.
+// by testFramework.IsPromiseChainCall, which recognizes `then`, `catch` and
+// `finally` reached either as a property access or as a bracket access keyed by
+// a string or no-substitution template literal.
+//
+// The two forms are gated differently. A property access spells the member as
+// an identifier — a keyword-named property is interned like any other — so the
+// source file's identifier table answers that form exactly and in O(1). It also
+// excludes the `catch` of a `try`/`catch`, which stays a keyword token and never
+// reaches the table; gating on the raw source text instead let every file with a
+// `try`/`catch`, and every file with a backslash, through to the AST walk this
+// function exists to avoid.
+//
+// A bracket access keys the member off a literal that never reaches the
+// identifier table, so it keeps a text scan. That scan stays narrow by first
+// requiring a quote or backtick directly after `[`. The backslash check remains
+// for escaped keys such as promise["\x74hen"](), whose source text does not
+// spell the member name.
 func sourceMayContainPromiseChain(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
+	// Reading a nil identifier table is well defined; a file with no identifiers
+	// has no property-access chain either way.
+	for _, name := range promiseChainMemberNames {
+		if _, ok := sourceFile.Identifiers[name]; ok {
+			return nodeContainsPromiseChain(sourceFile.AsNode())
+		}
+	}
+
 	text := sourceFile.Text()
+	if !strings.Contains(text, `["`) &&
+		!strings.Contains(text, `['`) &&
+		!strings.Contains(text, "[`") {
+		return false
+	}
 	if !strings.Contains(text, "then") &&
 		!strings.Contains(text, "catch") &&
 		!strings.Contains(text, "finally") &&
@@ -30,6 +57,8 @@ func sourceMayContainPromiseChain(sourceFile *ast.SourceFile) bool {
 	return nodeContainsPromiseChain(sourceFile.AsNode())
 }
 
+var promiseChainMemberNames = [...]string{"then", "catch", "finally"}
+
 func nodeContainsPromiseChain(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -37,12 +66,9 @@ func nodeContainsPromiseChain(node *ast.Node) bool {
 	if testFramework.IsPromiseChainCall(node) {
 		return true
 	}
-	found := false
-	node.ForEachChild(func(child *ast.Node) bool {
-		found = nodeContainsPromiseChain(child)
-		return found
-	})
-	return found
+	// ForEachChild reports whether any visit returned true, so passing the
+	// recursion itself keeps the walk free of a capturing closure.
+	return node.ForEachChild(nodeContainsPromiseChain)
 }
 
 var ValidExpectInPromiseRule = shared.NewRule(shared.Config{

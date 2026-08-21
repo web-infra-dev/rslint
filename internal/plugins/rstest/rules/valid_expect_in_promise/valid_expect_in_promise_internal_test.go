@@ -25,6 +25,15 @@ func TestSourceMayContainPromiseChain(t *testing.T) {
 		{source: `const text = "\x74hen"`, want: false},
 		{source: `promise.then()`, want: false},
 		{source: `promise.catch(onRejected, extra)`, want: false},
+		// The `catch` of a try/catch is a keyword token, so it never reaches the
+		// identifier table and must not open the walk.
+		{source: `test("case", () => { try { run() } catch (error) { fail(error) } })`, want: false},
+		// A backslash alone is not a bracket access; only an escaped bracket key
+		// needs the walk.
+		{source: `test("case", () => expect(text).toMatch(/\d+/))`, want: false},
+		{source: `test("case", () => expect(text).toBe("a\tb"))`, want: false},
+		// A bracket access keyed by an unrelated literal stays out.
+		{source: `test("case", () => expect(map["other"]).toBe(1))`, want: false},
 	}
 
 	for _, testCase := range testCases {
