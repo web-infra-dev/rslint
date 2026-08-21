@@ -436,7 +436,11 @@ func NewRule(config Config) rule.Rule {
 					calleeName := ""
 					if len(additionalTestBlockSet) > 0 {
 						calleeName = testFramework.CalleeChainName(callExpr.Expression)
-						if _, ok := additionalTestBlockSet[calleeName]; ok {
+						// CalleeChainName returns "" for every callee it cannot name
+						// (`arr[i]()`, `obj[key]()`, `(a ?? b)()`). The option's items
+						// carry no minLength, so a configured "" would otherwise turn
+						// each of those ordinary calls into a reported test block.
+						if _, ok := additionalTestBlockSet[calleeName]; ok && calleeName != "" {
 							if strings.HasSuffix(calleeName, ".todo") {
 								return
 							}
