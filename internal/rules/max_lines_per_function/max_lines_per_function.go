@@ -25,6 +25,7 @@ var MaxLinesPerFunctionRule = rule.Rule{
 		sourceFile := ctx.SourceFile
 		text := sourceFile.Text()
 		state := &lineState{}
+		headLocator := utils.NewCoreFunctionHeadLocator(sourceFile)
 
 		process := func(node *ast.Node) {
 			// Overload signatures, abstract / declare members, and TS interface
@@ -40,7 +41,6 @@ var MaxLinesPerFunctionRule = rule.Rule{
 
 			startPos := scanner.GetTokenPosOfNode(node, sourceFile, false)
 			endPos := node.End()
-			textRange := core.NewTextRange(startPos, endPos)
 			lineCount := 0
 			if len(state.lineStarts) == 0 && opts.max >= 1 && isSingleLineRange(text, startPos, endPos) {
 				lineCount = 1
@@ -57,8 +57,8 @@ var MaxLinesPerFunctionRule = rule.Rule{
 			}
 
 			if lineCount > opts.max {
-				name := upperCaseFirst(utils.GetFunctionNameWithKind(node))
-				ctx.ReportRange(textRange, rule.RuleMessage{
+				name := utils.UpperCaseFirstASCII(utils.GetFunctionNameWithKindCore(node))
+				ctx.ReportRange(headLocator.Loc(node), rule.RuleMessage{
 					Id: "exceed",
 					Description: fmt.Sprintf(
 						"%s has too many lines (%d). Maximum allowed is %d.",
@@ -116,17 +116,6 @@ func parseOptions(options []any) maxLinesPerFunctionOptions {
 		result.iifes = v
 	}
 	return result
-}
-
-// upperCaseFirst mirrors ESLint's shared/string-utils upperCaseFirst — used to
-// capitalize the leading word of `getFunctionNameWithKind`'s output before
-// embedding it into the diagnostic message ("function 'foo'" → "Function
-// 'foo'", "arrow function" → "Arrow function").
-func upperCaseFirst(s string) string {
-	for i, r := range s {
-		return ecmascript.StringToUpperCase(string(r)) + s[i+len(string(r)):]
-	}
-	return s
 }
 
 // isIIFE reports whether the given function-like node is the callee of a call
