@@ -85,9 +85,6 @@ linters:
 
   exclusions:
     rules:
-      - path: internal/fourslash/tests/gen/
-        linters:
-          - misspell
       - path: '_test\.go$'
         linters:
           - forcetypeassert
@@ -112,6 +109,3 @@ issues:
 formatters:
   enable:
     - gofmt
-  exclusions:
-    paths:
-      - internal/fourslash/tests/gen
