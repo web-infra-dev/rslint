@@ -51,7 +51,7 @@ Check current tool versions from CI config before building:
 
 | Tool            | Version Source                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------ |
-| Go              | `.github/workflows/ci.yml` → `go-version` matrix (currently `1.25.0`)                            |
+| Go              | `.github/workflows/ci.yml` → `go-version` matrix (currently `1.27.0`)                            |
 | Node            | `.github/actions/setup-node/action.yml` → `node-version` (currently `24`)                        |
 | xvfb + GUI deps | `.github/workflows/ci.yml` → `test-node` job → "Install xvfb and dependencies" step              |
 | golangci-lint   | `.github/workflows/ci.yml` → `lint` job → `golangci-lint-action` `version` (currently `v2.13.1`) |
