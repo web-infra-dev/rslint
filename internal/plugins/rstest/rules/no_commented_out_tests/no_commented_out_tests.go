@@ -2,12 +2,12 @@ package no_commented_out_tests
 
 import (
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 type commentBlockSegment struct {
@@ -44,7 +44,7 @@ func skipRstestHorizontalWhitespace(text string, offset int) int {
 			break
 		}
 		char, size := utf8.DecodeRuneInString(text[offset:])
-		if !unicode.IsSpace(char) && char != '\uFEFF' {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(char) {
 			break
 		}
 		offset += size
@@ -280,7 +280,7 @@ func containsExactlyOneLineTerminator(text string) bool {
 		}
 
 		r, size := utf8.DecodeRuneInString(text[offset:])
-		if r == utf8.RuneError && size == 1 || !unicode.IsSpace(r) {
+		if r == utf8.RuneError && size == 1 || !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			return false
 		}
 		offset += size

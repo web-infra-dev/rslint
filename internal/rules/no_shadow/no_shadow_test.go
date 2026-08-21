@@ -1333,6 +1333,14 @@ function bar() { }`},
 				},
 			},
 
+			// ---- Function overload definitions form one shadowing variable ----
+			{
+				Code: `const f = 0; { function f(x: string): void; function f(x: any) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadow", Line: 1, Column: 25},
+				},
+			},
+
 			// ---- Factory returning object method with generic shadow ----
 			{
 				Code: `function mk<T>(x: T) { return { get<T>(): T { return null as any; } }; }`,

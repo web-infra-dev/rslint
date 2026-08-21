@@ -72,8 +72,9 @@ func isReferenceIdentifier(id *ast.Node) bool {
 		return false
 
 	case ast.KindTypePredicate:
-		// `x is T` — `x` names a parameter, it does not read it.
-		return false
+		// `x is T` / `asserts x is T` references the value binding named by
+		// the predicate. `this is T` uses a ThisType node, not an Identifier.
+		return true
 
 	case ast.KindJsxAttribute, ast.KindJsxNamespacedName:
 		return false
@@ -90,6 +91,18 @@ func isReferenceIdentifier(id *ast.Node) bool {
 // export forms name whichever space the exported binding happens to live in.
 func referenceSpaces(id *ast.Node) (value bool, isType bool) {
 	parent := id.Parent
+	// TSESTree erases parentheses, so a parenthesized bare identifier remains
+	// the direct declaration of `export default (X)` / `export = (X)` there.
+	// Recover that shape before switching on the immediate tsgo parent.
+	if parent.Kind == ast.KindExportAssignment || parent.Kind == ast.KindParenthesizedExpression {
+		if exportParent := ast.WalkUpParenthesizedExpressions(parent); exportParent != nil &&
+			exportParent.Kind == ast.KindExportAssignment {
+			if assignment := exportParent.AsExportAssignment(); assignment != nil &&
+				ast.SkipParentheses(assignment.Expression) == id {
+				return true, true
+			}
+		}
+	}
 	switch parent.Kind {
 	case ast.KindExportSpecifier:
 		// `export type { T }` and `export { type T }` export types only.
@@ -102,12 +115,10 @@ func referenceSpaces(id *ast.Node) (value bool, isType bool) {
 			}
 		}
 		return true, true
-	case ast.KindExportAssignment:
-		// `export = X` exports a value or a type; `export default X` is an
-		// expression and names a value.
-		if assignment := parent.AsExportAssignment(); assignment != nil && assignment.IsExportEquals {
-			return true, true
-		}
+	case ast.KindTypePredicate:
+		// The parameter name is a value reference even though the surrounding
+		// predicate is a type node.
+		return true, false
 	}
 
 	if InTypePosition(id) {

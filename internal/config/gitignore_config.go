@@ -42,6 +42,55 @@ func ConfigWithGitignoreWithBoundaries(config RslintConfig, configDir string, fs
 	return ConfigWithCollectedGitignore(config, patterns, caseInsensitive)
 }
 
+// ConfigWithGitignoreForTargets prepends only the .gitignore patterns that can
+// affect the supplied exact files and recursive directory targets. When both
+// target slices are nil, it retains the full-tree behavior used by no-argument
+// CLI and LSP calls.
+func ConfigWithGitignoreForTargets(
+	config RslintConfig,
+	configDir string,
+	fsys vfs.FS,
+	targetFiles []string,
+	targetDirectories []string,
+) RslintConfig {
+	if len(targetDirectories) == 0 {
+		return ConfigWithGitignore(config, configDir, fsys, targetFiles)
+	}
+
+	collectionFiles := targetFiles
+	collectionDirectories := targetDirectories
+	var isDirectoryBlocked func(string) bool
+	configIgnores := extractConfigIgnores(config)
+	if len(configIgnores) > 0 {
+		isDirectoryBlocked = func(relativePath string) bool {
+			return isDirAbsolutelyBlocked(relativePath, configIgnores)
+		}
+	}
+	if fsys != nil {
+		if len(targetFiles) > 0 {
+			collectionFiles = make([]string, len(targetFiles))
+			for i, file := range targetFiles {
+				collectionFiles[i] = ResolveGitignoreCollectionPath(file, "", configDir, fsys)
+			}
+		}
+		if len(targetDirectories) > 0 {
+			collectionDirectories = make([]string, len(targetDirectories))
+			for i, directory := range targetDirectories {
+				collectionDirectories[i] = ResolveGitignoreCollectionDirectory(directory, configDir, fsys)
+			}
+		}
+	}
+	patterns := gitignore.CollectPatternsForTargets(
+		configDir,
+		fsys,
+		collectionFiles,
+		collectionDirectories,
+		isDirectoryBlocked,
+	)
+	caseInsensitive := fsys != nil && !fsys.UseCaseSensitiveFileNames()
+	return ConfigWithCollectedGitignore(config, patterns, caseInsensitive)
+}
+
 // ConfigWithCollectedGitignore prepends one already-collected Git projection
 // without retaining a filesystem. Both the standalone collector path and
 // staged config discovery use this constructor so private Git matching metadata
@@ -132,4 +181,20 @@ func ResolveGitignoreCollectionPath(filePath string, canonicalPath string, confi
 		return tspath.ResolvePath(configDir, relative)
 	}
 	return filePath
+}
+
+// ResolveGitignoreCollectionDirectory is the directory-target form of
+// ResolveGitignoreCollectionPath. A directory that physically contains the
+// config root maps to the root because its relevant projection is the complete
+// config-owned tree.
+func ResolveGitignoreCollectionDirectory(directory string, configDir string, fsys vfs.FS) string {
+	directory = tspath.NormalizePath(directory)
+	matchDirectory, matchConfigDir := ResolveConfigPathSpace(directory, configDir, fsys)
+	if relative, ok := RelativePathWithinConfigRoot(matchDirectory, matchConfigDir, true); ok {
+		return tspath.ResolvePath(configDir, relative)
+	}
+	if _, containsConfigRoot := RelativePathWithinConfigRoot(matchConfigDir, matchDirectory, true); containsConfigRoot {
+		return tspath.NormalizePath(configDir)
+	}
+	return directory
 }

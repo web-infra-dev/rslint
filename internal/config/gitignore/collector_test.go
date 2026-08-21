@@ -780,6 +780,110 @@ func TestExplicitCollectorNeverAccessesOutsideConfigDir(t *testing.T) {
 	})
 }
 
+func TestTargetCollectorVisitsOnlyDirectorySubtreesAndFileChains(t *testing.T) {
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			"/repo/.gitignore":                 "root.ts\n",
+			"/repo/packages/.gitignore":        "package.ts\n",
+			"/repo/packages/a/.gitignore":      "a.ts\n",
+			"/repo/packages/a/deep/.gitignore": "deep.ts\n",
+			"/repo/packages/b/.gitignore":      "b.ts\n",
+			"/repo/tools/.gitignore":           "tool.ts\n",
+			"/repo/unrelated/.gitignore":       "unrelated.ts\n",
+		},
+		entries: map[string]vfs.Entries{
+			"/repo":                 {Directories: []string{"packages", "tools", "unrelated"}, Symlinks: map[string]struct{}{}},
+			"/repo/packages":        {Directories: []string{"a", "b"}, Symlinks: map[string]struct{}{}},
+			"/repo/packages/a":      {Directories: []string{"deep"}, Symlinks: map[string]struct{}{}},
+			"/repo/packages/a/deep": {Symlinks: map[string]struct{}{}},
+			"/repo/packages/b":      {Symlinks: map[string]struct{}{}},
+			"/repo/tools":           {Symlinks: map[string]struct{}{}},
+			"/repo/unrelated":       {Symlinks: map[string]struct{}{}},
+		},
+		caseSensitiveFS: true,
+	}
+
+	patterns := CollectPatternsForTargets(
+		"/repo",
+		mock,
+		[]string{"/repo/tools/index.ts"},
+		[]string{"/repo/packages/a"},
+		nil,
+	)
+
+	assert.DeepEqual(t, patternGlobs(patterns), []string{
+		"**/root.ts",
+		"packages/**/package.ts",
+		"packages/a/**/a.ts",
+		"packages/a/deep/**/deep.ts",
+		"tools/**/tool.ts",
+	})
+	assert.DeepEqual(t, mock.readFileCalls, []string{
+		"/repo/.gitignore",
+		"/repo/packages/.gitignore",
+		"/repo/packages/a/.gitignore",
+		"/repo/packages/a/deep/.gitignore",
+		"/repo/tools/.gitignore",
+	})
+	assert.DeepEqual(t, mock.accessedDirs, []string{
+		"/repo",
+		"/repo/packages",
+		"/repo/packages/a",
+		"/repo/packages/a/deep",
+	})
+	assert.Assert(t, len(mock.realpathCalls) == 0, "target collector resolved unexpected paths: %v", mock.realpathCalls)
+}
+
+func TestCollectionTargetsTreatContainingDirectoryAsFullRoot(t *testing.T) {
+	for _, directory := range []string{"/repo", "/"} {
+		targets := buildCollectionTargets("/repo", nil, []string{directory}, true)
+		assert.Equal(
+			t,
+			targets[tspath.ToPath("/repo", "", true)],
+			collectionTargetRecursive,
+			"containing directory %q did not cover the config root",
+			directory,
+		)
+	}
+
+	targets := buildCollectionTargets("/repo", nil, []string{"/unrelated"}, true)
+	assert.Equal(t, len(targets), 0, "unrelated directory entered the target set")
+}
+
+func TestCollectionTargetsAreVolumeAndCaseAware(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		root   string
+		target string
+	}{
+		{name: "case insensitive", root: "/Repo", target: "/repo/PACKAGES"},
+		{name: "drive", root: "C:/Repo", target: "c:/repo/Packages"},
+		{name: "UNC", root: "//server/share/repo", target: "//SERVER/SHARE/REPO/packages"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			targets := buildCollectionTargets(test.root, nil, []string{test.target}, false)
+			assert.Equal(
+				t,
+				targets[tspath.ToPath(test.target, "", false)],
+				collectionTargetRecursive,
+				"target set = %+v",
+				targets,
+			)
+		})
+	}
+
+	targets := buildCollectionTargets("C:/repo", nil, []string{"D:/repo/packages"}, false)
+	assert.Equal(t, len(targets), 0, "a different drive entered the target set")
+	targets = buildCollectionTargets(
+		"//server/share/repo",
+		nil,
+		[]string{"//server/other/repo/packages"},
+		false,
+	)
+	assert.Equal(t, len(targets), 0, "a different UNC share entered the target set")
+}
+
 func TestCollectionBoundariesAreVolumeAndCaseAware(t *testing.T) {
 	tests := []struct {
 		name             string

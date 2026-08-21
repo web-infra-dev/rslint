@@ -1,6 +1,6 @@
 # Third-party notices
 
-This distribution includes software and data from `globals` 17.9.0:
+This distribution includes software and data from `globals` 17.11.0:
 https://github.com/sindresorhus/globals
 
 MIT License

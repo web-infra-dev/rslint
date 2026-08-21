@@ -1,11 +1,10 @@
 package no_typos
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // propTypesNames is the set of valid PropTypes.* property names, mirroring
@@ -304,9 +303,9 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if propertyName == "propTypes" || propertyName == "contextTypes" || propertyName == "childContextTypes" {
 			checkValidPropObject(value)
 		}
-		lower := strings.ToLower(propertyName)
+		lower := ecmascript.StringToLowerCase(propertyName)
 		for _, canonical := range staticClassProperties {
-			if strings.ToLower(canonical) != lower || canonical == propertyName {
+			if ecmascript.StringToLowerCase(canonical) != lower || canonical == propertyName {
 				continue
 			}
 			messageId := "typoPropDeclaration"
@@ -352,13 +351,13 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if nodeKeyName == "" {
 			return
 		}
-		lowerKey := strings.ToLower(nodeKeyName)
+		lowerKey := ecmascript.StringToLowerCase(nodeKeyName)
 
 		// staticLifecycleMethod: declared non-static but name matches a static
 		// lifecycle method (case-insensitively).
 		if !isStatic {
 			for _, method := range lifecycleStatic {
-				if strings.ToLower(method) == lowerKey {
+				if ecmascript.StringToLowerCase(method) == lowerKey {
 					ctx.ReportNode(member, rule.RuleMessage{
 						Id:          "staticLifecycleMethod",
 						Description: "Lifecycle method should be static: " + nodeKeyName,
@@ -371,7 +370,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// typoLifecycleMethod: name case-insensitively matches a known
 		// lifecycle method (instance or static) but casing differs.
 		for _, method := range lifecycleInstance {
-			if strings.ToLower(method) == lowerKey && method != nodeKeyName {
+			if ecmascript.StringToLowerCase(method) == lowerKey && method != nodeKeyName {
 				ctx.ReportNode(member, rule.RuleMessage{
 					Id:          "typoLifecycleMethod",
 					Description: "Typo in component lifecycle method declaration: " + nodeKeyName + " should be " + method,
@@ -380,7 +379,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			}
 		}
 		for _, method := range lifecycleStatic {
-			if strings.ToLower(method) == lowerKey && method != nodeKeyName {
+			if ecmascript.StringToLowerCase(method) == lowerKey && method != nodeKeyName {
 				ctx.ReportNode(member, rule.RuleMessage{
 					Id:          "typoLifecycleMethod",
 					Description: "Typo in component lifecycle method declaration: " + nodeKeyName + " should be " + method,
@@ -443,10 +442,10 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			if propertyName == nil || propertyName.Kind != ast.KindIdentifier {
 				return
 			}
-			lower := strings.ToLower(propertyName.AsIdentifier().Text)
+			lower := ecmascript.StringToLowerCase(propertyName.AsIdentifier().Text)
 			anyMatch := false
 			for _, canonical := range staticClassProperties {
-				if strings.ToLower(canonical) == lower {
+				if ecmascript.StringToLowerCase(canonical) == lower {
 					anyMatch = true
 					break
 				}

@@ -19,11 +19,11 @@ type NoThisAliasOptions struct {
 var (
 	thisAssignmentMessage = rule.RuleMessage{
 		Id:          "thisAssignment",
-		Description: "Unexpected aliasing of `this` to local variable.",
+		Description: "Unexpected aliasing of 'this' to local variable.",
 	}
 	thisDestructureMessage = rule.RuleMessage{
 		Id:          "thisDestructure",
-		Description: "Destructuring `this` is not allowed.",
+		Description: "Unexpected aliasing of members of 'this' to local variables.",
 	}
 )
 
@@ -86,10 +86,21 @@ func parseOptions(options []any) NoThisAliasOptions {
 }
 
 func reportTarget(ctx *rule.RuleContext, target *ast.Node, message rule.RuleMessage) {
-	ctx.ReportRange(
-		target.Loc.WithPos(scanner.SkipTrivia(ctx.SourceFile.Text(), target.Pos())),
-		message,
-	)
+	targetRange := target.Loc.WithPos(scanner.SkipTrivia(ctx.SourceFile.Text(), target.Pos()))
+	// TSESTree includes a variable declarator's definite-assignment marker and
+	// type annotation in the id range, including for binding patterns.
+	if target.Parent != nil && target.Parent.Kind == ast.KindVariableDeclaration {
+		declaration := target.Parent.AsVariableDeclaration()
+		if declaration.Name() == target {
+			if declaration.ExclamationToken != nil && declaration.ExclamationToken.End() > targetRange.End() {
+				targetRange = targetRange.WithEnd(declaration.ExclamationToken.End())
+			}
+			if declaration.Type != nil && declaration.Type.End() > targetRange.End() {
+				targetRange = targetRange.WithEnd(declaration.Type.End())
+			}
+		}
+	}
+	ctx.ReportRange(targetRange, message)
 }
 
 func defaultThisListener(ctx *rule.RuleContext) func(node *ast.Node) {

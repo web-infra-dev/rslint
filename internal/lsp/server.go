@@ -68,6 +68,7 @@ func NewServer(opts *ServerOptions) *Server {
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
+		lintSessionRoots:       newLintSessionProjectRootCache(),
 	}
 }
 
@@ -157,8 +158,9 @@ type Server struct {
 	watchEnabled     bool
 	watchers         collections.SyncSet[project.WatcherID]
 
-	session      *project.Session
-	lintPrograms *lintProgramStore
+	session          *project.Session
+	lintPrograms     *lintProgramStore
+	lintSessionRoots *lintSessionProjectRootCache
 
 	// enables tests to share a cache of parsed source files
 	parseCache *project.ParseCache

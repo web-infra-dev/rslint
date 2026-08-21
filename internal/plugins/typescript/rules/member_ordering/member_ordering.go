@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed member_ordering.schema.json
@@ -730,11 +731,11 @@ func isOutOfOrder(name, previousName, order string) bool {
 	case orderAlphabetically:
 		return name < previousName
 	case orderAlphaCaseInsensitive:
-		return strings.ToLower(name) < strings.ToLower(previousName)
+		return ecmascript.StringToLowerCase(name) < ecmascript.StringToLowerCase(previousName)
 	case orderNatural:
 		return utils.NaturalCompare(name, previousName) == -1
 	case orderNaturalCaseInsensitive:
-		return utils.NaturalCompare(strings.ToLower(name), strings.ToLower(previousName)) == -1
+		return utils.NaturalCompare(ecmascript.StringToLowerCase(name), ecmascript.StringToLowerCase(previousName)) == -1
 	}
 	return false
 }

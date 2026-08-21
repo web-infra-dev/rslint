@@ -59,6 +59,8 @@ describe('built-in globals catalog', () => {
     expect(globals.node.require).toBe(false);
     expect(globals.nodeBuiltin.process).toBe(false);
     expect(Object.hasOwn(globals.nodeBuiltin, 'require')).toBe(false);
+    expect(globals.greasemonkey.GM_cookie).toBe(false);
+    expect(globals['react-native'].__DEV__).toBe(false);
   });
 
   test('includes language catalogs for parity with the upstream API', () => {

@@ -1035,6 +1035,29 @@ ruleTester.run('valid-expect', {} as never, {
         },
       ],
     },
+    // Parentheses around the array argument are transparent when finding the
+    // Promise wrapper, so the call reports once instead of each assertion.
+    {
+      code: `
+        test("valid-expect", () => {
+          Promise.all(([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]));
+        });
+      `,
+      output: `
+        test("valid-expect", async () => {
+          await Promise.all(([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]));
+        });
+      `,
+      errors: [
+        {
+          line: 2,
+          column: 3,
+          endColumn: 78,
+          messageId: 'promisesWithAsyncAssertionsMustBeAwaited',
+          data: { orReturned: ' or returned' },
+        },
+      ],
+    },
     // Promise.any([expect1, expect2]) returns one error
     {
       code: `

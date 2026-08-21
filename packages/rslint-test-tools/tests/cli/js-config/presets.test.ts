@@ -149,8 +149,14 @@ describe('defineConfig and config presets', () => {
       'rstest/no-disabled-tests': 'warn',
       'rstest/no-focused-tests': 'error',
       'rstest/no-identical-title': 'error',
+      'rstest/no-import-node-test': 'error',
       'rstest/no-interpolation-in-snapshots': 'error',
       'rstest/no-mocks-import': 'error',
+      'rstest/no-standalone-expect': 'error',
+      'rstest/prefer-called-exactly-once-with': 'error',
+      'rstest/require-local-test-context-for-concurrent-snapshots': 'error',
+      'rstest/valid-expect': 'error',
+      'rstest/valid-expect-in-promise': 'error',
       'rstest/valid-title': 'error',
     });
   });
