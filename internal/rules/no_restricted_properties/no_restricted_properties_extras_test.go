@@ -63,6 +63,13 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 			{Code: `let {...rest} = foo;`, Options: []any{map[string]any{"property": "rest"}}},
 			{Code: `({...rest} = foo);`, Options: []any{map[string]any{"property": "rest"}}},
 
+			// ---- Dimension 4: numeric keys stringify with JavaScript's
+			// Number::toString, which leaves fixed notation outside
+			// [1e-6, 1e21) — so the fixed spelling of such a key never matches ----
+			{Code: `foo[1e21]`, Options: []any{map[string]any{"property": "1000000000000000000000"}}},
+			{Code: `foo[1e-7]`, Options: []any{map[string]any{"property": "0.0000001"}}},
+			{Code: `let {[1e21]: x} = foo;`, Options: []any{map[string]any{"property": "1000000000000000000000"}}},
+
 			// ---- Graceful degradation: empty object patterns ----
 			{Code: `let {} = foo;`, Options: []any{map[string]any{"object": "foo"}}},
 			{Code: `({} = foo);`, Options: []any{map[string]any{"object": "foo"}}},
@@ -160,6 +167,46 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 					MessageId: "restrictedProperty",
 					Message:   "'bar' is restricted from being used.",
 					Line:      1, Column: 1, EndLine: 1, EndColumn: 11,
+				}},
+			},
+
+			// ---- Dimension 4: a numeric key at or past 1e21 (and below 1e-6)
+			// is named by its exponential spelling, both in element access and
+			// as a computed destructuring key ----
+			{
+				Code:    `foo[1e21]`,
+				Options: []any{map[string]any{"property": "1e+21"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1e+21' is restricted from being used.",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 10,
+				}},
+			},
+			{
+				Code:    `foo[1e-7]`,
+				Options: []any{map[string]any{"property": "1e-7"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1e-7' is restricted from being used.",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 10,
+				}},
+			},
+			{
+				Code:    `foo[1e21]`,
+				Options: []any{map[string]any{"object": "foo", "property": "1e+21"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedObjectProperty",
+					Message:   "'foo.1e+21' is restricted from being used.",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 10,
+				}},
+			},
+			{
+				Code:    `let {[1e21]: x} = foo;`,
+				Options: []any{map[string]any{"property": "1e+21"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1e+21' is restricted from being used.",
+					Line:      1, Column: 5, EndLine: 1, EndColumn: 16,
 				}},
 			},
 

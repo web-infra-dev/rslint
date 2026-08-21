@@ -1708,7 +1708,7 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 
 // NormalizeNumericLiteral parses a numeric literal text and returns its
 // normalized string representation, matching ESLint's String(node.value) behavior.
-// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
+// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100", "1e21" -> "1e+21"
 func NormalizeNumericLiteral(text string) string {
 	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
 	// Use big.Int to handle arbitrary precision, then convert to float64
@@ -1716,7 +1716,7 @@ func NormalizeNumericLiteral(text string) string {
 	if len(text) > 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
 		if n, ok := new(big.Int).SetString(text, 0); ok {
 			f, _ := new(big.Float).SetInt(n).Float64()
-			return strconv.FormatFloat(f, 'f', -1, 64)
+			return ecmascript.NumberToString(f)
 		}
 		return text
 	}
@@ -1728,13 +1728,7 @@ func NormalizeNumericLiteral(text string) string {
 			return text
 		}
 	}
-	if math.IsInf(f, 1) {
-		return "Infinity"
-	}
-	if math.IsInf(f, -1) {
-		return "-Infinity"
-	}
-	return strconv.FormatFloat(f, 'f', -1, 64)
+	return ecmascript.NumberToString(f)
 }
 
 // NormalizeBigIntLiteral normalizes a BigInt literal to its decimal string
