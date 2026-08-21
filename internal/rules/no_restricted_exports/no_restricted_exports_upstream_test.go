@@ -323,7 +323,7 @@ func TestNoRestrictedExportsUpstream(t *testing.T) {
 				},
 			},
 			{
-				Code:    `export { b as 'a' } from 'foo';`,
+				Code:    `export { b as '\u0061' } from 'foo';`,
 				Options: []any{map[string]any{"restrictedNamedExports": []any{"a"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedNamed", Message: namedMsg("a"), Line: 1, Column: 15},
