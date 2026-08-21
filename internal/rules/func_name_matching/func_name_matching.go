@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	tsscanner "github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -382,11 +382,11 @@ var es6ReservedWords = map[string]bool{
 // tables (github.com/microsoft/typescript-go/shim/scanner.IsValidIdentifier),
 // which track a current Unicode identifier snapshot rather than the frozen
 // ES5.1/Unicode-v9 tables esutils ships for its ES5 path. A small number of
-// codepoints added to Unicode's identifier properties after that snapshot
+// code points added to Unicode's identifier properties after that snapshot
 // (e.g. U+1885) are treated as valid identifier characters here at every
 // ecmaVersion, where ESLint's ES5 mode rejects them.
 func isIdentifierName(name string, ecmaVersion int) bool {
-	if !tsscanner.IsValidIdentifier(name) {
+	if !scanner.IsValidIdentifier(name) {
 		return false
 	}
 	if name == "yield" {
