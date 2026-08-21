@@ -72,38 +72,30 @@ linters:
     forbidigo:
       forbid:
         - pattern: '^strings\.ToLower$'
-          msg: 'A string a rule lowercases is lowercased the way JavaScript lowercases it. Use ecmascript.StringToLowerCase, which is the same answer for ASCII and the right one past it.'
+          msg: 'Use ecmascript.StringToLowerCase instead.'
         - pattern: '^strings\.ToUpper$'
-          msg: 'A string a rule uppercases is uppercased the way JavaScript uppercases it. Use ecmascript.StringToUpperCase, which grows the string where JavaScript grows it.'
+          msg: 'Use ecmascript.StringToUpperCase instead.'
         - pattern: '^strings\.TrimSpace$'
-          msg: 'The whitespace a rule trims is what JavaScript trims: ECMAScript WhiteSpace plus LineTerminator. Use ecmascript.StringTrim.'
+          msg: 'Use ecmascript.StringTrim instead.'
         - pattern: '^strings\.EqualFold$'
-          msg: 'Two strings a rule compares without regard to case are compared the way whatever it is ported from compares them: use ecmascript.EqualsWhenUppercased where upstream writes toUpperCase (jsx-ast-utils looks a prop up that way) and ecmascript.EqualsWhenLowercased where it writes toLowerCase. strings.EqualFold is neither: it folds U+017F ſ onto `s` in both directions, and never folds U+0131 ı onto `i` although uppercasing does.'
+          msg: 'Use ecmascript.EqualsWhenUppercased or ecmascript.EqualsWhenLowercased instead.'
+        - pattern: '^unicode\.To(Upper|Lower|Title)?$'
+          msg: 'Use ecmascript.StringToUpperCase or ecmascript.StringToLowerCase instead.'
+        - pattern: '^unicode\.SimpleFold$'
+          msg: 'Use esregexp.Canonicalize or esregexp.CaseEquivalents instead.'
+        - pattern: '^unicode\.IsSpace$'
+          msg: 'Use ecmascript.IsWhiteSpaceOrLineTerminator instead.'
     depguard:
       rules:
         js-semantics:
-          # Lax so that the allow list below reads as an exception to a deny
-          # rather than as the only thing a rule may import.
           list-mode: lax
           files:
             - '**/internal/rules/**'
             - '**/internal/plugins/**'
-            # A helper a rule calls answers the rule's question, so it is held
-            # to the rule's standard. The ports themselves are the exception:
-            # reading Go's tables is how they are built.
             - '**/internal/utils/**'
             - '!**/internal/utils/ecmascript/**'
             - '!**/internal/utils/minimatch3/**'
-          allow:
-            # depguard matches an import by prefix, and the deny below would
-            # otherwise take these with it. A UTF-16 code unit is what
-            # JavaScript indexes a string by, so utf16 is as much a rule's
-            # business as utf8 is.
-            - 'unicode/utf8'
-            - 'unicode/utf16'
           deny:
-            - pkg: 'unicode'
-              desc: 'A character a rule reads is read the way JavaScript reads it, not the way Go does. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript" for case, whitespace and a general category, and "github.com/microsoft/typescript-go/shim/scanner" for an identifier.'
             - pkg: 'github.com/dlclark/regexp2'
               desc: 'A pattern a rule is handed was written as a JavaScript regexp. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp" instead.'
             - pkg: 'github.com/bmatcuk/doublestar'
@@ -117,19 +109,12 @@ linters:
       - path: '_test\.go$'
         linters:
           - forcetypeassert
-      # A rule reproduces JavaScript, as does a helper it calls; everything
-      # else here is a linter written in Go, answering Go's questions with Go's
-      # standard library.
       - path-except: '^internal/(rules|plugins|utils)/'
         linters:
           - forbidigo
-      # The ports are where a JavaScript answer is assembled out of Go's, so
-      # they are the one place the standard library's calls belong.
       - path: '^internal/utils/(ecmascript|minimatch3)/'
         linters:
           - forbidigo
-      # Test scaffolding builds its own strings rather than reading a source
-      # file, so it is not asking the question the rule asks.
       - path: '_test\.go$'
         linters:
           - forbidigo

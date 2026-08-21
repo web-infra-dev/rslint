@@ -3,6 +3,7 @@ package prefer_array_flat
 import (
 	_ "embed"
 	"fmt"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -264,7 +265,7 @@ func isPascalCaseIdentifier(node *ast.Node) bool {
 		return false
 	}
 	first, _ := utf8.DecodeRuneInString(node.AsIdentifier().Text)
-	return first != utf8.RuneError && ecmascript.IsUpper(first)
+	return first != utf8.RuneError && unicode.IsUpper(first)
 }
 
 func isDefinitelyArrayExpression(node *ast.Node) bool {

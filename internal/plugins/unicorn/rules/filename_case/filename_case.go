@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/core"
@@ -231,7 +232,7 @@ func splitWords(s string) []string {
 	wordStart := -1
 	var previous rune
 	for pos, current := range s {
-		if !ecmascript.IsLetter(current) && !isASCIIDigit(current) {
+		if !unicode.IsLetter(current) && !isASCIIDigit(current) {
 			if wordStart >= 0 {
 				words = append(words, s[wordStart:pos])
 				wordStart = -1
@@ -242,11 +243,11 @@ func splitWords(s string) []string {
 		if wordStart < 0 {
 			wordStart = pos
 		} else {
-			boundary := (ecmascript.IsLower(previous) || isASCIIDigit(previous)) && ecmascript.IsUpper(current)
-			if !boundary && ecmascript.IsUpper(previous) && ecmascript.IsUpper(current) {
+			boundary := (unicode.IsLower(previous) || isASCIIDigit(previous)) && unicode.IsUpper(current)
+			if !boundary && unicode.IsUpper(previous) && unicode.IsUpper(current) {
 				_, size := utf8.DecodeRuneInString(s[pos:])
 				next, _ := utf8.DecodeRuneInString(s[pos+size:])
-				boundary = ecmascript.IsLower(next)
+				boundary = unicode.IsLower(next)
 			}
 			if boundary {
 				words = append(words, s[wordStart:pos])

@@ -19,12 +19,12 @@ This document provides a comprehensive reference for utility functions available
 
 Values a rule is handed were written for JavaScript, and Go's standard library answers a nearby but different question about each of them. These packages hold the readings that match — see [JavaScript Semantics](#javascript-semantics-ecmascript-minimatch3-isglob).
 
-| Package                   | Description                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| `utils/ecmascript`        | Trim, blank, whitespace, upper/lower case, number-to-string, general categories |
-| `utils/ecmascript/regexp` | Compiles and matches a JavaScript RegExp, and `/i` comparison                   |
-| `utils/minimatch3`        | Glob matching the way minimatch 3 does — what plugins pin                       |
-| `utils/isglob`            | "Was this written as a glob, or is it a plain path?"                            |
+| Package                   | Description                                                   |
+| ------------------------- | ------------------------------------------------------------- |
+| `utils/ecmascript`        | Trim, blank, whitespace, upper/lower case, number-to-string   |
+| `utils/ecmascript/regexp` | Compiles and matches a JavaScript RegExp, and `/i` comparison |
+| `utils/minimatch3`        | Glob matching the way minimatch 3 does — what plugins pin     |
+| `utils/isglob`            | "Was this written as a glob, or is it a plain path?"          |
 
 ---
 
@@ -711,8 +711,8 @@ ecmascript.IsLineTerminator(r) // \n \r U+2028 U+2029; Go knows only the first t
 ecmascript.LineTerminators     // the four, as a string
 
 // String.prototype.toUpperCase / toLowerCase. NOT strings.ToUpper or
-// unicode.ToUpper, which map one character to one character on Go's edition of
-// Unicode: `ß` uppercases to `SS` here as it does in JavaScript, `ﬁ` to `FI`,
+// unicode.ToUpper, which map one character to one character: `ß` uppercases to
+// `SS` here as it does in JavaScript, `ﬁ` to `FI`,
 // and a capital sigma lowercases to a final sigma when it ends a word. An
 // all-ASCII string never leaves the ASCII path, so this is the default even
 // for a tag name or an option.
@@ -739,22 +739,11 @@ ecmascript.SkipTrailingWhitespace(text, low, high)
 ecmascript.ContainsLineTerminator(text, low, high)
 ecmascript.IsTriviaWhitespaceByte(b) // ASCII fast path
 ecmascript.IsTriviaWhitespaceRune(r) // call only for r >= U+0080
-
-// The general categories a JavaScript regexp names with \p{...}. Reach for
-// these when the upstream rule reads a character class: change-case's `\p{Ll}`
-// behind `unicorn/filename-case`, `\p{Uppercase_Letter}` behind
-// `unicorn/prefer-array-flat`, `\p{M}` behind `no-misleading-character-class`.
-// When upstream instead writes `c === c.toUpperCase()`, that is a case mapping
-// and belongs to StringToUpperCase above.
-ecmascript.IsUpper(r)  // \p{Lu}
-ecmascript.IsLower(r)  // \p{Ll}
-ecmascript.IsLetter(r) // \p{L}
-ecmascript.IsMark(r)   // \p{M} — the combining marks
 ```
 
-> `depguard` denies the standard library's `unicode` under `internal/rules/**` and `internal/plugins/**`. A case or category question goes here, and an identifier question — is this character allowed to start or continue an identifier? — to tsgo's `scanner.IsIdentifierStart` / `scanner.IsIdentifierPart`, which reads TypeScript's own tables so that a rule and the parser never disagree.
+> `forbidigo` denies `strings.ToLower`, `strings.ToUpper` and `strings.TrimSpace` under `internal/rules/**` and `internal/plugins/**`. There is no exception to argue about: for a string that holds nothing but ASCII the port returns the same answer, and past ASCII it returns the one JavaScript returns.
 >
-> `forbidigo` denies `strings.ToLower`, `strings.ToUpper` and `strings.TrimSpace` under the same trees. There is no exception to argue about: for a string that holds nothing but ASCII the port returns the same answer, and past ASCII it returns the one JavaScript returns.
+> A general category is not a case mapping and does not come from here — see [the standard library's `unicode`](#the-standard-librarys-unicode--a-general-category) below. An identifier question — is this character allowed to start or continue an identifier? — goes to tsgo's `scanner.IsIdentifierStart` / `scanner.IsIdentifierPart`, which reads TypeScript's own tables so that a rule and the parser never disagree.
 
 ### `internal/utils/ecmascript/regexp` — a JavaScript RegExp
 
@@ -794,6 +783,25 @@ esregexp.CaseEquivalenceGroups(unicodeMode)   // for widening a whole range
 Not covered: the `v` flag's set syntax (`Compile` refuses it), and case-insensitive backreference comparison.
 
 > `depguard` denies `github.com/dlclark/regexp2` under `internal/rules/**` and `internal/plugins/**`. Go through this package.
+
+### The standard library's `unicode` — a general category
+
+```go
+import "unicode"
+```
+
+Go 1.27's tables are Unicode 17.0, which is the edition Node 26 reads through ICU 78, so a category question is asked of the standard library directly:
+
+```go
+unicode.IsUpper(r)        // \p{Lu}
+unicode.IsLower(r)        // \p{Ll}
+unicode.IsLetter(r)       // \p{L}
+unicode.Is(unicode.M, r)  // \p{M} — the combining marks
+```
+
+Reach for these when the upstream rule reads a **character class**: change-case's `\p{Ll}` behind `unicorn/filename-case`, `\p{Uppercase_Letter}` behind `unicorn/prefer-array-flat`, `\p{M}` behind `no-misleading-character-class`. When upstream instead writes `c === c.toUpperCase()`, that is a case mapping and belongs to `ecmascript`.
+
+> A category is all the standard library answers here. `forbidigo` denies `unicode.ToUpper`, `ToLower`, `ToTitle`, `To`, `SimpleFold` and `IsSpace` under `internal/rules/**` and `internal/plugins/**`.
 
 ### `internal/utils/minimatch3` — globs the way a plugin reads them
 
