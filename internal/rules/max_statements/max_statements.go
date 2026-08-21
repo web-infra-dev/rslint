@@ -34,14 +34,14 @@ var MaxStatementsRule = rule.Rule{
 			count int
 		}
 		var topLevelFunctions []topLevelEntry
-		headLocator := utils.NewCoreFunctionHeadLocator(ctx.SourceFile)
+		headLocator := utils.NewFunctionHeadRangeLocator(ctx.SourceFile)
 
 		report := func(node *ast.Node, count int) {
 			if count <= opts.max {
 				return
 			}
 			name := utils.UpperCaseFirstASCII(utils.GetFunctionNameWithKindCore(node))
-			ctx.ReportRange(headLocator.Loc(node), rule.RuleMessage{
+			ctx.ReportRange(headLocator.Range(node), rule.RuleMessage{
 				Id: "exceed",
 				Description: fmt.Sprintf(
 					"%s has too many statements (%d). Maximum allowed is %d.",

@@ -6,34 +6,34 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
-// CoreFunctionHeadLocator mirrors core ESLint's getFunctionHeadLoc. The
-// shared GetFunctionHeadLoc helper follows typescript-eslint's decorator
-// behavior, so Loc restores the owning member's decorator-inclusive start
-// required by core rules.
-type CoreFunctionHeadLocator struct {
+// FunctionHeadRangeLocator returns function-head report ranges matching
+// ESLint's built-in rules. The shared GetFunctionHeadLoc helper follows
+// typescript-eslint's decorator behavior, so Range restores the owning
+// member's decorator-inclusive start where the two implementations differ.
+type FunctionHeadRangeLocator struct {
 	sourceFile *ast.SourceFile
 	tokens     *scanner.Scanner
 }
 
-// NewCoreFunctionHeadLocator returns a reusable locator for one source file.
-func NewCoreFunctionHeadLocator(sourceFile *ast.SourceFile) *CoreFunctionHeadLocator {
-	return &CoreFunctionHeadLocator{sourceFile: sourceFile}
+// NewFunctionHeadRangeLocator returns a reusable locator for one source file.
+func NewFunctionHeadRangeLocator(sourceFile *ast.SourceFile) *FunctionHeadRangeLocator {
+	return &FunctionHeadRangeLocator{sourceFile: sourceFile}
 }
 
-// Loc returns the core ESLint report range for node's function head.
-func (l *CoreFunctionHeadLocator) Loc(node *ast.Node) core.TextRange {
+// Range returns the report range for node's function head.
+func (l *FunctionHeadRangeLocator) Range(node *ast.Node) core.TextRange {
 	// GetFunctionHeadLoc has to reproduce SourceCode.getTokenBefore() for a
 	// single-parameter field arrow. Its general implementation scans from the
 	// start of the source file, which becomes quadratic when a rule reports many
 	// such fields. The owning field gives us a narrow, local token boundary.
-	if loc, ok := l.singleParameterFieldArrowHeadLoc(node); ok {
+	if loc, ok := l.singleParameterFieldArrowHeadRange(node); ok {
 		return loc
 	}
 
 	loc := GetFunctionHeadLoc(l.sourceFile, node)
 	member := node
 	switch {
-	case isCoreFunctionMember(node):
+	case isFunctionHeadMember(node):
 	case node.Kind == ast.KindArrowFunction || node.Kind == ast.KindFunctionExpression:
 		owner := ast.WalkUpParenthesizedExpressions(node.Parent)
 		if owner == nil || owner.Kind != ast.KindPropertyDeclaration ||
@@ -51,7 +51,7 @@ func (l *CoreFunctionHeadLocator) Loc(node *ast.Node) core.TextRange {
 	return core.NewTextRange(TrimNodeTextRange(l.sourceFile, member).Pos(), loc.End())
 }
 
-func (l *CoreFunctionHeadLocator) singleParameterFieldArrowHeadLoc(node *ast.Node) (core.TextRange, bool) {
+func (l *FunctionHeadRangeLocator) singleParameterFieldArrowHeadRange(node *ast.Node) (core.TextRange, bool) {
 	if node.Kind != ast.KindArrowFunction {
 		return core.TextRange{}, false
 	}
@@ -110,7 +110,7 @@ func (l *CoreFunctionHeadLocator) singleParameterFieldArrowHeadLoc(node *ast.Nod
 	return core.NewTextRange(TrimNodeTextRange(l.sourceFile, owner).Pos(), end), true
 }
 
-func isCoreFunctionMember(node *ast.Node) bool {
+func isFunctionHeadMember(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 		return true

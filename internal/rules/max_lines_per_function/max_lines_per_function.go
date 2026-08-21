@@ -25,7 +25,7 @@ var MaxLinesPerFunctionRule = rule.Rule{
 		sourceFile := ctx.SourceFile
 		text := sourceFile.Text()
 		state := &lineState{}
-		headLocator := utils.NewCoreFunctionHeadLocator(sourceFile)
+		headLocator := utils.NewFunctionHeadRangeLocator(sourceFile)
 
 		process := func(node *ast.Node) {
 			// Overload signatures, abstract / declare members, and TS interface
@@ -58,7 +58,7 @@ var MaxLinesPerFunctionRule = rule.Rule{
 
 			if lineCount > opts.max {
 				name := utils.UpperCaseFirstASCII(utils.GetFunctionNameWithKindCore(node))
-				ctx.ReportRange(headLocator.Loc(node), rule.RuleMessage{
+				ctx.ReportRange(headLocator.Range(node), rule.RuleMessage{
 					Id: "exceed",
 					Description: fmt.Sprintf(
 						"%s has too many lines (%d). Maximum allowed is %d.",
