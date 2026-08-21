@@ -518,6 +518,7 @@ export default defineConfig({
     './tests/eslint/rules/radix.test.ts',
     './tests/eslint/rules/require-atomic-updates.test.ts',
     './tests/eslint/rules/require-await.test.ts',
+    './tests/eslint/rules/require-unicode-regexp.test.ts',
     './tests/eslint/rules/require-yield.test.ts',
     './tests/eslint/rules/symbol-description.test.ts',
     './tests/eslint/rules/unicode-bom.test.ts',

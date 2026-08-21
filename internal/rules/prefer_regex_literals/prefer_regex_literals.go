@@ -365,56 +365,13 @@ func regexLiteralPatternAndFlags(node *ast.Node) (string, string, bool) {
 }
 
 func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
-	if callee == nil {
-		return false
-	}
-
-	switch callee.Kind {
-	case ast.KindIdentifier:
-		if callee.AsIdentifier().Text != "RegExp" || utils.IsShadowed(callee, "RegExp") {
-			return false
-		}
-		// A config `/* global RegExp: off */` / `languageOptions.globals` entry
-		// un-declares the builtin, so it no longer resolves to a known global —
-		// ESLint's `getVariableByName(scope, "RegExp")` would be undefined and
-		// the rule stays silent.
-		return ctx.Globals.Access("RegExp").IsDeclared()
-	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
-		if access == nil || access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
-			return false
-		}
-		if access.Name().AsIdentifier().Text != "RegExp" {
-			return false
-		}
-		return isKnownGlobalObject(ctx, access.Expression)
-	case ast.KindElementAccessExpression:
-		access := callee.AsElementAccessExpression()
-		if access == nil || access.ArgumentExpression == nil {
-			return false
-		}
-		value, ok := utils.GetStaticExpressionValue(utils.SkipAssertionsAndParens(access.ArgumentExpression))
-		if !ok || value != "RegExp" {
-			return false
-		}
-		return isKnownGlobalObject(ctx, access.Expression)
-	}
-
-	return false
-}
-
-func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {
-	node = utils.SkipAssertionsAndParens(node)
-	if node == nil || node.Kind != ast.KindIdentifier {
-		return false
-	}
-	name := node.AsIdentifier().Text
-	switch name {
-	case "globalThis", "window", "self", "global":
-		return !utils.IsShadowed(node, name) && ctx.Globals.Access(name).IsDeclared()
-	default:
-		return false
-	}
+	// A config `/* global RegExp: off */` / `languageOptions.globals` entry
+	// un-declares the builtin, so it no longer resolves to a known global —
+	// ESLint's `getVariableByName(scope, "RegExp")` would be undefined and
+	// the rule stays silent.
+	return utils.IsBuiltinGlobalCallee(callee, "RegExp", func(name string) bool {
+		return ctx.Globals.Access(name).IsDeclared()
+	})
 }
 
 func canFixTo(ctx rule.RuleContext, node *ast.Node, literal string) bool {
