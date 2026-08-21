@@ -66,6 +66,9 @@ jobs:
       - name: Unit Test (Windows)
         if: matrix.runner == 'rspack-windows-2022-large'
         shell: pwsh
+        env:
+          # The container sees the shared host's cores; that much concurrency only thrashes.
+          GOMAXPROCS: 16
         run: |
           # The Windows runner can exhaust its commit limit with up to 64
           # package builds/test binaries in flight. Keep every package and
