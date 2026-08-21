@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
@@ -188,24 +189,14 @@ func ParseAssertionFunctionOptions(options []any) AssertionFunctionOptions {
 	if optsMap == nil {
 		return parsed
 	}
-	if raw, ok := optsMap["assertFunctionNames"].([]interface{}); ok {
-		parsed.AssertFunctionNames = stringList(raw)
+	if names := internalUtils.ToStringSlice(optsMap["assertFunctionNames"]); names != nil {
+		parsed.AssertFunctionNames = names
 	}
-	if raw, ok := optsMap["additionalTestBlockFunctions"].([]interface{}); ok {
-		parsed.AdditionalTestBlockFunctions = stringList(raw)
+	if additional := internalUtils.ToStringSlice(optsMap["additionalTestBlockFunctions"]); additional != nil {
+		parsed.AdditionalTestBlockFunctions = additional
 	}
 
 	return parsed
-}
-
-func stringList(raw []interface{}) []string {
-	out := make([]string, 0, len(raw))
-	for _, value := range raw {
-		if text, ok := value.(string); ok {
-			out = append(out, text)
-		}
-	}
-	return out
 }
 
 // CompileAssertFunctionNamePatterns compiles eslint-plugin-jest's star-pattern

@@ -34,9 +34,9 @@ func TestPreferEndingWithAnExpectExtras(t *testing.T) {
 			{Code: `test('expression body', () => verify());`, Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"verify"}}}},
 			// Locks in upstream matcher branch: a configured additional test wrapper is exact-match only.
 			{Code: `suite.case('ignored', () => {});`, Options: []interface{}{map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"suite.test"}}}},
-			// ---- Real-user: #1752 awaited expect regression ----
+			// ---- Real-user: eslint-plugin-jest#1752 awaited expect regression ----
 			{Code: `test('awaited assertion', async () => { await expect(load()).resolves.toBe('ok'); });`},
-			// ---- Real-user: #1742 SuperTest assertion chain ----
+			// ---- Real-user: eslint-plugin-jest#1742 SuperTest assertion chain ----
 			{Code: `test('http assertion', () => request(app).get('/').expect(200));`, Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.expect"}}}},
 		},
 		[]rule_tester.InvalidTestCase{
