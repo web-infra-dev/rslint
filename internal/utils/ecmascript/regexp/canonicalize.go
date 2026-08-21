@@ -1,7 +1,6 @@
 package regexp
 
 import (
-	"cmp"
 	"slices"
 	"sync"
 	"unicode"
@@ -68,7 +67,6 @@ var caseRanges = sync.OnceValue(func() []unicode.CaseRange {
 	for _, r := range [...]rune{0x0390, 0x03B0, 0x1FD3, 0x1FE3, 0xFB05, 0xFB06} {
 		ranges = append(ranges, unicode.CaseRange{Lo: uint32(r), Hi: uint32(r)})
 	}
-	slices.SortFunc(ranges, func(a, b unicode.CaseRange) int { return cmp.Compare(a.Lo, b.Lo) })
 	return ranges
 })
 

@@ -2,7 +2,12 @@
 
 package ecmascript
 
-import "testing"
+import (
+	"testing"
+	"unicode"
+
+	"golang.org/x/text/cases"
+)
 
 // Every expectation here is what Node 26 answers for the same call. The cases
 // are the ones where the answer is more than a character-by-character walk of
@@ -140,6 +145,31 @@ func TestEqualsWhenCased(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// nodeEdition is the edition of Unicode this package answers from. Every
+// expectation here is Node 26's answer, and Node 26's ICU reads Unicode 17, so
+// the port agrees with JavaScript only while the tables it maps from are that
+// same edition.
+const nodeEdition = "17.0.0"
+
+// TestUnicodeEdition is the marker on the port: it fails the moment the
+// toolchain moves past the edition Node reads, which is the moment the case
+// mappings and the derived properties beside them start answering something
+// JavaScript does not. Moving the constant means checking Node's ICU first,
+// then walking the characters the new edition brought in the way
+// unicode17Pairs does for this one.
+func TestUnicodeEdition(t *testing.T) {
+	if unicode.Version != nodeEdition {
+		t.Errorf("the standard library is on Unicode %s rather than %s, so StringToUpperCase, "+
+			"Canonicalize and the Cased and Case_Ignorable questions in this package no longer "+
+			"answer what Node does", unicode.Version, nodeEdition)
+	}
+	if cases.UnicodeVersion != unicode.Version {
+		t.Errorf("golang.org/x/text is on Unicode %s while the standard library is on %s, so a "+
+			"full case mapping and the single-character one beside it come from different editions",
+			cases.UnicodeVersion, unicode.Version)
 	}
 }
 
