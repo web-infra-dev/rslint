@@ -132,6 +132,34 @@ var FuncStyleRule = rule.Rule{
 			listeners[rule.ListenerOnExit(kind)] = exitFunctionExpressionLike
 		}
 
+		// tsgo keeps a member's decorators and computed name inside the member
+		// node, so they are walked while its frame is open. ESTree hangs both
+		// off MethodDefinition/Property — siblings of the FunctionExpression
+		// that owns the `this`/`super` binding — so a reference written there
+		// belongs to the enclosing frame instead. Hide the member's frame while
+		// traversing that metadata so it is attributed the same way.
+		var hiddenFrames []bool
+		hideMemberFrame := func(node *ast.Node) {
+			if !isMemberMetadata(node) {
+				return
+			}
+			n := len(stack) - 1
+			hiddenFrames = append(hiddenFrames, stack[n])
+			stack = stack[:n]
+		}
+		restoreMemberFrame := func(node *ast.Node) {
+			if !isMemberMetadata(node) {
+				return
+			}
+			n := len(hiddenFrames) - 1
+			stack = append(stack, hiddenFrames[n])
+			hiddenFrames = hiddenFrames[:n]
+		}
+		listeners[ast.KindDecorator] = hideMemberFrame
+		listeners[rule.ListenerOnExit(ast.KindDecorator)] = restoreMemberFrame
+		listeners[ast.KindComputedPropertyName] = hideMemberFrame
+		listeners[rule.ListenerOnExit(ast.KindComputedPropertyName)] = restoreMemberFrame
+
 		if !opts.allowArrowFunctions {
 			listeners[ast.KindArrowFunction] = func(node *ast.Node) {
 				stack = append(stack, false)
@@ -195,6 +223,21 @@ func isNamedExport(node *ast.Node) bool {
 	return flags&ast.ModifierFlagsExport != 0 && flags&ast.ModifierFlagsDefault == 0
 }
 
+// isMemberMetadata reports whether node is a decorator or computed name that
+// belongs to a member this rule opened a `this`/`super` frame for.
+func isMemberMetadata(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		return true
+	default:
+		return false
+	}
+}
+
 // isNamedExportedDeclarator reports whether declarator (a VariableDeclaration
 // node, i.e. an ESTree VariableDeclarator) sits inside a named-exported
 // `export var/let/const ...` statement. tsgo attaches the `export` modifier to
@@ -219,12 +262,18 @@ func isNamedExportedDeclarator(declarator *ast.Node) bool {
 // an expression. tsgo parses every signature as an ordinary
 // KindFunctionDeclaration with a nil Body, so the port re-derives the same
 // "is this name overloaded" answer by scanning siblings instead.
+//
+// A signature only counts when it is wrapped the same way the implementation
+// is: upstream matches `ExportNamedDeclaration > TSDeclareFunction` siblings
+// for an exported implementation and bare `TSDeclareFunction` siblings
+// otherwise, which the port reproduces by comparing the `export` modifier.
 func isOverloadedFunction(node *ast.Node) bool {
 	nameNode := node.Name()
 	if nameNode == nil {
 		return false
 	}
 	name := nameNode.Text()
+	exported := isNamedExport(node)
 
 	parent := node.Parent
 	if parent == nil {
@@ -240,7 +289,7 @@ func isOverloadedFunction(node *ast.Node) bool {
 			return false
 		}
 		for _, clause := range caseBlock.AsCaseBlock().Clauses.Nodes {
-			if hasOverloadSignature(clause.Statements(), name) {
+			if hasOverloadSignature(clause.Statements(), name, exported) {
 				return true
 			}
 		}
@@ -250,16 +299,19 @@ func isOverloadedFunction(node *ast.Node) bool {
 	if !parent.CanHaveStatements() {
 		return false
 	}
-	return hasOverloadSignature(parent.Statements(), name)
+	return hasOverloadSignature(parent.Statements(), name, exported)
 }
 
-func hasOverloadSignature(statements []*ast.Node, name string) bool {
+func hasOverloadSignature(statements []*ast.Node, name string, exported bool) bool {
 	for _, stmt := range statements {
 		if stmt.Kind != ast.KindFunctionDeclaration {
 			continue
 		}
 		fd := stmt.AsFunctionDeclaration()
 		if fd.Body != nil {
+			continue
+		}
+		if isNamedExport(stmt) != exported {
 			continue
 		}
 		if stmt.Name() != nil && stmt.Name().Text() == name {

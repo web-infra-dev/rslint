@@ -93,6 +93,23 @@ export default function test(a: unknown) { return a; }
 			// frame exactly as it does here. Locks in that this port does
 			// *not* push a frame for ast.KindClassStaticBlockDeclaration ----
 			{Code: "var foo = () => { class C { static { this.x = 1; } } };", Options: []any{"declaration"}},
+
+			// ---- Dimension 2 nesting: a member's decorators and computed name
+			// live inside the member node in tsgo, but hang off
+			// MethodDefinition/Property — outside the FunctionExpression value
+			// — in ESTree, so a `this`/`super` written there belongs to the
+			// enclosing arrow's frame and keeps the arrow from being reported ----
+			{Code: "class A { m() { var foo = () => ({ [this.k]() {} }); } }", Options: []any{"declaration"}},
+			{Code: "class A extends B { m() { var foo = () => ({ [super.k]() {} }); } }", Options: []any{"declaration"}},
+			{Code: "var foo = () => class { [this.k]() {} };", Options: []any{"declaration"}},
+			{Code: "var foo = () => ({ get [this.k]() { return 1; } });", Options: []any{"declaration"}},
+			{Code: "class A { m() { var foo = () => class { @this.dec n() {} }; } }", Options: []any{"declaration"}},
+
+			// ---- Locks in isOverloadedFunction's wrapper matching: upstream
+			// pairs an exported implementation only with `export`ed signatures,
+			// so a set whose export modifiers agree stays exempt ----
+			{Code: "export function foo(a: string): void;\nexport function foo(a: any): void {}", Options: []any{"expression"}},
+			{Code: "function foo(a: string): void;\nfunction foo(a: any): void {}", Options: []any{"expression"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: `(X).y`-style single/multi-level parenthesized
@@ -241,6 +258,34 @@ export default function test(a: unknown) { return a; }
 				Options: []any{"declaration"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "declaration", Line: 1, Column: 5, EndLine: 1, EndColumn: 57},
+				},
+			},
+
+			// ---- Locks in isOverloadedFunction's wrapper matching: a
+			// signature whose `export` modifier disagrees with the
+			// implementation's is a different wrapper upstream
+			// (`TSDeclareFunction` vs `ExportNamedDeclaration >
+			// TSDeclareFunction`), so it never marks the implementation as
+			// overloaded and the implementation is still reported ----
+			{
+				Code:    "function foo(a: string): void;\nexport function foo(a: any): void {}",
+				Options: []any{"expression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expression", Line: 2, Column: 8, EndLine: 2, EndColumn: 37},
+				},
+			},
+			{
+				Code:    "export function foo(a: string): void;\nfunction foo(a: any): void {}",
+				Options: []any{"expression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expression", Line: 2, Column: 1, EndLine: 2, EndColumn: 30},
+				},
+			},
+			{
+				Code:    "declare function foo(a: string): void;\nexport function foo(a: any): void {}",
+				Options: []any{"expression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expression", Line: 2, Column: 8, EndLine: 2, EndColumn: 37},
 				},
 			},
 		},
