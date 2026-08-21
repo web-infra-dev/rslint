@@ -15,17 +15,15 @@ import (
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
-// only the unified Program sequence, lint projection, and source/config path
+// only the unified Program sequence, lint projection, and source/target path
 // mappings needed by integrations; compiler and parser assembly details remain
 // private to the loader. Its slices and maps are immutable after LoadCLI or
 // LoadAPI returns.
 type LoadResult struct {
-	compilerPrograms           []*compiler.Program
-	Programs                   []*lintprogram.Program
-	TargetsByProgram           [][]string
-	TargetPathBySourcePath     map[string]string
-	ConfigPathBySourcePath     map[string]string
-	OwnerConfigDirBySourcePath map[string]string
+	compilerPrograms       []*compiler.Program
+	Programs               []*lintprogram.Program
+	TargetsByProgram       [][]string
+	LintTargetBySourcePath map[string]rslintconfig.DiscoveredLintTarget
 }
 
 func sourceOnlyCompilerOptions() *core.CompilerOptions {
@@ -53,14 +51,19 @@ func canonicalPathID(filePath string, fsys vfs.FS) string {
 	return exactPathID(authoritativePath(filePath, fsys))
 }
 
-func storeSourcePathMapping(mapping map[string]string, sourcePath string, canonicalSourcePath string, value string) {
+func storeSourceTargetMapping(
+	mapping map[string]rslintconfig.DiscoveredLintTarget,
+	sourcePath string,
+	canonicalSourcePath string,
+	target rslintconfig.DiscoveredLintTarget,
+) {
 	if mapping == nil {
 		return
 	}
 	normalizedSource := tspath.NormalizePath(sourcePath)
-	mapping[normalizedSource] = value
+	mapping[normalizedSource] = target
 	if canonicalSourcePath != "" {
-		mapping[exactPathID(canonicalSourcePath)] = value
+		mapping[exactPathID(canonicalSourcePath)] = target
 	}
 }
 
@@ -445,11 +448,7 @@ func (s *Session) appendCompatibilityPrograms(
 			}
 			sourcePath := sourceFile.FileName()
 			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-			if tspath.NormalizePath(sourcePath) != target.Path {
-				storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.ConfigDirectory)
-				storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, binding.ConfigPathBySourcePath[tspath.NormalizePath(target.Path)])
-				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.CanonicalPath, target.Path)
-			}
+			storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath, target.CanonicalPath, target)
 		}
 	}
 	return nil
@@ -459,8 +458,8 @@ func finalizeResult(binding *LoadResult) {
 	for i := range binding.TargetsByProgram {
 		sort.Strings(binding.TargetsByProgram[i])
 	}
-	if len(binding.TargetPathBySourcePath) == 0 {
-		binding.TargetPathBySourcePath = nil
+	if len(binding.LintTargetBySourcePath) == 0 {
+		binding.LintTargetBySourcePath = nil
 	}
 }
 

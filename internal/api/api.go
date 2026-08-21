@@ -100,12 +100,12 @@ type LintRequest struct {
 	// ConfigDiscovery enables the high-level host-filesystem path. It is
 	// mutually exclusive with Config and intentionally unsupported by WASM.
 	ConfigDiscovery *ConfigDiscoveryRequest `json:"configDiscovery,omitempty"`
-	// Anchor directory for resolving the config's relative
-	// files / ignores / parserOptions.project. Defaults to the working dir.
+	// Anchor directory for resolving relative paths in the low-level Config.
+	// High-level ConfigDiscovery entries use their owning config directory;
+	// ConfigDiscovery.OverrideConfig entries use WorkingDirectory.
 	ConfigDirectory string `json:"configDirectory,omitempty"`
 	// PluginConfigDirectory is the opaque worker routing key for community
-	// plugins. It can differ from ConfigDirectory when overrideConfig rebases
-	// authored path patterns to the API cwd.
+	// plugins. It is independent from the directory used to resolve config paths.
 	PluginConfigDirectory string            `json:"pluginConfigDirectory,omitempty"`
 	WorkingDirectory      string            `json:"workingDirectory,omitempty"`
 	FileContents          map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
@@ -127,8 +127,10 @@ type ConfigDiscoveryRequest struct {
 	ExplicitConfigPath string `json:"explicitConfigPath,omitempty"`
 	// Directories are static roots for the already-expanded Files set. Go limits
 	// config discovery below them to branches that can govern those files.
-	Directories    []string        `json:"directories,omitempty"`
-	ExplicitFiles  []bool          `json:"explicitFiles,omitempty"`
+	Directories   []string `json:"directories,omitempty"`
+	ExplicitFiles []bool   `json:"explicitFiles,omitempty"`
+	// OverrideConfig is appended to every selected config while retaining
+	// LintRequest.WorkingDirectory as its authored relative-path base.
 	OverrideConfig json.RawMessage `json:"overrideConfig,omitempty"`
 }
 
@@ -154,10 +156,12 @@ type LintResponse struct {
 	FileCount           int `json:"fileCount"`
 	RuleCount           int `json:"ruleCount"`
 	// LintedFiles lists the files actually linted (config `ignores` excluded),
-	// using each caller-visible target path relative to the config directory.
-	// This is the same path space as Diagnostic.FilePath and Output. The JS side
-	// seeds one LintResult per entry, so ignored glob matches yield no phantom
-	// results. Present for lintFiles; lintText seeds its own explicit path.
+	// using each caller-visible target path. Low-level Config requests return
+	// paths relative to ConfigDirectory; high-level ConfigDiscovery requests
+	// return paths relative to WorkingDirectory. This is the same path space as
+	// Diagnostic.FilePath and Output. The JS side seeds one LintResult per entry,
+	// so ignored glob matches yield no phantom results. Present for lintFiles;
+	// lintText seeds its own explicit path.
 	//
 	// MUST NOT be omitempty: an all-ignored lint produces an empty (non-nil)
 	// slice that has to serialize as `[]`, distinct from an old binary that

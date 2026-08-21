@@ -123,8 +123,11 @@ func (loader *ConfigLoader) LoadDefaultRslintConfig() (RslintConfig, string, err
 }
 
 // LoadTsConfigsFromRslintConfig extracts and validates TypeScript configuration paths from rslint config.
-// Returns an empty slice (no error) when no parserOptions.project is specified — this is valid
-// for pure JS projects that don't need explicit TypeScript configuration.
+// Each explicit project path is resolved from the authored base of the entry
+// that declares it. Most entries use configDirectory; composed entries such as
+// API overrideConfig may retain a different origin.
+// Returns an empty slice (no error) when no project path is declared. Callers
+// separately distinguish an omitted project field from an explicit empty list.
 func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintConfig, configDirectory string) ([]string, error) {
 	tsConfigs := []string{}
 	seenPaths := make(map[string]struct{})
@@ -133,10 +136,11 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
 			continue
 		}
+		entryBaseDirectory := configEntryBaseDirectory(entry, configDirectory)
 
 		for _, config := range entry.LanguageOptions.ParserOptions.Project {
 			if containsGlobPattern(config) {
-				matches, err := loader.expandProjectGlob(configDirectory, config)
+				matches, err := loader.expandProjectGlob(entryBaseDirectory, config)
 				if err != nil {
 					return nil, err
 				}
@@ -149,7 +153,7 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 				continue
 			}
 
-			tsconfigPath := tspath.ResolvePath(configDirectory, config)
+			tsconfigPath := tspath.ResolvePath(entryBaseDirectory, config)
 
 			if !loader.fs.FileExists(tsconfigPath) {
 				return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
@@ -176,6 +180,12 @@ func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]s
 		return nil, err
 	}
 	if len(tsConfigs) == 0 {
+		// An explicit empty list means "use no TypeScript project". It must not
+		// silently turn into the default tsconfig.json; callers that want the
+		// default discovery behavior omit parserOptions.project.
+		if hasExplicitProjectSetting(rslintConfig) {
+			return nil, nil
+		}
 		defaultTsConfig := tspath.ResolvePath(cwd, "tsconfig.json")
 		if fs.FileExists(defaultTsConfig) {
 			return []string{defaultTsConfig}, nil
@@ -183,6 +193,17 @@ func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]s
 		return nil, nil
 	}
 	return tsConfigs, nil
+}
+
+func hasExplicitProjectSetting(config RslintConfig) bool {
+	for _, entry := range config {
+		if entry.LanguageOptions != nil &&
+			entry.LanguageOptions.ParserOptions != nil &&
+			entry.LanguageOptions.ParserOptions.Project != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, configPath string) []string {

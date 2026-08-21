@@ -301,6 +301,7 @@ type lspDiscoveredConfigSnapshot struct {
 	ownerResolver       *config.ConfigOwnerResolver
 	unavailableConfigs  map[string]struct{}
 	jsonConfig          config.RslintConfig
+	jsonConfigResolver  *config.ConfigOwnerResolver
 	jsonConfigPath      string
 	jsonTsConfigPaths   []string
 	transactionID       string
@@ -663,6 +664,10 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		nil,
 		jsonBoundaryResolver.ChildConfigDirs(jsonCWD),
 	)
+	snapshot.jsonConfigResolver = config.NewConfigOwnerResolver(
+		map[string]config.RslintConfig{jsonCWD: snapshot.jsonConfig},
+		fsys,
+	)
 	snapshot.jsonConfigPath = jsonPath
 	snapshot.jsonTsConfigPaths = jsonTsConfigs
 	return snapshot, nil
@@ -748,6 +753,7 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.jsConfigOwnerResolver = snapshot.ownerResolver
 	s.jsUnavailableConfigs = snapshot.unavailableConfigs
 	s.jsonConfig = snapshot.jsonConfig
+	s.jsonConfigResolver = snapshot.jsonConfigResolver
 	s.rslintConfigPath = snapshot.jsonConfigPath
 	s.tsConfigPaths = snapshot.jsonTsConfigPaths
 	s.eslintPluginConfigGeneration = snapshot.transactionID

@@ -567,6 +567,40 @@ func TestDiscoverLintFiles_ExplicitFileSkipsNestedDefaultExcludedDir(t *testing.
 	assert.DeepEqual(t, targets, []string{})
 }
 
+func TestDiscoverLintTargetsFromRootExplicitFileUsesScanRootDefaultExcludes(t *testing.T) {
+	root := t.TempDir()
+	scanRoot := tspath.NormalizePath(filepath.Join(root, "workspace"))
+	configDir := tspath.NormalizePath(filepath.Join(root, "physical", "package"))
+	aliasDir := tspath.CombinePaths(scanRoot, "node_modules", "package")
+	for _, directory := range []string{scanRoot, configDir, tspath.GetDirectoryPath(aliasDir)} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	physicalTarget := tspath.CombinePaths(configDir, "index.ts")
+	if err := os.WriteFile(physicalTarget, []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(configDir, aliasDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	aliasTarget := tspath.CombinePaths(aliasDir, "index.ts")
+
+	targets := discoverLintTargetsFromRoot(
+		RslintConfig{{
+			Files: []string{"**/*.ts"},
+			Rules: Rules{"test-rule": "error"},
+		}},
+		configDir,
+		scanRoot,
+		osvfs.FS(),
+		[]string{aliasTarget},
+		nil,
+		true,
+	)
+	assert.DeepEqual(t, targets, []DiscoveredLintTarget{})
+}
+
 func TestDiscoverLintFiles_OverlappingAllowDirsWalkChildOnce(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"packages/app/src/a.ts",
@@ -595,7 +629,361 @@ func TestDiscoverLintFiles_OverlappingAllowDirsWalkChildOnce(t *testing.T) {
 	assert.Equal(t, srcAccesses, 1, "overlapping allowDirs should not walk child roots twice")
 }
 
-func TestDiscoverLintTargets_DirectoryWalkAvoidsPerFileRealpath(t *testing.T) {
+func TestDiscoverLintTargetsFromRoot_WalksEveryRequestedDirectory(t *testing.T) {
+	root := t.TempDir()
+	configDir := tspath.NormalizePath(filepath.Join(root, "config"))
+	scanRoot := tspath.NormalizePath(filepath.Join(root, "workspace"))
+	firstDir := tspath.NormalizePath(filepath.Join(root, "first"))
+	secondDir := tspath.NormalizePath(filepath.Join(root, "second"))
+	for _, directory := range []string{configDir, scanRoot, firstDir, secondDir} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	firstFile := tspath.CombinePaths(firstDir, "a.ts")
+	secondFile := tspath.CombinePaths(secondDir, "b.ts")
+	for _, filePath := range []string{firstFile, secondFile} {
+		if err := os.WriteFile(filePath, []byte("export {};\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	targets := discoverLintTargetsFromRoot(
+		RslintConfig{{Rules: Rules{"test-rule": "error"}}},
+		configDir,
+		scanRoot,
+		osvfs.FS(),
+		nil,
+		[]string{firstDir, secondDir},
+		true,
+	)
+	assert.DeepEqual(t, targets, []DiscoveredLintTarget{
+		{Path: firstFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(firstFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(firstDir)), ConfigDirectory: configDir},
+		{Path: secondFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(secondFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(secondDir)), ConfigDirectory: configDir},
+	})
+}
+
+func TestDiscoverLintTargetsFromRoot_PreservesDistinctLexicalDirectorySelectors(t *testing.T) {
+	configDir := tspath.NormalizePath(t.TempDir())
+	physicalDir := tspath.NormalizePath(t.TempDir())
+	physicalChild := tspath.CombinePaths(physicalDir, "sub")
+	if err := os.MkdirAll(physicalChild, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physicalFile := tspath.CombinePaths(physicalChild, "x.TS")
+	if err := os.WriteFile(physicalFile, []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasA := tspath.CombinePaths(configDir, "a")
+	aliasB := tspath.CombinePaths(configDir, "b")
+	if err := os.Symlink(physicalDir, aliasA); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	if err := os.Symlink(physicalChild, aliasB); err != nil {
+		t.Skipf("second directory symlink unavailable: %v", err)
+	}
+
+	plan, err := ResolveLintTargetPlan(LintTargetPlanRequest{
+		Config: RslintConfig{{
+			Files: []string{"b/*.TS"},
+			Rules: Rules{"rule": "error"},
+		}},
+		ConfigDirectory: configDir,
+		ScanRoot:        configDir,
+		FS:              osvfs.FS(),
+		Directories:     []string{aliasA, aliasB},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath := tspath.CombinePaths(aliasB, "x.TS")
+	if len(plan.Targets) != 1 || plan.Targets[0].Path != wantPath {
+		t.Fatalf("targets = %+v, want only %q", plan.Targets, wantPath)
+	}
+}
+
+func TestDiscoverLintTargetsFromRoot_DirectoryAliasDoesNotRewriteSiblingScope(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	physicalDir := tspath.CombinePaths(root, "real")
+	if err := os.MkdirAll(physicalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physicalFile := tspath.CombinePaths(physicalDir, "x.TS")
+	if err := os.WriteFile(physicalFile, []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasDir := tspath.CombinePaths(root, "zalias")
+	if err := os.Symlink(physicalDir, aliasDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+
+	plan, err := ResolveLintTargetPlan(LintTargetPlanRequest{
+		Config: RslintConfig{{
+			Files: []string{"real/*.TS"},
+			Rules: Rules{"rule": "error"},
+		}},
+		ConfigDirectory: root,
+		ScanRoot:        root,
+		FS:              osvfs.FS(),
+		Directories:     []string{root, aliasDir},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Targets) != 1 || plan.Targets[0].Path != physicalFile {
+		t.Fatalf("targets = %+v, want only real-directory spelling %q", plan.Targets, physicalFile)
+	}
+}
+
+func TestDiscoverLintTargetsMultiConfig_PreservesProjectedCanonicalIdentity(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	physicalConfigDir := tspath.CombinePaths(root, "real")
+	physicalTargetDir := tspath.CombinePaths(physicalConfigDir, "sub")
+	if err := os.MkdirAll(physicalTargetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physicalFile := tspath.CombinePaths(physicalTargetDir, "x.ts")
+	if err := os.WriteFile(physicalFile, []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configAlias := tspath.CombinePaths(root, "config-alias")
+	targetAlias := tspath.CombinePaths(root, "target-alias")
+	if err := os.Symlink(physicalConfigDir, configAlias); err != nil {
+		t.Skipf("config directory symlink unavailable: %v", err)
+	}
+	if err := os.Symlink(physicalTargetDir, targetAlias); err != nil {
+		t.Skipf("target directory symlink unavailable: %v", err)
+	}
+
+	targets := DiscoverLintTargetsMultiConfig(
+		map[string]RslintConfig{
+			configAlias: {{Rules: Rules{"rule": "error"}}},
+		},
+		nil,
+		osvfs.FS(),
+		nil,
+		[]string{targetAlias},
+		true,
+	)
+	wantPath := tspath.CombinePaths(targetAlias, "x.ts")
+	if len(targets) != 1 || targets[0].Path != wantPath ||
+		targets[0].CanonicalPath != tspath.NormalizePath(osvfs.FS().Realpath(physicalFile)) ||
+		targets[0].ConfigDirectory != configAlias {
+		t.Fatalf("projected target identity = %+v", targets)
+	}
+}
+
+func TestDiscoverLintTargetsFromRoot_SharedAliasAncestorKeepsRelativeConfigMeaning(t *testing.T) {
+	physicalRoot := tspath.NormalizePath(t.TempDir())
+	physicalConfigDir := tspath.CombinePaths(physicalRoot, "config")
+	physicalWorkspace := tspath.CombinePaths(physicalRoot, "workspace")
+	for _, directory := range []string{physicalConfigDir, physicalWorkspace} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	visible := tspath.CombinePaths(physicalWorkspace, "visible.ts")
+	ignored := tspath.CombinePaths(physicalWorkspace, "ignored.ts")
+	for _, filePath := range []string{visible, ignored} {
+		if err := os.WriteFile(filePath, []byte("export {};\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	aliasRoot := tspath.CombinePaths(tspath.NormalizePath(t.TempDir()), "root-alias")
+	if err := os.Symlink(physicalRoot, aliasRoot); err != nil {
+		t.Skipf("root symlink unavailable: %v", err)
+	}
+	configDir := tspath.CombinePaths(aliasRoot, "config")
+	entries := RslintConfig{
+		{Ignores: []string{"../workspace/ignored.ts"}},
+		{Files: []string{"../workspace/*.ts"}, Rules: Rules{"rule": "error"}},
+	}
+	targets := discoverLintTargetsFromRoot(
+		entries,
+		configDir,
+		physicalWorkspace,
+		osvfs.FS(),
+		nil,
+		[]string{physicalWorkspace},
+		true,
+	)
+	if len(targets) != 1 || targets[0].Path != visible {
+		t.Fatalf("shared-alias targets = %+v, want only %q", targets, visible)
+	}
+	merged := NewFileConfigResolverWithFS(entries, configDir, osvfs.FS(), false).ConfigForFile(visible)
+	if merged == nil || merged.Rules["rule"] == nil {
+		t.Fatalf("shared-alias effective config = %#v", merged)
+	}
+}
+
+func TestDiscoverLintTargetsFromRoot_UnionsFilesAndDirectories(t *testing.T) {
+	root := t.TempDir()
+	configDir := tspath.NormalizePath(filepath.Join(root, "config"))
+	scanRoot := tspath.NormalizePath(filepath.Join(root, "workspace"))
+	directoryRoot := tspath.NormalizePath(filepath.Join(root, "directory"))
+	exactRoot := tspath.NormalizePath(filepath.Join(root, "exact"))
+	for _, directory := range []string{configDir, scanRoot, directoryRoot, exactRoot} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	directoryFile := tspath.CombinePaths(directoryRoot, "from-dir.ts")
+	exactFile := tspath.CombinePaths(exactRoot, "exact.ts")
+	for _, filePath := range []string{directoryFile, exactFile} {
+		if err := os.WriteFile(filePath, []byte("export {};\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	targets := discoverLintTargetsFromRoot(
+		nil,
+		configDir,
+		scanRoot,
+		osvfs.FS(),
+		[]string{exactFile},
+		[]string{directoryRoot},
+		true,
+	)
+	assert.DeepEqual(t, targets, []DiscoveredLintTarget{
+		{Path: directoryFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryRoot)), ConfigDirectory: configDir},
+		{Path: exactFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(exactFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(filepath.Dir(exactFile))), ConfigDirectory: configDir},
+	})
+}
+
+func TestDiscoverLintTargetsFromRoot_RequestedAncestorWidensOnlyScanScope(t *testing.T) {
+	root := t.TempDir()
+	configDir := tspath.NormalizePath(filepath.Join(root, "config"))
+	scanRoot := tspath.NormalizePath(filepath.Join(root, "workspace", "nested"))
+	insideFile := tspath.CombinePaths(scanRoot, "inside.ts")
+	siblingFile := tspath.CombinePaths(root, "sibling.ts")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(scanRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, filePath := range []string{insideFile, siblingFile} {
+		if err := os.WriteFile(filePath, []byte("export {};\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	targets := discoverLintTargetsFromRoot(nil, configDir, scanRoot, osvfs.FS(), nil, []string{tspath.NormalizePath(root)}, true)
+	paths := make([]string, 0, len(targets))
+	for _, target := range targets {
+		paths = append(paths, target.Path)
+	}
+	assert.DeepEqual(t, paths, []string{siblingFile, insideFile})
+	for _, target := range targets {
+		assert.Equal(t, target.ConfigDirectory, configDir)
+	}
+}
+
+func TestDiscoverLintTargetsFromRoot_SkipsIgnoredExternalRootBeforeWalking(t *testing.T) {
+	root := t.TempDir()
+	configDir := tspath.NormalizePath(filepath.Join(root, "config"))
+	scanRoot := tspath.NormalizePath(filepath.Join(root, "workspace"))
+	externalDir := tspath.NormalizePath(filepath.Join(root, "external"))
+	for _, directory := range []string{configDir, scanRoot, externalDir} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(tspath.CombinePaths(externalDir, "ignored.ts"), []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	spy := &spyFS{FS: osvfs.FS()}
+	targets := discoverLintTargetsFromRoot(
+		RslintConfig{
+			{Ignores: []string{"../external/**"}},
+			{Rules: Rules{"test-rule": "error"}},
+		},
+		configDir,
+		scanRoot,
+		spy,
+		nil,
+		[]string{externalDir},
+		true,
+	)
+	assert.DeepEqual(t, targets, []DiscoveredLintTarget{})
+	for _, accessed := range spy.snapshotAccessedDirs() {
+		if pathsEqual(accessed, externalDir, true) || tspath.StartsWithDirectory(accessed, externalDir, true) {
+			t.Fatalf("ignored external root was entered: %v", spy.snapshotAccessedDirs())
+		}
+	}
+}
+
+func TestDiscoverLintTargetsFromRoot_SkipsDefaultExcludedScanRoot(t *testing.T) {
+	root := t.TempDir()
+	configDir := tspath.NormalizePath(root)
+	scanRoot := tspath.NormalizePath(filepath.Join(root, "node_modules", "pkg"))
+	if err := os.MkdirAll(scanRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tspath.CombinePaths(scanRoot, "index.ts"), []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		name        string
+		directories []string
+	}{
+		{name: "implicit scan root"},
+		{name: "explicit scan root", directories: []string{scanRoot}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			spy := &spyFS{FS: osvfs.FS()}
+			targets := discoverLintTargetsFromRoot(
+				RslintConfig{{Rules: Rules{"test-rule": "error"}}},
+				configDir,
+				scanRoot,
+				spy,
+				nil,
+				test.directories,
+				true,
+			)
+			assert.DeepEqual(t, targets, []DiscoveredLintTarget{})
+			for _, accessed := range spy.snapshotAccessedDirs() {
+				if pathsEqual(accessed, scanRoot, true) || tspath.StartsWithDirectory(accessed, scanRoot, true) {
+					t.Fatalf("default-excluded scan root was entered: %v", spy.snapshotAccessedDirs())
+				}
+			}
+		})
+	}
+}
+
+func TestDiscoverLintTargetsFromRoot_DistinctCanonicalRootsDoNotCaseFold(t *testing.T) {
+	const (
+		configDir = "/config"
+		scanRoot  = "/workspace"
+		upperDir  = "/repo/Foo"
+		lowerDir  = "/repo/foo"
+	)
+	fake := &discoveryMockFS{
+		FS: osvfs.FS(),
+		entries: map[string]vfs.Entries{
+			upperDir: {Files: []string{"upper.ts"}, Symlinks: map[string]struct{}{}},
+			lowerDir: {Files: []string{"lower.ts"}, Symlinks: map[string]struct{}{}},
+		},
+		resolvedPaths: map[string]string{
+			configDir: "/physical/config",
+			scanRoot:  "/physical/workspace",
+			upperDir:  "/physical/Foo",
+			lowerDir:  "/physical/foo",
+		},
+		caseSensitiveFS: false,
+	}
+	targets := discoverLintTargetsFromRoot(nil, configDir, scanRoot, fake, nil, []string{upperDir, lowerDir}, true)
+	paths := make([]string, 0, len(targets))
+	for _, target := range targets {
+		paths = append(paths, target.Path)
+	}
+	assert.DeepEqual(t, paths, []string{"/repo/Foo/upper.ts", "/repo/foo/lower.ts"})
+}
+
+func TestDiscoverLintTargets_DirectoryWalkAvoidsPerNodeRealpath(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"src/b.ts",
@@ -614,6 +1002,12 @@ func TestDiscoverLintTargets_DirectoryWalkAvoidsPerFileRealpath(t *testing.T) {
 	for _, filePath := range paths {
 		assert.Equal(t, fsys.callCount(filePath), 0, "regular walk target should use the config-root canonical hint")
 	}
+	assert.Equal(
+		t,
+		fsys.callCount(tspath.CombinePaths(configDir, "src")),
+		0,
+		"lexically contained walk directory should not resolve its physical path",
+	)
 }
 
 func TestDiscoverLintTargets_ExplicitFileResolvesPhysicalIdentity(t *testing.T) {
@@ -669,9 +1063,10 @@ func TestDiscoverLintTargets_MissingSymlinkMetadataResolvesFileIdentity(t *testi
 
 	targets := DiscoverLintTargets(nil, configDir, fsys, nil, nil, true)
 	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
-		Path:            filePath,
-		CanonicalPath:   physicalPath,
-		ConfigDirectory: configDir,
+		Path:                filePath,
+		CanonicalPath:       physicalPath,
+		CanonicalParentPath: "/repo/src",
+		ConfigDirectory:     configDir,
 	}})
 }
 
@@ -917,11 +1312,16 @@ func TestDiscoverLintFilesMultiConfig_DoesNotWalkChildConfigFromParent(t *testin
 	assert.DeepEqual(t, targets, expected)
 
 	childAccesses := 0
+	rootAccesses := 0
 	for _, accessed := range spy.snapshotAccessedDirs() {
+		if accessed == rootDir {
+			rootAccesses++
+		}
 		if accessed == childDir {
 			childAccesses++
 		}
 	}
+	assert.Equal(t, rootAccesses, 1, "each child config must not rescan the invocation root")
 	assert.Equal(t, childAccesses, 1, "child config directory should be entered only by its owning config")
 }
 
@@ -1007,9 +1407,10 @@ func TestDiscoverLintTargetsMultiConfig_MatchesIgnoresInPhysicalConfigSpace(t *t
 		true,
 	)
 	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
-		Path:            paths["src/keep.ts"],
-		CanonicalPath:   tspath.NormalizePath(fsys.Realpath(paths["src/keep.ts"])),
-		ConfigDirectory: linkDir,
+		Path:                paths["src/keep.ts"],
+		CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["src/keep.ts"])),
+		CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["src/keep.ts"]))),
+		ConfigDirectory:     linkDir,
 	}})
 }
 
@@ -1096,14 +1497,16 @@ func TestDiscoverLintTargetsMultiConfig_MergesAutomaticAndHostAssignedFilesForSa
 
 	assert.DeepEqual(t, targets, []DiscoveredLintTarget{
 		{
-			Path:            paths["pkg/automatic.ts"],
-			CanonicalPath:   tspath.NormalizePath(fsys.Realpath(paths["pkg/automatic.ts"])),
-			ConfigDirectory: childDir,
+			Path:                paths["pkg/automatic.ts"],
+			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["pkg/automatic.ts"])),
+			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["pkg/automatic.ts"]))),
+			ConfigDirectory:     childDir,
 		},
 		{
-			Path:            paths["pkg/explicit.ts"],
-			CanonicalPath:   tspath.NormalizePath(fsys.Realpath(paths["pkg/explicit.ts"])),
-			ConfigDirectory: childDir,
+			Path:                paths["pkg/explicit.ts"],
+			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["pkg/explicit.ts"])),
+			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["pkg/explicit.ts"]))),
+			ConfigDirectory:     childDir,
 		},
 	})
 }
@@ -1138,9 +1541,10 @@ func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFil
 	)
 
 	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
-		Path:            paths["ignored/explicit.ts"],
-		CanonicalPath:   tspath.NormalizePath(fsys.Realpath(paths["ignored/explicit.ts"])),
-		ConfigDirectory: ignoredDir,
+		Path:                paths["ignored/explicit.ts"],
+		CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["ignored/explicit.ts"])),
+		CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["ignored/explicit.ts"]))),
+		ConfigDirectory:     ignoredDir,
 	}})
 }
 
@@ -1226,6 +1630,270 @@ func TestDiscoverLintTargets_PhysicalConfigFallbackPreservesDirectoryAliasPath(t
 	}
 	assert.Equal(t, targets[0].Path, tspath.ResolvePath(linkDir, "index.ts"))
 	assert.Equal(t, targets[0].CanonicalPath, tspath.NormalizePath(fSys.Realpath(paths["real/sub/index.ts"])))
+}
+
+func TestDiscoverLintTargetsMultiConfig_AliasAuthoredEntrySelectsNonDefaultExtension(t *testing.T) {
+	rootDir := tspath.NormalizePath(t.TempDir())
+	realConfigDir := tspath.CombinePaths(rootDir, "real")
+	realTargetDir := tspath.CombinePaths(realConfigDir, "sub")
+	if err := os.MkdirAll(realTargetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physicalTarget := tspath.CombinePaths(realTargetDir, "index.TS")
+	if err := os.WriteFile(physicalTarget, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := tspath.CombinePaths(rootDir, "link")
+	if err := os.Symlink(realTargetDir, linkDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+
+	inlineOverride := ConfigWithAuthoredPathBase(RslintConfig{{
+		Files: []string{"link/**/*.TS"},
+		Rules: Rules{"inline": "error"},
+	}}, rootDir)
+	entries := append(RslintConfig{{
+		Files: []string{"sub/**/*.ts"},
+		Rules: Rules{"physical": "error"},
+	}}, inlineOverride...)
+	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	targets := DiscoverLintTargetsMultiConfig(
+		map[string]RslintConfig{realConfigDir: entries},
+		nil,
+		fSys,
+		nil,
+		[]string{linkDir},
+		true,
+	)
+	wantPath := tspath.CombinePaths(linkDir, "index.TS")
+	if len(targets) != 1 ||
+		targets[0].Path != wantPath ||
+		targets[0].CanonicalPath != tspath.NormalizePath(fSys.Realpath(physicalTarget)) ||
+		targets[0].ConfigDirectory != realConfigDir {
+		t.Fatalf("alias-authored target = %+v, want %q owned by %q", targets, wantPath, realConfigDir)
+	}
+}
+
+func TestDiscoverLintTargetsMultiConfig_PrunesUsingCallerVisibleDirectoryAlias(t *testing.T) {
+	rootDir := tspath.NormalizePath(t.TempDir())
+	realConfigDir := tspath.CombinePaths(rootDir, "real")
+	realTargetDir := tspath.CombinePaths(realConfigDir, "sub")
+	if err := os.MkdirAll(realTargetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physicalTarget := tspath.CombinePaths(realTargetDir, "index.TS")
+	if err := os.WriteFile(physicalTarget, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := tspath.CombinePaths(rootDir, "link")
+	if err := os.Symlink(realTargetDir, linkDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+
+	inlineIgnore := ConfigWithAuthoredPathBase(
+		RslintConfig{{Ignores: []string{"real/**"}}},
+		rootDir,
+	)
+	entries := append(RslintConfig{{
+		Files: []string{"sub/**/*.TS"},
+		Rules: Rules{"physical": "error"},
+	}}, inlineIgnore...)
+	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	targets := DiscoverLintTargetsMultiConfig(
+		map[string]RslintConfig{realConfigDir: entries},
+		nil,
+		fSys,
+		nil,
+		[]string{linkDir},
+		true,
+	)
+	wantPath := tspath.CombinePaths(linkDir, "index.TS")
+	if len(targets) != 1 || targets[0].Path != wantPath {
+		t.Fatalf("directory alias was pruned in the physical path space: %+v", targets)
+	}
+}
+
+func TestDiscoverLintTargetsMultiConfig_EvaluatesEveryRequestedDirectoryAlias(t *testing.T) {
+	rootDir := tspath.NormalizePath(t.TempDir())
+	realConfigDir := tspath.CombinePaths(rootDir, "real")
+	realTargetDir := tspath.CombinePaths(realConfigDir, "sub")
+	if err := os.MkdirAll(realTargetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physicalTarget := tspath.CombinePaths(realTargetDir, "index.TS")
+	if err := os.WriteFile(physicalTarget, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasA := tspath.CombinePaths(rootDir, "a")
+	aliasB := tspath.CombinePaths(rootDir, "b")
+	for _, alias := range []string{aliasA, aliasB} {
+		if err := os.Symlink(realTargetDir, alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+	}
+	entries := ConfigWithAuthoredPathBase(RslintConfig{{
+		Files: []string{"b/**/*.TS"},
+		Rules: Rules{"inline": "error"},
+	}}, rootDir)
+	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	wantPath := tspath.CombinePaths(aliasB, "index.TS")
+	for _, directories := range [][]string{{aliasA, aliasB}, {aliasB, aliasA}} {
+		targets := DiscoverLintTargetsMultiConfig(
+			map[string]RslintConfig{realConfigDir: entries},
+			nil,
+			fSys,
+			nil,
+			directories,
+			true,
+		)
+		if len(targets) != 1 || targets[0].Path != wantPath {
+			t.Fatalf("requested aliases %v produced %+v, want %q", directories, targets, wantPath)
+		}
+	}
+}
+
+func TestDiscoverLintTargetsMultiConfig_DefaultExcludesUseRequestedDirectoryAlias(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		physicalParts []string
+		aliasParts    []string
+		wantTargets   int
+	}{
+		{
+			name:          "lexical node_modules remains excluded",
+			physicalParts: []string{"real", "sub"},
+			aliasParts:    []string{"node_modules", "link"},
+			wantTargets:   0,
+		},
+		{
+			name:          "physical node_modules hidden by lexical alias remains visible",
+			physicalParts: []string{"real", "node_modules", "pkg"},
+			aliasParts:    []string{"link"},
+			wantTargets:   1,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			rootDir := tspath.NormalizePath(t.TempDir())
+			realConfigDir := tspath.CombinePaths(rootDir, "real")
+			physicalTargetDir := realConfigDir
+			for _, part := range test.physicalParts[1:] {
+				physicalTargetDir = tspath.CombinePaths(physicalTargetDir, part)
+			}
+			if err := os.MkdirAll(physicalTargetDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			physicalTarget := tspath.CombinePaths(physicalTargetDir, "index.TS")
+			if err := os.WriteFile(physicalTarget, []byte("debugger;\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			aliasDir := rootDir
+			for _, part := range test.aliasParts {
+				aliasDir = tspath.CombinePaths(aliasDir, part)
+			}
+			if err := os.MkdirAll(tspath.GetDirectoryPath(aliasDir), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(physicalTargetDir, aliasDir); err != nil {
+				t.Skipf("directory symlink unavailable: %v", err)
+			}
+
+			physicalRelative, ok := RelativePathWithinConfigRoot(physicalTargetDir, realConfigDir, true)
+			if !ok {
+				t.Fatal("invalid physical fixture")
+			}
+			entries := RslintConfig{{
+				Files: []string{physicalRelative + "/**/*.TS"},
+				Rules: Rules{"physical": "error"},
+			}}
+			fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			targets := DiscoverLintTargetsMultiConfig(
+				map[string]RslintConfig{realConfigDir: entries},
+				nil,
+				fSys,
+				nil,
+				[]string{aliasDir},
+				true,
+			)
+			if len(targets) != test.wantTargets {
+				t.Fatalf("targets = %+v, want %d", targets, test.wantTargets)
+			}
+			if test.wantTargets == 1 && targets[0].Path != tspath.CombinePaths(aliasDir, "index.TS") {
+				t.Fatalf("visible alias target = %+v", targets)
+			}
+		})
+	}
+}
+
+func TestDiscoverLintTargetsMultiConfig_DefaultExcludeFiltersEachDirectoryAlias(t *testing.T) {
+	rootDir := tspath.NormalizePath(t.TempDir())
+	realConfigDir := tspath.CombinePaths(rootDir, "real")
+	realTargetDir := tspath.CombinePaths(realConfigDir, "sub")
+	if err := os.MkdirAll(realTargetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physicalTarget := tspath.CombinePaths(realTargetDir, "index.TS")
+	if err := os.WriteFile(physicalTarget, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	excludedAlias := tspath.CombinePaths(rootDir, "a", "node_modules", "link")
+	visibleAlias := tspath.CombinePaths(rootDir, "z")
+	if err := os.MkdirAll(tspath.GetDirectoryPath(excludedAlias), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, alias := range []string{excludedAlias, visibleAlias} {
+		if err := os.Symlink(realTargetDir, alias); err != nil {
+			t.Skipf("directory symlink unavailable: %v", err)
+		}
+	}
+	entries := RslintConfig{{
+		Files: []string{"sub/**/*.TS"},
+		Rules: Rules{"physical": "error"},
+	}}
+	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	targets := DiscoverLintTargetsMultiConfig(
+		map[string]RslintConfig{realConfigDir: entries},
+		nil,
+		fSys,
+		nil,
+		[]string{excludedAlias, visibleAlias},
+		true,
+	)
+	wantPath := tspath.CombinePaths(visibleAlias, "index.TS")
+	if len(targets) != 1 || targets[0].Path != wantPath {
+		t.Fatalf("per-alias default exclusion produced %+v, want only %q", targets, wantPath)
+	}
+}
+
+func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.T) {
+	projections := projectPathThroughRequestedDirectories(
+		"C:/Repo/src/a.TS",
+		"C:/Repo/src/a.TS",
+		[]resolvedAllowedDirectory{{
+			lexicalPath:   "c:/repo/src",
+			canonicalPath: "C:/Repo/src",
+		}},
+		false,
+	)
+	if len(projections) != 1 ||
+		projections[0].path != "c:/repo/src/a.TS" ||
+		projections[0].canonicalPath != "C:/Repo/src/a.TS" {
+		t.Fatalf("projections = %+v", projections)
+	}
+
+	projections = projectPathThroughRequestedDirectories(
+		"C:/Repo/src/a.TS",
+		"C:/Repo/src/a.TS",
+		[]resolvedAllowedDirectory{
+			{lexicalPath: "C:/Repo/src", canonicalPath: "C:/Repo/src"},
+			{lexicalPath: "c:/repo/src", canonicalPath: "c:/repo/src"},
+		},
+		false,
+	)
+	if len(projections) != 1 ||
+		projections[0].path != "C:/Repo/src/a.TS" ||
+		projections[0].canonicalPath != "" {
+		t.Fatalf("distinct case-only roots produced projections %+v", projections)
+	}
 }
 
 func TestDiscoverFilesOutsideProgramsMultiConfig_UsesNearestConfigOwner(t *testing.T) {

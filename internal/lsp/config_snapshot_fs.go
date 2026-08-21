@@ -19,6 +19,7 @@ type configSnapshotFS struct {
 
 	mu                sync.Mutex
 	gitignoreSnapshot map[string]configSnapshotFile
+	realpathSnapshot  map[string]string
 	caseSensitive     bool
 }
 
@@ -35,8 +36,31 @@ func newConfigSnapshotFS(fsys vfs.FS) *configSnapshotFS {
 	return &configSnapshotFS{
 		FS:                fsys,
 		gitignoreSnapshot: make(map[string]configSnapshotFile),
+		realpathSnapshot:  make(map[string]string),
 		caseSensitive:     caseSensitive,
 	}
+}
+
+// Realpath freezes normalized path lookups for this config evaluation. Cache
+// identity follows the filesystem's case sensitivity so alternate casing
+// cannot observe two physical generations on a case-insensitive filesystem.
+// It is intentionally scoped outside target capture: FreezeLintTargetIdentity
+// must observe its parent-before/file/parent-after sequence directly, while
+// owner selection, Git projection, and authored-base matching that follow it
+// must agree with one another.
+func (fsys *configSnapshotFS) Realpath(filePath string) string {
+	if fsys == nil || fsys.FS == nil {
+		return ""
+	}
+	key := fsys.snapshotKey(filePath)
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	if realPath, ok := fsys.realpathSnapshot[key]; ok {
+		return realPath
+	}
+	realPath := fsys.FS.Realpath(filePath)
+	fsys.realpathSnapshot[key] = realPath
+	return realPath
 }
 
 func (fsys *configSnapshotFS) ReadFile(filePath string) (string, bool) {
@@ -48,10 +72,7 @@ func (fsys *configSnapshotFS) ReadFile(filePath string) (string, bool) {
 		return fsys.FS.ReadFile(filePath)
 	}
 
-	key := filePath
-	if !fsys.caseSensitive {
-		key = strings.ToLower(key)
-	}
+	key := fsys.snapshotKey(filePath)
 	fsys.mu.Lock()
 	defer fsys.mu.Unlock()
 	if file, ok := fsys.gitignoreSnapshot[key]; ok {
@@ -60,4 +81,12 @@ func (fsys *configSnapshotFS) ReadFile(filePath string) (string, bool) {
 	content, exists := fsys.FS.ReadFile(filePath)
 	fsys.gitignoreSnapshot[key] = configSnapshotFile{content: content, exists: exists}
 	return content, exists
+}
+
+func (fsys *configSnapshotFS) snapshotKey(filePath string) string {
+	key := tspath.NormalizePath(filePath)
+	if !fsys.caseSensitive {
+		key = strings.ToLower(key)
+	}
+	return key
 }

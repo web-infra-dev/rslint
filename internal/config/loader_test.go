@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
@@ -477,6 +478,22 @@ func TestResolveTsConfigPaths_FallbackToDefaultTsConfig(t *testing.T) {
 	}
 }
 
+func TestResolveTsConfigPaths_ExplicitEmptyProjectDisablesFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "tsconfig.json"))
+	cfg := RslintConfig{{
+		LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+			Project: ProjectPaths{},
+		}},
+	}}
+
+	paths, err := ResolveTsConfigPaths(cfg, tmpDir, osvfs.FS())
+	assert.NilError(t, err)
+	if paths != nil {
+		t.Fatalf("explicit project: [] selected an implicit tsconfig: %v", paths)
+	}
+}
+
 func TestResolveTsConfigPaths_NilFS(t *testing.T) {
 	paths, err := ResolveTsConfigPaths(RslintConfig{{}}, "/any", nil)
 	assert.NilError(t, err)
@@ -501,4 +518,77 @@ func TestResolveTsConfigPaths_ErrorOnNonExistentTsConfig(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for non-existent tsconfig")
 	}
+}
+
+func TestAuthoredPathBaseAppliesToFilesIgnoresAndProjects(t *testing.T) {
+	root := t.TempDir()
+	configDirectory := filepath.Join(root, "config")
+	authoredDirectory := filepath.Join(root, "workspace")
+	target := filepath.Join(authoredDirectory, "src", "index.ts")
+	ignored := filepath.Join(authoredDirectory, "src", "ignored.ts")
+	ownerProject := filepath.Join(configDirectory, "tsconfig.json")
+	authoredProject := filepath.Join(authoredDirectory, "tsconfig.json")
+	for _, path := range []string{target, ignored, ownerProject, authoredProject} {
+		createTestFile(t, path)
+	}
+
+	base := RslintConfig{{
+		LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+			Project: ProjectPaths{"./tsconfig.json"},
+		}},
+	}}
+	override := RslintConfig{
+		{Ignores: []string{"src/ignored.ts"}},
+		{
+			Files: []string{"src/**/*.ts"},
+			LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+				Project: ProjectPaths{"./tsconfig.json"},
+			}},
+			Rules: Rules{"no-debugger": "error"},
+		},
+	}
+	composed := append(base, ConfigWithAuthoredPathBase(override, authoredDirectory)...)
+	if override[0].authoredPathBase != nil || override[1].authoredPathBase != nil {
+		t.Fatal("ConfigWithAuthoredPathBase mutated its input")
+	}
+	composed, optionErrors := ValidateRuleOptions(composed, NewRuleRegistry())
+	if len(optionErrors) != 0 {
+		t.Fatalf("ValidateRuleOptions returned errors: %v", optionErrors)
+	}
+
+	merged := composed.GetConfigForFile(target, configDirectory)
+	if merged == nil || merged.Rules["no-debugger"] == nil {
+		t.Fatalf("authored files base did not select target: %+v", merged)
+	}
+	if !composed.IsFileIgnored(ignored, configDirectory) {
+		t.Fatal("authored ignores base did not exclude target")
+	}
+
+	projects, err := ResolveTsConfigPaths(composed, configDirectory, osvfs.FS())
+	assert.NilError(t, err)
+	wantProjects := []string{
+		tspath.NormalizePath(ownerProject),
+		tspath.NormalizePath(authoredProject),
+	}
+	assert.DeepEqual(t, projects, wantProjects)
+}
+
+func TestResolveTsConfigPathsDefaultRemainsAtOwningConfigBase(t *testing.T) {
+	root := t.TempDir()
+	configDirectory := filepath.Join(root, "config")
+	authoredDirectory := filepath.Join(root, "workspace")
+	ownerProject := filepath.Join(configDirectory, "tsconfig.json")
+	for _, path := range []string{
+		ownerProject,
+		filepath.Join(authoredDirectory, "tsconfig.json"),
+	} {
+		createTestFile(t, path)
+	}
+
+	config := ConfigWithAuthoredPathBase(RslintConfig{{
+		Rules: Rules{"no-debugger": "error"},
+	}}, authoredDirectory)
+	projects, err := ResolveTsConfigPaths(config, configDirectory, osvfs.FS())
+	assert.NilError(t, err)
+	assert.DeepEqual(t, projects, []string{tspath.NormalizePath(ownerProject)})
 }
