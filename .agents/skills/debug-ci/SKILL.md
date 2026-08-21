@@ -49,12 +49,12 @@ gh api repos/web-infra-dev/rslint/actions/jobs/<JOB_ID>/logs
 
 Check current tool versions from CI config before building:
 
-| Tool            | Version Source                                                                                  |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| Go              | `.github/workflows/ci.yml` → `go-version` matrix (currently `1.25.0`)                           |
-| Node            | `.github/actions/setup-node/action.yml` → `node-version` (currently `24`)                       |
-| xvfb + GUI deps | `.github/workflows/ci.yml` → `test-node` job → "Install xvfb and dependencies" step             |
-| golangci-lint   | `.github/workflows/ci.yml` → `lint` job → `golangci-lint-action` `version` (currently `v2.4.0`) |
+| Tool            | Version Source                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| Go              | `.github/workflows/ci.yml` → `go-version` matrix (currently `1.25.0`)                            |
+| Node            | `.github/actions/setup-node/action.yml` → `node-version` (currently `24`)                        |
+| xvfb + GUI deps | `.github/workflows/ci.yml` → `test-node` job → "Install xvfb and dependencies" step              |
+| golangci-lint   | `.github/workflows/ci.yml` → `lint` job → `golangci-lint-action` `version` (currently `v2.13.1`) |
 
 Write a Dockerfile. The apt packages for xvfb **must match** the CI step in `test-node`:
 
@@ -88,7 +88,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Go (version from ci.yml go-version matrix)
-RUN curl -fsSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | tar -C /usr/local -xz
+RUN curl -fsSL https://go.dev/dl/go1.27.0.linux-amd64.tar.gz | tar -C /usr/local -xz
 ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOPATH="/root/go"
 ENV PATH="${GOPATH}/bin:${PATH}"
@@ -103,7 +103,7 @@ RUN corepack enable
 
 # golangci-lint (version from ci.yml lint job → golangci-lint-action)
 RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
-    | sh -s -- -b /usr/local/bin v2.4.0
+    | sh -s -- -b /usr/local/bin v2.13.1
 
 WORKDIR /workspace
 ```

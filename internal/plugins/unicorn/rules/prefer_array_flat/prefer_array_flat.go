@@ -10,7 +10,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 const messageID = "prefer-array-flat"
@@ -265,7 +264,7 @@ func isPascalCaseIdentifier(node *ast.Node) bool {
 		return false
 	}
 	first, _ := utf8.DecodeRuneInString(node.AsIdentifier().Text)
-	return first != utf8.RuneError && unicode17.IsUpper(first)
+	return first != utf8.RuneError && ecmascript.IsUpper(first)
 }
 
 func isDefinitelyArrayExpression(node *ast.Node) bool {

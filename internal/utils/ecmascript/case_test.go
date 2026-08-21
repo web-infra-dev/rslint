@@ -2,11 +2,7 @@
 
 package ecmascript
 
-import (
-	"testing"
-
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
-)
+import "testing"
 
 // Every expectation here is what Node 26 answers for the same call. The cases
 // are the ones where the answer is more than a character-by-character walk of
@@ -147,12 +143,10 @@ func TestEqualsWhenCased(t *testing.T) {
 	}
 }
 
-// TestUnicode17Mappings walks every character the delta names, which is what
-// case_test.go's table can only sample. Both directions have to reach past the
-// caser, since it is built on an older edition of Unicode than JavaScript
-// reads.
+// TestUnicode17Mappings walks every character Unicode 16 and 17 gave a case
+// mapping to, which the table above can only sample.
 func TestUnicode17Mappings(t *testing.T) {
-	for _, pair := range unicode17Pairs(t) {
+	for _, pair := range unicode17Pairs() {
 		lower, upper := string(pair[0]), string(pair[1])
 		if got := StringToUpperCase(lower); got != upper {
 			t.Errorf("StringToUpperCase(%U) = %U, want %U", pair[0], []rune(got), pair[1])
@@ -173,7 +167,7 @@ func TestUnicode17Mappings(t *testing.T) {
 // all: a capital sigma is final when a cased character comes before it and none
 // comes after.
 func TestUnicode17Cased(t *testing.T) {
-	for _, pair := range unicode17Pairs(t) {
+	for _, pair := range unicode17Pairs() {
 		for _, r := range pair {
 			before := string(r) + "Σ"
 			if got := StringToLowerCase(before); got != StringToLowerCase(string(r))+"ς" {
@@ -187,19 +181,21 @@ func TestUnicode17Cased(t *testing.T) {
 	}
 }
 
-// unicode17Pairs reads the delta's mapping data back out as the {lower, upper}
-// pairs the tests here want. Only the lower half of a pair has an uppercase the
-// delta knows, so the walk names each pair once.
-func unicode17Pairs(t *testing.T) [][2]rune {
-	t.Helper()
-	var pairs [][2]rune
-	for _, r := range unicode17.CaseAdditions() {
-		if upper, ok := unicode17.ToUpper(r); ok {
-			pairs = append(pairs, [2]rune{r, upper})
-		}
+// unicode17Pairs are the {lower, upper} pairs Unicode 16 and 17 gave a case
+// mapping to, which is where reading an edition older than Node's would show.
+// The two runs are the bicameral scripts the editions brought in whole.
+func unicode17Pairs() [][2]rune {
+	pairs := [][2]rune{
+		{0x019B, 0xA7DC}, {0x0264, 0xA7CB}, {0x1C8A, 0x1C89}, {0xA7CD, 0xA7CC},
+		{0xA7CF, 0xA7CE}, {0xA7D3, 0xA7D2}, {0xA7D5, 0xA7D4}, {0xA7DB, 0xA7DA},
 	}
-	if len(pairs) == 0 {
-		t.Fatal("the delta names no case mapping at all")
+	for _, run := range [...]struct{ lower, lastLower, toUpper rune }{
+		{0x10D70, 0x10D85, -0x20}, // Garay
+		{0x16EBB, 0x16ED3, -0x1B}, // Beria Erfe
+	} {
+		for lower := run.lower; lower <= run.lastLower; lower++ {
+			pairs = append(pairs, [2]rune{lower, lower + run.toUpper})
+		}
 	}
 	return pairs
 }

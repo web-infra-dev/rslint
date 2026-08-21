@@ -277,7 +277,7 @@ The workflow is complete ONLY when all tasks created during Planning are marked 
 | ------------------------------------------------------ | ------------------------------------------------------- |
 | Trim, blank, whitespace, upper/lower case, `String(n)` | `utils/ecmascript`                                      |
 | A regexp option, a `new RegExp(...)`, `/i` comparison  | `utils/ecmascript/regexp`, imported as `esregexp`       |
-| A general category — `\p{Lu}`, `\p{L}`, `\p{M}`        | `utils/unicode17`                                       |
+| A general category — `\p{Lu}`, `\p{L}`, `\p{M}`        | `utils/ecmascript`                                      |
 | "May this character start or continue an identifier?"  | tsgo's `scanner.IsIdentifierStart` / `IsIdentifierPart` |
 | A glob option (upstream on `minimatch@3`)              | `utils/minimatch3`                                      |
 | "Is this a glob or a plain path?"                      | `utils/isglob`                                          |

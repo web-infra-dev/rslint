@@ -3,8 +3,6 @@ package regexp
 import (
 	"slices"
 	"testing"
-
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 // Every expectation here is what `new RegExp("^"+x+"$", flags).test(y)` answers
@@ -123,15 +121,13 @@ func TestCaseEquivalenceGroupsAgree(t *testing.T) {
 	}
 }
 
-// TestCanonicalizeUnicode17 covers what the delta in [unicode17] is for:
-// JavaScript compares each of the pairs it names equal under a regexp's `iu`
-// flags, and Go's own tables would compare them unequal. The `i` flag on its
-// own canonicalizes one UTF-16 code unit at a time, so it joins the pairs
-// inside the basic plane and leaves the two supplementary-plane scripts apart —
-// which is checked too, because the delta must not reach further than
-// JavaScript does.
+// TestCanonicalizeUnicode17 covers the characters Unicode 16 and 17 gave a case
+// mapping to: JavaScript compares each of the pairs equal under a regexp's `iu`
+// flags. The `i` flag on its own canonicalizes one UTF-16 code unit at a time,
+// so it joins the pairs inside the basic plane and leaves the two
+// supplementary-plane scripts apart, which is checked too.
 func TestCanonicalizeUnicode17(t *testing.T) {
-	for _, pair := range unicode17Pairs(t) {
+	for _, pair := range unicode17Pairs() {
 		lower, upper := pair[0], pair[1]
 		group := []rune{min(lower, upper), max(lower, upper)}
 		joinsWithoutU := lower <= 0xFFFF
@@ -162,19 +158,21 @@ func TestCanonicalizeUnicode17(t *testing.T) {
 	}
 }
 
-// unicode17Pairs reads the delta's mapping data back out as the {lower, upper}
-// pairs the test above wants. Only the lower half of a pair has an uppercase
-// the delta knows, so the walk names each pair once.
-func unicode17Pairs(t *testing.T) [][2]rune {
-	t.Helper()
-	var pairs [][2]rune
-	for _, r := range unicode17.CaseAdditions() {
-		if upper, ok := unicode17.ToUpper(r); ok {
-			pairs = append(pairs, [2]rune{r, upper})
-		}
+// unicode17Pairs are the {lower, upper} pairs Unicode 16 and 17 gave a case
+// mapping to, which is where reading an edition older than Node's would show.
+// The two runs are the bicameral scripts the editions brought in whole.
+func unicode17Pairs() [][2]rune {
+	pairs := [][2]rune{
+		{0x019B, 0xA7DC}, {0x0264, 0xA7CB}, {0x1C8A, 0x1C89}, {0xA7CD, 0xA7CC},
+		{0xA7CF, 0xA7CE}, {0xA7D3, 0xA7D2}, {0xA7D5, 0xA7D4}, {0xA7DB, 0xA7DA},
 	}
-	if len(pairs) == 0 {
-		t.Fatal("the delta names no case mapping at all")
+	for _, run := range [...]struct{ lower, lastLower, toUpper rune }{
+		{0x10D70, 0x10D85, -0x20}, // Garay
+		{0x16EBB, 0x16ED3, -0x1B}, // Beria Erfe
+	} {
+		for lower := run.lower; lower <= run.lastLower; lower++ {
+			pairs = append(pairs, [2]rune{lower, lower + run.toUpper})
+		}
 	}
 	return pairs
 }

@@ -113,13 +113,10 @@ import (
     // Utility functions
     "github.com/web-infra-dev/rslint/internal/utils"
 
-    // JavaScript semantics — trim/blank/case/number, never strings.TrimSpace
-    // or strings.ToLower
+    // JavaScript semantics — trim/blank/case/number and the general categories
+    // (\p{Lu}, \p{L}, \p{M}); never strings.TrimSpace, strings.ToLower or the
+    // standard library's unicode package
     "github.com/web-infra-dev/rslint/internal/utils/ecmascript"
-
-    // A general category (\p{Lu}, \p{L}, \p{M}) on the edition of Unicode Node
-    // reads — never the standard library's unicode package
-    "github.com/web-infra-dev/rslint/internal/utils/unicode17"
 
     // A JavaScript RegExp — never the standard library's regexp, which is RE2
     esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -152,7 +149,7 @@ import (
 - [ ] Whole-file comment scans use `ctx.Comments.All()`
 - [ ] Cross-file source/module queries use `ctx.Program()` without backend-kind branches
 - [ ] Regexps go through `esregexp`, globs through `minimatch3`/`isglob`, and JS string/number semantics through `ecmascript` — no `strings.TrimSpace`, `strings.ToLower`/`ToUpper`, stdlib `regexp`, or `doublestar` on a value that came from JavaScript
-- [ ] A character question goes to `ecmascript` (case, whitespace), `esregexp` (`/i` comparison), `unicode17` (a general category) or tsgo's `scanner` (identifier) — never to the standard library's `unicode`
+- [ ] A character question goes to `ecmascript` (case, whitespace, a general category), `esregexp` (`/i` comparison) or tsgo's `scanner` (identifier) — never to the standard library's `unicode`
 - [ ] Grep the change for `"regexp"` and account for every hit: a stdlib pattern is allowed only when it is written here, RE2 and JavaScript read it the same way, and no user input reaches it — otherwise it takes `esregexp`
 - [ ] If the upstream rule reads globs with anything but minimatch 3 or is-glob — `minimatch@10` included — it was reported to the user rather than silently ported onto `minimatch3`/`doublestar` or hand-rolled
 - [ ] Type check passes (`pnpm typecheck`)

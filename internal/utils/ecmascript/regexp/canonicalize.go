@@ -5,8 +5,6 @@ import (
 	"sync"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 // Canonicalize maps a character to the one JavaScript compares it as when case
@@ -37,11 +35,6 @@ func Canonicalize(r rune, unicodeMode bool) rune {
 	if r > 0xFFFF || expandsOnUppercase(r) {
 		return r
 	}
-	// Go's tables are an older edition of Unicode than the one JavaScript
-	// reads; see [unicode17].
-	if upper, ok := unicode17.ToUpper(r); ok {
-		return upper
-	}
 	upper := unicode.ToUpper(r)
 	if r >= utf8.RuneSelf && upper < utf8.RuneSelf {
 		return r
@@ -60,12 +53,18 @@ func simpleFold(r rune) rune {
 			least = folded
 		}
 	}
-	// A pair [unicode17] carries folds together, so the lower of the two is the
-	// canonical form for both.
-	if other, ok := unicode17.Fold(r); ok && other < least {
-		least = other
-	}
 	return least
+}
+
+// foldWithoutCaseMapping holds the characters simple case folding brings
+// together without either being the other's case. Each has only a full
+// uppercase, onto a sequence of characters, which a case mapping cannot
+// express, so unicode.CaseRanges names neither member of the pair and a walk
+// over the case ranges cannot reach them.
+var foldWithoutCaseMapping = [...]rune{
+	0x0390, 0x1FD3, // ΐ
+	0x03B0, 0x1FE3, // ΰ
+	0xFB05, 0xFB06, // ﬅ and ﬆ
 }
 
 // expandsOnUppercase reports the characters whose simple uppercase is one
@@ -143,12 +142,8 @@ func buildCaseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 			}
 		}
 	}
-	// Except the ones Go has no case mapping for at all, and the ones it folds
-	// together with no case mapping between them.
-	for _, r := range unicode17.CaseAdditions() {
-		record(r)
-	}
-	for _, r := range unicode17.FoldAdditions() {
+	// Except the ones it folds together with no case mapping between them.
+	for _, r := range foldWithoutCaseMapping {
 		record(r)
 	}
 
