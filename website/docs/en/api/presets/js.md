@@ -14,6 +14,8 @@ export default defineConfig([js.configs.recommended]);
 | ------------------------ | ---------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `js.configs.recommended` | JavaScript recommended rules | [View rules →](/rules/?preset=js.configs.recommended) | [`@eslint/js` `configs.recommended`](https://eslint.org/docs/v10.x/use/configure/migration-guide#predefined-and-shareable-configs) |
 
+See [Rules & Presets](/config/rules-and-presets) for guidance on choosing and layering presets.
+
 ## Differences from ESLint
 
 Unlike the upstream preset, `js.configs.recommended` intentionally omits `no-undef`.
@@ -40,5 +42,3 @@ export default defineConfig([
   },
 ]);
 ```
-
-See [Rules & Presets](/config/rules-and-presets) for guidance on choosing and layering presets.
