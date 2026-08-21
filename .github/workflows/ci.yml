@@ -29,8 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         runner:
-          - rspack-ubuntu-22.04-large
-          - rspack-darwin-15.6.1-medium
+          # TEMP (probe): Linux and macOS dropped so this run only burns the Windows runner.
           - rspack-windows-2022-large
         go-version: ['1.26.0']
     steps:
@@ -113,6 +112,7 @@ jobs:
         run: go test -count=1 ./cmd/... ./internal/...
 
   lint:
+    if: false # TEMP (probe): disabled, only the Windows Go test job runs.
     name: Lint&Check
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -146,6 +146,7 @@ jobs:
         run: pnpm check-spell
 
   test-node:
+    if: false # TEMP (probe): disabled, only the Windows Go test job runs.
     name: Test npm packages
     runs-on: ${{ matrix.os }}
     strategy:
@@ -215,6 +216,7 @@ jobs:
         run: xvfb-run -a pnpm run test
 
   test-node-windows:
+    if: false # TEMP (probe): disabled, only the Windows Go test job runs.
     name: Test npm packages (rspack-windows-2022-large)
     runs-on: rspack-windows-2022-large
     steps:
@@ -283,6 +285,7 @@ jobs:
           if-no-files-found: error
 
   test-vscode-windows:
+    if: false # TEMP (probe): disabled, only the Windows Go test job runs.
     name: Test vscode-extension (windows-latest)
     runs-on: windows-latest
     needs: test-node-windows
@@ -339,6 +342,7 @@ jobs:
         run: pnpm --filter rslint test
 
   test-wasm:
+    if: false # TEMP (probe): disabled, only the Windows Go test job runs.
     name: Test WASM
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -364,6 +368,7 @@ jobs:
           pnpm --filter '@rslint/core' build:js
           pnpm --filter '@rslint/wasm' build
   test-rust:
+    if: false # TEMP (probe): disabled, only the Windows Go test job runs.
     name: Test Rust
     runs-on: ${{ matrix.os }}
     strategy:
@@ -428,7 +433,7 @@ jobs:
       - lint
       - test-wasm
       - test-rust
-    if: always()
+    if: false # TEMP (probe): disabled, only the Windows Go test job runs.
     runs-on: rspack-ubuntu-22.04-mini
     name: CI Done
     steps:
