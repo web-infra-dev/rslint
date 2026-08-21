@@ -314,13 +314,8 @@ func TestSourcePotentialReferenceGate(t *testing.T) {
 		})
 	}
 
-	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: "/new-for-builtins-gate-fallback-test.ts",
-		Path:     tspath.Path("/new-for-builtins-gate-fallback-test.ts"),
-	}, "helper();", core.ScriptKindTS)
-	sourceFile.Identifiers = nil
-	if !sourceHasPotentialReference(sourceFile) {
-		t.Fatal("sourceHasPotentialReference() must fail open without a parser identifier index")
+	if !sourceHasPotentialReference(nil) {
+		t.Fatal("sourceHasPotentialReference() must fail open without a source file")
 	}
 }
 

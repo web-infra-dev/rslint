@@ -38,7 +38,7 @@ type options struct {
 	globalObjects     map[string]sourceBindingState
 }
 
-func parseOptions(optionsList []any, sourceIdentifiers map[string]string) (options, bool) {
+func parseOptions(optionsList []any, sourceFile *ast.SourceFile) (options, bool) {
 	isGlobalsObject := false
 	var globalsObjectMap map[string]interface{}
 	if len(optionsList) > 0 {
@@ -72,7 +72,7 @@ func parseOptions(optionsList []any, sourceIdentifiers map[string]string) (optio
 	}
 
 	restrictedGlobals := make(map[string]globalEntry, len(rawGlobals))
-	mayUseRestrictedGlobal := sourceIdentifiers == nil
+	mayUseRestrictedGlobal := sourceFile == nil
 	for _, item := range rawGlobals {
 		var name string
 		switch v := item.(type) {
@@ -94,7 +94,7 @@ func parseOptions(optionsList []any, sourceIdentifiers map[string]string) (optio
 			}
 		}
 		if !mayUseRestrictedGlobal && name != "" {
-			_, mayUseRestrictedGlobal = sourceIdentifiers[name]
+			mayUseRestrictedGlobal = sourceFile.HasIdentifier(name)
 		}
 	}
 
@@ -120,11 +120,7 @@ var NoRestrictedGlobalsRule = rule.Rule{
 	Name:   "no-restricted-globals",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		var sourceIdentifiers map[string]string
-		if ctx.SourceFile != nil {
-			sourceIdentifiers = ctx.SourceFile.Identifiers
-		}
-		opts, mayUseRestrictedGlobal := parseOptions(options, sourceIdentifiers)
+		opts, mayUseRestrictedGlobal := parseOptions(options, ctx.SourceFile)
 
 		// If no globals are restricted, there's nothing to check.
 		if len(opts.restrictedGlobals) == 0 {
@@ -135,7 +131,7 @@ var NoRestrictedGlobalsRule = rule.Rule{
 				if !ctx.Globals.Access(name).IsDeclared() {
 					delete(opts.globalObjects, name)
 				} else if !mayUseRestrictedGlobal {
-					_, mayUseRestrictedGlobal = sourceIdentifiers[name]
+					mayUseRestrictedGlobal = ctx.SourceFile.HasIdentifier(name)
 				}
 			}
 		}

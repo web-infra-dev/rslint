@@ -1267,11 +1267,11 @@ func watchedBuiltinName(path []string) (string, bool) {
 }
 
 func sourceHasPotentialReference(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
 	for root := range potentialReferenceRoots {
-		if _, ok := sourceFile.Identifiers[root]; ok {
+		if sourceFile.HasIdentifier(root) {
 			return true
 		}
 	}

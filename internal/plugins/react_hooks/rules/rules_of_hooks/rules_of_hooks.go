@@ -586,16 +586,21 @@ func sourceMayUseHooks(sourceFile *ast.SourceFile) bool {
 	// Parsed identifier names are normalized, including Unicode escapes, and
 	// include property names such as the useState in React.useState. The table
 	// may also intern literal text, making computed properties a harmless false
-	// positive. Stay conservative for direct callers without parser metadata.
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	// positive. Stay conservative for direct callers without a source file.
+	if sourceFile == nil {
 		return true
 	}
-	for name := range sourceFile.Identifiers {
-		if hasHookNameShape(name) {
+	found := false
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && hasHookNameShape(node.Text()) {
+			found = true
 			return true
 		}
+		return node.ForEachChild(visit)
 	}
-	return false
+	sourceFile.AsNode().ForEachChild(visit)
+	return found
 }
 
 func hasHookNameShape(name string) bool {
@@ -625,11 +630,10 @@ func mayBeHookCallee(node *ast.Node) bool {
 }
 
 func sourceMayUseEffectEvent(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["useEffectEvent"]
-	return ok
+	return sourceFile.HasIdentifier("useEffectEvent")
 }
 
 // eeRegistry tracks `const X = useEffectEvent(...)` declarations per enclosing

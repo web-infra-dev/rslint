@@ -8,11 +8,10 @@ import (
 )
 
 func sourceMayContainConditionalRstestExpect(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["expect"]
-	return ok
+	return sourceFile.HasIdentifier("expect")
 }
 
 var NoConditionalExpectRule = shared.NewRule(shared.Config{

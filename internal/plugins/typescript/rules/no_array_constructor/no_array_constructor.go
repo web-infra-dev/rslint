@@ -17,11 +17,10 @@ func useLiteralMessage() rule.RuleMessage {
 func sourceMayUseArrayConstructor(sourceFile *ast.SourceFile) bool {
 	// Parsed identifier names are normalized, including Unicode escapes. Stay
 	// conservative for direct callers that do not provide parser metadata.
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["Array"]
-	return ok
+	return sourceFile.HasIdentifier("Array")
 }
 
 func buildArrayConstructorFixes(

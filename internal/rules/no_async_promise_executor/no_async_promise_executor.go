@@ -21,11 +21,10 @@ func sourceMayUsePromise(sourceFile *ast.SourceFile) bool {
 	// async executor also spells the contextual keyword contiguously; matches in
 	// comments and strings are harmless false positives. Stay conservative for
 	// direct callers that do not provide parser metadata.
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["Promise"]
-	return ok && strings.Contains(sourceFile.Text(), "async")
+	return sourceFile.HasIdentifier("Promise") && strings.Contains(sourceFile.Text(), "async")
 }
 
 func enclosingPromiseScope(node *ast.Node) *ast.Node {

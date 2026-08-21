@@ -63,11 +63,10 @@ func parseOptions(rawOptions []any) options {
 // identifier table lacks that name can skip every listener. Stay conservative
 // for direct callers that do not provide parser metadata.
 func sourceMayUsePromise(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
-	_, ok := sourceFile.Identifiers[promiseName]
-	return ok
+	return sourceFile.HasIdentifier(promiseName)
 }
 
 // isVoidExpression mirrors upstream expressionIsVoid. tsgo gives `void x` its

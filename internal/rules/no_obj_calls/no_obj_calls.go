@@ -42,18 +42,18 @@ var globalObjects = func() map[string]bool {
 }()
 
 func sourceMayUseNonCallableGlobal(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
 	for _, name := range nonCallableGlobalNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}
 	// Computed global-object access such as globalThis["Math"] does not put
-	// "Math" in SourceFile.Identifiers.
+	// "Math" in the source file's identifier index.
 	for _, name := range globalObjectNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}

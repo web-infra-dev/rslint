@@ -2518,7 +2518,6 @@ const SymbolFlagsBlockScopedVariableExcludes = ast.SymbolFlagsBlockScopedVariabl
 const SymbolFlagsClass = ast.SymbolFlagsClass
 const SymbolFlagsClassExcludes = ast.SymbolFlagsClassExcludes
 const SymbolFlagsClassMember = ast.SymbolFlagsClassMember
-const SymbolFlagsClassifiable = ast.SymbolFlagsClassifiable
 const SymbolFlagsConstEnum = ast.SymbolFlagsConstEnum
 const SymbolFlagsConstEnumExcludes = ast.SymbolFlagsConstEnumExcludes
 const SymbolFlagsConstEnumOnlyModule = ast.SymbolFlagsConstEnumOnlyModule

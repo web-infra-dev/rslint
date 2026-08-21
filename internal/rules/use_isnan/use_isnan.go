@@ -157,14 +157,13 @@ func (checker *globalReferenceChecker) mayShadow(name string) bool {
 }
 
 func sourceMayUseNaN(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
-	if _, ok := sourceFile.Identifiers["NaN"]; ok {
+	if sourceFile.HasIdentifier("NaN") {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["Number"]
-	return ok
+	return sourceFile.HasIdentifier("Number")
 }
 
 func isComparisonOperator(kind ast.Kind) bool {

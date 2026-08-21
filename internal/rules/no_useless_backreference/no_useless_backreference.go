@@ -77,7 +77,7 @@ func sourceMayUseRegExp(ctx rule.RuleContext) bool {
 	// constructor forms can match, so files lacking all of their names can
 	// safely avoid broad call/new listeners.
 	sourceFile := ctx.SourceFile
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
 	for _, name := range [...]string{
@@ -87,7 +87,7 @@ func sourceMayUseRegExp(ctx rule.RuleContext) bool {
 		"self",
 		"global",
 	} {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}

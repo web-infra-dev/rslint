@@ -21,7 +21,6 @@ const EmitAll = compiler.EmitAll
 type EmitHost = compiler.EmitHost
 type EmitOnly = compiler.EmitOnly
 const EmitOnlyDts = compiler.EmitOnlyDts
-const EmitOnlyForcedDts = compiler.EmitOnlyForcedDts
 const EmitOnlyJs = compiler.EmitOnlyJs
 type EmitOptions = compiler.EmitOptions
 type EmitResult = compiler.EmitResult

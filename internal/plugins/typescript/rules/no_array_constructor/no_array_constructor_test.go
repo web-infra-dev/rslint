@@ -336,7 +336,7 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			{Code: `new (Array)(value);`},
 		},
 		[]rule_tester.InvalidTestCase{
-			// SourceFile.Identifiers and the AST both normalize identifier
+			// SourceFile.HasIdentifier and the AST both normalize identifier
 			// escapes, so the file-level fast path must retain these reports.
 			{
 				Code: `Arr\u0061y(a, b);`,

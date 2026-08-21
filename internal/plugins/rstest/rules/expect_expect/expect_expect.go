@@ -13,11 +13,10 @@ import (
 // identifier somewhere, so a file without it can skip the resolving hook and
 // avoid forcing the analysis to collect test callbacks.
 func sourceMayContainRstestExpect(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["expect"]
-	return ok
+	return sourceFile.HasIdentifier("expect")
 }
 
 var ExpectExpectRule = shared.NewRule(shared.Config{

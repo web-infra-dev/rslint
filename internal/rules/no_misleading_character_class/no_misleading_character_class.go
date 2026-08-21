@@ -75,14 +75,14 @@ var regexpGlobalObjectNames = [...]string{
 }
 
 func sourceMayUseRegExp(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil {
 		return true
 	}
-	if _, ok := sourceFile.Identifiers["RegExp"]; ok {
+	if sourceFile.HasIdentifier("RegExp") {
 		return true
 	}
 	for _, name := range regexpGlobalObjectNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}

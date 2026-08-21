@@ -70,6 +70,7 @@ require (
 )
 
 require (
+	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/mackerelio/go-osstat v0.2.7 // indirect
@@ -83,6 +84,6 @@ require (
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
-	github.com/microsoft/typescript-go v0.0.0-20260721214542-01cbcdd8643c // indirect
+	github.com/microsoft/typescript-go v0.0.0-20260820064610-89d5d5b2849a // indirect
 	golang.org/x/text v0.41.0
 )
