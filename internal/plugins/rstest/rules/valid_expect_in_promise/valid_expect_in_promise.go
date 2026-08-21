@@ -2,6 +2,7 @@ package valid_expect_in_promise
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
@@ -11,10 +12,46 @@ import (
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/valid_expect_in_promise"
 )
 
+// sourceMayContainPromiseChain reports whether the file contains a call accepted
+// by testFramework.IsPromiseChainCall. The text check avoids an AST walk for
+// the common negative case. A backslash keeps escaped static names
+// such as promise["\x74hen"]() in the exact AST scan.
+func sourceMayContainPromiseChain(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	text := sourceFile.Text()
+	if !strings.Contains(text, "then") &&
+		!strings.Contains(text, "catch") &&
+		!strings.Contains(text, "finally") &&
+		!strings.Contains(text, `\`) {
+		return false
+	}
+	return nodeContainsPromiseChain(sourceFile.AsNode())
+}
+
+func nodeContainsPromiseChain(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if testFramework.IsPromiseChainCall(node) {
+		return true
+	}
+	found := false
+	node.ForEachChild(func(child *ast.Node) bool {
+		found = nodeContainsPromiseChain(child)
+		return found
+	})
+	return found
+}
+
 var ValidExpectInPromiseRule = shared.NewRule(shared.Config{
 	Name:               "rstest/valid-expect-in-promise",
 	MessageDescription: "This promise should either be returned or awaited to ensure the assertions in its chain are called",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		if !sourceMayContainPromiseChain(ctx.SourceFile) {
+			return shared.Runtime{}
+		}
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return shared.Runtime{
 			TestCallbackFunctions: analysis.Callbacks().Functions,
