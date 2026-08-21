@@ -332,9 +332,9 @@ func validateConfigGlobals(languageOptions *LanguageOptions) error {
 
 // validateConfigSourceType rejects authored `languageOptions.sourceType`
 // values that are not ESLint's "module" / "script" / "commonjs". Absent is
-// fine — JavaScript files resolve the default from the filename, and other
-// extensions keep the empty value. Matches the JS language plugin, which
-// only reads the top-level field (no legacy `parserOptions.sourceType`).
+// fine — ResolveLanguageDefaults fills the filename default afterward.
+// Matches the JS language plugin, which only reads the top-level field (no
+// legacy `parserOptions.sourceType`).
 func validateConfigSourceType(languageOptions *LanguageOptions) error {
 	if languageOptions == nil || languageOptions.Raw == nil {
 		return nil

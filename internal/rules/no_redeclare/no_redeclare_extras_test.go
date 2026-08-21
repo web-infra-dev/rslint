@@ -339,7 +339,8 @@ func TestNoRedeclareExtras(t *testing.T) {
 
 			// ---- Real-user: built-in globals report each user declaration ----
 			{
-				Code: "var Object;\nvar Object;",
+				Code:            "var Object;\nvar Object;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("Object", 1, 5),
 					builtinError("Object", 2, 5),
@@ -423,16 +424,25 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// An omitted property in an explicitly supplied empty option object
 			// retains upstream's builtinGlobals: true default.
 			{
-				Code:    "var Object = 0;",
-				Options: map[string]interface{}{},
+				Code:            "var Object = 0;",
+				Options:         map[string]interface{}{},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("Object", 1, 5),
 				},
 			},
 			// ESLint core treats parser-provided type declarations as variables;
 			// only the TypeScript extension excludes pure type-space declarations.
-			invalidBuiltin("interface Object {}", "Object", 1, 11),
-			invalidBuiltin("type Array = unknown;", "Array", 1, 6),
+			{
+				Code:            "interface Object {}",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{builtinError("Object", 1, 11)},
+			},
+			{
+				Code:            "type Array = unknown;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{builtinError("Array", 1, 6)},
+			},
 
 			// Locks in upstream checkForBlock() arm: non-function blocks are checked as their own lexical scope.
 			invalidRedeclared("{\n  const a = 1;\n  const a = 2;\n}", "a", 3, 9),
@@ -443,29 +453,33 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// ---- Real-user: config and inline global declaration ordering ----
 			invalidRedeclared("/* globals a:off */ /* globals a */", "a", 1, 32),
 			{
-				Code:    "/* globals Object */ var Object = 0;",
-				Globals: map[string]any{"Object": "off"},
+				Code:            "/* globals Object */ var Object = 0;",
+				Globals:         map[string]any{"Object": "off"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredBySyntaxError("Object", 1, 12),
 				},
 			},
 			{
-				Code:    "/* globals a */ var a = 0;",
-				Globals: map[string]any{"a": "readonly"},
+				Code:            "/* globals a */ var a = 0;",
+				Globals:         map[string]any{"a": "readonly"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("a", 1, 12),
 					builtinError("a", 1, 21),
 				},
 			},
 			{
-				Code: "/* globals a:off */ /* globals a */ var a = 0;",
+				Code:            "/* globals a:off */ /* globals a */ var a = 0;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredBySyntaxError("a", 1, 12),
 					redeclaredBySyntaxError("a", 1, 32),
 				},
 			},
 			{
-				Code: "/* globals a, a */ var a;",
+				Code:            "/* globals a, a */ var a;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredBySyntaxError("a", 1, 12),
 				},
@@ -485,8 +499,9 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// eslint/eslint#19141: config-declared application globals participate
 			// in the implicit-global branch when builtinGlobals uses its default.
 			{
-				Code:    "const chatgpt = {};",
-				Globals: map[string]any{"chatgpt": "readonly"},
+				Code:            "const chatgpt = {};",
+				Globals:         map[string]any{"chatgpt": "readonly"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("chatgpt", 1, 7),
 				},
@@ -495,7 +510,8 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// eslint/eslint#12334: directive diagnostics must cover exactly the
 			// name, including non-zero end locations across CRLF line endings.
 			{
-				Code: "/*globals foo,\r\n    Array */",
+				Code:            "/*globals foo,\r\n    Array */",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("Array", 2, 5),
 				},
@@ -559,7 +575,7 @@ func TestNoRedeclareECMAVersion(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{
 				Code:            "var Promise = 0;",
-				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, SourceType: "script"},
 				Errors:          []rule_tester.InvalidTestCaseError{builtinError("Promise", 1, 5)},
 			},
 		},
