@@ -88,11 +88,13 @@ const fooRegexp = new RegExp("foo", "v");
 
 ## Differences from ESLint
 
-- A pattern that relies on `v`-flag set-notation syntax to distinguish valid
-  from invalid (for example a character class nested unescaped inside another
-  class, like `[[a]`) is judged against `u`-flag syntax instead when deciding
-  whether adding `v` is safe. Such a pattern can be offered a suggestion that
-  ESLint would refuse, or refused a suggestion ESLint would offer.
+- A pattern is judged against `u`-flag syntax when deciding whether the
+  suggestion is safe, so one written in `v`-flag set notation — the difference
+  operator (`[\d--[3]]`), a `\q{...}` string literal — is reported without a
+  suggestion that ESLint would offer.
+- Unicode property escapes are recognized by their short aliases, so
+  `/\p{L}/` is offered the flag while `/\p{Letter}/` and
+  `/\p{Script=Greek}/` are reported without a suggestion.
 - A suggested flag insertion into a template literal that interpolates an
   expression is refused whenever that template's cooked value already
   contains the opposite flag character, even when the interpolated

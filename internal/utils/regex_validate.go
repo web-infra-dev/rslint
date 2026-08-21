@@ -1,6 +1,10 @@
 package utils
 
 import (
+	"slices"
+	"strings"
+	"unicode/utf8"
+
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -16,8 +20,12 @@ import (
 //     `v`-flag token, so `v` validation reuses the `u` compile — the two
 //     flags share the same non-class grammar.
 //   - A narrow u-flag identity-escape check for the handful of escapes
-//     regexp2 accepts but ES-u-mode rejects (`\a`, `\9`, …), plus a scan for
-//     the syntax characters regexp2 reads as literals.
+//     regexp2 accepts but ES-u-mode rejects (`\a`, `\9`, …), a scan for the
+//     syntax characters regexp2 reads as literals, and a check that every
+//     `\k<name>` resolves to a group the pattern declares.
+//   - Under `v` alone, a scan of each character class for the
+//     ClassSetExpression rules that only the `v` grammar imposes — an
+//     unescaped `(`, `-`, `|`, … or a doubled reserved punctuator.
 //
 // If ANY check fails the pattern is treated as unparsable — matching
 // JavaScript's own parse-or-reject behavior.
@@ -43,6 +51,12 @@ func IsValidRegexPattern(pattern string, flags RegexFlags) bool {
 		if hasInvalidSyntaxCharForUFlag(pattern, flags) {
 			return false
 		}
+		if hasUnresolvedNamedBackreferenceForUFlag(pattern) {
+			return false
+		}
+	}
+	if flags.UnicodeSets && hasInvalidClassContentForVFlag(pattern) {
+		return false
 	}
 	return true
 }
@@ -145,4 +159,183 @@ func hasInvalidIdentityEscapeForUFlag(pattern string) bool {
 		i += 2
 	}
 	return false
+}
+
+// classSetElementKind classifies one element of a v-flag class body for the
+// purposes of range validation: only a ClassSetCharacter may sit on either
+// side of a `-`.
+type classSetElementKind int
+
+const (
+	classSetPlainChar classSetElementKind = iota
+	classSetOperand
+)
+
+// reservedClassSetPunctuators are the characters ECMAScript reserves inside a
+// v-flag class when they appear doubled (`!!`, `##`, `..`, …). `&` is in the
+// set because `&&` is only legal as the intersection operator.
+const reservedClassSetPunctuators = "&!#$%*+,.:;<=>?@^`~"
+
+// hasInvalidClassContentForVFlag reports whether any character class in
+// pattern holds something the v-flag ClassSetExpression grammar rejects — an
+// unescaped ClassSetSyntaxCharacter, a doubled reserved punctuator, or a `-`
+// that isn't a range between two single characters. It is deliberately
+// conservative: set operators (`--`, and `&&` without operands on both sides)
+// count as invalid, because a pattern this scanner cannot prove legal must
+// not be offered the flag.
+func hasInvalidClassContentForVFlag(pattern string) bool {
+	flags := RegexFlags{UnicodeSets: true}
+	invalid := false
+	IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
+		if !invalid && hasInvalidClassBodyForVFlag(pattern, start, end, flags) {
+			invalid = true
+		}
+	})
+	return invalid
+}
+
+// hasInvalidClassBodyForVFlag checks the body of the single class spanning
+// [start, end). Nested classes are skipped whole — IterateRegexCharacterClasses
+// hands each of them to this function in its own right.
+func hasInvalidClassBodyForVFlag(pattern string, start, end int, flags RegexFlags) bool {
+	i := start + 1
+	last := end - 1
+	if i < last && pattern[i] == '^' {
+		i++
+	}
+
+	elements := 0
+	lastWasRange := false
+	sawOperator := false
+	for i < last {
+		c := pattern[i]
+		// A `-` here has no left-hand character to open a range with.
+		if c == '-' {
+			return true
+		}
+		if strings.IndexByte(reservedClassSetPunctuators, c) >= 0 && i+1 < last && pattern[i+1] == c {
+			// `&&` is the intersection operator, legal between two operands —
+			// and a range is not an operand. Every other doubled punctuator is
+			// reserved.
+			if c != '&' || elements == 0 || lastWasRange || i+2 >= last || pattern[i+2] == '&' {
+				return true
+			}
+			i += 2
+			elements = 0
+			sawOperator = true
+			continue
+		}
+
+		kind, next, ok := classSetElement(pattern, i, last, flags)
+		if !ok {
+			return true
+		}
+		i = next
+		elements++
+		lastWasRange = false
+
+		if i < last && pattern[i] == '-' {
+			// `--` is the difference operator, which this scanner doesn't
+			// track; refuse rather than read it as a range.
+			if kind != classSetPlainChar || sawOperator || i+1 >= last || pattern[i+1] == '-' {
+				return true
+			}
+			i++
+			kind, next, ok = classSetElement(pattern, i, last, flags)
+			if !ok || kind != classSetPlainChar {
+				return true
+			}
+			i = next
+			lastWasRange = true
+		}
+	}
+	return false
+}
+
+// classSetElement consumes one element of a v-flag class body at pattern[i],
+// returning its kind and the index just past it. ok is false for the
+// ClassSetSyntaxCharacters that must be escaped inside a v-flag class.
+func classSetElement(pattern string, i, last int, flags RegexFlags) (classSetElementKind, int, bool) {
+	switch c := pattern[i]; c {
+	case '\\':
+		step, ok := SkipPatternEscape(pattern, i, flags)
+		if !ok || i+step > last {
+			return classSetOperand, i, false
+		}
+		switch pattern[i+1] {
+		case 'd', 'D', 'w', 'W', 's', 'S', 'p', 'P', 'q':
+			return classSetOperand, i + step, true
+		}
+		return classSetPlainChar, i + step, true
+	case '[':
+		nestedEnd, ok := ClassEnd(pattern, i, flags)
+		if !ok || nestedEnd > last {
+			return classSetOperand, i, false
+		}
+		return classSetOperand, nestedEnd, true
+	case '(', ')', '{', '}', '/', '|', ']':
+		return classSetOperand, i, false
+	}
+	_, width := utf8.DecodeRuneInString(pattern[i:])
+	if width == 0 {
+		width = 1
+	}
+	return classSetPlainChar, i + width, true
+}
+
+// hasUnresolvedNamedBackreferenceForUFlag reports whether the pattern has a
+// `\k` that no `(?<name>…)` group in the same pattern can resolve. Without the
+// u/v flag such a `\k` reads as the literal characters `k<name>`; with it, an
+// unresolved reference is a SyntaxError.
+func hasUnresolvedNamedBackreferenceForUFlag(pattern string) bool {
+	var names, refs []string
+	for i := 0; i < len(pattern); {
+		if pattern[i] == '\\' {
+			if i+1 >= len(pattern) {
+				return false
+			}
+			if pattern[i+1] == 'k' {
+				name, next, ok := readAngleName(pattern, i+2)
+				if !ok {
+					return true
+				}
+				refs = append(refs, name)
+				i = next
+				continue
+			}
+			i += 2
+			continue
+		}
+		// `(?<name>` declares a group; `(?<=` and `(?<!` are lookbehinds.
+		if strings.HasPrefix(pattern[i:], "(?<") && i+3 < len(pattern) &&
+			pattern[i+3] != '=' && pattern[i+3] != '!' {
+			name, next, ok := readAngleName(pattern, i+2)
+			if !ok {
+				return false
+			}
+			names = append(names, name)
+			i = next
+			continue
+		}
+		i++
+	}
+	for _, ref := range refs {
+		if !slices.Contains(names, ref) {
+			return true
+		}
+	}
+	return false
+}
+
+// readAngleName reads a `<name>` starting at pattern[start], returning the
+// name and the index just past `>`.
+func readAngleName(pattern string, start int) (string, int, bool) {
+	if start >= len(pattern) || pattern[start] != '<' {
+		return "", start, false
+	}
+	closeRel := strings.IndexByte(pattern[start:], '>')
+	if closeRel < 0 {
+		return "", start, false
+	}
+	return pattern[start+1 : start+closeRel], start + closeRel + 1, true
 }

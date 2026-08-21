@@ -267,6 +267,90 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 					},
 				},
 			},
+			// ---- Only the `v` grammar makes these class characters syntax
+			// characters, so the suggestion has to be withheld under it ----
+			{
+				Code:            "/[(]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireVFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 6},
+				},
+			},
+			{
+				Code:            "/[-]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireVFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 6},
+				},
+			},
+			{
+				Code:            "/[a-]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireVFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 7},
+				},
+			},
+			// ---- A doubled punctuator is reserved under `v`; `&&` is the one
+			// that stays legal, and only between two operands ----
+			{
+				Code:            "/[..]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireVFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 7},
+				},
+			},
+			{
+				Code:            "/[&&]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireVFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 7},
+				},
+			},
+			{
+				Code:            "/[a&&b]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "requireVFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 9,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: "/[a&&b]/v"}},
+					},
+				},
+			},
+			// ---- Ordinary ranges and unions keep their suggestion under `v` ----
+			{
+				Code:            "/[a-z0-9_]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "requireVFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 12,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: "/[a-z0-9_]/v"}},
+					},
+				},
+			},
+			// ---- `\k<name>` is literal text without the flag but a
+			// SyntaxError with it unless the group exists ----
+			{
+				Code: "/\\k<a>/",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireUFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 8},
+				},
+			},
+			{
+				Code: "/(?<a>x)\\k<a>/",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "requireUFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 15,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "/(?<a>x)\\k<a>/u"}},
+					},
+				},
+			},
 			// ---- Dimension 4: parenthesized flags argument — ESTree has no
 			// parenthesis node, so the fix rewrites the literal inside ----
 			{
