@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/capitalized_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
+	"github.com/web-infra-dev/rslint/internal/rules/consistent_this"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
@@ -187,6 +188,7 @@ func GetAllRules() []rule.Rule {
 		capitalized_comments.CapitalizedCommentsRule,
 		complexity.ComplexityRule,
 		consistent_return.ConsistentReturnRule,
+		consistent_this.ConsistentThisRule,
 		constructor_super.ConstructorSuperRule,
 		curly.CurlyRule,
 		default_case.DefaultCaseRule,
