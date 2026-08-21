@@ -180,6 +180,8 @@ module["exports"] = function foo(name) {};
 
 - For a property whose name comes from a string literal (e.g. `{ "ᢅ": function foo() {} }`), rslint decides whether that name is a valid identifier using the same character rules at every configured ECMAScript version. ESLint's `ecmaVersion: 5` mode instead uses an older, frozen table of valid identifier characters, so a handful of characters that were only added to the identifier rules in later Unicode versions are treated as invalid identifiers by ESLint at `ecmaVersion: 5` — and the property is left unchecked — while rslint treats them as valid identifiers and checks the property at every ECMAScript version, including 5.
 
+- With `considerPropertyDescriptor` enabled, an `Object.defineProperties()` or `Object.create()` descriptor map is checked against its entry's key when that key is an identifier (e.g. `{ bar: { value: function bar() {} } }`). ESLint also reports entries keyed by a string or numeric literal (e.g. `{ "bar": { value: function baz() {} } }`), but names the property `undefined` in the message; rslint leaves those entries unchecked.
+
 ## Original Documentation
 
 - [ESLint: func-name-matching](https://eslint.org/docs/latest/rules/func-name-matching)

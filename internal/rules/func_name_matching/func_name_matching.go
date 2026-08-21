@@ -143,9 +143,9 @@ var FuncNameMatchingRule = rule.Rule{
 				if opts.considerPropertyDescriptor && propertyName == "value" &&
 					node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
 					switch {
-					case isPropertyCall(nthAncestor(node, 2), "Object", "defineProperty"),
-						isPropertyCall(nthAncestor(node, 2), "Reflect", "defineProperty"):
-						call := nthAncestor(node, 2).AsCallExpression()
+					case isPropertyCall(nthEstreeAncestor(node, 2), "Object", "defineProperty"),
+						isPropertyCall(nthEstreeAncestor(node, 2), "Reflect", "defineProperty"):
+						call := nthEstreeAncestor(node, 2).AsCallExpression()
 						if call.Arguments != nil && len(call.Arguments.Nodes) > 1 {
 							propArg := call.Arguments.Nodes[1]
 							if propArg.Kind == ast.KindStringLiteral {
@@ -155,14 +155,30 @@ var FuncNameMatchingRule = rule.Rule{
 								}
 							}
 						}
-					case isPropertyCall(nthAncestor(node, 4), "Object", "defineProperties"),
-						isPropertyCall(nthAncestor(node, 4), "Object", "create"):
-						outerProp := nthAncestor(node, 2)
-						if outerProp.Name().Kind == ast.KindIdentifier {
-							outerName := outerProp.Name().AsIdentifier().Text
-							if shouldWarn(opts, outerName, functionName) {
-								reportMismatch(ctx, opts, node, outerName, functionName, true)
+					case isPropertyCall(nthEstreeAncestor(node, 4), "Object", "defineProperties"),
+						isPropertyCall(nthEstreeAncestor(node, 4), "Object", "create"):
+						// The key this branch compares belongs to the
+						// descriptor map's own entry, so it only exists when
+						// the descriptor object sits in a property assignment.
+						// Other shapes — an array literal, a class field —
+						// reach the call at the same depth and are compared on
+						// their own key like any other property.
+						//
+						// Divergence: upstream reads that key's `name` even
+						// when it is a string or numeric literal, yielding
+						// `undefined` and a report naming it; the port compares
+						// identifier keys only and stays silent on the rest.
+						// Computed keys are skipped by both.
+						outerProp := nthEstreeAncestor(node, 2)
+						if outerProp != nil && outerProp.Kind == ast.KindPropertyAssignment {
+							if outerKey := outerProp.Name(); outerKey != nil && outerKey.Kind == ast.KindIdentifier {
+								outerName := outerKey.AsIdentifier().Text
+								if shouldWarn(opts, outerName, functionName) {
+									reportMismatch(ctx, opts, node, outerName, functionName, true)
+								}
 							}
+						} else if shouldWarn(opts, propertyName, functionName) {
+							reportMismatch(ctx, opts, node, propertyName, functionName, true)
 						}
 					default:
 						if shouldWarn(opts, propertyName, functionName) {
@@ -280,11 +296,16 @@ func isPropertyCall(node *ast.Node, objName, methodName string) bool {
 	return utils.IsSpecificMemberAccess(node.AsCallExpression().Expression, objName, methodName)
 }
 
-// nthAncestor walks n Parent links up from node, returning nil if the chain
-// runs out early.
-func nthAncestor(node *ast.Node, n int) *ast.Node {
+// nthEstreeAncestor walks n Parent links up from node, returning nil if the
+// chain runs out early. ParenthesizedExpression links are stepped over without
+// being counted, so the chain matches the one upstream walks over an ESTree
+// AST, which has no parenthesized-expression node.
+func nthEstreeAncestor(node *ast.Node, n int) *ast.Node {
 	for i := 0; i < n && node != nil; i++ {
 		node = node.Parent
+		for node != nil && node.Kind == ast.KindParenthesizedExpression {
+			node = node.Parent
+		}
 	}
 	return node
 }

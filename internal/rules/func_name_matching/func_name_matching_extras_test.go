@@ -102,6 +102,20 @@ func TestFuncNameMatchingExtras(t *testing.T) {
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
 			},
 
+			// ---- Divergence lock-in: upstream reads the outer key as
+			// `node.parent.parent.key.name`, which is `undefined` for a
+			// string- or numeric-literal key and then reported verbatim as
+			// ``should match property name `undefined` ``. The port compares
+			// only identifier outer keys, so these stay unreported ----
+			{
+				Code:    `Object.defineProperties(foo, { "bar": { value: function baz() {} } })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+			},
+			{
+				Code:    `Object.create(a, { 123: { value: function baz() {} } })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+			},
+
 			// ---- Real-user: named CommonJS export assignment
 			// (`exports.foo = function foo() {}`) — a very common Node.js
 			// idiom distinct from `module.exports`; matches here since names
@@ -182,6 +196,60 @@ func TestFuncNameMatchingExtras(t *testing.T) {
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "matchProperty", Line: 1, Column: 11},
+				},
+			},
+
+			// ---- Branch lock-in: the Object.defineProperties/Object.create
+			// branch is selected by the shape of the call four levels up, but
+			// the outer key it reads only exists when the enclosing node is a
+			// property assignment. Nested array literals reach the call at the
+			// same depth, so the descriptor object here is a plain object
+			// literal whose own `value` key is what gets compared ----
+			{
+				Code:    `Object.create(a, [[{ value: function baz() {} }]]);`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `value`.", Line: 1, Column: 22},
+				},
+			},
+
+			// ---- Branch lock-in: tsgo hangs class members directly off the
+			// class, one level shallower than ESTree's ClassBody, so a class
+			// field inside a descriptor call reaches it at the same depth as a
+			// descriptor-map entry. The key compared is still the field's own
+			// `value` property, not the field name ----
+			{
+				Code:            `Object.create(a, class { bar = { value: function baz() {} } });`,
+				Options:         []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `value`.", Line: 1, Column: 34},
+				},
+			},
+
+			// ---- Dimension 4: parenthesized descriptor map / descriptor
+			// object — parens are invisible to ESTree, so upstream still walks
+			// straight from the descriptor's `value` property to the enclosing
+			// Object.create/defineProperties/defineProperty call ----
+			{
+				Code:    `Object.create(a, ({ bar: { value: function baz() {} } }));`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `bar`.", Line: 1, Column: 28},
+				},
+			},
+			{
+				Code:    `Object.defineProperties(foo, { bar: ({ value: function baz() {} }) });`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `bar`.", Line: 1, Column: 40},
+				},
+			},
+			{
+				Code:    `Object.defineProperty(foo, 'bar', ({ value: function baz() {} }));`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `bar`.", Line: 1, Column: 38},
 				},
 			},
 
