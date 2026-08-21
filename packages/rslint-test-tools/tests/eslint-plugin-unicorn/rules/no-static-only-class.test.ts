@@ -31,6 +31,26 @@ ruleTester.run('no-static-only-class', null as never, {
     valid('class A { static declare a = 1; }'),
   ],
   invalid: [
+    {
+      filename: 'src/annotation.js',
+      code:
+        'class AnnotationFactory {\n' +
+        '\tstatic create() {}\n' +
+        '\t/** @private */\n' +
+        '\tstatic _create() {}\n' +
+        '}',
+      errors: 1,
+    },
+    {
+      filename: 'src/annotation_layer.js',
+      code:
+        'class AnnotationLayer {\n' +
+        '\t/** @public */\n' +
+        '\tstatic render() {}\n' +
+        '\tstatic update() {}\n' +
+        '}',
+      errors: 1,
+    },
     { code: 'class A { static a() {}; }', errors: 1 },
     { code: 'class A { static a() {} }', errors: 1 },
     { code: 'const A = class A { static a() {}; }', errors: 1 },

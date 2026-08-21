@@ -1093,7 +1093,7 @@ class A {
       "messageId": "noInferrableType",
       "range": {
         "end": {
-          "column": 17,
+          "column": 18,
           "line": 3,
         },
         "start": {
@@ -1187,7 +1187,7 @@ class Foo {
       "messageId": "noInferrableType",
       "range": {
         "end": {
-          "column": 16,
+          "column": 17,
           "line": 3,
         },
         "start": {
@@ -1202,7 +1202,7 @@ class Foo {
       "messageId": "noInferrableType",
       "range": {
         "end": {
-          "column": 20,
+          "column": 21,
           "line": 4,
         },
         "start": {
@@ -1217,7 +1217,7 @@ class Foo {
       "messageId": "noInferrableType",
       "range": {
         "end": {
-          "column": 20,
+          "column": 21,
           "line": 5,
         },
         "start": {
@@ -1289,7 +1289,7 @@ class Foo {
       "messageId": "noInferrableType",
       "range": {
         "end": {
-          "column": 25,
+          "column": 26,
           "line": 3,
         },
         "start": {

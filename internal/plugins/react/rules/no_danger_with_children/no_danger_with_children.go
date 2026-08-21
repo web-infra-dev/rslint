@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // isCreateElementCallee reports whether a CallExpression callee is
@@ -198,7 +199,7 @@ var NoDangerWithChildrenRule = rule.Rule{
 				return false
 			}
 			text := child.AsJsxText().Text
-			if strings.TrimSpace(text) != "" {
+			if ecmascript.StringTrim(text) != "" {
 				return false
 			}
 			return strings.Contains(text, "\n")

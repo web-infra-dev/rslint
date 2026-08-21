@@ -42,7 +42,20 @@ func TestNoThisAliasRule(t *testing.T) {
 			{
 				Code: `const self = this;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "thisAssignment"},
+					{
+						MessageId: "thisAssignment",
+						Message:   "Unexpected aliasing of 'this' to local variable.",
+						Line:      1,
+						Column:    7,
+						EndLine:   1,
+						EndColumn: 11,
+					},
+				},
+			},
+			{
+				Code: `const asThis: this = this;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "thisAssignment", Line: 1, Column: 7, EndLine: 1, EndColumn: 19},
 				},
 			},
 			{
@@ -96,7 +109,24 @@ value ??= this;`,
 				Code:    `const { props, state } = this;`,
 				Options: map[string]interface{}{"allowDestructuring": false},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "thisDestructure"},
+					{
+						MessageId: "thisDestructure",
+						Message:   "Unexpected aliasing of members of 'this' to local variables.",
+					},
+				},
+			},
+			{
+				Code:    `const { value }: { value: number } = this;`,
+				Options: map[string]interface{}{"allowDestructuring": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "thisDestructure", Line: 1, Column: 7, EndLine: 1, EndColumn: 35},
+				},
+			},
+			{
+				Code:    `const [value]: [number] = this;`,
+				Options: map[string]interface{}{"allowDestructuring": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "thisDestructure", Line: 1, Column: 7, EndLine: 1, EndColumn: 24},
 				},
 			},
 			{

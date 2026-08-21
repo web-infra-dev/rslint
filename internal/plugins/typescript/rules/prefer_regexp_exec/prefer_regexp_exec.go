@@ -71,7 +71,7 @@ func getWrappedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	if sourceFile == nil || node == nil {
 		return ""
 	}
-	text := strings.TrimSpace(scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false))
+	text := ecmascript.StringTrim(scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false))
 	if text == "" {
 		return ""
 	}

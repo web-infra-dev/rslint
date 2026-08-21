@@ -1,6 +1,6 @@
 import type { RslintConfigEntry } from '../define-config.js';
 
-// Aligned with official eslint:recommended (@eslint/js@10.x).
+// Based on official eslint:recommended (@eslint/js@10.x).
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry = {
   rules: {
@@ -31,7 +31,7 @@ const recommended: RslintConfigEntry = {
     'no-setter-return': 'error',
     'no-shadow-restricted-names': 'error',
     'no-this-before-super': 'error',
-    'no-undef': 'error',
+    // 'no-undef': 'error', // intentionally omitted
     'no-unexpected-multiline': 'error',
     'no-unreachable': 'error',
     'no-unsafe-finally': 'error',

@@ -27,8 +27,11 @@ it("uses assert", () => {
   assert.equal(value, 1);
 });
 
-it("in a promise callback", () =>
-  loadUser().then((user) => expect(user).toBeDefined()));
+it("in a promise callback", () => {
+  return loadUser().then((user) => {
+    expect(user).toBeDefined();
+  });
+});
 
 it("named callback", run);
 function run() {
