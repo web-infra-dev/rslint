@@ -200,7 +200,6 @@ func TestGetExportMap(t *testing.T) {
 		deep := exportMap.Get("deep")
 		if deep == nil {
 			t.Fatal("expected export-all namespace alias to expose deep")
-			return
 		}
 		if deep.Namespace != nil {
 			t.Fatal("expected export-all namespace alias not to carry namespace metadata")
@@ -234,7 +233,6 @@ func TestGetExportMap(t *testing.T) {
 		b := exportMap.Get("b")
 		if b == nil {
 			t.Fatal("expected b namespace export alias")
-			return
 		}
 		if b.Namespace != nil {
 			t.Fatal("expected export-all namespace alias not to carry namespace metadata")
@@ -268,7 +266,6 @@ func TestGetExportMap(t *testing.T) {
 		ambient := exportMap.Get("ambient")
 		if ambient == nil {
 			t.Fatal("expected ambient namespace export")
-			return
 		}
 		if ambient.Namespace != nil {
 			t.Fatal("expected ambient namespace declaration not to carry namespace metadata")
@@ -299,7 +296,6 @@ func TestGetExportMap(t *testing.T) {
 		def := exportMap.Get("default")
 		if def == nil {
 			t.Fatal("expected string-literal namespace default to be visible")
-			return
 		}
 		if def.Namespace != nil {
 			t.Fatal("expected string-literal namespace default not to carry namespace metadata")
@@ -345,7 +341,6 @@ func TestGetExportMap(t *testing.T) {
 		def := exportMap.Get("default")
 		if def == nil {
 			t.Fatal("expected default export to be visible")
-			return
 		}
 		if def.Namespace != nil {
 			t.Fatal("expected default-import re-export not to carry namespace metadata")
@@ -409,7 +404,6 @@ func TestGetExportMap(t *testing.T) {
 		forwarded := exportMap.Get("forwardedLocal")
 		if forwarded == nil {
 			t.Fatal("expected local re-export to be visible")
-			return
 		}
 		if forwarded.Namespace != nil {
 			t.Fatal("expected named-import re-export not to carry namespace metadata")
@@ -614,12 +608,10 @@ func contextForImportWithCompiler(t *testing.T, source string) (rule.RuleContext
 	sourceFile := program.GetSourceFile(fileName)
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) == 0 {
 		t.Fatal("test source file was not parsed")
-		return rule.RuleContext{}, nil, nil
 	}
 	importDecl := sourceFile.Statements.Nodes[0].AsImportDeclaration()
 	if importDecl == nil || importDecl.ModuleSpecifier == nil {
 		t.Fatal("test import declaration was not parsed")
-		return rule.RuleContext{}, nil, nil
 	}
 
 	return (rule.RuleContext{
@@ -642,12 +634,10 @@ func contextForImportWithFS(t *testing.T, fs vfs.FS, filePath string) (rule.Rule
 	sourceFile := program.GetSourceFile(filePath)
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) == 0 {
 		t.Fatal("test source file was not parsed")
-		return rule.RuleContext{}, nil
 	}
 	importDecl := sourceFile.Statements.Nodes[0].AsImportDeclaration()
 	if importDecl == nil || importDecl.ModuleSpecifier == nil {
 		t.Fatal("test import declaration was not parsed")
-		return rule.RuleContext{}, nil
 	}
 
 	return (rule.RuleContext{
@@ -672,12 +662,10 @@ func contextForImportWithCompilerOptions(t *testing.T, source string, options *c
 	sourceFile := program.GetSourceFile(filePath)
 	if sourceFile == nil || sourceFile.Statements == nil || len(sourceFile.Statements.Nodes) == 0 {
 		t.Fatal("test source file was not parsed")
-		return rule.RuleContext{}, nil
 	}
 	importDecl := sourceFile.Statements.Nodes[0].AsImportDeclaration()
 	if importDecl == nil || importDecl.ModuleSpecifier == nil {
 		t.Fatal("test import declaration was not parsed")
-		return rule.RuleContext{}, nil
 	}
 
 	return (rule.RuleContext{

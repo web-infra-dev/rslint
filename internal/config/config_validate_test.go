@@ -32,7 +32,6 @@ func TestValidateConfig_RejectsEmptyFilesArray(t *testing.T) {
 	err := ValidateConfig(cfg)
 	if err == nil {
 		t.Fatal("expected empty files array to be rejected")
-		return
 	}
 	if got := err.Error(); got != `config entry at index 0: key "files": expected value to be a non-empty array` {
 		t.Fatalf("unexpected error: %q", got)
@@ -53,7 +52,6 @@ func TestValidateConfig_RejectsNullFilesFromJSON(t *testing.T) {
 	err := json.Unmarshal([]byte(`[{"files": null, "rules": {}}]`), &cfg)
 	if err == nil {
 		t.Fatal("expected null files field to be rejected while unmarshaling")
-		return
 	}
 	if got := err.Error(); got != `config entry at index 0: key "files": expected value to be a non-empty array` {
 		t.Fatalf("unexpected error: %q", got)
@@ -65,7 +63,6 @@ func TestValidateConfig_RejectsEmptyFilesArrayFromJSON(t *testing.T) {
 	err := json.Unmarshal([]byte(`[{"files": [], "rules": {}}]`), &cfg)
 	if err == nil {
 		t.Fatal("expected empty files array to be rejected while unmarshaling")
-		return
 	}
 	if got := err.Error(); got != `config entry at index 0: key "files": expected value to be a non-empty array` {
 		t.Fatalf("unexpected error: %q", got)
@@ -205,7 +202,6 @@ func TestValidateConfig_RuleSeverities(t *testing.T) {
 		merged := cfg.GetConfigForFile("src/app.ts", "")
 		if merged == nil {
 			t.Fatal("expected JSON config to merge")
-			return
 		}
 		for name, want := range map[string]string{
 			"numeric-off": "off", "numeric-warn": "warn", "numeric-error": "error",
@@ -253,7 +249,6 @@ func TestValidateConfig_RejectsInvalidRuleValues(t *testing.T) {
 			err := json.Unmarshal([]byte(input), &cfg)
 			if err == nil {
 				t.Fatal("expected invalid rule value to be rejected during JSON ingress")
-				return
 			}
 			if message := err.Error(); !strings.Contains(message, `key "rules": rule "example"`) {
 				t.Fatalf("error does not identify the invalid rule: %q", message)
@@ -267,7 +262,6 @@ func TestValidateConfig_RejectsInvalidRuleValues(t *testing.T) {
 			err := ValidateConfig(RslintConfig{{Rules: Rules{"example": value}}})
 			if err == nil {
 				t.Fatal("expected invalid Go-constructed rule value to be rejected")
-				return
 			}
 			if message := err.Error(); !strings.Contains(message, `key "rules": rule "example"`) {
 				t.Fatalf("error does not identify the invalid rule: %q", message)

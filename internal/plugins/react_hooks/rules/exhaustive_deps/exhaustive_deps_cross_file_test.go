@@ -66,7 +66,6 @@ func TestContainsNodeRejectsCrossFileNodes(t *testing.T) {
 	fileB := program.GetSourceFile(pathB)
 	if fileA == nil || fileB == nil {
 		t.Fatalf("missing source files: a=%v b=%v", fileA, fileB)
-		return
 	}
 
 	var outerInA, fooInB *ast.Node
@@ -90,7 +89,6 @@ func TestContainsNodeRejectsCrossFileNodes(t *testing.T) {
 	walk(fileB, "foo", &fooInB)
 	if outerInA == nil || fooInB == nil {
 		t.Fatalf("missing test nodes: outer=%v foo=%v", outerInA, fooInB)
-		return
 	}
 
 	// Sanity: by construction the byte ranges must overlap so that the
@@ -203,7 +201,6 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 	tsxFile := program.GetSourceFile(tsxPath)
 	if tsxFile == nil {
 		t.Fatalf("missing user.tsx source file")
-		return
 	}
 
 	var mu sync.Mutex
