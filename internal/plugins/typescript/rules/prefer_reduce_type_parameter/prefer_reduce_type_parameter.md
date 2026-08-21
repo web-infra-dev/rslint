@@ -26,4 +26,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [typescript-eslint prefer-reduce-type-parameter](https://typescript-eslint.io/rules/prefer-reduce-type-parameter)
+- [typescript-eslint: prefer-reduce-type-parameter](https://typescript-eslint.io/rules/prefer-reduce-type-parameter)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-reduce-type-parameter.ts)

@@ -1,6 +1,7 @@
 package prefer_regex_literals
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 	"slices"
@@ -13,7 +14,11 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+//go:embed prefer_regex_literals.schema.json
+var schemaJSON []byte
 
 var safeRegexLiteralContentRe = regexp.MustCompile("^[-\\w\\\\\\[\\](){} \\t\\r\\n\\v\\f!@#$%^&*+=/~`.><?,'\"|:;]*$")
 
@@ -32,16 +37,16 @@ var validPrecedingTokens = map[string]bool{
 	"debugger": true, "case": true, "throw": true,
 }
 
-type options struct {
+type ruleOptions struct {
 	disallowRedundantWrapping bool
 }
 
 // https://eslint.org/docs/latest/rules/prefer-regex-literals
 var PreferRegexLiteralsRule = rule.Rule{
-	Name: "prefer-regex-literals",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
-		opts := parseOptions(rawOptions)
+	Name:   "prefer-regex-literals",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		check := func(node *ast.Node, callee *ast.Node, argsList *ast.NodeList) {
 			if !isBuiltinRegExpCallee(ctx, utils.SkipAssertionsAndParens(callee)) {
@@ -72,12 +77,14 @@ var PreferRegexLiteralsRule = rule.Rule{
 	},
 }
 
-func parseOptions(rawOptions any) options {
-	opts := options{}
-	if optsMap := utils.GetOptionsMap(rawOptions); optsMap != nil {
-		if v, ok := optsMap["disallowRedundantWrapping"].(bool); ok {
-			opts.disallowRedundantWrapping = v
-		}
+func parseOptions(options []any) ruleOptions {
+	opts := ruleOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["disallowRedundantWrapping"].(bool); ok {
+		opts.disallowRedundantWrapping = v
 	}
 	return opts
 }
@@ -340,7 +347,8 @@ func isStringRawTag(ctx rule.RuleContext, tag *ast.Node) bool {
 	return object != nil &&
 		object.Kind == ast.KindIdentifier &&
 		object.AsIdentifier().Text == "String" &&
-		!utils.IsShadowed(object, "String")
+		!utils.IsShadowed(object, "String") &&
+		ctx.Globals.Access("String").IsDeclared()
 }
 
 func isRegexLiteral(node *ast.Node) bool {
@@ -371,7 +379,7 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 		// un-declares the builtin, so it no longer resolves to a known global —
 		// ESLint's `getVariableByName(scope, "RegExp")` would be undefined and
 		// the rule stays silent.
-		return !isGlobalOff(ctx, "RegExp")
+		return ctx.Globals.Access("RegExp").IsDeclared()
 	case ast.KindPropertyAccessExpression:
 		access := callee.AsPropertyAccessExpression()
 		if access == nil || access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
@@ -396,10 +404,6 @@ func isBuiltinRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 	return false
 }
 
-func isGlobalOff(ctx rule.RuleContext, name string) bool {
-	return ctx.Globals[name] == utils.GlobalAccessOff
-}
-
 func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil || node.Kind != ast.KindIdentifier {
@@ -408,7 +412,7 @@ func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {
 	name := node.AsIdentifier().Text
 	switch name {
 	case "globalThis", "window", "self", "global":
-		return !utils.IsShadowed(node, name) && !isGlobalOff(ctx, name)
+		return !utils.IsShadowed(node, name) && ctx.Globals.Access(name).IsDeclared()
 	default:
 		return false
 	}
@@ -424,7 +428,7 @@ func canFixTo(ctx rule.RuleContext, node *ast.Node, literal string) bool {
 			return false
 		}
 	}
-	return utils.IsValidRegexLiteral(literal)
+	return ecmascript.IsValidRegexLiteral(literal)
 }
 
 func areFlagsEqual(flagsA string, flagsB string) bool {

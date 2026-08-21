@@ -49,7 +49,9 @@ function getPluginRuleEntries() {
         const content = fs.readFileSync(pluginGo, 'utf-8');
         const m = content.match(/PLUGIN_NAME\s*=\s*"([^"]+)"/);
         if (m) display = m[1];
-      } catch {}
+      } catch {
+        // ignore, fall back to the directory name
+      }
     }
     pluginNameCache.set(plugin, display);
     return display;

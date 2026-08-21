@@ -1,12 +1,17 @@
 package require_hook
 
 import (
+	_ "embed"
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
-	"strings"
 )
+
+//go:embed require_hook.schema.json
+var schemaJSON []byte
 
 func buildUseHookMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -33,17 +38,13 @@ func parseAllowedFunctionCalls(raw any) []string {
 	return out
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{AllowedFunctionCalls: nil}
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
 
-	optArray := rule.NormalizeOptions(options)
-	if len(optArray) == 0 {
-		return opts
-	}
-	optsMap, ok := optArray[0].(map[string]interface{})
+	optsMap, ok := options[0].(map[string]interface{})
 	if !ok {
 		return opts
 	}
@@ -182,9 +183,9 @@ func checkBlockBody(ctx rule.RuleContext, body []*ast.Node, allowedFunctionCalls
 }
 
 var RequireHookRule = rule.Rule{
-	Name: "jest/require-hook",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "jest/require-hook",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		if ctx.SourceFile != nil && ctx.SourceFile.Statements != nil {

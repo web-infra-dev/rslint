@@ -137,6 +137,12 @@ let state;`},
 				},
 			},
 			{
+				Code: `expect(value).catch(() => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
 				// An unresolvable timeout in the third position must not stop the
 				// second argument from being treated as the callback.
 				Code: `test("case", ({ expect }) => { if (condition) expect(value).toBe(1); }, TIMEOUT);`,
@@ -178,6 +184,24 @@ test("case", () => { if (condition) check(value).toBe(1); });`,
 				Code: `import * as rstest from "@rstest/core";
 rstest.test("case", () => {
   if (condition) rstest.expect(value).toBe(1);
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `import * as rstest from "@rstest/core";
+rstest["test"]("case", () => {
+  if (condition) rstest["expect"](value).toBe(1);
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `import { test, expect as \u0063heck } from "@rstest/core";
+test("case", () => {
+  if (condition) \u0063heck(value).toBe(1);
 });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "conditionalExpect"},
@@ -316,6 +340,17 @@ playwright.test("case", async ({ page }) => {
 				Code: `const forCase = test.for([{ enabled: true }]);
 forCase("case", (row, context) => {
   if (row.enabled) context.expect(row).toBeDefined();
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `import { test as importedTest, expect as importedExpect } from "@rstest/core";
+const testAlias = importedTest;
+const testCase = testAlias;
+testCase("case", () => {
+  if (condition) importedExpect(value).toBe(1);
 });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "conditionalExpect"},

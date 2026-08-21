@@ -296,7 +296,8 @@ func needsLeadingSemicolon(sourceFile *ast.SourceFile, classNode *ast.Node, node
 }
 
 var NoUselessConstructorRule = rule.CreateRule(rule.Rule{
-	Name: "no-useless-constructor",
+	Name:   "no-useless-constructor",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindConstructor: func(node *ast.Node) {

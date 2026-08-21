@@ -34,7 +34,8 @@ func isConstantBindingSymbol(symbol *ast.Symbol, sourceFile *ast.SourceFile) boo
 
 // NoConstAssignRule disallows reassigning constant variables.
 var NoConstAssignRule = rule.Rule{
-	Name: "no-const-assign",
+	Name:   "no-const-assign",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Every constant variable declaration contains one of these literal
 		// keywords. Avoid an identifier listener when the rule cannot report;

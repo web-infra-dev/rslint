@@ -1,5 +1,10 @@
 package no_restricted_syntax
 
+import (
+	"github.com/microsoft/typescript-go/shim/ast"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+)
+
 // selector models the subset of the ESLint / esquery selector grammar that the
 // rule needs in order to evaluate user-supplied patterns. Each variant is a
 // node in the parsed selector tree. The matcher in selector_matcher.go walks
@@ -12,7 +17,8 @@ type selector interface {
 // is the wildcard. ESTree type names map to one or more tsgo ast.Kind values
 // via estreeKindMap in selector_mapping.go.
 type identifierSelector struct {
-	Name string
+	Name  string
+	Kinds []ast.Kind
 }
 
 func (identifierSelector) isSelector() {}
@@ -22,7 +28,7 @@ func (identifierSelector) isSelector() {}
 // `Literal.key` requires the Literal to be the key of a Property).
 type classSelector struct {
 	Inner selector
-	Class string
+	Path  []string
 }
 
 func (classSelector) isSelector() {}
@@ -47,25 +53,25 @@ const (
 	attrValueNone   attrValueKind = iota // presence
 	attrValueString                      // "x" or 'x'
 	attrValueNumber                      // 42
-	attrValueBool                        // true / false
 	attrValueRegex                       // /pattern/flags
-	attrValueIdent                       // bareword (e.g. type(undefined))
-	attrValueNull                        // null literal
+	attrValueIdent                       // bareword literal (e.g. undefined)
+	attrValueType                        // type(string), type(number), ...
 )
 
 type attrValue struct {
-	Kind  attrValueKind
-	Str   string
-	Num   float64
-	Bool  bool
-	Regex string
-	Flags string
-	Ident string
+	Kind          attrValueKind
+	Str           string
+	Num           float64
+	Regex         string
+	Flags         string
+	Ident         string
+	compiledRegex *esregexp.RegExp
+	regexPrefix   string
 }
 
 // attrSelector matches a node whose attribute (a dotted path inside the
 // node's logical fields) satisfies a comparison. With Op == attrPresent the
-// rule only checks that the value resolves to truthy / non-nil.
+// rule only checks that the path resolves to a non-null value.
 type attrSelector struct {
 	Inner selector
 	Path  []string
@@ -95,6 +101,16 @@ type combinatorSelector struct {
 }
 
 func (combinatorSelector) isSelector() {}
+
+// relativeSelector is the leading-combinator form accepted inside :has(),
+// for example `:has(> Identifier)`. esquery models its left side as the exact
+// node on which :has() is being evaluated.
+type relativeSelector struct {
+	Kind  combinatorKind
+	Inner selector
+}
+
+func (relativeSelector) isSelector() {}
 
 // pseudoSelector covers the `:is(...)`, `:matches(...)`, `:not(...)`,
 // `:has(...)`, `:nth-child(N)`, `:nth-last-child(N)`, `:first-child`,

@@ -44,4 +44,5 @@ foo / bar / gym
 
 ## Original Documentation
 
-- [ESLint no-unexpected-multiline](https://eslint.org/docs/latest/rules/no-unexpected-multiline)
+- [ESLint: no-unexpected-multiline](https://eslint.org/docs/latest/rules/no-unexpected-multiline)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unexpected-multiline.js)

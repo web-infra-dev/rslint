@@ -31,6 +31,24 @@ func TestNoSelfImportRule(t *testing.T) {
 			{Code: `require("./foo.ts", 123)`, FileName: "foo.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// TypeScript collects `require` calls only in JavaScript files, and only
+			// with a bare `require` callee, so these reach the file they name through
+			// the relative specifier probe rather than through its resolution cache.
+			{
+				Code:     `require("./foo.ts")`,
+				FileName: "foo.ts",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "import/no-self-import", Line: 1, Column: 1}},
+			},
+			{
+				Code:     `require("./foo")`,
+				FileName: "foo.ts",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "import/no-self-import", Line: 1, Column: 1}},
+			},
+			{
+				Code:     `(require)("./foo.ts")`,
+				FileName: "foo.ts",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "import/no-self-import", Line: 1, Column: 1}},
+			},
 			{
 				Code: `
 import './foo.ts';

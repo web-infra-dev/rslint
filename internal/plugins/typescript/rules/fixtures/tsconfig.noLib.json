@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "noLib": true,
+    "strict": true,
+    "target": "esnext",
+    "types": []
+  }
+}

@@ -29,16 +29,19 @@ interface RuleEntry {
   presets: { name: string; value: unknown }[];
 }
 
+/** Resolve a preset to its config entries; a preset may ship several layers. */
 function resolvePresetConfig(
   importName: string,
   presetName: string,
-): RslintConfigEntry | undefined {
+): RslintConfigEntry[] {
   const mod = (rslintCore as Record<string, unknown>)[importName] as
-    { configs?: Record<string, RslintConfigEntry> } | undefined;
+    | { configs?: Record<string, RslintConfigEntry | RslintConfigEntry[]> }
+    | undefined;
   const prefix = `${importName}.configs.`;
-  if (!presetName.startsWith(prefix)) return undefined;
+  if (!presetName.startsWith(prefix)) return [];
   const configKey = presetName.slice(prefix.length);
-  return mod?.configs?.[configKey];
+  const config = mod?.configs?.[configKey];
+  return config ? [config].flat() : [];
 }
 
 const PLUGINS = PLUGIN_REGISTRY.map((p) => ({
@@ -46,10 +49,10 @@ const PLUGINS = PLUGIN_REGISTRY.map((p) => ({
   group: p.group,
   presets: p.presets
     .map(({ name }) => {
-      const config = resolvePresetConfig(p.importName, name);
-      return config ? { config, name } : null;
+      const entries = resolvePresetConfig(p.importName, name);
+      return entries.length > 0 ? { entries, name } : null;
     })
-    .filter((entry): entry is { config: RslintConfigEntry; name: string } =>
+    .filter((entry): entry is { entries: RslintConfigEntry[]; name: string } =>
       Boolean(entry),
     ),
 }));
@@ -84,9 +87,16 @@ function extractPresetRules(): Map<string, PresetInfo[]> {
   const result = new Map<string, PresetInfo[]>();
 
   for (const { presets } of PLUGINS) {
-    for (const { config, name: presetName } of presets) {
-      if (!config.rules) continue;
-      for (const [ruleKey, value] of Object.entries(config.rules)) {
+    for (const { entries, name: presetName } of presets) {
+      // The entries cascade in order, so the last one that mentions a rule
+      // decides the value the preset applies.
+      const effective = new Map<string, unknown>();
+      for (const entry of entries) {
+        for (const [ruleKey, value] of Object.entries(entry.rules ?? {})) {
+          effective.set(ruleKey, value);
+        }
+      }
+      for (const [ruleKey, value] of effective) {
         const severity = Array.isArray(value) ? value[0] : value;
         if (severity === 'off') continue;
 
@@ -217,7 +227,7 @@ function buildRuleDocContent(rule: RuleEntry): string {
  *
  * Generated structure:
  *   docs/en/rules/
- *     _meta.json                        ← Overview + one entry per group dir
+ *     _meta.json                        ← section headers + Overview + group dirs
  *     index.mdx                         ← already exists (Overview page)
  *     eslint/
  *       _meta.json                      ← lists individual rules
@@ -260,9 +270,11 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
     return oa !== ob ? oa - ob : a.localeCompare(b);
   });
 
-  // Write top-level _meta.json: Overview + one dir per group
+  // Write top-level _meta.json: grouped overview + one dir per plugin
   const topMeta: unknown[] = [
+    { type: 'section-header', label: 'Rule Status' },
     { type: 'file', name: 'index', label: 'Overview' },
+    { type: 'section-header', label: 'Plugins' },
     ...sortedGroups.map(([slug]) => ({
       type: 'dir',
       name: slug,

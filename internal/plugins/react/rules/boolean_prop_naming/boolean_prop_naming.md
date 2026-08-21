@@ -134,5 +134,5 @@ inspect inside them. Examples:
 
 ## Original Documentation
 
-- [eslint-plugin-react / boolean-prop-naming](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/boolean-prop-naming.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/boolean-prop-naming.js)
+- [eslint-plugin-react: boolean-prop-naming](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/boolean-prop-naming.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/boolean-prop-naming.js)

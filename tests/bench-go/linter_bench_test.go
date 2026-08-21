@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -26,7 +27,7 @@ var (
 )
 
 func BenchmarkLinterSyntaxRules(b *testing.B) {
-	program := createBenchmarkProgramInDir(b, filepath.Join(b.TempDir(), "syntax"), 32, false)
+	program := lintprogram.NewFromCompiler(createBenchmarkProgramInDir(b, filepath.Join(b.TempDir(), "syntax"), 32, false))
 	rules := benchmarkSyntaxRules()
 	getRules := func(*ast.SourceFile) []linter.ConfiguredRule { return rules }
 	onDiag := func(rule.RuleDiagnostic) {}
@@ -44,15 +45,13 @@ func BenchmarkLinterSyntaxRules(b *testing.B) {
 			false,
 			onDiag,
 			nil,
-			nil,
 		)
 	}
 }
 
 func BenchmarkLinterTypeAwareRules(b *testing.B) {
-	program := createBenchmarkProgramInDir(b, filepath.Join(b.TempDir(), "type-aware"), 32, false)
+	program := lintprogram.NewFromCompiler(createBenchmarkProgramInDir(b, filepath.Join(b.TempDir(), "type-aware"), 32, false))
 	rules := benchmarkTypeAwareRules()
-	typeInfoFiles := benchmarkTypeInfoFiles(program)
 	getRules := func(*ast.SourceFile) []linter.ConfiguredRule { return rules }
 	onDiag := func(rule.RuleDiagnostic) {}
 
@@ -68,7 +67,6 @@ func BenchmarkLinterTypeAwareRules(b *testing.B) {
 			getRules,
 			false,
 			onDiag,
-			typeInfoFiles,
 			nil,
 		)
 	}
@@ -234,14 +232,6 @@ func loadBenchmarkProgramInDir(b *testing.B, configDir string) *compiler.Program
 	}
 
 	return program
-}
-
-func benchmarkTypeInfoFiles(program *compiler.Program) map[string]struct{} {
-	typeInfoFiles := make(map[string]struct{}, len(program.CommandLine().FileNames()))
-	for _, fileName := range program.CommandLine().FileNames() {
-		typeInfoFiles[fileName] = struct{}{}
-	}
-	return typeInfoFiles
 }
 
 func benchmarkRootSourceFiles(b *testing.B, program *compiler.Program) []*ast.SourceFile {

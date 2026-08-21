@@ -32,4 +32,5 @@ function fn(arg: string) {
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-assignment](https://typescript-eslint.io/rules/no-unsafe-assignment)
+- [typescript-eslint: no-unsafe-assignment](https://typescript-eslint.io/rules/no-unsafe-assignment)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.65.0/packages/eslint-plugin/src/rules/no-unsafe-assignment.ts)

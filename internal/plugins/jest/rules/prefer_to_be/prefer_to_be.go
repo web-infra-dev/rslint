@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -105,20 +104,23 @@ func shouldUseToBe(arg *ast.Node) bool {
 	}
 }
 
-func appendRemoveNotModifierFix(fixes []rule.RuleFix, jestFnCall *utils.ParsedJestFnCall) []rule.RuleFix {
+func appendRemoveNotModifierFix(
+	ctx rule.RuleContext,
+	fixes []rule.RuleFix,
+	jestFnCall *utils.ParsedJestFnCall,
+) ([]rule.RuleFix, bool) {
 	for _, modEntry := range jestFnCall.ModifierEntries {
 		if modEntry.Name != "not" || modEntry.Node == nil {
 			continue
 		}
-		receiver, parent := utils.GetAccessorReceiverAndParent(&modEntry)
-		if receiver == nil || parent == nil {
-			continue
+
+		removeFixes, ok := utils.RemoveMemberAccessorFixes(ctx, &modEntry)
+		if !ok {
+			return nil, false
 		}
-		return append(fixes, rule.RuleFixRemoveRange(
-			core.NewTextRange(receiver.End(), parent.End()),
-		))
+		return append(fixes, removeFixes...), true
 	}
-	return fixes
+	return nil, false
 }
 
 // reportPreferToBe emits a diagnostic and an autofix replacing the matcher
@@ -157,38 +159,53 @@ func reportPreferToBe(ctx rule.RuleContext, kind preferKind, jestFnCall *utils.P
 	}
 
 	matcherEntry := jestFnCall.MemberEntries[n-1]
+	reportNode := matcherEntry.Node
+	if reportNode == nil {
+		reportNode = node
+	}
+	reportWithoutFix := func() {
+		ctx.ReportNode(reportNode, msg)
+	}
+
 	matcherCall := node.AsCallExpression()
 	if matcherCall == nil {
+		reportWithoutFix()
 		return
 	}
 	matcherExpr := matcherCall.Expression
 	if matcherExpr == nil {
+		reportWithoutFix()
 		return
 	}
 
 	// At most: rename matcher, replace (...)/[], strip `.not`.
 	fixes := make([]rule.RuleFix, 0, 3)
-	switch matcherExpr.Kind {
-	case ast.KindPropertyAccessExpression:
-		fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, matcherEntry.Node, newMatcher))
-	case ast.KindElementAccessExpression:
-		fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, matcherEntry.Node, "'"+newMatcher+"'"))
-	default:
+	renameFix, ok := utils.ReplaceMemberNameFix(ctx, &matcherEntry, newMatcher)
+	if !ok {
+		reportWithoutFix()
 		return
 	}
+	fixes = append(fixes, renameFix)
 
 	if dropArgs {
-		fixes = append(fixes, rule.RuleFixReplaceRange(
-			core.NewTextRange(matcherExpr.End(), node.End()),
-			"()",
-		))
+		callFix, ok := utils.ReplaceCallSuffixFix(ctx.SourceFile, node, "()")
+		if !ok {
+			reportWithoutFix()
+			return
+		}
+		fixes = append(fixes, callFix)
 	}
 
 	if stripNot {
-		fixes = appendRemoveNotModifierFix(fixes, jestFnCall)
+		var ok bool
+		fixes, ok = appendRemoveNotModifierFix(ctx, fixes, jestFnCall)
+		if !ok {
+			reportWithoutFix()
+			return
+		}
 	}
 
-	ctx.ReportNodeWithFixes(matcherEntry.Node, msg, fixes...)
+	ctx.ReportNodeWithFixes(reportNode, msg, fixes...)
 }
 
 var PreferToBeRule = rule.Rule{

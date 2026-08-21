@@ -389,6 +389,7 @@ func allUnionPartsAreIntegerNumberLiteral(t *checker.Type) bool {
 
 var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-type-conversion",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile

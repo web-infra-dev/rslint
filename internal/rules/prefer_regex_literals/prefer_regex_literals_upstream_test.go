@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -70,10 +71,8 @@ func TestPreferRegexLiteralsUpstream(t *testing.T) {
 			{Code: "function foo() { var String; new RegExp(String.raw`a`); }"},
 			{Code: "function foo(String) { RegExp(String.raw`a`); }"},
 			{Code: "if (foo) { const String = bar; RegExp(String.raw`a`); }"},
-			// SKIP: rslint does not support ESLint global directive comments.
-			{Code: "/* globals String:off */ new RegExp(String.raw`a`);", Skip: true},
-			// SKIP: rslint does not support disabling globals through languageOptions.globals.
-			{Code: "RegExp('a', String.raw`g`);", Skip: true},
+			{Code: "/* globals String:off */ new RegExp(String.raw`a`);"},
+			{Code: "RegExp('a', String.raw`g`);", Globals: map[string]any{"String": "off"}},
 			{Code: "new Regexp('abc');"},
 			{Code: "Regexp(`a`);"},
 			{Code: "new Regexp(String.raw`a`);"},
@@ -81,16 +80,11 @@ func TestPreferRegexLiteralsUpstream(t *testing.T) {
 			{Code: "function foo() { var RegExp; RegExp('a', 'g'); }"},
 			{Code: "function foo(RegExp) { new RegExp(String.raw`a`); }"},
 			{Code: "if (foo) { const RegExp = bar; RegExp('a'); }"},
-			// SKIP: rslint does not support ESLint global directive comments.
-			{Code: "/* globals RegExp:off */ new RegExp('a');", Skip: true},
-			// SKIP: rslint does not support disabling globals through languageOptions.globals.
-			{Code: "RegExp('a');", Skip: true},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific global availability.
-			{Code: "new globalThis.RegExp('a');", Skip: true},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific global availability.
-			{Code: "new globalThis.RegExp('a');", Skip: true},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific global availability.
-			{Code: "new globalThis.RegExp('a');", Skip: true},
+			{Code: "/* globals RegExp:off */ new RegExp('a');"},
+			{Code: "RegExp('a');", Globals: map[string]any{"RegExp": "off"}},
+			{Code: "new globalThis.RegExp('a');", LanguageOptions: rule.LanguageOptions{ECMAVersion: 5}},
+			{Code: "new globalThis.RegExp('a');", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015}},
+			{Code: "new globalThis.RegExp('a');", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}},
 			{Code: "class C { #RegExp; foo() { globalThis.#RegExp('a'); } }"},
 			{Code: "new RegExp('[[A--B]]' + a, 'v')"},
 		},
@@ -185,7 +179,7 @@ func TestPreferRegexLiteralsUpstream(t *testing.T) {
 			{Code: "new RegExp('\\0\\0', 'g');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "RegExp('\\\\0\\\\0\\\\0', '')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/\\0\\0\\0/"}}}}},
 			{Code: "RegExp('\\\\78\\\\126\\\\5934', '')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/\\78\\126\\5934/"}}}}},
-			{Code: "new window['RegExp']('\\\\x56\\\\x78\\\\x45', '');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/\\x56\\x78\\x45/;"}}}}},
+			{Code: "new window['RegExp']('\\\\x56\\\\x78\\\\x45', '');", Globals: map[string]any{"window": "readonly"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/\\x56\\x78\\x45/;"}}}}},
 			{Code: "a in(RegExp('abc'))", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "a in(/abc/)"}}}}},
 			{Code: "x = y\n            RegExp(\"foo\").test(x) ? bar() : baz()", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "func(new RegExp(String.raw`\\w{1, 2`, 'u'),new RegExp(String.raw`\\w{1, 2`, 'u'))", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}, {MessageId: "unexpectedRegExp"}}},

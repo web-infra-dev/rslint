@@ -18,23 +18,24 @@ The extension can be configured through VS Code settings:
 
 Enable/disable Rslint.
 
-### rslint.binPath
-
-- **Type:** `"local"` | `"built-in"` | `"custom"`
-- **Default:** `"local"`
-
-Choose which Rslint binary to use:
-
-- `local`: Use workspace node_modules Rslint binary
-- `built-in`: Use extension's built-in Rslint binary
-- `custom`: Use a custom path to Rslint binary
-
-### rslint.customBinPath
+### rslint.corePath
 
 - **Type:** `string`
-- **Default:** `undefined`
+- **Default:** `""`
 
-Custom path to Rslint executable. Only used when `rslint.binPath` is set to `custom`. Requires reloading VS Code to take effect.
+The extension uses the nearest `@rslint/core` installation for each open file.
+This follows normal `node_modules` ancestry, so a monorepo can use a root
+installation, nested versions, or both. Runtimes backed by the same physical
+installation are shared within a workspace folder.
+
+Yarn Plug'n'Play is not resolved or executed. Use a regular local installation
+or set `rslint.corePath` to an exact package directory.
+
+Set `rslint.corePath` to an `@rslint/core` package directory to override
+automatic resolution. Relative paths are resolved from the workspace folder.
+The extension does not ship a fallback core, so the project must install one.
+If an installation is replaced in place without changing its package directory,
+reload the VS Code window so its Node-loaded code and binary refresh together.
 
 ### rslint.trace.server
 

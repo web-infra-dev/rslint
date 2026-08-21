@@ -71,6 +71,16 @@ var PreferArraySomeRule = rule.Rule{
 // ---- `.find()` / `.findLast()` ----
 
 func checkFindCall(ctx rule.RuleContext, node *ast.Node) {
+	if !isPotentialFindMethodCall(node) {
+		return
+	}
+
+	comparison := comparisonParent(node)
+	isBooleanUse := comparison != nil || isBooleanExpression(ctx, node) || isControlFlowTest(node)
+	if !isBooleanUse && !isVariableDeclarationInitializer(node) {
+		return
+	}
+
 	minArgs := 1
 	maxArgs := 2
 	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
@@ -88,22 +98,16 @@ func checkFindCall(ctx rule.RuleContext, node *ast.Node) {
 		return
 	}
 
-	if isKnownNonIndexedCollection(ctx, call.Object) {
-		return
-	}
-
-	isCompare := isCheckingUndefined(node)
-	if !isCompare &&
-		!isBooleanExpression(ctx, node) &&
-		!isControlFlowTest(node) &&
-		!isFindResultVariableUsedOnlyAsBoolean(ctx, node, call) {
+	if isBooleanUse {
+		if isKnownNonIndexedCollection(ctx, call.Object) {
+			return
+		}
+	} else if !isFindResultVariableUsedOnlyAsBoolean(ctx, node, call) {
 		return
 	}
 
 	methodNode := call.Property
 	method := methodNode.AsIdentifier().Text
-
-	comparison := comparisonParent(node) // non-nil only when isCompare
 
 	ctx.ReportNodeWithDeferredSuggestions(methodNode, messageArraySome(method), func() []rule.RuleSuggestion {
 		// Removing the comparison would drop comments between the call and the
@@ -111,7 +115,7 @@ func checkFindCall(ctx rule.RuleContext, node *ast.Node) {
 		// case. Checked inside the builder so lint-only runs never materialize
 		// the comment list — returning no suggestions reports exactly what
 		// ReportNode would.
-		if isCompare && utils.HasCommentInSpan(
+		if comparison != nil && utils.HasCommentInSpan(
 			ctx.Comments.All(),
 			parenthesizedEnd(ctx, node),
 			comparison.End(),
@@ -120,7 +124,7 @@ func checkFindCall(ctx rule.RuleContext, node *ast.Node) {
 		}
 
 		fixes := []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, methodNode, "some")}
-		if isCompare {
+		if comparison != nil {
 			// Remove the `== undefined` / `!== null` tail.
 			parenEnd := parenthesizedEnd(ctx, node)
 			fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(parenEnd, comparison.End())))
@@ -139,16 +143,46 @@ func checkFindCall(ctx rule.RuleContext, node *ast.Node) {
 	})
 }
 
+// isPotentialFindMethodCall is a conservative, allocation-free initial filter for
+// the CallExpression listener. MatchDotMethodCall still owns the optional-call,
+// argument-count, spread, and parenthesized-callee checks.
+func isPotentialFindMethodCall(node *ast.Node) bool {
+	if node == nil || !ast.IsCallExpression(node) {
+		return false
+	}
+	expression := node.AsCallExpression().Expression
+	if expression == nil {
+		return false
+	}
+	callee := ast.SkipParentheses(expression)
+	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
+		return false
+	}
+	name := callee.AsPropertyAccessExpression().Name()
+	if name == nil || !ast.IsIdentifier(name) {
+		return false
+	}
+	method := name.AsIdentifier().Text
+	return method == "find" || method == "findLast"
+}
+
+func isVariableDeclarationInitializer(node *ast.Node) bool {
+	declarator := node.Parent
+	return declarator != nil && ast.IsVariableDeclaration(declarator) &&
+		declarator.AsVariableDeclaration().Initializer == node
+}
+
 // comparisonParent returns the BinaryExpression comparing `node` against
-// undefined / null (per isCheckingUndefined), skipping parentheses around the
-// call. Returns nil when node is not the left operand of such a comparison.
+// undefined / null, skipping parentheses around the call. Returns nil when
+// node is not the left operand of such a comparison.
 func comparisonParent(node *ast.Node) *ast.Node {
 	parent := effectiveParent(node)
 	if parent == nil || !ast.IsBinaryExpression(parent) {
 		return nil
 	}
 	bin := parent.AsBinaryExpression()
-	if ast.SkipParentheses(bin.Left) != node {
+	if bin.Left == nil || bin.Right == nil || bin.OperatorToken == nil ||
+		ast.SkipParentheses(bin.Left) != node {
 		return nil
 	}
 	right := bin.Right
@@ -165,22 +199,12 @@ func comparisonParent(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// isCheckingUndefined mirrors upstream: the call is the left operand of a
-// comparison against `undefined` (`==`/`!=`/`===`/`!==`) or `null` (`==`/`!=`).
-// Yoda comparisons (`undefined !== foo.find()`) are intentionally not matched.
-func isCheckingUndefined(node *ast.Node) bool {
-	return comparisonParent(node) != nil
-}
-
 // isFindResultVariableUsedOnlyAsBoolean mirrors upstream's helper: a
 // `const x = arr.find(fn)` whose every read is used as a boolean. Requires the
 // receiver to be a known array (upstream `isArray`), a plain single-name
 // `const` binding that isn't exported, and ≥1 reference — all of which must be
 // boolean-position reads.
 func isFindResultVariableUsedOnlyAsBoolean(ctx rule.RuleContext, callExpression *ast.Node, call unicornutil.DotMethodCall) bool {
-	if !isArray(ctx, call.Object) {
-		return false
-	}
 	if ctx.Refs == nil {
 		return false
 	}
@@ -216,6 +240,9 @@ func isFindResultVariableUsedOnlyAsBoolean(ctx rule.RuleContext, callExpression 
 	if statement.ModifierFlags()&ast.ModifierFlagsExport != 0 {
 		return false
 	}
+	if !isArray(ctx, call.Object) {
+		return false
+	}
 
 	sym := declarator.Symbol()
 	if sym == nil {
@@ -242,16 +269,6 @@ func checkFindIndexComparison(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 
-	argsLen := 1
-	call, ok := unicornutil.MatchDotMethodCall(bin.Left, unicornutil.DotMethodCallOptions{
-		Methods:             []string{"findIndex", "findLastIndex"},
-		ArgumentsLength:     &argsLen,
-		RejectSpreadElement: true,
-	})
-	if !ok {
-		return false
-	}
-
 	operator := bin.OperatorToken.Kind
 	rhsMatches := false
 	switch operator {
@@ -262,6 +279,16 @@ func checkFindIndexComparison(ctx rule.RuleContext, node *ast.Node) bool {
 		rhsMatches = isLiteralZero(bin.Right)
 	}
 	if !rhsMatches {
+		return false
+	}
+
+	argsLen := 1
+	call, ok := unicornutil.MatchDotMethodCall(bin.Left, unicornutil.DotMethodCallOptions{
+		Methods:             []string{"findIndex", "findLastIndex"},
+		ArgumentsLength:     &argsLen,
+		RejectSpreadElement: true,
+	})
+	if !ok {
 		return false
 	}
 
@@ -297,6 +324,9 @@ func checkFindIndexComparison(ctx rule.RuleContext, node *ast.Node) bool {
 // isNegativeOne matches `-1` (with any parenthesized / spaced form of the `1`).
 // tsgo models `-1` as PrefixUnaryExpression(minus, NumericLiteral "1").
 func isNegativeOne(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil || node.Kind != ast.KindPrefixUnaryExpression {
 		return false
@@ -305,12 +335,18 @@ func isNegativeOne(node *ast.Node) bool {
 	if unary.Operator != ast.KindMinusToken {
 		return false
 	}
+	if unary.Operand == nil {
+		return false
+	}
 	operand := ast.SkipParentheses(unary.Operand)
 	return operand != nil && operand.Kind == ast.KindNumericLiteral &&
 		utils.NormalizeNumericLiteral(operand.AsNumericLiteral().Text) == "1"
 }
 
 func isLiteralZero(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
 	node = ast.SkipParentheses(node)
 	return node != nil && node.Kind == ast.KindNumericLiteral &&
 		utils.NormalizeNumericLiteral(node.AsNumericLiteral().Text) == "0"
@@ -671,6 +707,9 @@ var typedArrayNames = []string{
 // to `getTypeScriptType`. `targetNames` and `nonTargetNames` are the type-name
 // sets that resolve to target / non-target respectively.
 func classifyReceiver(ctx rule.RuleContext, node *ast.Node, targetNames, nonTargetNames *utils.Set[string]) typeClass {
+	if node == nil {
+		return classUnknown
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return classUnknown
@@ -724,6 +763,9 @@ func classifyReceiver(ctx rule.RuleContext, node *ast.Node, targetNames, nonTarg
 // a plain identifier name are resolved (matching upstream's getTypeFromVariable
 // preconditions).
 func constInitializer(ctx rule.RuleContext, idNode *ast.Node) *ast.Node {
+	if ctx.Refs == nil || idNode == nil {
+		return nil
+	}
 	sym := ctx.Refs.Resolve(idNode)
 	if sym == nil || len(sym.Declarations) != 1 {
 		return nil
@@ -737,7 +779,8 @@ func constInitializer(ctx rule.RuleContext, idNode *ast.Node) *ast.Node {
 		return nil
 	}
 	varDecl := decl.AsVariableDeclaration()
-	if varDecl.Name() == nil || !ast.IsIdentifier(varDecl.Name()) || varDecl.Type != nil {
+	if varDecl.Name() == nil || !ast.IsIdentifier(varDecl.Name()) ||
+		varDecl.Type != nil || varDecl.Initializer == nil {
 		return nil
 	}
 	return ast.SkipParentheses(varDecl.Initializer)

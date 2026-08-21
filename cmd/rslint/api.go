@@ -24,6 +24,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -251,8 +252,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// The Program context must wrap the fully composed request VFS so metadata
 	// snapshots observe overlay contents and canonical aliases exactly as the
 	// rest of this request does. A new context is created for every API call.
-	buildContext := utils.NewProgramBuildContext(fs)
-	fs = buildContext.FS()
+	programSession := loader.NewSession(fs)
+	fs = programSession.FS()
 
 	var (
 		configMap              map[string]rslintconfig.RslintConfig
@@ -421,38 +422,37 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		UseCaseSensitiveFileNames: true,
 	}
 
-	// Resolve the exact lint target set, bind targets to existing Programs, and
-	// append a non-project-backed fallback Program for selected files absent from
-	// every Program (the typical lintText/lintFiles in-memory file). Identical to
-	// the CLI via the shared helper. Native discovery can supply a hierarchical
+	// Resolve the exact lint target set and load one unified Program sequence.
+	// Selected files outside configured projects (the typical lintText/lintFiles
+	// in-memory file) are represented by source-only Programs. Native discovery
+	// can supply a hierarchical
 	// configMap; low-level config and explicit overrideConfigFile requests remain
 	// invocation-wide single-config paths.
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	targetPlan, err := resolveLintTargetPlan(configMap, rslintConfig, configDirectory, configTargetScopes, fs, allowedFiles, nil, false)
+	targetPlan, err := rslintconfig.ResolveLintTargetPlan(configMap, rslintConfig, configDirectory, configTargetScopes, fs, allowedFiles, nil, false)
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
 	}
 	// A plain API lint only needs type information when at least one target is
 	// selected. Resolve the target plan before project paths so an ignored or
 	// empty request cannot fail on an inactive project declaration.
-	var programSet lintProgramSet
+	var projectSet loader.ProjectSet
 	if len(targetPlan.Targets) > 0 {
 		if configMap != nil {
-			programSet, err = createProgramSetForConfigs(configsForLintTargetPlan(configMap, targetPlan), false, buildContext)
+			projectSet, err = programSession.BuildProjects(targetPlan.ActiveConfigs(configMap), false)
 		} else {
-			programSet, err = createProgramSetForConfig(configDirectory, rslintConfig, false, buildContext)
+			projectSet, err = programSession.BuildProject(configDirectory, rslintConfig, false)
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
-	binding, err := bindLintTargetPlan(programSet, targetPlan, configDirectory, buildContext, false)
+	binding, err := programSession.LoadAPI(projectSet, targetPlan, configDirectory, false)
 	if err != nil {
 		return nil, err
 	}
 	programs := binding.Programs
-	typeInfoFiles := binding.TypeInfoFiles
 	targetsByProgram := binding.TargetsByProgram
 	targetPathBySourcePath := binding.TargetPathBySourcePath
 	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
@@ -460,7 +460,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		Config:                     rslintConfig,
 		CurrentDirectory:           configDirectory,
 		EnforcePlugins:             true,
-		TypeInfoFiles:              typeInfoFiles,
 		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
 		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
 		SourceMappingsCanonical:    true,
@@ -601,58 +600,49 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 
 	// Every selected target is parsed even when no config entry contributes
 	// rules. Global ignores were already removed during target discovery.
-	syntaxDiagnostics, syntaxErrorFiles := collectTargetSyntacticDiagnostics(programs, targetsByProgram, nil, false, false)
+	syntaxDiagnostics := collectTargetSyntacticDiagnostics(programs, targetsByProgram, false, false)
 	for _, diagnostic := range syntaxDiagnostics {
 		diagnosticCollector(diagnostic)
 	}
 
-	// Build one run descriptor shared by native lint and plugin target
-	// collection, keeping both paths on the exact same file/rule selection.
+	// Build one run descriptor and prepared plan shared by native lint and
+	// plugin dispatch, keeping both paths on the exact same file/rule selection.
 	runOpts := linter.RunLinterOptions{
 		Programs:       programs,
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
 		Cwd:            currentDirectory,
 		Scope:          linter.FileScope{Files: allowedFiles},
 		TargetFiles:    targetsByProgram,
-		// RunLinter repeats the RequiresTypeInfo eligibility check for files
-		// outside this set and withholds the project TypeChecker from them.
-		TypeInfoFiles:    typeInfoFiles,
-		SyntaxErrorFiles: syntaxErrorFiles,
-		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
 			filePath := responsePathForSourcePath(sourceFile.FileName())
 			sourceFiles[filePath] = sourceFile
 			sourceFilesLock.Unlock()
 
-			// GetActiveRulesForFile applies the type-aware gate: when
-			// typeInfoFiles is non-nil and this file is not in it (a gap /
-			// fallback file with no type information), type-aware rules are
-			// filtered out. RunLinter repeats this check at the execution boundary.
-			// typeInfoFiles==nil ⇒ no fallback ⇒ every linted file has type
-			// info ⇒ nothing to filter. Rules come solely from the resolved
-			// config object (config.rules); --api has no separate rule-options
-			// surface.
+			// Rules come solely from the resolved config object (config.rules).
+			// Program capability filtering happens once while PrepareLintPlan
+			// freezes the shared native/plugin execution plan.
 			//
 			// enforcePlugins=true: the --api config is a resolved JS-style flat
 			// config (plugins + rules), exactly like the CLI's JS/TS config path,
 			// so a rule carrying a plugin prefix runs only when its plugin is
 			// declared in the config's `plugins` — matching CLI and ESLint
 			// semantics (a rule whose plugin is not declared is skipped).
-			activeRules := fileConfigResolver.ActiveRulesForFile(sourceFile.FileName())
+			enabledRules := fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
 			// Plugin placeholders live in the process-global registry. Restrict
 			// them to this request's metadata so a long-lived API process cannot
 			// leak a plugin registered by an earlier lint into a later request.
-			for i, configuredRule := range activeRules {
+			for i, configuredRule := range enabledRules {
 				if !configuredRule.IsEslintPluginRule {
 					continue
 				}
 				if _, ok := requestPluginRules[configuredRule.Name]; ok {
 					continue
 				}
-				filtered := make([]linter.ConfiguredRule, 0, len(activeRules)-1)
-				filtered = append(filtered, activeRules[:i]...)
-				for _, remainingRule := range activeRules[i+1:] {
+				filtered := make([]rule.ConfiguredRule, 0, len(enabledRules)-1)
+				filtered = append(filtered, enabledRules[:i]...)
+				for _, remainingRule := range enabledRules[i+1:] {
 					if !remainingRule.IsEslintPluginRule {
 						filtered = append(filtered, remainingRule)
 						continue
@@ -663,7 +653,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				}
 				return filtered
 			}
-			return activeRules
+			return enabledRules
 		},
 		// The API returns concrete fixes, suggestions, and fixable counts
 		// independently of whether req.Fix later applies autofixes.
@@ -672,6 +662,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			Report: diagnosticCollector,
 		},
 	}
+	preparedPlan, err := linter.PrepareLintPlan(runOpts)
+	if err != nil {
+		return nil, fmt.Errorf("error preparing lint plan: %w", err)
+	}
+	runOpts.PreparedPlan = preparedPlan
 
 	// Metadata is the feature gate: without it there is no plugin target walk,
 	// goroutine, or reverse request. With metadata, dispatch starts before the
@@ -689,7 +684,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			}
 			pluginConfigDirByOwner = map[string]string{configDirectory: wireConfigDirectory}
 		}
-		pluginInputs := buildPluginFileInputs(runOpts, pluginConfigResolver{
+		pluginInputs := buildPluginFileInputs(runOpts.PreparedPlan, pluginConfigResolver{
 			lintResolver:           fileConfigResolver,
 			pluginConfigDirByOwner: pluginConfigDirByOwner,
 		})
@@ -761,7 +756,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			// consumed it — so put it back before fixing. Output is what the
 			// JS side writes to disk, and it has to be the whole file.
 			originalContent := fileDiags[0].SourceFile.Text()
-			if utils.SourceHasBOM(buildContext.FS(), filePath) {
+			if utils.SourceHasBOM(programSession.FS(), filePath) {
 				originalContent = utils.BOM + originalContent
 			}
 			fixedContent, _, didFix := linter.ApplyRuleFixes(originalContent, fileDiags)

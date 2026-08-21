@@ -42,8 +42,9 @@ func unexpectedThisMessage(interfaceName string) rule.RuleMessage {
 }
 
 var PreferFunctionTypeRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-function-type",
-	Run:  run,
+	Name:   "prefer-function-type",
+	Schema: rule.EmptyArraySchema,
+	Run:    run,
 })
 
 // collectCommentsForward walks `text` starting at `start`, skipping whitespace

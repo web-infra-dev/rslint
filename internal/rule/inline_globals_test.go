@@ -294,24 +294,3 @@ func TestParseGlobalNameList(t *testing.T) {
 		})
 	}
 }
-
-func TestMergeGlobals_InlineOverridesConfigWithoutMutatingInputs(t *testing.T) {
-	config := map[string]utils.GlobalAccess{"configOnly": utils.GlobalAccessWritable, "overridden": utils.GlobalAccessWritable}
-	inline := map[string]utils.GlobalAccess{"inlineOnly": utils.GlobalAccessReadonly, "overridden": utils.GlobalAccessOff}
-	want := map[string]utils.GlobalAccess{
-		"configOnly": utils.GlobalAccessWritable,
-		"inlineOnly": utils.GlobalAccessReadonly,
-		"overridden": utils.GlobalAccessOff,
-	}
-
-	got := MergeGlobals(config, inline)
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("MergeGlobals() = %#v, want %#v", got, want)
-	}
-	if config["overridden"] != utils.GlobalAccessWritable {
-		t.Fatal("MergeGlobals mutated config input")
-	}
-	if inline["overridden"] != utils.GlobalAccessOff {
-		t.Fatal("MergeGlobals mutated inline input")
-	}
-}

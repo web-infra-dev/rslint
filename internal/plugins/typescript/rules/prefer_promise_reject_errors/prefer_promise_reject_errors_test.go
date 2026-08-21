@@ -5,7 +5,6 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestPreferPromiseRejectErrorsRule(t *testing.T) {
@@ -13,21 +12,21 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
 		{Code: "Promise.resolve(5);"},
 		{
 			Code:    "Promise.reject();",
-			Options: PreferPromiseRejectErrorsOptions{AllowEmptyReject: utils.Ref(true)},
+			Options: map[string]interface{}{"allowEmptyReject": true},
 		},
 		{
 			Code: `
         declare const someAnyValue: any;
         Promise.reject(someAnyValue);
       `,
-			Options: PreferPromiseRejectErrorsOptions{AllowThrowingAny: utils.Ref(true), AllowThrowingUnknown: utils.Ref(false)},
+			Options: map[string]interface{}{"allowThrowingAny": true, "allowThrowingUnknown": false},
 		},
 		{
 			Code: `
         declare const someUnknownValue: unknown;
         Promise.reject(someUnknownValue);
       `,
-			Options: PreferPromiseRejectErrorsOptions{AllowThrowingAny: utils.Ref(false), AllowThrowingUnknown: utils.Ref(true)},
+			Options: map[string]interface{}{"allowThrowingAny": false, "allowThrowingUnknown": true},
 		},
 		{Code: "Promise.reject(new Error());"},
 		{Code: "Promise.reject(new TypeError());"},
@@ -136,7 +135,7 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
           reject();
         });
       `,
-			Options: PreferPromiseRejectErrorsOptions{AllowEmptyReject: utils.Ref(true)},
+			Options: map[string]interface{}{"allowEmptyReject": true},
 		},
 		{Code: "new Promise((yes, no) => no(new Error()));"},
 		{Code: "new Promise();"},
@@ -285,14 +284,14 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
         declare const someAnyValue: any;
         Promise.reject(someAnyValue);
       `,
-			Options: PreferPromiseRejectErrorsOptions{AllowThrowingAny: utils.Ref(true), AllowThrowingUnknown: utils.Ref(true)},
+			Options: map[string]interface{}{"allowThrowingAny": true, "allowThrowingUnknown": true},
 		},
 		{
 			Code: `
         declare const someUnknownValue: unknown;
         Promise.reject(someUnknownValue);
       `,
-			Options: PreferPromiseRejectErrorsOptions{AllowThrowingAny: utils.Ref(true), AllowThrowingUnknown: utils.Ref(true)},
+			Options: map[string]interface{}{"allowThrowingAny": true, "allowThrowingUnknown": true},
 		},
 	}, []rule_tester.InvalidTestCase{
 		{
@@ -393,7 +392,7 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
 		},
 		{
 			Code:    "Promise.reject(undefined);",
-			Options: PreferPromiseRejectErrorsOptions{AllowEmptyReject: utils.Ref(true)},
+			Options: map[string]interface{}{"allowEmptyReject": true},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "rejectAnError",
@@ -1404,7 +1403,7 @@ function fun<T extends number>(t: T): void {
         declare const someAnyValue: any;
         Promise.reject(someAnyValue);
       `,
-			Options: PreferPromiseRejectErrorsOptions{AllowThrowingAny: utils.Ref(false), AllowThrowingUnknown: utils.Ref(true)},
+			Options: map[string]interface{}{"allowThrowingAny": false, "allowThrowingUnknown": true},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "rejectAnError",
@@ -1416,7 +1415,7 @@ function fun<T extends number>(t: T): void {
         declare const someUnknownValue: unknown;
         Promise.reject(someUnknownValue);
       `,
-			Options: PreferPromiseRejectErrorsOptions{AllowThrowingAny: utils.Ref(true), AllowThrowingUnknown: utils.Ref(false)},
+			Options: map[string]interface{}{"allowThrowingAny": true, "allowThrowingUnknown": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "rejectAnError",

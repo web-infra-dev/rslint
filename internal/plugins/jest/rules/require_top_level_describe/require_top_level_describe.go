@@ -19,13 +19,13 @@ type options struct {
 	MaxNumberOfTopLevelDescribes int
 }
 
-func parseOptions(raw any) options {
+func parseOptions(rawOptions []any) options {
 	opts := options{MaxNumberOfTopLevelDescribes: math.MaxInt}
-	m := internalUtils.GetOptionsMap(raw)
-	if m == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
 
+	m, _ := rawOptions[0].(map[string]any)
 	if n, ok := internalUtils.CoerceInt(m["maxNumberOfTopLevelDescribes"]); ok && n >= 1 {
 		opts.MaxNumberOfTopLevelDescribes = n
 	}
@@ -62,8 +62,8 @@ var (
 var RequireTopLevelDescribeRule = rule.Rule{
 	Name:   "jest/require-top-level-describe",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		opts := parseOptions(rule.LegacyUnwrapOptions(_options))
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		numberOfDescribeBlocks := 0
 		numberOfTopLevelDescribeBlocks := 0
 

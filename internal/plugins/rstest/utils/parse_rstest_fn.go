@@ -17,6 +17,7 @@ const (
 	rstestAPIDescribe
 	rstestAPIParameterizedTest
 	rstestAPIParameterizedDescribe
+	rstestAPIHook
 )
 
 type rstestInvocation uint8
@@ -47,6 +48,7 @@ type rstestResolvedAPI struct {
 	parameterizedKind RstestParameterizedKind
 	skipped           bool
 	todo              bool
+	focusEntries      []ParsedRstestFnMemberEntry
 }
 
 type rstestAPIProfile uint8
@@ -56,25 +58,9 @@ const (
 	rstestProfilePlaywright
 )
 
-// ParseRstestFnCall parses a final Rstest test/describe registration call.
-// Factory calls such as test.each(cases), test.runIf(condition), and
-// test.extend(fixtures) are intentionally not returned.
-func ParseRstestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedRstestFnCall {
-	return parseRstestFnCall(node, ctx, false, false)
-}
-
-func ParseRstestFnCallWithOfficialExtensions(
-	node *ast.Node,
-	ctx rule.RuleContext,
-) *ParsedRstestFnCall {
-	return parseRstestFnCall(node, ctx, true, true)
-}
-
 func parseRstestFnCall(
 	node *ast.Node,
 	ctx rule.RuleContext,
-	includeImportMeta bool,
-	includePlaywright bool,
 ) *ParsedRstestFnCall {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return nil
@@ -91,10 +77,8 @@ func parseRstestFnCall(
 			ctx,
 			nil,
 			0,
-			includeImportMeta,
-			includePlaywright,
 		)
-	} else if includeImportMeta {
+	} else {
 		var importMetaRoot *ast.Node
 		importMetaRoot, parts, rootInvoked, ok = parseImportMetaRstestChain(call.Expression)
 		if ok && !rootInvoked && importMetaRoot != nil && len(parts) > 0 {
@@ -129,6 +113,8 @@ func parseRstestFnCall(
 		resolved.kind = RstestFnTypeTest
 	case rstestAPIDescribe, rstestAPIParameterizedDescribe:
 		resolved.kind = RstestFnTypeDescribe
+	case rstestAPIHook:
+		resolved.kind = RstestFnTypeHook
 	default:
 		return nil
 	}
@@ -153,7 +139,7 @@ func parseRstestFnCall(
 	if root.Kind == ast.KindIdentifier {
 		localName = root.AsIdentifier().Text
 	}
-	return &ParsedRstestFnCall{
+	parsed := &ParsedRstestFnCall{
 		ParsedCall: testFramework.ParsedCall{
 			Name:          resolved.name,
 			LocalName:     localName,
@@ -176,6 +162,10 @@ func parseRstestFnCall(
 		Skipped:           resolved.skipped,
 		Todo:              resolved.todo,
 	}
+	if len(resolved.focusEntries) > 0 {
+		parsed.focus = &rstestFocus{entries: resolved.focusEntries}
+	}
+	return parsed
 }
 
 func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool) {
@@ -324,8 +314,6 @@ func resolveRstestRoot(
 	ctx rule.RuleContext,
 	visited map[*ast.Symbol]bool,
 	depth int,
-	includeImportMeta bool,
-	includePlaywright bool,
 ) (rstestResolvedAPI, int, bool) {
 	if root == nil || root.Kind != ast.KindIdentifier || depth > 16 {
 		return rstestResolvedAPI{}, 0, false
@@ -336,7 +324,7 @@ func resolveRstestRoot(
 	if ctx.TypeChecker != nil {
 		symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
 	}
-	for _, profile := range rstestProfiles(includePlaywright) {
+	for _, profile := range rstestAllProfiles {
 		module := profileImportModule(profile)
 		name, originalNode, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
 			localName,
@@ -356,21 +344,19 @@ func resolveRstestRoot(
 		}
 	}
 
-	if includeImportMeta {
-		if name, originalNode, ok := resolveImportMetaRstestBinding(symbol); ok {
-			if state := directRstestAPIState(rstestProfileCore, name); state != rstestAPIInvalid {
-				return rstestResolvedAPI{
-					name:         name,
-					state:        state,
-					originalNode: originalNode,
-					mode:         RSTEST_IMPORT_MODE,
-					profile:      rstestProfileCore,
-				}, 0, true
-			}
+	if name, originalNode, ok := resolveImportMetaRstestBinding(symbol); ok {
+		if state := directRstestAPIState(rstestProfileCore, name); state != rstestAPIInvalid {
+			return rstestResolvedAPI{
+				name:         name,
+				state:        state,
+				originalNode: originalNode,
+				mode:         RSTEST_IMPORT_MODE,
+				profile:      rstestProfileCore,
+			}, 0, true
 		}
 	}
 
-	for _, profile := range rstestProfiles(includePlaywright) {
+	for _, profile := range rstestAllProfiles {
 		if testFramework.IsModuleNamespaceSymbol(symbol, profileImportModule(profile)) {
 			if len(parts) == 0 || parts[0].invocation != rstestNotInvoked {
 				return rstestResolvedAPI{}, 0, false
@@ -400,7 +386,7 @@ func resolveRstestRoot(
 		}
 		initializer := declaration.AsVariableDeclaration().Initializer
 		aliasRoot, aliasParts, aliasRootInvoked, ok := parseRstestChain(initializer)
-		if includeImportMeta && !ok && isImportMetaRstest(initializer) {
+		if !ok && isImportMetaRstest(initializer) {
 			if len(parts) == 0 || parts[0].invocation != rstestNotInvoked {
 				continue
 			}
@@ -433,8 +419,6 @@ func resolveRstestRoot(
 			ctx,
 			visited,
 			depth+1,
-			includeImportMeta,
-			includePlaywright,
 		)
 		if !ok {
 			continue
@@ -495,18 +479,40 @@ func isConstRstestVariableDeclaration(declaration *ast.Node) bool {
 }
 
 func directRstestAPIState(profile rstestAPIProfile, name string) rstestAPIState {
-	switch name {
-	case "test", "it":
-		if profile == rstestProfilePlaywright && name == "it" {
-			return rstestAPIInvalid
-		}
-		return rstestAPITestWithExtend
-	case "describe":
-		return rstestAPIDescribe
-	default:
+	states, ok := rstestDirectAPIStates[name]
+	if !ok {
 		return rstestAPIInvalid
 	}
+	return states[profile]
 }
+
+var rstestDirectAPIStates = func() map[string][2]rstestAPIState {
+	states := map[string][2]rstestAPIState{
+		"test": {
+			rstestProfileCore:       rstestAPITestWithExtend,
+			rstestProfilePlaywright: rstestAPITestWithExtend,
+		},
+		"it": {
+			rstestProfileCore:       rstestAPITestWithExtend,
+			rstestProfilePlaywright: rstestAPIInvalid,
+		},
+		"describe": {
+			rstestProfileCore:       rstestAPIDescribe,
+			rstestProfilePlaywright: rstestAPIDescribe,
+		},
+	}
+	// Both profiles expose the same four hooks: @rstest/playwright re-exports
+	// them (packages/playwright/src/index.ts:2-9). Hooks accept no chained
+	// members, which holds by construction: applyRstestChainPart has no
+	// rstestAPIHook branch, so any member invalidates the chain.
+	for _, name := range testFramework.HooksOrder {
+		states[name] = [2]rstestAPIState{
+			rstestProfileCore:       rstestAPIHook,
+			rstestProfilePlaywright: rstestAPIHook,
+		}
+	}
+	return states
+}()
 
 func applyRstestChainPart(profile rstestAPIProfile, state rstestAPIState, part rstestChainPart) rstestAPIState {
 	switch state {
@@ -537,6 +543,22 @@ func applyRstestChainPart(profile rstestAPIProfile, state rstestAPIState, part r
 				return rstestAPIDescribe
 			}
 		}
+		// PlaywrightTest declares the four hooks as members of the test object,
+		// and extend() returns another PlaywrightTest, so `test.beforeEach()`
+		// and `test.extend(fixtures).beforeEach()` register a hook. This is a
+		// member lookup on the test object, not a modifier applied to an
+		// already resolved hook, which is why it is reached from the test state
+		// rather than from rstestAPIHook.
+		//
+		// Only rstestAPITestWithExtend qualifies: that state means the receiver
+		// is still a PlaywrightTest. Modifiers such as `.skip` or `.each(...)`
+		// leave rstestAPITest, and those results do not expose hooks.
+		if profile == rstestProfilePlaywright &&
+			state == rstestAPITestWithExtend &&
+			part.invocation == rstestNotInvoked &&
+			testFramework.IsHookName(part.name) {
+			return rstestAPIHook
+		}
 	case rstestAPIDescribe:
 		switch part.name {
 		case "only", "skip", "todo", "concurrent", "sequential":
@@ -562,6 +584,19 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 		resolved.state = rstestAPIInvalid
 		return false
 	}
+	// `test.beforeEach()` resolves to the hook the member selects, not to the
+	// test object it was read from, so the reported name and original node move
+	// to the member. Rules keyed on the hook name — prefer-hooks-in-order, for
+	// one — would otherwise see every Playwright hook as `test`.
+	//
+	// No guard against a hook→hook transition is needed: applyRstestChainPart
+	// has no rstestAPIHook branch, so a member applied to a hook always
+	// invalidates the chain and returns above. Reaching here with a hook state
+	// therefore means the member just introduced it.
+	if state == rstestAPIHook {
+		resolved.name = part.name
+		resolved.originalNode = part.node
+	}
 	resolved.state = state
 	// Only semantic conclusions are recorded here. This runs on the alias chain
 	// as well as the call-site chain, so anything accumulated becomes visible
@@ -572,6 +607,11 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 		resolved.parameterizedKind = RstestParameterizedEach
 	case "for":
 		resolved.parameterizedKind = RstestParameterizedFor
+	case "only":
+		resolved.focusEntries = append(resolved.focusEntries, ParsedRstestFnMemberEntry{
+			Name: part.name,
+			Node: part.node,
+		})
 	case "skip":
 		resolved.skipped = true
 	case "todo":
@@ -587,12 +627,7 @@ func profileImportModule(profile rstestAPIProfile) string {
 	return RstestImportModule
 }
 
-func rstestProfiles(includePlaywright bool) []rstestAPIProfile {
-	if includePlaywright {
-		return []rstestAPIProfile{rstestProfileCore, rstestProfilePlaywright}
-	}
-	return []rstestAPIProfile{rstestProfileCore}
-}
+var rstestAllProfiles = [...]rstestAPIProfile{rstestProfileCore, rstestProfilePlaywright}
 
 func isImportMetaRstest(node *ast.Node) bool {
 	// SkipParentheses dereferences its argument, so the nil check has to come

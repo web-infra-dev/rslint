@@ -4,9 +4,11 @@ Disallow the use of undeclared variables.
 
 This rule reports identifiers that reference variables which have not been declared via `var`, `let`, `const`, `function`, `class`, `import`, or as a parameter.
 
-Resolution is lexical scope analysis: declared bindings, standard ECMAScript built-ins (`Array`, `Promise`, `JSON`, `undefined`, and similar), and anything declared through `languageOptions.globals` or a `/* global */` comment. On a file with type information available, names known only to the type checker — DOM/Node globals such as `console` or `window`, or anything declared in a `.d.ts` file — are recognized too.
+Resolution follows ESLint scope semantics: bindings declared or imported in the current file, the standard language globals selected by `languageOptions.ecmaVersion`, and names declared through [`languageOptions.globals`](/config/language-options#languageoptionsglobals) or a `/* global */` comment. `ecmaVersion` defaults to `"latest"`.
 
-Enable this rule for files that aren't type-checked. On a type-checked file, `tsc` already reports references to undeclared names. On files without type information, declare the host globals your code relies on (`console`, `process`, `setTimeout`, and similar) through `languageOptions.globals` or a `/* global */` comment, the same way ESLint's own `no-undef` expects.
+TypeScript's TypeChecker does not alter the result. DOM, Node, cross-file, and ambient `.d.ts` names are not implicit ESLint globals, even when TypeScript can resolve them. Declare host globals such as `console`, `window`, `process`, and `setTimeout` through `languageOptions.globals` or a `/* global */` comment. TypeScript projects normally leave this core rule disabled because `tsc` already reports undeclared names.
+
+For browser, Node.js, worker, and other runtime names, use the `globals` catalog exported by `@rslint/core` instead of listing every name manually. Scope each environment to the files where it exists; no runtime environment is enabled by default. See [Configuring runtime globals](/config/language-options#languageoptionsglobals) for examples.
 
 ## Options
 
@@ -44,3 +46,8 @@ f();
 
 typeof maybeUndefined === 'string';
 ```
+
+## Original Documentation
+
+- [ESLint: no-undef](https://eslint.org/docs/latest/rules/no-undef)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-undef.js)

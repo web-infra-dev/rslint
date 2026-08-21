@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"regexp"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed dot_notation.schema.json
@@ -23,16 +23,17 @@ type Options struct {
 	AllowPattern  string
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{AllowKeywords: true}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["allowKeywords"].(bool); ok {
-			opts.AllowKeywords = v
-		}
-		if v, ok := optsMap["allowPattern"].(string); ok {
-			opts.AllowPattern = v
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if v, ok := optsMap["allowKeywords"].(bool); ok {
+		opts.AllowKeywords = v
+	}
+	if v, ok := optsMap["allowPattern"].(string); ok {
+		opts.AllowPattern = v
 	}
 	return opts
 }
@@ -272,8 +273,7 @@ func buildUseBracketsFix(
 var DotNotationRule = rule.Rule{
 	Name:   "dot-notation",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
@@ -284,9 +284,9 @@ var DotNotationRule = rule.Rule{
 		// where the schema's `format: "regex"` on allowPattern rejects the
 		// config before linting starts - so the compile-error branch here is
 		// only defensive.
-		var allowRE *regexp2.Regexp
+		var allowRE *esregexp.RegExp
 		if opts.AllowPattern != "" {
-			if re, err := regexp2.Compile(opts.AllowPattern, regexp2.ECMAScript|regexp2.Unicode); err == nil {
+			if re, err := esregexp.Compile(opts.AllowPattern, "u"); err == nil {
 				allowRE = re
 			}
 		}
@@ -306,10 +306,7 @@ var DotNotationRule = rule.Rule{
 				return
 			}
 			if allowRE != nil {
-				if matched, err := allowRE.MatchString(value); err != nil || matched {
-					// Fail open on regex errors (e.g. a timeout if MatchTimeout
-					// were ever set): skip reporting rather than risk a false
-					// positive.
+				if allowRE.TestOrTimeout(value) {
 					return
 				}
 			}

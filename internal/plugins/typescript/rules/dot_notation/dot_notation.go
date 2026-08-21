@@ -1,16 +1,20 @@
 package dot_notation
 
 import (
+	_ "embed"
 	"regexp"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
+
+//go:embed dot_notation.schema.json
+var schemaJSON []byte
 
 // Options mirrors @typescript-eslint/dot-notation options
 type Options struct {
@@ -21,44 +25,31 @@ type Options struct {
 	AllowProtectedClassPropertyAccess bool   `json:"allowProtectedClassPropertyAccess"`
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{
 		AllowKeywords:                     true,
 		AllowIndexSignaturePropertyAccess: false,
 	}
 
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 
-	// Parse options with dual-format support (handles both array and object formats)
-	var optsMap map[string]interface{}
-	var ok bool
-
-	// Handle array format: [{ option: value }]
-	if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-		optsMap, ok = optArray[0].(map[string]interface{})
-	} else {
-		// Handle direct object format: { option: value }
-		optsMap, ok = options.(map[string]interface{})
+	if v, ok := optsMap["allowIndexSignaturePropertyAccess"].(bool); ok {
+		opts.AllowIndexSignaturePropertyAccess = v
 	}
-
-	if ok {
-		if v, ok := optsMap["allowIndexSignaturePropertyAccess"].(bool); ok {
-			opts.AllowIndexSignaturePropertyAccess = v
-		}
-		if v, ok := optsMap["allowKeywords"].(bool); ok {
-			opts.AllowKeywords = v
-		}
-		if v, ok := optsMap["allowPattern"].(string); ok {
-			opts.AllowPattern = v
-		}
-		if v, ok := optsMap["allowPrivateClassPropertyAccess"].(bool); ok {
-			opts.AllowPrivateClassPropertyAccess = v
-		}
-		if v, ok := optsMap["allowProtectedClassPropertyAccess"].(bool); ok {
-			opts.AllowProtectedClassPropertyAccess = v
-		}
+	if v, ok := optsMap["allowKeywords"].(bool); ok {
+		opts.AllowKeywords = v
+	}
+	if v, ok := optsMap["allowPattern"].(string); ok {
+		opts.AllowPattern = v
+	}
+	if v, ok := optsMap["allowPrivateClassPropertyAccess"].(bool); ok {
+		opts.AllowPrivateClassPropertyAccess = v
+	}
+	if v, ok := optsMap["allowProtectedClassPropertyAccess"].(bool); ok {
+		opts.AllowProtectedClassPropertyAccess = v
 	}
 	return opts
 }
@@ -251,24 +242,24 @@ func (f *dotNotationFixer) buildUseBracketsFix(
 // See: /packages/rule-tester/src/index.ts line 273 - the lint() call doesn't use per-test config.
 var DotNotationRule = rule.CreateRule(rule.Rule{
 	Name:             "dot-notation",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work
 		// identically to the original rule (Go's standard `regexp` / RE2 does not
 		// support those). Invalid regex patterns are silently ignored for parity.
-		var allowRE *regexp2.Regexp
+		var allowRE *esregexp.RegExp
 		if opts.AllowPattern != "" {
-			if re, err := regexp2.Compile(opts.AllowPattern, regexp2.ECMAScript|regexp2.Unicode); err == nil {
+			if re, err := esregexp.Compile(opts.AllowPattern, "u"); err == nil {
 				allowRE = re
 			}
 		}
 
 		// Derive allowIndexSignaturePropertyAccess from tsconfig option as well (currently not used directly)
-		if ctx.Program != nil {
-			_ = ctx.Program.Options()
+		if ctx.Program() != nil {
+			_ = ctx.Program().Options()
 		}
 
 		fixer := dotNotationFixer{
@@ -281,8 +272,8 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 		// rule option and the `noPropertyAccessFromIndexSignature` tsconfig flag
 		// (same derivation as typescript-eslint).
 		allowIndexAccess := opts.AllowIndexSignaturePropertyAccess
-		if ctx.Program != nil {
-			if copts := ctx.Program.Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
+		if ctx.Program() != nil {
+			if copts := ctx.Program().Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
 				allowIndexAccess = true
 			}
 		}
@@ -306,10 +297,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			// patterns behave identically, ES-only features like lookbehind
 			// are not supported).
 			if allowRE != nil {
-				// Fail open: on regex errors (e.g. catastrophic-backtracking
-				// timeouts if MatchTimeout is ever set) skip reporting rather
-				// than risk a false positive.
-				if matched, err := allowRE.MatchString(propName); err != nil || matched {
+				if allowRE.TestOrTimeout(propName) {
 					return
 				}
 			}

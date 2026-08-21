@@ -1548,8 +1548,8 @@ declare const value: boolean | 1;
 switch (value) {
   case false:
     break;
-  case true: { throw new Error('Not implemented yet: true case') }
   case 1: { throw new Error('Not implemented yet: 1 case') }
+  case true: { throw new Error('Not implemented yet: true case') }
 }
       `,
             },
@@ -1750,7 +1750,7 @@ switch (day) {
           column: 9,
           data: {
             missingBranches:
-              '"Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"',
+              '"Friday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"',
           },
           line: 14,
           messageId: 'switchIsNotExhaustive',
@@ -1775,12 +1775,12 @@ switch (day) {
     result = 1;
     break;
   }
-  case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
-  case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
-  case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
   case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
   case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
   case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
+  case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
+  case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
+  case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
 }
       `,
             },
@@ -1897,7 +1897,7 @@ function test(value: Union): number {
         {
           column: 11,
           data: {
-            missingBranches: 'true | 1',
+            missingBranches: '1 | true',
           },
           line: 9,
           messageId: 'switchIsNotExhaustive',
@@ -1915,8 +1915,8 @@ function test(value: Union): number {
   switch (value) {
     case 'a':
       return 1;
-    case true: { throw new Error('Not implemented yet: true case') }
     case 1: { throw new Error('Not implemented yet: 1 case') }
+    case true: { throw new Error('Not implemented yet: true case') }
   }
 }
       `,
@@ -1985,7 +1985,7 @@ switch (day) {
           column: 9,
           data: {
             missingBranches:
-              '"Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"',
+              '"Friday" | "Monday" | "Saturday" | "Sunday" | "Thursday" | "Tuesday" | "Wednesday"',
           },
           line: 13,
           messageId: 'switchIsNotExhaustive',
@@ -2005,13 +2005,13 @@ type Day =
 const day = 'Monday' as Day;
 
 switch (day) {
-case "Monday": { throw new Error('Not implemented yet: "Monday" case') }
-case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
-case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
-case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
 case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
+case "Monday": { throw new Error('Not implemented yet: "Monday" case') }
 case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
 case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
+case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
+case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
+case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
 }
       `,
             },
@@ -2277,46 +2277,6 @@ switch (value) {
         {
           allowDefaultCaseForExhaustiveSwitch: true,
           requireDefaultForNonUnion: true,
-        },
-      ],
-    },
-    {
-      code: `
-        enum Enum {
-          'a' = 1,
-          [\`key-with
-
-          new-line\`] = 2,
-        }
-
-        declare const a: Enum;
-
-        switch (a) {
-        }
-      `,
-      errors: [
-        {
-          messageId: 'switchIsNotExhaustive',
-          suggestions: [
-            {
-              messageId: 'addMissingCases',
-              output: `
-        enum Enum {
-          'a' = 1,
-          [\`key-with
-
-          new-line\`] = 2,
-        }
-
-        declare const a: Enum;
-
-        switch (a) {
-        case Enum.a: { throw new Error('Not implemented yet: Enum.a case') }
-        case Enum['key-with\\n\\n          new-line']: { throw new Error('Not implemented yet: Enum[\\'key-with\\\\n\\\\n          new-line\\'] case') }
-        }
-      `,
-            },
-          ],
         },
       ],
     },

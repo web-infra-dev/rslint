@@ -12,6 +12,7 @@ export {
   type PluginConfigDescriptor,
 } from './config-file-loader.js';
 export { ConfigModuleHost } from './config-module-host.js';
+export { resolveRslintBinary } from '../internal/resolve-binary.js';
 export type {
   ConfigModuleActivationPlan,
   ConfigModuleHostOptions,

@@ -145,16 +145,10 @@ namespace Outer {
   }
 }
     `},
-		// ---- Config contract: upstream schema is [] — any options shape must be ignored ----
-		// rslint's CLI / JS config passes options through several shapes
-		// (bare object, [{...}], null, []); none of them should change
-		// behavior or crash. Locks in that the rule's `Run` truly ignores
-		// its `options any` parameter, matching upstream's empty `schema`
-		// and `defaultOptions: []` contract.
+		// ---- Config contract: upstream schema is [], so the only shapes a
+		// config can carry are "no options at all" ----
 		{Code: `const x: A.B = 3;`, Options: nil},
 		{Code: `const x: A.B = 3;`, Options: []interface{}{}},
-		{Code: `const x: A.B = 3;`, Options: map[string]interface{}{"someUnknownOption": true}},
-		{Code: `const x: A.B = 3;`, Options: []interface{}{map[string]interface{}{"checkX": false}}},
 		// ---- Real-user: ImportType qualifier (`import('./foo').T`) outside scope ----
 		// `import('./foo').T` is an ImportTypeNode whose Qualifier is an
 		// EntityName — for `import('./foo').N.T` the Qualifier is a
@@ -555,29 +549,6 @@ namespace N {
     A,
     B = A,
   }
-}
-      `},
-		},
-		// ---- Config contract: invalid case carries options too (CLI-shape) ----
-		// Same rule semantics regardless of options shape. CLI ships a bare
-		// map after config.go unwraps single-element arrays; pass that
-		// shape directly to confirm the unwrap path doesn't accidentally
-		// gate the listeners on an option that doesn't exist.
-		{
-			Code: `
-namespace A {
-  export type B = number;
-  const x: A.B = 3;
-}
-      `,
-			Options: map[string]interface{}{"anyKey": "anyValue"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unnecessaryQualifier", Line: 4, Column: 12},
-			},
-			Output: []string{`
-namespace A {
-  export type B = number;
-  const x: B = 3;
 }
       `},
 		},

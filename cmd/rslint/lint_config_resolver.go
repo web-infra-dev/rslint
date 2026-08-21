@@ -5,13 +5,12 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
-	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type lintConfigResolver struct {
 	configMap                  map[string]rslintconfig.RslintConfig
 	currentDirectory           string
-	typeInfoFiles              map[string]struct{}
 	configPathBySourcePath     map[string]string
 	ownerConfigDirBySourcePath map[string]string
 	fsys                       vfs.FS
@@ -28,7 +27,6 @@ type lintConfigResolverOptions struct {
 	Config                     rslintconfig.RslintConfig
 	CurrentDirectory           string
 	EnforcePlugins             bool
-	TypeInfoFiles              map[string]struct{}
 	ConfigPathBySourcePath     map[string]string
 	OwnerConfigDirBySourcePath map[string]string
 	// SourceMappingsCanonical indicates that binding already supplied both
@@ -41,7 +39,6 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
 	resolver := &lintConfigResolver{
 		configMap:                  opts.ConfigMap,
 		currentDirectory:           opts.CurrentDirectory,
-		typeInfoFiles:              opts.TypeInfoFiles,
 		configPathBySourcePath:     normalizeSourcePathMappings(opts.ConfigPathBySourcePath, opts.FS, opts.SourceMappingsCanonical),
 		ownerConfigDirBySourcePath: normalizeSourcePathMappings(opts.OwnerConfigDirBySourcePath, opts.FS, opts.SourceMappingsCanonical),
 		fsys:                       opts.FS,
@@ -153,19 +150,15 @@ func (r *lintConfigResolver) ConfigForFile(filePath string) *rslintconfig.Merged
 	return resolver.ConfigForFile(configPath)
 }
 
-func (r *lintConfigResolver) ActiveRulesForFile(filePath string) []linter.ConfiguredRule {
+// EnabledRulesForFile returns the complete configured rule set. Program
+// capabilities are applied once by the lint planner, not while resolving
+// configuration.
+func (r *lintConfigResolver) EnabledRulesForFile(filePath string) []rule.ConfiguredRule {
 	configPath := r.configPathFor(filePath)
 	_, resolver, ok := r.resolverForFile(filePath, configPath)
 	if !ok {
 		return nil
 	}
-	activeRules, _ := resolver.EnabledRulesForFile(configPath)
-	if r.typeInfoFiles != nil {
-		if _, hasTypeInfo := r.typeInfoFiles[filePath]; !hasTypeInfo {
-			if _, hasTypeInfo = r.typeInfoFiles[configPath]; !hasTypeInfo {
-				activeRules = linter.FilterNonTypeAwareRules(activeRules)
-			}
-		}
-	}
-	return activeRules
+	enabledRules, _ := resolver.EnabledRulesForFile(configPath)
+	return enabledRules
 }

@@ -8,11 +8,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed filename_case.schema.json
@@ -62,8 +61,6 @@ func isIgnoredByDefault(basename string) bool {
 	}
 }
 
-const reOpts = regexp2.ECMAScript | regexp2.Unicode
-
 // invalidIgnore captures a single user-supplied `ignore` pattern that failed
 // to compile. The rule reports each one as its own diagnostic so the user can
 // see which configuration entry is broken.
@@ -79,7 +76,7 @@ type invalidIgnore struct {
 type options struct {
 	cases                  [caseStyleCount]caseStyle
 	caseCount              int
-	ignores                []*regexp2.Regexp
+	ignores                []*esregexp.RegExp
 	invalidIgnores         []invalidIgnore
 	multipleFileExtensions bool
 }
@@ -87,10 +84,10 @@ type options struct {
 func parseOptions(rawOpts []any) options {
 	opts := options{caseCount: 1, multipleFileExtensions: true}
 	opts.cases[0] = allCases[2] // kebabCase
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]any)
 
 	if v, ok := optsMap["case"].(string); ok {
 		if c, found := caseForKey(v); found {
@@ -137,15 +134,15 @@ func (o *options) selectedCases() []caseStyle {
 	return o.cases[:o.caseCount]
 }
 
-// regexp2 compilation is considerably more expensive than matching, while a
+// Compiling is considerably more expensive than matching, while a
 // configured ignore list is shared by every file. Cache compiled patterns at
 // rule scope so parallel files reuse them. The fixed-size FIFO bound prevents
 // long-lived API/LSP processes from retaining an unbounded stream of config
-// values; regexp2.Regexp is documented as safe for concurrent use.
+// values; a compiled pattern is safe for concurrent use.
 const ignoreRegexpCacheCapacity = 128
 
 type compiledIgnoreRegexp struct {
-	regexp *regexp2.Regexp
+	regexp *esregexp.RegExp
 	err    error
 }
 
@@ -157,7 +154,7 @@ var ignoreRegexpCache = struct {
 	next    int
 }{}
 
-func compileIgnoreRegexp(pattern string) (*regexp2.Regexp, error) {
+func compileIgnoreRegexp(pattern string) (*esregexp.RegExp, error) {
 	ignoreRegexpCache.Lock()
 	defer ignoreRegexpCache.Unlock()
 
@@ -165,7 +162,7 @@ func compileIgnoreRegexp(pattern string) (*regexp2.Regexp, error) {
 		return cached.regexp, cached.err
 	}
 
-	re, err := regexp2.Compile(pattern, reOpts)
+	re, err := esregexp.Compile(pattern, "u")
 	if ignoreRegexpCache.entries == nil {
 		ignoreRegexpCache.entries = make(map[string]compiledIgnoreRegexp, ignoreRegexpCacheCapacity)
 	}
@@ -625,7 +622,7 @@ var FilenameCaseRule = rule.Rule{
 			return nil
 		}
 		for _, re := range opts.ignores {
-			if matched, _ := re.MatchString(basename); matched {
+			if re.TestOrTimeout(basename) {
 				return nil
 			}
 		}

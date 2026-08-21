@@ -1,12 +1,17 @@
 package no_useless_default_assignment
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_useless_default_assignment.schema.json
+var schemaJSON []byte
 
 // NoUselessDefaultAssignmentRule mirrors
 // @typescript-eslint/no-useless-default-assignment.
@@ -21,6 +26,7 @@ import (
 // Upstream source: packages/eslint-plugin/src/rules/no-useless-default-assignment.ts
 var NoUselessDefaultAssignmentRule = rule.CreateRule(rule.Rule{
 	Name:             "no-useless-default-assignment",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run:              run,
 })
@@ -29,12 +35,12 @@ type Options struct {
 	allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if v, ok := optsMap["allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"].(bool); ok {
 		opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = v
 	}
@@ -71,14 +77,13 @@ func buildUselessUndefinedMessage(kind string) rule.RuleMessage {
 	}
 }
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	if ctx.TypeChecker == nil {
 		return rule.RuleListeners{}
 	}
 
 	opts := parseOptions(options)
-	compilerOptions := ctx.Program.Options()
+	compilerOptions := ctx.Program().Options()
 	isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.StrictNullChecks)
 	if !isStrictNullChecks && !opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing {
 		ctx.ReportRange(core.NewTextRange(0, 0), buildNoStrictNullCheckMessage())

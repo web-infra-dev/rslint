@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -11,7 +12,7 @@ import (
 // (https://github.com/eslint/eslint/blob/main/tests/lib/rules/no-shadow.js),
 // in roughly the same order so that a diff against that file is tractable.
 // Framework-level concepts that rslint doesn't model
-// (languageOptions.globals / env / parserOptions.globalReturn / script-vs-
+// (env / parserOptions.globalReturn / script-vs-
 // module sourceType distinction) are marked `Skip: true` with a comment
 // pointing at the reason.
 func TestNoShadowRule(t *testing.T) {
@@ -120,6 +121,11 @@ func TestNoShadowRule(t *testing.T) {
 			{Code: `function foo() { var Object = 0; }`},
 			// A declared global does not shadow when `builtinGlobals` is off.
 			{Code: `function foo() { var top = 0; }`, Globals: map[string]any{"top": "readonly"}},
+			// TypeScript's default libraries are not ESLint environments. Host
+			// names remain absent until languageOptions.globals declares them.
+			{Code: `function foo() { var window = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: `function foo() { var top = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: `function foo() { var console = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
 
 			// ---- builtinGlobals + explicit `off` setting ----
 			// Config `Object: "off"` / `/* global Object: off */` un-declares
@@ -138,31 +144,6 @@ func TestNoShadowRule(t *testing.T) {
 
 			// ---- allow list ----
 			{Code: `function foo(cb) { (function (cb) { cb(42); })(cb); }`, Options: map[string]interface{}{"allow": []interface{}{"cb"}}},
-
-			// ---- Function-name initializer exception with arbitrary CallExpression
-			// wrappers — ESLint's `outerScope === innerScope.upper` accepts any
-			// non-scope-introducing wrapper, not just a fixed list of operators.
-			{Code: `const a = wrap(function a() {});`},
-			{Code: `const a = foo || wrap(function a() {});`},
-			{Code: `const { a = wrap(function a() {}) } = obj;`},
-			{Code: `const { a = foo || wrap(function a() {}) } = obj;`},
-			{Code: `function foo(a = wrap(function a() {})) {}`},
-			{Code: `function foo(a = foo || wrap(function a() {})) {}`},
-			{Code: `const A = wrap(class A {});`},
-			{Code: `const A = foo || wrap(class A {});`},
-			{Code: `const { A = wrap(class A {}) } = obj;`},
-			{Code: `const { A = foo || wrap(class A {}) } = obj;`},
-			{Code: `function foo(A = wrap(class A {})) {}`},
-			{Code: `function foo(A = foo || wrap(class A {})) {}`},
-			// Sibling-init in same destructuring also exempted by the same rule.
-			{Code: `const { a = foo, b = function a() {} } = {}`},
-			{Code: `const { A = Foo, B = class A {} } = {}`},
-			// FunctionExpression / ClassExpression at the test position of a
-			// ternary in the initializer is also exempted (same scope/range).
-			{Code: `var a = function a() {} ? foo : bar`},
-			{Code: `var A = class A {} ? foo : bar`},
-			// Wrap with side-effecting top-level `let` — still exempted.
-			{Code: `let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });`, Options: map[string]interface{}{"hoist": "all"}},
 
 			// ---- Class fields / methods (not shadowing — different kinds) ----
 			{Code: `class C { foo; foo() { let foo; } }`},
@@ -503,6 +484,21 @@ function bar() { }`},
 	}
   }
 		`},
+			// ---- A string-literal enum member binds its name but declares no
+			// identifier, so it is neither reported nor reported against ----
+			{Code: `
+			const A = 2;
+			enum Test {
+				"A" = 1,
+				B = A,
+			}
+		`},
+			{Code: `
+			enum Test {
+				"A" = 1,
+				B = ((): number => { const A = 2; return A; })(),
+			}
+		`},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -599,6 +595,28 @@ function bar() { }`},
 			{Code: `(function() { var a = function() { (class a{}); }; })()`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
 			{Code: `(function() { var a = class { constructor() { class a {} } }; })()`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
 			{Code: `class A { constructor() { var A; } }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+
+			// ---- Function/class names that are not direct initializers ----
+			// Calls are not transparent, even when a surrounding logical expression is.
+			{Code: `const a = wrap(function a() {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 25}}},
+			{Code: `const a = foo || wrap(function a() {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { a = wrap(function a() {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { a = foo || wrap(function a() {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `function foo(a = wrap(function a() {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `function foo(a = foo || wrap(function a() {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const A = wrap(class A {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const A = foo || wrap(class A {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { A = wrap(class A {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { A = foo || wrap(class A {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `function foo(A = wrap(class A {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `function foo(A = foo || wrap(class A {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			// A sibling destructuring default is not this binding's initializer.
+			{Code: `const { a = foo, b = function a() {} } = {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `const { A = Foo, B = class A {} } = {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			// The test position of a conditional expression is not a result branch.
+			{Code: `var a = function a() {} ? foo : bar`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `var A = class A {} ? foo : bar`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+			{Code: `let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });`, Options: map[string]interface{}{"hoist": "all"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
 
 			// ---- Nested shadowing chain (multiple errors) ----
 			{
@@ -931,6 +949,14 @@ function bar() { }`},
 				Code: "\n\t\tconst A = 2;\n\t\tenum Test {\n\t\t\tA = 1,\n\t\t\tB = A,\n\t\t}\n\t",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noShadow"},
+				},
+			},
+			// Core ESLint keeps the generic noShadow diagnostic when the outer
+			// declaration is the enum itself.
+			{
+				Code: `enum A { A }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadow", Line: 1, Column: 10},
 				},
 			},
 
@@ -1307,6 +1333,14 @@ function bar() { }`},
 				},
 			},
 
+			// ---- Function overload definitions form one shadowing variable ----
+			{
+				Code: `const f = 0; { function f(x: string): void; function f(x: any) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadow", Line: 1, Column: 25},
+				},
+			},
+
 			// ---- Factory returning object method with generic shadow ----
 			{
 				Code: `function mk<T>(x: T) { return { get<T>(): T { return null as any; } }; }`,
@@ -1611,6 +1645,71 @@ let y;`, Options: map[string]interface{}{"hoist": "all"}, Errors: []rule_tester.
 				B = A,
 			}
 		`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
+		},
+	)
+}
+
+func TestNoShadowECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoShadowRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            `function foo() { var Promise = 0; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+				Options:         map[string]interface{}{"builtinGlobals": true},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `function foo() { var Promise = 0; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Message: "'Promise' is already a global variable."}},
+			},
+		},
+	)
+}
+
+func TestNoShadowLanguageDefaults(t *testing.T) {
+	builtinGlobals := map[string]any{"builtinGlobals": true}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.allow-js.json",
+		t,
+		&NoShadowRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:     `function f(require) { return require; }`,
+				FileName: "plain-script.js",
+				Options:  builtinGlobals,
+			},
+			{
+				Code:     `var require;`,
+				FileName: "require-off.cjs",
+				Options:  builtinGlobals,
+				Globals:  map[string]any{"require": "off"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:     `function f(require) { return require; }`,
+				FileName: "function.cjs",
+				Options:  builtinGlobals,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadowGlobal", Line: 1, Column: 12},
+				},
+			},
+			{
+				Code:     `var exports;`,
+				FileName: "exports.cjs",
+				Options:  builtinGlobals,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadowGlobal", Line: 1, Column: 5},
+				},
+			},
 		},
 	)
 }

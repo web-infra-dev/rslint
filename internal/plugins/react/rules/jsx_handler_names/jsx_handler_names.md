@@ -110,4 +110,5 @@ If you are not using JSX, or if you don't want to enforce specific naming conven
 
 ## Original Documentation
 
-- [react/jsx-handler-names](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-handler-names.md)
+- [eslint-plugin-react: jsx-handler-names](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-handler-names.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-handler-names.js)

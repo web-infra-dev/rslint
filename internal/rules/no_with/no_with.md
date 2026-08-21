@@ -22,4 +22,5 @@ const r = Math.sqrt(point.x * point.x + point.y * point.y);
 
 ## Original Documentation
 
-- [ESLint no-with](https://eslint.org/docs/latest/rules/no-with)
+- [ESLint: no-with](https://eslint.org/docs/latest/rules/no-with)
+- [Source code](https://github.com/eslint/eslint/blob/v9.39.1/lib/rules/no-with.js)

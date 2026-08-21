@@ -39,4 +39,5 @@ fruit === Fruit.Banana;
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-enum-comparison](https://typescript-eslint.io/rules/no-unsafe-enum-comparison)
+- [typescript-eslint: no-unsafe-enum-comparison](https://typescript-eslint.io/rules/no-unsafe-enum-comparison)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/no-unsafe-enum-comparison.ts)

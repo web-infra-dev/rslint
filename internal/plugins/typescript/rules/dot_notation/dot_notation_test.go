@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -347,7 +348,7 @@ func TestDotNotationEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			HasTypeInfo:  true,
 			ExcludePaths: []string{},
@@ -418,5 +419,25 @@ func TestDotNotationEditDemand(t *testing.T) {
 			diagnostics[rule.EditDemandSuggestion][index].FixesPtr != nil {
 			t.Errorf("diagnostic %d attached fixes without autofix demand", index)
 		}
+	}
+}
+
+// TestDotNotationAllowPatternSchema locks in the fail-fast behavior for an
+// invalid allowPattern. The rule compiles `allowPattern` as an ECMAScript
+// regex, so an unparsable pattern would otherwise be dropped and the rule
+// would silently lint as if no pattern were configured. Marking it
+// `format: "regex"` moves the failure to config validation, matching what
+// ESLint core's dot-notation schema does — upstream's typescript-eslint
+// schema declares a bare string.
+func TestDotNotationAllowPatternSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allowPattern": "("}}
+	if err := DotNotationRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allowPattern regex to fail schema validation")
+	}
+	// Lookbehind is JS-legal but RE2-illegal; it must still validate, proving
+	// the schema checks patterns with the ECMAScript engine, not Go's regexp.
+	valid := []any{map[string]any{"allowPattern": "(?<=a)b"}}
+	if err := DotNotationRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allowPattern regex to pass schema validation, got: %v", err)
 	}
 }

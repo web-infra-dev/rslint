@@ -32,4 +32,5 @@ Examples of **correct** code with `"multiline-multiprop"` (default):
 
 ## Original Documentation
 
-- [react/jsx-first-prop-new-line](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-first-prop-new-line.md)
+- [eslint-plugin-react: jsx-first-prop-new-line](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-first-prop-new-line.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-first-prop-new-line.js)

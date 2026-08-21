@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 type CompilerReactFunctionType string
@@ -847,7 +848,7 @@ func IsInsideComponentOrHook(node *ast.Node) bool {
 // compiles it as a regex. Returns nil when the setting is absent
 // or the pattern fails to compile — mirroring upstream's lenient
 // behavior of silently ignoring malformed regex strings.
-func AdditionalHooksFromSettings(settings map[string]interface{}, key string) *regexp.Regexp {
+func AdditionalHooksFromSettings(settings map[string]interface{}, key string) *esregexp.RegExp {
 	if settings == nil {
 		return nil
 	}
@@ -863,7 +864,7 @@ func AdditionalHooksFromSettings(settings map[string]interface{}, key string) *r
 	if !ok || pattern == "" {
 		return nil
 	}
-	re, err := regexp.Compile(pattern)
+	re, err := esregexp.Compile(pattern, "")
 	if err != nil {
 		return nil
 	}

@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
-//go:embed no-unused-vars.schema.json
+//go:embed no_unused_vars.schema.json
 var schemaJSON []byte
 
 type Config struct {
@@ -29,10 +29,10 @@ type Config struct {
 	IgnoreUsingDeclarations        bool   `json:"ignoreUsingDeclarations"`
 	ReportUsedIgnorePattern        bool   `json:"reportUsedIgnorePattern"`
 
-	varsIgnoreRe              *regexp2.Regexp
-	argsIgnoreRe              *regexp2.Regexp
-	caughtErrorsIgnoreRe      *regexp2.Regexp
-	destructuredArrayIgnoreRe *regexp2.Regexp
+	varsIgnoreRe              *esregexp.RegExp
+	argsIgnoreRe              *esregexp.RegExp
+	caughtErrorsIgnoreRe      *esregexp.RegExp
+	destructuredArrayIgnoreRe *esregexp.RegExp
 }
 
 type variableType string
@@ -259,21 +259,25 @@ func parseOptions(options []any) Config {
 		CaughtErrors: "all",
 	}
 
-	if len(options) > 0 {
-		if vars, ok := options[0].(string); ok {
-			config.Vars = vars
-			return compilePatterns(config)
-		}
+	if len(options) == 0 {
+		return compilePatterns(config)
 	}
 
-	if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+	// The first option is either the shorthand string form ("all" / "local",
+	// which only sets `vars`) or the full option object.
+	if vars, ok := options[0].(string); ok {
+		config.Vars = vars
+		return compilePatterns(config)
+	}
+
+	if optsMap, ok := options[0].(map[string]any); ok {
 		parseOptionsFromMap(optsMap, &config)
 	}
 
 	return compilePatterns(config)
 }
 
-func parseOptionsFromMap(optsMap map[string]interface{}, config *Config) {
+func parseOptionsFromMap(optsMap map[string]any, config *Config) {
 	if val, ok := optsMap["vars"].(string); ok {
 		config.Vars = val
 	}
@@ -311,16 +315,16 @@ func parseOptionsFromMap(optsMap map[string]interface{}, config *Config) {
 
 func compilePatterns(config Config) Config {
 	if config.VarsIgnorePattern != "" {
-		config.varsIgnoreRe, _ = utils.CompileRegexp2(config.VarsIgnorePattern, utils.JSUnicodeRegexOptions)
+		config.varsIgnoreRe, _ = esregexp.Compile(config.VarsIgnorePattern, "u")
 	}
 	if config.ArgsIgnorePattern != "" {
-		config.argsIgnoreRe, _ = utils.CompileRegexp2(config.ArgsIgnorePattern, utils.JSUnicodeRegexOptions)
+		config.argsIgnoreRe, _ = esregexp.Compile(config.ArgsIgnorePattern, "u")
 	}
 	if config.CaughtErrorsIgnorePattern != "" {
-		config.caughtErrorsIgnoreRe, _ = utils.CompileRegexp2(config.CaughtErrorsIgnorePattern, utils.JSUnicodeRegexOptions)
+		config.caughtErrorsIgnoreRe, _ = esregexp.Compile(config.CaughtErrorsIgnorePattern, "u")
 	}
 	if config.DestructuredArrayIgnorePattern != "" {
-		config.destructuredArrayIgnoreRe, _ = utils.CompileRegexp2(config.DestructuredArrayIgnorePattern, utils.JSUnicodeRegexOptions)
+		config.destructuredArrayIgnoreRe, _ = esregexp.Compile(config.DestructuredArrayIgnorePattern, "u")
 	}
 	return config
 }
@@ -956,8 +960,8 @@ func hasStaticInitBlock(classNode *ast.Node) bool {
 // ignore pattern, and whether the match should result in ignoring or
 // reporting (when reportUsedIgnorePattern is true and the variable is used).
 // Returns: (shouldIgnore bool, matchesPattern bool, matched variable type)
-func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) (bool, bool, variableType) {
-	var re *regexp2.Regexp
+func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, writeRefs map[*ast.Symbol][]*ast.Node, sym *ast.Symbol) (bool, bool, variableType) {
+	var re *esregexp.RegExp
 	kind := variableTypeVariable
 	matched := false
 
@@ -966,7 +970,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, wr
 	// args/caughtErrors is "none" together with reportUsedIgnorePattern.
 	if opts.destructuredArrayIgnoreRe != nil &&
 		(isDirectArrayDestructuredIdentifier(varInfo.Definition) || hasDirectArrayDestructuringWrite(writeRefs, sym)) &&
-		utils.Regexp2MatchString(opts.destructuredArrayIgnoreRe, varName) {
+		opts.destructuredArrayIgnoreRe.TestOrTimeout(varName) {
 		kind = variableTypeArrayDestructure
 		matched = true
 	} else if isParameterNode(varInfo.Definition) {
@@ -986,7 +990,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, wr
 	}
 
 	if !matched {
-		matched = re != nil && utils.Regexp2MatchString(re, varName)
+		matched = re != nil && re.TestOrTimeout(varName)
 	}
 
 	if !matched {
@@ -1001,7 +1005,7 @@ func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config, wr
 	return true, true, kind
 }
 
-func ignorePatternAdditional(kind variableType, opts Config, used bool) string {
+func ignorePatternAdditional(kind variableType, opts *Config, used bool) string {
 	var description, pattern string
 	switch kind {
 	case variableTypeArrayDestructure:
@@ -1026,7 +1030,7 @@ func ignorePatternAdditional(kind variableType, opts Config, used bool) string {
 	return fmt.Sprintf(". Allowed unused %s must match /%s/u", description, pattern)
 }
 
-func definitionVariableType(definition *ast.Node, opts Config) variableType {
+func definitionVariableType(definition *ast.Node, opts *Config) variableType {
 	if opts.DestructuredArrayIgnorePattern != "" && isDirectArrayDestructuredIdentifier(definition) {
 		return variableTypeArrayDestructure
 	}
@@ -1941,7 +1945,7 @@ func isScriptGlobalDefinition(sourceFile *ast.SourceFile, definition *ast.Node) 
 //  5. Apply ignore patterns (varsIgnorePattern, argsIgnorePattern, etc.)
 //  6. Skip exports, "after-used" parameters, and option-specific suppressions
 //  7. Report at the last write-reference position (or declaration name as fallback)
-func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts Config, ac *analysisContext) {
+func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts *Config, ac *analysisContext) {
 	varInfo := &VariableInfo{
 		Variable:       nameNode,
 		Used:           false,
@@ -2029,24 +2033,33 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		}
 	}
 
-	scriptGlobal := isScriptGlobalDefinition(ctx.SourceFile, definition)
-	// vars: "local" skips only the script global scope. ES module top-level
-	// bindings live in a module scope and must still be checked.
-	if opts.Vars == "local" && scriptGlobal {
-		return
-	}
-
 	if varInfo.OnlyUsedAsType {
 		// TypeScript's scope manager presents type references to ESLint's core
 		// rule as uses. Preserve that base-rule behavior.
 		varInfo.Used = true
 		varInfo.OnlyUsedAsType = false
 	}
+	// A used binding cannot produce a diagnostic unless the caller asks to
+	// report names that match an ignore pattern. Avoid category, export, and
+	// assignment analysis on the common path.
+	if varInfo.Used && !opts.ReportUsedIgnorePattern {
+		return
+	}
+
+	scriptGlobal := isScriptGlobalDefinition(ctx.SourceFile, definition)
+	// vars: "local" skips only the script global scope. ES module top-level
+	// bindings live in a module scope and must still be checked.
+	if opts.Vars == "local" && scriptGlobal {
+		return
+	}
 	// Check ignore patterns (varsIgnorePattern / argsIgnorePattern / caughtErrorsIgnorePattern).
 	// If the variable matches its category's pattern and is unused → ignore silently.
 	// If it matches but IS used and reportUsedIgnorePattern is true → report as usedIgnoredVar.
 	shouldIgnore, matchedPattern, matchedType := matchesIgnorePattern(name, varInfo, opts, ac.writeRefs, sym)
 	if shouldIgnore {
+		return
+	}
+	if varInfo.Used && !matchedPattern {
 		return
 	}
 
@@ -2140,7 +2153,8 @@ func newRule() rule.Rule {
 			if ctx.SourceFile == nil {
 				return rule.RuleListeners{}
 			}
-			opts := parseOptions(options)
+			parsedOptions := parseOptions(options)
+			opts := &parsedOptions
 			reporter := &diagnosticReporter{ctx: ctx}
 
 			ac := &analysisContext{
@@ -2481,7 +2495,7 @@ func newRule() rule.Rule {
 
 			ensureCollected(ctx.SourceFile.AsNode())
 			if opts.Vars != "local" {
-				for _, inlineGlobal := range ctx.InlineGlobals {
+				for _, inlineGlobal := range ctx.Globals.InlineDeclarations() {
 					if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
 						continue
 					}

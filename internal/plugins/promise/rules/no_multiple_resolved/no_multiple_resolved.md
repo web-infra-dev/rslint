@@ -83,4 +83,5 @@ new Promise(async (resolve, reject) => {
 
 ## Original Documentation
 
-- [eslint-plugin-promise: no-multiple-resolved](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-multiple-resolved.md)
+- [eslint-plugin-promise: no-multiple-resolved](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/no-multiple-resolved.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/no-multiple-resolved.js)

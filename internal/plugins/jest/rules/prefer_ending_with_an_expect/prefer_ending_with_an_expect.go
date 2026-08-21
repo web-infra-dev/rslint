@@ -2,12 +2,12 @@ package prefer_ending_with_an_expect
 
 import (
 	_ "embed"
-	"regexp"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -44,7 +44,7 @@ func lastFunctionStatement(fn *ast.Node) *ast.Node {
 	return ast.SkipParentheses(last)
 }
 
-func isAssertionCall(node *ast.Node, ctx rule.RuleContext, patterns []*regexp.Regexp) bool {
+func isAssertionCall(node *ast.Node, ctx rule.RuleContext, patterns []*esregexp.RegExp) bool {
 	if node == nil {
 		return false
 	}

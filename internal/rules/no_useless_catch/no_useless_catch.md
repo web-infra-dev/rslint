@@ -47,4 +47,5 @@ try {
 
 ## Original Documentation
 
-- [ESLint no-useless-catch](https://eslint.org/docs/latest/rules/no-useless-catch)
+- [ESLint: no-useless-catch](https://eslint.org/docs/latest/rules/no-useless-catch)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-useless-catch.js)

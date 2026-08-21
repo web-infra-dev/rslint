@@ -38,4 +38,5 @@ interface Foo {
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/member-ordering
+- [typescript-eslint: member-ordering](https://typescript-eslint.io/rules/member-ordering)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/member-ordering.ts)

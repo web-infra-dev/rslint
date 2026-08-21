@@ -76,4 +76,5 @@ None known.
 
 ## Original Documentation
 
-- [eslint-plugin-promise: no-promise-in-callback](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-promise-in-callback.md)
+- [eslint-plugin-promise: no-promise-in-callback](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/no-promise-in-callback.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/no-promise-in-callback.js)

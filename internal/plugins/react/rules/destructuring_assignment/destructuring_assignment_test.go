@@ -1,10 +1,17 @@
 package destructuring_assignment
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestDestructuringAssignmentRule(t *testing.T) {
@@ -661,6 +668,16 @@ func TestDestructuringAssignmentRule(t *testing.T) {
           return <div>{helper()}</div>;
         };
       `, Tsx: true, Options: []interface{}{"never"}},
+
+		// A line-scoped disable suppresses the diagnostic without changing
+		// SFC stack bookkeeping for the rest of the component.
+		{Code: `
+function Card(props) {
+  // rslint-disable-next-line test
+  const title = props.title;
+  return <div>{title}</div>;
+}
+`, Tsx: true, Options: []interface{}{"always"}},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: SFC accessing `props.id` directly ----
 		{
@@ -1648,5 +1665,155 @@ func TestDestructuringAssignmentRule(t *testing.T) {
 			},
 			Output: []string{"\n          function Foo({a}) {\n            \n            function helper() {\n              let props = { b: 1 };\n              return props.b;\n            }\n            return <p>{a}{helper()}</p>;\n          }\n        "},
 		},
+
+		// Exact message and range stay anchored to the member expression.
+		{
+			Code: `function Card(props) { return <div>{props.title}</div>; }`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useDestructAssignment",
+					Message:   "Must use destructuring props assignment",
+					Line:      1,
+					Column:    37,
+					EndLine:   1,
+					EndColumn: 48,
+				},
+			},
+		},
+
+		// Non-SFC and SFC entries must unwind in strict traversal order. The
+		// inner component uses its own parameter and the outer component is
+		// still active after both nested functions exit.
+		{
+			Code: `function Outer(props) {
+  function helper(value) { return value.x; }
+  const Inner = (innerProps) => <span>{innerProps.x}</span>;
+  return <div>{props.y}</div>;
+}`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useDestructAssignment", Line: 3, Column: 40, EndLine: 3, EndColumn: 52},
+				{MessageId: "useDestructAssignment", Line: 4, Column: 16, EndLine: 4, EndColumn: 23},
+			},
+		},
+
+		// A block-scoped disable suppresses only the enclosed access; the
+		// re-enabled access retains its exact diagnostic and range.
+		{
+			Code: `function Card(props) {
+  /* rslint-disable test */
+  const title = props.title;
+  /* rslint-enable test */
+  return <div>{props.subtitle}</div>;
+}`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useDestructAssignment", Line: 5, Column: 16, EndLine: 5, EndColumn: 30},
+			},
+		},
 	})
+}
+
+func TestDestructuringAssignmentEditDemand(t *testing.T) {
+	const source = `function Card(props: Props) {
+  const { title } = props;
+  return <div>{title}</div>;
+}`
+	const fileName = "react.tsx"
+
+	root := fixtures.GetRootDir()
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{
+		tspath.ResolvePath(root.Dir, fileName): source,
+	})
+	host := utils.CreateCompilerHost(root.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceFile := program.GetSourceFile(fileName)
+	if sourceFile == nil {
+		t.Fatalf("source file %q was not created", fileName)
+	}
+	options := rule_tester.ResolveTestCaseOptions(t, &DestructuringAssignmentRule, []any{
+		"always",
+		map[string]any{"destructureInSignature": "always"},
+	})
+
+	tests := []struct {
+		name      string
+		demand    rule.EditDemand
+		wantFixes bool
+	}{
+		{name: "diagnostics only", demand: rule.EditDemandNone},
+		{name: "wrong suggestion demand", demand: rule.EditDemandSuggestion},
+		{name: "autofix", demand: rule.EditDemandAutofix, wantFixes: true},
+		{name: "all edits", demand: rule.EditDemandAll, wantFixes: true},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var diagnostics []rule.RuleDiagnostic
+			_, err := linter.RunLinter(linter.RunLinterOptions{
+				Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
+				SingleThreaded: true,
+				Scope:          linter.FileScope{Files: []string{sourceFile.FileName()}},
+				ExcludePaths:   []string{},
+				GetRulesForFile: func(_ *ast.SourceFile) []linter.ConfiguredRule {
+					return []linter.ConfiguredRule{
+						{
+							Name:     "test",
+							Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								return DestructuringAssignmentRule.Run(ctx, options)
+							},
+						},
+					}
+				},
+				Consumer: rule.DiagnosticConsumer{
+					Demand: testCase.demand,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+			}
+
+			diagnostic := diagnostics[0]
+			wantPos := strings.Index(source, "{ title } = props")
+			wantEnd := wantPos + len("{ title } = props")
+			if diagnostic.Message.Id != "destructureInSignature" ||
+				diagnostic.Message.Description != "Must destructure props in the function signature." ||
+				diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
+				t.Fatalf("unexpected diagnostic: %#v", diagnostic)
+			}
+			if diagnostic.Suggestions != nil {
+				t.Fatalf("suggestions leaked under demand %v: %#v", testCase.demand, *diagnostic.Suggestions)
+			}
+
+			fixes := diagnostic.Fixes()
+			if !testCase.wantFixes {
+				if diagnostic.FixesPtr != nil || len(fixes) != 0 {
+					t.Fatalf("fixes leaked under demand %v: %#v", testCase.demand, fixes)
+				}
+				return
+			}
+			if len(fixes) != 2 {
+				t.Fatalf("fixes = %#v, want two", fixes)
+			}
+			fixed, _, applied := linter.ApplyRuleFixes(source, diagnostics)
+			if !applied {
+				t.Fatal("autofix demand did not materialize the signature fix")
+			}
+			const wantFixed = "function Card({ title }: Props) {\n  \n  return <div>{title}</div>;\n}"
+			if fixed != wantFixed {
+				t.Fatalf("fixed source:\n%s\nwant:\n%s", fixed, wantFixed)
+			}
+		})
+	}
 }

@@ -55,8 +55,40 @@ customTest("same", () => {});`},
 describe.fails("same", () => {});`},
 			{Code: `test.only.extend({})("same", () => {});
 test.only.extend({})("same", () => {});`},
+			{Code: `import.meta.rstest.test.each([1, 2])("same", () => {});
+import.meta.rstest.test.each([3])("same", () => {});`},
+			{Code: `import { test } from "@rstest/playwright";
+test.describe("a", () => { test("same", () => {}); });
+test.describe("b", () => { test("same", () => {}); });`},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import.meta.rstest.describe("suite", () => {
+  import.meta.rstest.test("same", () => {});
+  import.meta.rstest.test("same", () => {});
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "multipleTestTitle", Line: 3, Column: 27},
+				},
+			},
+			{
+				Code: `import { test, describe } from "@rstest/playwright";
+describe("suite", () => {
+  test("same", () => {});
+  test("same", () => {});
+});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "multipleTestTitle", Line: 4, Column: 8},
+				},
+			},
+			{
+				Code: `import { test } from "@rstest/playwright";
+test.describe("same", () => {});
+test.describe("same", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "multipleDescribeTitle", Line: 3, Column: 15},
+				},
+			},
 			{
 				Code: `test("same", () => {});
 test("same", () => {});`,

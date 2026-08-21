@@ -77,10 +77,10 @@ var expectParseProbe = rule.Rule{
 	Name:             "rstest/expect-parse-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := rstestUtils.ParseRstestExpectCall(node, ctx, callbacks)
+				parsed := analysis.ParseExpectCall(node)
 				if parsed == nil {
 					return
 				}
@@ -94,10 +94,10 @@ var expectChainParseProbe = rule.Rule{
 	Name:             "rstest/expect-chain-parse-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := rstestUtils.ParseRstestExpectCall(node, ctx, callbacks)
+				parsed := analysis.ParseExpectCall(node)
 				if parsed == nil {
 					return
 				}
@@ -117,10 +117,10 @@ func parsedExpectError(message string) []rule_tester.InvalidTestCaseError {
 var expectEntryInvariantProbe = rule.Rule{
 	Name: "rstest/probe-expect-entry-invariant",
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := rstestUtils.ParseRstestExpectCall(node, ctx, callbacks)
+				parsed := analysis.ParseExpectCall(node)
 				if parsed == nil {
 					return
 				}
@@ -750,10 +750,10 @@ var expectAwaitProbe = rule.Rule{
 	Name:             "rstest/expect-await-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := rstestUtils.ParseRstestExpectCall(node, ctx, callbacks)
+				parsed := analysis.ParseExpectCall(node)
 				if parsed == nil {
 					return
 				}
@@ -770,10 +770,10 @@ var expectIdentityProbe = rule.Rule{
 	Name:             "rstest/expect-identity-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if rstestUtils.IsRstestExpectCall(node, ctx, callbacks) {
+				if analysis.IsExpectCall(node) {
 					ctx.ReportNode(node, probeMessage("expectCall", "expect=true"))
 				}
 			},

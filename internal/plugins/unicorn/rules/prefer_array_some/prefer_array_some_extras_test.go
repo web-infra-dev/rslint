@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -96,6 +97,13 @@ func TestPreferArraySomeExtras(t *testing.T) {
 		{
 			Code:   `if ((foo).find(fn)) {}`,
 			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`if ((foo).some(fn)) {}`)},
+		},
+		// A `for…of` const binding has no VariableDeclaration initializer. Its
+		// inferred array type still makes the boolean `.find()` use reportable.
+		{
+			Code:   `declare const arrays: number[][]; declare const fn: (value: number) => boolean; for (const array of arrays) { if (array.find(fn)) {} }`,
+			Tsx:    false,
+			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`declare const arrays: number[][]; declare const fn: (value: number) => boolean; for (const array of arrays) { if (array.some(fn)) {} }`)},
 		},
 		// Double-parenthesized call in a control-flow test.
 		{
@@ -259,7 +267,7 @@ func createPreferArraySomeProgram(t testing.TB, fileName, code string) (*compile
 func lintPreferArraySomeWithDemand(program *compiler.Program, sourceFile *ast.SourceFile, demand rule.EditDemand) []rule.RuleDiagnostic {
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:     program,
+		Program:     lintprogram.NewFromCompiler(program),
 		File:        sourceFile.FileName(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

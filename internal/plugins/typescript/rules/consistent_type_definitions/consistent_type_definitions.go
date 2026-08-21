@@ -1,6 +1,7 @@
 package consistent_type_definitions
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed consistent_type_definitions.schema.json
+var schemaJSON []byte
 
 type DefinitionStyle string
 
@@ -18,6 +22,19 @@ const (
 
 type ConsistentTypeDefinitionsOptions struct {
 	Style DefinitionStyle `json:"style"`
+}
+
+func parseOptions(options []any) ConsistentTypeDefinitionsOptions {
+	opts := ConsistentTypeDefinitionsOptions{
+		Style: DefinitionStyleInterface,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	if str, ok := options[0].(string); ok {
+		opts.Style = DefinitionStyle(str)
+	}
+	return opts
 }
 
 type consistentTypeDefinitionsFixer struct {
@@ -180,26 +197,13 @@ func (f consistentTypeDefinitionsFixer) interfaceFix(node *ast.Node, interfaceDe
 
 // ConsistentTypeDefinitionsRule enforces consistent type definitions
 var ConsistentTypeDefinitionsRule = rule.CreateRule(rule.Rule{
-	Name: "consistent-type-definitions",
-	Run:  run,
+	Name:   "consistent-type-definitions",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
-	opts := ConsistentTypeDefinitionsOptions{
-		Style: DefinitionStyleInterface,
-	}
-
-	// Parse options
-	if options != nil {
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			if str, ok := optArray[0].(string); ok {
-				opts.Style = DefinitionStyle(str)
-			}
-		} else if str, ok := options.(string); ok {
-			opts.Style = DefinitionStyle(str)
-		}
-	}
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opts := parseOptions(options)
 
 	fixer := consistentTypeDefinitionsFixer{
 		sourceFile: ctx.SourceFile,

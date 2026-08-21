@@ -70,4 +70,5 @@ var Hello = createReactClass({
 
 ## Original Documentation
 
-- [eslint-plugin-react / jsx-no-comment-textnodes](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-comment-textnodes.md)
+- [eslint-plugin-react: jsx-no-comment-textnodes](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-no-comment-textnodes.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-no-comment-textnodes.js)

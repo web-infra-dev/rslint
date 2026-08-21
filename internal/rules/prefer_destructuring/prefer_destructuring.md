@@ -115,4 +115,5 @@ declaration.
 
 ## Original Documentation
 
-- [ESLint prefer-destructuring](https://eslint.org/docs/latest/rules/prefer-destructuring)
+- [ESLint: prefer-destructuring](https://eslint.org/docs/latest/rules/prefer-destructuring)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-destructuring.js)

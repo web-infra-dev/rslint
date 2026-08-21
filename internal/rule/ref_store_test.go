@@ -23,7 +23,8 @@ func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind,
 		Path:     tspath.Path(fileName),
 	}, source, scriptKind)
 	binder.BindSourceFile(sourceFile)
-	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil)
+	_, refsInit := ResolveLanguageDefaults(fileName)
+	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit)
 }
 
 // newCheckedRefStore builds a real Program (via the shared fixtures
@@ -48,7 +49,8 @@ func newCheckedRefStore(t *testing.T, source string) (*ast.SourceFile, *RefStore
 		t.Fatalf("GetSourceFile(%q) = nil", filePath)
 	}
 	tc, done := program.GetTypeChecker(t.Context())
-	return sourceFile, NewRefStore(sourceFile, program.Options(), tc), done
+	_, refsInit := ResolveLanguageDefaults(sourceFile.FileName())
+	return sourceFile, NewRefStore(sourceFile, program.Options(), tc, refsInit), done
 }
 
 // identifiers returns every Identifier node under root with the given text,
@@ -874,6 +876,79 @@ func TestRefStoreResolveCheckerFallback(t *testing.T) {
 	}
 }
 
+func TestRefStoreResolveInFileNeverUsesCheckerFallback(t *testing.T) {
+	// ResolveInFile must preserve local/import scope resolution while refusing
+	// the same lib.dom symbol that Resolve finds through its checker fallback.
+	sourceFile, refs, done := newCheckedRefStore(t, "export {}; const local = 1; local; window;")
+	defer done()
+
+	localOccurrences := identifiers(sourceFile.AsNode(), "local")
+	if len(localOccurrences) != 2 {
+		t.Fatalf("expected declaration + reference for local, got %d", len(localOccurrences))
+	}
+	if got := refs.ResolveInFile(localOccurrences[1]); got == nil {
+		t.Fatal("ResolveInFile(local reference) = nil, want the current-file binding")
+	}
+
+	windowOccurrences := identifiers(sourceFile.AsNode(), "window")
+	if len(windowOccurrences) != 1 {
+		t.Fatalf("expected one window reference, got %d", len(windowOccurrences))
+	}
+	window := windowOccurrences[0]
+	if got := refs.ResolveInFile(window); got != nil {
+		t.Fatalf("ResolveInFile(window) = %v, want nil for a lib.d.ts binding", got)
+	}
+	if got := refs.Resolve(window); got == nil {
+		t.Fatal("Resolve(window) = nil, want proof that the checker fallback is available")
+	}
+}
+
+func TestRefStoreImplicitFileArguments(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		fileName string
+		source   string
+		want     []bool
+	}{
+		{
+			name:     "commonjs top level arrow and function",
+			fileName: "/file.cjs",
+			source:   "arguments; (() => arguments)(); function f() { return arguments; }",
+			want:     []bool{true, true, true},
+		},
+		{
+			name:     "module top level arrow and function",
+			fileName: "/file.js",
+			source:   "arguments; (() => arguments)(); function f() { return arguments; }",
+			want:     []bool{false, false, true},
+		},
+		{
+			name:     "local declaration wins",
+			fileName: "/file.cjs",
+			source:   "let arguments = 1; arguments;",
+			want:     []bool{false, true},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			sourceFile, refs := newBoundRefStore(t, test.fileName, core.ScriptKindJS, test.source)
+			occurrences := identifiers(sourceFile.AsNode(), "arguments")
+			if len(occurrences) != len(test.want) {
+				t.Fatalf("found %d arguments identifiers, want %d", len(occurrences), len(test.want))
+			}
+			for i, node := range occurrences {
+				if got := refs.IsDefinedInFile(node); got != test.want[i] {
+					t.Errorf("IsDefinedInFile(arguments occurrence %d) = %v, want %v", i, got, test.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestRefStoreResolveCheckerFallbackExcludedPositions(t *testing.T) {
 	// A TypeChecker resolves a property key's own declaration name to the
 	// property's symbol (its only declaration is that very key), not to
@@ -909,6 +984,171 @@ func TestRefStoreResolveNoCheckerFallback(t *testing.T) {
 	}
 	if got := refs.Resolve(occurrences[0]); got != nil {
 		t.Fatalf("Resolve(window) = %v, want nil (no TypeChecker supplied)", got)
+	}
+}
+
+func TestRefStoreTypeOnlyHeritageQualifierSkipsValueShadow(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "class implements",
+			source: `
+export {};
+namespace N { export interface T {} }
+function f() {
+	let N = 0;
+	class C implements N.T {}
+}`,
+		},
+		{
+			name: "interface extends",
+			source: `
+export {};
+namespace N { export interface T {} }
+function f() {
+	let N = 0;
+	interface I extends N.T {}
+}`,
+		},
+		{
+			name: "nested qualifier",
+			source: `
+export {};
+namespace N { export namespace Inner { export interface T {} } }
+function f() {
+	let N = 0;
+	class C implements N.Inner.T {}
+}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/type-only-heritage.ts", core.ScriptKindTS, test.source)
+			occurrences := identifiers(sourceFile.AsNode(), "N")
+			if len(occurrences) != 3 {
+				t.Fatalf("identifier occurrences = %d, want 3", len(occurrences))
+			}
+
+			namespace := occurrences[0].Parent.Symbol()
+			localValue := occurrences[1].Parent.Symbol()
+			use := occurrences[2]
+			if namespace == nil || localValue == nil {
+				t.Fatal("declaration identifier has no bound symbol")
+			}
+			if got := refs.Resolve(use); got != namespace {
+				t.Fatalf("Resolve(heritage qualifier) = %v, want namespace %v", got, namespace)
+			}
+			if got := refs.References(namespace); len(got) != 1 || got[0] != use {
+				t.Fatalf("References(namespace) = %v, want [%v]", got, use)
+			}
+			if got := refs.References(localValue); len(got) != 0 {
+				t.Fatalf("References(local value) = %v, want none", got)
+			}
+		})
+	}
+}
+
+func TestRefStoreExpressionShapedTypeQualifierPreservesValueContexts(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source string
+	}{
+		{
+			// Unlike `implements` and an interface's `extends`, a class
+			// `extends` expression executes at runtime.
+			name: "class extends",
+			source: `
+export {};
+namespace N { export class Base {} }
+function f() {
+	const N = { Base: class {} };
+	class C extends N.Base {}
+	}`,
+		},
+		{
+			// A type query names the runtime value even though the query itself
+			// is type syntax.
+			name: "type query",
+			source: `
+export {};
+namespace N { export const value = 1; }
+function f() {
+	const N = { value: 1 };
+	type T = typeof N.value;
+}`,
+		},
+		{
+			// An arbitrary expression inside `implements` is still a value use;
+			// only a pure dotted entity name acts as a namespace qualifier.
+			name: "call expression in implements",
+			source: `
+export {};
+namespace N { export interface T {} }
+function f() {
+	function N() { return { T: class {} }; }
+	class C implements N().T {}
+}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/value-qualifier.ts", core.ScriptKindTS, test.source)
+			occurrences := identifiers(sourceFile.AsNode(), "N")
+			if len(occurrences) != 3 {
+				t.Fatalf("identifier occurrences = %d, want 3", len(occurrences))
+			}
+			namespace := occurrences[0].Parent.Symbol()
+			localValue := occurrences[1].Parent.Symbol()
+			use := occurrences[2]
+			if namespace == nil || localValue == nil {
+				t.Fatal("declaration identifier has no bound symbol")
+			}
+			if got := refs.Resolve(use); got != localValue {
+				t.Fatalf("Resolve(value qualifier) = %v, want local value %v", got, localValue)
+			}
+			if got := refs.References(localValue); len(got) != 1 || got[0] != use {
+				t.Fatalf("References(local value) = %v, want [%v]", got, use)
+			}
+			if got := refs.References(namespace); len(got) != 0 {
+				t.Fatalf("References(namespace) = %v, want none", got)
+			}
+		})
+	}
+}
+
+func TestRefStoreTypeOnlyHeritageQualifierCheckerFallbackRespectsMeaning(t *testing.T) {
+	// The binder cannot see namespaces declared in lib files. Its namespace
+	// lookup must fall back to a meaning-aware checker lookup rather than let
+	// GetSymbolAtLocation select the same-named local value.
+	sourceFile, refs, done := newCheckedRefStore(t, `
+export {};
+function f() {
+	let Intl = 0;
+	class C implements Intl.CollatorOptions {}
+}`)
+	defer done()
+
+	occurrences := identifiers(sourceFile.AsNode(), "Intl")
+	if len(occurrences) != 2 {
+		t.Fatalf("identifier occurrences = %d, want 2", len(occurrences))
+	}
+	localValue := occurrences[0].Parent.Symbol()
+	use := occurrences[1]
+	if localValue == nil {
+		t.Fatal("local declaration identifier has no bound symbol")
+	}
+	target := refs.Resolve(use)
+	if target == nil || target == localValue {
+		t.Fatalf("Resolve(heritage qualifier) = %v, want the global Intl namespace", target)
+	}
+	if target.Flags&(ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) == 0 {
+		t.Fatalf("resolved checker symbol flags = %v, want a namespace-capable symbol", target.Flags)
+	}
+	if got := refs.References(target); len(got) != 1 || got[0] != use {
+		t.Fatalf("References(global namespace) = %v, want [%v]", got, use)
+	}
+	if got := refs.References(localValue); len(got) != 0 {
+		t.Fatalf("References(local value) = %v, want none", got)
 	}
 }
 

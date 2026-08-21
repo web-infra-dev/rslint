@@ -94,4 +94,5 @@ None known.
 
 ## Original Documentation
 
-- [eslint-plugin-promise: always-return](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/always-return.md)
+- [eslint-plugin-promise: always-return](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/always-return.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/always-return.js)

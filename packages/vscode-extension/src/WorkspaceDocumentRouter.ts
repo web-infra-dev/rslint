@@ -1,5 +1,4 @@
 import {
-  languages,
   workspace,
   RelativePattern,
   type CodeAction,
@@ -28,7 +27,6 @@ export interface DocumentRoutingRuntime {
 
 interface ActiveRuntime {
   readonly runtime: DocumentRoutingRuntime;
-  readonly selector: DocumentFilter[];
 }
 
 interface ServerOpenDocumentSession {
@@ -87,6 +85,7 @@ export function isSupportedWorkspaceDocument(
  */
 export class WorkspaceDocumentRouter {
   private activeRoots = new Map<string, ActiveRuntime>();
+  private documentOwners = new Map<string, string>();
   private readonly serverOpenDocuments = new Map<
     string,
     ServerOpenDocumentSession
@@ -180,17 +179,45 @@ export class WorkspaceDocumentRouter {
       if (existing?.runtime === runtime) return;
       if (existing) {
         throw new Error(
-          `workspace root ${JSON.stringify(runtime.rootKey)} is already active`,
+          `runtime key ${JSON.stringify(runtime.rootKey)} is already active`,
         );
       }
 
       const before = this.activeRoots;
       const after = new Map(before);
-      after.set(runtime.rootKey, {
-        runtime,
-        selector: createWorkspaceDocumentSelector(runtime.workspaceFolder),
-      });
-      await this.transferDocuments(before, after, true);
+      after.set(runtime.rootKey, { runtime });
+      await this.transferDocuments(
+        before,
+        after,
+        this.documentOwners,
+        this.documentOwners,
+        true,
+      );
+    });
+  }
+
+  /** Assign one open document to the runtime selected by local-core resolution. */
+  public async assign(
+    document: TextDocument,
+    rootKey: string | undefined,
+  ): Promise<void> {
+    return this.enqueue(async () => {
+      const uri = documentKey(document);
+      const previous = this.documentOwners.get(uri);
+      const next = isSupportedWorkspaceDocument(document) ? rootKey : undefined;
+      if (previous === next) return;
+
+      const afterOwners = new Map(this.documentOwners);
+      if (next) afterOwners.set(uri, next);
+      else afterOwners.delete(uri);
+      await this.transferDocuments(
+        this.activeRoots,
+        this.activeRoots,
+        this.documentOwners,
+        afterOwners,
+        true,
+        [document],
+      );
     });
   }
 
@@ -203,7 +230,13 @@ export class WorkspaceDocumentRouter {
       after.delete(rootKey);
       const errors: unknown[] = [];
       try {
-        await this.transferDocuments(before, after, false);
+        await this.transferDocuments(
+          before,
+          after,
+          this.documentOwners,
+          this.documentOwners,
+          false,
+        );
       } catch (error) {
         errors.push(...errorList(error));
       }
@@ -252,6 +285,7 @@ export class WorkspaceDocumentRouter {
       }
       this.serverOpenDocuments.clear();
       this.activeRoots = new Map();
+      this.documentOwners = new Map();
       throwCollectedErrors(errors, 'failed to close routed documents');
     });
   }
@@ -261,20 +295,27 @@ export class WorkspaceDocumentRouter {
   }
 
   public ownerKeyForDocument(document: TextDocument): string | undefined {
-    return this.ownerKeyForDocumentIn(this.activeRoots, document);
+    return this.ownerKeyForDocumentIn(
+      this.activeRoots,
+      this.documentOwners,
+      document,
+    );
   }
 
   private async transferDocuments(
     before: Map<string, ActiveRuntime>,
     after: Map<string, ActiveRuntime>,
+    beforeOwners: Map<string, string>,
+    afterOwners: Map<string, string>,
     rollbackOnFailure: boolean,
+    documents: readonly TextDocument[] = workspace.textDocuments,
   ): Promise<void> {
-    const transfers = workspace.textDocuments
+    const transfers = documents
       .filter(isSupportedWorkspaceDocument)
       .map((document) => ({
         document,
-        oldOwnerKey: this.ownerKeyForDocumentIn(before, document),
-        newOwnerKey: this.ownerKeyForDocumentIn(after, document),
+        oldOwnerKey: this.ownerKeyForDocumentIn(before, beforeOwners, document),
+        newOwnerKey: this.ownerKeyForDocumentIn(after, afterOwners, document),
       }))
       .filter(({ oldOwnerKey, newOwnerKey }) => oldOwnerKey !== newOwnerKey);
 
@@ -302,7 +343,7 @@ export class WorkspaceDocumentRouter {
     }
 
     if (errors.length > 0 && rollbackOnFailure) {
-      await this.restoreOldOwners(before, closedOld, errors);
+      await this.restoreOldOwners(before, beforeOwners, closedOld, errors);
       throw new AggregateError(
         errors,
         'failed to close previous document owners',
@@ -310,6 +351,7 @@ export class WorkspaceDocumentRouter {
     }
 
     this.activeRoots = after;
+    this.documentOwners = afterOwners;
 
     for (const transfer of transfers) {
       if (!transfer.newOwnerKey) continue;
@@ -348,12 +390,14 @@ export class WorkspaceDocumentRouter {
       this.releaseDocumentSession(newOwner.runtime, transfer.document, errors);
     }
     this.activeRoots = before;
-    await this.restoreOldOwners(before, closedOld, errors);
+    this.documentOwners = beforeOwners;
+    await this.restoreOldOwners(before, beforeOwners, closedOld, errors);
     throw new AggregateError(errors, 'failed to activate document owner');
   }
 
   private async restoreOldOwners(
     before: Map<string, ActiveRuntime>,
+    beforeOwners: Map<string, string>,
     transfers: ReadonlyArray<{
       document: TextDocument;
       oldOwnerKey: string | undefined;
@@ -361,6 +405,7 @@ export class WorkspaceDocumentRouter {
     errors: unknown[],
   ): Promise<void> {
     this.activeRoots = before;
+    this.documentOwners = beforeOwners;
     for (const transfer of transfers) {
       if (!transfer.oldOwnerKey) continue;
       const oldOwner = before.get(transfer.oldOwnerKey);
@@ -380,24 +425,12 @@ export class WorkspaceDocumentRouter {
 
   private ownerKeyForDocumentIn(
     roots: ReadonlyMap<string, ActiveRuntime>,
+    owners: ReadonlyMap<string, string>,
     document: TextDocument,
   ): string | undefined {
     if (!isSupportedWorkspaceDocument(document)) return undefined;
-    let best: { key: string; depth: number } | undefined;
-    for (const [key, entry] of roots) {
-      if (languages.match(entry.selector, document) <= 0) continue;
-      const depth = entry.runtime.workspaceFolder.uri.path
-        .split('/')
-        .filter(Boolean).length;
-      if (
-        !best ||
-        depth > best.depth ||
-        (depth === best.depth && key.localeCompare(best.key) < 0)
-      ) {
-        best = { key, depth };
-      }
-    }
-    return best?.key;
+    const key = owners.get(documentKey(document));
+    return key && roots.has(key) ? key : undefined;
   }
 
   private ownerForDocument(

@@ -1,10 +1,15 @@
 package no_implicit_coercion
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_implicit_coercion.schema.json
+var schemaJSON []byte
 
 type options struct {
 	boolean                   bool
@@ -14,17 +19,17 @@ type options struct {
 	allow                     *utils.Set[string]
 }
 
-func parseOptions(raw any) options {
+func parseOptions(rawOptions []any) options {
 	opts := options{
 		boolean: true,
 		number:  true,
 		str:     true,
 		allow:   utils.NewSetWithSizeHint[string](0),
 	}
-	m := utils.GetOptionsMap(raw)
-	if m == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
+	m, _ := rawOptions[0].(map[string]any)
 	if v, ok := m["boolean"].(bool); ok {
 		opts.boolean = v
 	}
@@ -47,9 +52,9 @@ func parseOptions(raw any) options {
 // explicit `Boolean()` / `Number()` / `String()` calls instead.
 // https://eslint.org/docs/latest/rules/no-implicit-coercion
 var NoImplicitCoercionRule = rule.Rule{
-	Name: "no-implicit-coercion",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "no-implicit-coercion",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		// report emits the diagnostic for `node` (replaced with `recommendation`).
@@ -103,7 +108,7 @@ var NoImplicitCoercionRule = rule.Rule{
 				target := ast.SkipParentheses(innerPue.Operand)
 				recommendation := "Boolean(" + utils.TrimmedNodeText(ctx.SourceFile, target) + ")"
 				shouldFix := !utils.IsShadowed(node, "Boolean")
-				if ctx.Globals["Boolean"] == utils.GlobalAccessOff {
+				if !ctx.Globals.Access("Boolean").IsDeclared() {
 					shouldFix = false
 				}
 				report(node, recommendation, true, shouldFix)

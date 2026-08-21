@@ -57,4 +57,5 @@ When set to `"always"`, allows equality checks for a single character (e.g. `foo
 
 ## Original Documentation
 
-- [typescript-eslint prefer-string-starts-ends-with](https://typescript-eslint.io/rules/prefer-string-starts-ends-with)
+- [typescript-eslint: prefer-string-starts-ends-with](https://typescript-eslint.io/rules/prefer-string-starts-ends-with)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.55.0/packages/eslint-plugin/src/rules/prefer-string-starts-ends-with.ts)

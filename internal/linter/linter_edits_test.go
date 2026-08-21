@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -75,7 +74,7 @@ func TestRunLinterDiagnosticConsumerEditDemand(t *testing.T) {
 			timing := NewTimingCollector()
 
 			_, err := RunLinter(RunLinterOptions{
-				Programs:       []*compiler.Program{program},
+				Programs:       wrapTestPrograms(program),
 				SingleThreaded: true,
 				TargetFiles:    [][]string{{paths["edits.ts"]}},
 				Timing:         timing,
@@ -170,7 +169,7 @@ func TestRunLinterDeferredFixesSkipSuppressedDiagnostic(t *testing.T) {
 	builderCalls := 0
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["suppressed.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
@@ -221,7 +220,7 @@ func TestRunLinterDeferredBuilderMayDeclineArtifact(t *testing.T) {
 	builderCalls := 0
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["decline.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
@@ -291,7 +290,7 @@ func TestRunLinterLegacyReportsRespectEditDemand(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			var got []rule.RuleDiagnostic
 			_, err := RunLinter(RunLinterOptions{
-				Programs:       []*compiler.Program{program},
+				Programs:       wrapTestPrograms(program),
 				SingleThreaded: true,
 				TargetFiles:    [][]string{{paths["legacy.ts"]}},
 				GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
@@ -339,7 +338,7 @@ func TestRunLinterDiscardingConsumerSkipsDeferredEdits(t *testing.T) {
 
 	builderCalls := 0
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["discarded.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {

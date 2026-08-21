@@ -2,16 +2,21 @@
 
 ## Rule Details
 
-Enforce template literal expressions to be of `string` type. When using template literal expressions (`${expr}`), non-string values are implicitly converted to strings using their `.toString()` method. This can lead to unexpected results such as `"[object Object]"` for objects or `"null"` for null values. This rule ensures that only values of type `string` are used in template expressions by default, though other types can be allowed via options.
+Enforce template literal expressions to be of `string` type. When a value is interpolated into a template literal (`${expr}`), it is implicitly converted to a string, which produces results such as `"[object Object]"` for plain objects. This rule restricts which types may be interpolated.
+
+By default, primitives that stringify predictably are permitted (`number`, `bigint`, `boolean`, `null`, `undefined`, `any`, `RegExp`), along with `Error`, `URL`, and `URLSearchParams` and their subclasses.
 
 Examples of **incorrect** code for this rule:
 
 ```typescript
-const num = 42;
-const str = `value: ${num}`;
-
-const obj = {};
+declare const obj: object;
 const msg = `result: ${obj}`;
+
+declare const arr: string[];
+const msg2 = `items: ${arr}`;
+
+declare const sym: symbol;
+const msg3 = `symbol: ${sym}`;
 ```
 
 Examples of **correct** code for this rule:
@@ -20,11 +25,46 @@ Examples of **correct** code for this rule:
 const name = 'world';
 const greeting = `Hello, ${name}`;
 
-const num = 42;
-const str = `value: ${String(num)}`;
-const str2 = `value: ${num.toString()}`;
+declare const obj: object;
+const msg = `result: ${JSON.stringify(obj)}`;
+
+declare const arr: string[];
+const msg2 = `items: ${arr.join(', ')}`;
+```
+
+## Options
+
+| Option         | Type                                     | Default                                     | Description                                                    |
+| -------------- | ---------------------------------------- | ------------------------------------------- | -------------------------------------------------------------- |
+| `allow`        | `(string \| TypeOrValueSpecifier)[]`     | `[{ from: 'lib', name: ['Error', 'URL', 'URLSearchParams'] }]` | Additional types to permit, matched against the type or any of its base types. |
+| `allowAny`     | `boolean`                                | `true`                                      | Permit `any` typed values.                                     |
+| `allowArray`   | `boolean`                                | `false`                                     | Permit arrays and tuples whose element type is itself permitted. |
+| `allowBoolean` | `boolean`                                | `true`                                      | Permit `boolean` typed values.                                 |
+| `allowNever`   | `boolean`                                | `false`                                     | Permit `never` typed values.                                   |
+| `allowNullish` | `boolean`                                | `true`                                      | Permit `null` and `undefined`.                                 |
+| `allowNumber`  | `boolean`                                | `true`                                      | Permit `number` and `bigint` typed values.                     |
+| `allowRegExp`  | `boolean`                                | `true`                                      | Permit `RegExp` typed values.                                  |
+
+To require every interpolated value to be a `string`, empty the `allow` list and turn each `allow*` option off:
+
+```json
+{
+  "@typescript-eslint/restrict-template-expressions": [
+    "error",
+    {
+      "allow": [],
+      "allowAny": false,
+      "allowBoolean": false,
+      "allowNever": false,
+      "allowNullish": false,
+      "allowNumber": false,
+      "allowRegExp": false
+    }
+  ]
+}
 ```
 
 ## Original Documentation
 
-- [typescript-eslint restrict-template-expressions](https://typescript-eslint.io/rules/restrict-template-expressions)
+- [typescript-eslint: restrict-template-expressions](https://typescript-eslint.io/rules/restrict-template-expressions)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/restrict-template-expressions.ts)

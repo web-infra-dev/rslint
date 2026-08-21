@@ -20,6 +20,7 @@ import (
 // Upstream source: packages/eslint-plugin/src/rules/no-unnecessary-parameter-property-assignment.ts
 var NoUnnecessaryParameterPropertyAssignmentRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-parameter-property-assignment",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run:              run,
 })

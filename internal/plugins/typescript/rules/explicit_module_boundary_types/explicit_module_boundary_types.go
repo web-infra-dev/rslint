@@ -1,6 +1,7 @@
 package explicit_module_boundary_types
 
 import (
+	_ "embed"
 	"sort"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed explicit_module_boundary_types.schema.json
+var schemaJSON []byte
 
 // options mirrors upstream's schema.
 type options struct {
@@ -21,7 +25,7 @@ type options struct {
 	allowTypedFunctionExpressions             bool
 }
 
-func parseOptions(rawOpts any) options {
+func parseOptions(rawOpts []any) options {
 	opts := options{
 		allowArgumentsExplicitlyTypedAsAny:        false,
 		allowDirectConstAssertionInArrowFunctions: true,
@@ -30,10 +34,10 @@ func parseOptions(rawOpts any) options {
 		allowOverloadFunctions:        false,
 		allowTypedFunctionExpressions: true,
 	}
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
 	if v, ok := optsMap["allowArgumentsExplicitlyTypedAsAny"].(bool); ok {
 		opts.allowArgumentsExplicitlyTypedAsAny = v
 	}
@@ -60,7 +64,8 @@ func parseOptions(rawOpts any) options {
 }
 
 var ExplicitModuleBoundaryTypesRule = rule.CreateRule(rule.Rule{
-	Name: "explicit-module-boundary-types",
+	Name:   "explicit-module-boundary-types",
+	Schema: rule.NewSchema(schemaJSON),
 	// Upstream rule isn't type-aware (uses ESLint's scope manager) but a
 	// TypeScript rule running on a TS project always has a TypeChecker
 	// available, and the symbol-based scope walk we use here is strictly
@@ -71,8 +76,7 @@ var ExplicitModuleBoundaryTypesRule = rule.CreateRule(rule.Rule{
 	Run:              run,
 })
 
-func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-	rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 	opts := parseOptions(rawOptions)
 
 	// Per-file state. rslint constructs a new RuleListeners for each file, so
@@ -106,7 +110,7 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 	}
 
 	reportMissingReturn := func(node *ast.Node) {
-		reportRange(functionHeadReportRange(ctx.SourceFile, node), rule.RuleMessage{
+		reportRange(utils.GetFunctionHeadLoc(ctx.SourceFile, node), rule.RuleMessage{
 			Id:          "missingReturnType",
 			Description: "Missing return type on function.",
 		})
@@ -576,9 +580,8 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 	// Sort pending diagnostics by display-range start so the order matches
 	// ESLint's RuleTester (which compares by `loc.start.line`,
 	// `loc.start.column`). The display range comes from `getFunctionHeadLoc`
-	// for missingReturnType and from the param node for missingArgType —
-	// `functionHeadReportRange` already handles the AccessorProperty carve-
-	// out, so simple range-based sorting is enough.
+	// for missingReturnType and from the param node for missingArgType, so
+	// simple range-based sorting is enough.
 	sort.SliceStable(pending, func(i, j int) bool {
 		if pending[i].rng.Pos() != pending[j].rng.Pos() {
 			return pending[i].rng.Pos() < pending[j].rng.Pos()
@@ -592,30 +595,6 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 	// No live listeners — all work happens eagerly above. Returning nil is
 	// not currently supported, so we return an empty map.
 	return rule.RuleListeners{}
-}
-
-// functionHeadReportRange returns the range used as the diagnostic's display
-// range for a missingReturnType report. For most function-likes it forwards
-// to utils.GetFunctionHeadLoc — the existing helper that mirrors ESLint's
-// `getFunctionHeadLoc`. The one carve-out is AccessorProperty (tsgo:
-// PropertyDeclaration with the `accessor` modifier): upstream's
-// `getFunctionHeadLoc` has a dedicated PropertyDefinition case but NOT an
-// AccessorProperty case, so AccessorProperty arrows fall back to the arrow's
-// own loc (`=>` token range), not the property header. Mirror that so the
-// sorted order matches upstream when an accessor field's arrow lacks parens
-// (`accessor bool = arg => body` reports arg before the head, but
-// `bool = arg => body` reports the head first).
-func functionHeadReportRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
-	if node.Kind == ast.KindArrowFunction && node.Parent != nil &&
-		node.Parent.Kind == ast.KindPropertyDeclaration &&
-		ast.HasSyntacticModifier(node.Parent, ast.ModifierFlagsAccessor) {
-		af := node.AsArrowFunction()
-		if af.EqualsGreaterThanToken != nil {
-			arrowRange := scanner.GetRangeOfTokenAtPosition(sf, af.EqualsGreaterThanToken.Pos())
-			return core.NewTextRange(arrowRange.Pos(), arrowRange.End())
-		}
-	}
-	return utils.GetFunctionHeadLoc(sf, node)
 }
 
 // bodylessReportRange constructs the report range that upstream's

@@ -28,4 +28,5 @@ delete obj['a']; // objects are fine
 
 ## Original Documentation
 
-- [typescript-eslint no-array-delete](https://typescript-eslint.io/rules/no-array-delete)
+- [typescript-eslint: no-array-delete](https://typescript-eslint.io/rules/no-array-delete)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-array-delete.ts)

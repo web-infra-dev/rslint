@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed first.schema.json
@@ -185,7 +186,11 @@ func checkFirst(ctx rule.RuleContext, options []any) {
 		return
 	}
 
-	absoluteFirst := utils.GetOptionsString(options) == "absolute-first"
+	absoluteFirst := false
+	if len(options) > 0 {
+		mode, _ := options[0].(string)
+		absoluteFirst = mode == "absolute-first"
+	}
 	body := statements.Nodes
 
 	nonImportCount := 0
@@ -325,7 +330,7 @@ func buildFix(sourceText string, body []*ast.Node, lastLegalImp *ast.Node, sortN
 		// If the extracted text starts with a non-whitespace character (e.g.
 		// the import immediately follows a `}` with no line break), prepend a
 		// newline so the moved import appears on its own line.
-		if r, _ := utf8.DecodeRuneInString(nodeText); r != utf8.RuneError && !utils.IsStrWhiteSpace(r) {
+		if r, _ := utf8.DecodeRuneInString(nodeText); r != utf8.RuneError && !ecmascript.IsWhiteSpace(r) {
 			nodeText = "\n" + nodeText
 		}
 		insertParts = append(insertParts, nodeText)
@@ -337,7 +342,7 @@ func buildFix(sourceText string, body []*ast.Node, lastLegalImp *ast.Node, sortN
 		// preserve the original leading whitespace pattern after them.
 		trimmed := strings.TrimSpace(insertSourceCode)
 		leadingWSEnd := strings.IndexFunc(insertSourceCode, func(r rune) bool {
-			return !utils.IsStrWhiteSpace(r)
+			return !ecmascript.IsWhiteSpace(r)
 		})
 		if leadingWSEnd < 0 {
 			leadingWSEnd = len(insertSourceCode)

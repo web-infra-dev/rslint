@@ -1,455 +1,795 @@
 package consistent_indexed_object_style
 
 import (
+	_ "embed"
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed consistent_indexed_object_style.schema.json
+var schemaJSON []byte
 
 type ConsistentIndexedObjectStyleOptions struct {
 	Style string `json:"style"`
 }
 
-// ConsistentIndexedObjectStyleRule enforces consistent usage of type imports
+var (
+	preferRecordMessage = rule.RuleMessage{
+		Id:          "preferRecord",
+		Description: "A record is preferred over an index signature.",
+	}
+	preferRecordSuggestionMessage = rule.RuleMessage{
+		Id:          "preferRecordSuggestion",
+		Description: "Change into a record instead of an index signature.",
+	}
+	preferIndexSignatureMessage = rule.RuleMessage{
+		Id:          "preferIndexSignature",
+		Description: "An index signature is preferred over a record.",
+	}
+	preferIndexSignatureSuggestionMessage = rule.RuleMessage{
+		Id:          "preferIndexSignatureSuggestion",
+		Description: "Change into an index signature instead of a record.",
+	}
+)
+
+// ConsistentIndexedObjectStyleRule requires a consistent indexed-object syntax.
 var ConsistentIndexedObjectStyleRule = rule.CreateRule(rule.Rule{
-	Name: "consistent-indexed-object-style",
-	Run:  run,
+	Name:   "consistent-indexed-object-style",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
-	opts := ConsistentIndexedObjectStyleOptions{
-		Style: "record", // default
-	}
-
-	// Parse options
-	if options != nil {
-		// Handle array format: ["index-signature"]
-		if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-			if style, ok := optArray[0].(string); ok {
-				opts.Style = style
-			}
-		} else if optsMap, ok := options.(map[string]interface{}); ok {
-			if style, exists := optsMap["style"].(string); exists {
-				opts.Style = style
-			}
-		} else if style, ok := options.(string); ok {
+func parseOptions(options []any) ConsistentIndexedObjectStyleOptions {
+	opts := ConsistentIndexedObjectStyleOptions{Style: "record"}
+	if len(options) > 0 {
+		if style, ok := options[0].(string); ok {
 			opts.Style = style
 		}
 	}
+	return opts
+}
 
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	if parseOptions(options).Style == "index-signature" {
+		return rule.RuleListeners{
+			ast.KindTypeReference: func(node *ast.Node) {
+				reportRecordAsIndexSignature(&ctx, node)
+			},
+		}
+	}
+
+	circularReferences := circularReferenceAnalyzer{refs: ctx.Refs}
 	return rule.RuleListeners{
-		// Check interfaces with index signatures
 		ast.KindInterfaceDeclaration: func(node *ast.Node) {
-			if opts.Style != "record" {
+			declaration := node.AsInterfaceDeclaration()
+			if declaration == nil || !hasSingleIndexSignatureMember(declaration.Members) {
 				return
 			}
-
-			if node.Kind != ast.KindInterfaceDeclaration {
-				return
+			indexSignature := declaration.Members.Nodes[0]
+			keyType, valueType, ok := indexSignatureTypes(indexSignature)
+			if ok {
+				reportInterfaceAsRecord(&ctx, &circularReferences, node, declaration, indexSignature, keyType, valueType)
 			}
-
-			interfaceDecl := node.AsInterfaceDeclaration()
-			if interfaceDecl == nil {
-				return
-			}
-
-			// Skip if interface extends other types
-			if interfaceDecl.HeritageClauses != nil && len(interfaceDecl.HeritageClauses.Nodes) > 0 {
-				return
-			}
-
-			// Check if interface has exactly one member and it's an index signature
-			if interfaceDecl.Members == nil || len(interfaceDecl.Members.Nodes) != 1 {
-				return
-			}
-
-			member := interfaceDecl.Members.Nodes[0]
-			if member.Kind != ast.KindIndexSignature {
-				return
-			}
-
-			indexSig := member.AsIndexSignatureDeclaration()
-			if indexSig == nil {
-				return
-			}
-
-			// Check for circular references
-			if isDeeplyReferencingType(interfaceDecl.Name(), indexSig.Type) {
-				return
-			}
-
-			// Report violation
-			ctx.ReportNode(node, rule.RuleMessage{
-				Id:          "preferRecord",
-				Description: "A record is preferred over an index signature.",
-			})
 		},
-
-		// Check type literals with index signatures
-		ast.KindTypeLiteral: func(node *ast.Node) {
-			if opts.Style != "record" {
-				return
-			}
-
-			if node.Kind != ast.KindTypeLiteral {
-				return
-			}
-
-			typeLiteral := node.AsTypeLiteralNode()
-			if typeLiteral == nil {
-				return
-			}
-
-			// Check if type literal has exactly one member and it's an index signature
-			if typeLiteral.Members == nil || len(typeLiteral.Members.Nodes) != 1 {
-				return
-			}
-
-			member := typeLiteral.Members.Nodes[0]
-			if member.Kind != ast.KindIndexSignature {
-				return
-			}
-
-			indexSig := member.AsIndexSignatureDeclaration()
-			if indexSig == nil {
-				return
-			}
-
-			// Check for circular references - need to find the type alias name
-			if isCircularTypeReference(node, indexSig.Type) {
-				return
-			}
-
-			ctx.ReportNode(node, rule.RuleMessage{
-				Id:          "preferRecord",
-				Description: "A record is preferred over an index signature.",
-			})
-		},
-
-		// Check mapped types
 		ast.KindMappedType: func(node *ast.Node) {
-			if opts.Style != "record" {
-				return
-			}
-
-			if node.Kind != ast.KindMappedType {
-				return
-			}
-
 			mappedType := node.AsMappedTypeNode()
-			if mappedType == nil {
+			if mappedType == nil || mappedType.TypeParameter == nil {
 				return
 			}
-
-			// Check if mapped type can be converted to Record
-			if !canConvertMappedTypeToRecord(mappedType) {
+			typeParameter := mappedType.TypeParameter.AsTypeParameterDeclaration()
+			if typeParameter == nil || typeParameter.Name() == nil || typeParameter.Name().Kind != ast.KindIdentifier ||
+				typeParameter.Constraint == nil {
 				return
 			}
-
-			ctx.ReportNode(node, rule.RuleMessage{
-				Id:          "preferRecord",
-				Description: "A record is preferred over an index signature.",
-			})
+			constraint := typeParameter.Constraint
+			if constraint.Kind == ast.KindTypeOperator {
+				typeOperator := constraint.AsTypeOperatorNode()
+				if typeOperator != nil && typeOperator.Operator == ast.KindKeyOfKeyword {
+					return
+				}
+			}
+			reportMappedTypeAsRecord(&ctx, &circularReferences, node, mappedType, typeParameter, constraint)
 		},
-
-		// Check Record types when in index-signature mode
-		ast.KindTypeReference: func(node *ast.Node) {
-			if opts.Style != "index-signature" {
+		ast.KindTypeLiteral: func(node *ast.Node) {
+			typeLiteral := node.AsTypeLiteralNode()
+			if typeLiteral == nil || !hasSingleIndexSignatureMember(typeLiteral.Members) {
 				return
 			}
-
-			if node.Kind != ast.KindTypeReference {
-				return
+			indexSignature := typeLiteral.Members.Nodes[0]
+			keyType, valueType, ok := indexSignatureTypes(indexSignature)
+			if ok {
+				reportTypeLiteralAsRecord(&ctx, &circularReferences, node, indexSignature, keyType, valueType)
 			}
-
-			typeRef := node.AsTypeReferenceNode()
-			if typeRef == nil {
-				return
-			}
-
-			// Check if this is a Record type reference
-			if !isRecordType(typeRef) {
-				return
-			}
-
-			ctx.ReportNode(node, rule.RuleMessage{
-				Id:          "preferIndexSignature",
-				Description: "An index signature is preferred over a record.",
-			})
 		},
 	}
 }
 
-// isRecordType checks if a type reference is a Record type
-func isRecordType(typeRef *ast.TypeReferenceNode) bool {
-	if typeRef.TypeName == nil {
-		return false
-	}
-
-	if typeRef.TypeName.Kind != ast.KindIdentifier {
-		return false
-	}
-
-	ident := typeRef.TypeName.AsIdentifier()
-	if ident == nil {
-		return false
-	}
-
-	// Check if it's "Record"
-	if ident.Text != "Record" {
-		return false
-	}
-
-	// Must have type arguments
-	if typeRef.TypeArguments == nil || len(typeRef.TypeArguments.Nodes) < 2 {
-		return false
-	}
-
-	// First type argument should be string, number, or symbol
-	firstArg := typeRef.TypeArguments.Nodes[0]
-	return isValidRecordKeyType(firstArg)
+func hasSingleIndexSignatureMember(members *ast.NodeList) bool {
+	return members != nil && len(members.Nodes) == 1 && members.Nodes[0] != nil &&
+		members.Nodes[0].Kind == ast.KindIndexSignature
 }
 
-// isValidRecordKeyType checks if a type is a valid key type for Record
-func isValidRecordKeyType(typeNode *ast.Node) bool {
-	switch typeNode.Kind {
-	case ast.KindStringKeyword, ast.KindNumberKeyword, ast.KindSymbolKeyword:
-		return true
-	case ast.KindLiteralType:
-		return true
-	case ast.KindUnionType:
-		unionType := typeNode.AsUnionTypeNode()
-		if unionType == nil || unionType.Types == nil {
-			return false
+func reportInterfaceAsRecord(
+	ctx *rule.RuleContext,
+	circularReferences *circularReferenceAnalyzer,
+	node *ast.Node,
+	declaration *ast.InterfaceDeclaration,
+	indexSignature *ast.Node,
+	keyType *ast.Node,
+	valueType *ast.Node,
+) {
+	if circularReferences.referencesDeclaration(node, valueType) {
+		return
+	}
+
+	reportRange := interfaceDeclarationRange(ctx.SourceFile, node)
+	safeFix := (declaration.HeritageClauses == nil || len(declaration.HeritageClauses.Nodes) == 0) &&
+		!ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault)
+	reportIndexSignatureAsRecord(
+		ctx,
+		reportRange,
+		indexSignature,
+		keyType,
+		valueType,
+		declaration,
+		";",
+		safeFix,
+	)
+}
+
+func reportTypeLiteralAsRecord(
+	ctx *rule.RuleContext,
+	circularReferences *circularReferenceAnalyzer,
+	node *ast.Node,
+	indexSignature *ast.Node,
+	keyType *ast.Node,
+	valueType *ast.Node,
+) {
+	if canDeeplyReferenceType(valueType.Kind) {
+		if parentDeclaration := findParentTypeAlias(node); parentDeclaration != nil &&
+			circularReferences.referencesDeclaration(parentDeclaration, valueType) {
+			return
 		}
-		// All union members should be valid key types
-		for _, t := range unionType.Types.Nodes {
-			if !isValidRecordKeyType(t) {
-				return false
+	}
+
+	reportIndexSignatureAsRecord(
+		ctx,
+		bracedTypeRange(ctx.SourceFile, node),
+		indexSignature,
+		keyType,
+		valueType,
+		nil,
+		"",
+		true,
+	)
+}
+
+func indexSignatureTypes(indexSignature *ast.Node) (
+	keyType *ast.Node,
+	valueType *ast.Node,
+	ok bool,
+) {
+	declaration := indexSignature.AsIndexSignatureDeclaration()
+	if declaration == nil || declaration.Parameters == nil || len(declaration.Parameters.Nodes) == 0 || declaration.Type == nil {
+		return nil, nil, false
+	}
+	parameter := declaration.Parameters.Nodes[0].AsParameterDeclaration()
+	if parameter == nil || parameter.DotDotDotToken != nil || parameter.Name() == nil ||
+		parameter.Name().Kind != ast.KindIdentifier || parameter.Type == nil {
+		return nil, nil, false
+	}
+	return parameter.Type, declaration.Type, true
+}
+
+func reportIndexSignatureAsRecord(
+	ctx *rule.RuleContext,
+	reportRange core.TextRange,
+	indexSignature *ast.Node,
+	keyType *ast.Node,
+	valueType *ast.Node,
+	interfaceDeclaration *ast.InterfaceDeclaration,
+	postfix string,
+	safeFix bool,
+) {
+	if !safeFix {
+		ctx.ReportRange(reportRange, preferRecordMessage)
+		return
+	}
+
+	keyType = skipParenthesizedType(keyType)
+	valueType = skipParenthesizedType(valueType)
+	ctx.ReportRangeWithDeferredFixesAndSuggestions(
+		reportRange,
+		preferRecordMessage,
+		func() []rule.RuleFix {
+			if hasUnpreservedComments(ctx, reportRange, keyType, valueType) {
+				return nil
 			}
-		}
-		return true
-	}
-	return false
+			return []rule.RuleFix{rule.RuleFixReplaceRange(
+				reportRange,
+				indexSignatureRecordReplacement(ctx, interfaceDeclaration, indexSignature, keyType, valueType, postfix),
+			)}
+		},
+		func() []rule.RuleSuggestion {
+			if !hasUnpreservedComments(ctx, reportRange, keyType, valueType) {
+				return nil
+			}
+			return []rule.RuleSuggestion{{
+				Message: preferRecordSuggestionMessage,
+				FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(
+					reportRange,
+					indexSignatureRecordReplacement(ctx, interfaceDeclaration, indexSignature, keyType, valueType, postfix),
+				)},
+			}}
+		},
+	)
 }
 
-// canConvertMappedTypeToRecord checks if a mapped type can be converted to Record
-func canConvertMappedTypeToRecord(mappedType *ast.MappedTypeNode) bool {
-	// Check if the type parameter constraint is string, number, or symbol
-	if mappedType.TypeParameter == nil {
-		return false
+func indexSignatureRecordReplacement(
+	ctx *rule.RuleContext,
+	interfaceDeclaration *ast.InterfaceDeclaration,
+	indexSignature *ast.Node,
+	keyType *ast.Node,
+	valueType *ast.Node,
+	postfix string,
+) string {
+	key := utils.TrimmedNodeText(ctx.SourceFile, keyType)
+	value := utils.TrimmedNodeText(ctx.SourceFile, valueType)
+	record := "Record<" + key + ", " + value + ">"
+	if ast.HasSyntacticModifier(indexSignature, ast.ModifierFlagsReadonly) {
+		record = "Readonly<" + record + ">"
+	}
+	if interfaceDeclaration == nil {
+		return record + postfix
+	}
+	return interfaceTypeAliasPrefix(ctx.SourceFile, interfaceDeclaration) + record + postfix
+}
+
+func interfaceTypeAliasPrefix(sourceFile *ast.SourceFile, declaration *ast.InterfaceDeclaration) string {
+	var text strings.Builder
+	text.WriteString("type ")
+	text.WriteString(declaration.Name().Text())
+	if declaration.TypeParameters != nil && len(declaration.TypeParameters.Nodes) > 0 {
+		text.WriteByte('<')
+		for index, typeParameter := range declaration.TypeParameters.Nodes {
+			if index > 0 {
+				text.WriteString(", ")
+			}
+			text.WriteString(utils.TrimmedNodeText(sourceFile, typeParameter))
+		}
+		text.WriteByte('>')
+	}
+	text.WriteString(" = ")
+	return text.String()
+}
+
+func interfaceDeclarationRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
+	modifiers := node.Modifiers()
+	if modifiers == nil || len(modifiers.Nodes) == 0 {
+		return nodeRange
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier.Kind != ast.KindExportKeyword && modifier.Kind != ast.KindDefaultKeyword {
+			return core.NewTextRange(utils.TrimNodeTextRange(sourceFile, modifier).Pos(), node.End())
+		}
+	}
+	if !ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) {
+		return nodeRange
 	}
 
-	// TypeParameter is already a *Node, check if it's a valid type parameter
-	if mappedType.TypeParameter.Kind != ast.KindTypeParameter {
-		return false
+	s := scanner.GetScannerForSourceFile(sourceFile, nodeRange.Pos())
+	for s.TokenStart() < node.End() {
+		if s.Token() == ast.KindInterfaceKeyword {
+			return core.NewTextRange(s.TokenStart(), node.End())
+		}
+		s.Scan()
 	}
+	return nodeRange
+}
 
-	typeParam := mappedType.TypeParameter.AsTypeParameterDeclaration()
-	if typeParam == nil {
-		return false
+func bracedTypeRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	sourceText := sourceFile.Text()
+	start := node.Pos()
+	end := node.End()
+	if start >= 0 && end <= len(sourceText) && start < end {
+		if sourceText[start] == '{' {
+			return core.NewTextRange(start, end)
+		}
+		if start+1 < end && isASCIIWhitespace(sourceText[start]) && sourceText[start+1] == '{' {
+			return core.NewTextRange(start+1, end)
+		}
+		for start < end && isASCIIWhitespace(sourceText[start]) {
+			start++
+		}
+		if start < end && sourceText[start] == '{' {
+			return core.NewTextRange(start, end)
+		}
 	}
+	return utils.TrimNodeTextRange(sourceFile, node)
+}
 
-	// Check constraint
-	if typeParam.Constraint == nil {
-		return false
-	}
-
-	constraint := typeParam.Constraint
-	switch constraint.Kind {
-	case ast.KindStringKeyword, ast.KindNumberKeyword, ast.KindSymbolKeyword:
-		// Valid key types
+func isASCIIWhitespace(character byte) bool {
+	switch character {
+	case ' ', '\t', '\n', '\r', '\f', '\v':
+		return true
 	default:
 		return false
 	}
+}
 
-	// Check if the mapped type references the type parameter in a way that prevents conversion
-	if mappedType.Type != nil && isDeeplyReferencingTypeParam(typeParam.Name(), mappedType.Type) {
-		return false
+func reportMappedTypeAsRecord(
+	ctx *rule.RuleContext,
+	circularReferences *circularReferenceAnalyzer,
+	node *ast.Node,
+	mappedType *ast.MappedTypeNode,
+	typeParameter *ast.TypeParameterDeclaration,
+	constraint *ast.Node,
+) {
+	if mappedTypeReferencesKey(ctx, mappedType, typeParameter) {
+		return
+	}
+	if node.Parent != nil {
+		circularStart := node.Parent
+		if circularStart.Kind == ast.KindTypeAliasDeclaration {
+			circularStart = mappedType.Type
+		}
+		if circularStart != nil && canDeeplyReferenceType(circularStart.Kind) {
+			if parentDeclaration := findParentTypeAlias(node); parentDeclaration != nil &&
+				circularReferences.referencesDeclaration(parentDeclaration, circularStart) {
+				return
+			}
+		}
 	}
 
+	reportRange := bracedTypeRange(ctx.SourceFile, node)
+	if mappedType.ReadonlyToken != nil && mappedType.ReadonlyToken.Kind == ast.KindMinusToken {
+		ctx.ReportRange(reportRange, preferRecordMessage)
+		return
+	}
+
+	constraint = skipParenthesizedType(constraint)
+	valueType := skipParenthesizedType(mappedType.Type)
+	ctx.ReportRangeWithDeferredFixesAndSuggestions(
+		reportRange,
+		preferRecordMessage,
+		func() []rule.RuleFix {
+			if hasUnpreservedComments(ctx, reportRange, constraint, valueType) {
+				return nil
+			}
+			return []rule.RuleFix{rule.RuleFixReplaceRange(
+				reportRange,
+				mappedTypeRecordReplacement(ctx, mappedType, constraint, valueType),
+			)}
+		},
+		func() []rule.RuleSuggestion {
+			if !hasUnpreservedComments(ctx, reportRange, constraint, valueType) {
+				return nil
+			}
+			return []rule.RuleSuggestion{{
+				Message: preferRecordSuggestionMessage,
+				FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(
+					reportRange,
+					mappedTypeRecordReplacement(ctx, mappedType, constraint, valueType),
+				)},
+			}}
+		},
+	)
+}
+
+func mappedTypeRecordReplacement(
+	ctx *rule.RuleContext,
+	mappedType *ast.MappedTypeNode,
+	constraint *ast.Node,
+	valueType *ast.Node,
+) string {
+	key := utils.TrimmedNodeText(ctx.SourceFile, constraint)
+	value := "any"
+	if valueType != nil {
+		value = utils.TrimmedNodeText(ctx.SourceFile, valueType)
+	}
+	record := "Record<" + key + ", " + value + ">"
+	if mappedType.QuestionToken != nil {
+		switch mappedType.QuestionToken.Kind {
+		case ast.KindQuestionToken, ast.KindPlusToken:
+			record = "Partial<" + record + ">"
+		case ast.KindMinusToken:
+			record = "Required<" + record + ">"
+		}
+	}
+	if mappedType.ReadonlyToken != nil {
+		switch mappedType.ReadonlyToken.Kind {
+		case ast.KindReadonlyKeyword, ast.KindPlusToken:
+			record = "Readonly<" + record + ">"
+		}
+	}
+	return record
+}
+
+func mappedTypeReferencesKey(ctx *rule.RuleContext, mappedType *ast.MappedTypeNode, typeParameter *ast.TypeParameterDeclaration) bool {
+	target := mappedType.TypeParameter.Symbol()
+	name := typeParameter.Name().Text()
+	return subtreeReferencesSymbol(ctx, mappedType.NameType, target, name) ||
+		subtreeReferencesSymbol(ctx, mappedType.Type, target, name)
+}
+
+func subtreeReferencesSymbol(ctx *rule.RuleContext, node *ast.Node, target *ast.Symbol, fallbackName string) bool {
+	if node == nil || isIdentifierFreeType(node.Kind) {
+		return false
+	}
+	sourceText := ctx.SourceFile.Text()
+	if node.Pos() >= 0 && node.End() <= len(sourceText) && node.Pos() <= node.End() {
+		nodeText := sourceText[node.Pos():node.End()]
+		if !strings.Contains(nodeText, "\\") && !strings.Contains(nodeText, fallbackName) {
+			return false
+		}
+	}
+	return subtreeReferencesSymbolWorker(ctx.Refs, node, target, fallbackName)
+}
+
+func isIdentifierFreeType(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindAnyKeyword,
+		ast.KindBigIntKeyword,
+		ast.KindBooleanKeyword,
+		ast.KindNeverKeyword,
+		ast.KindNumberKeyword,
+		ast.KindObjectKeyword,
+		ast.KindStringKeyword,
+		ast.KindSymbolKeyword,
+		ast.KindUndefinedKeyword,
+		ast.KindUnknownKeyword,
+		ast.KindVoidKeyword:
+		return true
+	default:
+		return false
+	}
+}
+
+func subtreeReferencesSymbolWorker(refs *rule.RefStore, node *ast.Node, target *ast.Symbol, fallbackName string) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == ast.KindIdentifier && node.Text() == fallbackName {
+		if refs == nil {
+			return true
+		}
+		if symbol := refs.ResolveInFile(node); symbol != nil && symbol == target {
+			return true
+		}
+	}
+	found := false
+	node.ForEachChild(func(child *ast.Node) bool {
+		if subtreeReferencesSymbolWorker(refs, child, target, fallbackName) {
+			found = true
+			return true
+		}
+		return false
+	})
+	return found
+}
+
+func reportRecordAsIndexSignature(ctx *rule.RuleContext, node *ast.Node) {
+	typeReference := node.AsTypeReferenceNode()
+	if typeReference == nil || typeReference.TypeName == nil || typeReference.TypeName.Kind != ast.KindIdentifier ||
+		typeReference.TypeName.Text() != "Record" || typeReference.TypeArguments == nil || len(typeReference.TypeArguments.Nodes) != 2 {
+		return
+	}
+
+	keyType := skipParenthesizedType(typeReference.TypeArguments.Nodes[0])
+	valueType := skipParenthesizedType(typeReference.TypeArguments.Nodes[1])
+	reportRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+	ctx.ReportRangeWithDeferredFixesAndSuggestions(
+		reportRange,
+		preferIndexSignatureMessage,
+		func() []rule.RuleFix {
+			if !isAutofixableRecordKey(keyType.Kind) || hasUnpreservedComments(ctx, reportRange, keyType, valueType) {
+				return nil
+			}
+			return []rule.RuleFix{rule.RuleFixReplaceRange(
+				reportRange,
+				recordIndexSignatureReplacement(ctx, keyType, valueType),
+			)}
+		},
+		func() []rule.RuleSuggestion {
+			if isAutofixableRecordKey(keyType.Kind) && !hasUnpreservedComments(ctx, reportRange, keyType, valueType) {
+				return nil
+			}
+			return []rule.RuleSuggestion{{
+				Message: preferIndexSignatureSuggestionMessage,
+				FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(
+					reportRange,
+					recordIndexSignatureReplacement(ctx, keyType, valueType),
+				)},
+			}}
+		},
+	)
+}
+
+func isAutofixableRecordKey(kind ast.Kind) bool {
+	return kind == ast.KindStringKeyword || kind == ast.KindNumberKeyword || kind == ast.KindSymbolKeyword
+}
+
+func recordIndexSignatureReplacement(ctx *rule.RuleContext, keyType *ast.Node, valueType *ast.Node) string {
+	key := utils.TrimmedNodeText(ctx.SourceFile, keyType)
+	value := utils.TrimmedNodeText(ctx.SourceFile, valueType)
+	return "{ [key: " + key + "]: " + value + " }"
+}
+
+func hasUnpreservedComments(ctx *rule.RuleContext, nodeRange core.TextRange, preserved ...*ast.Node) bool {
+	if ctx.Comments == nil {
+		return false
+	}
+	for _, comment := range ctx.Comments.All() {
+		if comment.End() <= nodeRange.Pos() {
+			continue
+		}
+		if comment.Pos() >= nodeRange.End() {
+			break
+		}
+		if comment.Pos() < nodeRange.Pos() || comment.End() > nodeRange.End() {
+			continue
+		}
+		isPreserved := false
+		for _, target := range preserved {
+			if target == nil {
+				continue
+			}
+			targetRange := utils.TrimNodeTextRange(ctx.SourceFile, target)
+			if comment.Pos() >= targetRange.Pos() && comment.End() <= targetRange.End() {
+				isPreserved = true
+				break
+			}
+		}
+		if !isPreserved {
+			return true
+		}
+	}
+	return false
+}
+
+func skipParenthesizedType(node *ast.Node) *ast.Node {
+	for node != nil && node.Kind == ast.KindParenthesizedType {
+		parenthesizedType := node.AsParenthesizedTypeNode()
+		if parenthesizedType == nil || parenthesizedType.Type == nil {
+			break
+		}
+		node = parenthesizedType.Type
+	}
+	return node
+}
+
+func findParentTypeAlias(node *ast.Node) *ast.Node {
+	for current := node; current != nil && current.Parent != nil; {
+		parent := current.Parent
+		if parent.Kind == ast.KindTypeAliasDeclaration {
+			return parent
+		}
+		if isTypeAnnotationBoundary(parent) {
+			return nil
+		}
+		current = parent
+	}
+	return nil
+}
+
+func isTypeAnnotationBoundary(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindCallSignature,
+		ast.KindConstructSignature,
+		ast.KindConstructorType,
+		ast.KindFunctionType,
+		ast.KindIndexSignature,
+		ast.KindMethodSignature,
+		ast.KindParameter,
+		ast.KindPropertySignature:
+		return true
+	default:
+		return false
+	}
+}
+
+type circularReferenceAnalyzer struct {
+	refs *rule.RefStore
+}
+
+func (a *circularReferenceAnalyzer) referencesDeclaration(targetDeclaration *ast.Node, start *ast.Node) bool {
+	if start == nil || !canDeeplyReferenceType(start.Kind) || targetDeclaration == nil || targetDeclaration.Name() == nil ||
+		targetDeclaration.Name().Kind != ast.KindIdentifier {
+		return false
+	}
+	checker := circularReferenceChecker{
+		refs:              a.refs,
+		targetDeclaration: targetDeclaration,
+		targetSymbol:      circularTargetSymbol(targetDeclaration),
+		targetName:        targetDeclaration.Name().Text(),
+	}
+	return checker.check(start)
+}
+
+func circularTargetSymbol(declaration *ast.Node) *ast.Symbol {
+	var typeParameters *ast.NodeList
+	switch declaration.Kind {
+	case ast.KindTypeAliasDeclaration:
+		if typed := declaration.AsTypeAliasDeclaration(); typed != nil {
+			typeParameters = typed.TypeParameters
+		}
+	case ast.KindInterfaceDeclaration:
+		if typed := declaration.AsInterfaceDeclaration(); typed != nil {
+			typeParameters = typed.TypeParameters
+		}
+	}
+	if typeParameters != nil {
+		declarationName := declaration.Name().Text()
+		for _, parameter := range typeParameters.Nodes {
+			if name := parameter.Name(); name != nil && name.Kind == ast.KindIdentifier && name.Text() == declarationName {
+				return parameter.Symbol()
+			}
+		}
+	}
+	return declaration.Symbol()
+}
+
+func canDeeplyReferenceType(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindIdentifier,
+		ast.KindTypeLiteral,
+		ast.KindTypeAliasDeclaration,
+		ast.KindIndexedAccessType,
+		ast.KindMappedType,
+		ast.KindConditionalType,
+		ast.KindUnionType,
+		ast.KindIntersectionType,
+		ast.KindInterfaceDeclaration,
+		ast.KindIndexSignature,
+		ast.KindTypeReference,
+		ast.KindParenthesizedType:
+		return true
+	default:
+		return false
+	}
+}
+
+type circularReferenceChecker struct {
+	refs              *rule.RefStore
+	targetDeclaration *ast.Node
+	targetSymbol      *ast.Symbol
+	targetName        string
+	visitedSmall      [8]*ast.Node
+	visitedCount      int
+	visitedLarge      map[*ast.Node]struct{}
+}
+
+func (c *circularReferenceChecker) check(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return c.checkIdentifier(node)
+	case ast.KindTypeLiteral:
+		typeLiteral := node.AsTypeLiteralNode()
+		return typeLiteral != nil && c.checkNodes(typeLiteral.Members)
+	case ast.KindTypeAliasDeclaration:
+		declaration := node.AsTypeAliasDeclaration()
+		return declaration != nil && c.check(declaration.Type)
+	case ast.KindIndexedAccessType:
+		indexedAccessType := node.AsIndexedAccessTypeNode()
+		return indexedAccessType != nil && (c.check(indexedAccessType.IndexType) || c.check(indexedAccessType.ObjectType))
+	case ast.KindMappedType:
+		mappedType := node.AsMappedTypeNode()
+		return mappedType != nil && c.check(mappedType.Type)
+	case ast.KindConditionalType:
+		conditionalType := node.AsConditionalTypeNode()
+		return conditionalType != nil &&
+			(c.check(conditionalType.CheckType) ||
+				c.check(conditionalType.ExtendsType) ||
+				c.check(conditionalType.FalseType) ||
+				c.check(conditionalType.TrueType))
+	case ast.KindUnionType:
+		unionType := node.AsUnionTypeNode()
+		return unionType != nil && c.checkNodes(unionType.Types)
+	case ast.KindIntersectionType:
+		intersectionType := node.AsIntersectionTypeNode()
+		return intersectionType != nil && c.checkNodes(intersectionType.Types)
+	case ast.KindInterfaceDeclaration:
+		declaration := node.AsInterfaceDeclaration()
+		return declaration != nil && c.checkNodes(declaration.Members)
+	case ast.KindIndexSignature:
+		indexSignature := node.AsIndexSignatureDeclaration()
+		return indexSignature != nil && c.check(indexSignature.Type)
+	case ast.KindTypeReference:
+		typeReference := node.AsTypeReferenceNode()
+		return typeReference != nil &&
+			(c.check(typeReference.TypeName) || c.checkNodes(typeReference.TypeArguments))
+	case ast.KindParenthesizedType:
+		parenthesizedType := node.AsParenthesizedTypeNode()
+		return parenthesizedType != nil && c.check(parenthesizedType.Type)
+	default:
+		return false
+	}
+}
+
+func (c *circularReferenceChecker) checkNodes(nodes *ast.NodeList) bool {
+	if nodes == nil {
+		return false
+	}
+	for _, node := range nodes.Nodes {
+		if c.check(node) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *circularReferenceChecker) checkIdentifier(identifier *ast.Node) bool {
+	var symbol *ast.Symbol
+	if c.refs != nil {
+		symbol = c.refs.ResolveInFile(identifier)
+	}
+	if symbol == nil {
+		return identifier.Text() == c.targetName
+	}
+	if symbol == c.targetSymbol || symbolDeclaresNode(symbol, c.targetDeclaration) {
+		return true
+	}
+
+	for _, declaration := range symbol.Declarations {
+		if declaration.Kind != ast.KindTypeAliasDeclaration && declaration.Kind != ast.KindInterfaceDeclaration {
+			continue
+		}
+		if !c.markDeclarationVisited(declaration) {
+			continue
+		}
+		if c.check(declaration) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *circularReferenceChecker) markDeclarationVisited(declaration *ast.Node) bool {
+	for index := 0; index < c.visitedCount && index < len(c.visitedSmall); index++ {
+		if c.visitedSmall[index] == declaration {
+			return false
+		}
+	}
+	if c.visitedLarge != nil {
+		if _, seen := c.visitedLarge[declaration]; seen {
+			return false
+		}
+		c.visitedLarge[declaration] = struct{}{}
+		c.visitedCount++
+		return true
+	}
+	if c.visitedCount < len(c.visitedSmall) {
+		c.visitedSmall[c.visitedCount] = declaration
+		c.visitedCount++
+		return true
+	}
+
+	c.visitedLarge = make(map[*ast.Node]struct{}, len(c.visitedSmall)*2)
+	for _, visited := range c.visitedSmall {
+		c.visitedLarge[visited] = struct{}{}
+	}
+	c.visitedLarge[declaration] = struct{}{}
+	c.visitedCount++
 	return true
 }
 
-// isDeeplyReferencingType checks if a type deeply references another type (circular reference)
-func isDeeplyReferencingType(name *ast.Node, typeNode *ast.Node) bool {
-	if name == nil || typeNode == nil {
+func symbolDeclaresNode(symbol *ast.Symbol, declaration *ast.Node) bool {
+	if symbol == nil || declaration == nil {
 		return false
 	}
-
-	nameIdent := name.AsIdentifier()
-	if nameIdent == nil {
-		return false
-	}
-
-	return checkTypeReference(nameIdent.Text, typeNode)
-}
-
-// isDeeplyReferencingTypeParam checks if a type references a type parameter
-func isDeeplyReferencingTypeParam(name *ast.Node, typeNode *ast.Node) bool {
-	if name == nil || typeNode == nil {
-		return false
-	}
-
-	nameIdent := name.AsIdentifier()
-	if nameIdent == nil {
-		return false
-	}
-
-	return checkTypeReference(nameIdent.Text, typeNode)
-}
-
-// checkTypeReference recursively checks if a type references a given identifier
-func checkTypeReference(targetName string, typeNode *ast.Node) bool {
-	if typeNode == nil {
-		return false
-	}
-
-	switch typeNode.Kind {
-	case ast.KindTypeReference:
-		typeRef := typeNode.AsTypeReferenceNode()
-		if typeRef != nil && typeRef.TypeName != nil {
-			if typeRef.TypeName.Kind == ast.KindIdentifier {
-				ident := typeRef.TypeName.AsIdentifier()
-				if ident != nil && ident.Text == targetName {
-					return true
-				}
-			}
-			// Check type arguments
-			if typeRef.TypeArguments != nil {
-				for _, arg := range typeRef.TypeArguments.Nodes {
-					if checkTypeReference(targetName, arg) {
-						return true
-					}
-				}
-			}
-		}
-
-	case ast.KindArrayType:
-		arrayType := typeNode.AsArrayTypeNode()
-		if arrayType != nil && arrayType.ElementType != nil {
-			return checkTypeReference(targetName, arrayType.ElementType)
-		}
-
-	case ast.KindUnionType:
-		unionType := typeNode.AsUnionTypeNode()
-		if unionType != nil && unionType.Types != nil {
-			for _, t := range unionType.Types.Nodes {
-				if checkTypeReference(targetName, t) {
-					return true
-				}
-			}
-		}
-
-	case ast.KindIntersectionType:
-		intersectionType := typeNode.AsIntersectionTypeNode()
-		if intersectionType != nil && intersectionType.Types != nil {
-			for _, t := range intersectionType.Types.Nodes {
-				if checkTypeReference(targetName, t) {
-					return true
-				}
-			}
-		}
-
-	case ast.KindParenthesizedType:
-		parenType := typeNode.AsParenthesizedTypeNode()
-		if parenType != nil && parenType.Type != nil {
-			return checkTypeReference(targetName, parenType.Type)
-		}
-
-	case ast.KindTupleType:
-		tupleType := typeNode.AsTupleTypeNode()
-		if tupleType != nil && tupleType.Elements != nil {
-			for _, elem := range tupleType.Elements.Nodes {
-				if checkTypeReference(targetName, elem) {
-					return true
-				}
-			}
-		}
-
-	case ast.KindTypeLiteral:
-		typeLiteral := typeNode.AsTypeLiteralNode()
-		if typeLiteral != nil && typeLiteral.Members != nil {
-			for _, member := range typeLiteral.Members.Nodes {
-				if checkMemberReference(targetName, member) {
-					return true
-				}
-			}
-		}
-
-	case ast.KindFunctionType, ast.KindConstructorType:
-		// For function/constructor types, check parameters and return type
-		if typeNode.Kind == ast.KindFunctionType {
-			funcType := typeNode.AsFunctionTypeNode()
-			if funcType != nil {
-				if funcType.Type != nil && checkTypeReference(targetName, funcType.Type) {
-					return true
-				}
-				if funcType.Parameters != nil {
-					for _, param := range funcType.Parameters.Nodes {
-						paramDecl := param.AsParameterDeclaration()
-						if paramDecl != nil && paramDecl.Type != nil {
-							if checkTypeReference(targetName, paramDecl.Type) {
-								return true
-							}
-						}
-					}
-				}
-			}
+	for _, candidate := range symbol.Declarations {
+		if candidate == declaration {
+			return true
 		}
 	}
-
-	return false
-}
-
-// checkMemberReference checks if a type member references a given identifier
-func checkMemberReference(targetName string, member *ast.Node) bool {
-	if member == nil {
-		return false
-	}
-
-	switch member.Kind {
-	case ast.KindPropertySignature:
-		propSig := member.AsPropertySignatureDeclaration()
-		if propSig != nil && propSig.Type != nil {
-			return checkTypeReference(targetName, propSig.Type)
-		}
-
-	case ast.KindMethodSignature:
-		methodSig := member.AsMethodSignatureDeclaration()
-		if methodSig != nil && methodSig.Type != nil {
-			return checkTypeReference(targetName, methodSig.Type)
-		}
-
-	case ast.KindIndexSignature:
-		indexSig := member.AsIndexSignatureDeclaration()
-		if indexSig != nil && indexSig.Type != nil {
-			return checkTypeReference(targetName, indexSig.Type)
-		}
-	}
-
-	return false
-}
-
-// isCircularTypeReference checks if a type literal in a type alias has a circular reference
-func isCircularTypeReference(typeLiteralNode *ast.Node, valueType *ast.Node) bool {
-	if typeLiteralNode == nil || valueType == nil {
-		return false
-	}
-
-	// Walk up the AST to find the type alias declaration
-	parent := typeLiteralNode.Parent
-	for parent != nil {
-		if parent.Kind == ast.KindTypeAliasDeclaration {
-			typeAlias := parent.AsTypeAliasDeclaration()
-			if typeAlias != nil && typeAlias.Name() != nil {
-				// Check if the value type references the type alias name
-				return isDeeplyReferencingType(typeAlias.Name(), valueType)
-			}
-			break
-		}
-		parent = parent.Parent
-	}
-
 	return false
 }

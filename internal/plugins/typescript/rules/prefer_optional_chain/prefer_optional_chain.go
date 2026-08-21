@@ -1,22 +1,64 @@
 package prefer_optional_chain
 
 import (
-	"encoding/json"
+	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed prefer_optional_chain.schema.json
+var schemaJSON []byte
+
 type PreferOptionalChainOptions struct {
-	AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing *bool `json:"allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing"`
-	CheckAny                                                           *bool `json:"checkAny"`
-	CheckUnknown                                                       *bool `json:"checkUnknown"`
-	CheckString                                                        *bool `json:"checkString"`
-	CheckNumber                                                        *bool `json:"checkNumber"`
-	CheckBoolean                                                       *bool `json:"checkBoolean"`
-	CheckBigInt                                                        *bool `json:"checkBigInt"`
-	RequireNullish                                                     *bool `json:"requireNullish"`
+	AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing bool
+	CheckAny                                                           bool
+	CheckUnknown                                                       bool
+	CheckString                                                        bool
+	CheckNumber                                                        bool
+	CheckBoolean                                                       bool
+	CheckBigInt                                                        bool
+	RequireNullish                                                     bool
+}
+
+func parseOptions(options []any) PreferOptionalChainOptions {
+	opts := PreferOptionalChainOptions{
+		CheckAny:     true,
+		CheckUnknown: true,
+		CheckString:  true,
+		CheckNumber:  true,
+		CheckBoolean: true,
+		CheckBigInt:  true,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["allowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing"].(bool); ok {
+		opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing = value
+	}
+	if value, ok := optsMap["checkAny"].(bool); ok {
+		opts.CheckAny = value
+	}
+	if value, ok := optsMap["checkUnknown"].(bool); ok {
+		opts.CheckUnknown = value
+	}
+	if value, ok := optsMap["checkString"].(bool); ok {
+		opts.CheckString = value
+	}
+	if value, ok := optsMap["checkNumber"].(bool); ok {
+		opts.CheckNumber = value
+	}
+	if value, ok := optsMap["checkBoolean"].(bool); ok {
+		opts.CheckBoolean = value
+	}
+	if value, ok := optsMap["checkBigInt"].(bool); ok {
+		opts.CheckBigInt = value
+	}
+	if value, ok := optsMap["requireNullish"].(bool); ok {
+		opts.RequireNullish = value
+	}
+	return opts
 }
 
 func buildPreferOptionalChainMessage() rule.RuleMessage {
@@ -34,49 +76,11 @@ func buildOptionalChainSuggestMessage() rule.RuleMessage {
 }
 
 var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-optional-chain",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(PreferOptionalChainOptions)
-		if !ok {
-			opts = PreferOptionalChainOptions{}
-			if options != nil {
-				// For IPC mode, options come as []interface{} or map[string]interface{}
-				raw := options
-				if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-					raw = optArray[0]
-				}
-				if jsonBytes, err := json.Marshal(raw); err == nil {
-					_ = json.Unmarshal(jsonBytes, &opts)
-				}
-			}
-		}
-
-		// Set defaults
-		if opts.CheckAny == nil {
-			opts.CheckAny = utils.Ref(true)
-		}
-		if opts.CheckUnknown == nil {
-			opts.CheckUnknown = utils.Ref(true)
-		}
-		if opts.CheckString == nil {
-			opts.CheckString = utils.Ref(true)
-		}
-		if opts.CheckNumber == nil {
-			opts.CheckNumber = utils.Ref(true)
-		}
-		if opts.CheckBoolean == nil {
-			opts.CheckBoolean = utils.Ref(true)
-		}
-		if opts.CheckBigInt == nil {
-			opts.CheckBigInt = utils.Ref(true)
-		}
-		if opts.RequireNullish == nil {
-			opts.RequireNullish = utils.Ref(false)
-		}
-		if opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing == nil {
-			opts.AllowPotentiallyUnsafeFixesThatModifyTheReturnTypeIKnowWhatImDoing = utils.Ref(false)
-		}
+	Name:             "prefer-optional-chain",
+	RequiresTypeInfo: true,
+	Schema:           rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		analyzer := NewOperandAnalyzer(ctx, opts)
 		chainAnalyzer := NewChainAnalyzer(ctx, opts)
@@ -127,10 +131,3 @@ var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
 		}
 	},
 })
-
-func derefBoolDefault(b *bool, defaultVal bool) bool {
-	if b == nil {
-		return defaultVal
-	}
-	return *b
-}

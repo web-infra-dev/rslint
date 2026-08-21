@@ -1,10 +1,15 @@
 package no_this_alias
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_this_alias.schema.json
+var schemaJSON []byte
 
 type NoThisAliasOptions struct {
 	AllowDestructuring bool     `json:"allowDestructuring"`
@@ -62,17 +67,7 @@ func parseOptions(options []any) NoThisAliasOptions {
 		return opts
 	}
 
-	// A real config supplies context.options directly. Retain the old nested
-	// array compatibility for direct callers that still pass [[{...}]].
-	option := options[0]
-	if nested, ok := option.([]interface{}); ok {
-		if len(nested) == 0 {
-			return opts
-		}
-		option = nested[0]
-	}
-
-	optsMap, ok := option.(map[string]interface{})
+	optsMap, ok := options[0].(map[string]interface{})
 	if !ok {
 		return opts
 	}
@@ -132,7 +127,8 @@ func configuredThisListener(ctx *rule.RuleContext, opts NoThisAliasOptions) func
 }
 
 var NoThisAliasRule = rule.CreateRule(rule.Rule{
-	Name: "no-this-alias",
+	Name:   "no-this-alias",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if len(options) == 0 {
 			return rule.RuleListeners{ast.KindThisKeyword: defaultThisListener(&ctx)}

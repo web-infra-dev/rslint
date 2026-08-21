@@ -1420,7 +1420,7 @@ function b() { while (1) { while (2) { while (3) {} } } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "complex",
-						Message:   "Private method '#x' has a complexity of 2. Maximum allowed is 1.",
+						Message:   "Private method #x has a complexity of 2. Maximum allowed is 1.",
 					},
 				},
 			},
@@ -2061,7 +2061,7 @@ function c() { if (x) {} if (y) {} }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "complex",
-						Message:   "Static private method '#x' has a complexity of 2. Maximum allowed is 1.",
+						Message:   "Static private method #x has a complexity of 2. Maximum allowed is 1.",
 					},
 				},
 			},
@@ -2240,7 +2240,7 @@ function c() { if (x) {} if (y) {} }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "complex",
-						Message:   "Private getter '#x' has a complexity of 2. Maximum allowed is 1.",
+						Message:   "Private getter #x has a complexity of 2. Maximum allowed is 1.",
 					},
 				},
 			},

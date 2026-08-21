@@ -47,4 +47,5 @@ if (!a >= b) {
 
 ## Original Documentation
 
-- [ESLint no-unsafe-negation](https://eslint.org/docs/latest/rules/no-unsafe-negation)
+- [ESLint: no-unsafe-negation](https://eslint.org/docs/latest/rules/no-unsafe-negation)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unsafe-negation.js)

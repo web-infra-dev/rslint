@@ -48,4 +48,5 @@ class Test {
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/explicit-function-return-type
+- [typescript-eslint: explicit-function-return-type](https://typescript-eslint.io/rules/explicit-function-return-type)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/explicit-function-return-type.ts)

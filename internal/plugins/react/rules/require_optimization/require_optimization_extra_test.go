@@ -1,11 +1,13 @@
 package require_optimization
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -2398,10 +2400,120 @@ class C extends Component {}`, Tsx: true},
 	})
 }
 
+func TestRequireOptimizationSinglePassOwnershipAndDemand(t *testing.T) {
+	t.Parallel()
+
+	const outer = `class Outer extends React.Component {
+  build() {
+    class Inner extends React.Component {}
+  }
+}`
+	const inner = `class Inner extends React.Component {}`
+	const code = outer + `
+class MarkedOuter extends React.Component {
+  build() {
+    class Helper {
+      shouldComponentUpdate() {}
+    }
+  }
+}
+// eslint-disable-next-line react/require-optimization
+class Disabled extends React.Component {}
+`
+
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir.Dir, "react.tsx")
+	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	program, err := utils.CreateProgram(
+		true, fs, rootDir.Dir, "tsconfig.json", utils.CreateCompilerHost(rootDir.Dir, fs),
+	)
+	if err != nil {
+		t.Fatalf("CreateProgram: %v", err)
+	}
+	sourceFile := program.GetSourceFile(filePath)
+	if sourceFile == nil {
+		t.Fatalf("source file not found for %s", filePath)
+	}
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	defer done()
+
+	type diagnosticIdentity struct {
+		pos         int
+		end         int
+		messageID   string
+		description string
+	}
+	wantRanges := [][2]int{
+		{strings.Index(code, outer), strings.Index(code, outer) + len(outer)},
+		{strings.Index(code, inner), strings.Index(code, inner) + len(inner)},
+	}
+	var baseline []diagnosticIdentity
+	for _, demand := range []rule.EditDemand{
+		rule.EditDemandNone,
+		rule.EditDemandAutofix,
+		rule.EditDemandSuggestion,
+		rule.EditDemandAll,
+	} {
+		comments := rule.NewCommentStore(sourceFile)
+		var diagnostics []rule.RuleDiagnostic
+		ctx := (rule.RuleContext{
+			SourceFile:     sourceFile,
+			Settings:       map[string]interface{}{},
+			TypeChecker:    typeChecker,
+			Comments:       comments,
+			DisableManager: rule.NewDisableManager(sourceFile, comments),
+		}).WithProgram(lintprogram.NewFromCompiler(program)).WithDiagnosticConsumer(RequireOptimizationRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		})
+
+		_ = RequireOptimizationRule.Run(ctx, nil)
+		if len(diagnostics) != len(wantRanges) {
+			t.Fatalf("demand %d: expected %d diagnostics, got %#v", demand, len(wantRanges), diagnostics)
+		}
+
+		identities := make([]diagnosticIdentity, len(diagnostics))
+		for i, diagnostic := range diagnostics {
+			if diagnostic.Range.Pos() != wantRanges[i][0] || diagnostic.Range.End() != wantRanges[i][1] {
+				t.Errorf(
+					"demand %d diagnostic %d: range = [%d,%d), want [%d,%d)",
+					demand,
+					i,
+					diagnostic.Range.Pos(),
+					diagnostic.Range.End(),
+					wantRanges[i][0],
+					wantRanges[i][1],
+				)
+			}
+			if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+				t.Errorf("demand %d diagnostic %d unexpectedly carried edits: %#v", demand, i, diagnostic)
+			}
+			identities[i] = diagnosticIdentity{
+				pos:         diagnostic.Range.Pos(),
+				end:         diagnostic.Range.End(),
+				messageID:   diagnostic.Message.Id,
+				description: diagnostic.Message.Description,
+			}
+		}
+
+		if baseline == nil {
+			baseline = identities
+			continue
+		}
+		for i := range baseline {
+			if identities[i] != baseline[i] {
+				t.Errorf("demand %d diagnostic %d = %#v, want %#v", demand, i, identities[i], baseline[i])
+			}
+		}
+	}
+}
+
 // TestRequireOptimizationRule_NilTypeChecker verifies the rule operates
 // without panicking when the TypeChecker is unavailable. rslint schedules
-// rules without `RequiresTypeInfo: true` against "gap files" (files in the
-// program but not in `typeInfoFiles`) with a nil checker; the rule must
+// rules without `RequiresTypeInfo: true` against Programs without checker
+// capability with a nil checker; the rule must
 // degrade gracefully — the only TC-aware path (SFC classification via
 // `reactutil.IsStatelessReactComponentWithChecker`) falls back to a
 // local-block scan when `tc == nil`.
@@ -2461,10 +2573,9 @@ const ArrowComp = (p) => <div />;
 
 	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     program,
 		Settings:    map[string]interface{}{},
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithReporter("test/require-optimization", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
+	}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/require-optimization", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
 
 	defer func() {
 		if r := recover(); r != nil {

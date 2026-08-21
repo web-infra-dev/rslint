@@ -61,4 +61,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [eslint-plugin-react/jsx-no-bind](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-bind.md)
+- [eslint-plugin-react: jsx-no-bind](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-no-bind.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-no-bind.js)

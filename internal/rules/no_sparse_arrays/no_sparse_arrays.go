@@ -7,7 +7,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-sparse-arrays
 var NoSparseArraysRule = rule.Rule{
-	Name: "no-sparse-arrays",
+	Name:   "no-sparse-arrays",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindArrayLiteralExpression: func(node *ast.Node) {

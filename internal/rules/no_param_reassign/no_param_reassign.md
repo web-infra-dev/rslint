@@ -91,4 +91,5 @@ function foo(bar) {
 
 ## Original Documentation
 
-- [ESLint no-param-reassign](https://eslint.org/docs/latest/rules/no-param-reassign)
+- [ESLint: no-param-reassign](https://eslint.org/docs/latest/rules/no-param-reassign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-param-reassign.js)

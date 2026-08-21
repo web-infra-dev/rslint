@@ -100,4 +100,5 @@ If you don't want to forbid any elements.
 
 ## Original Documentation
 
-- [eslint-plugin-react / forbid-elements](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/forbid-elements.md)
+- [eslint-plugin-react: forbid-elements](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/forbid-elements.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/forbid-elements.js)

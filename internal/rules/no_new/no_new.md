@@ -20,4 +20,5 @@ Thing();
 
 ## Original Documentation
 
-- [ESLint no-new](https://eslint.org/docs/latest/rules/no-new)
+- [ESLint: no-new](https://eslint.org/docs/latest/rules/no-new)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-new.js)

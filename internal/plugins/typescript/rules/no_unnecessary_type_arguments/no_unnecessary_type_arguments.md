@@ -33,4 +33,5 @@ const y: Foo<number> = [];
 
 ## Original Documentation
 
-- [typescript-eslint no-unnecessary-type-arguments](https://typescript-eslint.io/rules/no-unnecessary-type-arguments)
+- [typescript-eslint: no-unnecessary-type-arguments](https://typescript-eslint.io/rules/no-unnecessary-type-arguments)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.29.0/packages/eslint-plugin/src/rules/no-unnecessary-type-arguments.ts)

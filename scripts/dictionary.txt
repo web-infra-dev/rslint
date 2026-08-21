@@ -2,11 +2,14 @@
 aavascript
 accesskey
 accum
+acdfg
+acefg
 acked
 acking
 acks
 activedescendant
 addl
+aeiou
 affordances
 afoob
 agen
@@ -20,6 +23,7 @@ analysed
 anee
 anyfunc
 anyof
+applescript
 apos
 argl
 Armn
@@ -29,6 +33,7 @@ arrayliteralexpression
 ascript
 assertee
 asynchrony
+atomtest
 autobinding
 autofixers
 autofocus
@@ -65,6 +70,7 @@ brefs
 Buttom
 butwhy
 cachedvfs
+caféx
 callbackify
 callees
 callsite
@@ -120,6 +126,7 @@ deboucne
 dedup
 dedupe
 dedups
+depguard
 deprec
 Deque
 describedby
@@ -139,6 +146,7 @@ DPUB
 dropeffect
 eacute
 embedfs
+embertest
 endline
 englishish
 enochian
@@ -150,7 +158,9 @@ escope
 ESLint
 esmodule
 espree
+esregexp
 estree
+eszett
 Ethi
 exclam
 execdir
@@ -166,6 +176,7 @@ fieldset
 figcaption
 fileless
 finalizer
+fixability
 fixall
 flaggable
 flowto
@@ -219,6 +230,7 @@ gosec
 gotest
 graphlib
 Grek
+gruber
 Gujr
 guoyu
 handl
@@ -242,6 +254,7 @@ interrobang
 iovfs
 IPC
 isatty
+isglob
 isnan
 Isnt
 jakebailey
@@ -262,6 +275,7 @@ keyshortcuts
 keytar
 Khmr
 Knda
+koblas
 Kore
 labelledby
 Laoo
@@ -274,7 +288,9 @@ Lingui
 lingui
 lintable
 lintedfile
+lintprogram
 listitem
+litera
 llms
 lockdown
 lockdowns
@@ -326,8 +342,10 @@ mynamespace
 módulo
 nanotime
 napi
+nashorn
 native
 nbsp
+ndefined
 neighbour
 neighbouring
 nend
@@ -410,10 +428,12 @@ promisify
 promisifying
 propertyassignment
 proptypes
+prototypejs
 psdifjo
 Ptrs
 pullquote
 punct
+qmark
 quasis
 quxx
 qwer
@@ -485,12 +505,14 @@ résumé
 saddr
 samp
 santhosh
+schlueter
 scopemanager
 sectionhead
 Seeked
 segs
 semacquire
 serde
+serviceworker
 setsize
 Setstate
 setstate
@@ -498,6 +520,7 @@ shadcn
 shadowable
 shouldnt
 SIGSEGV
+slashless
 smajobber
 somethingelse
 sonarjs
@@ -530,6 +553,7 @@ tablist
 Taml
 tanstack
 tarask
+tarjan
 tascript
 tekuri
 Telu
@@ -562,13 +586,18 @@ tsgo
 tsgolint
 TSJSDoc
 tsoptions
+tsparser
 tspath
 tsutils
+tttodo
+txtar
+txtarfs
 typeparam
 typescriptutil
 unaliased
 unbnound
 uncast
+Uncapitalize
 unconfig
 unconfigured
 undefinded
@@ -582,6 +611,7 @@ unional
 uniseg
 unmarshals
 unmodeled
+unnegated
 unpadded
 unpark
 Unparseable
@@ -593,9 +623,11 @@ unrepresentable
 unrooted
 unshadowed
 unshift
+unspaced
 unstarted
 unstrict
 unstub
+unsuggested
 untest
 unvalidated
 Unwatch
@@ -631,6 +663,7 @@ xjavascript
 xlink
 xoff
 xtest
+Xopenport
 yutil
 zeebo
 zigbuild

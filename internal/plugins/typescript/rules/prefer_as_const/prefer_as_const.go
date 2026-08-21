@@ -105,7 +105,8 @@ func compareLiteralTypes(ctx *rule.RuleContext, sourceText string, valueNode *as
 }
 
 var PreferAsConstRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-as-const",
+	Name:   "prefer-as-const",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		compareTypes := func(valueNode *ast.Node, typeNode *ast.Node, canFix bool) {
 			if valueNode == nil || typeNode == nil ||

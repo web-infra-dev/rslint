@@ -60,5 +60,5 @@ The second option is an object with additional flags (valid with `"always"`,
 
 ## Original Documentation
 
-- ESLint rule: https://eslint.org/docs/latest/rules/object-shorthand
-- Source code: https://github.com/eslint/eslint/blob/main/lib/rules/object-shorthand.js
+- [ESLint: object-shorthand](https://eslint.org/docs/latest/rules/object-shorthand)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/object-shorthand.js)

@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -39,16 +40,16 @@ func TestPreferExponentiationOperatorUpstream(t *testing.T) {
 			{Code: "globalThis.Math.max(a, b)"},
 
 			// ---- not the global Math ----
-			{Code: "/* globals Math:off*/ Math.pow(a, b)", Skip: true}, // SKIP: rslint does not support ESLint's /* globals */ directive comments.
+			{Code: "/* globals Math:off*/ Math.pow(a, b)"},
 			{Code: "let Math; Math.pow(a, b);"},
 			{Code: "if (foo) { const Math = 1; Math.pow(a, b); }"},
 			{Code: "var x = function Math() { Math.pow(a, b); }"},
 			{Code: "function foo(Math) { Math.pow(a, b); }"},
 			{Code: "function foo() { Math.pow(a, b); var Math; }"},
 
-			{Code: "globalThis.Math.pow(a, b)", Skip: true}, // SKIP: mirrors upstream ecmaVersion 2019 case; rslint does not expose ecmaVersion-specific globalThis availability.
-			{Code: "globalThis.Math.pow(a, b)", Skip: true}, // SKIP: mirrors upstream ecmaVersion 6 case; rslint does not expose ecmaVersion-specific globalThis availability.
-			{Code: "globalThis.Math.pow(a, b)", Skip: true}, // SKIP: mirrors upstream ecmaVersion 2017 case; rslint does not expose ecmaVersion-specific globalThis availability.
+			{Code: "globalThis.Math.pow(a, b)", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019}},
+			{Code: "globalThis.Math.pow(a, b)", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015}},
+			{Code: "globalThis.Math.pow(a, b)", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}},
 			{Code: `
                 var globalThis = bar;
                 globalThis.Math.pow(a, b)
@@ -315,7 +316,7 @@ func expectedErrors(code string) []rule_tester.InvalidTestCaseError {
 		if node == nil {
 			return
 		}
-		if node.Kind == ast.KindCallExpression && isMathPowCall(node, nil) {
+		if node.Kind == ast.KindCallExpression && isMathPowCall(node, rule.Globals{}) {
 			rng := utils.TrimNodeTextRange(sf, node)
 			line, column := scanner.GetECMALineAndUTF16CharacterOfPosition(sf, rng.Pos())
 			endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(sf, rng.End())

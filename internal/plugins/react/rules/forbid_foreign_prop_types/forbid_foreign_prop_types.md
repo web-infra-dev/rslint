@@ -68,5 +68,5 @@ this rule disabled.
 
 ## Original Documentation
 
-- [eslint-plugin-react / forbid-foreign-prop-types](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/forbid-foreign-prop-types.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/forbid-foreign-prop-types.js)
+- [eslint-plugin-react: forbid-foreign-prop-types](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/forbid-foreign-prop-types.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/forbid-foreign-prop-types.js)

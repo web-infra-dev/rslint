@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
@@ -26,6 +26,9 @@ type ValidTestCase struct {
 	Skip     bool                   `json:"skip"`
 	Options  any                    `json:"options"`
 	Settings map[string]interface{} `json:"settings"`
+	// LanguageOptions is the normalized per-file language configuration used
+	// to construct native rule globals. Its zero value means latest.
+	LanguageOptions rule.LanguageOptions `json:"languageOptions"`
 	// Globals simulates a config-declared `languageOptions.globals` for rules
 	// that read ctx.Globals (e.g. no-undef). Values are authored exactly as in
 	// an ESLint config — "readonly", "writable", "off", or their aliases — and
@@ -62,6 +65,9 @@ type InvalidTestCase struct {
 	Output   []string               `json:"output"`
 	Errors   []InvalidTestCaseError `json:"errors"`
 	Settings map[string]interface{} `json:"settings"`
+	// LanguageOptions is the normalized per-file language configuration used
+	// to construct native rule globals. Its zero value means latest.
+	LanguageOptions rule.LanguageOptions `json:"languageOptions"`
 	// Globals simulates a config-declared `languageOptions.globals` for rules
 	// that read ctx.Globals (e.g. no-undef). Values are authored exactly as in
 	// an ESLint config — "readonly", "writable", "off", or their aliases — and
@@ -132,8 +138,8 @@ type ESLintTestSuite struct {
 // rule whose defaults live in its schema sees them in tests too, exactly as it
 // would at runtime.
 //
-// Rules that declare no schema yet run whatever the test case passes,
-// preserving the pre-schema behavior.
+// Ad-hoc rules constructed directly in tests may declare no schema; they run
+// whatever the test case passes, unvalidated.
 //
 // It is exported so test harnesses that call a rule's Run directly instead of
 // going through [RunRuleTester] (e.g. to inspect diagnostics across multiple
@@ -178,7 +184,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, rawGlobals map[string]any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, languageOptions rule.LanguageOptions, rawGlobals map[string]any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
 		options := ResolveTestCaseOptions(t, r, rawOptions)
 		globals := resolveTestCaseGlobals(t, rawGlobals)
 
@@ -200,16 +206,19 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		allowedFiles := []string{sourceFile.FileName()}
 
 		_, err = linter.RunLinter(linter.RunLinterOptions{
-			Programs:       []*compiler.Program{program},
+			Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 			SingleThreaded: true,
 			Scope:          linter.FileScope{Files: allowedFiles},
 			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{
 					{
-						Name:     "test",
-						Settings: settings,
-						Globals:  globals,
+						Name: "test",
+						Environment: &rule.RuleEnvironment{
+							Settings:        settings,
+							LanguageOptions: languageOptions,
+							Globals:         globals,
+						},
 						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return r.Run(ctx, options)
@@ -248,7 +257,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 				fileName = testCase.FileName
 			}
 
-			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.Settings, testCase.Globals, testCase.TSConfig, fileName)
+			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.Settings, testCase.LanguageOptions, testCase.Globals, testCase.TSConfig, fileName)
 			if len(diagnostics) != 0 {
 				// TODO: pretty errors
 				t.Errorf("Expected valid test case not to contain errors. Code:\n%v", testCase.Code)
@@ -281,7 +290,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 			}
 
 			for i := range 10 {
-				diagnostics := runLinter(t, code, testCase.Options, testCase.Settings, testCase.Globals, testCase.TSConfig, fileName)
+				diagnostics := runLinter(t, code, testCase.Options, testCase.Settings, testCase.LanguageOptions, testCase.Globals, testCase.TSConfig, fileName)
 				if i == 0 {
 					initialDiagnostics = diagnostics
 				}

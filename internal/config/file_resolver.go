@@ -1,10 +1,10 @@
 package config
 
-import "github.com/web-infra-dev/rslint/internal/linter"
+import "github.com/web-infra-dev/rslint/internal/rule"
 
 type effectiveConfigPlan struct {
 	mergedConfig *MergedConfig
-	enabledRules []linter.ConfiguredRule
+	enabledRules []rule.ConfiguredRule
 }
 
 // FileConfigResolver resolves config and rules for one immutable config root.
@@ -20,6 +20,7 @@ type FileConfigResolver struct {
 	// call is pure waste at thousands-of-files scale.
 	globalIgnorePatterns []IgnorePattern
 	entryIgnorePatterns  [][]IgnorePattern
+	directoryBlocks      *directoryBlockMatcher
 
 	filePlans  publishOnceCache[string, *effectiveConfigPlan]
 	shapePlans publishOnceCache[configMatchKey, *effectiveConfigPlan]
@@ -27,12 +28,14 @@ type FileConfigResolver struct {
 
 // NewFileConfigResolver creates a per-run resolver for one config root.
 func NewFileConfigResolver(config RslintConfig, cwd string, enforcePlugins bool) *FileConfigResolver {
+	globalIgnorePatterns := extractConfigIgnores(config)
 	return &FileConfigResolver{
 		config:               config,
 		cwd:                  cwd,
 		enforcePlugins:       enforcePlugins,
-		globalIgnorePatterns: extractConfigIgnores(config),
+		globalIgnorePatterns: globalIgnorePatterns,
 		entryIgnorePatterns:  parseEntryIgnorePatterns(config),
+		directoryBlocks:      newDirectoryBlockMatcher(globalIgnorePatterns, cwd),
 	}
 }
 
@@ -48,7 +51,7 @@ func (r *FileConfigResolver) ConfigForFile(filePath string) *MergedConfig {
 
 // EnabledRulesForFile returns cached enabled rules and their merged config.
 // Both returned values are shared immutable resolver state and must be read-only.
-func (r *FileConfigResolver) EnabledRulesForFile(filePath string) ([]linter.ConfiguredRule, *MergedConfig) {
+func (r *FileConfigResolver) EnabledRulesForFile(filePath string) ([]rule.ConfiguredRule, *MergedConfig) {
 	plan := r.planForFile(filePath)
 	if plan == nil {
 		return nil, nil
@@ -63,6 +66,7 @@ func (r *FileConfigResolver) planForFile(filePath string) *effectiveConfigPlan {
 			r.cwd,
 			r.globalIgnorePatterns,
 			r.entryIgnorePatterns,
+			r.directoryBlocks,
 		)
 		if !matched {
 			return nil
@@ -76,24 +80,4 @@ func (r *FileConfigResolver) planForFile(filePath string) *effectiveConfigPlan {
 			}
 		})
 	})
-}
-
-// ActiveRulesForFile filters cached enabled rules by the optional type-info set.
-func (r *FileConfigResolver) ActiveRulesForFile(filePath string, typeInfoFiles map[string]struct{}) []linter.ConfiguredRule {
-	activeRules, _ := r.EnabledRulesForFile(filePath)
-	if typeInfoFiles != nil {
-		if _, hasTypeInfo := typeInfoFiles[filePath]; !hasTypeInfo {
-			activeRules = linter.FilterNonTypeAwareRules(activeRules)
-		}
-	}
-	return activeRules
-}
-
-// ActiveRulesForFileHasTypeInfo filters cached enabled rules by a known type-info flag.
-func (r *FileConfigResolver) ActiveRulesForFileHasTypeInfo(filePath string, hasTypeInfo bool) []linter.ConfiguredRule {
-	activeRules, _ := r.EnabledRulesForFile(filePath)
-	if !hasTypeInfo {
-		activeRules = linter.FilterNonTypeAwareRules(activeRules)
-	}
-	return activeRules
 }

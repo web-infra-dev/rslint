@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -62,12 +64,10 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 
 	s.initializeParams = params
 
+	// rslint diagnostics and edits use VS Code's native UTF-16 coordinates.
+	// UTF-16 is mandatory for LSP clients, so selecting it unconditionally keeps
+	// incoming incremental edits and outgoing ranges on one encoding contract.
 	s.positionEncoding = lsproto.PositionEncodingKindUTF16
-	if genCapabilities := s.initializeParams.Capabilities.General; genCapabilities != nil && genCapabilities.PositionEncodings != nil {
-		if slices.Contains(*genCapabilities.PositionEncodings, lsproto.PositionEncodingKindUTF8) {
-			s.positionEncoding = lsproto.PositionEncodingKindUTF8
-		}
-	}
 
 	response := &lsproto.InitializeResult{
 		ServerInfo: &lsproto.ServerInfo{
@@ -79,7 +79,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
 				Options: &lsproto.TextDocumentSyncOptions{
 					OpenClose: ptrTo(true),
-					Change:    ptrTo(lsproto.TextDocumentSyncKindFull),
+					Change:    ptrTo(lsproto.TextDocumentSyncKindIncremental),
 					Save: &lsproto.BooleanOrSaveOptions{
 						SaveOptions: &lsproto.SaveOptions{
 							IncludeText: ptrTo(true),
@@ -143,7 +143,7 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 			CurrentDirectory:   s.cwd,
 			DefaultLibraryPath: s.defaultLibraryPath,
 			TypingsLocation:    s.typingsLocation,
-			PositionEncoding:   lsproto.PositionEncodingKindUTF8,
+			PositionEncoding:   s.positionEncoding,
 			WatchEnabled:       s.watchEnabled,
 		},
 		FS:         s.fs,
@@ -242,7 +242,7 @@ func fileURIFromPath(filePath string) lsproto.URI {
 
 // reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
 // The LSP reuses projects already loaded by project service and builds a
-// standalone Program for a declared custom project. Resolving
+// session-external ts-go Program for a declared custom project. Resolving
 // project paths here preserves declaration order and ensures type-aware rules
 // run only when the governing config's first containing project supplies type
 // information.
@@ -313,7 +313,8 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 			needsAncestorJSConfigRefresh = true
 		}
 	}
-	if (needsIgnoreRefresh || needsAncestorJSConfigRefresh) && s.configDiscoveryActive {
+	needsAutomaticAncestorRefresh := needsAncestorJSConfigRefresh && s.configRefreshConfigPath == ""
+	if (needsIgnoreRefresh || needsAutomaticAncestorRefresh) && s.configDiscoveryActive {
 		// didChangeWatchedFiles and configRefresh are both blocking methods, so
 		// this direct call stays on the server's serialized dispatch loop and
 		// cannot race an extension-initiated transaction. JSON fallback is part
@@ -321,13 +322,10 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		// active, otherwise a later JS activation failure could leave half of a
 		// rejected generation live.
 		reason := "gitignore-change"
-		if needsAncestorJSConfigRefresh {
+		if needsAutomaticAncestorRefresh {
 			reason = "config-change"
 		}
-		_, err := s.handleConfigRefresh(ctx, configRefreshRequest{
-			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
-			Reason:          reason,
-		})
+		_, err := s.refreshConfig(ctx)
 		if err == nil {
 			return nil
 		}
@@ -552,10 +550,16 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 
 	uri := params.TextDocument.Uri
 
-	// For full document sync, we expect one change with the full text
-	if len(params.ContentChanges) > 0 {
-		s.documents[uri] = params.ContentChanges[0].WholeDocument.Text
+	content, err := applyDocumentChanges(s.documents[uri], params.ContentChanges)
+	if err != nil {
+		// didChange is a notification, so the server cannot return an error to
+		// request a retry. Keep both document mirrors on their previous content
+		// instead of partially applying malformed input or sending an invalid
+		// JSON-RPC response with a null request ID.
+		log.Printf("Ignoring invalid didChange for %s: %v", uri, err)
+		return nil
 	}
+	s.documents[uri] = content
 	if s.lintPrograms != nil {
 		s.lintPrograms.DidChange(uri, s.documents[uri])
 	}
@@ -971,7 +975,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 // runLintWithProgramLoader resolves one document against two distinct
 // directories: configCwd is the config's own path space, which a nested JS
 // config moves to its own directory, while processCwd is the server's working
-// directory that rules see as RuleContext.Cwd.
+// directory that rules see through RuleContext.ProcessCurrentDirectory.
 func runLintWithProgramLoader(
 	uri lsproto.DocumentUri,
 	session *project.Session,
@@ -1038,12 +1042,12 @@ var rulesSkippedInEditors = map[string]bool{
 // rulesServedToEditors drops the rules the language server never runs. The
 // input is a cached slice shared across files, so filtering builds a new one
 // and an unaffected configuration keeps the original.
-func rulesServedToEditors(rules []linter.ConfiguredRule) []linter.ConfiguredRule {
-	skipped := func(r linter.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
+func rulesServedToEditors(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
+	skipped := func(r rule.ConfiguredRule) bool { return rulesSkippedInEditors[r.Name] }
 	if !slices.ContainsFunc(rules, skipped) {
 		return rules
 	}
-	served := make([]linter.ConfiguredRule, 0, len(rules))
+	served := make([]rule.ConfiguredRule, 0, len(rules))
 	for _, configured := range rules {
 		if !skipped(configured) {
 			served = append(served, configured)
@@ -1065,7 +1069,8 @@ func lintSingleFile(
 	if sourceFile == nil {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}
 	}
-	if syntacticDiagnostics := program.GetSyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
+	sourceProgram := lintprogram.NewFromCompiler(program)
+	if syntacticDiagnostics := sourceProgram.SyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
 		diagnostics := make([]rule.RuleDiagnostic, 0, len(syntacticDiagnostics))
 		for _, diagnostic := range syntacticDiagnostics {
 			diagnostics = append(diagnostics, rule.RuleDiagnostic{
@@ -1094,12 +1099,13 @@ func lintSingleFile(
 	}
 
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:     program,
+		Program:     sourceProgram,
 		File:        sourceFile.FileName(),
 		Cwd:         processCwd,
 		HasTypeInfo: hasTypeInfo,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return rulesServedToEditors(fileConfigResolver.ActiveRulesForFileHasTypeInfo(configFilePath, hasTypeInfo))
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			rules, _ := fileConfigResolver.EnabledRulesForFile(configFilePath)
+			return rulesServedToEditors(rules)
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: editDemand,
@@ -1135,7 +1141,7 @@ func selectLintProgram(
 	// Type information follows parserOptions.project declaration order, not the
 	// TypeScript session's default-project heuristic. Prefer an already-loaded
 	// containing project. Custom config names that the main project service has
-	// not loaded are supplied by rslint-owned standalone Programs.
+	// not loaded are supplied by rslint-owned session-external ts-go Programs.
 	loadedByConfig := make(map[string]*compiler.Program, len(loadedProjects))
 	for _, candidate := range loadedProjects {
 		if candidate == nil || candidate.GetProgram() == nil {
@@ -1375,9 +1381,12 @@ func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {
 	return config.IsDefaultExcludedPath(filePath, cwd, useCaseSensitive)
 }
 
-func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []linter.ConfiguredRule {
-	return config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).
-		ActiveRulesForFileHasTypeInfo(filePath, hasTypeInfo)
+func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []rule.ConfiguredRule {
+	rules, _ := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).EnabledRulesForFile(filePath)
+	if !hasTypeInfo {
+		return rule.FilterNonTypeAwareRules(rules)
+	}
+	return rules
 }
 
 // Helper function to check if two ranges overlap
@@ -1685,4 +1694,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	if !lintResult.HasSyntaxErrors {
 		s.dispatchPluginLintWithConfig(uri, generation, rslintConfig, configCwd, isJSConfig)
 	}
+
+	// The pacer cannot see that the lint just dropped what it derived.
+	go runtime.GC()
 }

@@ -12,9 +12,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-const defaultTSConfig = `import { defineConfig, ts } from '@rslint/core';
+const defaultTSConfig = `import { defineConfig, js, ts } from '@rslint/core';
 
 export default defineConfig([
+  js.configs.recommended,
   ts.configs.recommended,
   {
     rules: {

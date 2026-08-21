@@ -24,4 +24,5 @@ const w = obj[dynamicKey]; // computed access
 
 ## Original Documentation
 
-- [typescript-eslint dot-notation](https://typescript-eslint.io/rules/dot-notation)
+- [typescript-eslint: dot-notation](https://typescript-eslint.io/rules/dot-notation)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/dot-notation.ts)

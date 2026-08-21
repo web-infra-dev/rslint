@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -22,7 +23,7 @@ func TestRunLinterInProgram_AllowFilesNil(t *testing.T) {
 		"b.ts": "const b = 2;",
 	})
 
-	lintedFiles := RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+	lintedFiles := runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
@@ -41,7 +42,7 @@ func TestRunLinterInProgram_AllowFilesSingle(t *testing.T) {
 	})
 
 	lintedFileNames := []string{}
-	lintedFiles := RunLinterInProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
+	lintedFiles := runLinterInCompilerProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
@@ -68,7 +69,7 @@ func TestRunLinterInProgram_AllowFilesMultiple(t *testing.T) {
 	})
 
 	lintedFileNames := []string{}
-	lintedFiles := RunLinterInProgram(program, []string{paths["a.ts"], paths["c.ts"]}, nil, utils.ExcludePaths,
+	lintedFiles := runLinterInCompilerProgram(program, []string{paths["a.ts"], paths["c.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
@@ -92,7 +93,7 @@ func TestRunLinterInProgram_AllowFilesEmpty(t *testing.T) {
 		"a.ts": "const a = 1;",
 	})
 
-	lintedFiles := RunLinterInProgram(program, []string{}, nil, utils.ExcludePaths,
+	lintedFiles := runLinterInCompilerProgram(program, []string{}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
@@ -109,7 +110,7 @@ func TestRunLinterInProgram_AllowFilesNotInProgram(t *testing.T) {
 	})
 
 	nonexistent := tspath.NormalizePath(filepath.Join(t.TempDir(), "nonexistent.ts"))
-	lintedFiles := RunLinterInProgram(program, []string{nonexistent}, nil, utils.ExcludePaths,
+	lintedFiles := runLinterInCompilerProgram(program, []string{nonexistent}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
@@ -126,7 +127,7 @@ func TestRunLinterInProgram_AllowFilesNoRules(t *testing.T) {
 	})
 
 	diagnostics := []rule.RuleDiagnostic{}
-	lintedFiles := RunLinterInProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
+	lintedFiles := runLinterInCompilerProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		false, func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
 		nil,
@@ -148,7 +149,7 @@ func TestRunLinterInProgram_AllowFilesPartialMatch(t *testing.T) {
 
 	nonexistent := tspath.NormalizePath(filepath.Join(t.TempDir(), "nonexistent.ts"))
 	lintedFileNames := []string{}
-	lintedFiles := RunLinterInProgram(program, []string{paths["a.ts"], nonexistent}, nil, utils.ExcludePaths,
+	lintedFiles := runLinterInCompilerProgram(program, []string{paths["a.ts"], nonexistent}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
@@ -167,7 +168,7 @@ func TestRunLinterInProgram_AllowFilesDuplicate(t *testing.T) {
 		"a.ts": "const a = 1;",
 	})
 
-	lintedFiles := RunLinterInProgram(program, []string{paths["a.ts"], paths["a.ts"]}, nil, utils.ExcludePaths,
+	lintedFiles := runLinterInCompilerProgram(program, []string{paths["a.ts"], paths["a.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
@@ -229,7 +230,7 @@ func TestRunLinter_TargetFilesEmptyDoesNotScanProgram(t *testing.T) {
 
 	called := false
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{nil},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -247,16 +248,16 @@ func TestRunLinter_TargetFilesEmptyDoesNotScanProgram(t *testing.T) {
 		t.Fatalf("expected zero linted files for an empty target plan, got %d", result.LintedFileCount)
 	}
 
-	targets := CollectLintTargets(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+	targets := mustPrepareLintPlan(t, RunLinterOptions{
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{nil},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
 			return noopRule()
 		},
-	})
+	}).Targets()
 	if len(targets) != 0 {
-		t.Fatalf("CollectLintTargets should also see zero files for an empty target plan, got %+v", targets)
+		t.Fatalf("PrepareLintPlan should also see zero files for an empty target plan, got %+v", targets)
 	}
 }
 
@@ -266,7 +267,7 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 
 	var linted []string
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{target}},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
@@ -284,16 +285,16 @@ func TestRunLinter_TargetFilesCanSelectImportedNonRootFile(t *testing.T) {
 		t.Fatalf("expected only lib.ts to be linted, got %v", linted)
 	}
 
-	targets := CollectLintTargets(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+	targets := mustPrepareLintPlan(t, RunLinterOptions{
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{target}},
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
 			return noopRule()
 		},
-	})
+	}).Targets()
 	if len(targets) != 1 || targets[0].File.FileName() != target || len(targets[0].Rules) == 0 {
-		t.Fatalf("CollectLintTargets should mirror native exact targeting, got %+v", targets)
+		t.Fatalf("PrepareLintPlan should mirror native exact targeting, got %+v", targets)
 	}
 }
 
@@ -303,7 +304,7 @@ func TestLintSingleFile_TargetsImportedNonRootFile(t *testing.T) {
 
 	var linted []string
 	LintSingleFile(LintSingleFileOptions{
-		Program: program,
+		Program: lintprogram.NewFromCompiler(program),
 		File:    target,
 		GetRulesForFile: func(sf *ast.SourceFile) []ConfiguredRule {
 			linted = append(linted, sf.FileName())

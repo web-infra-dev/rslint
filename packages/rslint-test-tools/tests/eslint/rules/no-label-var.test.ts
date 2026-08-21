@@ -16,9 +16,10 @@ ruleTester.run('no-label-var', {
     'for (const k in obj) { q: for(;;) { break q; } }',
     'for (const v of arr) { q: for(;;) { break q; } }',
 
-    // ---- TS type-only declarations should NOT clash (only values count) ----
-    'interface X {} X: for(;;) { break X; }',
-    'type X = number; X: for(;;) { break X; }',
+    // ---- Type-only names in sibling scopes are not visible ----
+    'function f<T>() {} T: for(;;) { break T; }',
+    'function f() { type X = number; } X: for(;;) { break X; }',
+    'export {}; declare global { interface X {} } X: for(;;) { break X; }',
 
     // ---- Nested label inside iteration; outer var has different name ----
     'var x = 1; function f() { y: for(;;) { break y; } }',
@@ -44,6 +45,32 @@ ruleTester.run('no-label-var', {
     {
       code: 'function bar(x) { x: for(;;) { break x; } }',
       errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 19 }],
+    },
+
+    // ---- TypeScript type-space bindings ----
+    {
+      code: 'interface X {} X: for(;;) { break X; }',
+      errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 16 }],
+    },
+    {
+      code: 'type X = number; X: for(;;) { break X; }',
+      errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 18 }],
+    },
+    {
+      code: 'function f<T>() { T: for(;;) { break T; } }',
+      errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 19 }],
+    },
+    {
+      code: 'class C<T> { static m() { T: for(;;) { break T; } } }',
+      errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 27 }],
+    },
+    {
+      code: 'Record: for(;;) { break Record; }',
+      errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 1 }],
+    },
+    {
+      code: 'export {}; Record: for(;;) { break Record; }',
+      errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 12 }],
     },
 
     // ---- Local-binding clashes (strategy A path) ----
@@ -132,8 +159,7 @@ ruleTester.run('no-label-var', {
       errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 27 }],
     },
 
-    // ---- Globals from tsgo lib (strategy B path; requires TypeChecker) ----
-    // Use ES standard built-ins so the assertion holds without `lib: ["dom"]`.
+    // ---- ECMAScript globals ----
     {
       code: 'Promise: for (;;) { break Promise; }',
       errors: [{ messageId: 'identifierClashWithLabel', line: 1, column: 1 }],

@@ -4,7 +4,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -29,7 +28,7 @@ func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
 	}
 
 	// Build lookup for returned enabled rules
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -51,6 +50,11 @@ func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
 	// "off" rule should NOT be included
 	if _, ok := ruleMap["for-direction"]; ok {
 		t.Error("Expected for-direction to be excluded (set to off)")
+	}
+
+	if ruleMap["no-debugger"].Environment == nil ||
+		ruleMap["no-debugger"].Environment != ruleMap["no-console"].Environment {
+		t.Fatal("rules from one resolved file config did not share one environment")
 	}
 }
 
@@ -94,7 +98,7 @@ func TestGetEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T) {
 		return
 	}
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -130,7 +134,7 @@ func TestGetEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
 		return
 	}
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -159,7 +163,7 @@ func TestGetEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -185,7 +189,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePlugins(t *testing.T) {
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.tsx", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -216,7 +220,7 @@ func TestGetEnabledRules_NoEnforcePlugins_AllowsAll(t *testing.T) {
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", false)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -247,7 +251,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginFromDifferentEntry(t *testing.T) {
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -277,7 +281,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginEntryDoesNotMatchFile(t *testing.T
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -314,7 +318,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusOverride(t *testing.T) {
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -347,7 +351,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T)
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.tsx", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -383,7 +387,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginInLaterEntry(t *testing.T) {
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -417,7 +421,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsBothDeclared(t *testing.T
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.tsx", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -456,7 +460,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T)
 
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.tsx", "", true)
 
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -490,7 +494,7 @@ func TestGetEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testing.T)
 
 	// Non-ignored file: entry matches, plugin and rule both apply
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -529,7 +533,7 @@ func TestGetEnabledRules_EnforcePlugins_IgnoresOnlyAffectsOwnEntry(t *testing.T)
 
 	// test.ts: entry1 ignores it (plugin not merged from entry1), entry2 matches (no plugin)
 	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.test.ts", "", true)
-	ruleMap := make(map[string]linter.ConfiguredRule)
+	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
 	}
@@ -566,7 +570,7 @@ func TestGetEnabledRules_EnforcePlugins_OffRuleNotBlocked(t *testing.T) {
 	}
 }
 
-func TestGetActiveRulesForFile_FiltersTypeAwareWhenNotInTypeInfoFiles(t *testing.T) {
+func TestGetEnabledRulesLeavesTypeEligibilityToLinter(t *testing.T) {
 	RegisterAllRules()
 
 	cfg := RslintConfig{
@@ -578,58 +582,25 @@ func TestGetActiveRulesForFile_FiltersTypeAwareWhenNotInTypeInfoFiles(t *testing
 		},
 	}
 
-	typeInfoFiles := map[string]struct{}{
-		"src/covered.ts": {},
+	enabled, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "src/uncovered.ts", "", false)
+	if len(enabled) != 2 {
+		t.Fatalf("Expected config resolution to return 2 rules, got %d: %v", len(enabled), ruleNames(enabled))
+	}
+	enabledNames := ruleNameSet(enabled)
+	if !enabledNames["@typescript-eslint/require-await"] {
+		t.Error("Expected config resolution to retain require-await")
+	}
+	if !enabledNames["no-console"] {
+		t.Error("Expected config resolution to retain no-console")
 	}
 
-	// File IN typeInfoFiles — both rules returned
-	covered := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "src/covered.ts", "", false, typeInfoFiles)
-	if len(covered) != 2 {
-		t.Fatalf("Expected 2 rules for covered file, got %d: %v", len(covered), ruleNames(covered))
-	}
-	coveredNames := ruleNameSet(covered)
-	if !coveredNames["@typescript-eslint/require-await"] {
-		t.Error("Expected require-await for covered file")
-	}
-	if !coveredNames["no-console"] {
-		t.Error("Expected no-console for covered file")
-	}
-
-	// File NOT in typeInfoFiles — type-aware filtered, only non-type-aware remains
-	uncovered := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "src/uncovered.ts", "", false, typeInfoFiles)
-	if len(uncovered) != 1 {
-		t.Fatalf("Expected 1 rule for uncovered file (only non-type-aware), got %d: %v", len(uncovered), ruleNames(uncovered))
-	}
-	if uncovered[0].Name != "no-console" {
-		t.Errorf("Expected only no-console for uncovered file, got %q", uncovered[0].Name)
+	eligible := rule.FilterNonTypeAwareRules(enabled)
+	if len(eligible) != 1 || eligible[0].Name != "no-console" {
+		t.Fatalf("Expected linter eligibility filtering to retain no-console, got %v", ruleNames(eligible))
 	}
 }
 
-func TestGetActiveRulesForFile_NilTypeInfoFilesNoFiltering(t *testing.T) {
-	RegisterAllRules()
-
-	cfg := RslintConfig{
-		{
-			Rules: Rules{
-				"@typescript-eslint/require-await": "error",
-			},
-		},
-	}
-
-	// nil typeInfoFiles → no filtering, all rules enabled
-	rules := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "src/any.ts", "", false, nil)
-	found := false
-	for _, r := range rules {
-		if r.Name == "@typescript-eslint/require-await" {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("Expected require-await when typeInfoFiles is nil (no filtering)")
-	}
-}
-
-func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T) {
+func TestFileConfigResolver_MatchesRegistry(t *testing.T) {
 	RegisterAllRules()
 
 	cfg := RslintConfig{
@@ -664,23 +635,15 @@ func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T
 			}
 		}
 	}
-	for _, rules := range [][]linter.ConfiguredRule{cachedRules, registryRules} {
+	for _, rules := range [][]rule.ConfiguredRule{cachedRules, registryRules} {
 		for _, rule := range rules {
-			if rule.Globals["readonlyGlobal"] != utils.GlobalAccessReadonly {
+			if rule.Environment.Globals["readonlyGlobal"] != utils.GlobalAccessReadonly {
 				t.Fatalf("expected resolver/registry rule %q to carry declared global", rule.Name)
 			}
-			if rule.Globals["disabledGlobal"] != utils.GlobalAccessOff {
+			if rule.Environment.Globals["disabledGlobal"] != utils.GlobalAccessOff {
 				t.Fatalf("expected resolver/registry rule %q to carry disabled global as off", rule.Name)
 			}
 		}
-	}
-
-	uncovered := resolver.ActiveRulesForFile(filePath, map[string]struct{}{})
-	if len(uncovered) != 1 {
-		t.Fatalf("expected only non-type-aware rule for uncovered file, got %v", ruleNames(uncovered))
-	}
-	if uncovered[0].Name != "no-console" {
-		t.Fatalf("expected no-console for uncovered file, got %q", uncovered[0].Name)
 	}
 
 	if ignoredConfig := resolver.ConfigForFile("/repo/test/app.ts"); ignoredConfig != nil {
@@ -710,10 +673,6 @@ func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
 		"/repo/src/b.ts",
 		"/repo/test/a.ts",
 	}
-	typeInfoFiles := map[string]struct{}{
-		"/repo/src/a.ts": {},
-	}
-
 	var wg sync.WaitGroup
 	for range 32 {
 		wg.Add(1)
@@ -723,7 +682,6 @@ func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
 				for _, filePath := range paths {
 					_ = resolver.ConfigForFile(filePath)
 					_, _ = resolver.EnabledRulesForFile(filePath)
-					_ = resolver.ActiveRulesForFile(filePath, typeInfoFiles)
 				}
 			}
 		}()
@@ -731,7 +689,7 @@ func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
-func ruleNames(rules []linter.ConfiguredRule) []string {
+func ruleNames(rules []rule.ConfiguredRule) []string {
 	names := make([]string, len(rules))
 	for i, r := range rules {
 		names[i] = r.Name
@@ -739,7 +697,7 @@ func ruleNames(rules []linter.ConfiguredRule) []string {
 	return names
 }
 
-func ruleNameSet(rules []linter.ConfiguredRule) map[string]bool {
+func ruleNameSet(rules []rule.ConfiguredRule) map[string]bool {
 	set := make(map[string]bool, len(rules))
 	for _, r := range rules {
 		set[r.Name] = true

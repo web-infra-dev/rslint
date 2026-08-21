@@ -111,6 +111,7 @@ func hasAsyncIterator(typeChecker *checker.Checker, t *checker.Type) bool {
 
 var RequireAwaitRule = rule.CreateRule(rule.Rule{
 	Name:             "require-await",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var scopes []scopeInfo

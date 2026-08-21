@@ -84,7 +84,7 @@ func TestBoundary_DefaultLibsCleanAcrossPrograms(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        progs,
+		Programs:        wrapTestPrograms(progs...),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,
@@ -287,7 +287,7 @@ func TestBoundary_DiagnosticsStableUnderParallelism(t *testing.T) {
 		var mu sync.Mutex
 		var diags []rule.RuleDiagnostic
 		_, err := RunLinter(RunLinterOptions{
-			Programs:        programs,
+			Programs:        wrapTestPrograms(programs...),
 			SingleThreaded:  false,
 			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 			TypeCheck:       true,
@@ -377,7 +377,7 @@ func TestBoundary_NoSourceLocationDiagnosticsDropped(t *testing.T) {
 
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{program},
+		Programs:        wrapTestPrograms(program),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,

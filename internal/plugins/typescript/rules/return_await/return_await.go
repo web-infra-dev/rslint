@@ -1,11 +1,16 @@
 package return_await
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed return_await.schema.json
+var schemaJSON []byte
 
 func buildDisallowedPromiseAwaitMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -47,22 +52,12 @@ const (
 	ReturnAwaitOptionNever
 )
 
-type ReturnAwaitOptions struct {
-	Option *ReturnAwaitOption
-}
-
 func parseReturnAwaitOption(options []any) ReturnAwaitOption {
-	switch opts := rule.LegacyUnwrapOptions(options).(type) {
-	case ReturnAwaitOptions:
-		if opts.Option != nil {
-			return *opts.Option
-		}
-	case *ReturnAwaitOptions:
-		if opts != nil && opts.Option != nil {
-			return *opts.Option
-		}
-	case string:
-		switch opts {
+	if len(options) == 0 {
+		return ReturnAwaitOptionInTryCatch
+	}
+	if opt, ok := options[0].(string); ok {
+		switch opt {
 		case "always":
 			return ReturnAwaitOptionAlways
 		case "error-handling-correctness-only":
@@ -160,9 +155,10 @@ func reportNodeWithDeferredFixesOrSuggestions(
 
 var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 	Name:             "return-await",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		option := parseReturnAwaitOption(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		option := parseReturnAwaitOption(options)
 		sourceFile := ctx.SourceFile
 
 		var scopes []scopeInfo

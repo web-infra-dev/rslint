@@ -25,7 +25,9 @@ function isMusl() {
   if (process.platform !== 'linux') return false;
   try {
     if (fs.readFileSync('/usr/bin/ldd', 'utf-8').includes('musl')) return true;
-  } catch {}
+  } catch {
+    // fall through to the ldd --version check below
+  }
   try {
     return execFileSync('ldd', ['--version'], { encoding: 'utf8' }).includes(
       'musl',

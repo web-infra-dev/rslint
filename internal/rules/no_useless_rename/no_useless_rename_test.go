@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -70,23 +71,23 @@ func TestNoUselessRenameRule(t *testing.T) {
 			{Code: `const {foo: bar, ...stuff} = myObject;`},
 
 			// ---- { ignoreDestructuring: true } ----
-			{Code: `let {foo: foo} = obj;`, Options: map[string]interface{}{"ignoreDestructuring": true}},
-			{Code: `let {foo: foo, bar: baz} = obj;`, Options: map[string]interface{}{"ignoreDestructuring": true}},
-			{Code: `let {foo: foo, bar: bar} = obj;`, Options: map[string]interface{}{"ignoreDestructuring": true}},
-			{Code: `({foo: foo} = obj); for ({bar: bar} of values) {}`, Options: map[string]interface{}{"ignoreDestructuring": true}},
+			{Code: `let {foo: foo} = obj;`, Options: []any{map[string]interface{}{"ignoreDestructuring": true}}},
+			{Code: `let {foo: foo, bar: baz} = obj;`, Options: []any{map[string]interface{}{"ignoreDestructuring": true}}},
+			{Code: `let {foo: foo, bar: bar} = obj;`, Options: []any{map[string]interface{}{"ignoreDestructuring": true}}},
+			{Code: `({foo: foo} = obj); for ({bar: bar} of values) {}`, Options: []any{map[string]interface{}{"ignoreDestructuring": true}}},
 
 			// ---- { ignoreImport: true } ----
-			{Code: `import {foo as foo} from 'foo';`, Options: map[string]interface{}{"ignoreImport": true}},
-			{Code: `import {foo as foo, bar as baz} from 'foo';`, Options: map[string]interface{}{"ignoreImport": true}},
-			{Code: `import {foo as foo, bar as bar} from 'foo';`, Options: map[string]interface{}{"ignoreImport": true}},
+			{Code: `import {foo as foo} from 'foo';`, Options: []any{map[string]interface{}{"ignoreImport": true}}},
+			{Code: `import {foo as foo, bar as baz} from 'foo';`, Options: []any{map[string]interface{}{"ignoreImport": true}}},
+			{Code: `import {foo as foo, bar as bar} from 'foo';`, Options: []any{map[string]interface{}{"ignoreImport": true}}},
 
 			// ---- { ignoreExport: true } ----
-			{Code: `var foo = 0;export {foo as foo};`, Options: map[string]interface{}{"ignoreExport": true}},
-			{Code: `var foo = 0;var bar = 0;export {foo as foo, bar as baz};`, Options: map[string]interface{}{"ignoreExport": true}},
-			{Code: `var foo = 0;var bar = 0;export {foo as foo, bar as bar};`, Options: map[string]interface{}{"ignoreExport": true}},
-			{Code: `export {foo as foo} from 'foo';`, Options: map[string]interface{}{"ignoreExport": true}},
-			{Code: `export {foo as foo, bar as baz} from 'foo';`, Options: map[string]interface{}{"ignoreExport": true}},
-			{Code: `export {foo as foo, bar as bar} from 'foo';`, Options: map[string]interface{}{"ignoreExport": true}},
+			{Code: `var foo = 0;export {foo as foo};`, Options: []any{map[string]interface{}{"ignoreExport": true}}},
+			{Code: `var foo = 0;var bar = 0;export {foo as foo, bar as baz};`, Options: []any{map[string]interface{}{"ignoreExport": true}}},
+			{Code: `var foo = 0;var bar = 0;export {foo as foo, bar as bar};`, Options: []any{map[string]interface{}{"ignoreExport": true}}},
+			{Code: `export {foo as foo} from 'foo';`, Options: []any{map[string]interface{}{"ignoreExport": true}}},
+			{Code: `export {foo as foo, bar as baz} from 'foo';`, Options: []any{map[string]interface{}{"ignoreExport": true}}},
+			{Code: `export {foo as foo, bar as bar} from 'foo';`, Options: []any{map[string]interface{}{"ignoreExport": true}}},
 
 			// When every category is ignored, Run returns no listeners.
 			{
@@ -106,15 +107,15 @@ const {foo: foo} = value;
 			{Code: `let {0: foo} = obj;`},
 			// Empty options object behaves the same as no options at all —
 			// all three flags default to false.
-			{Code: `let {foo} = obj;`, Options: map[string]interface{}{}},
+			{Code: `let {foo} = obj;`, Options: []any{map[string]interface{}{}}},
 			// Options explicitly set to false — same as defaults.
 			{
 				Code: `let {foo: bar} = obj;`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"ignoreDestructuring": false,
 					"ignoreImport":        false,
 					"ignoreExport":        false,
-				},
+				}},
 			},
 			// Array destructuring has no propertyName, so never triggers.
 			{Code: `let [foo, bar] = arr;`},
@@ -131,7 +132,7 @@ const {foo: foo} = value;
 			// TS: type-only imports/exports without rename.
 			{Code: `import type {foo as bar} from 'foo';`},
 			{Code: `import {type foo as bar} from 'foo';`},
-			{Code: `export type {foo as bar};`, Options: map[string]interface{}{}},
+			{Code: `export type {foo as bar};`, Options: []any{map[string]interface{}{}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Destructuring (declarations) — basic ----
@@ -1073,7 +1074,7 @@ const { binding: binding = fallback } = input;
 		t.Helper()
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			HasTypeInfo:  true,
 			ExcludePaths: []string{},

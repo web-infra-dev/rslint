@@ -48,4 +48,5 @@ When set to `true`, allows using bitwise expressions in enum initializers, which
 
 ## Original Documentation
 
-- [typescript-eslint prefer-literal-enum-member](https://typescript-eslint.io/rules/prefer-literal-enum-member)
+- [typescript-eslint: prefer-literal-enum-member](https://typescript-eslint.io/rules/prefer-literal-enum-member)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-literal-enum-member.ts)

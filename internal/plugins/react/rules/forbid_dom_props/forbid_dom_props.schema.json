@@ -34,7 +34,8 @@
                   "message": {
                     "type": "string"
                   }
-                }
+                },
+                "additionalProperties": false
               }
             ],
             "minLength": 1

@@ -49,4 +49,5 @@ var bools = [1, 2, 3].filter(function (x) {
 
 ## Original Documentation
 
-- [ESLint array-callback-return](https://eslint.org/docs/latest/rules/array-callback-return)
+- [ESLint: array-callback-return](https://eslint.org/docs/latest/rules/array-callback-return)
+- [Source code](https://github.com/eslint/eslint/blob/v9.39.1/lib/rules/array-callback-return.js)

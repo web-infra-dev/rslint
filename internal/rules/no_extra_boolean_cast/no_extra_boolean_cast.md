@@ -72,4 +72,5 @@ if ((a, b, Boolean(c))) {
 
 ## Original Documentation
 
-- [ESLint no-extra-boolean-cast](https://eslint.org/docs/latest/rules/no-extra-boolean-cast)
+- [ESLint: no-extra-boolean-cast](https://eslint.org/docs/latest/rules/no-extra-boolean-cast)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/no-extra-boolean-cast.js)

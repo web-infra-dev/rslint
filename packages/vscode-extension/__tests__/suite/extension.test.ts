@@ -382,6 +382,68 @@ suite('rslint extension', function () {
     );
   });
 
+  test('incremental edit after an emoji keeps UTF-16 positions aligned', async () => {
+    const doc = await openFixture('autofix.ts');
+    const editor = await vscode.window.showTextDocument(doc);
+    await waitForDiagnostics(doc);
+
+    const eol = doc.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+    const cleanContent = `const marker = '😀'; export { marker };${eol}`;
+    await editor.edit((builder) => {
+      builder.replace(
+        new vscode.Range(
+          doc.positionAt(0),
+          doc.positionAt(doc.getText().length),
+        ),
+        cleanContent,
+      );
+    });
+    await waitForDiagnosticsCount(doc, 0);
+
+    const insertedContent = `const unsafeValue: any = {};${eol}unsafeValue.foo;${eol}`;
+    const insertionOffset = doc.getText().indexOf('export');
+    assert.ok(insertionOffset > 0, 'Expected an export insertion anchor');
+    await editor.edit((builder) => {
+      builder.insert(doc.positionAt(insertionOffset), insertedContent);
+    });
+
+    assert.strictEqual(
+      doc.getText(),
+      cleanContent.replace('export', `${insertedContent}export`),
+      'VS Code should preserve the document EOL while applying the edit',
+    );
+    const diagnostics = await waitForDiagnosticsWithMessage(
+      doc,
+      'no-unsafe-member-access',
+    );
+    const unsafeMember = diagnostics.find((diagnostic) =>
+      diagnostic.message.includes('no-unsafe-member-access'),
+    );
+    assert.ok(unsafeMember, 'Expected an unsafe member access diagnostic');
+    assert.deepStrictEqual(
+      {
+        start: {
+          line: unsafeMember.range.start.line,
+          character: unsafeMember.range.start.character,
+        },
+        end: {
+          line: unsafeMember.range.end.line,
+          character: unsafeMember.range.end.character,
+        },
+      },
+      {
+        start: { line: 1, character: 'unsafeValue.'.length },
+        end: { line: 1, character: 'unsafeValue.foo'.length },
+      },
+      'The server should return the UTF-16 range of the inserted property',
+    );
+    assert.strictEqual(
+      doc.getText(unsafeMember.range),
+      'foo',
+      'The server diagnostic should select the inserted property',
+    );
+  });
+
   test('diagnostics clear completely when all errors removed', async () => {
     const doc = await openFixture('index.ts');
     const editor = await vscode.window.showTextDocument(doc);

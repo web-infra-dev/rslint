@@ -28,4 +28,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [react/void-dom-elements-no-children](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/void-dom-elements-no-children.md)
+- [eslint-plugin-react: void-dom-elements-no-children](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/void-dom-elements-no-children.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/void-dom-elements-no-children.js)

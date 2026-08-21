@@ -24,4 +24,5 @@ var arr = [1, undefined, 3]; // explicit undefined is fine
 
 ## Original Documentation
 
-- [ESLint no-sparse-arrays](https://eslint.org/docs/latest/rules/no-sparse-arrays)
+- [ESLint: no-sparse-arrays](https://eslint.org/docs/latest/rules/no-sparse-arrays)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-sparse-arrays.js)

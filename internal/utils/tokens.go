@@ -190,7 +190,7 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 	if (leftRune == '+' && rightRune == '+') || (leftRune == '-' && rightRune == '-') {
 		return false
 	}
-	if leftRune == '/' && (rightRune == '/' || rightRune == '*' || scanner.IsIdentifierPart(rightRune)) {
+	if leftRune == '/' && (rightRune == '/' || rightRune == '*') {
 		return false
 	}
 	return true

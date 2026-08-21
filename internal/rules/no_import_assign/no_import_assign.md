@@ -37,4 +37,5 @@ ns.named.prop = 0; // Writing to nested properties is fine
 
 ## Original Documentation
 
-- [ESLint no-import-assign](https://eslint.org/docs/latest/rules/no-import-assign)
+- [ESLint: no-import-assign](https://eslint.org/docs/latest/rules/no-import-assign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-import-assign.js)

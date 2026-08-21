@@ -69,4 +69,5 @@ React.createElement(MyComponent, {}, () => <div />)
 
 ## Original Documentation
 
-- [eslint-plugin-react/no-children-prop](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-children-prop.md)
+- [eslint-plugin-react: no-children-prop](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-children-prop.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-children-prop.js)

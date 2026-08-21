@@ -136,4 +136,5 @@ const x = (() => {}) as Foo;
 
 ## Original Documentation
 
-- [typescript-eslint explicit-module-boundary-types](https://typescript-eslint.io/rules/explicit-module-boundary-types)
+- [typescript-eslint: explicit-module-boundary-types](https://typescript-eslint.io/rules/explicit-module-boundary-types)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/explicit-module-boundary-types.ts)

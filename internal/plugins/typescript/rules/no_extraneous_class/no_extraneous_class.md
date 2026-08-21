@@ -41,4 +41,5 @@ export function helper() {}
 
 ## Original Documentation
 
-- [typescript-eslint no-extraneous-class](https://typescript-eslint.io/rules/no-extraneous-class)
+- [typescript-eslint: no-extraneous-class](https://typescript-eslint.io/rules/no-extraneous-class)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.46.3/packages/eslint-plugin/src/rules/no-extraneous-class.ts)

@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildNoUselessConstructorMessage() rule.RuleMessage {
@@ -180,7 +181,7 @@ func reportRange(ctx rule.RuleContext, node *ast.Node, constructor *ast.Construc
 		if p > start && text[p-1] == '(' {
 			p--
 		}
-		p = utils.SkipTrailingWhitespace(text, start, p)
+		p = ecmascript.SkipTrailingWhitespace(text, start, p)
 		end = p
 	}
 	return core.NewTextRange(start, end)
@@ -214,7 +215,8 @@ func needsLeadingSemicolon(sf *ast.SourceFile, classNode *ast.Node, node *ast.No
 }
 
 var NoUselessConstructorRule = rule.Rule{
-	Name: "no-useless-constructor",
+	Name:   "no-useless-constructor",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindConstructor: func(node *ast.Node) {

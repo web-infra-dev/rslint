@@ -1,7 +1,7 @@
 package only_throw_error
 
 import (
-	"encoding/json"
+	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -9,11 +9,40 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed only_throw_error.schema.json
+var schemaJSON []byte
+
 type OnlyThrowErrorOptions struct {
-	Allow                []utils.TypeOrValueSpecifier `json:"allow"`
-	AllowRethrowing      *bool                        `json:"allowRethrowing"`
-	AllowThrowingAny     *bool                        `json:"allowThrowingAny"`
-	AllowThrowingUnknown *bool                        `json:"allowThrowingUnknown"`
+	Allow                []utils.TypeOrValueSpecifier
+	AllowRethrowing      bool
+	AllowThrowingAny     bool
+	AllowThrowingUnknown bool
+}
+
+func parseOptions(options []any) OnlyThrowErrorOptions {
+	opts := OnlyThrowErrorOptions{
+		Allow:                []utils.TypeOrValueSpecifier{},
+		AllowRethrowing:      true,
+		AllowThrowingAny:     true,
+		AllowThrowingUnknown: true,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if specifiers := utils.ParseTypeOrValueSpecifiers(optsMap["allow"]); specifiers != nil {
+		opts.Allow = specifiers
+	}
+	if value, ok := optsMap["allowRethrowing"].(bool); ok {
+		opts.AllowRethrowing = value
+	}
+	if value, ok := optsMap["allowThrowingAny"].(bool); ok {
+		opts.AllowThrowingAny = value
+	}
+	if value, ok := optsMap["allowThrowingUnknown"].(bool); ok {
+		opts.AllowThrowingUnknown = value
+	}
+	return opts
 }
 
 func buildObjectMessage() rule.RuleMessage {
@@ -133,44 +162,22 @@ func isRethrownError(ctx rule.RuleContext, expr *ast.Node) bool {
 
 var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 	Name:             "only-throw-error",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(OnlyThrowErrorOptions)
-		if !ok {
-			opts = OnlyThrowErrorOptions{}
-			// When options come from JSON (API/TS tests), they arrive as []interface{};
-			// NormalizeOptions also re-wraps config.rules' unwrapped single option.
-			if optionsArray := rule.NormalizeOptions(options); len(optionsArray) > 0 {
-				if optsJSON, err := json.Marshal(optionsArray[0]); err == nil {
-					json.Unmarshal(optsJSON, &opts)
-				}
-			}
-		}
-		if opts.Allow == nil {
-			opts.Allow = []utils.TypeOrValueSpecifier{}
-		}
-		if opts.AllowRethrowing == nil {
-			opts.AllowRethrowing = utils.Ref(true)
-		}
-		if opts.AllowThrowingAny == nil {
-			opts.AllowThrowingAny = utils.Ref(true)
-		}
-		if opts.AllowThrowingUnknown == nil {
-			opts.AllowThrowingUnknown = utils.Ref(true)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
 				expr := node.Expression()
 
-				if *opts.AllowRethrowing && isRethrownError(ctx, expr) {
+				if opts.AllowRethrowing && isRethrownError(ctx, expr) {
 					return
 				}
 
 				t := ctx.TypeChecker.GetTypeAtLocation(expr)
 
-				if utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program) {
+				if utils.TypeMatchesSomeSpecifier(t, opts.Allow, nil, ctx.Program()) {
 					return
 				}
 
@@ -179,15 +186,15 @@ var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				if *opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
+				if opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
 					return
 				}
 
-				if *opts.AllowThrowingUnknown && utils.IsTypeUnknownType(t) {
+				if opts.AllowThrowingUnknown && utils.IsTypeUnknownType(t) {
 					return
 				}
 
-				if utils.IsErrorLike(ctx.Program, ctx.TypeChecker, t) {
+				if utils.IsErrorLike(ctx.Program(), ctx.TypeChecker, t) {
 					return
 				}
 

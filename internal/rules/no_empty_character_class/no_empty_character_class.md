@@ -35,4 +35,5 @@ var foo = /[[a][b]]/v;
 
 ## Original Documentation
 
-- [ESLint no-empty-character-class](https://eslint.org/docs/latest/rules/no-empty-character-class)
+- [ESLint: no-empty-character-class](https://eslint.org/docs/latest/rules/no-empty-character-class)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-empty-character-class.js)

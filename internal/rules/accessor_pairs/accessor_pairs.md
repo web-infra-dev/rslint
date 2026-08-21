@@ -49,4 +49,5 @@ All options are boolean with the following defaults:
 
 ## Original Documentation
 
-- ESLint rule: https://eslint.org/docs/latest/rules/accessor-pairs
+- [ESLint: accessor-pairs](https://eslint.org/docs/latest/rules/accessor-pairs)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/accessor-pairs.js)

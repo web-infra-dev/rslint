@@ -1,35 +1,30 @@
 package no_sequences
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_sequences.schema.json
+var schemaJSON []byte
+
 type options struct {
 	allowInParentheses bool
 }
 
-func parseOptions(raw any) options {
+func parseOptions(raw []any) options {
 	opts := options{allowInParentheses: true}
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
+	if len(raw) == 0 {
 		return opts
 	}
-	if v, ok := optsMap["allowInParentheses"].(bool); ok {
+	m, _ := raw[0].(map[string]any)
+	if v, ok := m["allowInParentheses"].(bool); ok {
 		opts.allowInParentheses = v
 	}
 	return opts
-}
-
-// isCommaBinary reports whether node is a BinaryExpression whose operator is
-// the comma token — tsgo's collapsed form of ESLint's SequenceExpression.
-func isCommaBinary(node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindBinaryExpression {
-		return false
-	}
-	bin := node.AsBinaryExpression()
-	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindCommaToken
 }
 
 // walkUpSkippingParens returns the first ancestor of node that is not a
@@ -86,7 +81,7 @@ func firstCommaToken(node *ast.Node) *ast.Node {
 	for {
 		bin := current.AsBinaryExpression()
 		left := ast.SkipParentheses(bin.Left)
-		if !isCommaBinary(left) {
+		if !utils.IsCommaOperator(left) {
 			return bin.OperatorToken
 		}
 		current = left
@@ -95,14 +90,14 @@ func firstCommaToken(node *ast.Node) *ast.Node {
 
 // https://eslint.org/docs/latest/rules/no-sequences
 var NoSequencesRule = rule.Rule{
-	Name: "no-sequences",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "no-sequences",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if !isCommaBinary(node) {
+				if !utils.IsCommaOperator(node) {
 					return
 				}
 				// Single walk-up; all downstream checks read from these.
@@ -110,7 +105,7 @@ var NoSequencesRule = rule.Rule{
 
 				// Only report once per comma chain — skip inner nodes of
 				// `(a, b), c` / `a, b, c`.
-				if isCommaBinary(parent) {
+				if utils.IsCommaOperator(parent) {
 					return
 				}
 				// `for (init; cond; update)` — ESLint unconditionally allows

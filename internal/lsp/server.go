@@ -180,6 +180,12 @@ type Server struct {
 	// extension remains the sole refresh owner for workspace/descendant JS and
 	// JSON changes.
 	configDiscoveryActive bool
+	// configRefreshInitialized records that the client has chosen this process's
+	// invocation-wide config source. configRefreshConfigPath is empty for
+	// automatic discovery and otherwise contains one immutable normalized
+	// explicit JS/TS config path. Changing that choice requires a new process.
+	configRefreshInitialized bool
+	configRefreshConfigPath  string
 	// configDiscoveryHasLastGood distinguishes a committed catalog with at
 	// least one usable JS config from an empty catalog or the synthetic
 	// unavailable boundaries used to keep LSP alive when every JS config is

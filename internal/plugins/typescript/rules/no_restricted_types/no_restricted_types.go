@@ -1,6 +1,7 @@
 package no_restricted_types
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_restricted_types.schema.json
+var schemaJSON []byte
 
 // keywordTypeNames maps the tsgo keyword `ast.Kind` for a primitive type
 // annotation to the lower-case name upstream uses as the bannedTypes map key
@@ -149,11 +153,12 @@ func buildReplacementSuggestions(
 }
 
 var NoRestrictedTypesRule = rule.CreateRule(rule.Rule{
-	Name: "no-restricted-types",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-restricted-types",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		bannedTypes := map[string]bannedTypeConfig{}
-		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+		if len(options) > 0 {
+			optsMap, _ := options[0].(map[string]interface{})
 			if types, ok := optsMap["types"].(map[string]interface{}); ok {
 				bannedTypes = parseBannedTypes(types)
 			}

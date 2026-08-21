@@ -1,6 +1,7 @@
 package object_shorthand
 
 import (
+	_ "embed"
 	"regexp"
 	"strings"
 
@@ -9,7 +10,11 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
+
+//go:embed object_shorthand.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/object-shorthand
 
@@ -28,32 +33,23 @@ var jsdocStarRegex = regexp.MustCompile(`^\s*\*`)
 type options struct {
 	apply                     string
 	ignoreConstructors        bool
-	methodsIgnorePattern      *regexp.Regexp
+	methodsIgnorePattern      *esregexp.RegExp
 	avoidQuotes               bool
 	avoidExplicitReturnArrows bool
 }
 
-func parseOptions(opts any) options {
+func parseOptions(opts []any) options {
 	o := options{apply: modeAlways}
 
-	if arr, ok := opts.([]interface{}); ok {
-		if len(arr) > 0 {
-			if s, ok := arr[0].(string); ok && s != "" {
-				o.apply = s
-			}
-		}
-		if len(arr) > 1 {
-			if m, ok := arr[1].(map[string]interface{}); ok {
-				applyObjectOptions(&o, m)
-			}
-		}
-	} else if s, ok := opts.(string); ok && s != "" {
-		o.apply = s
-	} else if m := utils.GetOptionsMap(opts); m != nil {
-		if s, ok := m["apply"].(string); ok && s != "" {
+	if len(opts) > 0 {
+		if s, ok := opts[0].(string); ok {
 			o.apply = s
 		}
-		applyObjectOptions(&o, m)
+	}
+	if len(opts) > 1 {
+		if m, ok := opts[1].(map[string]interface{}); ok {
+			applyObjectOptions(&o, m)
+		}
 	}
 
 	return o
@@ -70,7 +66,14 @@ func applyObjectOptions(o *options, m map[string]interface{}) {
 		o.avoidExplicitReturnArrows = v
 	}
 	if v, ok := m["methodsIgnorePattern"].(string); ok && v != "" {
-		if re, err := regexp.Compile(v); err == nil {
+		// ECMAScript + Unicode mirrors upstream's `new RegExp(pattern, "u")`,
+		// so lookaround, backreferences and `\p{...}` behave the same as in the
+		// original rule (Go's RE2-based `regexp` supports none of them).
+		// Upstream throws at rule-load time on an invalid pattern; rslint's
+		// equivalent fail-fast surface is config validation, where the schema's
+		// `format: "regex"` on methodsIgnorePattern rejects the config before
+		// linting starts - so the compile-error branch here is only defensive.
+		if re, err := esregexp.Compile(v, "u"); err == nil {
 			o.methodsIgnorePattern = re
 		}
 	}
@@ -251,7 +254,7 @@ func shouldIgnoreMethodName(o *options, nameNode *ast.Node) bool {
 	if !ok {
 		return false
 	}
-	return o.methodsIgnorePattern.MatchString(name)
+	return o.methodsIgnorePattern.TestOrTimeout(name)
 }
 
 // isArgumentsIdentifier reports whether the node is an Identifier whose
@@ -352,10 +355,10 @@ func declarationListDeclaresBlockScopedArguments(node *ast.Node) bool {
 }
 
 var ObjectShorthandRule = rule.Rule{
-	Name: "object-shorthand",
-	Run: func(ctx rule.RuleContext, _optionsAny []any) rule.RuleListeners {
-		optionsAny := rule.LegacyUnwrapOptions(_optionsAny)
-		opts := parseOptions(optionsAny)
+	Name:   "object-shorthand",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, ruleOptions []any) rule.RuleListeners {
+		opts := parseOptions(ruleOptions)
 		sourceText := ctx.SourceFile.Text()
 
 		applyToMethods := opts.apply == modeMethods || opts.apply == modeAlways

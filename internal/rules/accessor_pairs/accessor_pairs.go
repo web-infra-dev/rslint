@@ -1,6 +1,7 @@
 package accessor_pairs
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed accessor_pairs.schema.json
+var schemaJSON []byte
+
 type Options struct {
 	GetWithoutSet          bool
 	SetWithoutGet          bool
@@ -16,27 +20,28 @@ type Options struct {
 	EnforceForTSTypes      bool
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{
 		GetWithoutSet:          false,
 		SetWithoutGet:          true,
 		EnforceForClassMembers: true,
 		EnforceForTSTypes:      false,
 	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["getWithoutSet"].(bool); ok {
-			opts.GetWithoutSet = v
-		}
-		if v, ok := optsMap["setWithoutGet"].(bool); ok {
-			opts.SetWithoutGet = v
-		}
-		if v, ok := optsMap["enforceForClassMembers"].(bool); ok {
-			opts.EnforceForClassMembers = v
-		}
-		if v, ok := optsMap["enforceForTSTypes"].(bool); ok {
-			opts.EnforceForTSTypes = v
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if v, ok := optsMap["getWithoutSet"].(bool); ok {
+		opts.GetWithoutSet = v
+	}
+	if v, ok := optsMap["setWithoutGet"].(bool); ok {
+		opts.SetWithoutGet = v
+	}
+	if v, ok := optsMap["enforceForClassMembers"].(bool); ok {
+		opts.EnforceForClassMembers = v
+	}
+	if v, ok := optsMap["enforceForTSTypes"].(bool); ok {
+		opts.EnforceForTSTypes = v
 	}
 	return opts
 }
@@ -387,9 +392,9 @@ func checkTypeMembers(ctx rule.RuleContext, members []*ast.Node, opts Options) {
 
 // https://eslint.org/docs/latest/rules/accessor-pairs
 var AccessorPairsRule = rule.Rule{
-	Name: "accessor-pairs",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "accessor-pairs",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		if !opts.SetWithoutGet && !opts.GetWithoutSet {
 			return rule.RuleListeners{}

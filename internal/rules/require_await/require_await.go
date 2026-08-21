@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildMissingAwaitMessage(node *ast.Node) rule.RuleMessage {
@@ -43,7 +44,7 @@ func findAsyncKeyword(sourceFile *ast.SourceFile, node *ast.Node) (asyncKeywordI
 			continue
 		}
 		tokenRange := utils.TrimNodeTextRange(sourceFile, mod)
-		removeEnd := utils.SkipLeadingWhitespace(sourceFile.Text(), tokenRange.End(), len(sourceFile.Text()))
+		removeEnd := ecmascript.SkipLeadingWhitespace(sourceFile.Text(), tokenRange.End(), len(sourceFile.Text()))
 		return asyncKeywordInfo{
 			tokenRange:  tokenRange,
 			removeRange: core.NewTextRange(tokenRange.Pos(), removeEnd),
@@ -100,7 +101,8 @@ func reportMissingAwait(ctx rule.RuleContext, node *ast.Node) {
 
 // https://eslint.org/docs/latest/rules/require-await
 var RequireAwaitRule = rule.Rule{
-	Name: "require-await",
+	Name:   "require-await",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		stack := make([]scopeFrame, 0, 8)
 

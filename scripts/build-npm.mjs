@@ -1,5 +1,7 @@
 #!/usr/bin/env zx
 import fs from 'fs';
+import { $, argv } from 'zx';
+
 $.verbose = true;
 
 // build binary for following platforms
@@ -41,12 +43,13 @@ async function build_rslint() {
   }
 }
 
-async function build_tsgo() {
+async function build_tsgo_server() {
   for (const platform of platforms) {
     const nodeOs = platform['node-os'] || platform.os;
     const nodeArch = platform['node-arch'];
-    const outputDir = `npm/tsgo/${nodeOs}-${nodeArch}`;
+    const outputDir = `npm/tsgo/${nodeOs}-${nodeArch}/lib`;
     const ext = platform.os === 'windows' ? '.exe' : '';
+    fs.mkdirSync(outputDir, { recursive: true });
     await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o ${outputDir}/tsgo${ext} ./cmd/tsgo`;
   }
 }
@@ -55,12 +58,10 @@ async function main() {
   const target = argv._[0];
   if (target === 'rslint') {
     await build_rslint();
-  } else if (target === 'tsgo') {
-    await build_tsgo();
+  } else if (target === 'tsgo-server' || target === 'tsgo') {
+    await build_tsgo_server();
   } else {
-    // Build all by default
-    await build_rslint();
-    await build_tsgo();
+    throw new Error('Usage: zx scripts/build-npm.mjs <rslint|tsgo-server>');
   }
 }
 

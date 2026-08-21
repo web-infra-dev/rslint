@@ -1,0 +1,1539 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-assignment > invalid 1`] = `
+{
+  "code": "const x = 1 as any;",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 2`] = `
+{
+  "code": "
+const x = 1 as any,
+  y = 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 7,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 3`] = `
+{
+  "code": "function foo(a = 1 as any) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 4`] = `
+{
+  "code": "
+class Foo {
+  constructor(private a = 1 as any) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 5`] = `
+{
+  "code": "
+class Foo {
+  private a = 1 as any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 6`] = `
+{
+  "code": "
+class Foo {
+  accessor a = 1 as any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 7`] = `
+{
+  "code": "
+const [x] = spooky;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an error typed value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 7,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 8`] = `
+{
+  "code": "
+const [[[x]]] = [spooky];
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an error typed value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 8,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 9`] = `
+{
+  "code": "
+const {
+  x: { y: z },
+} = { x: spooky };
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an error typed value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+    {
+      "message": "Unsafe assignment of an error typed value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 10`] = `
+{
+  "code": "
+let value: number;
+
+value = spooky;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an error typed value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 11`] = `
+{
+  "code": "
+const [x] = 1 as any;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 7,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 12`] = `
+{
+  "code": "
+const [x] = [] as any[];
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of an \`any\` array value.",
+      "messageId": "unsafeArrayPattern",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 2,
+        },
+        "start": {
+          "column": 7,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 13`] = `
+{
+  "code": "const x: Set<string> = new Set<any>();",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of type \`Set<any>\` to a variable of type \`Set<string>\`.",
+      "messageId": "unsafeAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 14`] = `
+{
+  "code": "const x: Map<string, string> = new Map<string, any>();",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of type \`Map<string, any>\` to a variable of type \`Map<string, string>\`.",
+      "messageId": "unsafeAssignment",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 15`] = `
+{
+  "code": "const x: Set<string[]> = new Set<any[]>();",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of type \`Set<any[]>\` to a variable of type \`Set<string[]>\`.",
+      "messageId": "unsafeAssignment",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 16`] = `
+{
+  "code": "const x: Set<Set<Set<string>>> = new Set<Set<Set<any>>>();",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of type \`Set<Set<Set<any>>>\` to a variable of type \`Set<Set<Set<string>>>\`.",
+      "messageId": "unsafeAssignment",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 17`] = `
+{
+  "code": "const [x] = [1] as [any];",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 18`] = `
+{
+  "code": "function foo([x] = [1] as [any]) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 19`] = `
+{
+  "code": "[x] = [1] as [any];",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 20`] = `
+{
+  "code": "const [[[[x]]]] = [[[[1 as any]]]];",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 21`] = `
+{
+  "code": "function foo([[[[x]]]] = [[[[1 as any]]]]) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 22`] = `
+{
+  "code": "[[[[x]]]] = [[[[1 as any]]]];",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 23`] = `
+{
+  "code": "const [[[[x]]]] = [1 as any];",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 24`] = `
+{
+  "code": "function foo([[[[x]]]] = [1 as any]) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 25`] = `
+{
+  "code": "const [{ x }] = [{ x: 1 }] as [{ x: any }];",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 26`] = `
+{
+  "code": "function foo([{ x }] = [{ x: 1 }] as [{ x: any }]) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 27`] = `
+{
+  "code": "[{ x }] = [{ x: 1 }] as [{ x: any }];",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 28`] = `
+{
+  "code": "const [{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }];",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 29`] = `
+{
+  "code": "function foo([{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }]) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 30`] = `
+{
+  "code": "[{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }];",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 31`] = `
+{
+  "code": "const [{ [\`x\`]: x }] = [{ [\`x\`]: 1 }] as [{ [\`x\`]: any }];",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 32`] = `
+{
+  "code": "function foo([{ [\`x\`]: x }] = [{ [\`x\`]: 1 }] as [{ [\`x\`]: any }]) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 33`] = `
+{
+  "code": "[{ [\`x\`]: x }] = [{ [\`x\`]: 1 }] as [{ [\`x\`]: any }];",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 34`] = `
+{
+  "code": "[[[[x]]]] = [1 as any];",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of type \`[any]\` to a variable of type \`[[[[any]]]]\`.",
+      "messageId": "unsafeAssignment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 35`] = `
+{
+  "code": "
+const x = [...(1 as any)];
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe spread of an \`any\` value in an array.",
+      "messageId": "unsafeArraySpread",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 36`] = `
+{
+  "code": "
+const x = [...([] as any[])];
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe spread of an \`any\` value in an array.",
+      "messageId": "unsafeArraySpread",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 37`] = `
+{
+  "code": "const { x } = { x: 1 } as { x: any };",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 38`] = `
+{
+  "code": "function foo({ x } = { x: 1 } as { x: any }) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 39`] = `
+{
+  "code": "({ x } = { x: 1 } as { x: any });",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 40`] = `
+{
+  "code": "const { x: y } = { x: 1 } as { x: any };",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 41`] = `
+{
+  "code": "function foo({ x: y } = { x: 1 } as { x: any }) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 42`] = `
+{
+  "code": "({ x: y } = { x: 1 } as { x: any });",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 43`] = `
+{
+  "code": "
+const {
+  x: { y },
+} = { x: { y: 1 } } as { x: { y: any } };
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 44`] = `
+{
+  "code": "function foo({ x: { y } } = { x: { y: 1 } } as { x: { y: any } }) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 45`] = `
+{
+  "code": "
+({
+  x: { y },
+} = { x: { y: 1 } } as { x: { y: any } });
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe object destructuring of a property with an \`any\` value.",
+      "messageId": "unsafeObjectPattern",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 46`] = `
+{
+  "code": "
+const {
+  x: [y],
+} = { x: { y: 1 } } as { x: [any] };
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 47`] = `
+{
+  "code": "function foo({ x: [y] } = { x: { y: 1 } } as { x: [any] }) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 48`] = `
+{
+  "code": "
+({
+  x: [y],
+} = { x: { y: 1 } } as { x: [any] });
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe array destructuring of a tuple element with an \`any\` value.",
+      "messageId": "unsafeArrayPatternFromTuple",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 49`] = `
+{
+  "code": "const x = { y: 1 as any };",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 50`] = `
+{
+  "code": "const x = { y: { z: 1 as any } };",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 51`] = `
+{
+  "code": "const x: { y: Set<Set<Set<string>>> } = { y: new Set<Set<Set<any>>>() };",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of type \`Set<Set<Set<any>>>\` to a variable of type \`Set<Set<Set<string>>>\`.",
+      "messageId": "unsafeAssignment",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 52`] = `
+{
+  "code": "const x = { ...(1 as any) };",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 53`] = `
+{
+  "code": "
+type Props = { a: string };
+declare function Foo(props: Props): never;
+<Foo a={1 as any} />;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 54`] = `
+{
+  "code": "
+function foo() {
+  const bar = this;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value. \`this\` is typed as \`any\`.
+You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "messageId": "anyAssignmentThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 55`] = `
+{
+  "code": "
+type T = [string, T[]];
+const test: T = ['string', []] as any;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-assignment > invalid 56`] = `
+{
+  "code": "
+type Foo = { bar: number };
+const bar: any = 1;
+const foo: Foo = { bar };
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assignment of an \`any\` value.",
+      "messageId": "anyAssignment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

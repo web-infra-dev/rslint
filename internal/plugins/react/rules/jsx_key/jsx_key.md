@@ -122,4 +122,5 @@ the JSX inside an iterable, you may want to disable this rule.
 
 ## Original Documentation
 
-- https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-key.md
+- [eslint-plugin-react: jsx-key](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-key.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-key.js)

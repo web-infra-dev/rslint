@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkNever": {
+          "type": "boolean",
+          "description": "Whether to suggest removing `void` when the argument has type `never`."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

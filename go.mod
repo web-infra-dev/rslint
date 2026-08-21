@@ -65,7 +65,7 @@ require (
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
-	golang.org/x/tools v0.47.0
+	golang.org/x/tools v0.49.0
 	gotest.tools/v3 v3.5.2
 )
 
@@ -76,7 +76,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/mod v0.39.0 // indirect
 )
 
 require (
@@ -84,5 +84,5 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
 	github.com/microsoft/typescript-go v0.0.0-20260721214542-01cbcdd8643c // indirect
-	golang.org/x/text v0.40.0
+	golang.org/x/text v0.41.0
 )

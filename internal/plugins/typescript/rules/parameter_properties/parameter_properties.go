@@ -1,38 +1,63 @@
 package parameter_properties
 
 import (
-	"fmt"
+	_ "embed"
 	"sort"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed parameter_properties.schema.json
+var schemaJSON []byte
 
 // Modifier values that match the ESLint option schema:
 // "readonly", "private", "protected", "public",
 // "private readonly", "protected readonly", "public readonly"
 
+type allowedModifier uint8
+
+const (
+	allowedReadonly allowedModifier = 1 << iota
+	allowedPrivate
+	allowedProtected
+	allowedPublic
+	allowedPrivateReadonly
+	allowedProtectedReadonly
+	allowedPublicReadonly
+)
+
 type options struct {
-	allow  map[string]bool
+	allow  allowedModifier
 	prefer string
 }
 
-func parseOptions(rawOpts any) options {
-	o := options{
-		allow:  make(map[string]bool),
-		prefer: "class-property",
-	}
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+func parseOptions(rawOpts []any) options {
+	o := options{prefer: "class-property"}
+	if len(rawOpts) == 0 {
 		return o
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
 	if allow, ok := optsMap["allow"].([]interface{}); ok {
 		for _, a := range allow {
 			if s, ok := a.(string); ok {
-				o.allow[s] = true
+				switch s {
+				case "readonly":
+					o.allow |= allowedReadonly
+				case "private":
+					o.allow |= allowedPrivate
+				case "protected":
+					o.allow |= allowedProtected
+				case "public":
+					o.allow |= allowedPublic
+				case "private readonly":
+					o.allow |= allowedPrivateReadonly
+				case "protected readonly":
+					o.allow |= allowedProtectedReadonly
+				case "public readonly":
+					o.allow |= allowedPublicReadonly
+				}
 			}
 		}
 	}
@@ -42,37 +67,51 @@ func parseOptions(rawOpts any) options {
 	return o
 }
 
-// getModifiers builds the ESLint-style modifier string (e.g. "public readonly") from a node's
-// accessibility and readonly flags. The result is used to match against the user's "allow" list.
-// NOTE: class_literal_property_style has a similar printNodeModifiers, but it also handles
-// "static" and serves a different purpose (generating replacement code text).
-func getModifiers(node *ast.Node) string {
-	var parts []string
-	flags := ast.GetCombinedModifierFlags(node)
+func (o options) allows(node *ast.Node) bool {
+	if o.allow == 0 {
+		return false
+	}
+
+	// Callers pass only parameter or property declarations, for which direct
+	// modifier flags are identical to combined modifier flags.
+	flags := node.ModifierFlags()
+	readonly := flags&ast.ModifierFlagsReadonly != 0
+	var modifier allowedModifier
 	if flags&ast.ModifierFlagsPublic != 0 {
-		parts = append(parts, "public")
+		if readonly {
+			modifier = allowedPublicReadonly
+		} else {
+			modifier = allowedPublic
+		}
 	} else if flags&ast.ModifierFlagsProtected != 0 {
-		parts = append(parts, "protected")
+		if readonly {
+			modifier = allowedProtectedReadonly
+		} else {
+			modifier = allowedProtected
+		}
 	} else if flags&ast.ModifierFlagsPrivate != 0 {
-		parts = append(parts, "private")
+		if readonly {
+			modifier = allowedPrivateReadonly
+		} else {
+			modifier = allowedPrivate
+		}
+	} else if readonly {
+		modifier = allowedReadonly
 	}
-	if flags&ast.ModifierFlagsReadonly != 0 {
-		parts = append(parts, "readonly")
-	}
-	return strings.Join(parts, " ")
+	return o.allow&modifier != 0
 }
 
 func buildPreferClassPropertyMessage(name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "preferClassProperty",
-		Description: fmt.Sprintf("Property %s should be declared as a class property.", name),
+		Description: "Property " + name + " should be declared as a class property.",
 	}
 }
 
 func buildPreferParameterPropertyMessage(name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "preferParameterProperty",
-		Description: fmt.Sprintf("Property %s should be declared as a parameter property.", name),
+		Description: "Property " + name + " should be declared as a parameter property.",
 	}
 }
 
@@ -86,19 +125,20 @@ type propertyNodes struct {
 }
 
 var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
-	Name: "parameter-properties",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "parameter-properties",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
 		if opts.prefer == "class-property" {
 			return rule.RuleListeners{
 				ast.KindParameter: func(node *ast.Node) {
-					if node.Parent == nil {
-						return
-					}
-					// Check if this parameter is a parameter property
-					if !ast.IsParameterPropertyDeclaration(node, node.Parent) {
+					// This is equivalent to IsParameterPropertyDeclaration for a
+					// KindParameter listener, ordered to reject non-constructor
+					// parameters before reading their modifier flags.
+					if node.Parent == nil ||
+						node.Parent.Kind != ast.KindConstructor ||
+						node.ModifierFlags()&ast.ModifierFlagsParameterPropertyModifier == 0 {
 						return
 					}
 
@@ -118,8 +158,7 @@ var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					modifiers := getModifiers(node)
-					if opts.allow[modifiers] {
+					if opts.allows(node) {
 						return
 					}
 
@@ -132,16 +171,6 @@ var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 		// "parameter-property" mode: use a stack to handle nested classes.
 		// Each map tracks {name → propertyNodes} for the current class scope.
 		var propertyNodesByNameStack []map[string]*propertyNodes
-
-		getNodesByName := func(name string) *propertyNodes {
-			m := propertyNodesByNameStack[len(propertyNodesByNameStack)-1]
-			if existing, ok := m[name]; ok {
-				return existing
-			}
-			created := &propertyNodes{}
-			m[name] = created
-			return created
-		}
 
 		// typeAnnotationsMatch checks that both nodes either lack type annotations or
 		// have identical annotation text. ESLint compares getText(TSTypeAnnotation)
@@ -162,7 +191,7 @@ var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 		}
 
 		enterClass := func(node *ast.Node) {
-			propertyNodesByNameStack = append(propertyNodesByNameStack, make(map[string]*propertyNodes))
+			var propertyNodesByName map[string]*propertyNodes
 
 			// Process class body members (equivalent to ClassBody visitor in ESLint)
 			members := node.Members()
@@ -183,11 +212,21 @@ var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 					continue
 				}
 				// Skip if modifier is in allow list
-				if opts.allow[getModifiers(member)] {
+				if opts.allows(member) {
 					continue
 				}
-				getNodesByName(nameNode.AsIdentifier().Text).classProperty = member
+				if propertyNodesByName == nil {
+					propertyNodesByName = make(map[string]*propertyNodes)
+				}
+				name := nameNode.AsIdentifier().Text
+				nodes := propertyNodesByName[name]
+				if nodes == nil {
+					nodes = &propertyNodes{}
+					propertyNodesByName[name] = nodes
+				}
+				nodes.classProperty = member
 			}
+			propertyNodesByNameStack = append(propertyNodesByNameStack, propertyNodesByName)
 		}
 
 		exitClass := func(node *ast.Node) {
@@ -213,9 +252,11 @@ var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 					violations = append(violations, violation{name, nodes.classProperty})
 				}
 			}
-			sort.Slice(violations, func(i, j int) bool {
-				return violations[i].node.Pos() < violations[j].node.Pos()
-			})
+			if len(violations) > 1 {
+				sort.Slice(violations, func(i, j int) bool {
+					return violations[i].node.Pos() < violations[j].node.Pos()
+				})
+			}
 			for _, v := range violations {
 				ctx.ReportNode(v.node, buildPreferParameterPropertyMessage(v.name))
 			}
@@ -236,6 +277,10 @@ var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 			},
 			ast.KindConstructor: func(node *ast.Node) {
 				if len(propertyNodesByNameStack) == 0 {
+					return
+				}
+				propertyNodesByName := propertyNodesByNameStack[len(propertyNodesByNameStack)-1]
+				if len(propertyNodesByName) == 0 {
 					return
 				}
 
@@ -276,7 +321,9 @@ var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 					if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 						continue
 					}
-					getNodesByName(nameNode.AsIdentifier().Text).constructorParameter = param
+					if nodes := propertyNodesByName[nameNode.AsIdentifier().Text]; nodes != nil {
+						nodes.constructorParameter = param
+					}
 				}
 
 				// Scan leading statements of the form `this.X = Y` (where Y is an identifier).
@@ -328,7 +375,9 @@ var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 						break
 					}
 					rightName := right.AsIdentifier().Text
-					getNodesByName(rightName).constructorAssignment = true
+					if nodes := propertyNodesByName[rightName]; nodes != nil {
+						nodes.constructorAssignment = true
+					}
 				}
 			},
 		}

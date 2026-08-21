@@ -136,5 +136,5 @@ function foo() {
 
 ## Original Documentation
 
-- [ESLint rule](https://eslint.org/docs/latest/rules/one-var)
-- [Source code](https://github.com/eslint/eslint/blob/main/lib/rules/one-var.js)
+- [ESLint: one-var](https://eslint.org/docs/latest/rules/one-var)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/one-var.js)

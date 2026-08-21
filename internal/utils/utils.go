@@ -214,11 +214,6 @@ func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should sto
 	}
 }
 
-// SUPER DIRTY HACK FOR OPTIONAL FIELDS :(
-func Ref[T any](a T) *T {
-	return &a
-}
-
 func GetNumberIndexType(typeChecker *checker.Checker, t *checker.Type) *checker.Type {
 	return checker.Checker_getIndexTypeOfType(typeChecker, t, checker.Checker_numberType(typeChecker))
 }
@@ -372,40 +367,6 @@ func IsThisVoidParameter(param *ast.Node) bool {
 	return t != nil && t.Kind == ast.KindVoidKeyword
 }
 
-// Source: https://github.com/microsoft/typescript-go/blob/5652e65d5ae944375676d3955f9755e554576d41/internal/jsnum/string.go#L99
-func IsStrWhiteSpace(r rune) bool {
-	// This is different than stringutil.IsWhiteSpaceLike.
-
-	// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-LineTerminator
-	// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-WhiteSpace
-
-	switch r {
-	// LineTerminator
-	case '\n', '\r', 0x2028, 0x2029:
-		return true
-	// WhiteSpace
-	case '\t', '\v', '\f', 0xFEFF:
-		return true
-	}
-
-	// WhiteSpace
-	return unicode.Is(unicode.Zs, r)
-}
-
-// IsECMABlankLine reports whether s contains only ECMAScript WhiteSpace /
-// LineTerminator runes — matching JavaScript's `"".trim() === ""` check used
-// by rules like max-lines / max-lines-per-function for `skipBlankLines`.
-// Go's strings.TrimSpace diverges on U+FEFF (BOM) and U+0085 (NEL), so we
-// can't use it directly.
-func IsECMABlankLine(s string) bool {
-	for _, r := range s {
-		if !IsStrWhiteSpace(r) {
-			return false
-		}
-	}
-	return true
-}
-
 // LineContentEnd returns the byte position just past the last character of the
 // line whose successor starts at nextLineStart — i.e. nextLineStart with its
 // immediately-preceding ECMA line terminator (LF, CR, CRLF, LS, PS) stripped.
@@ -437,12 +398,12 @@ var ExcludePaths = []string{"/node_modules/", "bundled:"}
 
 // DefaultExcludeDirNames contains directory names that are always excluded
 // from file scanning. This is the single source of truth for default directory
-// exclusions used by lint target discovery and fallback Program roots.
+// exclusions used by lint-target discovery and source-only Program roots.
 // Aligned with JS-side SCAN_EXCLUDE_DIRS: new Set(['node_modules', '.git']).
 var DefaultExcludeDirNames = []string{"node_modules", ".git"}
 
 // DefaultIgnoreDirGlobs returns glob patterns derived from DefaultExcludeDirNames,
-// suitable for use with ignore pattern matching (e.g., DiscoverGapFiles).
+// suitable for use with lint-target ignore matching.
 func DefaultIgnoreDirGlobs() []string {
 	globs := make([]string, len(DefaultExcludeDirNames))
 	for i, name := range DefaultExcludeDirNames {
@@ -458,8 +419,6 @@ func Must[T any](v T, err error) T {
 	return v
 }
 
-// GetOptionsMap extracts a map[string]interface{} from rule options.
-// It handles both array format [{ option: value }] and direct object format { option: value }.
 // ExtractRegexPatternAndFlags splits a RegularExpressionLiteral's text (e.g. "/pattern/gi")
 // into the pattern and flags portions. Returns ("", "") for malformed input.
 func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
@@ -473,43 +432,18 @@ func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
 	return text[1 : lastSlash+1], text[lastSlash+2:]
 }
 
-func GetOptionsMap(opts any) map[string]interface{} {
-	if opts == nil {
-		return nil
-	}
-
-	var optsMap map[string]interface{}
-	if arr, ok := opts.([]interface{}); ok && len(arr) > 0 {
-		optsMap, _ = arr[0].(map[string]interface{})
-	} else {
-		optsMap, _ = opts.(map[string]interface{})
-	}
-
-	return optsMap
-}
-
-// ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape.
-// It handles number forms (`3` / `[3]`) plus object forms (`{max: 3}` /
-// `[{maximum: 3}]`). `maximum` wins only when it coerces to a non-zero number;
-// otherwise `max` is used. If either key is present but neither yields a
-// numeric threshold, ESLint ends up comparing against `undefined`, which never
-// reports; MaxInt gives the same observable behavior in Go.
-func ResolveLegacyMaxOption(options any, defaultMax int) int {
-	if options == nil {
-		return defaultMax
-	}
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) == 0 {
-			return defaultMax
-		}
-		if n, ok := CoerceInt(arr[0]); ok {
-			return n
-		}
-	} else if n, ok := CoerceInt(options); ok {
+// ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape:
+// the single option element is either a bare number (`3`) or an object
+// (`{max: 3}` / `{maximum: 3}`). `maximum` wins only when it coerces to a
+// non-zero number; otherwise `max` is used. If either key is present but
+// neither yields a numeric threshold, ESLint ends up comparing against
+// `undefined`, which never reports; MaxInt gives the same observable behavior
+// in Go.
+func ResolveLegacyMaxOption(option any, defaultMax int) int {
+	if n, ok := CoerceInt(option); ok {
 		return n
 	}
-
-	m := GetOptionsMap(options)
+	m, _ := option.(map[string]interface{})
 	if m == nil {
 		return defaultMax
 	}
@@ -568,23 +502,6 @@ func CoerceIntegral(v any) (int, bool) {
 		}
 	}
 	return CoerceInt(v)
-}
-
-// GetOptionsString extracts a string option from the weakly-typed options parameter.
-// It handles both direct string format ("value") and array format (["value"]).
-func GetOptionsString(opts any) string {
-	if opts == nil {
-		return ""
-	}
-	if s, ok := opts.(string); ok {
-		return s
-	}
-	if arr, ok := opts.([]interface{}); ok && len(arr) > 0 {
-		if s, ok := arr[0].(string); ok {
-			return s
-		}
-	}
-	return ""
 }
 
 // ToStringSlice converts a weakly-typed JSON array ([]interface{}) to []string,

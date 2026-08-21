@@ -24,4 +24,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [typescript-eslint ban-tslint-comment](https://typescript-eslint.io/rules/ban-tslint-comment)
+- [typescript-eslint: ban-tslint-comment](https://typescript-eslint.io/rules/ban-tslint-comment)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/ban-tslint-comment.ts)

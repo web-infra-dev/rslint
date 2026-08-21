@@ -1165,7 +1165,7 @@ exports[`no-deprecated > invalid 38`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`a.b\` is deprecated.",
+      "message": "\`b\` is deprecated.",
       "messageId": "deprecated",
       "range": {
         "end": {
@@ -1307,7 +1307,7 @@ exports[`no-deprecated > invalid 42`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`a.b\` is deprecated.",
+      "message": "\`b\` is deprecated.",
       "messageId": "deprecated",
       "range": {
         "end": {
@@ -1343,7 +1343,7 @@ exports[`no-deprecated > invalid 43`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`a.b\` is deprecated. Use b(value).",
+      "message": "\`b\` is deprecated. Use b(value).",
       "messageId": "deprecatedWithReason",
       "range": {
         "end": {
@@ -1751,7 +1751,7 @@ exports[`no-deprecated > invalid 55`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`A.b\` is deprecated.",
+      "message": "\`b\` is deprecated.",
       "messageId": "deprecated",
       "range": {
         "end": {
@@ -1785,7 +1785,7 @@ exports[`no-deprecated > invalid 56`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`assert.fail\` is deprecated. since v10.0.0 - use fail([message]) or other assert functions instead.",
+      "message": "\`fail\` is deprecated. since v10.0.0 - use fail([message]) or other assert functions instead.",
       "messageId": "deprecatedWithReason",
       "range": {
         "end": {
@@ -3069,7 +3069,7 @@ exports[`no-deprecated > invalid 96`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`imported.deprecatedFunctionWithOverloads\` is deprecated.",
+      "message": "\`deprecatedFunctionWithOverloads\` is deprecated.",
       "messageId": "deprecated",
       "range": {
         "end": {
@@ -3339,7 +3339,7 @@ exports[`no-deprecated > invalid 105`] = `
       ",
   "diagnostics": [
     {
-      "message": "\`imported.ClassWithDeprecatedConstructor\` is deprecated.",
+      "message": "\`ClassWithDeprecatedConstructor\` is deprecated.",
       "messageId": "deprecated",
       "range": {
         "end": {

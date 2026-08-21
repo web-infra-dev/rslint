@@ -1,14 +1,18 @@
 package no_invalid_regexp
 
 import (
+	_ "embed"
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
+
+//go:embed no_invalid_regexp.schema.json
+var schemaJSON []byte
 
 // validFlags is the set of standard RegExp flags.
 var validFlags = map[byte]bool{
@@ -24,9 +28,9 @@ var validFlags = map[byte]bool{
 
 // https://eslint.org/docs/latest/rules/no-invalid-regexp
 var NoInvalidRegexpRule = rule.Rule{
-	Name: "no-invalid-regexp",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-invalid-regexp",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		report := func(node *ast.Node, msg string) {
@@ -152,32 +156,39 @@ func validateFlags(flags string, allowConstructorFlags map[byte]bool) string {
 	return ""
 }
 
-// validatePattern tries to compile the pattern using regexp2 with ECMAScript mode.
-// Returns an error message or empty string if valid.
-// Note: regexp2 is a .NET regex port and does not fully support ECMAScript semantics.
-// See no_invalid_regexp.md "Known Limitations" for details on misalignments with ESLint.
+// validatePattern reports whether the pattern compiles as a JavaScript
+// RegExp, returning an error message or the empty string when it does.
+// See no_invalid_regexp.md "Known Limitations" for the misalignments that
+// remain against ESLint.
 func validatePattern(pattern string, flags string) string {
-	var regexpFlags regexp2.RegexOptions = regexp2.ECMAScript
-	if strings.Contains(flags, "i") {
-		regexpFlags |= regexp2.IgnoreCase
+	// Flags are validated separately by validateFlags, which also honors
+	// allowConstructorFlags, so only the ones that change what the pattern
+	// means are passed on here. `v` extends `u` rather than replacing it, and
+	// the set syntax it adds is not supported, so it is read as the `u` it
+	// builds on.
+	var builder strings.Builder
+	for _, flag := range "imsu" { // cspell:ignore imsu
+		if strings.ContainsRune(flags, flag) {
+			builder.WriteRune(flag)
+		}
 	}
-	if strings.Contains(flags, "m") {
-		regexpFlags |= regexp2.Multiline
-	}
-	if strings.Contains(flags, "s") {
-		regexpFlags |= regexp2.Singleline
-	}
-	if strings.Contains(flags, "u") || strings.Contains(flags, "v") {
-		regexpFlags |= regexp2.Unicode
+	compileFlags := builder.String()
+	if !strings.Contains(compileFlags, "u") && strings.Contains(flags, "v") {
+		compileFlags += "u"
 	}
 
-	_, err := regexp2.Compile(pattern, regexpFlags)
+	_, err := esregexp.Compile(pattern, compileFlags)
 	if err != nil {
-		// Extract a clean error message
 		errMsg := err.Error()
-		// regexp2 error messages often start with "error parsing regexp:"
-		if idx := strings.Index(errMsg, ": "); idx != -1 {
-			errMsg = errMsg[idx+2:]
+		// A regexp2 message opens with "error parsing regexp: ", which says
+		// nothing the diagnostic has not already said. Trimming up to the
+		// first ": " drops it — but the package's own errors name what they
+		// refused after that same separator, so trimming there would keep the
+		// refused text and throw the explanation away.
+		if !errors.Is(err, esregexp.ErrUnsupportedSyntax) && !errors.Is(err, esregexp.ErrUnsupportedFlag) {
+			if idx := strings.Index(errMsg, ": "); idx != -1 {
+				errMsg = errMsg[idx+2:]
+			}
 		}
 		return fmt.Sprintf("Invalid regular expression: /%s/: %s", pattern, errMsg)
 	}
@@ -188,29 +199,24 @@ type noInvalidRegexpOptions struct {
 	allowConstructorFlags map[byte]bool
 }
 
-func parseOptions(opts any) noInvalidRegexpOptions {
-	result := noInvalidRegexpOptions{
+func parseOptions(options []any) noInvalidRegexpOptions {
+	opts := noInvalidRegexpOptions{
 		allowConstructorFlags: make(map[byte]bool),
 	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if allowArr, ok := optsMap["allowConstructorFlags"].([]interface{}); ok {
-			for _, item := range allowArr {
-				if str, ok := item.(string); ok {
-					for i := range len(str) {
-						result.allowConstructorFlags[str[i]] = true
-					}
+	if len(options) == 0 {
+		return opts
+	}
+	m, _ := options[0].(map[string]any)
+	if allowArr, ok := m["allowConstructorFlags"].([]interface{}); ok {
+		for _, item := range allowArr {
+			if str, ok := item.(string); ok {
+				for i := range len(str) {
+					opts.allowConstructorFlags[str[i]] = true
 				}
-			}
-		}
-		// Also handle string format: "allowConstructorFlags": "a"
-		if allowStr, ok := optsMap["allowConstructorFlags"].(string); ok {
-			for i := range len(allowStr) {
-				result.allowConstructorFlags[allowStr[i]] = true
 			}
 		}
 	}
 
-	return result
+	return opts
 }

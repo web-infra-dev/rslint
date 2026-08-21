@@ -171,4 +171,5 @@ describe('Foo', () => {
 
 ## Original Documentation
 
-- [jest/require-hook](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/require-hook.md)
+- [eslint-plugin-jest: require-hook](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/require-hook.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/require-hook.ts)

@@ -27,6 +27,7 @@ var evalLikeFunctions = []string{"execScript", "setImmediate", "setInterval", "s
 
 var NoImpliedEvalRule = rule.CreateRule(rule.Rule{
 	Name:             "no-implied-eval",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		getCalleeName := func(node *ast.Expression) string {
@@ -58,7 +59,7 @@ var NoImpliedEvalRule = rule.CreateRule(rule.Rule{
 				return true
 			}
 
-			if utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "Function") {
+			if utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, t, "Function") {
 				return true
 			}
 
@@ -98,7 +99,7 @@ var NoImpliedEvalRule = rule.CreateRule(rule.Rule{
 				symbol := checker.Type_symbol(t)
 
 				if symbol != nil {
-					if utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "FunctionConstructor") {
+					if utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, t, "FunctionConstructor") {
 						ctx.ReportNode(node, buildNoFunctionConstructorMessage())
 						return
 					}

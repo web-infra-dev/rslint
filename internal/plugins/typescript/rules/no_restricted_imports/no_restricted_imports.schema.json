@@ -1,0 +1,163 @@
+{
+  "anyOf": [
+    {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "importNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowImportNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowTypeImports": {
+                "type": "boolean",
+                "description": "Whether to allow type-only imports for a path."
+              }
+            },
+            "required": ["name"]
+          }
+        ]
+      },
+      "uniqueItems": true
+    },
+    {
+      "type": "array",
+      "additionalItems": false,
+      "items": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "importNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "allowImportNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "allowTypeImports": {
+                        "type": "boolean",
+                        "description": "Whether to allow type-only imports for a path."
+                      }
+                    },
+                    "required": ["name"]
+                  }
+                ]
+              },
+              "uniqueItems": true
+            },
+            "patterns": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "importNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "uniqueItems": true
+                      },
+                      "allowImportNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "uniqueItems": true
+                      },
+                      "group": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "uniqueItems": true
+                      },
+                      "regex": {
+                        "type": "string"
+                      },
+                      "importNamePattern": {
+                        "type": "string"
+                      },
+                      "allowImportNamePattern": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "caseSensitive": {
+                        "type": "boolean"
+                      },
+                      "allowTypeImports": {
+                        "type": "boolean",
+                        "description": "Whether to allow type-only imports for a path."
+                      }
+                    }
+                  },
+                  "uniqueItems": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

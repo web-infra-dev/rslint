@@ -34,4 +34,5 @@ class MyClass {
 
 ## Original Documentation
 
-- [typescript-eslint no-base-to-string](https://typescript-eslint.io/rules/no-base-to-string)
+- [typescript-eslint: no-base-to-string](https://typescript-eslint.io/rules/no-base-to-string)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/no-base-to-string.ts)

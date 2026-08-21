@@ -1,10 +1,15 @@
 package no_constant_condition
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_constant_condition.schema.json
+var schemaJSON []byte
 
 // Message builder
 func buildUnexpectedMessage() rule.RuleMessage {
@@ -20,26 +25,24 @@ type Options struct {
 }
 
 // parseOptions parses the rule options
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
 	opts := Options{
 		CheckLoops: "allExceptWhileTrue", // default
 	}
 
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
 
-	// Handle map[string]interface{}
-	if optMap, ok := options.(map[string]interface{}); ok {
-		if checkLoops, ok := optMap["checkLoops"].(string); ok {
-			opts.CheckLoops = checkLoops
-		} else if checkLoopsBool, ok := optMap["checkLoops"].(bool); ok {
-			// Handle boolean values: true = "all", false = "none"
-			if checkLoopsBool {
-				opts.CheckLoops = "all"
-			} else {
-				opts.CheckLoops = "none"
-			}
+	optMap, _ := options[0].(map[string]any)
+	if checkLoops, ok := optMap["checkLoops"].(string); ok {
+		opts.CheckLoops = checkLoops
+	} else if checkLoopsBool, ok := optMap["checkLoops"].(bool); ok {
+		// Handle boolean values: true = "all", false = "none"
+		if checkLoopsBool {
+			opts.CheckLoops = "all"
+		} else {
+			opts.CheckLoops = "none"
 		}
 	}
 
@@ -496,7 +499,7 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 					// First check if this identifier is the global built-in (not shadowed)
 					// If we can't determine (no TypeChecker), conservatively assume it's NOT the global builtin
 					// to avoid false positives from shadowing
-					if ctx == nil || ctx.TypeChecker == nil || ctx.Program == nil || ctx.SourceFile == nil {
+					if ctx == nil || ctx.TypeChecker == nil || ctx.Program() == nil || ctx.SourceFile == nil {
 						// Can't check for shadowing - conservatively assume it's shadowed
 						return false
 					}
@@ -519,7 +522,7 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 					}
 
 					// Check if the symbol is from the default library (not shadowed)
-					isGlobalBuiltin := utils.IsSymbolFromDefaultLibrary(ctx.Program, symbol)
+					isGlobalBuiltin := utils.IsSymbolFromDefaultLibrary(ctx.Program(), symbol)
 
 					// If it's not the global builtin, it's not constant
 					if !isGlobalBuiltin {
@@ -720,9 +723,9 @@ func checkCondition(ctx *rule.RuleContext, node *ast.Node, opts Options) {
 
 // NoConstantConditionRule disallows constant expressions in conditions
 var NoConstantConditionRule = rule.Rule{
-	Name: "no-constant-condition",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-constant-condition",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

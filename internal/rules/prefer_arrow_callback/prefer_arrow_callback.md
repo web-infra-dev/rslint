@@ -68,3 +68,4 @@ foo(function () {
 ## Original Documentation
 
 - [ESLint: prefer-arrow-callback](https://eslint.org/docs/latest/rules/prefer-arrow-callback)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-arrow-callback.js)

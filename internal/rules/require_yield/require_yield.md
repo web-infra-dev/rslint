@@ -34,4 +34,5 @@ If you don't want to notify generator functions that have no `yield` expression,
 
 ## Original Documentation
 
-- https://eslint.org/docs/latest/rules/require-yield
+- [ESLint: require-yield](https://eslint.org/docs/latest/rules/require-yield)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/require-yield.js)

@@ -12559,7 +12559,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 2`] = `
       "messageId": "preferOptionalChain",
       "range": {
         "end": {
-          "column": 23,
+          "column": 52,
           "line": 1,
         },
         "start": {
@@ -12591,8 +12591,8 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 3`] = `
       "messageId": "preferOptionalChain",
       "range": {
         "end": {
-          "column": 32,
-          "line": 3,
+          "column": 42,
+          "line": 4,
         },
         "start": {
           "column": 11,
@@ -13616,36 +13616,6 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 39`] = `
 
 exports[`hand-crafted cases > prefer-optional-chain > invalid 40`] = `
 {
-  "code": "
-          declare const foo: { bar: string } | null;
-          foo !== null && foo.bar !== null;
-        ",
-  "diagnostics": [
-    {
-      "message": "Prefer using an optional chain expression instead, as it's more concise and easier to read.",
-      "messageId": "preferOptionalChain",
-      "range": {
-        "end": {
-          "column": 43,
-          "line": 3,
-        },
-        "start": {
-          "column": 11,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/prefer-optional-chain",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": null,
-  "ruleCount": 1,
-}
-`;
-
-exports[`hand-crafted cases > prefer-optional-chain > invalid 41`] = `
-{
   "code": "foo != null && foo.bar != null;",
   "diagnostics": [
     {
@@ -13671,37 +13641,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 41`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 42`] = `
-{
-  "code": "
-          declare const foo: { bar: string | null } | null;
-          foo != null && foo.bar !== null;
-        ",
-  "diagnostics": [
-    {
-      "message": "Prefer using an optional chain expression instead, as it's more concise and easier to read.",
-      "messageId": "preferOptionalChain",
-      "range": {
-        "end": {
-          "column": 42,
-          "line": 3,
-        },
-        "start": {
-          "column": 11,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/prefer-optional-chain",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": null,
-  "ruleCount": 1,
-}
-`;
-
-exports[`hand-crafted cases > prefer-optional-chain > invalid 43`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 41`] = `
 {
   "code": "
           declare const foo: { bar: string | null } | null;
@@ -13734,7 +13674,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 43`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 44`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 42`] = `
 {
   "code": "unrelated != null && foo != null && foo.bar != null;",
   "diagnostics": [
@@ -13761,7 +13701,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 44`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 45`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 43`] = `
 {
   "code": "unrelated1 != null && unrelated2 != null && foo != null && foo.bar != null;",
   "diagnostics": [
@@ -13788,7 +13728,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 45`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 46`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 44`] = `
 {
   "code": "foo1 != null && foo1.bar != null && foo2 != null && foo2.bar != null;",
   "diagnostics": [
@@ -13830,7 +13770,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 46`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 47`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 45`] = `
 {
   "code": "foo && foo.a && bar && bar.a;",
   "diagnostics": [
@@ -13872,7 +13812,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 47`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 48`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 46`] = `
 {
   "code": "foo.bar.baz != null && foo?.bar?.baz.bam != null;",
   "diagnostics": [
@@ -13899,7 +13839,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 48`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 49`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 47`] = `
 {
   "code": "foo?.bar.baz != null && foo.bar?.baz.bam != null;",
   "diagnostics": [
@@ -13926,7 +13866,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 49`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 50`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 48`] = `
 {
   "code": "foo?.bar?.baz != null && foo.bar.baz.bam != null;",
   "diagnostics": [
@@ -13953,7 +13893,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 50`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 51`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 49`] = `
 {
   "code": "foo.bar.baz != null && foo!.bar!.baz.bam != null;",
   "diagnostics": [
@@ -13980,7 +13920,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 51`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 52`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 50`] = `
 {
   "code": "foo!.bar.baz != null && foo.bar!.baz.bam != null;",
   "diagnostics": [
@@ -14007,7 +13947,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 52`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 53`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 51`] = `
 {
   "code": "foo!.bar!.baz != null && foo.bar.baz.bam != null;",
   "diagnostics": [
@@ -14034,7 +13974,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 53`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 54`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 52`] = `
 {
   "code": "
           a &&
@@ -14075,89 +14015,89 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 54`] = `
 }
 `;
 
+exports[`hand-crafted cases > prefer-optional-chain > invalid 53`] = `
+{
+  "code": "
+          !a ||
+            a.b == null ||
+            a.b.c === undefined ||
+            a.b.c === null ||
+            a.b.c.d == null ||
+            a.b.c.d.e === null ||
+            a.b.c.d.e === undefined ||
+            a.b.c.d.e.f == undefined ||
+            typeof a.b.c.d.e.f.g === 'undefined' ||
+            a.b.c.d.e.f.g === null ||
+            !a.b.c.d.e.f.g.h;
+        ",
+  "diagnostics": [
+    {
+      "message": "Prefer using an optional chain expression instead, as it's more concise and easier to read.",
+      "messageId": "preferOptionalChain",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 12,
+        },
+        "start": {
+          "column": 11,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+          !a?.b?.c?.d?.e?.f?.g?.h;
+        ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`hand-crafted cases > prefer-optional-chain > invalid 54`] = `
+{
+  "code": "
+          !a ||
+            a.b == null ||
+            a.b.c === null ||
+            a.b.c === undefined ||
+            a.b.c.d == null ||
+            a.b.c.d.e === null ||
+            a.b.c.d.e === undefined ||
+            a.b.c.d.e.f == undefined ||
+            typeof a.b.c.d.e.f.g === 'undefined' ||
+            a.b.c.d.e.f.g === null ||
+            !a.b.c.d.e.f.g.h;
+        ",
+  "diagnostics": [
+    {
+      "message": "Prefer using an optional chain expression instead, as it's more concise and easier to read.",
+      "messageId": "preferOptionalChain",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 12,
+        },
+        "start": {
+          "column": 11,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+          !a?.b?.c?.d?.e?.f?.g?.h;
+        ",
+  "ruleCount": 1,
+}
+`;
+
 exports[`hand-crafted cases > prefer-optional-chain > invalid 55`] = `
-{
-  "code": "
-          !a ||
-            a.b == null ||
-            a.b.c === undefined ||
-            a.b.c === null ||
-            a.b.c.d == null ||
-            a.b.c.d.e === null ||
-            a.b.c.d.e === undefined ||
-            a.b.c.d.e.f == undefined ||
-            typeof a.b.c.d.e.f.g === 'undefined' ||
-            a.b.c.d.e.f.g === null ||
-            !a.b.c.d.e.f.g.h;
-        ",
-  "diagnostics": [
-    {
-      "message": "Prefer using an optional chain expression instead, as it's more concise and easier to read.",
-      "messageId": "preferOptionalChain",
-      "range": {
-        "end": {
-          "column": 29,
-          "line": 12,
-        },
-        "start": {
-          "column": 11,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/prefer-optional-chain",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-          !a?.b?.c?.d?.e?.f?.g?.h;
-        ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`hand-crafted cases > prefer-optional-chain > invalid 56`] = `
-{
-  "code": "
-          !a ||
-            a.b == null ||
-            a.b.c === null ||
-            a.b.c === undefined ||
-            a.b.c.d == null ||
-            a.b.c.d.e === null ||
-            a.b.c.d.e === undefined ||
-            a.b.c.d.e.f == undefined ||
-            typeof a.b.c.d.e.f.g === 'undefined' ||
-            a.b.c.d.e.f.g === null ||
-            !a.b.c.d.e.f.g.h;
-        ",
-  "diagnostics": [
-    {
-      "message": "Prefer using an optional chain expression instead, as it's more concise and easier to read.",
-      "messageId": "preferOptionalChain",
-      "range": {
-        "end": {
-          "column": 29,
-          "line": 12,
-        },
-        "start": {
-          "column": 11,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/prefer-optional-chain",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-          !a?.b?.c?.d?.e?.f?.g?.h;
-        ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`hand-crafted cases > prefer-optional-chain > invalid 57`] = `
 {
   "code": "undefined !== foo && null !== foo && null != foo.bar && foo.bar.baz;",
   "diagnostics": [
@@ -14184,7 +14124,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 57`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 58`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 56`] = `
 {
   "code": "
           null != foo &&
@@ -14218,7 +14158,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 58`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 59`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 57`] = `
 {
   "code": "
           null != foo &&
@@ -14252,7 +14192,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 59`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 60`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 58`] = `
 {
   "code": "
           null != foo &&
@@ -14285,7 +14225,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 60`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 61`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 59`] = `
 {
   "code": "
           foo != null &&
@@ -14318,7 +14258,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 61`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 62`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 60`] = `
 {
   "code": "
           null != foo &&
@@ -14351,7 +14291,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 62`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 63`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 61`] = `
 {
   "code": "
           foo != null &&
@@ -14384,7 +14324,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 63`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 64`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 62`] = `
 {
   "code": "
           null != foo &&
@@ -14420,7 +14360,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 64`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 65`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 63`] = `
 {
   "code": "
           foo != null &&
@@ -14456,7 +14396,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 65`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 66`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 64`] = `
 {
   "code": "(await foo).bar && (await foo).bar.baz;",
   "diagnostics": [
@@ -14483,7 +14423,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 66`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 67`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 65`] = `
 {
   "code": "
           !a ||
@@ -14524,7 +14464,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 67`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 68`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 66`] = `
 {
   "code": "
           declare const foo: { bar: number } | null | undefined;
@@ -14557,7 +14497,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 68`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 69`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 67`] = `
 {
   "code": "
           declare const foo: { bar: number } | undefined;
@@ -14590,7 +14530,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 69`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 70`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 68`] = `
 {
   "code": "
           declare const foo: { bar: number } | undefined;
@@ -14623,7 +14563,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 70`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 71`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 69`] = `
 {
   "code": "
           declare const thing1: string | null;
@@ -14653,7 +14593,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 71`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 72`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 70`] = `
 {
   "code": "
           declare const thing1: string | null;
@@ -14683,7 +14623,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 72`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 73`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 71`] = `
 {
   "code": "
           declare const foo: string | null;
@@ -14713,7 +14653,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 73`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 74`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 72`] = `
 {
   "code": "
           declare const foo: { bar: string | null | undefined } | null | undefined;
@@ -14746,7 +14686,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 74`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 75`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 73`] = `
 {
   "code": "
           declare const foo: { bar: string | null | undefined } | null | undefined;
@@ -14779,7 +14719,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 75`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 76`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 74`] = `
 {
   "code": "
           declare const foo: string | null;
@@ -14809,7 +14749,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 76`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 77`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 75`] = `
 {
   "code": "
           declare const foo: string;
@@ -14839,7 +14779,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 77`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 78`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 76`] = `
 {
   "code": "
           declare const foo: string | null;
@@ -14869,7 +14809,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 78`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 79`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 77`] = `
 {
   "code": "
           declare const foo: { bar: number } | null | undefined;
@@ -14902,7 +14842,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 79`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 80`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 78`] = `
 {
   "code": "
           declare const foo: { bar: number } | null | undefined;
@@ -14932,7 +14872,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 80`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 81`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 79`] = `
 {
   "code": "
           declare const foo: { bar: boolean } | null | undefined;
@@ -14967,7 +14907,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 81`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 82`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 80`] = `
 {
   "code": "
           function foo(globalThis?: { Array: Function }) {
@@ -15002,7 +14942,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 82`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 83`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 81`] = `
 {
   "code": "
           typeof globalThis !== 'undefined' && globalThis.Array && globalThis.Array();
@@ -15031,7 +14971,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 83`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 84`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 82`] = `
 {
   "code": "a && (a.b && a.b.c)",
   "diagnostics": [
@@ -15058,7 +14998,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 84`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 85`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 83`] = `
 {
   "code": "(a && a.b) && a.b.c",
   "diagnostics": [
@@ -15085,7 +15025,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 85`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 86`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 84`] = `
 {
   "code": "((a && a.b)) && a.b.c",
   "diagnostics": [
@@ -15112,7 +15052,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 86`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 87`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 85`] = `
 {
   "code": "foo(a && (a.b && a.b.c))",
   "diagnostics": [
@@ -15139,7 +15079,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 87`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 88`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 86`] = `
 {
   "code": "foo(a && a.b && a.b.c)",
   "diagnostics": [
@@ -15166,7 +15106,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 88`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 89`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 87`] = `
 {
   "code": "!foo || !foo.bar || ((((!foo.bar.baz || !foo.bar.baz()))));",
   "diagnostics": [
@@ -15193,7 +15133,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 89`] = `
 }
 `;
 
-exports[`hand-crafted cases > prefer-optional-chain > invalid 90`] = `
+exports[`hand-crafted cases > prefer-optional-chain > invalid 88`] = `
 {
   "code": "a !== undefined && ((a !== null && a.prop));",
   "diagnostics": [

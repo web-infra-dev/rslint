@@ -17,8 +17,9 @@ var enableDisableRegex = regexp.MustCompile(`^\s*tslint:(enable|disable)(?:-(lin
 // BanTslintCommentRule implements the ban-tslint-comment rule.
 // Disallows tslint directive comments like // tslint:disable
 var BanTslintCommentRule = rule.CreateRule(rule.Rule{
-	Name: "ban-tslint-comment",
-	Run:  run,
+	Name:   "ban-tslint-comment",
+	Schema: rule.EmptyArraySchema,
+	Run:    run,
 })
 
 func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {

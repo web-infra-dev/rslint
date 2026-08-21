@@ -7,7 +7,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/guard-for-in
 var GuardForInRule = rule.Rule{
-	Name: "guard-for-in",
+	Name:   "guard-for-in",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindForInStatement: func(node *ast.Node) {

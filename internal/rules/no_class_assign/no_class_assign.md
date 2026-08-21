@@ -34,4 +34,5 @@ function fn(C) {
 
 ## Original Documentation
 
-- [ESLint no-class-assign](https://eslint.org/docs/latest/rules/no-class-assign)
+- [ESLint: no-class-assign](https://eslint.org/docs/latest/rules/no-class-assign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-class-assign.js)

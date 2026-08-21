@@ -1,12 +1,16 @@
 package no_eval
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_eval.schema.json
+var schemaJSON []byte
 
 var noEvalMessage = rule.RuleMessage{
 	Id:          "unexpected",
@@ -29,22 +33,29 @@ func sourceMayUseEval(sourceFile *ast.SourceFile) bool {
 		(strings.Contains(text, "[") && strings.Contains(text, "\\"))
 }
 
+// parseOptions returns the `allowIndirect` option.
+func parseOptions(options []any) bool {
+	allowIndirect := false
+	if len(options) == 0 {
+		return allowIndirect
+	}
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["allowIndirect"].(bool); ok {
+		allowIndirect = v
+	}
+	return allowIndirect
+}
+
 // https://eslint.org/docs/latest/rules/no-eval
 var NoEvalRule = rule.Rule{
-	Name: "no-eval",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	Name:   "no-eval",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if !sourceMayUseEval(ctx.SourceFile) {
 			return nil
 		}
 
-		options := rule.LegacyUnwrapOptions(_options)
-		allowIndirect := false
-		optsMap := utils.GetOptionsMap(options)
-		if optsMap != nil {
-			if v, ok := optsMap["allowIndirect"].(bool); ok {
-				allowIndirect = v
-			}
-		}
+		allowIndirect := parseOptions(options)
 
 		if allowIndirect {
 			// Only flag direct eval() calls
@@ -160,7 +171,7 @@ func (state *noEvalState) checkMemberAccess(object *ast.Node, reportNode *ast.No
 }
 
 func (state *noEvalState) isGlobalEvalReference(node *ast.Node) bool {
-	if state.ctx.Globals["eval"] == utils.GlobalAccessOff {
+	if !state.ctx.Globals.Access("eval").IsDeclared() {
 		return false
 	}
 	// A full-file miss is cached because IsShadowed's SourceFile check scans
@@ -233,7 +244,10 @@ func (state *noEvalState) isGlobalObjectChain(node *ast.Node) bool {
 }
 
 func (state *noEvalState) isGlobalObjectReference(identifier *ast.Node, name string) bool {
-	if state.ctx.Globals[name] == utils.GlobalAccessOff {
+	// Scope/type resolution may prove that TypeScript knows a same-named lib or
+	// ambient symbol, but ESLint exposes a host global object only when it exists
+	// in the effective languageOptions.globals view.
+	if !state.ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
 
@@ -310,13 +324,7 @@ func (state *noEvalState) isKnownGlobalObject(name string, status *globalObjectS
 		return status.known
 	}
 	status.knownChecked = true
-	if access, ok := state.ctx.Globals[name]; ok {
-		status.known = access.IsDeclared()
-	} else if state.ctx.TypeChecker != nil {
-		status.known = state.ctx.TypeChecker.GetGlobalSymbol(name, ast.SymbolFlagsValue, nil) != nil
-	} else {
-		status.known = true
-	}
+	status.known = state.ctx.Globals.Access(name).IsDeclared()
 	return status.known
 }
 

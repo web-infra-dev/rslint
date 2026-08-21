@@ -93,4 +93,5 @@ renamed alias) is also flagged, matching `eslint-plugin-react`'s
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-will-update-set-state](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-will-update-set-state.md)
+- [eslint-plugin-react: no-will-update-set-state](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-will-update-set-state.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-will-update-set-state.js)

@@ -23,4 +23,5 @@ function qux(value: string) {} // primitives are always readonly
 
 ## Original Documentation
 
-- [typescript-eslint prefer-readonly-parameter-types](https://typescript-eslint.io/rules/prefer-readonly-parameter-types)
+- [typescript-eslint: prefer-readonly-parameter-types](https://typescript-eslint.io/rules/prefer-readonly-parameter-types)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.46.3/packages/eslint-plugin/src/rules/prefer-readonly-parameter-types.ts)

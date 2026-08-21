@@ -96,4 +96,5 @@ Examples of **correct** code with `{ "tabbable": ["button"] }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/interactive-supports-focus](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/interactive-supports-focus.md)
+- [eslint-plugin-jsx-a11y: interactive-supports-focus](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/interactive-supports-focus.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/interactive-supports-focus.js)

@@ -56,4 +56,5 @@ expect(catchError()).toStrictEqual({ message: undefined });
 
 ## Original Documentation
 
-- [jest/prefer-to-be](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-to-be.md)
+- [eslint-plugin-jest: prefer-to-be](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-to-be.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-to-be.ts)

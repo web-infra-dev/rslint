@@ -32,30 +32,6 @@ func TestExtractRegexPatternAndFlags(t *testing.T) {
 	}
 }
 
-func TestIsValidRegexLiteral(t *testing.T) {
-	tests := []struct {
-		name    string
-		literal string
-		want    bool
-	}{
-		{name: "basic", literal: `/abc/g`, want: true},
-		{name: "unicode sets", literal: `/[[A--B]]/v`, want: true},
-		{name: "inline modifier", literal: `/(?i:foo)bar/`, want: true},
-		{name: "annex b decimal escape", literal: `/\78\126\5934/`, want: true},
-		{name: "invalid unicode property", literal: `/\p{NotAProperty}/u`, want: false},
-		{name: "invalid v set", literal: `/[[A&&&]]/v`, want: false},
-		{name: "invalid flag", literal: `/a/-`, want: false},
-		{name: "conflicting unicode flags", literal: `/a/uv`, want: false},
-		{name: "unterminated class", literal: `/[a/`, want: false},
-		{name: "not a literal", literal: `abc`, want: false},
-	}
-	for _, tt := range tests {
-		if got := IsValidRegexLiteral(tt.literal); got != tt.want {
-			t.Errorf("%s: IsValidRegexLiteral(%q) = %v, want %v", tt.name, tt.literal, got, tt.want)
-		}
-	}
-}
-
 func TestHasCommentInsideNode(t *testing.T) {
 	source := "const a = \"https://example.com/*x*/\";\n" +
 		"const b = /\\/\\//;\n" +
@@ -294,13 +270,12 @@ func TestResolveLegacyMaxOption(t *testing.T) {
 		want       int
 	}{
 		{name: "nil uses default", defaultMax: 3, want: 3},
-		{name: "empty array uses default", options: []interface{}{}, defaultMax: 3, want: 3},
 		{name: "bare number", options: 4, defaultMax: 3, want: 4},
-		{name: "array number", options: []interface{}{float64(5)}, defaultMax: 3, want: 5},
-		{name: "bare max object", options: map[string]interface{}{"max": 6}, defaultMax: 3, want: 6},
-		{name: "array maximum object", options: []interface{}{map[string]interface{}{"maximum": 7, "max": 1}}, defaultMax: 3, want: 7},
-		{name: "zero maximum falls through to max", options: []interface{}{map[string]interface{}{"maximum": 0, "max": 8}}, defaultMax: 3, want: 8},
-		{name: "zero maximum without fallback disables", options: []interface{}{map[string]interface{}{"maximum": 0}}, defaultMax: 3, want: math.MaxInt},
+		{name: "json-decoded number", options: float64(5), defaultMax: 3, want: 5},
+		{name: "max object", options: map[string]interface{}{"max": 6}, defaultMax: 3, want: 6},
+		{name: "maximum wins over max", options: map[string]interface{}{"maximum": 7, "max": 1}, defaultMax: 3, want: 7},
+		{name: "zero maximum falls through to max", options: map[string]interface{}{"maximum": 0, "max": 8}, defaultMax: 3, want: 8},
+		{name: "zero maximum without fallback disables", options: map[string]interface{}{"maximum": 0}, defaultMax: 3, want: math.MaxInt},
 		{name: "nonnumeric max disables", options: map[string]interface{}{"max": "wide"}, defaultMax: 3, want: math.MaxInt},
 		{name: "object without max keys uses default", options: map[string]interface{}{"foo": 1}, defaultMax: 3, want: 3},
 	}

@@ -89,10 +89,15 @@ var PreferComparisonMatcherRule = rule.Rule{
 				}
 
 				matcherEntry := jestFnCall.MatcherEntry
-				if matcherEntry.Node == nil ||
-					matcherEntry.Node.Parent == nil ||
-					matcherEntry.Call == nil ||
-					node != matcherEntry.Call {
+				if matcherEntry.Call == nil || node != matcherEntry.Call {
+					return
+				}
+
+				// The accessor, not the entry's direct parent, ends the modifier
+				// range: a parenthesized key such as `[("toBe")]` parents the
+				// literal to the parentheses rather than the element access.
+				_, matcherAccessor := utils.GetAccessorReceiverAndParent(matcherEntry)
+				if matcherAccessor == nil {
 					return
 				}
 
@@ -115,7 +120,7 @@ var PreferComparisonMatcherRule = rule.Rule{
 				comparison := ast.SkipParentheses(expectArgs[0])
 				leftText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, left, false)
 				rightText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, right, false)
-				modifierRange := core.NewTextRange(expectCall.End(), matcherEntry.Node.Parent.End())
+				modifierRange := core.NewTextRange(expectCall.End(), matcherAccessor.End())
 
 				ctx.ReportNodeWithFixes(
 					matcherEntry.Node,

@@ -11,7 +11,7 @@
  * transport boundary.
  */
 
-export const CONFIG_DISCOVERY_PROTOCOL_VERSION = 1 as const;
+export const CONFIG_DISCOVERY_PROTOCOL_VERSION = 2 as const;
 
 export type ConfigModuleLoadMode = 'cached' | 'fresh';
 

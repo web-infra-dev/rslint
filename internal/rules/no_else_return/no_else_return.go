@@ -1,22 +1,27 @@
 package no_else_return
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_else_return.schema.json
+var schemaJSON []byte
+
 type options struct {
 	allowElseIf bool
 }
 
-func parseOptions(ruleOptions any) options {
+func parseOptions(ruleOptions []any) options {
 	opts := options{allowElseIf: true}
-	optsMap := utils.GetOptionsMap(ruleOptions)
-	if optsMap == nil {
+	if len(ruleOptions) == 0 {
 		return opts
 	}
+	optsMap, _ := ruleOptions[0].(map[string]any)
 	if allowElseIf, ok := optsMap["allowElseIf"].(bool); ok {
 		opts.allowElseIf = allowElseIf
 	}
@@ -30,9 +35,9 @@ var unexpectedMessage = rule.RuleMessage{
 
 // https://eslint.org/docs/latest/rules/no-else-return
 var NoElseReturnRule = rule.Rule{
-	Name: "no-else-return",
-	Run: func(ctx rule.RuleContext, _ruleOptions []any) rule.RuleListeners {
-		ruleOptions := rule.LegacyUnwrapOptions(_ruleOptions)
+	Name:   "no-else-return",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, ruleOptions []any) rule.RuleListeners {
 		opts := parseOptions(ruleOptions)
 		check := checkIfWithoutElse
 		if !opts.allowElseIf {

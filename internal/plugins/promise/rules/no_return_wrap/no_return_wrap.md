@@ -60,4 +60,5 @@ None known.
 
 ## Original Documentation
 
-- [eslint-plugin-promise: no-return-wrap](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-return-wrap.md)
+- [eslint-plugin-promise: no-return-wrap](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/no-return-wrap.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/no-return-wrap.js)

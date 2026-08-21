@@ -36,4 +36,5 @@ for (const x of [1, 2, 3]) {
 
 ## Original Documentation
 
-- [ESLint prefer-const](https://eslint.org/docs/latest/rules/prefer-const)
+- [ESLint: prefer-const](https://eslint.org/docs/latest/rules/prefer-const)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-const.js)

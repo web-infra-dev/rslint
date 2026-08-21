@@ -42,4 +42,5 @@ switch (a) {
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/no-duplicate-case
+- [ESLint: no-duplicate-case](https://eslint.org/docs/latest/rules/no-duplicate-case)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-duplicate-case.js)

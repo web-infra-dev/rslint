@@ -2,17 +2,14 @@ package utils
 
 import (
 	"encoding/json"
-	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -33,8 +30,6 @@ const (
 	JestFnTypeTest                = testFramework.FnKindTest
 	JestFnTypeUnknown             = testFramework.FnKindUnknown
 )
-
-var JEST_HOOKS_ORDER = []string{"beforeAll", "beforeEach", "afterEach", "afterAll"}
 
 var JEST_METHOD_NAMES = map[string]bool{
 	"afterAll":   true,
@@ -144,8 +139,8 @@ func JoinJestFnMemberEntries(entries []ParsedJestFnMemberEntry) string {
 
 // JestFnMemberEntriesRange returns the source range spanning the first through
 // last member entry nodes in a parsed jest/expect call chain.
-func JestFnMemberEntriesRange(entries []ParsedJestFnMemberEntry) (core.TextRange, bool) {
-	return testFramework.MemberEntriesRange(entries)
+func JestFnMemberEntriesRange(sourceFile *ast.SourceFile, entries []ParsedJestFnMemberEntry) (core.TextRange, bool) {
+	return testFramework.MemberEntriesRange(sourceFile, entries)
 }
 
 func GetJestKind(name string) JestFnType {
@@ -159,16 +154,11 @@ func GetJestKind(name string) JestFnType {
 	case "expect":
 		return JestFnTypeExpect
 	default:
-		if slices.Contains(JEST_HOOKS_ORDER, name) {
+		if testFramework.IsHookName(name) {
 			return JestFnTypeHook
 		}
 		return JestFnTypeUnknown
 	}
-}
-
-// JestHookOrderIndex returns the expected declaration order index for a Jest hook name, or -1 if unknown.
-func JestHookOrderIndex(name string) int {
-	return slices.Index(JEST_HOOKS_ORDER, name)
 }
 
 func GetJestFnMemberEntries(node *ast.Node) []ParsedJestFnMemberEntry {
@@ -190,7 +180,10 @@ func ParseAssertionFunctionOptions(options []any) AssertionFunctionOptions {
 		AdditionalTestBlockFunctions: []string{},
 	}
 
-	optsMap := internalUtils.GetOptionsMap(options)
+	if len(options) == 0 {
+		return parsed
+	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if optsMap == nil {
 		return parsed
 	}
@@ -217,15 +210,15 @@ func stringList(raw []interface{}) []string {
 // CompileAssertFunctionNamePatterns compiles eslint-plugin-jest's star-pattern
 // syntax. A single star matches within a dotted segment, while a double star
 // segment can span dots.
-func CompileAssertFunctionNamePatterns(patterns []string) []*regexp.Regexp {
-	compiled := make([]*regexp.Regexp, 0, len(patterns))
+func CompileAssertFunctionNamePatterns(patterns []string) []*esregexp.RegExp {
+	compiled := make([]*esregexp.RegExp, 0, len(patterns))
 	for _, pattern := range patterns {
 		compiled = append(compiled, compileAssertFunctionNamePattern(pattern))
 	}
 	return compiled
 }
 
-func compileAssertFunctionNamePattern(pattern string) *regexp.Regexp {
+func compileAssertFunctionNamePattern(pattern string) *esregexp.RegExp {
 	segments := strings.Split(pattern, ".")
 	parts := make([]string, 0, len(segments))
 	for _, segment := range segments {
@@ -238,7 +231,7 @@ func compileAssertFunctionNamePattern(pattern string) *regexp.Regexp {
 
 	// Other regular-expression characters are intentionally preserved because
 	// upstream passes configured patterns directly to RegExp.
-	re, err := regexp.Compile(`(?i)^(?:` + strings.Join(parts, `\.`) + `)(?:\.|$)`)
+	re, err := esregexp.Compile(`^(?:`+strings.Join(parts, `\.`)+`)(?:\.|$)`, "iu")
 	if err != nil {
 		return nil
 	}
@@ -247,12 +240,12 @@ func compileAssertFunctionNamePattern(pattern string) *regexp.Regexp {
 
 // MatchesAssertFunctionName reports whether name matches one of the compiled
 // assertion function patterns.
-func MatchesAssertFunctionName(name string, compiled []*regexp.Regexp) bool {
+func MatchesAssertFunctionName(name string, compiled []*esregexp.RegExp) bool {
 	if name == "" {
 		return false
 	}
 	for _, re := range compiled {
-		if re != nil && re.MatchString(name) {
+		if re != nil && re.TestOrTimeout(name) {
 			return true
 		}
 	}
@@ -432,21 +425,29 @@ func jestVersionFromPackageJSONText(data string) string {
 }
 
 // readJestVersionFromPackageJson resolves the jest version from the nearest package.json (same package
-// as the current source file) using the TypeScript program's host filesystem.
-func readJestVersionFromPackageJson(program *compiler.Program, sourceFile *ast.SourceFile) string {
-	if program == nil || sourceFile == nil {
+// as the current source file) using the effective Program's filesystem.
+func readJestVersionFromPackageJson(ctx rule.RuleContext) string {
+	if ctx.SourceFile == nil {
 		return ""
 	}
-	dir := tspath.GetDirectoryPath(sourceFile.FileName())
-	pkgDir := program.GetNearestAncestorDirectoryWithPackageJson(dir)
+	if !ctx.Program().IsValid() {
+		return ""
+	}
+	sourceProgram := ctx.Program()
+	dir := tspath.GetDirectoryPath(ctx.SourceFile.FileName())
+	pkgDir := sourceProgram.NearestPackageJSONDirectory(dir)
 	if pkgDir == "" {
 		return ""
 	}
 	pkgPath := tspath.CombinePaths(pkgDir, "package.json")
-	if !program.FileExists(pkgPath) {
+	if !sourceProgram.FileExists(pkgPath) {
 		return ""
 	}
-	text, ok := program.Host().FS().ReadFile(pkgPath)
+	fileSystem := sourceProgram.FS()
+	if fileSystem == nil {
+		return ""
+	}
+	text, ok := fileSystem.ReadFile(pkgPath)
 	if !ok {
 		return ""
 	}
@@ -459,7 +460,7 @@ func GetJestVersion(ctx rule.RuleContext) string {
 	if s, ok := jestVersionFromSettings(ctx.Settings); ok {
 		return s
 	}
-	if v := readJestVersionFromPackageJson(ctx.Program, ctx.SourceFile); v != "" {
+	if v := readJestVersionFromPackageJson(ctx); v != "" {
 		return v
 	}
 

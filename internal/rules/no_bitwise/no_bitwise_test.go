@@ -27,78 +27,78 @@ func TestNoBitwiseRule(t *testing.T) {
 			// ── `allow` option ────────────────────────────────────────────
 			{
 				Code:    `~[1, 2, 3].indexOf(1)`,
-				Options: map[string]interface{}{"allow": []interface{}{"~"}},
+				Options: []any{map[string]interface{}{"allow": []interface{}{"~"}}},
 			},
 			{
 				Code:    `~1<<2 === -8`,
-				Options: map[string]interface{}{"allow": []interface{}{"~", "<<"}},
+				Options: []any{map[string]interface{}{"allow": []interface{}{"~", "<<"}}},
 			},
 
 			// ── `int32Hint` option: canonical + alternative zero forms ────
 			{
 				Code:    `a|0`,
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | (0)`, // Parenthesized zero; ESLint treats parens as transparent.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0.0`, // Float zero — Number("0.0") === 0.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0x0`, // Hex zero.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0b0`, // Binary zero.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0o0`, // Octal zero.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0e0`, // Scientific zero.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0E0`, // Uppercase exponent.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0e+0`, // Signed positive exponent.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0e-0`, // Signed negative exponent.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0.`, // Trailing decimal point.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | .0`, // Leading decimal point.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0.0e0`, // Combined float + exponent.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 			{
 				Code:    `a | 0X0`, // Uppercase hex prefix.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 			},
 
 			// ── `allow` takes precedence; int32Hint may be off explicitly ─
 			{
 				Code: `a|0`,
-				Options: map[string]interface{}{
+				Options: []any{map[string]interface{}{
 					"allow":     []interface{}{"|"},
 					"int32Hint": false,
-				},
+				}},
 			},
 
 			// ── Type-level unions/intersections are NOT BinaryExpression ─
@@ -230,49 +230,49 @@ func TestNoBitwiseRule(t *testing.T) {
 			// ── int32Hint boundaries ──────────────────────────────────────
 			{
 				Code:    `a | 1`, // int32Hint is only for `| 0`.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `a | 0x10`, // Non-zero hex must still report (sanity).
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `a | 1.0`, // Non-zero float must still report.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `0 | a`, // int32Hint requires zero on the RIGHT.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `a & 0`, // int32Hint is `|` only, not `&`.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `a | -0`, // Unary minus → not a Literal node in ESTree.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code:    `a | 0n`, // BigInt zero is distinct from numeric 0.
-				Options: map[string]interface{}{"int32Hint": true},
+				Options: []any{map[string]interface{}{"int32Hint": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},
@@ -302,7 +302,7 @@ func TestNoBitwiseRule(t *testing.T) {
 			// ── `~` not listed in `allow` still reports ──────────────────
 			{
 				Code:    `~a`,
-				Options: map[string]interface{}{"allow": []interface{}{"|"}},
+				Options: []any{map[string]interface{}{"allow": []interface{}{"|"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},

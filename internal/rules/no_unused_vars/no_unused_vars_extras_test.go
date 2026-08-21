@@ -423,11 +423,91 @@ func TestNoUnusedVarsTypeOnlyLocalExports(t *testing.T) {
 	)
 }
 
+func TestNoUnusedVarsUsedFastPath(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `const used = 1; consume(used);`},
+			{
+				Code: `const _used = 1; consume(_used);`,
+				Options: map[string]interface{}{
+					"varsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": false,
+				},
+			},
+			{
+				Code: `function use(_arg) { consume(_arg); } use(1);`,
+				Options: map[string]interface{}{
+					"args":                    "all",
+					"argsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": false,
+				},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `const _used = 1; consume(_used);`,
+				Options: map[string]interface{}{
+					"varsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUsedIgnoredError("_used", ". Used vars must not match /^_/u", 1, 7, 12),
+				},
+			},
+			{
+				Code: `function use(_arg) { consume(_arg); } use(1);`,
+				Options: map[string]interface{}{
+					"args":                    "all",
+					"argsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUsedIgnoredError("_arg", ". Used args must not match /^_/u", 1, 14, 18),
+				},
+			},
+		},
+	)
+}
+
 func TestNoUnusedVarsWithoutSourceFile(t *testing.T) {
 	t.Parallel()
 	listeners := NoUnusedVarsRule.Run(rule.RuleContext{}, nil)
 	if len(listeners) != 0 {
 		t.Fatalf("expected no listeners without a source file, got %d", len(listeners))
+	}
+}
+
+// TestNoUnusedVarsIgnorePatternSchema locks in the fail-fast behavior for an
+// invalid ignore pattern. Upstream builds `new RegExp(pattern, "u")` while
+// creating the rule, so an invalid pattern like `"("` throws before any linting
+// happens. rslint's equivalent surface is config validation: the schema marks
+// every ignore-pattern option with `format: "regex"`, so the config is rejected
+// up front instead of linting as if no pattern were configured.
+func TestNoUnusedVarsIgnorePatternSchema(t *testing.T) {
+	t.Parallel()
+
+	patternOptions := []string{
+		"varsIgnorePattern",
+		"argsIgnorePattern",
+		"caughtErrorsIgnorePattern",
+		"destructuredArrayIgnorePattern",
+	}
+	for _, name := range patternOptions {
+		invalid := []any{map[string]any{name: "("}}
+		if err := NoUnusedVarsRule.Schema.Validate(invalid); err == nil {
+			t.Errorf("expected an invalid %s regex to fail schema validation", name)
+		}
+		// Lookbehind is JS-legal but RE2-illegal; it must still validate,
+		// proving the schema checks patterns with the ECMAScript engine, not
+		// Go's regexp.
+		valid := []any{map[string]any{name: "(?<=_)unused"}}
+		if err := NoUnusedVarsRule.Schema.Validate(valid); err != nil {
+			t.Errorf("expected a valid %s regex to pass schema validation, got: %v", name, err)
+		}
 	}
 }
 

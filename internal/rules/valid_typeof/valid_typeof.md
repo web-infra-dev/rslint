@@ -40,4 +40,5 @@ typeof foo === someVariable;
 
 ## Original Documentation
 
-- [ESLint valid-typeof](https://eslint.org/docs/latest/rules/valid-typeof)
+- [ESLint: valid-typeof](https://eslint.org/docs/latest/rules/valid-typeof)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/valid-typeof.js)

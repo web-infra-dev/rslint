@@ -30,6 +30,29 @@ type ParsedRstestFnCall struct {
 	// resolution, so prefer them over scanning Members, which is call-site only.
 	Skipped bool
 	Todo    bool
+	// focus is allocated only when the resolved registration carries `.only`.
+	// Keeping rare provenance behind one pointer avoids increasing every parsed
+	// registration allocation in files without focused tests.
+	focus *rstestFocus
+}
+
+type rstestFocus struct {
+	// Entries holds every `.only` source accessor that contributed to the
+	// focused registration. Unlike MemberEntries, alias-internal entries live
+	// here because they have a concrete source node useful for diagnostics and
+	// suggestions.
+	entries []ParsedRstestFnMemberEntry
+}
+
+func (parsed *ParsedRstestFnCall) IsFocused() bool {
+	return parsed != nil && parsed.focus != nil
+}
+
+func (parsed *ParsedRstestFnCall) FocusEntries() []ParsedRstestFnMemberEntry {
+	if parsed == nil || parsed.focus == nil {
+		return nil
+	}
+	return parsed.focus.entries
 }
 
 // IsParameterized reports whether the call was registered through `.each` or
@@ -46,6 +69,7 @@ type ParsedRstestFnMemberEntry = testFramework.MemberEntry
 
 const (
 	RstestFnTypeDescribe = testFramework.FnKindDescribe
+	RstestFnTypeHook     = testFramework.FnKindHook
 	RstestFnTypeTest     = testFramework.FnKindTest
 )
 
@@ -62,8 +86,8 @@ func JoinRstestFnMemberEntries(entries []ParsedRstestFnMemberEntry) string {
 	return testFramework.JoinMemberEntries(entries)
 }
 
-func RstestFnMemberEntriesRange(entries []ParsedRstestFnMemberEntry) (core.TextRange, bool) {
-	return testFramework.MemberEntriesRange(entries)
+func RstestFnMemberEntriesRange(sourceFile *ast.SourceFile, entries []ParsedRstestFnMemberEntry) (core.TextRange, bool) {
+	return testFramework.MemberEntriesRange(sourceFile, entries)
 }
 
 func ResolveFirstIdentifier(node *ast.Node) *ast.Node {

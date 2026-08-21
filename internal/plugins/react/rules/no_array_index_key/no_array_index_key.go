@@ -73,7 +73,12 @@ func isImportSpecifierFromReact(ctx rule.RuleContext, ident *ast.Node) bool {
 	}
 
 	if ctx.TypeChecker != nil {
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(ident)
+		var symbol *ast.Symbol
+		if ctx.Refs != nil {
+			symbol = ctx.Refs.Resolve(ident)
+		} else {
+			symbol = ctx.TypeChecker.GetSymbolAtLocation(ident)
+		}
 		if symbol == nil {
 			return false
 		}
@@ -550,10 +555,9 @@ var NoArrayIndexKeyRule = rule.Rule{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
 
-				if isCreateCloneElement(call.Expression) && call.Arguments != nil && len(call.Arguments.Nodes) > 1 {
-					if len(indexParamNames) == 0 {
-						return
-					}
+				if len(indexParamNames) > 0 &&
+					isCreateCloneElement(call.Expression) &&
+					call.Arguments != nil && len(call.Arguments.Nodes) > 1 {
 					checkObjectKeyProp(call.Arguments.Nodes[1])
 					return
 				}

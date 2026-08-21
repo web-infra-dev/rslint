@@ -45,4 +45,5 @@ This rule takes no options.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/role-has-required-aria-props](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/role-has-required-aria-props.md)
+- [eslint-plugin-jsx-a11y: role-has-required-aria-props](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/role-has-required-aria-props.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/role-has-required-aria-props.js)

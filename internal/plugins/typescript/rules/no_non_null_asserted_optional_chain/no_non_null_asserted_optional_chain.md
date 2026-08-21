@@ -22,4 +22,5 @@ foo?.bar();
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/no-non-null-asserted-optional-chain
+- [typescript-eslint: no-non-null-asserted-optional-chain](https://typescript-eslint.io/rules/no-non-null-asserted-optional-chain)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-non-null-asserted-optional-chain.ts)

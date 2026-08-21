@@ -67,4 +67,5 @@ has already been sanitized.
 
 ## Original Documentation
 
-- https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-danger.md
+- [eslint-plugin-react: no-danger](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-danger.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-danger.js)

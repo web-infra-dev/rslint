@@ -1,0 +1,72 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "$defs": {
+        "accessibilityLevel": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Always require an accessor.",
+              "enum": ["explicit"]
+            },
+            {
+              "type": "string",
+              "description": "Require an accessor except when public.",
+              "enum": ["no-public"]
+            },
+            {
+              "type": "string",
+              "description": "Never check whether there is an accessor.",
+              "enum": ["off"]
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "accessibility": {
+          "$ref": "#/items/0/$defs/accessibilityLevel",
+          "description": "Which accessibility modifier is required to exist or not exist."
+        },
+        "ignoredMethodNames": {
+          "type": "array",
+          "description": "Specific method names that may be ignored.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Changes to required accessibility modifiers for specific kinds of class members.",
+          "properties": {
+            "accessors": {
+              "$ref": "#/items/0/$defs/accessibilityLevel",
+              "description": "Which member accessibility modifier requirements to apply for accessors."
+            },
+            "constructors": {
+              "$ref": "#/items/0/$defs/accessibilityLevel",
+              "description": "Which member accessibility modifier requirements to apply for constructors."
+            },
+            "methods": {
+              "$ref": "#/items/0/$defs/accessibilityLevel",
+              "description": "Which member accessibility modifier requirements to apply for methods."
+            },
+            "parameterProperties": {
+              "$ref": "#/items/0/$defs/accessibilityLevel",
+              "description": "Which member accessibility modifier requirements to apply for parameterProperties."
+            },
+            "properties": {
+              "$ref": "#/items/0/$defs/accessibilityLevel",
+              "description": "Which member accessibility modifier requirements to apply for properties."
+            }
+          }
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

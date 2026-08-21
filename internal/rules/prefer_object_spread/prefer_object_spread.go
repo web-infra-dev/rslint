@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildUseSpreadMessage() rule.RuleMessage {
@@ -259,7 +260,7 @@ func (t *objectTracker) isPristineGlobal(node *ast.Node, name string) bool {
 	if utils.IsShadowed(node, name) {
 		return false
 	}
-	if t.ctx.Globals[name] == utils.GlobalAccessOff {
+	if !t.ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
 	return !t.globals.writtenBefore(name, node.Pos())
@@ -558,7 +559,7 @@ func needsSpreadParens(argNode *ast.Node) bool {
 
 // extendForwardOverSpace advances pos over a run of whitespace characters.
 func extendForwardOverSpace(text string, pos int) int {
-	return utils.SkipLeadingWhitespace(text, pos, len(text))
+	return ecmascript.SkipLeadingWhitespace(text, pos, len(text))
 }
 
 // extendBackwardOverSpace mirrors extendForwardOverSpace but walks backward,
@@ -567,7 +568,7 @@ func extendForwardOverSpace(text string, pos int) int {
 // line and doesn't swallow the following token. Mirrors upstream's
 // getStartWithSpaces, which special-cases a preceding Line comment token.
 func extendBackwardOverSpace(text string, comments []*ast.CommentRange, pos int) int {
-	boundary := utils.SkipTrailingWhitespace(text, 0, pos)
+	boundary := ecmascript.SkipTrailingWhitespace(text, 0, pos)
 	if boundary == pos {
 		return pos
 	}
@@ -730,7 +731,8 @@ func buildFixes(ctx rule.RuleContext, node *ast.Node, args []*ast.Node) []rule.R
 
 // https://eslint.org/docs/latest/rules/prefer-object-spread
 var PreferObjectSpreadRule = rule.Rule{
-	Name: "prefer-object-spread",
+	Name:   "prefer-object-spread",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		tracker := &objectTracker{
 			ctx:       ctx,

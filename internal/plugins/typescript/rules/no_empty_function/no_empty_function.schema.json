@@ -1,0 +1,37 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "functions",
+              "arrowFunctions",
+              "generatorFunctions",
+              "methods",
+              "generatorMethods",
+              "getters",
+              "setters",
+              "constructors",
+              "private-constructors",
+              "protected-constructors",
+              "asyncFunctions",
+              "asyncMethods",
+              "decoratedFunctions",
+              "overrideMethods"
+            ],
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "description": "Locations and kinds of functions that are allowed to be empty."
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

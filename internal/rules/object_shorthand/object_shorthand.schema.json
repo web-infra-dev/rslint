@@ -1,0 +1,69 @@
+{
+  "anyOf": [
+    {
+      "type": "array",
+      "items": [
+        {
+          "enum": [
+            "always",
+            "methods",
+            "properties",
+            "never",
+            "consistent",
+            "consistent-as-needed"
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    {
+      "type": "array",
+      "items": [
+        {
+          "enum": ["always", "methods", "properties"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "avoidQuotes": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 2
+    },
+    {
+      "type": "array",
+      "items": [
+        {
+          "enum": ["always", "methods"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ignoreConstructors": {
+              "type": "boolean"
+            },
+            "methodsIgnorePattern": {
+              "type": "string",
+              "format": "regex"
+            },
+            "avoidQuotes": {
+              "type": "boolean"
+            },
+            "avoidExplicitReturnArrows": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 2
+    }
+  ]
+}

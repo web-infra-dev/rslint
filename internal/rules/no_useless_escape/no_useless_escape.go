@@ -7,6 +7,7 @@
 package no_useless_escape
 
 import (
+	_ "embed"
 	"strings"
 	"unicode/utf8"
 
@@ -17,11 +18,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_useless_escape.schema.json
+var schemaJSON []byte
+
 // https://eslint.org/docs/latest/rules/no-useless-escape
 var NoUselessEscapeRule = rule.Rule{
-	Name: "no-useless-escape",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-useless-escape",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		allowed := parseAllowRegexCharacters(options)
 
 		return rule.RuleListeners{
@@ -62,16 +66,12 @@ var NoUselessEscapeRule = rule.Rule{
 	},
 }
 
-func parseAllowRegexCharacters(options any) map[string]bool {
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+func parseAllowRegexCharacters(options []any) map[string]bool {
+	if len(options) == 0 {
 		return nil
 	}
-	raw, ok := optsMap["allowRegexCharacters"]
-	if !ok {
-		return nil
-	}
-	arr, ok := raw.([]interface{})
+	m, _ := options[0].(map[string]any)
+	arr, ok := m["allowRegexCharacters"].([]interface{})
 	if !ok {
 		return nil
 	}

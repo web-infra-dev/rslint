@@ -1,0 +1,588 @@
+// Rstest Snapshot v1
+
+exports[`max-statements > invalid 1`] = `
+{
+  "code": "function foo() { var bar = 1; var baz = 2; var qux = 3; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 2`] = `
+{
+  "code": "var foo = () => { var bar = 1; var baz = 2; var qux = 3; };",
+  "diagnostics": [
+    {
+      "message": "Arrow function has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 3`] = `
+{
+  "code": "var foo = function() { var bar = 1; var baz = 2; var qux = 3; };",
+  "diagnostics": [
+    {
+      "message": "Function has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 4`] = `
+{
+  "code": "function foo() { var bar = 1; if (true) { while (false) { var qux = null; } } return 3; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (5). Maximum allowed is 4.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 5`] = `
+{
+  "code": "function foo() { var bar = 1; if (true) { for (;;) { var qux = null; } } return 3; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (5). Maximum allowed is 4.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 6`] = `
+{
+  "code": "function foo() { var bar = 1; if (true) { for (;;) { var qux = null; } } else { quxx(); } return 3; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (6). Maximum allowed is 5.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 7`] = `
+{
+  "code": "function foo() { var x = 5; function bar() { var y = 6; } bar(); z = 10; baz(); }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (5). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 8`] = `
+{
+  "code": "function foo() { var x = 5; function bar() { var y = 6; } bar(); z = 10; baz(); }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (5). Maximum allowed is 4.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 9`] = `
+{
+  "code": ";(function() { var bar = 1; return function () { var z; return 42; }; })()",
+  "diagnostics": [
+    {
+      "message": "Function has too many statements (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 10`] = `
+{
+  "code": ";(function() { var bar = 1; var baz = 2; })(); (function() { var bar = 1; var baz = 2; })()",
+  "diagnostics": [
+    {
+      "message": "Function has too many statements (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+    {
+      "message": "Function has too many statements (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 11`] = `
+{
+  "code": "define(['foo', 'qux'], function(foo, qux) { var bar = 1; var baz = 2; return function () { var z; return 42; }; })",
+  "diagnostics": [
+    {
+      "message": "Function has too many statements (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 87,
+          "line": 1,
+        },
+        "start": {
+          "column": 78,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 12`] = `
+{
+  "code": "function foo() { var a; var b; var c; var x; var y; var z; bar(); baz(); qux(); quxx(); foo(); }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (11). Maximum allowed is 10.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 13`] = `
+{
+  "code": "var foo = { thing: function() { var bar = 1; var baz = 2; var baz2; } }",
+  "diagnostics": [
+    {
+      "message": "Method 'thing' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 14`] = `
+{
+  "code": "var foo = { thing() { var bar = 1; var baz = 2; var baz2; } }",
+  "diagnostics": [
+    {
+      "message": "Method 'thing' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 15`] = `
+{
+  "code": "var foo = { thing: () => { var bar = 1; var baz = 2; var baz2; } }",
+  "diagnostics": [
+    {
+      "message": "Method 'thing' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 16`] = `
+{
+  "code": "var foo = { thing: function() { var bar = 1; var baz = 2; var baz2; } }",
+  "diagnostics": [
+    {
+      "message": "Method 'thing' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 17`] = `
+{
+  "code": "function foo() { 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (11). Maximum allowed is 10.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 18`] = `
+{
+  "code": "function foo() { 1; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 19`] = `
+{
+  "code": "function foo() { foo_1; /* foo_ 2 */ class C { static { one; two; three; four; { five; six; seven; eight; } } } foo_3 }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 20`] = `
+{
+  "code": "class C { static { one; two; three; four; function not_top_level() { 1; 2; 3; } five; six; seven; eight; } }",
+  "diagnostics": [
+    {
+      "message": "Function 'not_top_level' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 21`] = `
+{
+  "code": "class C { static { { one; two; three; four; function not_top_level() { 1; 2; 3; } five; six; seven; eight; } } }",
+  "diagnostics": [
+    {
+      "message": "Function 'not_top_level' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-statements > invalid 22`] = `
+{
+  "code": "class C { static { { one; two; three; four; } function not_top_level() { 1; 2; 3; } { five; six; seven; eight; } } }",
+  "diagnostics": [
+    {
+      "message": "Function 'not_top_level' has too many statements (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-statements",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

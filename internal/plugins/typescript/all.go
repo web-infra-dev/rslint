@@ -76,6 +76,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_type_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_type_constraint"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_type_conversion"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_type_parameters"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unsafe_argument"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unsafe_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unsafe_call"
@@ -211,6 +212,7 @@ func GetAllRules() []rule.Rule {
 		no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
 		no_unnecessary_type_constraint.NoUnnecessaryTypeConstraintRule,
 		no_unnecessary_type_conversion.NoUnnecessaryTypeConversionRule,
+		no_unnecessary_type_parameters.NoUnnecessaryTypeParametersRule,
 		no_unsafe_argument.NoUnsafeArgumentRule,
 		no_unsafe_assignment.NoUnsafeAssignmentRule,
 		no_unsafe_call.NoUnsafeCallRule,

@@ -158,6 +158,7 @@ func discoverLintTargetsWithStopDirs(
 
 	filesPatterns := collectLintFilePatterns(config)
 	filesMatcher := buildFilesMatcher(filesPatterns)
+	directoryBlocks := newDirectoryBlockMatcher(globalIgnores, configMatchDir)
 
 	var allowFileSet map[string]string
 	if allowFiles != nil {
@@ -192,7 +193,7 @@ func discoverLintTargetsWithStopDirs(
 		})
 	}
 	isGloballyIgnored := func(matchPath string) bool {
-		return isDirBlockedByIgnores(matchPath, globalIgnores, configMatchDir) ||
+		return directoryBlocks.blocksFileDirectory(matchPath) ||
 			isFileIgnored(matchPath, globalIgnores, configMatchDir)
 	}
 
@@ -1200,104 +1201,8 @@ func (index *configDirectoryIndex) assignExplicitFiles(files []string) map[strin
 	return filesByConfig
 }
 
-// DiscoverGapFiles returns resolved lint targets that are absent from existing
-// Programs. The filesystem walk and config/default-files matching are owned by
-// DiscoverLintFiles; this helper only subtracts programFiles for callers that
-// need a non-project-backed fallback Program.
-//
-// Files pass through these filters in DiscoverLintFiles:
-//  1. Inside CLI/API file or directory scope
-//  2. Selected by config `files` patterns or default lintable extensions;
-//     explicit file targets may pass this step to produce an empty result
-//  3. Not in global ignores or .gitignore-injected ignores
-//  4. Not already in programFiles
-//
-// Walking model:
-//   - A bounded worker pool (see walkPool) traverses the directory tree.
-//     Total live goroutines at any moment is at most `workers`.
-//   - Default workers = max(2, GOMAXPROCS); singleThreaded forces workers=1
-//     for fully serial traversal (a knob users rely on for debugging,
-//     reproducibility, and constrained environments).
-//   - The vfsAdapter is constructed with followSymlinks=false, so symlinked
-//     subdirectories are skipped entirely. This matches ESLint v10's
-//     flat-config file walker, which uses @humanfs/node and recurses only
-//     when Dirent.isDirectory() is true (Node returns false for symlinks).
-//     It also avoids the otherwise scheduling-dependent "first writer wins"
-//     non-determinism a parallel walker would introduce.
-//
-// When allowFiles/allowDirs are provided (CLI args), only files within scope.
-//
-// Returns:
-//   - []: no gaps found
-//   - [...]: gap files to create a fallback Program for (sorted lexically)
-func DiscoverGapFiles(
-	config RslintConfig,
-	configDir string,
-	fsys vfs.FS,
-	programFiles map[string]struct{},
-	allowFiles []string,
-	allowDirs []string,
-	singleThreaded bool,
-) []string {
-	gapFiles := []string{}
-	targetFiles := DiscoverLintFiles(config, configDir, fsys, allowFiles, allowDirs, singleThreaded)
-	for _, fullPath := range targetFiles {
-		if _, exists := programFiles[fullPath]; exists {
-			continue
-		}
-		gapFiles = append(gapFiles, fullPath)
-	}
-	return gapFiles
-}
-
-// DiscoverGapFilesMultiConfig runs DiscoverGapFiles for each config in a
-// monorepo config map and returns the union of all gap files.
-//
-// Configs are processed serially. Each DiscoverGapFiles invocation already
-// uses an internal worker pool, so the total live goroutine count is bounded
-// by the worker pool size, not by `len(configMap) × workers`. Cross-config
-// parallelism can be added later if benchmarks justify it.
-func DiscoverGapFilesMultiConfig(
-	configMap map[string]RslintConfig,
-	fsys vfs.FS,
-	programFiles map[string]struct{},
-	allowFiles []string,
-	allowDirs []string,
-	singleThreaded bool,
-) []string {
-	if len(configMap) == 0 {
-		return nil
-	}
-
-	index := newConfigDirectoryIndex(configMap, fsys)
-	configDirs := make([]string, 0, len(configMap))
-	for configDir := range configMap {
-		configDirs = append(configDirs, configDir)
-	}
-	sort.Strings(configDirs)
-
-	seen := make(map[string]struct{})
-	var allGapFiles []string
-	for _, configDir := range configDirs {
-		targets := discoverLintTargetsForConfigInMap(configMap, index, nil, configDir, fsys, allowFiles, allowDirs, singleThreaded)
-		for _, target := range targets {
-			f := target.Path
-			if _, exists := programFiles[f]; exists {
-				continue
-			}
-			if _, exists := seen[f]; !exists {
-				seen[f] = struct{}{}
-				allGapFiles = append(allGapFiles, f)
-			}
-		}
-	}
-
-	sort.Strings(allGapFiles)
-	return allGapFiles
-}
-
 // walkPool is a fixed-size worker pool with an unbounded internal LIFO queue,
-// used by DiscoverGapFiles to walk directory trees with a bounded number of
+// used by lint-target discovery to walk directory trees with a bounded number of
 // live goroutines. Properties:
 //
 //   - At most `workers` goroutines exist concurrently.

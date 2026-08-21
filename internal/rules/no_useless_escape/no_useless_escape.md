@@ -88,4 +88,5 @@ If you do not want to be notified about unnecessary escapes, you can safely disa
 
 ## Original Documentation
 
-- [no-useless-escape](https://eslint.org/docs/latest/rules/no-useless-escape)
+- [ESLint: no-useless-escape](https://eslint.org/docs/latest/rules/no-useless-escape)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-useless-escape.js)

@@ -865,3 +865,20 @@ console.log(obj?.x?.y);`,
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
 }
+
+// TestNoUnusedVarsPatternsLookahead locks in that the ignore patterns are
+// matched with the same ECMAScript regex engine the schema validates them
+// against (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a
+// JS-only pattern that passes schema validation would otherwise silently
+// fail to compile and never ignore anything.
+func TestNoUnusedVarsPatternsLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, []rule_tester.ValidTestCase{
+		{Code: `const _foo = 1;`, Options: map[string]interface{}{"varsIgnorePattern": "^_(?!ignore)"}},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    `const _ignoreMe = 1;`,
+			Options: map[string]interface{}{"varsIgnorePattern": "^_(?!ignore)"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
+		},
+	})
+}

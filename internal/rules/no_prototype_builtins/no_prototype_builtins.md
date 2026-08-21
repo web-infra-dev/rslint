@@ -31,4 +31,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- ESLint rule: https://eslint.org/docs/latest/rules/no-prototype-builtins
+- [ESLint: no-prototype-builtins](https://eslint.org/docs/latest/rules/no-prototype-builtins)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-prototype-builtins.js)

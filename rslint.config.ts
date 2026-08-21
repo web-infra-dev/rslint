@@ -1,4 +1,4 @@
-import { defineConfig, globalIgnores, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, globals, js, ts } from '@rslint/core';
 
 export default defineConfig([
   globalIgnores([
@@ -27,8 +27,10 @@ export default defineConfig([
     // Files that need special handling
     'packages/rslint-wasm/src/worker.ts',
     'packages/rule-tester/src/index.ts',
+    'packages/rslint-wasm/wasm_exec.js',
   ]),
   // Start from recommended preset, then override rules and parserOptions
+  js.configs.recommended,
   ts.configs.recommended,
   {
     files: ['**/*.ts', '**/*.tsx'],
@@ -38,7 +40,6 @@ export default defineConfig([
         project: [
           './packages/*/tsconfig.build.json',
           './packages/*/tsconfig.spec.json',
-          './packages/rslint/fixtures/tsconfig.json',
         ],
       },
     },
@@ -72,7 +73,17 @@ export default defineConfig([
       '@typescript-eslint/prefer-includes': 'error',
       '@typescript-eslint/prefer-regexp-exec': 'error',
       '@typescript-eslint/prefer-ts-expect-error': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': 'warn',
       'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 ]);

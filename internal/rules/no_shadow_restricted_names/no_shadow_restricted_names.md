@@ -56,4 +56,5 @@ import { baz as globalThis } from "foo";
 
 ## Original Documentation
 
-- [ESLint no-shadow-restricted-names](https://eslint.org/docs/latest/rules/no-shadow-restricted-names)
+- [ESLint: no-shadow-restricted-names](https://eslint.org/docs/latest/rules/no-shadow-restricted-names)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-shadow-restricted-names.js)

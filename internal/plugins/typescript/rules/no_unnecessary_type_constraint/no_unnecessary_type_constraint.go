@@ -34,7 +34,8 @@ func buildRemoveUnnecessaryConstraintMessage(constraint string) rule.RuleMessage
 var disambiguationExtensions = []string{tspath.ExtensionCts, tspath.ExtensionMts, tspath.ExtensionTsx}
 
 var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
-	Name: "no-unnecessary-type-constraint",
+	Name:   "no-unnecessary-type-constraint",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		needsDisambiguationResolved := false
 		needsDisambiguation := false
@@ -46,6 +47,15 @@ var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 				// In tsgo, `infer U`, mapped-type `[P in K]`, and JSDoc `@template` also
 				// surface as KindTypeParameter but have no TSTypeParameterDeclaration
 				// analog, so upstream doesn't report them.
+				//
+				// JSDoc type parameters can appear twice: once under the template tag and
+				// once as a reparsed clone attached to the host declaration. The clone no
+				// longer has a JSDoc parent, so its Reparsed flag is the distinguishing
+				// signal.
+				if node.Flags&ast.NodeFlagsReparsed != 0 {
+					return
+				}
+
 				parent := node.Parent
 				if parent == nil {
 					return

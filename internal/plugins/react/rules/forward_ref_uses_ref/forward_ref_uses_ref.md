@@ -36,5 +36,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/forward-ref-uses-ref.md
-- https://react.dev/reference/react/forwardRef
+- [eslint-plugin-react: forward-ref-uses-ref](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/forward-ref-uses-ref.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/forward-ref-uses-ref.js)

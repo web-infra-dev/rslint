@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing": {
+          "type": "boolean",
+          "description": "Unless this is set to `true`, the rule will error on every file whose `tsconfig.json` does _not_ have the `strictNullChecks` compiler option (or `strict`) set to `true`."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

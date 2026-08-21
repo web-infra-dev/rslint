@@ -1,0 +1,117 @@
+{
+  "definitions": {
+    "nameList": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      ]
+    }
+  },
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "description": "Types to allow in template expressions.",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "name"],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "enum": ["file"]
+                  },
+                  "name": {
+                    "$ref": "#/definitions/nameList"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "name"],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "enum": ["lib"]
+                  },
+                  "name": {
+                    "$ref": "#/definitions/nameList"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "name", "package"],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "enum": ["package"]
+                  },
+                  "name": {
+                    "$ref": "#/definitions/nameList"
+                  },
+                  "package": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "allowAny": {
+          "type": "boolean",
+          "description": "Whether to allow `any` typed values in template expressions."
+        },
+        "allowArray": {
+          "type": "boolean",
+          "description": "Whether to allow `array` typed values in template expressions."
+        },
+        "allowBoolean": {
+          "type": "boolean",
+          "description": "Whether to allow `boolean` typed values in template expressions."
+        },
+        "allowNever": {
+          "type": "boolean",
+          "description": "Whether to allow `never` typed values in template expressions."
+        },
+        "allowNullish": {
+          "type": "boolean",
+          "description": "Whether to allow `nullish` typed values in template expressions."
+        },
+        "allowNumber": {
+          "type": "boolean",
+          "description": "Whether to allow `number` typed values in template expressions."
+        },
+        "allowRegExp": {
+          "type": "boolean",
+          "description": "Whether to allow `regexp` typed values in template expressions."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

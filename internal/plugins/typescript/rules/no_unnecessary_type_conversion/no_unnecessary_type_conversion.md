@@ -55,4 +55,5 @@ new Boolean(true);
 
 ## Original Documentation
 
-- [typescript-eslint no-unnecessary-type-conversion](https://typescript-eslint.io/rules/no-unnecessary-type-conversion)
+- [typescript-eslint: no-unnecessary-type-conversion](https://typescript-eslint.io/rules/no-unnecessary-type-conversion)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.59.3/packages/eslint-plugin/src/rules/no-unnecessary-type-conversion.ts)

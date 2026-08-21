@@ -25,4 +25,5 @@ promise.catch((...args: [unknown]) => {});
 
 ## Original Documentation
 
-- [typescript-eslint use-unknown-in-catch-callback-variable](https://typescript-eslint.io/rules/use-unknown-in-catch-callback-variable)
+- [typescript-eslint: use-unknown-in-catch-callback-variable](https://typescript-eslint.io/rules/use-unknown-in-catch-callback-variable)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/use-unknown-in-catch-callback-variable.ts)

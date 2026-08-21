@@ -172,4 +172,5 @@ If you are not using JSX, you can disable this rule.
 
 ## Original Documentation
 
-- [react/jsx-closing-bracket-location](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-closing-bracket-location.md)
+- [eslint-plugin-react: jsx-closing-bracket-location](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-closing-bracket-location.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-closing-bracket-location.js)

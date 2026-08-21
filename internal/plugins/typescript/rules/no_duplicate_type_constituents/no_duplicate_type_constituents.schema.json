@@ -1,0 +1,21 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ignoreIntersections": {
+          "type": "boolean",
+          "description": "Whether to ignore `&` intersections."
+        },
+        "ignoreUnions": {
+          "type": "boolean",
+          "description": "Whether to ignore `|` unions."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

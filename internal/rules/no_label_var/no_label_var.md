@@ -40,10 +40,13 @@ This rule has no options.
 ## Differences from ESLint
 
 - On files without type information, only declarations written in the file
-  plus configured globals (`languageOptions.globals` / `/* global foo */`)
-  are checked; clashes with built-in globals (`Promise`, `Array`, …) are not
-  reported in that case.
+  plus [configured globals](/config/language-options#languageoptionsglobals)
+  (`languageOptions.globals` / `/* global foo */`) are checked; clashes with
+  built-in globals (`Promise`, `Array`, …) are not reported in that case. The
+  `globals` catalog exported by `@rslint/core` can supply runtime-specific
+  declarations.
 
 ## Original Documentation
 
-- [ESLint rule: no-label-var](https://eslint.org/docs/latest/rules/no-label-var)
+- [ESLint: no-label-var](https://eslint.org/docs/latest/rules/no-label-var)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-label-var.js)

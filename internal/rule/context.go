@@ -3,8 +3,8 @@ package rule
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -39,29 +39,12 @@ type DiagnosticConsumer struct {
 type RuleContext struct {
 	SourceFile *ast.SourceFile
 	Settings   map[string]interface{}
-	// Cwd is the normalized working directory of the linting process, the
-	// counterpart of ESLint's `process.cwd()`. Rules that resolve configured
-	// relative paths should use it instead of the Program's current directory,
-	// which is the owning tsconfig's directory and therefore differs between
-	// Programs in the same run. Empty when the caller has no process directory
-	// to speak of, such as rule tests reading an in-memory fixture root.
-	Cwd string
-	// ConfigGlobals contains only globals from the effective
-	// `languageOptions.globals` configuration, before inline comments are
-	// applied.
-	ConfigGlobals map[string]utils.GlobalAccess
-	// InlineGlobals contains `/* global */` declaration metadata in first-name
-	// source order. Rules can use its exact name ranges without scanning source
-	// text again. Treat the slice and its nested ranges as read-only.
-	InlineGlobals []InlineGlobal
-	// Globals is the resolved access level of every global name this file
-	// mentions — config `languageOptions.globals` merged with inline
-	// `/* global */` comments, resolved once per file by the linter. Rules
-	// should read this instead of parsing comments or config themselves. A name
-	// neither source mentions reads back as utils.GlobalAccessUnset, so rules
-	// can index it directly and fall back to what they already know about the
-	// name, e.g. utils.IsECMAScriptGlobal.
-	Globals map[string]utils.GlobalAccess
+	fileCache  *FileCache
+	// Globals owns the file's complete global-variable view: the selected
+	// ECMAScript edition, languageOptions.globals, inline /* global */ comments,
+	// their effective access, and inline declaration metadata. Rules should use
+	// its accessors instead of reimplementing precedence or version selection.
+	Globals Globals
 	// Comments lazily provides every comment in SourceFile, in source order.
 	// Rules should call Comments.All instead of walking the token tree with
 	// utils.ForEachComment. The first consumer computes the list and every
@@ -71,16 +54,55 @@ type RuleContext struct {
 	// that need "all references to this declared symbol" should query this
 	// instead of walking the AST and calling TypeChecker.GetSymbolAtLocation
 	// per identifier. Keys are binder symbols (node.Symbol()); see RefStore.
-	// Nil when no program is available.
+	// Manually assembled contexts may leave it nil.
 	Refs *RefStore
 	// BOM lazily answers whether this file's source text began with a byte
 	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
-	// false, which is what a context with no program can say.
-	BOM            *SourceBOM
-	Program        *compiler.Program
+	// false, which is what a context with no Program can say.
+	BOM *SourceBOM
+	// program is the sole source authority for this context. Parser, filesystem,
+	// package, module-resolution, syntax, and optional type services all derive
+	// from this one immutable generation.
+	program        *program.Program
 	TypeChecker    *checker.Checker
 	DisableManager *DisableManager
 	reporter       ruleContextReporter
+}
+
+// Program returns the authoritative rslint source universe.
+func (ctx *RuleContext) Program() *program.Program {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.program
+}
+
+// WithProgram binds the source authority. It is a one-time assembly hook for
+// the linter and rule tests. Rebinding an assembled context to a different
+// Program would leave its other source-derived state incoherent and therefore
+// panics.
+func (ctx RuleContext) WithProgram(sourceProgram *program.Program) RuleContext {
+	if ctx.program != nil && ctx.program != sourceProgram {
+		panic("rule: cannot rebind RuleContext to a different Program")
+	}
+	if sourceProgram != nil && !sourceProgram.IsValid() {
+		panic("rule: cannot bind RuleContext to an invalid Program")
+	}
+	if sourceProgram != nil && ctx.SourceFile != nil && !sourceProgram.OwnsSourceFile(ctx.SourceFile) {
+		panic("rule: RuleContext source file does not belong to Program")
+	}
+	ctx.program = sourceProgram
+	return ctx
+}
+
+// ProcessCurrentDirectory returns the normalized working directory of the
+// linting process, the counterpart of ESLint's process.cwd(). It differs from
+// Program.CurrentDirectory when a Program is owned by another tsconfig.
+func (ctx *RuleContext) ProcessCurrentDirectory() string {
+	if ctx == nil || ctx.fileCache == nil {
+		return ""
+	}
+	return ctx.fileCache.processCurrentDirectory
 }
 
 // ruleContextReporter is immutable after Rule.Run starts. Keeping only the

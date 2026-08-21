@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -31,6 +32,7 @@ import (
 func newTestServer() *Server {
 	return &Server{
 		jsConfigs:              make(map[string]config.RslintConfig),
+		positionEncoding:       lsproto.PositionEncodingKindUTF16,
 		documents:              make(map[lsproto.DocumentUri]string),
 		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		refreshCh:              make(chan struct{}, 1),
@@ -56,7 +58,8 @@ func documentURIFromPath(filePath string) lsproto.DocumentUri {
 	return lsproto.DocumentUri((&url.URL{Scheme: "file", Path: uriPath}).String())
 }
 
-// helper to build a didChange params for full-sync mode
+// helper to build a whole-document didChange. Incremental-sync servers must
+// still accept this change shape because it is part of the protocol union.
 func makeDidChangeParams(uri lsproto.DocumentUri, version int32, text string) *lsproto.DidChangeTextDocumentParams {
 	return &lsproto.DidChangeTextDocumentParams{
 		TextDocument: lsproto.VersionedTextDocumentIdentifier{
@@ -66,6 +69,69 @@ func makeDidChangeParams(uri lsproto.DocumentUri, version int32, text string) *l
 		ContentChanges: []lsproto.TextDocumentContentChangePartialOrWholeDocument{
 			{WholeDocument: &lsproto.TextDocumentContentChangeWholeDocument{Text: text}},
 		},
+	}
+}
+
+func makePartialDidChangeParams(
+	uri lsproto.DocumentUri,
+	version int32,
+	startLine uint32,
+	startCharacter uint32,
+	endLine uint32,
+	endCharacter uint32,
+	text string,
+) *lsproto.DidChangeTextDocumentParams {
+	return &lsproto.DidChangeTextDocumentParams{
+		TextDocument: lsproto.VersionedTextDocumentIdentifier{Uri: uri, Version: version},
+		ContentChanges: []lsproto.TextDocumentContentChangePartialOrWholeDocument{
+			partialDocumentChange(startLine, startCharacter, endLine, endCharacter, text),
+		},
+	}
+}
+
+func TestHandleInitializeAdvertisesIncrementalSync(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		encodings    *[]lsproto.PositionEncodingKind
+		wantEncoding lsproto.PositionEncodingKind
+	}{
+		{name: "defaults to UTF-16", wantEncoding: lsproto.PositionEncodingKindUTF16},
+		{
+			name:         "keeps UTF-16 when UTF-8 is offered",
+			encodings:    &[]lsproto.PositionEncodingKind{lsproto.PositionEncodingKindUTF16, lsproto.PositionEncodingKindUTF8},
+			wantEncoding: lsproto.PositionEncodingKindUTF16,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newTestServer()
+			response, err := s.handleInitialize(context.Background(), &lsproto.InitializeParams{
+				Capabilities: &lsproto.ClientCapabilities{
+					General: &lsproto.GeneralClientCapabilities{PositionEncodings: tt.encodings},
+				},
+			})
+			if err != nil {
+				t.Fatalf("handleInitialize failed: %v", err)
+			}
+
+			options := response.Capabilities.TextDocumentSync.Options
+			if options == nil || options.Change == nil {
+				t.Fatal("initialize response omitted text document sync change capability")
+			}
+			if *options.Change != lsproto.TextDocumentSyncKindIncremental {
+				t.Fatalf("text document sync = %v, want incremental", *options.Change)
+			}
+			if response.Capabilities.PositionEncoding == nil || *response.Capabilities.PositionEncoding != tt.wantEncoding {
+				t.Fatalf("response position encoding = %v, want %v", response.Capabilities.PositionEncoding, tt.wantEncoding)
+			}
+			if s.positionEncoding != tt.wantEncoding {
+				t.Fatalf("server position encoding = %v, want %v", s.positionEncoding, tt.wantEncoding)
+			}
+		})
 	}
 }
 
@@ -130,6 +196,49 @@ func TestHandleDidChange(t *testing.T) {
 
 	if s.documents[uri] != "const x = 2;" {
 		t.Errorf("document content = %q, want %q", s.documents[uri], "const x = 2;")
+	}
+}
+
+func TestHandleDidChange_AppliesIncrementalUTF16Change(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///project/test.ts")
+	s.documents[uri] = "const marker = '😀'; const value = 1;"
+
+	err := s.handleDidChange(
+		context.Background(),
+		makePartialDidChangeParams(uri, 2, 0, 27, 0, 32, "result"),
+	)
+	if err != nil {
+		t.Fatalf("handleDidChange failed: %v", err)
+	}
+
+	want := "const marker = '😀'; const result = 1;"
+	if s.documents[uri] != want {
+		t.Fatalf("document content = %q, want %q", s.documents[uri], want)
+	}
+}
+
+func TestHandleDidChange_InvalidIncrementalRangeDoesNotMutateState(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///project/test.ts")
+	s.documents[uri] = "a\nb"
+	s.docGeneration[uri] = 7
+	s.diagnostics[uri] = []rule.RuleDiagnostic{{RuleName: "native/existing"}}
+
+	if err := s.handleDidChange(
+		context.Background(),
+		makePartialDidChangeParams(uri, 2, 1, 0, 0, 0, "invalid"),
+	); err != nil {
+		t.Fatalf("handleDidChange failed: %v", err)
+	}
+	if s.documents[uri] != "a\nb" {
+		t.Fatalf("invalid change mutated document to %q", s.documents[uri])
+	}
+	if s.docGeneration[uri] != 7 {
+		t.Fatalf("invalid change advanced generation to %d", s.docGeneration[uri])
+	}
+	if len(s.diagnostics[uri]) != 1 {
+		t.Fatal("invalid change cleared current diagnostics")
 	}
 }
 
@@ -208,6 +317,27 @@ func TestHandleDidChange_RapidSuccessiveChanges(t *testing.T) {
 
 	if s.documents[uri] != "version 20" {
 		t.Errorf("after rapid changes: content = %q, want %q", s.documents[uri], "version 20")
+	}
+}
+
+func TestHandleDidChange_RapidSuccessiveIncrementalChanges(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+	uri := lsproto.DocumentUri("file:///project/test.ts")
+	s.documents[uri] = ""
+
+	for i, character := range "hello" {
+		err := s.handleDidChange(
+			ctx,
+			makePartialDidChangeParams(uri, int32(i+1), 0, uint32(i), 0, uint32(i), string(character)),
+		)
+		if err != nil {
+			t.Fatalf("change %d failed: %v", i+1, err)
+		}
+	}
+
+	if s.documents[uri] != "hello" {
+		t.Fatalf("after rapid incremental changes: content = %q, want %q", s.documents[uri], "hello")
 	}
 }
 
@@ -1494,7 +1624,7 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 		t.Helper()
 		var diags []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program: program,
+			Program: lintprogram.NewFromCompiler(program),
 			File:    file,
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return lspActiveRulesForFile(cfg, sourceFile.FileName(), dir, false, true)

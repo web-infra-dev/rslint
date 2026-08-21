@@ -1,16 +1,20 @@
 package no_restricted_imports
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
+
+//go:embed no_restricted_imports.schema.json
+var schemaJSON []byte
 
 // specifierInfo holds the node and type-only status of an import/export specifier,
 // used to report errors on the correct AST location.
@@ -57,13 +61,13 @@ type restrictedPathEntry struct {
 // restrictedPatternGroup represents one entry from the "patterns" config option.
 // It matches import sources via either gitignore-style globs or regex.
 type restrictedPatternGroup struct {
-	matcher                *ignoreMatcher  // gitignore-style matcher (from "group")
-	regexMatcher           *regexp2.Regexp // regex matcher (from "regex"); uses regexp2 for JS-compatible lookahead/lookbehind
+	matcher                *ignoreMatcher   // gitignore-style matcher (from "group")
+	regexMatcher           *esregexp.RegExp // regex matcher (from "regex"); uses regexp2 for JS-compatible lookahead/lookbehind
 	customMessage          string
 	importNames            []string
-	importNamePattern      *regexp2.Regexp
+	importNamePattern      *esregexp.RegExp
 	allowImportNames       []string
-	allowImportNamePattern *regexp2.Regexp
+	allowImportNamePattern *esregexp.RegExp
 	allowTypeImports       bool
 }
 
@@ -204,7 +208,7 @@ type Engine struct {
 }
 
 // NewEngine parses options and returns an Engine.
-func NewEngine(options any) *Engine {
+func NewEngine(options []any) *Engine {
 	g, p := parseOptions(options)
 	return &Engine{grouped: g, patterns: p}
 }
@@ -256,7 +260,7 @@ func IsTypeOnlyDeclaration(node *ast.Node) bool {
 // Without this short-circuit, conflicting duplicate entries (e.g. two `paths`
 // for the same name with allowTypeImports both true and false) would diverge
 // from upstream — upstream skips on any "true", rslint core checks per-entry.
-func BuildAllowTypeImportSourceFilter(options any) func(source string) bool {
+func BuildAllowTypeImportSourceFilter(options []any) func(source string) bool {
 	grouped, patterns := parseOptions(options)
 	if len(grouped) == 0 && len(patterns) == 0 {
 		return nil
@@ -305,14 +309,9 @@ func BuildAllowTypeImportSourceFilter(options any) func(source string) bool {
 //   1. Array of strings/objects: ["fs", { name: "foo", importNames: ["bar"] }]
 //   2. Single object with paths/patterns: [{ paths: [...], patterns: [...] }]
 
-func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, patternGroups []restrictedPatternGroup) {
+func parseOptions(arr []any) (groupedPaths map[string][]restrictedPathEntry, patternGroups []restrictedPatternGroup) {
 	groupedPaths = make(map[string][]restrictedPathEntry)
 
-	// config.rules unwraps a single configured option to a bare value — a map
-	// for an object option, or a string for a string option such as
-	// ["error","import1"]. NormalizeOptions re-wraps either into eslint
-	// context.options form so each arrives uniformly as arr[0].
-	arr := rule.NormalizeOptions(options)
 	if len(arr) == 0 {
 		return groupedPaths, patternGroups
 	}
@@ -395,11 +394,11 @@ func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, p
 					pg.matcher = newIgnoreMatcher(group, caseSensitive)
 				}
 				if regexStr, ok := obj["regex"].(string); ok {
-					opts := regexp2.RegexOptions(regexp2.IgnoreCase | regexp2.Unicode)
+					flags := "iu"
 					if caseSensitive {
-						opts = regexp2.Unicode
+						flags = "u"
 					}
-					if re, err := regexp2.Compile(regexStr, opts); err == nil {
+					if re, err := esregexp.Compile(regexStr, flags); err == nil {
 						pg.regexMatcher = re
 					}
 				}
@@ -409,12 +408,12 @@ func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, p
 				pg.importNames = utils.ToStringSlice(obj["importNames"])
 				pg.allowImportNames = utils.ToStringSlice(obj["allowImportNames"])
 				if pattern, ok := obj["importNamePattern"].(string); ok && pattern != "" {
-					if re, err := regexp2.Compile(pattern, regexp2.Unicode); err == nil {
+					if re, err := esregexp.Compile(pattern, "u"); err == nil {
 						pg.importNamePattern = re
 					}
 				}
 				if pattern, ok := obj["allowImportNamePattern"].(string); ok && pattern != "" {
-					if re, err := regexp2.Compile(pattern, regexp2.Unicode); err == nil {
+					if re, err := esregexp.Compile(pattern, "u"); err == nil {
 						pg.allowImportNamePattern = re
 					}
 				}
@@ -431,9 +430,9 @@ func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, p
 // --- Rule Definition ---
 
 var NoRestrictedImportsRule = rule.Rule{
-	Name: "no-restricted-imports",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-restricted-imports",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		groupedPaths, patternGroups := parseOptions(options)
 
 		if len(groupedPaths) == 0 && len(patternGroups) == 0 {
@@ -729,7 +728,7 @@ func reportNameForPath(ctx *rule.RuleContext, node *ast.Node, specifiers []speci
 
 func isRestrictedPattern(importSource string, group *restrictedPatternGroup) bool {
 	if group.regexMatcher != nil {
-		return utils.Regexp2MatchString(group.regexMatcher, importSource)
+		return group.regexMatcher.Test(importSource)
 	}
 	if group.matcher != nil {
 		return group.matcher.ignores(importSource)
@@ -771,7 +770,7 @@ func reportPathForPatterns(
 
 		// Check restricted import names (by name list or regex pattern)
 		if (len(group.importNames) > 0 && slices.Contains(group.importNames, e.name)) ||
-			(group.importNamePattern != nil && utils.Regexp2MatchString(group.importNamePattern, e.name)) {
+			(group.importNamePattern != nil && group.importNamePattern.Test(e.name)) {
 			reportSpecifiersForPattern(ctx, node, e.specifiers, group, e.name, importSource,
 				"patternAndImportName", "patternAndImportNameWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted from being used by a pattern.", e.name, importSource))
@@ -782,7 +781,7 @@ func reportPathForPatterns(
 				"allowedImportName", "allowedImportNameWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted because only %s %s allowed.",
 					e.name, importSource, formatEnglishList(group.allowImportNames), isOrAre(group.allowImportNames)))
-		} else if group.allowImportNamePattern != nil && !utils.Regexp2MatchString(group.allowImportNamePattern, e.name) {
+		} else if group.allowImportNamePattern != nil && !group.allowImportNamePattern.TestOrTimeout(e.name) {
 			reportSpecifiersForPattern(ctx, node, e.specifiers, group, e.name, importSource,
 				"allowedImportNamePattern", "allowedImportNamePatternWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted because only imports that match the pattern '%s' are allowed from '%s'.",
@@ -951,11 +950,12 @@ func formatEnglishList(names []string) string {
 	}
 }
 
-// jsRegexString formats a Go regexp pattern in JavaScript RegExp.toString() notation: /pattern/u.
-// ESLint creates these patterns with `new RegExp(pattern, "u")` and interpolates them via toString().
-// jsRegexString formats a regex pattern in JavaScript RegExp.toString() notation: /pattern/u.
-func jsRegexString(re *regexp2.Regexp) string {
-	return "/" + re.String() + "/u"
+// jsRegexString renders a pattern the way JavaScript's RegExp.toString() does,
+// which is how ESLint interpolates one into a message. Source rather than
+// String, because the pattern reaches regexp2 rewritten and the message has to
+// show what its author wrote.
+func jsRegexString(re *esregexp.RegExp) string {
+	return "/" + re.Source() + "/u"
 }
 
 func isOrAre(names []string) string {

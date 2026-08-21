@@ -1,6 +1,7 @@
 package method_signature_style
 
 import (
+	_ "embed"
 	"sort"
 	"strings"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed method_signature_style.schema.json
+var schemaJSON []byte
 
 type mode string
 
@@ -31,8 +35,9 @@ func messageErrorProperty() rule.RuleMessage {
 }
 
 var MethodSignatureStyleRule = rule.CreateRule(rule.Rule{
-	Name: "method-signature-style",
-	Run:  run,
+	Name:   "method-signature-style",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 // containsThisType recursively checks whether the given type node (or any of
@@ -241,11 +246,12 @@ func (f *methodSignatureFixer) buildPropertyFixes(
 	return []rule.RuleFix{rule.RuleFixReplace(f.sourceFile, node, replacement)}
 }
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
-	opt := mode(utils.GetOptionsString(options))
-	if opt == "" {
-		opt = modeProperty
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	opt := modeProperty
+	if len(options) > 0 {
+		if s, ok := options[0].(string); ok && s != "" {
+			opt = mode(s)
+		}
 	}
 
 	fixer := methodSignatureFixer{

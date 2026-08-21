@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildPreferRegExpExecMessage() rule.RuleMessage {
@@ -158,7 +159,7 @@ func isUndefinedLiteral(ctx rule.RuleContext, node *ast.Node) bool {
 	if id == nil || id.Text != "undefined" {
 		return false
 	}
-	if ctx.TypeChecker == nil || ctx.Program == nil {
+	if ctx.TypeChecker == nil || ctx.Program() == nil {
 		return true
 	}
 	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
@@ -314,7 +315,7 @@ func buildRegexLiteralFromString(pattern string) (string, bool) {
 	}
 	b.WriteByte('/')
 	literal := b.String()
-	if !utils.IsValidRegexLiteral(literal) {
+	if !ecmascript.IsValidRegexLiteral(literal) {
 		return "", false
 	}
 	return literal, true
@@ -355,6 +356,7 @@ func buildPreferRegExpExecReplacement(ctx rule.RuleContext, callNode *ast.Node, 
 
 var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-regexp-exec",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{

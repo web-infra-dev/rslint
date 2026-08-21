@@ -792,6 +792,12 @@ it("case", cb);`},
 				},
 			},
 			{
+				Code: `expect(value).catch(() => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
 				Code: `
         it('works', async () => {
           await somePromise.catch(error => expect(error).toBeInstanceOf(Error));

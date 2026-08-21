@@ -7,16 +7,28 @@ import (
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_conditional_expect"
 )
 
+func sourceMayContainConditionalRstestExpect(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	_, ok := sourceFile.Identifiers["expect"]
+	return ok
+}
+
 var NoConditionalExpectRule = shared.NewRule(shared.Config{
 	Name: "rstest/no-conditional-expect",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
-		callbacks := rstestUtils.CollectRstestTestCallbacks(ctx)
+		if !sourceMayContainConditionalRstestExpect(ctx.SourceFile) {
+			return shared.Runtime{Skip: true}
+		}
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return shared.Runtime{
-			TestCallbackFunctions: callbacks.Functions,
-			ClassifyCall: func(node *ast.Node) (bool, bool) {
-				parsed := callbacks.ParseFnCall(node)
-				return parsed != nil && parsed.Kind == rstestUtils.RstestFnTypeTest,
-					rstestUtils.IsRstestExpectCall(node, ctx, callbacks)
+			TestCallbackFunctions: analysis.Callbacks().Functions,
+			IsTestCall: func(node *ast.Node) bool {
+				return analysis.ParseTestCall(node) != nil
+			},
+			IsExpectCall: func(node *ast.Node) bool {
+				return analysis.IsExpectCall(node)
 			},
 		}
 	},

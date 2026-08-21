@@ -311,31 +311,22 @@ var RequireOptimizationRule = rule.Rule{
 		// it falls back to a local-block scan when `ctx.TypeChecker` is
 		// nil.
 		//
-		// Results are memoized per node: the same node is queried during
-		// the top-level `collect` walk AND during every enclosing
-		// component's `markedFromSubtree` skip-check, and SFC detection
-		// internally walks the function body looking for JSX returns —
-		// without memoization the rule degrades to O(N²) on large files.
-		detectionCache := make(map[*ast.Node]bool)
+		// The component stack walk below visits each node once, so detection
+		// also runs once per node and needs no per-file memoization map.
 		isDetectedComponent := func(node *ast.Node) bool {
-			if cached, ok := detectionCache[node]; ok {
-				return cached
-			}
-			var result bool
 			switch node.Kind {
 			case ast.KindClassDeclaration, ast.KindClassExpression:
-				result = reactutil.ExtendsReactComponent(node, pragma)
+				return reactutil.ExtendsReactComponent(node, pragma)
 			case ast.KindObjectLiteralExpression:
-				result = reactutil.IsCreateReactClassObjectArg(node, pragma, createClass)
+				return reactutil.IsCreateReactClassObjectArg(node, pragma, createClass)
 			case ast.KindFunctionDeclaration,
 				ast.KindFunctionExpression,
 				ast.KindArrowFunction:
 				if isInClassDeclarationMethodBody(node) {
-					result = reactutil.IsStatelessReactComponentWithChecker(node, pragma, ctx.TypeChecker)
+					return reactutil.IsStatelessReactComponentWithChecker(node, pragma, ctx.TypeChecker)
 				}
 			}
-			detectionCache[node] = result
-			return result
+			return false
 		}
 
 		// classSelfMarked covers upstream's `ClassDeclaration(node)` listener
@@ -351,70 +342,6 @@ var RequireOptimizationRule = rule.Rule{
 			return hasPureRenderDecorator(c) ||
 				hasCustomDecorator(c, opts.AllowDecorators) ||
 				reactutil.ExtendsReactPureComponent(c, pragma)
-		}
-
-		// markedFromSubtree implements upstream's `mark-SCU-as-declared` walk-up
-		// resolution: any markSCU source node (ObjectExpression with
-		// SCU/PureRenderMixin, MethodDefinition with name SCU, ClassDeclaration
-		// with PureRender / custom-allow decorator) inside `self`'s subtree
-		// flows up the parent chain until it hits the nearest detected
-		// component. We mirror that with a pre-order subtree scan that
-		// PRUNES nested detected components — they would absorb the
-		// markSCU themselves before it reaches `self`.
-		//
-		// Verified empirically against eslint-plugin-react@latest:
-		//
-		//   class C extends React.Component {
-		//     init() {
-		//       const cfg = { shouldComponentUpdate() {} };  // marks C
-		//     }
-		//   }                                                  // not reported
-		//
-		//   class Outer extends React.Component {
-		//     build() {
-		//       class Inner extends React.Component { scu() {} }  // marks Inner
-		//     }
-		//   }                                                       // Outer reported
-		var markedFromSubtree func(self *ast.Node, current *ast.Node) bool
-		markedFromSubtree = func(self *ast.Node, current *ast.Node) bool {
-			// Skip the subtree of any OTHER detected component — its own
-			// markSCU events resolve to itself, not bubbling up to `self`.
-			if current != self && isDetectedComponent(current) {
-				return false
-			}
-
-			// markSCU source: any ObjectExpression with SCU/PureRenderMixin.
-			if current.Kind == ast.KindObjectLiteralExpression && objectDeclaresSCUOrMixin(current) {
-				return true
-			}
-			// markSCU source: any class member (MethodDef/Get/Set/Constructor)
-			// named shouldComponentUpdate.
-			if methodNameIsSCU(current) {
-				return true
-			}
-			// markSCU source: nested ClassDeclaration carrying PureRender or
-			// custom-allow decorator. Upstream's listener fires only on
-			// ClassDeclaration, so a nested ClassExpression with the same
-			// shape is NOT a markSCU source. Nested ClassDeclaration that
-			// itself extends PureComponent is already handled by the
-			// "skip detected component" guard above (it's a detected
-			// component, absorbs its own markSCU).
-			if current != self && current.Kind == ast.KindClassDeclaration {
-				if hasPureRenderDecorator(current) ||
-					hasCustomDecorator(current, opts.AllowDecorators) {
-					return true
-				}
-			}
-
-			found := false
-			current.ForEachChild(func(child *ast.Node) bool {
-				if markedFromSubtree(self, child) {
-					found = true
-					return true // early exit
-				}
-				return false
-			})
-			return found
 		}
 
 		report := func(c *ast.Node) {
@@ -434,34 +361,78 @@ var RequireOptimizationRule = rule.Rule{
 			}
 		}
 
-		// Single-pass collect-and-resolve. Done eagerly here (instead of via
-		// listeners + a SourceFile-exit hook) because rslint's visitor enters
-		// the SourceFile's children directly — the SourceFile node itself is
-		// never visited, so a `ListenerOnExit(KindSourceFile)` registration
-		// would silently never fire.
+		// Collect components and resolve markSCU ownership in one pre-order
+		// traversal. A mark source always belongs to the innermost active
+		// detected component, which is equivalent to upstream walking parents
+		// until it reaches the nearest component. Pushing a nested component
+		// before inspecting its own mark sources makes it absorb those sources
+		// instead of leaking them to its outer component.
+		type componentState struct {
+			node   *ast.Node
+			marked bool
+		}
+		var components []componentState
+		var activeComponents []int
+
 		var collect func(*ast.Node)
 		collect = func(n *ast.Node) {
 			if n == nil {
 				return
 			}
+
+			componentIndex := -1
 			if isDetectedComponent(n) {
-				if !classSelfMarked(n) && !markedFromSubtree(n, n) {
-					report(n)
-				}
-				// Continue walking — a detected component's subtree may
-				// contain further detected components (nested class /
-				// nested createReactClass) that need their own
-				// independent evaluation.
+				componentIndex = len(components)
+				components = append(components, componentState{
+					node:   n,
+					marked: classSelfMarked(n),
+				})
+				activeComponents = append(activeComponents, componentIndex)
 			}
+
+			if len(activeComponents) != 0 {
+				marksActiveComponent := false
+				switch n.Kind {
+				case ast.KindObjectLiteralExpression:
+					marksActiveComponent = objectDeclaresSCUOrMixin(n)
+				case ast.KindMethodDeclaration,
+					ast.KindGetAccessor,
+					ast.KindSetAccessor,
+					ast.KindConstructor:
+					marksActiveComponent = methodNameIsSCU(n)
+				case ast.KindClassDeclaration:
+					// A detected class is already the active component and
+					// classSelfMarked handled its own decorators. Only a
+					// non-component nested class can mark an outer component.
+					if componentIndex < 0 {
+						marksActiveComponent = hasPureRenderDecorator(n) ||
+							hasCustomDecorator(n, opts.AllowDecorators)
+					}
+				}
+				if marksActiveComponent {
+					activeIndex := activeComponents[len(activeComponents)-1]
+					components[activeIndex].marked = true
+				}
+			}
+
 			n.ForEachChild(func(c *ast.Node) bool {
 				collect(c)
 				return false
 			})
+
+			if componentIndex >= 0 {
+				activeComponents = activeComponents[:len(activeComponents)-1]
+			}
 		}
 		ctx.SourceFile.Node.ForEachChild(func(n *ast.Node) bool {
 			collect(n)
 			return false
 		})
+		for _, component := range components {
+			if !component.marked {
+				report(component.node)
+			}
+		}
 
 		return rule.RuleListeners{}
 	},

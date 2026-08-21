@@ -46,6 +46,7 @@ type filterExpressionData struct {
 // that should be `arr.find(...)`. Mirrors typescript-eslint's prefer-find rule.
 var PreferFindRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-find",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil {

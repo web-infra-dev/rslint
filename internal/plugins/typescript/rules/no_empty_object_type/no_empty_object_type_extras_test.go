@@ -130,8 +130,8 @@ interface Both extends A, B {}
 		// `map[string]interface{}{...}` shape (covered by all options tests
 		// above) AND the array-wrapped `[]interface{}{...}` shape (matches
 		// the multi-element rule_tester / CLI invocation). These mirror
-		// upstream-valid cases via the array shape so that the JSON path
-		// through `utils.GetOptionsMap` is exercised end-to-end.
+		// upstream-valid cases via the array shape so that the rule's own
+		// options-array parsing is exercised end-to-end.
 		{
 			Code:    `interface Base {}`,
 			Options: []interface{}{map[string]interface{}{"allowInterfaces": "always"}},
@@ -994,8 +994,8 @@ declare namespace N {
 
 		// ---- Option JSON-array shape coverage (invalid side) ----
 		// Mirrors an upstream-invalid case but passes options through the
-		// `[]interface{}{...}` shape to exercise `utils.GetOptionsMap`'s
-		// multi-element path end-to-end.
+		// `[]interface{}{...}` shape to exercise the rule's own
+		// options-array parsing end-to-end.
 		{
 			Code:    `type Base = {};`,
 			Options: []interface{}{map[string]interface{}{"allowObjectTypes": "never"}},
@@ -1009,6 +1009,53 @@ declare namespace N {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "replaceEmptyObjectType", Output: `type Base = object;`},
 						{MessageId: "replaceEmptyObjectType", Output: `type Base = unknown;`},
+					},
+				},
+			},
+		},
+	})
+}
+
+// TestNoEmptyObjectTypeAllowWithNameSchema locks in that `allowWithName` is
+// validated as a regex. The rule compiles it to decide which names to skip,
+// so an unparsable pattern would otherwise be dropped silently and every
+// name would report. Upstream's schema declares a bare string.
+func TestNoEmptyObjectTypeAllowWithNameSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allowWithName": "("}}
+	if err := NoEmptyObjectTypeRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allowWithName regex to fail schema validation")
+	}
+	valid := []any{map[string]any{"allowWithName": "Props$"}}
+	if err := NoEmptyObjectTypeRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allowWithName regex to pass schema validation, got: %v", err)
+	}
+}
+
+// TestNoEmptyObjectTypeAllowWithNameLookbehind locks in that `allowWithName`
+// is matched with the same ECMAScript regex engine the schema validates it
+// against (regexp2), not Go's RE2. RE2 cannot compile lookbehind, so a
+// JS-only pattern that passes schema validation would otherwise silently
+// fail to compile and never allow anything.
+func TestNoEmptyObjectTypeAllowWithNameLookbehind(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoEmptyObjectTypeRule, []rule_tester.ValidTestCase{
+		{
+			Code:    `interface Foo {}`,
+			Options: map[string]interface{}{"allowWithName": "(?<!I)Foo$"},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    `interface IFoo {}`,
+			Options: map[string]interface{}{"allowWithName": "(?<!I)Foo$"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 15,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyInterface", Output: `type IFoo = object`},
+						{MessageId: "replaceEmptyInterface", Output: `type IFoo = unknown`},
 					},
 				},
 			},

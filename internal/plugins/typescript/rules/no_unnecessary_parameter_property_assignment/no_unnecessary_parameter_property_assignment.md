@@ -98,4 +98,5 @@ class Foo {
 
 ## Original Documentation
 
-- [typescript-eslint no-unnecessary-parameter-property-assignment](https://typescript-eslint.io/rules/no-unnecessary-parameter-property-assignment)
+- [typescript-eslint: no-unnecessary-parameter-property-assignment](https://typescript-eslint.io/rules/no-unnecessary-parameter-property-assignment)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.59.3/packages/eslint-plugin/src/rules/no-unnecessary-parameter-property-assignment.ts)

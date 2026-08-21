@@ -55,4 +55,5 @@ class A extends B {
 
 ## Original Documentation
 
-- [ESLint constructor-super](https://eslint.org/docs/latest/rules/constructor-super)
+- [ESLint: constructor-super](https://eslint.org/docs/latest/rules/constructor-super)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/constructor-super.js)

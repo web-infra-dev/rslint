@@ -28,4 +28,5 @@ Modules that cannot be resolved, are ignored, or are not ES modules are not repo
 
 ## Original Documentation
 
-- [eslint-plugin-import/default](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/default.md)
+- [eslint-plugin-import: default](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/default.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/default.js)

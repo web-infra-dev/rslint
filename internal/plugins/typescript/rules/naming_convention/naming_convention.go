@@ -1,11 +1,12 @@
 package naming_convention
 
 import (
+	_ "embed"
 	"fmt"
 	"math/bits"
-	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -13,12 +14,17 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
+
+//go:embed naming_convention.schema.json
+var schemaJSON []byte
 
 // NamingConventionRule is the exported rule for registration.
 var NamingConventionRule = rule.CreateRule(rule.Rule{
-	Name: "naming-convention",
-	Run:  run,
+	Name:   "naming-convention",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 // ---- Enums ----
@@ -34,22 +40,42 @@ const (
 	formatUpperCase
 )
 
-var formatNames = map[predefinedFormat]string{
-	formatCamelCase:        "camelCase",
-	formatStrictCamelCase:  "strictCamelCase",
-	formatPascalCase:       "PascalCase",
-	formatStrictPascalCase: "StrictPascalCase",
-	formatSnakeCase:        "snake_case",
-	formatUpperCase:        "UPPER_CASE",
+func parseFormatName(s string) (predefinedFormat, bool) {
+	switch s {
+	case "camelCase":
+		return formatCamelCase, true
+	case "strictCamelCase":
+		return formatStrictCamelCase, true
+	case "PascalCase":
+		return formatPascalCase, true
+	case "StrictPascalCase":
+		return formatStrictPascalCase, true
+	case "snake_case":
+		return formatSnakeCase, true
+	case "UPPER_CASE":
+		return formatUpperCase, true
+	default:
+		return 0, false
+	}
 }
 
-func parseFormatName(s string) (predefinedFormat, bool) {
-	for k, v := range formatNames {
-		if v == s {
-			return k, true
-		}
+func formatName(format predefinedFormat) string {
+	switch format {
+	case formatCamelCase:
+		return "camelCase"
+	case formatStrictCamelCase:
+		return "strictCamelCase"
+	case formatPascalCase:
+		return "PascalCase"
+	case formatStrictPascalCase:
+		return "StrictPascalCase"
+	case formatSnakeCase:
+		return "snake_case"
+	case formatUpperCase:
+		return "UPPER_CASE"
+	default:
+		return ""
 	}
-	return 0, false
 }
 
 type underscoreOption int
@@ -275,8 +301,17 @@ func parseTypeModifier(s string) (typeModifierKind, bool) {
 // ---- Normalized config types ----
 
 type matchRegex struct {
-	regex *regexp.Regexp
+	regex *esregexp.RegExp
 	match bool
+}
+
+const maxCachedNamingRegexps = 256
+
+var namingRegexpCache = struct {
+	sync.RWMutex
+	entries map[string]*esregexp.RegExp
+}{
+	entries: make(map[string]*esregexp.RegExp),
 }
 
 type normalizedSelector struct {
@@ -292,6 +327,98 @@ type normalizedSelector struct {
 	prefix             []string
 	suffix             []string
 	modifierWeight     int
+}
+
+type namingOptionsCacheKey struct {
+	// A Go pointer in the map key keeps the slice backing array alive, so the
+	// allocator cannot reuse this identity for another config.
+	first  *any
+	length int
+}
+
+const individualSelectorCount = 19
+
+type parsedNamingOptions struct {
+	selectors       []normalizedSelector
+	neededModifiers [individualSelectorCount]modifierKind
+	allModifiers    modifierKind
+}
+
+const maxCachedNamingOptions = 64
+
+var namingOptionsCache = struct {
+	sync.RWMutex
+	entries map[namingOptionsCacheKey]*parsedNamingOptions
+	keys    [maxCachedNamingOptions]namingOptionsCacheKey
+	next    int
+}{
+	entries: make(map[namingOptionsCacheKey]*parsedNamingOptions),
+}
+
+var (
+	defaultNamingOptionsOnce sync.Once
+	defaultNamingOptions     *parsedNamingOptions
+)
+
+// getParsedNamingOptions parses each immutable config-resolver option slice once.
+// Files with the same matched config shape share that exact slice, so a project
+// normally has only a handful of entries even when the rule runs on thousands
+// of files. The bounded cache also prevents repeated regexp compilation.
+func getParsedNamingOptions(options []any) *parsedNamingOptions {
+	if len(options) == 0 {
+		defaultNamingOptionsOnce.Do(func() {
+			defaultNamingOptions = buildParsedNamingOptions(options)
+		})
+		return defaultNamingOptions
+	}
+
+	key := namingOptionsCacheKey{first: &options[0], length: len(options)}
+	namingOptionsCache.RLock()
+	parsed, ok := namingOptionsCache.entries[key]
+	namingOptionsCache.RUnlock()
+	if ok {
+		return parsed
+	}
+
+	parsed = buildParsedNamingOptions(options)
+	namingOptionsCache.Lock()
+	defer namingOptionsCache.Unlock()
+	if existing, ok := namingOptionsCache.entries[key]; ok {
+		return existing
+	}
+	if len(namingOptionsCache.entries) == maxCachedNamingOptions {
+		delete(namingOptionsCache.entries, namingOptionsCache.keys[namingOptionsCache.next])
+	}
+	namingOptionsCache.entries[key] = parsed
+	namingOptionsCache.keys[namingOptionsCache.next] = key
+	namingOptionsCache.next = (namingOptionsCache.next + 1) % maxCachedNamingOptions
+	return parsed
+}
+
+func buildParsedNamingOptions(options []any) *parsedNamingOptions {
+	parsed := &parsedNamingOptions{selectors: parseOptions(options)}
+	const quotingSelectors = selectorProperty | selectorMethod | selectorAccessor | selectorEnumMember
+	for index := range individualSelectorCount {
+		individual := selectorKind(1 << index)
+		var needed modifierKind
+		for _, sel := range parsed.selectors {
+			if sel.selector&individual == 0 {
+				continue
+			}
+			needed |= sel.modifiers
+			if individual&quotingSelectors != 0 && !sel.formatNull && len(sel.format) != 0 {
+				needed |= modifierRequiresQuotes
+			}
+		}
+		// Exported declarations never receive the unused modifier, even when
+		// the selector does not explicitly mention exported.
+		if needed&modifierUnused != 0 {
+			needed |= modifierExported
+		}
+		parsed.neededModifiers[index] = needed
+		parsed.allModifiers |= needed
+	}
+	return parsed
 }
 
 // ---- Format checking functions ----
@@ -443,29 +570,13 @@ func checkFormat(name string, format predefinedFormat) bool {
 
 // ---- Options parsing ----
 
-func parseOptions(rawOpts any) []normalizedSelector {
-	if rawOpts == nil {
-		return getDefaultConfig()
-	}
-
-	var optsList []interface{}
-	switch v := rawOpts.(type) {
-	case []interface{}:
-		optsList = v
-	case map[string]interface{}:
-		// Single selector object (e.g., when the config has one option element,
-		// LegacyUnwrapOptions collapses the single-element options array).
-		optsList = []interface{}{v}
-	default:
-		return getDefaultConfig()
-	}
-
-	if len(optsList) == 0 {
+func parseOptions(options []any) []normalizedSelector {
+	if len(options) == 0 {
 		return getDefaultConfig()
 	}
 
 	var selectors []normalizedSelector
-	for _, opt := range optsList {
+	for _, opt := range options {
 		optMap, ok := opt.(map[string]interface{})
 		if !ok {
 			continue
@@ -509,7 +620,7 @@ func parseOptions(rawOpts any) []normalizedSelector {
 }
 
 func getDefaultConfig() []normalizedSelector {
-	return parseOptions([]interface{}{
+	return parseOptions([]any{
 		map[string]interface{}{
 			"selector":           "default",
 			"format":             []interface{}{"camelCase"},
@@ -677,8 +788,8 @@ func parseMatchRegex(val interface{}) *matchRegex {
 	}
 	switch v := val.(type) {
 	case string:
-		re, err := regexp.Compile(v)
-		if err != nil {
+		re := compileNamingRegexp(v)
+		if re == nil {
 			return nil
 		}
 		return &matchRegex{regex: re, match: true}
@@ -688,13 +799,41 @@ func parseMatchRegex(val interface{}) *matchRegex {
 		if m, ok := v["match"].(bool); ok {
 			matchVal = m
 		}
-		re, err := regexp.Compile(regexStr)
-		if err != nil {
+		re := compileNamingRegexp(regexStr)
+		if re == nil {
 			return nil
 		}
 		return &matchRegex{regex: re, match: matchVal}
 	}
 	return nil
+}
+
+// compileNamingRegexp shares immutable compiled programs across files using
+// the same config. regexp2.Regexp is safe for concurrent use. The bounded
+// cache avoids retaining an unbounded stream of patterns in long-lived LSP
+// processes while removing repeated compilation for ordinary project configs.
+func compileNamingRegexp(pattern string) *esregexp.RegExp {
+	namingRegexpCache.RLock()
+	re, ok := namingRegexpCache.entries[pattern]
+	namingRegexpCache.RUnlock()
+	if ok {
+		return re
+	}
+
+	namingRegexpCache.Lock()
+	defer namingRegexpCache.Unlock()
+
+	if re, ok = namingRegexpCache.entries[pattern]; ok {
+		return re
+	}
+	re, err := esregexp.Compile(pattern, "u")
+	if err != nil {
+		return nil
+	}
+	if len(namingRegexpCache.entries) < maxCachedNamingRegexps {
+		namingRegexpCache.entries[pattern] = re
+	}
+	return re
 }
 
 // calculateWeight mirrors the original ESLint rule's modifierWeight
@@ -773,7 +912,7 @@ func selectorTypeToMessageString(sk selectorKind) string {
 func doesNotMatchFormatMessage(typeName, name string, formats []predefinedFormat) rule.RuleMessage {
 	var fmtNames []string
 	for _, f := range formats {
-		fmtNames = append(fmtNames, formatNames[f])
+		fmtNames = append(fmtNames, formatName(f))
 	}
 	return rule.RuleMessage{
 		Id:          "doesNotMatchFormat",
@@ -784,7 +923,7 @@ func doesNotMatchFormatMessage(typeName, name string, formats []predefinedFormat
 func doesNotMatchFormatTrimmedMessage(typeName, name, processedName string, formats []predefinedFormat) rule.RuleMessage {
 	var fmtNames []string
 	for _, f := range formats {
-		fmtNames = append(fmtNames, formatNames[f])
+		fmtNames = append(fmtNames, formatName(f))
 	}
 	return rule.RuleMessage{
 		Id:          "doesNotMatchFormatTrimmed",
@@ -890,9 +1029,9 @@ func validate(name string, sel normalizedSelector, idMods modifierKind, idSelect
 
 	// 7. Validate custom regex (against processed name, after stripping underscores and affixes)
 	if sel.custom != nil {
-		matches := sel.custom.regex.MatchString(processedName)
-		if sel.custom.match != matches {
-			msg := satisfyCustomMessage(typeName, name, sel.custom.match, sel.custom.regex.String())
+		matches, err := sel.custom.regex.TestOrError(processedName)
+		if err == nil && sel.custom.match != matches {
+			msg := satisfyCustomMessage(typeName, name, sel.custom.match, sel.custom.regex.Source())
 			return validationResult{valid: false, message: &msg}
 		}
 	}
@@ -1140,33 +1279,49 @@ func isArrayLikeType(ch *checker.Checker, t *checker.Type) bool {
 
 // ---- Modifier detection helpers ----
 
-func getModifiers(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, sel selectorKind, name string, reExportedNames map[string]bool, destructured bool, refInfo *referencedInfo) modifierKind {
+func getModifiers(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	nameNode *ast.Node,
+	sel selectorKind,
+	name string,
+	reExportedNames map[string]bool,
+	destructured bool,
+	refInfo *referencedInfo,
+	needed modifierKind,
+) modifierKind {
 	var mods modifierKind
 
-	flags := ast.GetCombinedModifierFlags(node)
+	const flagModifiers = modifierPublic | modifierProtected | modifierPrivate |
+		modifierStatic | modifierReadonly | modifierAbstract | modifierAsync |
+		modifierConst | modifierOverride | modifierExported
+	var flags ast.ModifierFlags
+	if needed&flagModifiers != 0 {
+		flags = ast.GetCombinedModifierFlags(node)
+	}
 
 	// Access modifiers
-	if flags&ast.ModifierFlagsPublic != 0 {
+	if needed&modifierPublic != 0 && flags&ast.ModifierFlagsPublic != 0 {
 		mods |= modifierPublic
 	}
-	if flags&ast.ModifierFlagsProtected != 0 {
+	if needed&modifierProtected != 0 && flags&ast.ModifierFlagsProtected != 0 {
 		mods |= modifierProtected
 	}
-	if flags&ast.ModifierFlagsPrivate != 0 {
+	if needed&modifierPrivate != 0 && flags&ast.ModifierFlagsPrivate != 0 {
 		mods |= modifierPrivate
 	}
 
 	// Other modifiers
-	if flags&ast.ModifierFlagsStatic != 0 {
+	if needed&modifierStatic != 0 && flags&ast.ModifierFlagsStatic != 0 {
 		mods |= modifierStatic
 	}
-	if flags&ast.ModifierFlagsReadonly != 0 {
+	if needed&modifierReadonly != 0 && flags&ast.ModifierFlagsReadonly != 0 {
 		mods |= modifierReadonly
 	}
-	if flags&ast.ModifierFlagsAbstract != 0 {
+	if needed&modifierAbstract != 0 && flags&ast.ModifierFlagsAbstract != 0 {
 		mods |= modifierAbstract
 	}
-	if flags&ast.ModifierFlagsAsync != 0 {
+	if needed&modifierAsync != 0 && flags&ast.ModifierFlagsAsync != 0 {
 		mods |= modifierAsync
 	}
 
@@ -1174,7 +1329,7 @@ func getModifiers(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, sel 
 	// For `AsyncBar = async () => {}` (class property or object literal property)
 	// and `const asyncFoo = async () => {}` (variable), the async flag is on
 	// the initializer, not on the declaration itself.
-	if mods&modifierAsync == 0 {
+	if needed&modifierAsync != 0 && mods&modifierAsync == 0 {
 		switch node.Kind {
 		case ast.KindPropertyDeclaration:
 			if init := node.AsPropertyDeclaration().Initializer; init != nil {
@@ -1203,37 +1358,38 @@ func getModifiers(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, sel 
 		}
 	}
 
-	if flags&ast.ModifierFlagsConst != 0 {
+	if needed&modifierConst != 0 && flags&ast.ModifierFlagsConst != 0 {
 		mods |= modifierConst
 	}
-	if flags&ast.ModifierFlagsOverride != 0 {
+	if needed&modifierOverride != 0 && flags&ast.ModifierFlagsOverride != 0 {
 		mods |= modifierOverride
 	}
 	// Accessor keyword check is handled by the selector system, not as a modifier
 
 	// Hash private (ECMAScript private)
-	declNameNode := ast.GetNameOfDeclaration(node)
-	if declNameNode != nil && declNameNode.Kind == ast.KindPrivateIdentifier {
+	if needed&modifierHashPrivate != 0 && nameNode != nil && nameNode.Kind == ast.KindPrivateIdentifier {
 		mods |= modifierHashPrivate
 	}
 
 	// Default accessibility: if no access modifier on a class member, it's public
-	if sel&selectorMemberLike != 0 && mods&(modifierPublic|modifierProtected|modifierPrivate|modifierHashPrivate) == 0 {
+	if needed&modifierPublic != 0 && sel&selectorMemberLike != 0 &&
+		flags&(ast.ModifierFlagsPublic|ast.ModifierFlagsProtected|ast.ModifierFlagsPrivate) == 0 &&
+		(nameNode == nil || nameNode.Kind != ast.KindPrivateIdentifier) {
 		mods |= modifierPublic
 	}
 
 	// Export check (direct export or re-export via export { ... })
-	if isExported(node) || reExportedNames[name] {
+	if needed&modifierExported != 0 && (isExported(node, flags) || reExportedNames[name]) {
 		mods |= modifierExported
 	}
 
 	// Global check
-	if isGlobalScope(node) {
+	if needed&modifierGlobal != 0 && isGlobalScope(node) {
 		mods |= modifierGlobal
 	}
 
 	// Destructured check (per-identifier, set during extraction)
-	if destructured {
+	if needed&modifierDestructured != 0 && destructured {
 		mods |= modifierDestructured
 	}
 
@@ -1241,44 +1397,49 @@ func getModifiers(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, sel 
 	// scope-participating declarations (not members or imports) can be unused.
 	// Use nameNode (the specific identifier) for symbol lookup, not the declaration node,
 	// so that individual destructured bindings are correctly detected as unused.
-	if sel&selectorUnusedSupported != 0 && mods&modifierExported == 0 && isUnusedByNameNode(ctx, nameNode, refInfo) {
+	if needed&modifierUnused != 0 && sel&selectorUnusedSupported != 0 &&
+		mods&modifierExported == 0 && isUnusedByNameNode(ctx, nameNode, refInfo) {
 		mods |= modifierUnused
 	}
 
 	// Const check for variables
-	if sel&selectorVariable != 0 {
+	if needed&modifierConst != 0 && sel&selectorVariable != 0 {
 		if isConstVariable(node) {
 			mods |= modifierConst
 		}
 	}
 
 	// Const check for enum
-	if sel&selectorEnum != 0 {
+	if needed&modifierConst != 0 && sel&selectorEnum != 0 {
 		if flags&ast.ModifierFlagsConst != 0 {
 			mods |= modifierConst
 		}
 	}
 
 	// requiresQuotes check for members
-	if sel&(selectorProperty|selectorMethod|selectorAccessor|selectorEnumMember) != 0 {
-		if requiresQuoting(node) {
+	if needed&modifierRequiresQuotes != 0 && sel&(selectorProperty|selectorMethod|selectorAccessor|selectorEnumMember) != 0 {
+		if requiresQuoting(nameNode) {
 			mods |= modifierRequiresQuotes
 		}
 	}
 
 	// Import modifier detection (default vs named vs namespace)
-	if sel&selectorImport != 0 {
+	if sel&selectorImport != 0 && needed&(modifierDefault|modifierNamespace) != 0 {
 		switch node.Kind {
 		case ast.KindImportClause:
 			// `import Foo from ...` is a default import
-			mods |= modifierDefault
+			if needed&modifierDefault != 0 {
+				mods |= modifierDefault
+			}
 		case ast.KindNamespaceImport:
 			// `import * as Foo from ...` is a namespace import
-			mods |= modifierNamespace
+			if needed&modifierNamespace != 0 {
+				mods |= modifierNamespace
+			}
 		case ast.KindImportSpecifier:
 			// `import { default as Foo } from ...` is also a default import
 			importSpec := node.AsImportSpecifier()
-			if importSpec.PropertyName != nil && importSpec.PropertyName.Kind == ast.KindIdentifier {
+			if needed&modifierDefault != 0 && importSpec.PropertyName != nil && importSpec.PropertyName.Kind == ast.KindIdentifier {
 				if importSpec.PropertyName.AsIdentifier().Text == "default" {
 					mods |= modifierDefault
 				}
@@ -1289,9 +1450,8 @@ func getModifiers(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, sel 
 	return mods
 }
 
-func isExported(node *ast.Node) bool {
+func isExported(node *ast.Node, flags ast.ModifierFlags) bool {
 	// Check if node itself has export keyword
-	flags := ast.GetCombinedModifierFlags(node)
 	if flags&ast.ModifierFlagsExport != 0 {
 		return true
 	}
@@ -1312,16 +1472,6 @@ func isExported(node *ast.Node) bool {
 					return true
 				}
 			}
-		}
-	}
-
-	// Check if parent is an export statement
-	if ast.IsFunctionDeclaration(node) || ast.IsClassDeclaration(node) ||
-		node.Kind == ast.KindInterfaceDeclaration || node.Kind == ast.KindTypeAliasDeclaration ||
-		node.Kind == ast.KindEnumDeclaration || node.Kind == ast.KindModuleDeclaration {
-		parentFlags := ast.GetCombinedModifierFlags(node)
-		if parentFlags&ast.ModifierFlagsExport != 0 {
-			return true
 		}
 	}
 
@@ -1357,21 +1507,16 @@ func isTopLevelScope(node *ast.Node) bool {
 }
 
 type referencedInfo struct {
+	refs           *rule.RefStore
 	symbols        map[*ast.Symbol]bool
 	shorthandNames map[string]bool // names used in shorthand property assignments
 }
 
-// needsUnusedInfo reports whether any selector checks the "unused" modifier.
-// Only then is the referenced-symbols collection needed — isUnusedByNameNode
-// treats a nil referencedInfo as "not unused", and the unused bit in the
-// computed modifiers is only ever consumed by selectors that require it.
-func needsUnusedInfo(selectors []normalizedSelector) bool {
-	for _, sel := range selectors {
-		if sel.modifiers&modifierUnused != 0 {
-			return true
-		}
+func getReferencedInfo(ctx rule.RuleContext) *referencedInfo {
+	if ctx.Refs != nil {
+		return &referencedInfo{refs: ctx.Refs}
 	}
-	return false
+	return collectReferencedSymbols(ctx)
 }
 
 // collectReferencedSymbols walks the source file and collects all symbols that are referenced
@@ -1449,7 +1594,14 @@ func collectReferencedSymbols(ctx rule.RuleContext) *referencedInfo {
 // its symbol directly, rather than going through the declaration node.
 // This correctly handles individual bindings in destructuring patterns.
 func isUnusedByNameNode(ctx rule.RuleContext, nameNode *ast.Node, refInfo *referencedInfo) bool {
-	if refInfo == nil || nameNode == nil || ctx.TypeChecker == nil {
+	if refInfo == nil || nameNode == nil {
+		return false
+	}
+	if refInfo.refs != nil {
+		symbol := utils.BindingNameSymbol(nameNode)
+		return symbol != nil && len(refInfo.refs.References(symbol)) == 0
+	}
+	if ctx.TypeChecker == nil {
 		return false
 	}
 
@@ -1487,8 +1639,7 @@ func isConstVariable(node *ast.Node) bool {
 	return declList.Flags&ast.NodeFlagsConst != 0
 }
 
-func requiresQuoting(node *ast.Node) bool {
-	nameNode := ast.GetNameOfDeclaration(node)
+func requiresQuoting(nameNode *ast.Node) bool {
 	if nameNode == nil {
 		return false
 	}
@@ -1549,65 +1700,64 @@ type identifierInfo struct {
 	destructured bool // whether this identifier comes from a destructured binding (without rename)
 }
 
-func getIdentifierFromNode(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifierFromNode(ctx rule.RuleContext, node *ast.Node, result []identifierInfo) []identifierInfo {
 	switch node.Kind {
 	case ast.KindVariableStatement:
-		return getIdentifiersFromVariableStatement(ctx, node)
+		return getIdentifiersFromVariableStatement(node, result)
 	case ast.KindForOfStatement, ast.KindForInStatement, ast.KindForStatement:
-		return getIdentifiersFromForLoopInitializer(ctx, node)
+		return getIdentifiersFromForLoopInitializer(node, result)
 	case ast.KindFunctionDeclaration:
-		return getIdentifiersFromFunctionDeclaration(node)
+		return getIdentifiersFromFunctionDeclaration(node, result)
 	case ast.KindFunctionExpression:
-		return getIdentifiersFromFunctionExpression(node)
+		return getIdentifiersFromFunctionExpression(node, result)
 	case ast.KindParameter:
-		return getIdentifiersFromParameter(ctx, node)
+		return getIdentifiersFromParameter(node, result)
 	case ast.KindClassDeclaration:
-		return getIdentifiersFromClassDeclaration(node)
+		return getIdentifiersFromClassDeclaration(node, result)
 	case ast.KindClassExpression:
-		return getIdentifiersFromClassExpression(node)
+		return getIdentifiersFromClassExpression(node, result)
 	case ast.KindInterfaceDeclaration:
-		return getIdentifiersFromInterfaceDeclaration(node)
+		return getIdentifiersFromInterfaceDeclaration(node, result)
 	case ast.KindTypeAliasDeclaration:
-		return getIdentifiersFromTypeAliasDeclaration(node)
+		return getIdentifiersFromTypeAliasDeclaration(node, result)
 	case ast.KindEnumDeclaration:
-		return getIdentifiersFromEnumDeclaration(node)
+		return getIdentifiersFromEnumDeclaration(node, result)
 	case ast.KindEnumMember:
-		return getIdentifiersFromEnumMember(ctx, node)
+		return getIdentifiersFromEnumMember(ctx, node, result)
 	case ast.KindTypeParameter:
-		return getIdentifiersFromTypeParameter(node)
+		return getIdentifiersFromTypeParameter(node, result)
 	case ast.KindPropertyDeclaration:
-		return getIdentifiersFromPropertyDeclaration(ctx, node)
+		return getIdentifiersFromPropertyDeclaration(ctx, node, result)
 	case ast.KindMethodDeclaration:
-		return getIdentifiersFromMethodDeclaration(ctx, node)
+		return getIdentifiersFromMethodDeclaration(ctx, node, result)
 	case ast.KindGetAccessor, ast.KindSetAccessor:
-		return getIdentifiersFromAccessorDeclaration(ctx, node)
+		return getIdentifiersFromAccessorDeclaration(ctx, node, result)
 	case ast.KindPropertySignature:
-		return getIdentifiersFromPropertySignature(ctx, node)
+		return getIdentifiersFromPropertySignature(ctx, node, result)
 	case ast.KindMethodSignature:
-		return getIdentifiersFromMethodSignature(ctx, node)
+		return getIdentifiersFromMethodSignature(ctx, node, result)
 	case ast.KindPropertyAssignment:
-		return getIdentifiersFromPropertyAssignment(ctx, node)
+		return getIdentifiersFromPropertyAssignment(ctx, node, result)
 	case ast.KindShorthandPropertyAssignment:
-		return getIdentifiersFromShorthandPropertyAssignment(ctx, node)
+		return getIdentifiersFromShorthandPropertyAssignment(node, result)
 	case ast.KindImportClause:
-		return getIdentifiersFromImportClause(node)
+		return getIdentifiersFromImportClause(node, result)
 	case ast.KindImportSpecifier:
-		return getIdentifiersFromImportSpecifier(node)
+		return getIdentifiersFromImportSpecifier(node, result)
 	case ast.KindNamespaceImport:
-		return getIdentifiersFromNamespaceImport(node)
+		return getIdentifiersFromNamespaceImport(node, result)
 	default:
-		return nil
+		return result
 	}
 }
 
-func getIdentifiersFromVariableStatement(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromVariableStatement(node *ast.Node, result []identifierInfo) []identifierInfo {
 	varStmt := node.AsVariableStatement()
 	if varStmt.DeclarationList == nil {
-		return nil
+		return result
 	}
 
 	declList := varStmt.DeclarationList.AsVariableDeclarationList()
-	var result []identifierInfo
 
 	for _, decl := range declList.Declarations.Nodes {
 		nameNode := decl.Name()
@@ -1624,11 +1774,11 @@ func getIdentifiersFromVariableStatement(ctx rule.RuleContext, node *ast.Node) [
 				selector: selectorVariable,
 			})
 		case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-			ids := getIdentifiersFromBindingPattern(nameNode)
-			for i := range ids {
-				ids[i].declNode = decl
+			start := len(result)
+			result = getIdentifiersFromBindingPattern(nameNode, result)
+			for i := start; i < len(result); i++ {
+				result[i].declNode = decl
 			}
-			result = append(result, ids...)
 		}
 	}
 	return result
@@ -1637,14 +1787,13 @@ func getIdentifiersFromVariableStatement(ctx rule.RuleContext, node *ast.Node) [
 // getIdentifiersFromForLoopInitializer extracts variable identifiers from
 // for-of, for-in, and for statement initializers (e.g., `for (const x of arr)`).
 // These are VariableDeclarationLists that are NOT inside a VariableStatement.
-func getIdentifiersFromForLoopInitializer(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromForLoopInitializer(node *ast.Node, result []identifierInfo) []identifierInfo {
 	init := node.Initializer()
 	if init == nil || init.Kind != ast.KindVariableDeclarationList {
-		return nil
+		return result
 	}
 
 	declList := init.AsVariableDeclarationList()
-	var result []identifierInfo
 
 	for _, decl := range declList.Declarations.Nodes {
 		nameNode := decl.Name()
@@ -1661,19 +1810,17 @@ func getIdentifiersFromForLoopInitializer(ctx rule.RuleContext, node *ast.Node) 
 				selector: selectorVariable,
 			})
 		case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-			ids := getIdentifiersFromBindingPattern(nameNode)
-			for i := range ids {
-				ids[i].declNode = decl
+			start := len(result)
+			result = getIdentifiersFromBindingPattern(nameNode, result)
+			for i := start; i < len(result); i++ {
+				result[i].declNode = decl
 			}
-			result = append(result, ids...)
 		}
 	}
 	return result
 }
 
-func getIdentifiersFromBindingPattern(pattern *ast.Node) []identifierInfo {
-	var result []identifierInfo
-
+func getIdentifiersFromBindingPattern(pattern *ast.Node, result []identifierInfo) []identifierInfo {
 	elements := ast.GetElementsOfBindingOrAssignmentPattern(pattern)
 	for _, elem := range elements {
 		if elem.Kind == ast.KindBindingElement {
@@ -1696,7 +1843,7 @@ func getIdentifiersFromBindingPattern(pattern *ast.Node) []identifierInfo {
 					destructured: isDestructuredBinding,
 				})
 			case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-				result = append(result, getIdentifiersFromBindingPattern(nameNode)...)
+				result = getIdentifiersFromBindingPattern(nameNode, result)
 			}
 		}
 	}
@@ -1704,19 +1851,19 @@ func getIdentifiersFromBindingPattern(pattern *ast.Node) []identifierInfo {
 	return result
 }
 
-func getIdentifiersFromFunctionDeclaration(node *ast.Node) []identifierInfo {
+func getIdentifiersFromFunctionDeclaration(node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorFunction,
-	}}
+	})
 }
 
-func getIdentifiersFromFunctionExpression(node *ast.Node) []identifierInfo {
+func getIdentifiersFromFunctionExpression(node *ast.Node, result []identifierInfo) []identifierInfo {
 	// Only named function expressions have a name to check.
 	// Use the function expression's own Name() rather than GetNameOfDeclaration(),
 	// because GetNameOfDeclaration() for anonymous function expressions returns the
@@ -1724,23 +1871,23 @@ func getIdentifiersFromFunctionExpression(node *ast.Node) []identifierInfo {
 	// with the VariableStatement/PropertyAssignment handlers.
 	nameNode := node.AsFunctionExpression().Name()
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		declNode: node, // Use the FunctionExpression for modifier detection (async, etc.)
 		selector: selectorFunction,
-	}}
+	})
 }
 
-func getIdentifiersFromParameter(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromParameter(node *ast.Node, result []identifierInfo) []identifierInfo {
 	// Parameters of type-only signatures (function types, call/construct/method
 	// signatures, index signatures, ...) create no binding, so real
 	// @typescript-eslint/naming-convention never validates their names. Only
 	// parameters of an actual function-like declaration/expression are checked.
 	if !ast.IsFunctionLikeDeclaration(node.Parent) {
-		return nil
+		return result
 	}
 
 	// Check if this is a parameter property (constructor parameter with access modifier, readonly, or override)
@@ -1748,7 +1895,7 @@ func getIdentifiersFromParameter(ctx rule.RuleContext, node *ast.Node) []identif
 
 	nameNode := node.Name()
 	if nameNode == nil {
-		return nil
+		return result
 	}
 
 	sel := selectorParameter
@@ -1758,34 +1905,35 @@ func getIdentifiersFromParameter(ctx rule.RuleContext, node *ast.Node) []identif
 
 	switch nameNode.Kind {
 	case ast.KindIdentifier:
-		return []identifierInfo{{
+		return append(result, identifierInfo{
 			name:     nameNode.AsIdentifier().Text,
 			node:     nameNode,
 			selector: sel,
-		}}
+		})
 	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-		ids := getIdentifiersFromBindingPattern(nameNode)
-		for i := range ids {
-			ids[i].selector = sel
+		start := len(result)
+		result = getIdentifiersFromBindingPattern(nameNode, result)
+		for i := start; i < len(result); i++ {
+			result[i].selector = sel
 		}
-		return ids
+		return result
 	}
-	return nil
+	return result
 }
 
-func getIdentifiersFromClassDeclaration(node *ast.Node) []identifierInfo {
+func getIdentifiersFromClassDeclaration(node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorClass,
-	}}
+	})
 }
 
-func getIdentifiersFromClassExpression(node *ast.Node) []identifierInfo {
+func getIdentifiersFromClassExpression(node *ast.Node, result []identifierInfo) []identifierInfo {
 	// Only named class expressions have a name to check.
 	// Use the class expression's own Name() rather than GetNameOfDeclaration(),
 	// because GetNameOfDeclaration() for anonymous class expressions returns the
@@ -1795,139 +1943,139 @@ func getIdentifiersFromClassExpression(node *ast.Node) []identifierInfo {
 	// never flags this — it only validates the class's own identifier, if any).
 	nameNode := node.AsClassExpression().Name()
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorClass,
-	}}
+	})
 }
 
-func getIdentifiersFromInterfaceDeclaration(node *ast.Node) []identifierInfo {
+func getIdentifiersFromInterfaceDeclaration(node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorInterface,
-	}}
+	})
 }
 
-func getIdentifiersFromTypeAliasDeclaration(node *ast.Node) []identifierInfo {
+func getIdentifiersFromTypeAliasDeclaration(node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorTypeAlias,
-	}}
+	})
 }
 
-func getIdentifiersFromEnumDeclaration(node *ast.Node) []identifierInfo {
+func getIdentifiersFromEnumDeclaration(node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorEnum,
-	}}
+	})
 }
 
-func getIdentifiersFromEnumMember(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromEnumMember(ctx rule.RuleContext, node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil {
-		return nil
+		return result
 	}
 
 	name, ok := getNameFromNode(ctx, nameNode)
 	if !ok {
-		return nil
+		return result
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     name,
 		node:     nameNode,
 		selector: selectorEnumMember,
-	}}
+	})
 }
 
-func getIdentifiersFromTypeParameter(node *ast.Node) []identifierInfo {
+func getIdentifiersFromTypeParameter(node *ast.Node, result []identifierInfo) []identifierInfo {
 	// Only check type parameters inside declaration containers
 	// (e.g., `function fn<T>`, `class C<T>`, `interface I<T>`, `type T<U>`).
 	// Skip type parameters in mapped types (`{ [K in T]: V }`) and infer
 	// types (`infer U`), matching the original ESLint rule's
 	// `TSTypeParameterDeclaration > TSTypeParameter` selector.
 	if node.Parent != nil && (node.Parent.Kind == ast.KindMappedType || node.Parent.Kind == ast.KindInferType) {
-		return nil
+		return result
 	}
 
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorTypeParameter,
-	}}
+	})
 }
 
-func getIdentifiersFromPropertyDeclaration(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromPropertyDeclaration(ctx rule.RuleContext, node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil {
-		return nil
+		return result
 	}
 
 	name, ok := getNameFromNode(ctx, nameNode)
 	if !ok {
-		return nil
+		return result
 	}
 
 	// Check if this is an accessor property
 	flags := ast.GetCombinedModifierFlags(node)
 	if flags&ast.ModifierFlagsAccessor != 0 {
-		return []identifierInfo{{
+		return append(result, identifierInfo{
 			name:     name,
 			node:     nameNode,
 			selector: selectorAutoAccessor,
-		}}
+		})
 	}
 
 	// Check if the property has a function value (making it a method-like property)
 	propDecl := node.AsPropertyDeclaration()
 	if propDecl.Initializer != nil {
 		if ast.IsArrowFunction(propDecl.Initializer) || ast.IsFunctionExpression(propDecl.Initializer) {
-			return []identifierInfo{{
+			return append(result, identifierInfo{
 				name:     name,
 				node:     nameNode,
 				selector: selectorClassMethod,
-			}}
+			})
 		}
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     name,
 		node:     nameNode,
 		selector: selectorClassProperty,
-	}}
+	})
 }
 
-func getIdentifiersFromMethodDeclaration(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromMethodDeclaration(ctx rule.RuleContext, node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil {
-		return nil
+		return result
 	}
 
 	name, ok := getNameFromNode(ctx, nameNode)
 	if !ok {
-		return nil
+		return result
 	}
 
 	// Determine if this is class method or object literal method
@@ -1937,40 +2085,40 @@ func getIdentifiersFromMethodDeclaration(ctx rule.RuleContext, node *ast.Node) [
 		sel = selectorObjectLiteralMethod
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     name,
 		node:     nameNode,
 		selector: sel,
-	}}
+	})
 }
 
-func getIdentifiersFromAccessorDeclaration(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromAccessorDeclaration(ctx rule.RuleContext, node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil {
-		return nil
+		return result
 	}
 
 	name, ok := getNameFromNode(ctx, nameNode)
 	if !ok {
-		return nil
+		return result
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     name,
 		node:     nameNode,
 		selector: selectorClassicAccessor,
-	}}
+	})
 }
 
-func getIdentifiersFromPropertySignature(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromPropertySignature(ctx rule.RuleContext, node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil {
-		return nil
+		return result
 	}
 
 	name, ok := getNameFromNode(ctx, nameNode)
 	if !ok {
-		return nil
+		return result
 	}
 
 	// Check if the property has a function type annotation (e.g., `method: () => void`)
@@ -1981,87 +2129,87 @@ func getIdentifiersFromPropertySignature(ctx rule.RuleContext, node *ast.Node) [
 		sel = selectorTypeMethod
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     name,
 		node:     nameNode,
 		selector: sel,
-	}}
+	})
 }
 
-func getIdentifiersFromMethodSignature(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromMethodSignature(ctx rule.RuleContext, node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil {
-		return nil
+		return result
 	}
 
 	name, ok := getNameFromNode(ctx, nameNode)
 	if !ok {
-		return nil
+		return result
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     name,
 		node:     nameNode,
 		selector: selectorTypeMethod,
-	}}
+	})
 }
 
-func getIdentifiersFromPropertyAssignment(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromPropertyAssignment(ctx rule.RuleContext, node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil {
-		return nil
+		return result
 	}
 
 	name, ok := getNameFromNode(ctx, nameNode)
 	if !ok {
-		return nil
+		return result
 	}
 
 	propAssignment := node.AsPropertyAssignment()
 	if propAssignment.Initializer != nil {
 		if ast.IsArrowFunction(propAssignment.Initializer) || ast.IsFunctionExpression(propAssignment.Initializer) {
-			return []identifierInfo{{
+			return append(result, identifierInfo{
 				name:     name,
 				node:     nameNode,
 				selector: selectorObjectLiteralMethod,
-			}}
+			})
 		}
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     name,
 		node:     nameNode,
 		selector: selectorObjectLiteralProperty,
-	}}
+	})
 }
 
-func getIdentifiersFromShorthandPropertyAssignment(ctx rule.RuleContext, node *ast.Node) []identifierInfo {
+func getIdentifiersFromShorthandPropertyAssignment(node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := ast.GetNameOfDeclaration(node)
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorObjectLiteralProperty,
-	}}
+	})
 }
 
-func getIdentifiersFromImportClause(node *ast.Node) []identifierInfo {
+func getIdentifiersFromImportClause(node *ast.Node, result []identifierInfo) []identifierInfo {
 	// Default import: `import Foo from ...`
 	importClause := node.AsImportClause()
 	if importClause.Name() != nil && importClause.Name().Kind == ast.KindIdentifier {
-		return []identifierInfo{{
+		return append(result, identifierInfo{
 			name:     importClause.Name().AsIdentifier().Text,
 			node:     importClause.Name(),
 			selector: selectorImport,
-		}}
+		})
 	}
-	return nil
+	return result
 }
 
-func getIdentifiersFromImportSpecifier(node *ast.Node) []identifierInfo {
+func getIdentifiersFromImportSpecifier(node *ast.Node, result []identifierInfo) []identifierInfo {
 	importSpec := node.AsImportSpecifier()
 
 	// The import selector only matches default and namespace imports, NOT named imports.
@@ -2071,31 +2219,31 @@ func getIdentifiersFromImportSpecifier(node *ast.Node) []identifierInfo {
 		importSpec.PropertyName.Kind == ast.KindIdentifier &&
 		importSpec.PropertyName.AsIdentifier().Text == "default"
 	if !isDefaultImport {
-		return nil
+		return result
 	}
 
 	localName := importSpec.Name()
 	if localName == nil || localName.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
 
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     localName.AsIdentifier().Text,
 		node:     localName,
 		selector: selectorImport,
-	}}
+	})
 }
 
-func getIdentifiersFromNamespaceImport(node *ast.Node) []identifierInfo {
+func getIdentifiersFromNamespaceImport(node *ast.Node, result []identifierInfo) []identifierInfo {
 	nameNode := node.AsNamespaceImport().Name()
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
-		return nil
+		return result
 	}
-	return []identifierInfo{{
+	return append(result, identifierInfo{
 		name:     nameNode.AsIdentifier().Text,
 		node:     nameNode,
 		selector: selectorImport,
-	}}
+	})
 }
 
 // ---- Re-export name collection ----
@@ -2146,24 +2294,29 @@ func collectReExportedNames(ctx rule.RuleContext) map[string]bool {
 
 // ---- Main run function ----
 
-func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.LegacyUnwrapOptions(_options)
-	selectors := parseOptions(options)
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	parsed := getParsedNamingOptions(options)
+	selectors := parsed.selectors
 
 	if len(selectors) == 0 {
 		return nil
 	}
 
-	reExportedNames := collectReExportedNames(ctx)
-	var refInfo *referencedInfo
-	if needsUnusedInfo(selectors) {
-		refInfo = collectReferencedSymbols(ctx)
+	var reExportedNames map[string]bool
+	if parsed.allModifiers&modifierExported != 0 {
+		reExportedNames = collectReExportedNames(ctx)
 	}
+	var refInfo *referencedInfo
+	if parsed.allModifiers&modifierUnused != 0 {
+		refInfo = getReferencedInfo(ctx)
+	}
+	identifierBuffer := make([]identifierInfo, 0, 8)
 
 	handleNode := func(node *ast.Node) {
-		identifiers := getIdentifierFromNode(ctx, node)
-		for _, id := range identifiers {
-			validateIdentifier(ctx, id, selectors, node, reExportedNames, refInfo)
+		identifierBuffer = getIdentifierFromNode(ctx, node, identifierBuffer[:0])
+		for _, id := range identifierBuffer {
+			neededMods := parsed.neededModifiers[bits.TrailingZeros(uint(id.selector))]
+			validateIdentifier(ctx, id, selectors, node, reExportedNames, refInfo, neededMods)
 		}
 	}
 
@@ -2196,30 +2349,47 @@ func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 	}
 }
 
-func validateIdentifier(ctx rule.RuleContext, id identifierInfo, selectors []normalizedSelector, originalNode *ast.Node, reExportedNames map[string]bool, referencedInfo *referencedInfo) {
+func validateIdentifier(
+	ctx rule.RuleContext,
+	id identifierInfo,
+	selectors []normalizedSelector,
+	originalNode *ast.Node,
+	reExportedNames map[string]bool,
+	referencedInfo *referencedInfo,
+	neededMods modifierKind,
+) {
 	// Use the declaration node for modifier detection if available
 	modNode := originalNode
 	if id.declNode != nil {
 		modNode = id.declNode
 	}
 
+	var idMods modifierKind
+	modsReady := neededMods == 0
 	for _, sel := range selectors {
 		// Check if this selector matches the identifier's selector kind
 		if id.selector&sel.selector == 0 {
 			continue
 		}
 
-		// Check modifiers match
-		idMods := getModifiers(ctx, modNode, id.node, id.selector, id.name, reExportedNames, id.destructured, referencedInfo)
-		if sel.modifiers != 0 && (idMods&sel.modifiers) != sel.modifiers {
-			continue
+		// Preserve the cheap modifier gate before configured regexes when the
+		// selector actually asks for modifiers. Otherwise defer modifier work
+		// until a selector has passed its filter and type predicates.
+		if sel.modifiers != 0 {
+			if !modsReady {
+				idMods = getModifiers(ctx, modNode, id.node, id.selector, id.name, reExportedNames, id.destructured, referencedInfo, neededMods)
+				modsReady = true
+			}
+			if (idMods & sel.modifiers) != sel.modifiers {
+				continue
+			}
 		}
 
 		// Check filter match — if filter doesn't match the name, skip this
 		// selector entirely so the next one in specificity order can match.
 		if sel.filter != nil {
-			matches := sel.filter.regex.MatchString(id.name)
-			if sel.filter.match != matches {
+			matches, err := sel.filter.regex.TestOrError(id.name)
+			if err != nil || sel.filter.match != matches {
 				continue
 			}
 		}
@@ -2229,6 +2399,10 @@ func validateIdentifier(ctx rule.RuleContext, id identifierInfo, selectors []nor
 			if !isCorrectType(ctx.TypeChecker, id.node, sel.types) {
 				continue
 			}
+		}
+
+		if !modsReady {
+			idMods = getModifiers(ctx, modNode, id.node, id.selector, id.name, reExportedNames, id.destructured, referencedInfo, neededMods)
 		}
 
 		// This selector matches - validate the name

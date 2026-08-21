@@ -1,6 +1,7 @@
 package no_magic_numbers
 
 import (
+	_ "embed"
 	"math"
 	"math/big"
 	"strconv"
@@ -10,6 +11,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_magic_numbers.schema.json
+var schemaJSON []byte
 
 // Maximum array length by the ECMAScript Specification.
 const maxArrayLength = 1<<32 - 1
@@ -27,14 +31,12 @@ type options struct {
 	ignoreTypeIndexes             bool
 }
 
-func parseOptions(rawOpts any) options {
-	opts := options{
-		ignore: make(map[string]bool),
-	}
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+func parseOptions(rawOpts []any) options {
+	opts := options{}
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
 	if v, ok := optsMap["detectObjects"].(bool); ok {
 		opts.detectObjects = v
 	}
@@ -63,6 +65,7 @@ func parseOptions(rawOpts any) options {
 		opts.ignoreTypeIndexes = v
 	}
 	if arr, ok := optsMap["ignore"].([]interface{}); ok {
+		opts.ignore = make(map[string]bool, len(arr))
 		for _, item := range arr {
 			switch v := item.(type) {
 			case float64:
@@ -190,97 +193,95 @@ var useConstMessage = rule.RuleMessage{
 	Description: "Number constants declarations must use 'const'.",
 }
 
+func noMagicNumberMessage(raw string) rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          noMagicMessage.Id,
+		Description: "No magic number: " + raw + ".",
+	}
+}
+
 // NoMagicNumbersRule implements the @typescript-eslint/no-magic-numbers rule.
 var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
-	Name: "no-magic-numbers",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "no-magic-numbers",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
+		hasIgnoredValues := len(opts.ignore) != 0
 
 		handleNumericNode := func(node *ast.Node, isBigInt bool) {
-			raw := utils.TrimmedNodeText(ctx.SourceFile, node)
+			nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+			raw := ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 
 			// --- TS-specific checks (from @typescript-eslint extension) ---
-			var isAllowed *bool
-			trueVal := true
-			falseVal := false
+			isAllowed := false
+			hasAllowanceDecision := false
 
-			if opts.ignore[normalizeLiteralValue(node, raw, isBigInt)] {
-				isAllowed = &trueVal
+			if hasIgnoredValues && opts.ignore[normalizeLiteralValue(node, raw, isBigInt)] {
+				isAllowed = true
+				hasAllowanceDecision = true
 			}
 
-			if isAllowed == nil && isParentTSEnumDeclaration(node) {
-				if opts.ignoreEnums {
-					isAllowed = &trueVal
-				} else {
-					isAllowed = &falseVal
+			if !hasAllowanceDecision && isParentTSEnumDeclaration(node) {
+				isAllowed = opts.ignoreEnums
+				hasAllowanceDecision = true
+			}
+
+			if !hasAllowanceDecision && isTSNumericLiteralType(node) {
+				isAllowed = opts.ignoreNumericLiteralTypes
+				hasAllowanceDecision = true
+			}
+
+			if !hasAllowanceDecision && isAncestorTSIndexedAccessType(node) {
+				isAllowed = opts.ignoreTypeIndexes
+				hasAllowanceDecision = true
+			}
+
+			if !hasAllowanceDecision && isParentTSReadonlyPropertyDefinition(node) {
+				isAllowed = opts.ignoreReadonlyClassProperties
+				hasAllowanceDecision = true
+			}
+
+			if hasAllowanceDecision {
+				if isAllowed {
+					return
 				}
-			}
-
-			if isAllowed == nil && isTSNumericLiteralType(node) {
-				if opts.ignoreNumericLiteralTypes {
-					isAllowed = &trueVal
-				} else {
-					isAllowed = &falseVal
-				}
-			}
-
-			if isAllowed == nil && isAncestorTSIndexedAccessType(node) {
-				if opts.ignoreTypeIndexes {
-					isAllowed = &trueVal
-				} else {
-					isAllowed = &falseVal
-				}
-			}
-
-			if isAllowed == nil && isParentTSReadonlyPropertyDefinition(node) {
-				if opts.ignoreReadonlyClassProperties {
-					isAllowed = &trueVal
-				} else {
-					isAllowed = &falseVal
-				}
-			}
-
-			if isAllowed != nil && *isAllowed {
-				return
-			}
-
-			if isAllowed != nil && !*isAllowed {
 				// Report as TS violation: only prepend '-' for negative numbers (not '+')
-				reportNode := node
+				reportRange := nodeRange
 				reportRaw := raw
 				if unary, op := findUnaryParent(node); unary != nil && op == ast.KindMinusToken {
-					reportNode = unary
+					reportRange = utils.TrimNodeTextRange(ctx.SourceFile, unary)
 					reportRaw = "-" + raw
 				}
-				ctx.ReportNode(reportNode, rule.RuleMessage{
-					Id:          noMagicMessage.Id,
-					Description: strings.Replace(noMagicMessage.Description, "{{raw}}", reportRaw, 1),
-				})
+				ctx.ReportRange(reportRange, noMagicNumberMessage(reportRaw))
 				return
 			}
 
 			// --- Core ESLint base rule logic ---
 			fullNumberNode := node
+			fullNumberRange := nodeRange
 			fullRaw := raw
 			var numericValue float64
 			var bigintValue *big.Int
+			needsNumericValue := hasIgnoredValues || opts.ignoreArrayIndexes
 
-			if isBigInt {
-				text := strings.TrimSuffix(raw, "n")
-				bigintValue, _ = new(big.Int).SetString(text, 0)
-				if bigintValue == nil {
-					bigintValue = new(big.Int)
+			if needsNumericValue {
+				if isBigInt {
+					text := strings.TrimSuffix(raw, "n")
+					bigintValue, _ = new(big.Int).SetString(text, 0)
+					if bigintValue == nil {
+						bigintValue = new(big.Int)
+					}
+				} else {
+					numericValue, _ = parseRawNumericValue(raw)
 				}
-			} else {
-				numericValue, _ = parseRawNumericValue(raw)
 			}
 
 			// Detect unary +/- parent (through parentheses)
 			if unary, op := findUnaryParent(node); unary != nil {
 				fullNumberNode = unary
-				fullRaw = utils.TrimmedNodeText(ctx.SourceFile, unary)
-				if op == ast.KindMinusToken {
+				fullNumberRange = utils.TrimNodeTextRange(ctx.SourceFile, unary)
+				fullRaw = ctx.SourceFile.Text()[fullNumberRange.Pos():fullNumberRange.End()]
+				if needsNumericValue && op == ast.KindMinusToken {
 					if isBigInt {
 						bigintValue = new(big.Int).Neg(bigintValue)
 					} else {
@@ -296,14 +297,16 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 			}
 
 			// Check ignore list with the full (signed) value
-			var valueKey string
-			if isBigInt {
-				valueKey = "bigint:" + bigintValue.String()
-			} else {
-				valueKey = strconv.FormatFloat(numericValue, 'f', -1, 64)
-			}
-			if opts.ignore[valueKey] {
-				return
+			if hasIgnoredValues {
+				var valueKey string
+				if isBigInt {
+					valueKey = "bigint:" + bigintValue.String()
+				} else {
+					valueKey = strconv.FormatFloat(numericValue, 'f', -1, 64)
+				}
+				if opts.ignore[valueKey] {
+					return
+				}
 			}
 
 			// Always allow parseInt radix and JSX numbers
@@ -327,14 +330,11 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 				if opts.enforceConst {
 					declList := parent.Parent
 					if declList != nil && declList.Kind == ast.KindVariableDeclarationList && !ast.IsVarConst(declList) {
-						ctx.ReportNode(fullNumberNode, useConstMessage)
+						ctx.ReportRange(fullNumberRange, useConstMessage)
 					}
 				}
 			} else if !isOkParent(parent, opts.detectObjects) {
-				ctx.ReportNode(fullNumberNode, rule.RuleMessage{
-					Id:          noMagicMessage.Id,
-					Description: strings.Replace(noMagicMessage.Description, "{{raw}}", fullRaw, 1),
-				})
+				ctx.ReportRange(fullNumberRange, noMagicNumberMessage(fullRaw))
 			}
 		}
 

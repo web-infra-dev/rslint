@@ -115,14 +115,18 @@ var NoRestrictedMatchersRule = rule.Rule{
 				}
 
 				chain := strings.Join(jestFnCall.Members, ".")
-				reportRange, ok := jestUtils.JestFnMemberEntriesRange(jestFnCall.MemberEntries)
-				if !ok {
-					return
-				}
 
 				for _, restricted := range restrictedMatchers {
 					if !isChainRestricted(chain, restricted) {
 						continue
+					}
+
+					// Computed only after a restriction matches: the range walks
+					// the scanner, so every parsed expect() would otherwise pay
+					// for it even when nothing is restricted.
+					reportRange, ok := jestUtils.JestFnMemberEntriesRange(ctx.SourceFile, jestFnCall.MemberEntries)
+					if !ok {
+						return
 					}
 
 					if restricted.Message != "" {

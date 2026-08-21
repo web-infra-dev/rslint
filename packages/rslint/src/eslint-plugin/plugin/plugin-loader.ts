@@ -191,11 +191,16 @@ export async function loadPluginsFromConfigFile(
     );
   }
 
-  // Config file's default export is `RslintConfigEntry[]`; each entry may
-  // carry `plugins: { <prefix>: pluginObj }`.
+  // Config file's default export is `RslintConfig`; each entry may carry
+  // `plugins: { <prefix>: pluginObj }`. A preset listed in the config expands
+  // to an array of entries, so one level of nesting is flattened here just as
+  // `normalizeConfig` does on the host side — otherwise a plugin declared
+  // inside a preset would be invisible to this worker.
   const exportedDefault =
     (configMod as { default?: unknown }).default ?? configMod;
-  const configArray = Array.isArray(exportedDefault) ? exportedDefault : [];
+  const configArray = Array.isArray(exportedDefault)
+    ? exportedDefault.flat()
+    : [];
 
   // Track which prefixes we've already loaded: a re-declared prefix with the
   // SAME plugin instance is deduped (collapse to one LoadedPlugin), while a

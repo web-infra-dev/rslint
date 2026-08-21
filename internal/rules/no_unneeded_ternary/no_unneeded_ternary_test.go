@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -35,15 +36,15 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{Code: `var a = foo ? 'Yes' : foo;`},
 			{
 				Code:    `var a = foo ? 'Yes' : foo;`,
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 			},
 			{
 				Code:    `var a = foo ? bar : foo;`,
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 			},
 			{
 				Code:    `foo ? bar : foo;`,
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 			},
 
 			// ---- Default-assignment pattern stays valid by default ----
@@ -58,28 +59,28 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			// ---- Conditional that isn't a default-assignment pattern (test ≠ consequent) ----
 			{
 				Code:    `var a = foo ? bar : 1;`,
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 			},
 			// Property access doesn't match the simple-identifier pattern.
 			{
 				Code:    `var a = foo.bar ? foo.bar : baz;`,
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 			},
 
 			// ---- Explicit `defaultAssignment: true` matches the no-options default ----
 			{
 				Code:    `var a = foo ? foo : bar;`,
-				Options: map[string]interface{}{"defaultAssignment": true},
+				Options: []any{map[string]interface{}{"defaultAssignment": true}},
 			},
 			// Empty options object: same as defaults.
 			{
 				Code:    `var a = foo ? foo : bar;`,
-				Options: map[string]interface{}{},
+				Options: []any{map[string]interface{}{}},
 			},
 			// Identifier vs different identifier: not a default-assignment pattern.
 			{
 				Code:    `var a = foo ? bar : baz;`,
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 			},
 			// Test and consequent are SAME identifier text but different tokens
 			// (different `Identifier` node references); both are "foo" so the rule
@@ -197,7 +198,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
                 var canSet = true
                 var result = value || (canSet ? 'unset' : 'can not set')
             `},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Message: "Unnecessary use of conditional expression for default assignment.", Line: 4, Column: 30, EndLine: 4, EndColumn: 78},
 				},
@@ -205,7 +206,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `foo ? foo : (bar ? baz : qux)`,
 				Output:  []string{`foo || (bar ? baz : qux)`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
 				},
@@ -213,7 +214,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `function* fn() { foo ? foo : yield bar }`,
 				Output:  []string{`function* fn() { foo || (yield bar) }`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 18, EndLine: 1, EndColumn: 39},
 				},
@@ -221,7 +222,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = foo ? foo : 'No';`,
 				Output:  []string{`var a = foo || 'No';`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 25},
 				},
@@ -229,7 +230,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = ((foo)) ? (((((foo))))) : ((((((((((((((bar))))))))))))));`,
 				Output:  []string{`var a = ((foo)) || ((((((((((((((bar))))))))))))));`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 66},
 				},
@@ -237,7 +238,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = b ? b : c => c;`,
 				Output:  []string{`var a = b || (c => c);`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 23},
 				},
@@ -245,7 +246,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = b ? b : c = 0;`,
 				Output:  []string{`var a = b || (c = 0);`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 22},
 				},
@@ -253,7 +254,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = b ? b : (c => c);`,
 				Output:  []string{`var a = b || (c => c);`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 25},
 				},
@@ -261,7 +262,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = b ? b : (c = 0);`,
 				Output:  []string{`var a = b || (c = 0);`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 24},
 				},
@@ -269,7 +270,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = b ? b : (c) => (c);`,
 				Output:  []string{`var a = b || ((c) => (c));`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 27},
 				},
@@ -277,7 +278,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = b ? b : c, d; // this is ((b ? b : c), (d))`,
 				Output:  []string{`var a = b || c, d; // this is ((b ? b : c), (d))`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 18},
 				},
@@ -285,7 +286,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = b ? b : (c, d);`,
 				Output:  []string{`var a = b || (c, d);`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 23},
 				},
@@ -293,7 +294,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `f(x ? x : 1);`,
 				Output:  []string{`f(x || 1);`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 3, EndLine: 1, EndColumn: 12},
 				},
@@ -301,7 +302,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `x ? x : 1;`,
 				Output:  []string{`x || 1;`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 10},
 				},
@@ -309,7 +310,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = foo ? foo : bar;`,
 				Output:  []string{`var a = foo || bar;`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 24},
 				},
@@ -317,7 +318,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `var a = foo ? foo : a ?? b;`,
 				Output:  []string{`var a = foo || (a ?? b);`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 9, EndLine: 1, EndColumn: 27},
 				},
@@ -338,7 +339,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `foo ? foo : bar as any`,
 				Output:  []string{`foo || (bar as any)`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 23},
 				},
@@ -503,7 +504,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `foo ? foo : bar satisfies number`,
 				Output:  []string{`foo || (bar satisfies number)`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 33},
 				},
@@ -517,7 +518,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 					`foo || (foo ? foo : c)`,
 					`foo || (foo || c)`,
 				},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 28},
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 14, EndLine: 1, EndColumn: 27},
@@ -554,7 +555,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `b ? b : c ? d : e;`,
 				Output:  []string{`b || (c ? d : e);`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 18},
 				},
@@ -564,7 +565,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `b ? b : function() { return 1; };`,
 				Output:  []string{`b || function() { return 1; };`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 33},
 				},
@@ -572,7 +573,7 @@ func TestNoUnneededTernaryRule(t *testing.T) {
 			{
 				Code:    `b ? b : class { static foo() {} };`,
 				Output:  []string{`b || class { static foo() {} };`},
-				Options: map[string]interface{}{"defaultAssignment": false},
+				Options: []any{map[string]interface{}{"defaultAssignment": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryConditionalAssignment", Line: 1, Column: 1, EndLine: 1, EndColumn: 34},
 				},
@@ -644,7 +645,7 @@ const defaultAssignment = value ? value : other ?? fallback;`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			HasTypeInfo:  true,
 			ExcludePaths: []string{},

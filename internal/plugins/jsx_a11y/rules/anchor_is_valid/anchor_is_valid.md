@@ -102,4 +102,5 @@ the `onClick` does not redirect the report.
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/anchor-is-valid](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md)
+- [eslint-plugin-jsx-a11y: anchor-is-valid](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/anchor-is-valid.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/anchor-is-valid.js)

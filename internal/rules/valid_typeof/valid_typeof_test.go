@@ -45,9 +45,9 @@ func TestValidTypeofRule(t *testing.T) {
 			{Code: `typeof foo`},
 
 			// With requireStringLiterals: valid cases still valid
-			{Code: `typeof foo === "string"`, Options: map[string]interface{}{"requireStringLiterals": true}},
-			{Code: `typeof foo === typeof bar`, Options: map[string]interface{}{"requireStringLiterals": true}},
-			{Code: `"undefined" === typeof foo`, Options: map[string]interface{}{"requireStringLiterals": true}},
+			{Code: `typeof foo === "string"`, Options: []interface{}{map[string]interface{}{"requireStringLiterals": true}}},
+			{Code: `typeof foo === typeof bar`, Options: []interface{}{map[string]interface{}{"requireStringLiterals": true}}},
+			{Code: `"undefined" === typeof foo`, Options: []interface{}{map[string]interface{}{"requireStringLiterals": true}}},
 
 			// != and !== with valid strings
 			{Code: `typeof foo !== "string"`},
@@ -121,7 +121,7 @@ func TestValidTypeofRule(t *testing.T) {
 			// Bare undefined identifier with requireStringLiterals → notString + suggestion
 			{
 				Code:    `typeof foo === undefined`,
-				Options: map[string]interface{}{"requireStringLiterals": true},
+				Options: []interface{}{map[string]interface{}{"requireStringLiterals": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "notString", Line: 1, Column: 16, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestString", Output: `typeof foo === "undefined"`},
@@ -131,7 +131,7 @@ func TestValidTypeofRule(t *testing.T) {
 			// Non-string identifier with requireStringLiterals → notString
 			{
 				Code:    `typeof foo === Object`,
-				Options: map[string]interface{}{"requireStringLiterals": true},
+				Options: []interface{}{map[string]interface{}{"requireStringLiterals": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "notString", Line: 1, Column: 16},
 				},
@@ -198,7 +198,7 @@ func TestValidTypeofRule(t *testing.T) {
 			// Shadowed undefined with requireStringLiterals → notString (no suggestion)
 			{
 				Code:    `function f(undefined: string) { typeof foo === undefined }`,
-				Options: map[string]interface{}{"requireStringLiterals": true},
+				Options: []interface{}{map[string]interface{}{"requireStringLiterals": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "notString", Line: 1, Column: 48},
 				},

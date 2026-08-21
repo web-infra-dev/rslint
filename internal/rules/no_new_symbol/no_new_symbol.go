@@ -8,7 +8,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-new-symbol
 var NoNewSymbolRule = rule.Rule{
-	Name: "no-new-symbol",
+	Name:   "no-new-symbol",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
@@ -30,7 +31,7 @@ var NoNewSymbolRule = rule.Rule{
 				// entry un-declares the builtin, so `Symbol` no longer resolves to
 				// a known global — ESLint's `globalScope.set.get("Symbol")` would
 				// be undefined and the rule stays silent.
-				if ctx.Globals["Symbol"] == utils.GlobalAccessOff {
+				if !ctx.Globals.Access("Symbol").IsDeclared() {
 					return
 				}
 

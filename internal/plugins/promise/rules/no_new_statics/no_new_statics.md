@@ -38,4 +38,5 @@ This rule provides an autofix that removes the `new` keyword.
 
 ## Original Documentation
 
-- [eslint-plugin-promise: no-new-statics](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-new-statics.md)
+- [eslint-plugin-promise: no-new-statics](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/no-new-statics.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/no-new-statics.js)
