@@ -1,6 +1,6 @@
 {
   "name": "@rslint/tsgo-server-linux-x64",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "license": "MIT",
   "description": "tsgo server binary for linux x64",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
