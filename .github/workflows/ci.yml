@@ -70,35 +70,42 @@ jobs:
           # The container sees the shared host's cores; that much concurrency only thrashes.
           GOMAXPROCS: 16
         run: |
-          # The Windows runner can exhaust its commit limit with up to 64
-          # package builds/test binaries in flight. Keep every package and
-          # test, but cap inter-package concurrency to bound peak memory use.
-          $packageParallelism = 32
+          Write-Host "== Machine =="
+          Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer, Model, NumberOfProcessors, NumberOfLogicalProcessors, TotalPhysicalMemory, HypervisorPresent | Format-List
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, TotalVisibleMemorySize, FreePhysicalMemory, TotalVirtualMemorySize, FreeVirtualMemory, LastBootUpTime | Format-List
 
-          # Pre-build shared dependencies to warm the build cache
-          go build -p $packageParallelism ./cmd/... ./internal/...
+          Write-Host "== Load before the run =="
+          Get-CimInstance Win32_PerfFormattedData_PerfOS_System | Select-Object Processes, Threads, ProcessorQueueLength, ContextSwitchesPersec | Format-List
+          Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory | Select-Object CommittedBytes, CommitLimit, PercentCommittedBytesInUse, AvailableBytes | Format-List
 
-          $packages = go list ./cmd/... ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 64
-          $batch = @()
+          Write-Host "== What Go sees =="
+          $probe = Join-Path $env:RUNNER_TEMP 'cpuprobe'
+          New-Item -ItemType Directory -Force -Path $probe | Out-Null
+          Set-Content -Path (Join-Path $probe 'main.go') -Value 'package main; import ("fmt"; "runtime"); func main() { fmt.Printf("NumCPU=%d GOMAXPROCS=%d\n", runtime.NumCPU(), runtime.GOMAXPROCS(0)) }'
+          go -C $probe mod init cpuprobe
+          go -C $probe run .
 
-          foreach ($pkg in $packages) {
-            $batch += $pkg
-
-            if ($batch.Count -ge $batchSize) {
-              Write-Host "Running batch of $($batch.Count) packages..."
-              go test -p $packageParallelism -count=1 $batch
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-              $batch = @()
+          $sampler = Start-Job {
+            while ($true) {
+              $sys = Get-CimInstance Win32_PerfFormattedData_PerfOS_System -ErrorAction SilentlyContinue
+              $mem = Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory -ErrorAction SilentlyContinue
+              $cpu = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'" -ErrorAction SilentlyContinue
+              '{0} cpu={1}% queue={2} threads={3} processes={4} committedMB={5}' -f (Get-Date -Format HH:mm:ss), $cpu.PercentProcessorTime, $sys.ProcessorQueueLength, $sys.Threads, $sys.Processes, [int]($mem.CommittedBytes / 1MB)
+              Start-Sleep -Seconds 10
             }
           }
 
-          # Run remaining packages
-          if ($batch.Count -gt 0) {
-            Write-Host "Running final batch of $($batch.Count) packages..."
-            go test -p $packageParallelism -count=1 $batch
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $code = 1
+          try {
+            go test -count=1 ./cmd/... ./internal/...
+            $code = $LASTEXITCODE
+          } finally {
+            Stop-Job $sampler
+            Write-Host "== Load during the run =="
+            Receive-Job $sampler
+            Remove-Job $sampler -Force
           }
+          exit $code
 
       # Fallback for any runner without a dedicated step above.
       - name: Unit Test
