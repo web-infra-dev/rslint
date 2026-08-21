@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildPreferFindMessage() rule.RuleMessage {
@@ -591,7 +592,7 @@ func jsStringFromNumber(v float64) string {
 //     JS `Number()` rejects them (`Number('1_000') === NaN`). Reject any
 //     string containing `_` up front to match JS.
 func jsNumberFromString(s string) float64 {
-	trimmed := strings.TrimSpace(s)
+	trimmed := ecmascript.StringTrim(s)
 	if trimmed == "" {
 		return 0
 	}

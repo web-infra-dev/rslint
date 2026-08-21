@@ -3,12 +3,12 @@ package jsx_handler_names
 import (
 	_ "embed"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -126,42 +126,21 @@ func parseOptions(raw []any) options {
 }
 
 // stripWhitespace removes every character that JS's `\s` regex matches,
-// mirroring upstream's `propValue.replace(/\s*/g, ”)`. The set is JS
-// WhiteSpace + LineTerminator per ECMA-262: ASCII whitespace, U+00A0
-// NBSP, U+FEFF ZWNBSP, U+2028 / U+2029 line/paragraph separators, and
-// Unicode "Space_Separator" (Zs) code points.
-//
-// Go's `unicode.IsSpace` differs from JS `\s` in two chars only:
-//
-//   - U+0085 NEL — Go matches, JS does not.
-//   - U+FEFF BOM — Go does not match, JS does.
-//
-// We patch those two so the strip behavior is byte-for-byte aligned with
-// JS — otherwise an exotic-whitespace member-access chain could produce
-// different regex outcomes here vs. upstream.
+// mirroring upstream's `propValue.replace(/\s*/g, ”)`. That set is JS
+// WhiteSpace + LineTerminator, which is what
+// [ecmascript.IsWhiteSpaceOrLineTerminator] answers — an exotic-whitespace
+// member-access chain would otherwise produce different regex outcomes here and
+// upstream.
 func stripWhitespace(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if isJSWhitespace(r) {
+		if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			continue
 		}
 		b.WriteRune(r)
 	}
 	return b.String()
-}
-
-func isJSWhitespace(r rune) bool {
-	switch r {
-	case '\u0085':
-		// NEL: Go's unicode.IsSpace matches it, JS \s does not.
-		return false
-	case '\uFEFF':
-		// BOM: JS \s matches it (legacy WhiteSpace category), Go's
-		// unicode.IsSpace does not.
-		return true
-	}
-	return unicode.IsSpace(r)
 }
 
 // stripThisOrBindBase mirrors upstream's `.replace(/^this\.|.*::/, ”)`

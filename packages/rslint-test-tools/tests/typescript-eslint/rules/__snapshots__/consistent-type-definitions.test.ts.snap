@@ -5,7 +5,7 @@ exports[`consistent-type-definitions > invalid 1`] = `
   "code": "type T = { x: number; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -32,7 +32,7 @@ exports[`consistent-type-definitions > invalid 2`] = `
   "code": "type T={ x: number; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -59,7 +59,7 @@ exports[`consistent-type-definitions > invalid 3`] = `
   "code": "type T=                         { x: number; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -86,7 +86,7 @@ exports[`consistent-type-definitions > invalid 4`] = `
   "code": "type T /* comment */={ x: number; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -117,7 +117,7 @@ export type W<T> = {
       ",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -148,7 +148,7 @@ exports[`consistent-type-definitions > invalid 6`] = `
   "code": "type T = { [K: string]: number };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -175,7 +175,7 @@ exports[`consistent-type-definitions > invalid 7`] = `
   "code": "type T= { x: number; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -202,7 +202,7 @@ exports[`consistent-type-definitions > invalid 8`] = `
   "code": "type T = { x: number };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -229,7 +229,7 @@ exports[`consistent-type-definitions > invalid 9`] = `
   "code": "type T = { x: number; y: string; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -256,7 +256,7 @@ exports[`consistent-type-definitions > invalid 10`] = `
   "code": "type T = { x: number; y: { z: string; }; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -283,7 +283,7 @@ exports[`consistent-type-definitions > invalid 11`] = `
   "code": "type T<U> = { x: U; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -310,7 +310,7 @@ exports[`consistent-type-definitions > invalid 12`] = `
   "code": "type Foo = { a: string; };",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -337,7 +337,7 @@ exports[`consistent-type-definitions > invalid 13`] = `
   "code": "type Foo = (  { a: string; });",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -364,7 +364,7 @@ exports[`consistent-type-definitions > invalid 14`] = `
   "code": "interface T { x: number; }",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -391,7 +391,7 @@ exports[`consistent-type-definitions > invalid 15`] = `
   "code": "interface T{ x: number; }",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -418,7 +418,7 @@ exports[`consistent-type-definitions > invalid 16`] = `
   "code": "interface T                          { x: number; }",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -445,7 +445,7 @@ exports[`consistent-type-definitions > invalid 17`] = `
   "code": "interface A extends B, C { x: number; };",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -472,7 +472,7 @@ exports[`consistent-type-definitions > invalid 18`] = `
   "code": "interface A extends B<T1>, C<T2> { x: number; };",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -503,7 +503,7 @@ export interface W<T> {
       ",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -534,7 +534,7 @@ exports[`consistent-type-definitions > invalid 20`] = `
   "code": "interface T { x: number }",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -561,7 +561,7 @@ exports[`consistent-type-definitions > invalid 21`] = `
   "code": "interface T { x: number; y: string; }",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -588,7 +588,7 @@ exports[`consistent-type-definitions > invalid 22`] = `
   "code": "export interface W<T> { x: T; };",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -615,7 +615,7 @@ exports[`consistent-type-definitions > invalid 23`] = `
   "code": "interface T<U> { x: U; };",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -642,7 +642,7 @@ exports[`consistent-type-definitions > invalid 24`] = `
   "code": "interface Foo { a: string; }",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -669,7 +669,7 @@ exports[`consistent-type-definitions > invalid 25`] = `
   "code": "namespace Foo { export interface Bar {} }",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -702,7 +702,7 @@ namespace JSX {
       ",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -741,7 +741,7 @@ global {
       ",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -780,7 +780,7 @@ declare global {
       ",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -813,7 +813,7 @@ declare global {
       ",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -845,7 +845,7 @@ export default interface Test {
       ",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -883,7 +883,7 @@ export declare type Test = {
       ",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -920,7 +920,7 @@ export declare interface Test {
       ",
   "diagnostics": [
     {
-      "message": "Use a type literal instead of an interface.",
+      "message": "Use a \`type\` instead of an \`interface\`.",
       "messageId": "typeOverInterface",
       "range": {
         "end": {
@@ -956,7 +956,7 @@ type Foo = ({
       ",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -991,7 +991,7 @@ type Foo = ((((((((({
       ",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -1026,7 +1026,7 @@ type Foo = {
       ",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -1062,7 +1062,7 @@ type Bar = string;
       ",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {
@@ -1100,7 +1100,7 @@ const bar = 1;
       ",
   "diagnostics": [
     {
-      "message": "Use an interface instead of a type literal.",
+      "message": "Use an \`interface\` instead of a \`type\`.",
       "messageId": "interfaceOverType",
       "range": {
         "end": {

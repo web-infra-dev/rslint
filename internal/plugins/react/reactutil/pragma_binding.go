@@ -1,10 +1,9 @@
 package reactutil
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // IsDestructuredFromPragmaImport mirrors upstream eslint-plugin-react's
@@ -24,7 +23,7 @@ import (
 //
 // `pragma` is the React pragma name (e.g. "React") — the comparison
 // against ImportDeclaration / require argument uses
-// `strings.ToLower(pragma)` to match upstream's
+// `ecmascript.StringToLowerCase(pragma)` to match upstream's
 // `pragma.toLocaleLowerCase()` semantic. `tc` may be nil — when no
 // TypeChecker is available the function falls back to a syntax-only
 // SourceFile-wide scan via `findPragmaBindingByName`. That fallback is
@@ -39,7 +38,7 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 	if pragma == "" {
 		pragma = DefaultReactPragma
 	}
-	pragmaLower := strings.ToLower(pragma)
+	pragmaLower := ecmascript.StringToLowerCase(pragma)
 
 	if tc == nil {
 		// Syntax-only fallback: walk up to the SourceFile and scan it

@@ -2,12 +2,10 @@ package regexp
 
 import (
 	"strings"
-
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // A JavaScript regexp carrying the `i` flag compares two characters by
-// ecmascript.Canonicalize, which is neither Go's case folding nor the Unicode
+// Canonicalize, which is neither Go's case folding nor the Unicode
 // folding regexp2 reaches for when told to ignore case. It is also not one
 // reading but two: `u` and `v` select simple case folding, and their absence
 // selects an uppercase mapping that never crosses into ASCII. U+212A KELVIN
@@ -22,7 +20,7 @@ import (
 // comparison accepts for it, reporting false when the character stands alone
 // and needs no widening.
 func CaseClass(r rune, unicode bool) (string, bool) {
-	members := ecmascript.CaseEquivalents(r, unicode)
+	members := CaseEquivalents(r, unicode)
 	if len(members) == 0 {
 		return "", false
 	}

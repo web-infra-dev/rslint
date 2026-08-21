@@ -285,6 +285,7 @@ instead of re-exporting aliases.
 type RuleContext struct {
     SourceFile     *ast.SourceFile
     Settings       map[string]interface{}
+    LanguageOptions LanguageOptions
     Globals        Globals
     Comments       *CommentStore
     Refs           *RefStore
@@ -368,12 +369,15 @@ without exposing a language mode or requiring rules to parse paths.
 Config resolution normalizes the per-file `ecmaVersion` and authored top-level
 `languageOptions.sourceType` (`module`, `script`, or `commonjs`) into
 `LanguageOptions`, which is exposed as a whole on each native `RuleContext`.
-The legacy `parserOptions.sourceType` location is not read. The linter resolves
+`ecmaVersion`'s zero value means the moving `latest` edition. The legacy
+`parserOptions.sourceType` location is not read. The linter resolves
 an omitted source type from the filename (`.cjs` to `commonjs`, `.js`/`.mjs`
 to `module`); the remaining zero value has module semantics through
 `EffectiveSourceType`. Source type does not change TypeScript parsing or
 compiler module resolution. The linter uses the normalized edition to build
-one `Globals` value for each native rule context. `Globals` owns the
+one `Globals` value for each native rule context. Rules read
+`LanguageOptions` when upstream behavior depends on language configuration;
+they use `Globals` for variable-availability decisions. `Globals` owns the
 ESLint-versioned language-global set, resolved language defaults, the authored
 `languageOptions.globals` source, inline `/* global */` settings and ranges,
 and the effective access after applying their precedence. Rules use
