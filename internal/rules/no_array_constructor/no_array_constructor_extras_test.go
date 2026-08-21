@@ -309,6 +309,11 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 				`export {}; declare global { const Array: any; } [];`,
 			),
 			directFixCase(
+				`export {}; declare global { type Array = any; } Array();`,
+				`Array()`,
+				`export {}; declare global { type Array = any; } [];`,
+			),
+			directFixCase(
 				`export {}; declare global { namespace Array {} } Array();`,
 				`Array()`,
 				`export {}; declare global { namespace Array {} } [];`,
