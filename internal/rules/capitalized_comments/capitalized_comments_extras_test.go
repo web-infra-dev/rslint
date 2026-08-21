@@ -72,6 +72,13 @@ func TestCapitalizedCommentsExtras(t *testing.T) {
 			// scheme followed immediately by "://x" is exempt.
 			{Code: "// http://x", Options: []any{"always"}},
 
+			// ---- Branch: the default ignore pattern exempts this linter's
+			// own directive comments, so `--fix` cannot rewrite one into a
+			// spelling DisableManager no longer recognizes ----
+			{Code: "// rslint-disable-next-line no-console\nconsole.log(1);", Options: []any{"always"}},
+			{Code: "/* rslint-disable-next-line no-console */\nconsole.log(1);", Options: []any{"always"}},
+			{Code: "/* rslint-enable no-console */", Options: []any{"always"}},
+
 			// ---- Branch: caseless getNormalizedOptions()'s ignorePattern
 			// fallback recognizes the "line"-only override for a Line
 			// comment ----

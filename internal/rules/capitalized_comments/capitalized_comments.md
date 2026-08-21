@@ -37,7 +37,7 @@ This rule has two options: a string value `"always"` or `"never"` which determin
 Here are the supported object options:
 
 - `ignorePattern`: A string representing a regular expression pattern of words that should be ignored by this rule. If the first word of a comment matches the pattern, this rule will not report that comment.
-  - Note that the following words are always ignored by this rule: `["jscs", "jshint", "eslint", "istanbul", "global", "globals", "exported"]`.
+  - Note that the following words are always ignored by this rule: `["jscs", "jshint", "eslint", "rslint", "istanbul", "global", "globals", "exported"]`.
 - `ignoreInlineComments`: If this is `true`, the rule will not report on comments in the middle of code. By default, this is `false`.
 - `ignoreConsecutiveComments`: If this is `true`, the rule will not report on a comment which violates the rule, as long as the comment immediately follows another comment. By default, this is `false`.
 
@@ -206,6 +206,7 @@ Examples of **correct** code with different line and block comment configuration
 ## Differences from ESLint
 
 - An `ignorePattern` that is not a valid regular expression never matches any comment, instead of throwing an error when the rule is configured.
+- `rslint` joins the list of always-ignored words, so `// rslint-disable-next-line no-console` is treated the same as its `eslint-` equivalent.
 
 ## Original Documentation
 

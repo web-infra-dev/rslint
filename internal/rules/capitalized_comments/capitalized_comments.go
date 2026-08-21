@@ -19,8 +19,10 @@ var schemaJSON []byte
 
 // defaultIgnorePattern ports astUtils.COMMENTS_IGNORE_PATTERN: words this rule
 // always ignores at the start of a comment, regardless of any configured
-// ignorePattern.
-var defaultIgnorePattern = esregexp.MustCompile(`^\s*(?:eslint|jshint\s+|jslint\s+|istanbul\s+|globals?\s+|exported\s+|jscs)`, "u")
+// ignorePattern. It also accepts the `rslint` prefix this linter recognizes
+// alongside `eslint`, so its own directive comments stay exempt and no fix
+// rewrites one into a form DisableManager no longer recognizes.
+var defaultIgnorePattern = esregexp.MustCompile(`^\s*(?:eslint|rslint|jshint\s+|jslint\s+|istanbul\s+|globals?\s+|exported\s+|jscs)`, "u")
 
 // maybeURL ports upstream's MAYBE_URL: a comment that starts with something
 // that looks like a `scheme://` URL is never reported.
