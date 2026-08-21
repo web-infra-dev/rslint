@@ -109,11 +109,55 @@ func TestIsInStrictMode(t *testing.T) {
 			expected: true,
 		},
 
-		// === TypeScript namespace/module scopes are strict in typescript-eslint ===
+		// === TypeScript namespace/module and enum scopes are strict in typescript-eslint ===
 		{
 			name:     "function inside namespace",
 			code:     `namespace N { if (true) function f() {} }`,
 			kind:     ast.KindFunctionDeclaration,
+			expected: true,
+		},
+		{
+			name:     "enum member initializer",
+			code:     `enum E { A = (x = 1) }`,
+			kind:     ast.KindBinaryExpression,
+			expected: true,
+		},
+
+		// === A class's own decorators are evaluated outside the class scope ===
+		{
+			name:     "class declaration decorator",
+			code:     `@dec(x = 1) class C {}`,
+			kind:     ast.KindBinaryExpression,
+			expected: false,
+		},
+		{
+			name:     "class expression decorator",
+			code:     `const C = @dec(x = 1) class {};`,
+			kind:     ast.KindBinaryExpression,
+			expected: false,
+		},
+		{
+			name:     "class member decorator",
+			code:     `class C { @dec(x = 1) m() {} }`,
+			kind:     ast.KindBinaryExpression,
+			expected: true,
+		},
+		{
+			name:     "class computed member name",
+			code:     `class C { [(x = 1)]: number; }`,
+			kind:     ast.KindBinaryExpression,
+			expected: true,
+		},
+		{
+			name:     "class heritage clause",
+			code:     `class C extends (x = 1) {}`,
+			kind:     ast.KindBinaryExpression,
+			expected: true,
+		},
+		{
+			name:     "decorator on a class nested in a strict scope",
+			code:     `namespace N { @dec(x = 1) class C {} }`,
+			kind:     ast.KindBinaryExpression,
 			expected: true,
 		},
 
