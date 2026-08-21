@@ -70,7 +70,7 @@ func scanRegexTerm(pattern string, flags RegexFlags, pos *int, groups *[]RegexCa
 		}
 		*pos = end
 	case '\\':
-		step, ok := SkipPatternEscape(pattern, *pos, flags)
+		step, ok := skipPatternLevelEscape(pattern, *pos, flags)
 		if !ok {
 			return false
 		}
@@ -96,6 +96,38 @@ func scanRegexTerm(pattern string, flags RegexFlags, pos *int, groups *[]RegexCa
 	}
 	skipRegexQuantifier(pattern, pos)
 	return true
+}
+
+// skipPatternLevelEscape returns how many bytes the `\`-prefixed escape at
+// pattern[i] consumes when it appears outside a character class. Two escapes
+// read differently there than they do inside one, so they can't go through
+// SkipPatternEscape:
+//
+//   - `\c` opens a control escape only when a ControlLetter follows. Under u/v
+//     anything else is a SyntaxError; outside u/v, Annex B reads the backslash
+//     alone as a literal `\` and leaves the `c` to be scanned as an ordinary
+//     character, so only the backslash is consumed here.
+//   - `\q{...}` is a v-mode string disjunction, which exists only inside a
+//     class. Outside one, `\q` under u/v isn't a valid escape at all.
+func skipPatternLevelEscape(pattern string, i int, flags RegexFlags) (int, bool) {
+	if i+1 >= len(pattern) {
+		return 0, false
+	}
+	switch pattern[i+1] {
+	case 'c':
+		if i+2 < len(pattern) && isRegexControlLetter(pattern[i+2]) {
+			return 3, true
+		}
+		if flags.UV() {
+			return 0, false
+		}
+		return 1, true
+	case 'q':
+		if flags.UV() {
+			return 0, false
+		}
+	}
+	return SkipPatternEscape(pattern, i, flags)
 }
 
 func skipRegexQuantifier(pattern string, pos *int) {
@@ -205,19 +237,21 @@ func scanRegexGroup(pattern string, flags RegexFlags, pos *int, groups *[]RegexC
 // skipRegexModifierGroupHeader consumes an ES2025 regex-modifier group header
 // `?ims-ims:` / `?ims:` / `?-ims:` starting at pattern[*pos]=='?', leaving
 // *pos positioned right after the ':'. Only `i`, `m`, and `s` are valid
-// modifier flags.
+// modifier flags, no flag may repeat within a set, the added and removed sets
+// must be disjoint, and at least one of them must be non-empty.
 func skipRegexModifierGroupHeader(pattern string, pos *int) bool {
 	i := *pos + 1 // skip '?'
-	for i < len(pattern) && isRegexModifierFlag(pattern[i]) {
-		i++
+	added, ok := scanRegexModifierFlags(pattern, &i)
+	if !ok {
+		return false
 	}
+	removed := uint(0)
 	if i < len(pattern) && pattern[i] == '-' {
 		i++
-		start := i
-		for i < len(pattern) && isRegexModifierFlag(pattern[i]) {
-			i++
+		if removed, ok = scanRegexModifierFlags(pattern, &i); !ok {
+			return false
 		}
-		if i == start {
+		if added|removed == 0 || added&removed != 0 {
 			return false
 		}
 	}
@@ -226,6 +260,21 @@ func skipRegexModifierGroupHeader(pattern string, pos *int) bool {
 	}
 	*pos = i + 1
 	return true
+}
+
+// scanRegexModifierFlags consumes the run of modifier flags at pattern[*pos]
+// and returns them as a bit set, rejecting a flag that appears twice.
+func scanRegexModifierFlags(pattern string, pos *int) (uint, bool) {
+	seen := uint(0)
+	for *pos < len(pattern) && isRegexModifierFlag(pattern[*pos]) {
+		bit := uint(1) << (pattern[*pos] - 'a')
+		if seen&bit != 0 {
+			return 0, false
+		}
+		seen |= bit
+		*pos++
+	}
+	return seen, true
 }
 
 // classHasBareQEscape reports whether pattern[start:end] (a `[...]` class,
@@ -257,5 +306,9 @@ func classHasBareQEscape(pattern string, start, end int) bool {
 }
 
 func isRegexModifierFlag(c byte) bool { return c == 'i' || c == 'm' || c == 's' }
+
+func isRegexControlLetter(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+}
 
 func isRegexDigit(c byte) bool { return c >= '0' && c <= '9' }

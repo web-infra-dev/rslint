@@ -33,7 +33,7 @@ var PreferNamedCaptureGroupRule = rule.Rule{
 				return
 			}
 			patternNode := utils.SkipAssertionsAndParens(args.Nodes[0])
-			pattern, ok := getEval().EvalToString(patternNode)
+			pattern, ok := staticStringValue(getEval(), patternNode)
 			if !ok || pattern == "" {
 				return
 			}
@@ -41,7 +41,7 @@ var PreferNamedCaptureGroupRule = rule.Rule{
 			flags := ""
 			if len(args.Nodes) >= 2 {
 				flagsNode := utils.SkipAssertionsAndParens(args.Nodes[1])
-				if v, ok := getEval().EvalToString(flagsNode); ok {
+				if v, ok := staticStringValue(getEval(), flagsNode); ok {
 					flags = v
 				}
 			}
@@ -64,6 +64,17 @@ var PreferNamedCaptureGroupRule = rule.Rule{
 			},
 		}
 	},
+}
+
+// staticStringValue folds a `RegExp()` argument to a string the way
+// `String(value)` would: a regex literal becomes its own source text —
+// delimiting slashes and flags included, so `new RegExp(/(a)/)` is read as the
+// pattern `/(a)/` — and everything else goes through the static evaluator.
+func staticStringValue(eval *utils.StaticStringEvaluator, node *ast.Node) (string, bool) {
+	if node != nil && node.Kind == ast.KindRegularExpressionLiteral {
+		return node.Text(), true
+	}
+	return eval.EvalToString(node)
 }
 
 // checkRegex parses pattern (as it would be read under flags) and reports
@@ -112,7 +123,7 @@ func buildSuggestions(ctx rule.RuleContext, patternSourceNode *ast.Node, pattern
 	rawText := utils.TrimmedNodeText(ctx.SourceFile, patternSourceNode)
 	switch patternSourceNode.Kind {
 	case ast.KindRegularExpressionLiteral:
-		// The pattern between the slashes is always the exact raw source.
+		// A regex literal carries its pattern verbatim in its own source.
 	case ast.KindStringLiteral:
 		if strings.Contains(rawText, "\\") {
 			return nil

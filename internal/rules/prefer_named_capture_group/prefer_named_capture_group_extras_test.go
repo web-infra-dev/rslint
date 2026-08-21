@@ -75,6 +75,15 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			{Code: "RegExp('a{');"},                 // standalone quantifier-shaped literal, no group
 			{Code: "RegExp('(?<dup>a)(?<dup>b)');"}, // duplicate group name — no unnamed group to report
 
+			// ---- ES2025 modifier-group headers the host engine rejects ----
+			{Code: "RegExp('(?ii:(a))');"},  // flag repeated within one set
+			{Code: "RegExp('(?i-i:(a))');"}, // same flag both added and removed
+			{Code: "RegExp('(?-:(a))');"},   // both modifier sets empty
+
+			// ---- Escapes that are only valid in the context they're missing ----
+			{Code: `RegExp('\\q{a}(b)', 'v');`}, // \q{...} is a class-only string disjunction
+			{Code: `RegExp('\\c(a)', 'u');`},    // \c without a control letter is a u-mode syntax error
+
 			// N/A: declaration/container forms (class/function shape) do not affect
 			// this expression-only rule — every observable branch is reached through
 			// a regex literal or a RegExp() call argument, not a declaration site.
@@ -358,18 +367,76 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			// a trailing `-` group don't create a capturing group, and the group
 			// inside is still discovered.
 			{
-				Code:            "/(?ims-ims:(a))bar/;",
+				Code:            "/(?ms-i:(a))bar/;",
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "required",
 					Message:   "Capture group '(a)' should be converted to a named or non-capturing group.",
 					Line:      1,
 					Column:    1,
-					EndColumn: 20,
+					EndColumn: 17,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "addGroupName", Output: "/(?ims-ims:(?<temp1>a))bar/;"},
-						{MessageId: "addNonCapture", Output: "/(?ims-ims:(?:a))bar/;"},
+						{MessageId: "addGroupName", Output: "/(?ms-i:(?<temp1>a))bar/;"},
+						{MessageId: "addNonCapture", Output: "/(?ms-i:(?:a))bar/;"},
 					},
+				}},
+			},
+
+			// An empty removal set is still a well-formed header, so the group
+			// inside is reported.
+			{
+				Code:            "/(?i-:(a))bar/;",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Message:   "Capture group '(a)' should be converted to a named or non-capturing group.",
+					Line:      1,
+					Column:    1,
+					EndColumn: 15,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addGroupName", Output: "/(?i-:(?<temp1>a))bar/;"},
+						{MessageId: "addNonCapture", Output: "/(?i-:(?:a))bar/;"},
+					},
+				}},
+			},
+
+			// `\c` not followed by a control letter is Annex B's literal
+			// backslash, so the `(` right after it still opens a capture group.
+			{
+				Code: `/\c(a)/;`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Message:   "Capture group '(a)' should be converted to a named or non-capturing group.",
+					Line:      1,
+					Column:    1,
+					EndColumn: 8,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addGroupName", Output: `/\c(?<temp1>a)/;`},
+						{MessageId: "addNonCapture", Output: `/\c(?:a)/;`},
+					},
+				}},
+			},
+			{
+				Code: `RegExp('\\c(a)');`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Message:   "Capture group '(a)' should be converted to a named or non-capturing group.",
+					Line:      1,
+					Column:    1,
+					EndColumn: 17,
+				}},
+			},
+
+			// Outside u/v mode `\q` is an identity escape, so the group after it
+			// is reached.
+			{
+				Code: `RegExp('\\q{a}(b)');`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Message:   "Capture group '(b)' should be converted to a named or non-capturing group.",
+					Line:      1,
+					Column:    1,
+					EndColumn: 20,
 				}},
 			},
 
@@ -407,21 +474,33 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 				}},
 			},
 
-			// A regex literal nested inside a RegExp() call is still checked
-			// directly through the regex-literal listener — the diagnostic anchors
-			// to the inner literal, not the surrounding call.
+			// A regex literal nested inside a RegExp() call is checked twice: the
+			// constructor reads it as the string `/(a)/`, slashes included, and the
+			// regex-literal listener reads it as the pattern `(a)`.
 			{
 				Code: "new RegExp(/(a)/);",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "required",
-					Line:      1,
-					Column:    12,
-					EndColumn: 17,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "addGroupName", Output: "new RegExp(/(?<temp1>a)/);"},
-						{MessageId: "addNonCapture", Output: "new RegExp(/(?:a)/);"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "required",
+						Line:      1,
+						Column:    1,
+						EndColumn: 18,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addGroupName", Output: "new RegExp(/(a?<temp1>)/);"},
+							{MessageId: "addNonCapture", Output: "new RegExp(/(a?:)/);"},
+						},
 					},
-				}},
+					{
+						MessageId: "required",
+						Line:      1,
+						Column:    12,
+						EndColumn: 17,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addGroupName", Output: "new RegExp(/(?<temp1>a)/);"},
+							{MessageId: "addNonCapture", Output: "new RegExp(/(?:a)/);"},
+						},
+					},
+				},
 			},
 
 			// ---- Real-user: common multi-capture date/URL parsing shapes ----
