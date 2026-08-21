@@ -93,8 +93,8 @@ func normalizeCommentOptions(raw map[string]any, which string) commentOptions {
 	if pattern, ok := source["ignorePattern"].(string); ok && pattern != "" {
 		// Upstream builds the RegExp when the rule is created, so a pattern the
 		// engine rejects surfaces as a configuration error. Rules here have no
-		// channel for reporting one, so an uncompilable pattern is dropped and
-		// exempts nothing.
+		// channel for reporting one, so a pattern that fails to compile is
+		// dropped and exempts nothing.
 		if re, err := esregexp.Compile(`^\s*(?:`+pattern+`)`, "u"); err == nil {
 			result.IgnorePattern = re
 		}
@@ -230,9 +230,9 @@ func buildFix(comment *ast.CommentRange, value string, capitalize string) []rule
 	return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(charStart, charEnd), replacement)}
 }
 
-// tokenBefore memoizes the nearest real token before pos. Resolving it
-// rescans the source from the start of the file, and the inline and
-// consecutive checks both need the same lookup.
+// tokenBefore memoizes the nearest real token before pos. Resolving it scans
+// the source again from the start of the file, and the inline and consecutive
+// checks both need the same lookup.
 type tokenBefore struct {
 	sourceFile *ast.SourceFile
 	pos        int
