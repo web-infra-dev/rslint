@@ -17,6 +17,10 @@ func TestNoDuplicateEnumValuesRule(t *testing.T) {
 			{Code: `enum E { A }`},
 			{Code: `enum E { A = 1, B }`},
 			{Code: `enum E { A = 1, B = 2 }`},
+			{Code: `enum E { A = -1, B = -2 }`},
+			{Code: `enum E { A = +1, B = +2 }`},
+			{Code: `enum E { A = +1, B = -1 }`},
+			{Code: `enum E { A = 1, B = -1 }`},
 			{Code: `enum E { A = 'A', B = 'B' }`},
 			{Code: `enum E { A = 'A', B }`},
 			{Code: `enum E { A = 'A', B = 1 + 1 }`},
@@ -26,7 +30,15 @@ func TestNoDuplicateEnumValuesRule(t *testing.T) {
 			{Code: `enum E { A = 1, B = '1' }`},
 			{Code: `enum E { A = -1, B = '-1' }`},
 			{Code: `enum E { A = 0, B = -0 }`},
+			{Code: `enum E { A = -0, B = +0 }`},
+			{Code: `enum E { A = -0, B = 0 }`},
 			{Code: `enum E { A = NaN }`},
+			{Code: `enum E { A = NaN, B = NaN }`},
+			{Code: `enum E { A = NaN, B = -NaN }`},
+			{Code: `enum E { A = 'NaN', B = NaN }`},
+			{Code: `enum E { A = -+-0, B = +-+0 }`},
+			{Code: `enum E { A = -'', B = 0 }`},
+			{Code: `enum E { A = Infinity, B = Infinity }`},
 			{Code: "const x = 'A'; enum E { A = `${x}` }"},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -49,6 +61,84 @@ func TestNoDuplicateEnumValuesRule(t *testing.T) {
 						Line:      1,
 						Column:    18,
 					},
+				},
+			},
+			{
+				Code: `enum E {
+  A = +1,
+  B = +1,
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value 1.", Line: 3, Column: 3, EndLine: 3, EndColumn: 9},
+				},
+			},
+			{
+				Code: `enum E {
+  A = +0,
+  B = 0,
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value 0.", Line: 3, Column: 3, EndLine: 3, EndColumn: 8},
+				},
+			},
+			{
+				Code: `enum E {
+  A = -0,
+  B = -0,
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value 0.", Line: 3, Column: 3, EndLine: 3, EndColumn: 9},
+				},
+			},
+			{
+				Code: `enum E {
+  A = +'0',
+  B = 0,
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value 0.", Line: 3, Column: 3, EndLine: 3, EndColumn: 8},
+				},
+			},
+			{
+				Code: `enum E {
+  A = 0x10,
+  B = 16,
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value 16.", Line: 3, Column: 3, EndLine: 3, EndColumn: 9},
+				},
+			},
+			{
+				Code: `enum E {
+  A = +'1e2',
+  B = 100,
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value 100.", Line: 3, Column: 3, EndLine: 3, EndColumn: 10},
+				},
+			},
+			{
+				Code: `enum E {
+  A = +'',
+  B = 0,
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value 0.", Line: 3, Column: 3, EndLine: 3, EndColumn: 8},
+				},
+			},
+			{
+				Code: `enum E {
+  A = -+1,
+  B = +-1,
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value -1.", Line: 3, Column: 3, EndLine: 3, EndColumn: 10},
+				},
+			},
+			{
+				Code: "enum E {\n  A = -`0`,\n  B = -0,\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicateValue", Message: "Duplicate enum member value 0.", Line: 3, Column: 3, EndLine: 3, EndColumn: 9},
 				},
 			},
 			{

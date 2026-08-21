@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_exactly_once_with"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_title"
@@ -31,6 +32,7 @@ func GetAllRules() []rule.Rule {
 		no_mocks_import.NoMocksImportRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		prefer_called_exactly_once_with.PreferCalledExactlyOnceWithRule,
+		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
 		valid_title.ValidTitleRule,

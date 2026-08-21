@@ -109,6 +109,14 @@ func TestIsInStrictMode(t *testing.T) {
 			expected: true,
 		},
 
+		// === TypeScript namespace/module scopes are strict in typescript-eslint ===
+		{
+			name:     "function inside namespace",
+			code:     `namespace N { if (true) function f() {} }`,
+			kind:     ast.KindFunctionDeclaration,
+			expected: true,
+		},
+
 		// === Non-strict (script without module/strict/class) ===
 		{
 			name:     "plain script file",
