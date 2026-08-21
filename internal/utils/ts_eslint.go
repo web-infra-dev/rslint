@@ -245,7 +245,7 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 		return start
 
 	case ast.KindFunctionDeclaration:
-		start := findFunctionKeywordPos(sourceFile, node)
+		start := FindFunctionKeywordPos(sourceFile, node)
 		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
 			return core.NewTextRange(start, parenPos)
 		}
@@ -958,11 +958,11 @@ func findOpenParenPosFrom(sourceFile *ast.SourceFile, start int, end int) int {
 	return -1
 }
 
-// findFunctionKeywordPos returns the start position of the function head,
+// FindFunctionKeywordPos returns the start position of the function head,
 // skipping only `export` and `default` keywords. Other modifiers like `async`
 // and `declare` are kept because they are part of the function signature
 // (matching ESLint's behavior where FunctionDeclaration.loc excludes export/default).
-func findFunctionKeywordPos(sourceFile *ast.SourceFile, node *ast.Node) int {
+func FindFunctionKeywordPos(sourceFile *ast.SourceFile, node *ast.Node) int {
 	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
 	end := node.End()
 	for s.TokenStart() < end {

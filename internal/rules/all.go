@@ -16,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/func_names"
+	"github.com/web-infra-dev/rslint/internal/rules/func_style"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
 	"github.com/web-infra-dev/rslint/internal/rules/id_length"
@@ -192,6 +193,7 @@ func GetAllRules() []rule.Rule {
 		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
 		func_names.FuncNamesRule,
+		func_style.FuncStyleRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
 		id_length.IdLengthRule,
