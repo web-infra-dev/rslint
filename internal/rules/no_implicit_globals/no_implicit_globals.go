@@ -213,10 +213,22 @@ func checkFunctionDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNo
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 		return
 	}
-	if ast.GetEnclosingBlockScopeContainer(node) != sourceFileNode {
+	if functionDeclarationScope(ctx, node) != sourceFileNode {
 		return
 	}
 	reportDeclaration(ctx, node, nameNode.Text(), "function", false)
+}
+
+// functionDeclarationScope returns the scope a function declaration binds its
+// name in. eslint-scope only creates block scopes from ES2015 on, so under
+// `languageOptions.ecmaVersion` 3 or 5 a block-level function declaration binds
+// in the enclosing variable scope instead, and `{ function foo() {} }` is a
+// global declaration.
+func functionDeclarationScope(ctx rule.RuleContext, node *ast.Node) *ast.Node {
+	if ctx.LanguageOptions.EffectiveECMAVersion() < 2015 {
+		return utils.FindEnclosingScope(node)
+	}
+	return ast.GetEnclosingBlockScopeContainer(node)
 }
 
 func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode *ast.Node) {
@@ -254,15 +266,24 @@ func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode 
 // variable before reaching its reference loop, so the readonly assignment goes
 // unreported, while the leak is collected from the global scope's implicit
 // variables, which the directive never touches.
+//
+// Both stop at any name the file itself defines, which in a global script means
+// any top-level declaration whatsoever: ESLint keeps that file's declarations
+// and the configured globals in one global-scope variable, so a type-only
+// `interface foo {}` gives `foo` a definition and neither an implicit variable
+// (the leak) nor a definition-less read-only global (the assignment) remains.
+// Inner scopes hold separate variables that a value reference never resolves
+// to, so the same declaration inside a function or namespace leaves the name
+// global — the distinction IsGlobalNameReference draws.
 func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLevel bool) {
 	root, writes := findPureAssignmentRoot(node)
 	if root == nil {
 		return
 	}
-	if ctx.Refs != nil && ctx.Refs.IsDefinedInFile(node) {
+	name := node.Text()
+	if ctx.Refs != nil && !ctx.Refs.IsGlobalNameReference(node, name, ast.SymbolFlagsValue) {
 		return
 	}
-	name := node.Text()
 	switch ctx.Globals.Access(name) {
 	case utils.GlobalAccessReadonly:
 		if ctx.Exported.Has(name) {
@@ -300,19 +321,31 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 // starts mirroring the scope manager. An AssignmentExpression's Left is
 // unwrapped exactly once — a TSAsExpression, TSTypeAssertion or
 // TSNonNullExpression, never a TSSatisfiesExpression — and what remains has to
-// be a pattern, so `(foo as any) = 1` is a write while `(foo as any)! = 1` and
-// `foo!! = 1` are not. A wrapper around a destructuring target does not survive
-// that test either: `[foo]` is no longer a destructuring pattern once an
-// assertion wraps it, so `([foo] as any) = arr` is no write at all. Every other
-// path — a for-in/for-of head, anything nested inside a pattern — visits the
-// pattern directly and accepts a wrapped target however deeply it is nested.
+// be a pattern, so `(foo as any) = 1` is a write while `(foo as any)! = 1`,
+// `foo!! = 1` and `(foo satisfies any) = 1` are not. A wrapper around a
+// destructuring target does not survive that test either: `[foo]` is no longer a
+// destructuring pattern once an assertion wraps it, so `([foo] as any) = arr` is
+// no write at all. Every other path — a for-in/for-of head, anything nested
+// inside a pattern — visits the pattern directly and accepts a wrapped target
+// however deeply it is nested, `satisfies` included: `[foo satisfies any] = arr`
+// is a write.
 func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 	current := node
 	writes := 1
 	// wrappers counts the TS expression wrappers the walk has climbed since the
 	// last pattern node, which is what an AssignmentExpression's Left has to
-	// shed in its single unwrap.
+	// shed in its single unwrap; satisfies records whether any of them is the
+	// one wrapper that unwrap never sheds.
 	wrappers := 0
+	satisfies := false
+	// enterPattern moves the walk onto a pattern node. Only the wrappers
+	// between the last pattern node and the assignment have to survive that
+	// single unwrap, so reaching one clears the wrapper state.
+	enterPattern := func(pattern *ast.Node) {
+		wrappers = 0
+		satisfies = false
+		current = pattern
+	}
 	for current != nil && current.Parent != nil {
 		parent := current.Parent
 		switch parent.Kind {
@@ -324,11 +357,10 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			}
 			if utils.IsDefaultValueInDestructuringAssignment(parent) {
 				writes++
-				wrappers = 0
-				current = parent
+				enterPattern(parent)
 				continue
 			}
-			if wrappers > 1 {
+			if wrappers > 1 || satisfies {
 				return nil, 0
 			}
 			return parent, writes
@@ -344,8 +376,7 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			if !utils.IsInDestructuringAssignment(parent) {
 				return nil, 0
 			}
-			wrappers = 0
-			current = parent
+			enterPattern(parent)
 
 		case ast.KindShorthandPropertyAssignment:
 			shorthand := parent.AsShorthandPropertyAssignment()
@@ -358,23 +389,24 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			if shorthand.ObjectAssignmentInitializer != nil {
 				writes++
 			}
-			wrappers = 0
-			current = parent
+			enterPattern(parent)
 
 		case ast.KindPropertyAssignment:
 			propAssignment := parent.AsPropertyAssignment()
 			if propAssignment == nil || propAssignment.Initializer != current {
 				return nil, 0
 			}
-			wrappers = 0
-			current = parent
+			enterPattern(parent)
 
 		case ast.KindSpreadElement, ast.KindSpreadAssignment:
-			wrappers = 0
-			current = parent
+			enterPattern(parent)
 
 		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression:
 			wrappers++
+			current = parent
+
+		case ast.KindSatisfiesExpression:
+			satisfies = true
 			current = parent
 
 		case ast.KindParenthesizedExpression:

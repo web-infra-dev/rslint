@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -14,6 +15,7 @@ import (
 // named lock-in.
 func TestNoImplicitGlobalsExtras(t *testing.T) {
 	lexical := []any{map[string]any{"lexicalBindings": true}}
+	es5 := rule.LanguageOptions{ECMAVersion: 5}
 
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -23,11 +25,15 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// ---- Dimension 4: receiver wrappers, opaque TS wrappers ----
 
-			// A `satisfies` write is not an eslint-scope-recognized pattern,
-			// unlike the `as`/`<T>` assertions the scope manager unwraps (see
-			// findPureAssignmentRoot doc comment).
+			// The single unwrap an AssignmentExpression's Left gets sheds an
+			// `as`/`<T>`/`!` wrapper but never a `satisfies`, so a directly
+			// wrapped target is no pattern at all (see findPureAssignmentRoot
+			// doc comment). Inside a real pattern the same wrapper is
+			// transparent — see the invalid cases.
 			{Code: `(foo satisfies any) = 1;`},
 			{Code: `(Array satisfies any) = 1;`},
+			{Code: `(foo satisfies any as any) = 1;`},
+			{Code: `((foo as any) satisfies any) = 1;`},
 
 			// An AssignmentExpression's Left is unwrapped exactly once, so a
 			// second wrapper leaves something that is no longer a pattern.
@@ -111,6 +117,37 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// still applies where this rule's declaration checks are switched
 			// off — a module file keeps its readonly-global protection.
 			{Code: "/* exported Array */\nexport {};\nArray = 1;"},
+
+			// ---- A global script's top-level declarations all define the
+			// global-scope variable, type-only ones included ----
+			//
+			// The name then has a definition, so it is neither an implicit
+			// variable nor a definition-less read-only global.
+			{Code: `foo = 1; interface foo {}`},
+			{Code: `foo = 1; type foo = number;`},
+			{Code: `Array = 1; interface Array {}`},
+			{Code: `Array = 1; type Array<T> = T;`},
+			{Code: `foo = 1; namespace foo {}`},
+
+			// ---- Strictness comes from the scope the write is evaluated in ----
+			//
+			// TS namespace and enum scopes are strict, so a write inside them
+			// records no implicit global.
+			{Code: `namespace N { foo = 1; }`},
+			{Code: `namespace N { function f() { foo = 1; } }`},
+			{Code: `enum E { A = (foo = 1) }`},
+			{Code: `namespace N { enum E { A = (foo = 1) } }`},
+			// Everything a class body evaluates is strict, decorators on its
+			// own members included.
+			{Code: `class C { p = (foo = 1); }`},
+			{Code: `class C { [foo = 1]: number; }`},
+			{Code: `class C { static { foo = 1; } }`},
+			{Code: `class C extends (foo = 1) {}`},
+			{Code: `class C { @dec(foo = 1) m() {} }`},
+
+			// ---- Block scopes exist from ES2015 on ----
+			{Code: `{ function foo() {} }`},
+			{Code: `if (true) { function foo() {} }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: receiver wrappers on the leak/readonly identifier ----
@@ -385,6 +422,85 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				FileName: "cjs/commonjs-leak.cjs",
 				TSConfig: "tsconfig.allow-js.json",
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+
+			// ---- Dimension 4: `satisfies` inside a real pattern ----
+			//
+			// A pattern element is visited directly, so the wrapper the
+			// AssignmentExpression unwrap would have rejected is transparent
+			// here.
+			{
+				Code:   `[foo satisfies any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 26}},
+			},
+			{
+				Code:   `[[foo satisfies any]] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `({a: foo satisfies any} = obj);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `[(foo satisfies any) as any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `for ((foo satisfies any) of arr) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `for ((Array satisfies any) in obj) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+
+			// ---- Only a global script's own top level defines the
+			// global-scope variable ----
+			//
+			// An inner scope holds a separate variable, and a value reference
+			// never resolves to a type-only one, so the write still reaches the
+			// global scope.
+			{
+				Code: `function f() { foo = 1; interface foo {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalNonLexicalBinding"},
+					{MessageId: "globalVariableLeak"},
+				},
+			},
+			{
+				Code:   `{ Array = 1; interface Array {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+
+			// ---- Strictness: a class's own decorators are evaluated before
+			// the class scope exists ----
+			{
+				Code:   `@dec(foo = 1) class C {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak", Line: 1, Column: 6, EndLine: 1, EndColumn: 13}},
+			},
+			{
+				Code:   `const C = @dec(foo = 1) class {};`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+
+			// ---- ES3/ES5 have no block scopes, so a block-level function
+			// declaration binds in the global scope ----
+			{
+				Code:            `{ function foo() {} }`,
+				LanguageOptions: es5,
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "globalNonLexicalBinding", Line: 1, Column: 3, EndLine: 1, EndColumn: 20}},
+			},
+			{
+				Code:            `if (true) { function foo() {} }`,
+				LanguageOptions: es5,
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "globalNonLexicalBinding"}},
+			},
+			// It binds in the enclosing variable scope, not always the global
+			// one: only `outer` is a global declaration here.
+			{
+				Code:            `function outer() { { function foo() {} } }`,
+				LanguageOptions: es5,
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "globalNonLexicalBinding"}},
 			},
 
 			// ---- `/* exported */` does not exempt a leak ----
