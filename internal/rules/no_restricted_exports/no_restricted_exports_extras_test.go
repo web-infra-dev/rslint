@@ -54,6 +54,31 @@ export class extends Example {}`, Options: []any{map[string]any{"restrictedNamed
 			// ---- Dimension 1: `export default interface Foo {}` is a default
 			// export, so the named restriction never reaches its name ----
 			{Code: `export default interface Foo {}`, Options: []any{map[string]any{"restrictedNamedExports": []any{"Foo"}}}},
+
+			// ---- Dimension 1: the remaining TS-only declaration kinds a named
+			// export can carry, none of them a type the declaration.type switch
+			// matches ----
+			{Code: `export const enum Foo { A }`, Options: []any{map[string]any{"restrictedNamedExports": []any{"Foo"}}}},
+			{Code: `export declare namespace N {}`, Options: []any{map[string]any{"restrictedNamedExports": []any{"N"}}}},
+			{Code: `export declare module N {}`, Options: []any{map[string]any{"restrictedNamedExports": []any{"N"}}}},
+
+			// ---- Dimension 4: an export clause with no specifiers exports no
+			// name to check ----
+			{Code: `export {} from 'mod';`, Options: []any{map[string]any{"restrictedNamedExports": []any{"a"}}}},
+
+			// ---- checkSpecifierName: which restrictDefaultExports property
+			// governs a `default` specifier depends on its local name and on
+			// whether a source is specified, so the other properties leave it
+			// alone ----
+			{Code: `export { default } from 'mod';`, Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"namedFrom": true}}}},
+			{Code: `export { foo as default } from 'mod';`, Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"defaultFrom": true}}}},
+			{Code: `export { default } from 'mod';`, Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"named": true}}}},
+			{Code: `let foo; export { foo as default };`, Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"namedFrom": true}}}},
+			{Code: `export * as default from 'mod';`, Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true, "named": true, "defaultFrom": true, "namedFrom": true}}}},
+
+			// ---- parseOptions: an empty restrictDefaultExports object keeps
+			// the rule running with every default branch off ----
+			{Code: `export default foo;`, Options: []any{map[string]any{"restrictDefaultExports": map[string]any{}}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: TS type-expression wrappers on the exported
@@ -307,10 +332,34 @@ export function foo(a: any) {}`,
 			// ExportDefaultDeclaration upstream reports to start at the
 			// `export` keyword, while tsgo keeps it inside the declaration ----
 			{
-				Code:    `declare const dec: any; @dec export default class Foo {}`,
+				Code:    `@dec export default class Foo {}`,
 				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 30, EndLine: 1, EndColumn: 57},
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 6, EndLine: 1, EndColumn: 33},
+				},
+			},
+			{
+				Code:    `@dec1 @dec2 export default class Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 13, EndLine: 1, EndColumn: 40},
+				},
+			},
+			{
+				Code:    `@dec /* c */ export default class Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 14, EndLine: 1, EndColumn: 41},
+				},
+			},
+
+			// ---- Position assertions: a decorator that follows `default`
+			// already sits inside the range both sides report ----
+			{
+				Code:    `export default @dec class Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 1, EndColumn: 33},
 				},
 			},
 
@@ -323,6 +372,191 @@ export function foo(a: any) {}`,
 				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 3, EndColumn: 2},
+				},
+			},
+
+			// ---- Position assertions: leading trivia stays out of the range,
+			// and a comment between the modifiers stays in it ----
+			{
+				Code:    `/** doc */ export default class Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 12, EndLine: 1, EndColumn: 39},
+				},
+			},
+			{
+				Code:    `export /*c*/ default /*c*/ class Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 1, EndColumn: 40},
+				},
+			},
+			{
+				Code: `export
+default
+class Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 3, EndColumn: 13},
+				},
+			},
+
+			// ---- Dimension 1: the remaining default-export shapes — an
+			// anonymous class, an abstract one, and an expression that is not
+			// a function or class ----
+			{
+				Code:    `export default class {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    `export default abstract class Foo {}`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 1, EndColumn: 37},
+				},
+			},
+			{
+				Code:    `export default (foo, bar);`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"direct": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
+				},
+			},
+
+			// ---- Position assertions: type parameters hang off the
+			// declaration rather than off the name upstream reports, and a
+			// decorator leaves a named export's name where it is ----
+			{
+				Code:    `export class Foo<T> {}`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"Foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("Foo"), Line: 1, Column: 14, EndLine: 1, EndColumn: 17},
+				},
+			},
+			{
+				Code:    `export function foo<T>(): void {}`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 17, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    `@dec export class Foo {}`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"Foo"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("Foo"), Line: 1, Column: 19, EndLine: 1, EndColumn: 22},
+				},
+			},
+
+			// ---- Only names bound by the same statement collapse, and a name
+			// that follows a collapsed one keeps its own report ----
+			{
+				Code: `export var a = 1;
+export var a = 2;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"a"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("a"), Line: 1, Column: 12, EndLine: 1, EndColumn: 13},
+					{MessageId: "restrictedNamed", Message: namedMsg("a"), Line: 2, Column: 12, EndLine: 2, EndColumn: 13},
+				},
+			},
+			{
+				Code:    `export var a, b, a;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"a", "b"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("a"), Line: 1, Column: 12, EndLine: 1, EndColumn: 13},
+					{MessageId: "restrictedNamed", Message: namedMsg("b"), Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+				},
+			},
+
+			// ---- Dimension 4: `using` and `await using` declarations reach
+			// the same VariableStatement path as var/let/const ----
+			{
+				Code:    `export using a = res;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"a"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("a"), Line: 1, Column: 14, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    `export await using a = res;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"a"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("a"), Line: 1, Column: 20, EndLine: 1, EndColumn: 21},
+				},
+			},
+
+			// ---- Position assertions: a nested binding pattern reports the
+			// bound name wherever it sits, defaults and rest included ----
+			{
+				Code:    `export const { a: [{ b }] } = obj;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"b"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("b"), Line: 1, Column: 22, EndLine: 1, EndColumn: 23},
+				},
+			},
+			{
+				Code:    `export const [a = 1, ...rest] = arr;`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"a", "rest"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("a"), Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedNamed", Message: namedMsg("rest"), Line: 1, Column: 25, EndLine: 1, EndColumn: 29},
+				},
+			},
+
+			// ---- Position assertions: a column counts UTF-16 code units, so
+			// an astral exported name spans two of them ----
+			{
+				Code:    `export { x as "👍" } from 'mod';`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"👍"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("👍"), Line: 1, Column: 15, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    `export { "👍" as x, y } from 'mod';`,
+				Options: []any{map[string]any{"restrictedNamedExports": []any{"y"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("y"), Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
+				},
+			},
+
+			// ---- checkSpecifierName / checkExportAllName: a string-literal
+			// `default` is the same exported name as the keyword one ----
+			{
+				Code:    `export { 'default' } from 'mod';`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"defaultFrom": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 10, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    `export * as 'default' from 'mod';`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"namespaceFrom": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 13, EndLine: 1, EndColumn: 22},
+				},
+			},
+			{
+				Code:    `let d; export { d as 'default' };`,
+				Options: []any{map[string]any{"restrictDefaultExports": map[string]any{"named": true}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedDefault", Message: defaultMsg, Line: 1, Column: 22, EndLine: 1, EndColumn: 31},
+				},
+			},
+
+			// ---- isRestrictedName: a name matched by both option arms is
+			// still one report ----
+			{
+				Code: `export const foo = 1;`,
+				Options: []any{map[string]any{
+					"restrictedNamedExports":        []any{"foo"},
+					"restrictedNamedExportsPattern": "^f",
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedNamed", Message: namedMsg("foo"), Line: 1, Column: 14, EndLine: 1, EndColumn: 17},
 				},
 			},
 		},
