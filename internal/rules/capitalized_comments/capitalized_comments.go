@@ -91,7 +91,10 @@ func normalizeCommentOptions(raw map[string]any, which string) commentOptions {
 		result.IgnoreConsecutiveComments = v
 	}
 	if pattern, ok := source["ignorePattern"].(string); ok && pattern != "" {
-		// A malformed pattern never matches, rather than panicking the linter.
+		// Upstream builds the RegExp when the rule is created, so a pattern the
+		// engine rejects surfaces as a configuration error. Rules here have no
+		// channel for reporting one, so an uncompilable pattern is dropped and
+		// exempts nothing.
 		if re, err := esregexp.Compile(`^\s*(?:`+pattern+`)`, "u"); err == nil {
 			result.IgnorePattern = re
 		}
@@ -108,8 +111,9 @@ func checkComment(ctx rule.RuleContext, text string, comments []*ast.CommentRang
 		commentOpts = opts.Block
 	}
 
-	isInline := isInlineComment(ctx.SourceFile, comments, index)
-	isConsecutive := isConsecutiveComment(ctx.SourceFile, comments, index)
+	before := tokenBefore{sourceFile: ctx.SourceFile, pos: comment.Pos()}
+	isInline := func() bool { return isInlineComment(ctx.SourceFile, comments, index, &before) }
+	isConsecutive := func() bool { return isConsecutiveComment(comments, index, &before) }
 
 	if isCommentValid(value, opts.Capitalize, commentOpts, isInline, isConsecutive) {
 		return
@@ -133,7 +137,7 @@ func checkComment(ctx rule.RuleContext, text string, comments []*ast.CommentRang
 // isCommentValid ports isCommentValid 1:1: a comment is valid (not reported)
 // if it hits any of the early-exit checks below, or if its first letter
 // already has the configured case.
-func isCommentValid(value string, capitalize string, opts commentOptions, isInline bool, isConsecutive bool) bool {
+func isCommentValid(value string, capitalize string, opts commentOptions, isInline func() bool, isConsecutive func() bool) bool {
 	// 1. Default ignore pattern.
 	if defaultIgnorePattern.Test(value) {
 		return true
@@ -147,12 +151,12 @@ func isCommentValid(value string, capitalize string, opts commentOptions, isInli
 	}
 
 	// 3. Inline comments.
-	if opts.IgnoreInlineComments && isInline {
+	if opts.IgnoreInlineComments && isInline() {
 		return true
 	}
 
 	// 4. Consecutive comments.
-	if opts.IgnoreConsecutiveComments && isConsecutive {
+	if opts.IgnoreConsecutiveComments && isConsecutive() {
 		return true
 	}
 
@@ -226,12 +230,31 @@ func buildFix(comment *ast.CommentRange, value string, capitalize string) []rule
 	return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(charStart, charEnd), replacement)}
 }
 
+// tokenBefore memoizes the nearest real token before pos. Resolving it
+// rescans the source from the start of the file, and the inline and
+// consecutive checks both need the same lookup.
+type tokenBefore struct {
+	sourceFile *ast.SourceFile
+	pos        int
+	resolved   bool
+	token      utils.SourceToken
+	ok         bool
+}
+
+func (t *tokenBefore) get() (utils.SourceToken, bool) {
+	if !t.resolved {
+		t.token, t.ok = utils.TokenBeforePosition(t.sourceFile, t.pos)
+		t.resolved = true
+	}
+	return t.token, t.ok
+}
+
 // isInlineComment ports isInlineComment: a comment is inline when both the
 // nearest preceding and following token-or-comment share its start/end line.
 // Only block comments can ever be inline — a line comment always consumes
 // the rest of its own line, so there can be no "next token on the same line".
-func isInlineComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int) bool {
-	prevEnd, ok := nearestBeforeEnd(sourceFile, comments, index, comments[index].Pos())
+func isInlineComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int, before *tokenBefore) bool {
+	prevEnd, ok := nearestBeforeEnd(comments, index, comments[index].Pos(), before)
 	if !ok {
 		return false
 	}
@@ -245,12 +268,12 @@ func isInlineComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, i
 
 // isConsecutiveComment ports isConsecutiveComment: true when the nearest
 // preceding token-or-comment is itself a comment.
-func isConsecutiveComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int) bool {
+func isConsecutiveComment(comments []*ast.CommentRange, index int, before *tokenBefore) bool {
 	if index == 0 {
 		return false
 	}
 	prevCommentEnd := comments[index-1].End()
-	if tok, ok := utils.TokenBeforePosition(sourceFile, comments[index].Pos()); ok && tok.End > prevCommentEnd {
+	if tok, ok := before.get(); ok && tok.End > prevCommentEnd {
 		// A real token sits between the two comments.
 		return false
 	}
@@ -260,9 +283,9 @@ func isConsecutiveComment(sourceFile *ast.SourceFile, comments []*ast.CommentRan
 // nearestBeforeEnd returns the End() of whichever is closer to pos: the
 // nearest real token before pos, or the immediately preceding sibling
 // comment (comments[index-1]) when no real token sits between them.
-func nearestBeforeEnd(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int, pos int) (int, bool) {
+func nearestBeforeEnd(comments []*ast.CommentRange, index int, pos int, before *tokenBefore) (int, bool) {
 	best := -1
-	if tok, ok := utils.TokenBeforePosition(sourceFile, pos); ok {
+	if tok, ok := before.get(); ok {
 		best = tok.End
 	}
 	if index > 0 {
