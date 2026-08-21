@@ -1020,7 +1020,6 @@ func TestNoRestrictedTypesEditDemand(t *testing.T) {
 			} else {
 				if autofixOnly == nil || allFixes == nil || !reflect.DeepEqual(*autofixOnly, *allFixes) {
 					t.Fatalf("autofix artifacts differ between autofix-only and all demand")
-					return
 				}
 				if len(*autofixOnly) != 1 || (*autofixOnly)[0].Text != config.fixText {
 					t.Fatalf("autofixes = %#v, want replacement %q", *autofixOnly, config.fixText)
@@ -1037,7 +1036,6 @@ func TestNoRestrictedTypesEditDemand(t *testing.T) {
 			}
 			if suggestionOnly == nil || allSuggestions == nil || !reflect.DeepEqual(*suggestionOnly, *allSuggestions) {
 				t.Fatalf("suggestion artifacts differ between suggestion-only and all demand")
-				return
 			}
 			if len(*suggestionOnly) != len(config.suggestionTexts) {
 				t.Fatalf("suggestions = %#v, want %d", *suggestionOnly, len(config.suggestionTexts))

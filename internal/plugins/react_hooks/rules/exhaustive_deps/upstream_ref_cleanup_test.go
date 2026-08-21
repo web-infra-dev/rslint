@@ -15,13 +15,11 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamRefCleanupValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamRefCleanupValid = []rule_tester.ValidTestCase{}
 
 var upstreamRefCleanupInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const myRef = useRef();
   useEffect(() => {
@@ -32,14 +30,14 @@ function MyComponent() {
   return <div ref={myRef} />;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const myRef = useRef();
   useEffect(() => {
@@ -50,14 +48,14 @@ function MyComponent() {
   return <div ref={myRef} />;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const myRef = useRef();
   useEffect(() => {
@@ -68,14 +66,14 @@ function MyComponent() {
   return <div ref={myRef} />;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing(myRef) {
   useEffect(() => {
     const handleMove = () => {};
@@ -84,14 +82,14 @@ function useMyThing(myRef) {
   }, [myRef]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing(myRef) {
   useEffect(() => {
     const handleMouse = () => {};
@@ -106,14 +104,14 @@ function useMyThing(myRef) {
   }, [myRef]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing(myRef, active) {
   useEffect(() => {
     const handleMove = () => {};
@@ -128,14 +126,14 @@ function useMyThing(myRef, active) {
   }, [myRef, active]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
         function MyComponent() {
           const myRef = useRef();
           useLayoutEffect_SAFE_FOR_SSR(() => {
@@ -146,12 +144,12 @@ function useMyThing(myRef, active) {
           return <div ref={myRef} />;
         }
       `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useLayoutEffect_SAFE_FOR_SSR"},
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useLayoutEffect_SAFE_FOR_SSR"},
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The ref value 'myRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'myRef.current' to a variable inside the effect, and use that variable in the cleanup function."},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_RefCleanup(t *testing.T) {

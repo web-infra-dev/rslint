@@ -2047,7 +2047,7 @@ func TestJsxClosingBracketLocationRule(t *testing.T) {
 		{
 			Code: `<App foo={x > y}
 />`,
-			Tsx: true,
+			Tsx:    true,
 			Output: []string{`<App foo={x > y}/>`},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{

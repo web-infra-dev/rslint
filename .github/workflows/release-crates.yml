@@ -63,7 +63,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.26.0
+          go-version: 1.27.0
           cache-name: tsgo-server-${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Build tsgo server
@@ -96,7 +96,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.26.0
+          go-version: 1.27.0
           cache-name: tsgo-server-libs
 
       - name: Build TypeScript standard libraries
@@ -157,7 +157,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.26.0
+          go-version: 1.27.0
           cache-name: release-tsgo
 
       - name: Setup Rust

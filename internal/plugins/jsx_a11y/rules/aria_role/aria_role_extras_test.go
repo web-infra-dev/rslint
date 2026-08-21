@@ -131,7 +131,7 @@ func TestAriaRoleExtras(t *testing.T) {
 			// array-wrapped (multi-element rule_tester) form.
 			// ============================================================
 			{
-				Code:    `<img role="invalid-role" />`, Tsx: true,
+				Code: `<img role="invalid-role" />`, Tsx: true,
 				Options: []interface{}{map[string]interface{}{"allowedInvalidRoles": []interface{}{"invalid-role"}}},
 			},
 
@@ -403,7 +403,7 @@ func TestAriaRoleExtras(t *testing.T) {
 			// line position too.
 			// ============================================================
 			{
-				Code:   `<div role="foobar" />`, Tsx: true,
+				Code: `<div role="foobar" />`, Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage, Line: 1, Column: 6, EndLine: 1, EndColumn: 19}},
 			},
 			{
@@ -666,8 +666,8 @@ func TestAriaRoleExtras(t *testing.T) {
 			// listener traversal into nested function/arrow bodies.
 			// ============================================================
 			{
-				Code: `function List() { return items.map(x => <li role="invalid" key={x.id} />); }`,
-				Tsx:  true,
+				Code:   `function List() { return items.map(x => <li role="invalid" key={x.id} />); }`,
+				Tsx:    true,
 				Errors: []rule_tester.InvalidTestCaseError{invalidRoleError()},
 			},
 

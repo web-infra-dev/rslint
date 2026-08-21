@@ -17,11 +17,11 @@ func parseJSFile(t *testing.T, code string) *ast.SourceFile {
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	host := CreateCompilerHost(rootDir.Dir, fs)
 	program, err := CreateProgramFromOptions(true, &core.CompilerOptions{
-		AllowJs:  core.TSTrue,
-		CheckJs:  core.TSTrue,
-		Strict:   core.TSTrue,
-		Target:   core.ScriptTargetESNext,
-		NoEmit:   core.TSTrue,
+		AllowJs: core.TSTrue,
+		CheckJs: core.TSTrue,
+		Strict:  core.TSTrue,
+		Target:  core.ScriptTargetESNext,
+		NoEmit:  core.TSTrue,
 	}, []string{filePath}, host)
 	if err != nil {
 		t.Fatalf("couldn't create program: %v", err)

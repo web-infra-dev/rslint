@@ -992,7 +992,6 @@ class Outer {
 					{MessageId: "unnecessaryAssign", Line: 7, Column: 5},
 				},
 			},
-
 		},
 	)
 }

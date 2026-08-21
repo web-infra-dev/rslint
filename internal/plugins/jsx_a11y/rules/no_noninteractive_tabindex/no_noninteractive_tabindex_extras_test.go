@@ -97,7 +97,7 @@ var allOptionsCombo = []interface{}{
 //     generators / async / IIFE / class / fragment / map / multi-component.
 //  10. **Spread literal** — `{...{role: "..."}}` shapes.
 //  11. **TypeScript JSX** — generics, satisfies, non-null, namespaced,
-//      long-chain member expression.
+//     long-chain member expression.
 func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveTabindexRule, []rule_tester.ValidTestCase{
 		// ============================================================
@@ -794,7 +794,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		{Code: `<div tabIndex="0O10" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // uppercase O
 		{Code: `<div tabIndex="0b10" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div tabIndex="0B10" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // uppercase B
-		{Code: `<div tabIndex="0x0" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // hex 0
+		{Code: `<div tabIndex="0x0" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},  // hex 0
 		{Code: `<div tabIndex="0xff" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // mixed-case hex digits
 		{Code: `<div tabIndex="0xFF" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		// Step-2 fallback hex via ConditionalExpression — staticEval picks
@@ -1075,8 +1075,8 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		},
 		// Switch-case rendering.
 		{
-			Code: `function Foo({type}) { switch(type) { case 'a': return <div tabIndex={0} />; default: return null; } }`,
-			Tsx:  true,
+			Code:   `function Foo({type}) { switch(type) { case 'a': return <div tabIndex={0} />; default: return null; } }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 

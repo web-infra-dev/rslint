@@ -449,67 +449,67 @@ func TestNoMutableExportsRule(t *testing.T) {
 			},
 			// switch / while / do-while / label / else / catch / finally
 			{
-				Code: "switch (1) { case 1: var x = 1; break; }\nexport { x }",
+				Code:   "switch (1) { case 1: var x = 1; break; }\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			{
-				Code: "while (false) { var x = 1 }\nexport { x }",
+				Code:   "while (false) { var x = 1 }\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			{
-				Code: "do { var x = 1 } while (false)\nexport { x }",
+				Code:   "do { var x = 1 } while (false)\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			{
-				Code: "label: var x = 1\nexport { x }",
+				Code:   "label: var x = 1\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			{
-				Code: "if (false) {} else { var x = 1 }\nexport { x }",
+				Code:   "if (false) {} else { var x = 1 }\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			{
-				Code: "try {} catch (e) { var x = 1 }\nexport { x }",
+				Code:   "try {} catch (e) { var x = 1 }\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			{
-				Code: "try {} finally { var x = 1 }\nexport { x }",
+				Code:   "try {} finally { var x = 1 }\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			// Hoisted var with alias
 			{
-				Code: "if (true) { var x = 1 }\nexport { x as y }",
+				Code:   "if (true) { var x = 1 }\nexport { x as y }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			// Hoisted var with default export
 			{
-				Code: "switch (1) { default: var x = 1 }\nexport default x",
+				Code:   "switch (1) { default: var x = 1 }\nexport default x",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 
 			// === Declaration merging: mutable binding ===
 			{
-				Code: "var Foo = 1\nnamespace Foo {}\nexport { Foo }",
+				Code:   "var Foo = 1\nnamespace Foo {}\nexport { Foo }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			{
-				Code: "let Foo: any\ninterface Foo {}\nexport { Foo }",
+				Code:   "let Foo: any\ninterface Foo {}\nexport { Foo }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 
 			// === declare var/let (ambient but mutable binding) ===
 			{
-				Code: "declare var x: number\nexport { x }",
+				Code:   "declare var x: number\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 			{
-				Code: "declare let x: number\nexport { x }",
+				Code:   "declare let x: number\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 
 			// === var redeclaration ===
 			{
-				Code: "var x = 1\nvar x = 2\nexport { x }",
+				Code:   "var x = 1\nvar x = 2\nexport { x }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMutableExports"}},
 			},
 

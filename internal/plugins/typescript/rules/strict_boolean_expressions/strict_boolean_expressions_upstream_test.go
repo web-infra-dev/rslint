@@ -83,11 +83,11 @@ func TestStrictBooleanExpressionsUpstream(t *testing.T) {
 
 		// nullable enum — allowed when opted in
 		{
-			Code: "\n        enum ExampleEnum {\n          This = 0,\n          That = 1,\n        }\n        const rand = Math.random();\n        let theEnum: ExampleEnum | null = null;\n        if (rand < 0.3) {\n          theEnum = ExampleEnum.This;\n        }\n        if (theEnum) {\n        }\n      ",
+			Code:    "\n        enum ExampleEnum {\n          This = 0,\n          That = 1,\n        }\n        const rand = Math.random();\n        let theEnum: ExampleEnum | null = null;\n        if (rand < 0.3) {\n          theEnum = ExampleEnum.This;\n        }\n        if (theEnum) {\n        }\n      ",
 			Options: map[string]interface{}{"allowNullableEnum": true},
 		},
 		{
-			Code: "\n        enum ExampleEnum {\n          This = 'one',\n          That = 'two',\n        }\n        const rand = Math.random();\n        let theEnum: ExampleEnum | null = null;\n        if (rand < 0.3) {\n          theEnum = ExampleEnum.This;\n        }\n        if (!theEnum) {\n        }\n      ",
+			Code:    "\n        enum ExampleEnum {\n          This = 'one',\n          That = 'two',\n        }\n        const rand = Math.random();\n        let theEnum: ExampleEnum | null = null;\n        if (rand < 0.3) {\n          theEnum = ExampleEnum.This;\n        }\n        if (!theEnum) {\n        }\n      ",
 			Options: map[string]interface{}{"allowNullableEnum": true},
 		},
 

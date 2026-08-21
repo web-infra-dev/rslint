@@ -15,13 +15,11 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamDuplicateValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamDuplicateValid = []rule_tester.ValidTestCase{}
 
 var upstreamDuplicateInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -30,9 +28,9 @@ function MyComponent() {
   }, [local, local]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a duplicate dependency: 'local'. Either omit it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a duplicate dependency: 'local'. Either omit it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -41,11 +39,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -53,9 +51,9 @@ function MyComponent() {
   }, [local, local]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a duplicate dependency: 'local'. Either omit it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a duplicate dependency: 'local'. Either omit it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -63,8 +61,8 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_Duplicate(t *testing.T) {

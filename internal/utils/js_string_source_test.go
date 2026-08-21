@@ -273,9 +273,9 @@ func TestParseJSStringLiteralSource_LegacyOctal(t *testing.T) {
 
 func TestParseJSStringLiteralSource_UnterminatedReturnsNil(t *testing.T) {
 	for _, src := range []string{
-		`"abc`,     // no closing quote
-		`"ab\`,     // ends on backslash
-		`"\u004`,   // truncated \u escape (still returns nil as the whole source is malformed overall: no closing quote)
+		`"abc`,   // no closing quote
+		`"ab\`,   // ends on backslash
+		`"\u004`, // truncated \u escape (still returns nil as the whole source is malformed overall: no closing quote)
 		``,
 		`"`,
 		`'`,
@@ -460,8 +460,8 @@ func TestParseJSStringLiteralSource_NestedBackslashEscapes(t *testing.T) {
 	src := `"\\\u0041"`
 	got := ParseJSStringLiteralSource(src)
 	want := []expectedUnit{
-		{'\\', 1, 3},    // \\ → \
-		{0x41, 3, 9},    // \u0041 → A (6 bytes)
+		{'\\', 1, 3}, // \\ → \
+		{0x41, 3, 9}, // \u0041 → A (6 bytes)
 	}
 	assertCodeUnits(t, "nested-\\\\\\u", src, got, want)
 
@@ -582,7 +582,7 @@ func TestParseJSStringLiteralSource_SourceCoverage(t *testing.T) {
 		`"\x41\x42"`,
 		`"\u0041\u0042"`,
 		`"\u{1F44D}Z"`,
-		"\"A\\\nB\"",          // with line continuation
+		"\"A\\\nB\"",           // with line continuation
 		"\"\U0001F44D\u00C1\"", // raw astral + raw 2-byte
 	}
 	for _, src := range srcs {

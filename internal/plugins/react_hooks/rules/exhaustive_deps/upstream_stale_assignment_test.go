@@ -15,13 +15,11 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamStaleAssignmentValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamStaleAssignmentValid = []rule_tester.ValidTestCase{}
 
 var upstreamStaleAssignmentInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let value;
   let value2;
@@ -43,17 +41,17 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "Assignments to the 'value' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
-		{Message: "Assignments to the 'value2' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
-		{Message: "Assignments to the 'value4' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
-		{Message: "Assignments to the 'asyncValue' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "Assignments to the 'value' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+			{Message: "Assignments to the 'value2' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+			{Message: "Assignments to the 'value4' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+			{Message: "Assignments to the 'asyncValue' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let value;
   let value2;
@@ -71,13 +69,13 @@ function MyComponent(props) {
   }, [value, value2, value3]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "Assignments to the 'value' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
-		{Message: "Assignments to the 'value2' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
-		{Message: "Assignments to the 'asyncValue' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "Assignments to the 'value' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+			{Message: "Assignments to the 'value2' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+			{Message: "Assignments to the 'asyncValue' variable from inside React Hook useEffect will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useEffect."},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_StaleAssignment(t *testing.T) {

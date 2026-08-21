@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/core"
@@ -12,7 +13,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 //go:embed filename_case.schema.json
@@ -232,7 +232,7 @@ func splitWords(s string) []string {
 	wordStart := -1
 	var previous rune
 	for pos, current := range s {
-		if !unicode17.IsLetter(current) && !isASCIIDigit(current) {
+		if !unicode.IsLetter(current) && !isASCIIDigit(current) {
 			if wordStart >= 0 {
 				words = append(words, s[wordStart:pos])
 				wordStart = -1
@@ -243,11 +243,11 @@ func splitWords(s string) []string {
 		if wordStart < 0 {
 			wordStart = pos
 		} else {
-			boundary := (unicode17.IsLower(previous) || isASCIIDigit(previous)) && unicode17.IsUpper(current)
-			if !boundary && unicode17.IsUpper(previous) && unicode17.IsUpper(current) {
+			boundary := (unicode.IsLower(previous) || isASCIIDigit(previous)) && unicode.IsUpper(current)
+			if !boundary && unicode.IsUpper(previous) && unicode.IsUpper(current) {
 				_, size := utf8.DecodeRuneInString(s[pos:])
 				next, _ := utf8.DecodeRuneInString(s[pos+size:])
-				boundary = unicode17.IsLower(next)
+				boundary = unicode.IsLower(next)
 			}
 			if boundary {
 				words = append(words, s[wordStart:pos])

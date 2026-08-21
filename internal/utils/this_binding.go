@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 )
 
-
 // IsDefaultThisBinding checks whether a function's 'this' binding defaults to the
 // global object. This mirrors ESLint's astUtils.isDefaultThisBinding.
 // Returns true when 'this' defaults to global; false when explicitly bound.
@@ -196,4 +195,3 @@ func isCallbackWithThisArg(call *ast.CallExpression, callback *ast.Node) bool {
 
 	return false
 }
-

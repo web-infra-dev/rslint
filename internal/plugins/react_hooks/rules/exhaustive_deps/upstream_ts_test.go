@@ -10,8 +10,8 @@ import (
 // TestExhaustiveDeps_UpstreamTs ports the small "upstream_ts_test" upstream group.
 
 var upstreamTsValid = []rule_tester.ValidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const ref = useRef() as React.MutableRefObject<HTMLDivElement>;
   useEffect(() => {
@@ -19,11 +19,11 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const [state, setState] = React.useState<number>(0);
 
@@ -33,11 +33,11 @@ function MyComponent() {
   }, [])
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const [state, setState] = React.useState<number>(0);
 
@@ -47,12 +47,12 @@ function MyComponent() {
   })
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useSpecialEffect", "experimental_autoDependenciesHooks": []interface{}{"useSpecialEffect"}},
-},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useSpecialEffect", "experimental_autoDependenciesHooks": []interface{}{"useSpecialEffect"}},
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function App() {
   const foo = {x: 1};
   React.useEffect(() => {
@@ -62,44 +62,44 @@ function App() {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function App(props) {
   React.useEffect(() => {
     console.log(props.test);
   }, [props.test] as const);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function App(props) {
   React.useEffect(() => {
     console.log(props.test);
   }, [props.test] as any);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function App(props) {
   React.useEffect((() => {
     console.log(props.test);
   }) as any, [props.test]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing<T>(): void {
   useEffect(() => {
     let foo: T;
@@ -107,13 +107,13 @@ function useMyThing<T>(): void {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 }
 
 var upstreamTsInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {} as string;
   useEffect(() => {
@@ -121,9 +121,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {} as string;
   useEffect(() => {
@@ -131,11 +131,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function App() {
   const foo = {x: 1};
   const bar = {x: 2};
@@ -145,9 +145,9 @@ function App() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'bar'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'bar'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function App() {
   const foo = {x: 1};
   const bar = {x: 2};
@@ -157,11 +157,11 @@ function App() {
   }, [bar]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const pizza = {};
 
@@ -171,9 +171,9 @@ function MyComponent() {
   }), []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'pizza.crust' and 'pizza?.toppings'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'pizza.crust' and 'pizza?.toppings'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const pizza = {};
 
@@ -183,11 +183,11 @@ function MyComponent() {
   }), [pizza.crust, pizza?.toppings]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const pizza = {};
 
@@ -197,9 +197,9 @@ function MyComponent() {
   }), []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'pizza.crust'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'pizza.crust'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const pizza = {};
 
@@ -209,11 +209,11 @@ function MyComponent() {
   }), [pizza.crust]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const pizza = {};
 
@@ -223,9 +223,9 @@ function MyComponent() {
   }), []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'pizza.crust'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'pizza.crust'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const pizza = {};
 
@@ -235,11 +235,11 @@ function MyComponent() {
   }), [pizza.crust]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const pizza = {};
 
@@ -249,9 +249,9 @@ function MyComponent() {
   }), []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'pizza?.crust'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'pizza?.crust'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const pizza = {};
 
@@ -261,11 +261,11 @@ function MyComponent() {
   }), [pizza?.crust]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Example(props) {
   useEffect(() => {
     let topHeight = 0;
@@ -273,9 +273,9 @@ function Example(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props.upperViewHeight'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props.upperViewHeight'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Example(props) {
   useEffect(() => {
     let topHeight = 0;
@@ -283,11 +283,11 @@ function Example(props) {
   }, [props.upperViewHeight]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Example(props) {
   useEffect(() => {
     let topHeight = 0;
@@ -295,9 +295,9 @@ function Example(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props?.upperViewHeight'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props?.upperViewHeight'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Example(props) {
   useEffect(() => {
     let topHeight = 0;
@@ -305,11 +305,11 @@ function Example(props) {
   }, [props?.upperViewHeight]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const [state, setState] = React.useState<number>(0);
 
@@ -319,9 +319,9 @@ function MyComponent() {
   }, [])
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'state'. Either include it or remove the dependency array. You can also do a functional update 'setState(s => ...)' if you only need 'state' in the 'setState' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'state'. Either include it or remove the dependency array. You can also do a functional update 'setState(s => ...)' if you only need 'state' in the 'setState' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const [state, setState] = React.useState<number>(0);
 
@@ -331,11 +331,11 @@ function MyComponent() {
   }, [state])
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const [state, setState] = React.useState<number>(0);
 
@@ -345,10 +345,10 @@ function MyComponent() {
   }, [])
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useSpecialEffect", "experimental_autoDependenciesHooks": []interface{}{"useSpecialEffect"}},
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useSpecialEffect has a missing dependency: 'state'. Either include it or remove the dependency array. You can also do a functional update 'setState(s => ...)' if you only need 'state' in the 'setState' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useSpecialEffect", "experimental_autoDependenciesHooks": []interface{}{"useSpecialEffect"}},
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useSpecialEffect has a missing dependency: 'state'. Either include it or remove the dependency array. You can also do a functional update 'setState(s => ...)' if you only need 'state' in the 'setState' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const [state, setState] = React.useState<number>(0);
 
@@ -358,11 +358,11 @@ function MyComponent() {
   }, [state])
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const [state, setState] = React.useState<number>(0);
 
@@ -372,9 +372,9 @@ function MyComponent() {
   }, [state])
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useMemo has an unnecessary dependency: 'state'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useMemo has an unnecessary dependency: 'state'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const [state, setState] = React.useState<number>(0);
 
@@ -384,11 +384,11 @@ function MyComponent() {
   }, [])
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   const foo = {} as any;
   useMemo(() => {
@@ -396,38 +396,38 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function useCustomCallback(callback, deps) {
   return useCallback(callback as any, deps)
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback received a function whose dependencies are unknown. Pass an inline function instead."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback received a function whose dependencies are unknown. Pass an inline function instead."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
   });
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"requireExplicitEffectDeps": true},
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect always requires dependencies. Please add a dependency array or an explicit `undefined`"},
+		Tsx:     true,
+		Options: map[string]interface{}{"requireExplicitEffectDeps": true},
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect always requires dependencies. Please add a dependency array or an explicit `undefined`"},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_UpstreamTs(t *testing.T) {

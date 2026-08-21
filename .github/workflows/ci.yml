@@ -32,7 +32,7 @@ jobs:
           - rspack-ubuntu-22.04-large
           - rspack-darwin-15.6.1-medium
           - rspack-windows-2022-large
-        go-version: ['1.26.0']
+        go-version: ['1.27.0']
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -117,20 +117,20 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.26.0
+          go-version: 1.27.0
           cache-name: ci-go-lint
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
-          version: v2.12.2
+          version: v2.13.1
           args: --timeout=15m ./cmd/... ./internal/...
 
       - name: go vet
         run: npm run lint:go
 
       - name: go fmt
-        run: npm run format:go
+        run: npm run format:go:check
 
       - name: Check Spell
         run: pnpm check-spell
@@ -142,7 +142,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [rspack-ubuntu-22.04-large]
-        go-version: ['1.26.0']
+        go-version: ['1.27.0']
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -222,7 +222,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.26.0
+          go-version: 1.27.0
           cache-name: ci-test-node-windows
 
       - name: Setup Node.js
@@ -340,7 +340,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.26.0
+          go-version: 1.27.0
           cache-name: ci-test-wasm
 
       - name: Setup Node.js
@@ -387,7 +387,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.26.0
+          go-version: 1.27.0
           cache-name: ci-test-wasm
       - name: Build tsgo server
         run: pnpm --filter '@rslint/tsgo-server' build

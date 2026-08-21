@@ -765,7 +765,6 @@ func lintNoImportAssignForComparison(
 	sourceFile := program.GetSourceFile(fileName)
 	if sourceFile == nil {
 		t.Fatal("comparison source file was not loaded")
-		return nil
 	}
 
 	var diagnostics []noImportAssignDiagnosticFingerprint

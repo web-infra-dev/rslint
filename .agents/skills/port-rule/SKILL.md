@@ -271,19 +271,19 @@ The workflow is complete ONLY when all tasks created during Planning are marked 
 | Identifier → symbol (incl. globals/`.d.ts`) | `ctx.Refs.Resolve(node)`                               |
 | Every comment in the file                   | `ctx.Comments.All()`                                   |
 
-**Values that came from JavaScript** — Go's standard library answers a nearby but different question about each, so never reach for `strings.TrimSpace`, `strings.ToLower`, the `unicode` package, the stdlib `regexp`, or `doublestar` on one:
+**Values that came from JavaScript** — Go's standard library answers a nearby but different question about each, so never reach for `strings.TrimSpace`, `strings.ToLower`, the stdlib `regexp`, or `doublestar` on one:
 
 | Need                                                   | Use                                                     |
 | ------------------------------------------------------ | ------------------------------------------------------- |
 | Trim, blank, whitespace, upper/lower case, `String(n)` | `utils/ecmascript`                                      |
 | A regexp option, a `new RegExp(...)`, `/i` comparison  | `utils/ecmascript/regexp`, imported as `esregexp`       |
-| A general category — `\p{Lu}`, `\p{L}`, `\p{M}`        | `utils/unicode17`                                       |
+| A general category — `\p{Lu}`, `\p{L}`, `\p{M}`        | `unicode.IsUpper` / `IsLetter` / `Is(unicode.M, r)`     |
 | "May this character start or continue an identifier?"  | tsgo's `scanner.IsIdentifierStart` / `IsIdentifierPart` |
 | A glob option (upstream on `minimatch@3`)              | `utils/minimatch3`                                      |
 | "Is this a glob or a plain path?"                      | `utils/isglob`                                          |
 | Any other glob package, **`minimatch@10`** too         | **Not ported — stop and report to the user**            |
 
-`depguard` denies the standard library's `unicode` and `forbidigo` denies `strings.ToLower` / `ToUpper` / `TrimSpace` under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. The ports agree with the standard library on ASCII, so there is nothing to weigh: the case a rule spells out is the JavaScript one.
+`forbidigo` denies `strings.ToLower` / `ToUpper` / `TrimSpace` and `unicode.ToUpper` / `ToLower` / `SimpleFold` / `IsSpace`, and `depguard` denies `regexp2` and `doublestar`, under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. The ports agree with the standard library on ASCII, so there is nothing to weigh: the case a rule spells out is the JavaScript one.
 
 The stdlib `regexp` is not banned outright: a pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. A pattern out of a rule option, a config file or the source under lint takes `esregexp`, however plain it looks.
 

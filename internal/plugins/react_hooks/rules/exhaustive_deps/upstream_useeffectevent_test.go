@@ -15,13 +15,11 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamUseEffectEventValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamUseEffectEventValid = []rule_tester.ValidTestCase{}
 
 var upstreamUseEffectEventInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ theme }) {
   const onStuff = useEffectEvent(() => {
     showNotification(theme);
@@ -34,9 +32,9 @@ function MyComponent({ theme }) {
   }, [onStuff]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "Functions returned from `useEffectEvent` must not be included in the dependency array. Remove `onStuff` from the list.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "Functions returned from `useEffectEvent` must not be included in the dependency array. Remove `onStuff` from the list.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ theme }) {
   const onStuff = useEffectEvent(() => {
     showNotification(theme);
@@ -49,7 +47,7 @@ function MyComponent({ theme }) {
   }, [onStuff]);
 }
 `}}},
-		{Message: "Functions returned from `useEffectEvent` must not be included in the dependency array. Remove `onStuff` from the list.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "Functions returned from `useEffectEvent` must not be included in the dependency array. Remove `onStuff` from the list.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ theme }) {
   const onStuff = useEffectEvent(() => {
     showNotification(theme);
@@ -62,8 +60,8 @@ function MyComponent({ theme }) {
   }, []);
 }
 `}}},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_UseEffectEvent(t *testing.T) {

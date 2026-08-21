@@ -220,8 +220,8 @@ func TestNoControlRegexRule(t *testing.T) {
 
 			// ── Non-string first argument — constructor path skipped ──
 			{Code: "RegExp(pattern)"},
-			{Code: "RegExp(/x20/)"},      // inner regex has no controls
-			{Code: "RegExp('a' + 'b')"},  // binary expression
+			{Code: "RegExp(/x20/)"},     // inner regex has no controls
+			{Code: "RegExp('a' + 'b')"}, // binary expression
 			{Code: "RegExp(cond ? 'a' : 'b')"},
 			{Code: "RegExp(123)"},
 			{Code: "RegExp(null)"},

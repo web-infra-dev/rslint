@@ -898,8 +898,8 @@ var x = (
 		// not produce diagnostics (no `\S` for the literal-line
 		// regex). ----
 		{
-			Code: "var x = (\n  <App>\n    <Foo />\n\n    <Bar />\n  </App>\n);\n",
-			Tsx:  true,
+			Code:    "var x = (\n  <App>\n    <Foo />\n\n    <Bar />\n  </App>\n);\n",
+			Tsx:     true,
 			Options: []interface{}{float64(2)},
 		},
 		// ---- Inline JSX as attribute prop value (no checkAttributes
@@ -2386,9 +2386,9 @@ var x = (
 		// regression of stripping `\r` while it consumes leading
 		// whitespace. ----
 		{
-			Code:   "var x = (\r\n  <App>\r\nHello\r\n  </App>\r\n);\r\n",
-			Output: []string{"var x = (\r\n  <App>\r\n    Hello\r\n  </App>\r\n);\r\n"},
-			Tsx:    true,
+			Code:    "var x = (\r\n  <App>\r\nHello\r\n  </App>\r\n);\r\n",
+			Output:  []string{"var x = (\r\n  <App>\r\n    Hello\r\n  </App>\r\n);\r\n"},
+			Tsx:     true,
 			Options: []interface{}{float64(2)},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "wrongIndent", Message: "Expected indentation of 4 space characters but found 0."},

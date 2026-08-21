@@ -833,8 +833,8 @@ func TestScopeExtras(t *testing.T) {
 		// Group 14: Class component with state-driven JSX
 		// ============================================================
 		{
-			Code: `class T extends React.Component { render() { return this.state.ready ? <div scope="row" /> : null; } }`,
-			Tsx:  true,
+			Code:   `class T extends React.Component { render() { return this.state.ready ? <div scope="row" /> : null; } }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -968,8 +968,8 @@ func TestScopeExtras(t *testing.T) {
 		// `<thead scope>` itself reports (thead is not th). Inner `<th scope>`
 		// is exempt — only one error from thead.
 		{
-			Code: `<thead scope><tr><th scope="col" /></tr></thead>`,
-			Tsx:  true,
+			Code:   `<thead scope><tr><th scope="col" /></tr></thead>`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		// 3-deep wrapper containing both reporting and exempt forms.
@@ -1007,8 +1007,8 @@ func TestScopeExtras(t *testing.T) {
 		},
 		// Render prop with both exempt + offending in arms.
 		{
-			Code: `<Provider cellRender={(c) => c.header ? <th scope="col" /> : <div scope="col" />} />`,
-			Tsx:  true,
+			Code:   `<Provider cellRender={(c) => c.header ? <th scope="col" /> : <div scope="col" />} />`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -1023,8 +1023,8 @@ func TestScopeExtras(t *testing.T) {
 			},
 		},
 		{
-			Code: `function App() { return [<div scope key="a" />, <th scope key="b" />]; }`,
-			Tsx:  true,
+			Code:   `function App() { return [<div scope key="a" />, <th scope key="b" />]; }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -1287,8 +1287,8 @@ func TestScopeExtras(t *testing.T) {
 		},
 		// Mixed cells: some th (exempt), some td (reports).
 		{
-			Code: `<table><tr><th scope="col" /><td scope="col" /><th scope="col" /><td scope="col" /></tr></table>`,
-			Tsx:  true,
+			Code:   `<table><tr><th scope="col" /><td scope="col" /><th scope="col" /><td scope="col" /></tr></table>`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError, expectedError},
 		},
 
@@ -1296,14 +1296,14 @@ func TestScopeExtras(t *testing.T) {
 		// Group 36: scope inside iterator / map with destructured items
 		// ============================================================
 		{
-			Code: `const cells = data.map(({ scope, ...rest }, i) => <td key={i} scope={scope} {...rest} />);`,
-			Tsx:  true,
+			Code:   `const cells = data.map(({ scope, ...rest }, i) => <td key={i} scope={scope} {...rest} />);`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		// flatMap producing offending elements.
 		{
-			Code: `const cells = rows.flatMap(r => [<td scope="col" key={r.id} />, <span />]);`,
-			Tsx:  true,
+			Code:   `const cells = rows.flatMap(r => [<td scope="col" key={r.id} />, <span />]);`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -1320,8 +1320,8 @@ func TestScopeExtras(t *testing.T) {
 		// Group 38: switch statement returning JSX
 		// ============================================================
 		{
-			Code: `function App({type}) { switch(type) { case 'a': return <div scope />; case 'b': return <span scope />; default: return null; } }`,
-			Tsx:  true,
+			Code:   `function App({type}) { switch(type) { case 'a': return <div scope />; case 'b': return <span scope />; default: return null; } }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError, expectedError},
 		},
 

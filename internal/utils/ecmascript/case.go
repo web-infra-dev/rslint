@@ -7,8 +7,6 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 // StringToUpperCase ports String.prototype.toUpperCase, which maps every
@@ -21,8 +19,7 @@ import (
 // library does not ship, so this reads it out of golang.org/x/text. That
 // package's tables carry the same edition of Unicode the standard library's
 // do, and move to the next one under the same build constraint, so the two
-// never answer from different editions — an older one than JavaScript reads,
-// which is what [unicode17] stands in for.
+// never answer from different editions.
 //
 // A lone surrogate is carried across untouched, as are bytes that are not
 // UTF-8, which is what happens to any character with no uppercase anyway.
@@ -33,7 +30,7 @@ func StringToUpperCase(s string) string {
 		return mapped
 	}
 	// A Caser may be stateful, so it is not shared across calls.
-	return unicode17Uppercase(cases.Upper(language.Und).String(s))
+	return cases.Upper(language.Und).String(s)
 }
 
 // StringToLowerCase ports String.prototype.toLowerCase, the other half of what
@@ -78,7 +75,7 @@ func StringToLowerCase(s string) string {
 		case r == 0x03A3 && casedBefore && !casedFollows(s[i+size:]):
 			out.WriteRune(0x03C2)
 		default:
-			out.WriteRune(toLower(r))
+			out.WriteRune(unicode.ToLower(r))
 		}
 		if tracksFinalSigma && !isCaseIgnorable(r) {
 			casedBefore = isCased(r)
@@ -206,44 +203,6 @@ func asciiCase(s string, lo, hi byte, delta int) (string, bool) {
 	return string(buf), true
 }
 
-// unicode17Uppercase carries an uppercased string the rest of the way to the
-// edition of Unicode JavaScript reads. The characters [unicode17] names have no
-// uppercase in the edition the caser is built on, so the caser hands them back
-// as they came in and this pass finishes the job.
-//
-// Only those characters are rewritten. Everything else is spliced across as the
-// bytes it already was, so a lone surrogate — which the caser leaves alone
-// because it is not UTF-8 — comes through unharmed.
-func unicode17Uppercase(mapped string) string {
-	var out strings.Builder
-	spliced := 0
-	for i, r := range mapped {
-		upper, ok := unicode17.ToUpper(r)
-		if !ok {
-			continue
-		}
-		if spliced == 0 {
-			out.Grow(len(mapped))
-		}
-		out.WriteString(mapped[spliced:i])
-		out.WriteRune(upper)
-		spliced = i + utf8.RuneLen(r)
-	}
-	if spliced == 0 {
-		return mapped
-	}
-	out.WriteString(mapped[spliced:])
-	return out.String()
-}
-
-// toLower is unicode.ToLower reading the edition of Unicode JavaScript does.
-func toLower(r rune) rune {
-	if lower, ok := unicode17.ToLower(r); ok {
-		return lower
-	}
-	return unicode.ToLower(r)
-}
-
 // casedFollows reports whether the forward half of the Final_Sigma condition
 // holds against s, which starts just past the sigma: a cased character, once
 // the ones the condition ignores are stepped over.
@@ -263,12 +222,8 @@ func casedFollows(s string) bool {
 
 // isCased reports Unicode's Cased property, which is a derived one the standard
 // library ships no table for. It is exactly the union of the five tables the
-// standard library does ship that its definition names, once the characters
-// [unicode17] knows better about are set aside.
+// standard library does ship that its definition names.
 func isCased(r rune) bool {
-	if cased, ok := unicode17.Cased(r); ok {
-		return cased
-	}
 	return unicode.In(r, unicode.Ll, unicode.Lu, unicode.Lt, unicode.Other_Lowercase, unicode.Other_Uppercase)
 }
 
@@ -276,9 +231,6 @@ func isCased(r rune) bool {
 // [isCased] describes. Its definition names one thing the standard library has
 // no table for, so [isWordBreakCaseIgnorable] states that part.
 func isCaseIgnorable(r rune) bool {
-	if ignorable, ok := unicode17.CaseIgnorable(r); ok {
-		return ignorable
-	}
 	return unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf, unicode.Lm, unicode.Sk) ||
 		isWordBreakCaseIgnorable(r)
 }

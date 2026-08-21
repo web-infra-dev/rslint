@@ -15,33 +15,31 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamMissingValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamMissingValid = []rule_tester.ValidTestCase{}
 
 var upstreamMissingInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.toString());
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.toString());
   }, [props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function ComponentUsingFormState(props) {
   const [state7, dispatch3] = useFormState();
   const [state8, dispatch4] = ReactDOM.useFormState();
@@ -56,9 +54,9 @@ function ComponentUsingFormState(props) {
   }, [state7, state8]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'dispatch3' and 'dispatch4'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'dispatch3' and 'dispatch4'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function ComponentUsingFormState(props) {
   const [state7, dispatch3] = useFormState();
   const [state8, dispatch4] = ReactDOM.useFormState();
@@ -73,71 +71,71 @@ function ComponentUsingFormState(props) {
   }, [dispatch3, dispatch4, state7, state8]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.bar.baz);
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'props.foo?.bar.baz'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'props.foo?.bar.baz'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.bar.baz);
   }, [props.foo?.bar.baz]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.bar?.baz);
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'props.foo?.bar?.baz'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'props.foo?.bar?.baz'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.bar?.baz);
   }, [props.foo?.bar?.baz]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.bar.toString());
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'props.foo?.bar'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'props.foo?.bar'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.bar.toString());
   }, [props.foo?.bar]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = someFunc();
   useEffect(() => {
@@ -145,9 +143,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = someFunc();
   useEffect(() => {
@@ -155,11 +153,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter(unstableProp) {
   let [count, setCount] = useState(0);
   setCount = unstableProp
@@ -173,9 +171,9 @@ function Counter(unstableProp) {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'setCount'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'setCount'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Counter(unstableProp) {
   let [count, setCount] = useState(0);
   setCount = unstableProp
@@ -189,11 +187,11 @@ function Counter(unstableProp) {
   return <h1>{count}</h1>;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   let local = 42;
   useEffect(() => {
@@ -201,9 +199,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   let local = 42;
   useEffect(() => {
@@ -211,11 +209,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = /foo/;
   useEffect(() => {
@@ -223,9 +221,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = /foo/;
   useEffect(() => {
@@ -233,11 +231,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = someFunc();
   useEffect(() => {
@@ -247,9 +245,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = someFunc();
   useEffect(() => {
@@ -259,11 +257,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -273,9 +271,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -285,11 +283,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -300,9 +298,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -313,11 +311,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = someFunc();
   {
@@ -329,9 +327,9 @@ function MyComponent() {
   }
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'local1' and 'local2'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'local1' and 'local2'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local1 = someFunc();
   {
@@ -343,11 +341,11 @@ function MyComponent() {
   }
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = {};
   const local2 = {};
@@ -357,9 +355,9 @@ function MyComponent() {
   }, [local1]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local2'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local2'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local1 = {};
   const local2 = {};
@@ -369,11 +367,11 @@ function MyComponent() {
   }, [local1, local2]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = someFunc();
   function MyNestedComponent() {
@@ -385,9 +383,9 @@ function MyComponent() {
   }
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'local2'. Either include it or remove the dependency array. Outer scope values like 'local1' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'local2'. Either include it or remove the dependency array. Outer scope values like 'local1' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local1 = someFunc();
   function MyNestedComponent() {
@@ -399,11 +397,11 @@ function MyComponent() {
   }
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -412,9 +410,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -423,31 +421,31 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ history }) {
   useEffect(() => {
     return history.listen();
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'history'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'history'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ history }) {
   useEffect(() => {
     return history.listen();
   }, [history]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ history }) {
   useEffect(() => {
     return [
@@ -457,9 +455,9 @@ function MyComponent({ history }) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'history.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'history.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ history }) {
   useEffect(() => {
     return [
@@ -469,11 +467,11 @@ function MyComponent({ history }) {
   }, [history.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ history }) {
   useEffect(() => {
     return [
@@ -482,9 +480,9 @@ function MyComponent({ history }) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'history?.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'history?.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ history }) {
   useEffect(() => {
     return [
@@ -493,56 +491,56 @@ function MyComponent({ history }) {
   }, [history?.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ foo, bar, baz }) {
   useEffect(() => {
     console.log(foo, bar, baz);
   }, ['foo', 'bar']);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'bar', 'baz', and 'foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'bar', 'baz', and 'foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ foo, bar, baz }) {
   useEffect(() => {
     console.log(foo, bar, baz);
   }, [bar, baz, foo]);
 }
 `}}},
-		{Message: "The 'foo' literal is not a valid dependency because it never changes. Did you mean to include foo in the array instead?"},
-		{Message: "The 'bar' literal is not a valid dependency because it never changes. Did you mean to include bar in the array instead?"},
+			{Message: "The 'foo' literal is not a valid dependency because it never changes. Did you mean to include foo in the array instead?"},
+			{Message: "The 'bar' literal is not a valid dependency because it never changes. Did you mean to include bar in the array instead?"},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ foo, bar, baz }) {
   useEffect(() => {
     console.log(foo, bar, baz);
   }, [42, false, null]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'bar', 'baz', and 'foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'bar', 'baz', and 'foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ foo, bar, baz }) {
   useEffect(() => {
     console.log(foo, bar, baz);
   }, [bar, baz, foo]);
 }
 `}}},
-		{Message: "The 42 literal is not a valid dependency because it never changes. You can safely remove it."},
-		{Message: "The false literal is not a valid dependency because it never changes. You can safely remove it."},
-		{Message: "The null literal is not a valid dependency because it never changes. You can safely remove it."},
+			{Message: "The 42 literal is not a valid dependency because it never changes. You can safely remove it."},
+			{Message: "The false literal is not a valid dependency because it never changes. You can safely remove it."},
+			{Message: "The null literal is not a valid dependency because it never changes. You can safely remove it."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   const dependencies = [local];
@@ -551,9 +549,9 @@ function MyComponent() {
   }, [...dependencies]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   const dependencies = [local];
@@ -562,12 +560,12 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
-		{Message: "React Hook useEffect has a spread element in its dependency array. This means we can't statically verify whether you've passed the correct dependencies."},
+			{Message: "React Hook useEffect has a spread element in its dependency array. This means we can't statically verify whether you've passed the correct dependencies."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -575,9 +573,9 @@ function MyComponent() {
   }, [computeCacheKey(local)]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -585,54 +583,54 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.items[0]);
   }, [props.items[0]]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props.items'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props.items'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.items[0]);
   }, [props.items]);
 }
 `}}},
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ items }) {
   useEffect(() => {
     console.log(items[0]);
   }, [items[0]]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'items'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'items'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ items }) {
   useEffect(() => {
     console.log(items[0]);
   }, [items]);
 }
 `}}},
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const local = {};
   useCallback(() => {
@@ -641,9 +639,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has missing dependencies: 'props.bar' and 'props.foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has missing dependencies: 'props.bar' and 'props.foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const local = {};
   useCallback(() => {
@@ -652,11 +650,11 @@ function MyComponent(props) {
   }, [props.bar, props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {id: 42};
   useEffect(() => {
@@ -664,9 +662,9 @@ function MyComponent() {
   }, [local.id]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {id: 42};
   useEffect(() => {
@@ -674,11 +672,11 @@ function MyComponent() {
   }, [local, local.id]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {id: 42};
   const fn = useCallback(() => {
@@ -686,9 +684,9 @@ function MyComponent() {
   }, [local.id]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {id: 42};
   const fn = useCallback(() => {
@@ -696,31 +694,31 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar.baz);
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'props.foo.bar.baz'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'props.foo.bar.baz'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar.baz);
   }, [props.foo.bar.baz]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let color = {}
   const fn = useCallback(() => {
@@ -729,9 +727,9 @@ function MyComponent(props) {
   }, [props.foo, props.foo.bar.baz]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'color'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'color'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let color = {}
   const fn = useCallback(() => {
@@ -740,11 +738,11 @@ function MyComponent(props) {
   }, [color, props.foo.bar.baz]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar.baz);
@@ -752,9 +750,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has missing dependencies: 'props.foo.bar.baz' and 'props.foo.fizz.bizz'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has missing dependencies: 'props.foo.bar.baz' and 'props.foo.fizz.bizz'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar.baz);
@@ -762,31 +760,31 @@ function MyComponent(props) {
   }, [props.foo.bar.baz, props.foo.fizz.bizz]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar);
   }, [props.foo.bar.baz]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'props.foo.bar'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'props.foo.bar'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar);
   }, [props.foo.bar]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props);
@@ -794,9 +792,9 @@ function MyComponent(props) {
   }, [props.foo.bar.baz]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'props'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'props'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props);
@@ -804,31 +802,31 @@ function MyComponent(props) {
   }, [props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
   }, [props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -836,9 +834,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'props.bar' and 'props.foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'props.bar' and 'props.foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -846,11 +844,11 @@ function MyComponent(props) {
   }, [props.bar, props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let a, b, c, d, e, f, g;
   useEffect(() => {
@@ -858,9 +856,9 @@ function MyComponent(props) {
   }, [c, a, g]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'b', 'd', 'e', and 'f'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'b', 'd', 'e', and 'f'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let a, b, c, d, e, f, g;
   useEffect(() => {
@@ -868,11 +866,11 @@ function MyComponent(props) {
   }, [c, a, g, b, e, d, f]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let a, b, c, d, e, f, g;
   useEffect(() => {
@@ -880,9 +878,9 @@ function MyComponent(props) {
   }, [a, c, g]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'b', 'd', 'e', and 'f'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'b', 'd', 'e', and 'f'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let a, b, c, d, e, f, g;
   useEffect(() => {
@@ -890,11 +888,11 @@ function MyComponent(props) {
   }, [a, b, c, d, e, f, g]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let a, b, c, d, e, f, g;
   useEffect(() => {
@@ -902,9 +900,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'a', 'b', 'c', 'd', 'e', 'f', and 'g'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'a', 'b', 'c', 'd', 'e', 'f', and 'g'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let a, b, c, d, e, f, g;
   useEffect(() => {
@@ -912,11 +910,11 @@ function MyComponent(props) {
   }, [a, b, c, d, e, f, g]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const local = {};
   useEffect(() => {
@@ -926,9 +924,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'local', 'props.bar', and 'props.foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'local', 'props.bar', and 'props.foo'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const local = {};
   useEffect(() => {
@@ -938,11 +936,11 @@ function MyComponent(props) {
   }, [local, props.bar, props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const local = {};
   useEffect(() => {
@@ -952,9 +950,9 @@ function MyComponent(props) {
   }, [props]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const local = {};
   useEffect(() => {
@@ -964,11 +962,11 @@ function MyComponent(props) {
   }, [local, props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -993,9 +991,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -1020,7 +1018,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useCallback has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useCallback has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -1045,7 +1043,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useMemo has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useMemo has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -1070,7 +1068,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook React.useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook React.useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -1095,7 +1093,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook React.useCallback has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook React.useCallback has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -1120,7 +1118,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook React.useMemo has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook React.useMemo has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -1145,11 +1143,11 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
@@ -1165,10 +1163,10 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useCustomEffect"},
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCustomEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useCustomEffect"},
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCustomEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
@@ -1184,7 +1182,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
@@ -1200,7 +1198,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook React.useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook React.useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
@@ -1216,33 +1214,33 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-// SKIP: unsupported settings shape
-{
-	Skip: true,
-	Code: `
+	// SKIP: unsupported settings shape
+	{
+		Skip: true,
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCustomEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCustomEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
   }, [props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -1250,9 +1248,9 @@ function MyComponent() {
   }, [a ? local : b]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -1260,12 +1258,12 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -1273,9 +1271,9 @@ function MyComponent() {
   }, [a && local]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -1283,12 +1281,12 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const ref = useRef();
   const [state, setState] = useState();
@@ -1298,9 +1296,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'state'. Either include it or remove the dependency array. You can also do a functional update 'setState(s => ...)' if you only need 'state' in the 'setState' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'state'. Either include it or remove the dependency array. You can also do a functional update 'setState(s => ...)' if you only need 'state' in the 'setState' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const ref = useRef();
   const [state, setState] = useState();
@@ -1310,11 +1308,11 @@ function MyComponent() {
   }, [state]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const ref = useRef();
   const [state, setState] = useState();
@@ -1324,9 +1322,9 @@ function MyComponent() {
   }, [ref]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'state'. Either include it or remove the dependency array. You can also do a functional update 'setState(s => ...)' if you only need 'state' in the 'setState' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'state'. Either include it or remove the dependency array. You can also do a functional update 'setState(s => ...)' if you only need 'state' in the 'setState' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const ref = useRef();
   const [state, setState] = useState();
@@ -1336,11 +1334,11 @@ function MyComponent() {
   }, [ref, state]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -1352,9 +1350,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'props.color' and 'props.someOtherRefs'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'props.color' and 'props.someOtherRefs'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -1366,11 +1364,11 @@ function MyComponent(props) {
   }, [props.color, props.someOtherRefs]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 const MyComponent = forwardRef((props, ref) => {
   useImperativeHandle(ref, () => ({
     focus() {
@@ -1379,9 +1377,9 @@ const MyComponent = forwardRef((props, ref) => {
   }), [])
 });
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useImperativeHandle has a missing dependency: 'props.hello'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useImperativeHandle has a missing dependency: 'props.hello'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 const MyComponent = forwardRef((props, ref) => {
   useImperativeHandle(ref, () => ({
     focus() {
@@ -1390,11 +1388,11 @@ const MyComponent = forwardRef((props, ref) => {
   }), [props.hello])
 });
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     if (props.onChange) {
@@ -1403,9 +1401,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     if (props.onChange) {
@@ -1414,11 +1412,11 @@ function MyComponent(props) {
   }, [props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     if (props?.onChange) {
@@ -1427,9 +1425,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     if (props?.onChange) {
@@ -1438,11 +1436,11 @@ function MyComponent(props) {
   }, [props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     function play() {
@@ -1454,9 +1452,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     function play() {
@@ -1468,11 +1466,11 @@ function MyComponent(props) {
   }, [props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     if (props.foo.onChange) {
@@ -1481,9 +1479,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     if (props.foo.onChange) {
@@ -1492,11 +1490,11 @@ function MyComponent(props) {
   }, [props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     props.onChange();
@@ -1506,9 +1504,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     props.onChange();
@@ -1518,11 +1516,11 @@ function MyComponent(props) {
   }, [props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const [skillsCount] = useState();
   useEffect(() => {
@@ -1532,9 +1530,9 @@ function MyComponent(props) {
   }, [skillsCount, props.isEditMode, props.toggleEditMode]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const [skillsCount] = useState();
   useEffect(() => {
@@ -1544,11 +1542,11 @@ function MyComponent(props) {
   }, [skillsCount, props.isEditMode, props.toggleEditMode, props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const [skillsCount] = useState();
   useEffect(() => {
@@ -1558,9 +1556,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'props' and 'skillsCount'. Either include them or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'props' and 'skillsCount'. Either include them or remove the dependency array. However, 'props' will change when *any* prop changes, so the preferred fix is to destructure the 'props' object outside of the useEffect call and refer to those specific props inside useEffect.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const [skillsCount] = useState();
   useEffect(() => {
@@ -1570,11 +1568,11 @@ function MyComponent(props) {
   }, [props, skillsCount]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     externalCall(props);
@@ -1582,9 +1580,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     externalCall(props);
@@ -1592,11 +1590,11 @@ function MyComponent(props) {
   }, [props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     props.onChange();
@@ -1604,9 +1602,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'props'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useEffect(() => {
     props.onChange();
@@ -1614,11 +1612,11 @@ function MyComponent(props) {
   }, [props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = 42;
   const local2 = '42';
@@ -1632,9 +1630,9 @@ function MyComponent() {
   }, [local1, local3]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local4'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local4'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local1 = 42;
   const local2 = '42';
@@ -1648,11 +1646,11 @@ function MyComponent() {
   }, [local1, local3, local4]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1682,9 +1680,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'handleNext1'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'handleNext1'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1714,7 +1712,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useLayoutEffect has a missing dependency: 'handleNext2'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useLayoutEffect has a missing dependency: 'handleNext2'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1744,7 +1742,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useMemo has a missing dependency: 'handleNext3'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useMemo has a missing dependency: 'handleNext3'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1774,11 +1772,11 @@ function MyComponent(props) {
   }, [handleNext3]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1811,9 +1809,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'handleNext1'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'handleNext1'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1846,7 +1844,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useLayoutEffect has a missing dependency: 'handleNext2'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useLayoutEffect has a missing dependency: 'handleNext2'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1879,7 +1877,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useMemo has a missing dependency: 'handleNext3'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useMemo has a missing dependency: 'handleNext3'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1912,11 +1910,11 @@ function MyComponent(props) {
   }, [handleNext3]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1949,9 +1947,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'handleNext1'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'handleNext1'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1984,7 +1982,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useLayoutEffect has a missing dependency: 'handleNext2'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useLayoutEffect has a missing dependency: 'handleNext2'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -2017,7 +2015,7 @@ function MyComponent(props) {
   }, []);
 }
 `}}},
-		{Message: "React Hook useMemo has a missing dependency: 'handleNext3'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "React Hook useMemo has a missing dependency: 'handleNext3'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -2050,11 +2048,11 @@ function MyComponent(props) {
   }, [handleNext3]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   let [count, setCount] = useState(0);
 
@@ -2068,9 +2066,9 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'count'. Either include it or remove the dependency array. You can also do a functional update 'setCount(c => ...)' if you only need 'count' in the 'setCount' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'count'. Either include it or remove the dependency array. You can also do a functional update 'setCount(c => ...)' if you only need 'count' in the 'setCount' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Counter() {
   let [count, setCount] = useState(0);
 
@@ -2084,11 +2082,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   let [count, setCount] = useState(0);
   let [increment, setIncrement] = useState(0);
@@ -2103,9 +2101,9 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'count' and 'increment'. Either include them or remove the dependency array. You can also do a functional update 'setCount(c => ...)' if you only need 'count' in the 'setCount' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'count' and 'increment'. Either include them or remove the dependency array. You can also do a functional update 'setCount(c => ...)' if you only need 'count' in the 'setCount' call.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Counter() {
   let [count, setCount] = useState(0);
   let [increment, setIncrement] = useState(0);
@@ -2120,11 +2118,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   let [count, setCount] = useState(0);
   let [increment, setIncrement] = useState(0);
@@ -2139,9 +2137,9 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'increment'. Either include it or remove the dependency array. You can also replace multiple useState variables with useReducer if 'setCount' needs the current value of 'increment'.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'increment'. Either include it or remove the dependency array. You can also replace multiple useState variables with useReducer if 'setCount' needs the current value of 'increment'.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Counter() {
   let [count, setCount] = useState(0);
   let [increment, setIncrement] = useState(0);
@@ -2156,11 +2154,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   let [count, setCount] = useState(0);
   let increment = useCustomHook();
@@ -2175,9 +2173,9 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'increment'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'increment'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Counter() {
   let [count, setCount] = useState(0);
   let increment = useCustomHook();
@@ -2192,11 +2190,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter({ step }) {
   let [count, setCount] = useState(0);
 
@@ -2214,9 +2212,9 @@ function Counter({ step }) {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'increment'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'increment'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Counter({ step }) {
   let [count, setCount] = useState(0);
 
@@ -2234,11 +2232,11 @@ function Counter({ step }) {
   return <h1>{count}</h1>;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter({ increment }) {
   let [count, setCount] = useState(0);
 
@@ -2252,9 +2250,9 @@ function Counter({ increment }) {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'increment'. Either include it or remove the dependency array. If 'setCount' needs the current value of 'increment', you can also switch to useReducer instead of useState and read 'increment' in the reducer.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'increment'. Either include it or remove the dependency array. If 'setCount' needs the current value of 'increment', you can also switch to useReducer instead of useState and read 'increment' in the reducer.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Counter({ increment }) {
   let [count, setCount] = useState(0);
 
@@ -2268,11 +2266,11 @@ function Counter({ increment }) {
   return <h1>{count}</h1>;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   const [count, setCount] = useState(0);
 
@@ -2290,9 +2288,9 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'tick'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'tick'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Counter() {
   const [count, setCount] = useState(0);
 
@@ -2310,11 +2308,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Podcasts() {
   useEffect(() => {
     alert(podcasts);
@@ -2322,9 +2320,9 @@ function Podcasts() {
   let [podcasts, setPodcasts] = useState(null);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'podcasts'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'podcasts'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Podcasts() {
   useEffect(() => {
     alert(podcasts);
@@ -2332,11 +2330,11 @@ function Podcasts() {
   let [podcasts, setPodcasts] = useState(null);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Podcasts({ fetchPodcasts, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2344,9 +2342,9 @@ function Podcasts({ fetchPodcasts, id }) {
   }, [id]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'fetchPodcasts'. Either include it or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'fetchPodcasts'. Either include it or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Podcasts({ fetchPodcasts, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2354,11 +2352,11 @@ function Podcasts({ fetchPodcasts, id }) {
   }, [fetchPodcasts, id]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Podcasts({ api: { fetchPodcasts }, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2366,9 +2364,9 @@ function Podcasts({ api: { fetchPodcasts }, id }) {
   }, [id]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'fetchPodcasts'. Either include it or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'fetchPodcasts'. Either include it or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Podcasts({ api: { fetchPodcasts }, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2376,11 +2374,11 @@ function Podcasts({ api: { fetchPodcasts }, id }) {
   }, [fetchPodcasts, id]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Podcasts({ fetchPodcasts, fetchPodcasts2, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2392,9 +2390,9 @@ function Podcasts({ fetchPodcasts, fetchPodcasts2, id }) {
   }, [id]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'fetchPodcasts' and 'fetchPodcasts2'. Either include them or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'fetchPodcasts' and 'fetchPodcasts2'. Either include them or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Podcasts({ fetchPodcasts, fetchPodcasts2, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2406,11 +2404,11 @@ function Podcasts({ fetchPodcasts, fetchPodcasts2, id }) {
   }, [fetchPodcasts, fetchPodcasts2, id]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Podcasts({ fetchPodcasts, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2419,9 +2417,9 @@ function Podcasts({ fetchPodcasts, id }) {
   }, [id]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'fetchPodcasts'. Either include it or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'fetchPodcasts'. Either include it or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Podcasts({ fetchPodcasts, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2430,11 +2428,11 @@ function Podcasts({ fetchPodcasts, id }) {
   }, [fetchPodcasts, id]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Podcasts({ fetchPodcasts, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2443,9 +2441,9 @@ function Podcasts({ fetchPodcasts, id }) {
   }, [id]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'fetchPodcasts'. Either include it or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'fetchPodcasts'. Either include it or remove the dependency array. If 'fetchPodcasts' changes too often, find the parent component that defines it and wrap that definition in useCallback.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Podcasts({ fetchPodcasts, id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -2454,11 +2452,11 @@ function Podcasts({ fetchPodcasts, id }) {
   }, [fetchPodcasts, id]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Example({ prop }) {
   const foo = useCallback(() => {
     prop.hello(foo);
@@ -2468,9 +2466,9 @@ function Example({ prop }) {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has a missing dependency: 'prop'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has a missing dependency: 'prop'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Example({ prop }) {
   const foo = useCallback(() => {
     prop.hello(foo);
@@ -2480,11 +2478,11 @@ function Example({ prop }) {
   }, [foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   function myEffect() {
@@ -2493,9 +2491,9 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   function myEffect() {
@@ -2504,11 +2502,11 @@ function MyComponent() {
   useEffect(myEffect, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   const myEffect = () => {
@@ -2517,9 +2515,9 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   const myEffect = () => {
@@ -2528,11 +2526,11 @@ function MyComponent() {
   useEffect(myEffect, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   const myEffect = function() {
@@ -2541,9 +2539,9 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   const myEffect = function() {
@@ -2552,11 +2550,11 @@ function MyComponent() {
   useEffect(myEffect, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   const myEffect = () => {
@@ -2568,9 +2566,9 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'otherThing'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'otherThing'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   const myEffect = () => {
@@ -2582,11 +2580,11 @@ function MyComponent() {
   useEffect(myEffect, [otherThing]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   const myEffect = debounce(() => {
@@ -2595,9 +2593,9 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'myEffect'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'myEffect'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   const myEffect = debounce(() => {
@@ -2606,11 +2604,11 @@ function MyComponent() {
   useEffect(myEffect, [myEffect]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   const myEffect = debounce(() => {
@@ -2619,9 +2617,9 @@ function MyComponent() {
   useEffect(myEffect, [local]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'myEffect'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'myEffect'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   const myEffect = debounce(() => {
@@ -2630,11 +2628,11 @@ function MyComponent() {
   useEffect(myEffect, [myEffect]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -2642,9 +2640,9 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"enableDangerousAutofixThisMayCauseInfiniteLoops": true},
-	Output: []string{`
+		Tsx:     true,
+		Options: map[string]interface{}{"enableDangerousAutofixThisMayCauseInfiniteLoops": true},
+		Output: []string{`
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -2652,8 +2650,8 @@ function MyComponent() {
   }, [local]);
 }
 `},
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -2661,11 +2659,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let foo = {}
   useEffect(() => {
@@ -2674,9 +2672,9 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has missing dependencies: 'foo.bar' and 'props.foo.bar'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has missing dependencies: 'foo.bar' and 'props.foo.bar'. Either include them or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let foo = {}
   useEffect(() => {
@@ -2685,8 +2683,8 @@ function MyComponent(props) {
   }, [foo.bar, props.foo.bar]);
 }
 `}}},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_Missing(t *testing.T) {

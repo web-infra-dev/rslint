@@ -185,7 +185,6 @@ var edgeValid = []rule_tester.ValidTestCase{
 			void setState;
 		}
 	`, Tsx: true},
-
 }
 
 var edgeInvalid = []rule_tester.InvalidTestCase{

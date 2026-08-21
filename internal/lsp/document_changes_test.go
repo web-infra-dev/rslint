@@ -145,7 +145,7 @@ func TestApplyDocumentChanges(t *testing.T) {
 			changes: []lsproto.TextDocumentContentChangePartialOrWholeDocument{{
 				Partial: &lsproto.TextDocumentContentChangePartial{
 					Range:       lsproto.Range{Start: lsproto.Position{Character: 1}, End: lsproto.Position{Character: 2}},
-					RangeLength: &rangeLength,
+					RangeLength: &rangeLength, //nolint:staticcheck
 					Text:        "X",
 				},
 			}},

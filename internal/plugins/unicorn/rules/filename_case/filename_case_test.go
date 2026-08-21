@@ -164,39 +164,39 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`)},
 			{Code: `// idx-via-ignore`, FileName: "src/foo/index.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`)},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("camelCase"), `FOOBAR\.js`)},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("camelCase"), `FOOBAR\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("snakeCase"), `FOOBAR\.js`)},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("pascalCase"), `FOOBAR\.js`)},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("pascalCase"), `FOOBAR\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// multi-ignore`, FileName: "src/foo/BARBAZ.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`, `BARBAZ\.js`)},
 			{Code: `// multi-ignore`, FileName: "src/foo/BARBAZ.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`, `BARBAZ\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// escaped-brackets`, FileName: "src/foo/[FOOBAR].js",
 				Options: withIgnore(caseOpt("camelCase"), `\[FOOBAR\]\.js`)},
 			{Code: `// escaped-brackets`, FileName: "src/foo/[FOOBAR].js",
 				Options: withIgnore(caseOpt("camelCase"), `\[FOOBAR]\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// escaped-braces`, FileName: "src/foo/{FOOBAR}.js",
 				Options: withIgnore(caseOpt("snakeCase"), `\{FOOBAR\}\.js`)},
 			{Code: `// escaped-braces`, FileName: "src/foo/{FOOBAR}.js",
 				Options: withIgnore(caseOpt("snakeCase"), `\{FOOBAR\}\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// alternation`, FileName: "src/foo/foo.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`)},
 			{Code: `// alternation`, FileName: "src/foo/foo-bar.js",
@@ -207,10 +207,10 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`)},
 			{Code: `// alternation`, FileName: "src/foo/foo_bar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`),
-				Skip: true /* SKIP: ignore JS RegExp variant (case-insensitive flag) */},
+				Skip:    true /* SKIP: ignore JS RegExp variant (case-insensitive flag) */},
 			{Code: `// alternation`, FileName: "src/foo/FOO_bar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`),
-				Skip: true /* SKIP: ignore JS RegExp variant (case-insensitive flag) */},
+				Skip:    true /* SKIP: ignore JS RegExp variant (case-insensitive flag) */},
 			{Code: `// suffix-ignore`, FileName: "src/foo/foo-bar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `\.(web|android|ios)\.js$`)},
 			{Code: `// suffix-ignore`, FileName: "src/foo/FooBar.web.js",
@@ -221,22 +221,22 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `\.(web|android|ios)\.js$`)},
 			{Code: `// suffix-ignore`, FileName: "src/foo/FooBar.something.js",
 				Options: withIgnore(caseOpt("kebabCase"), `\.(?:web|android|ios|something)\.js$`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// prefix-ignore`, FileName: "src/foo/FooBar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`)},
 			{Code: `// prefix-ignore`, FileName: "src/foo/FooBar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^[Ff]oo`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// 2-pattern-ignore`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^FOO`, `BAZ\.js$`)},
 			{Code: `// 2-pattern-ignore`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^FOO`, `BAZ\.js$`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// 2-pattern-ignore`, FileName: "src/foo/BARBAZ.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^FOO`, `BAZ\.js$`)},
 			{Code: `// 2-pattern-ignore`, FileName: "src/foo/BARBAZ.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^FOO`, `BAZ\.js$`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// many-ignore`, FileName: "src/foo/FOOBAR.js",
 				Options: map[string]interface{}{
 					"cases": map[string]interface{}{
@@ -375,7 +375,7 @@ func TestFilenameCase(t *testing.T) {
 			// A RegExp literal arrives as an object over the JSON bridge. It does
 			// not poison the array; the valid string pattern still applies.
 			{
-				Code: `// lock-in: object ignore entry silently dropped, valid sibling still ignores`,
+				Code:     `// lock-in: object ignore entry silently dropped, valid sibling still ignores`,
 				FileName: "src/foo/FOOBAR.js",
 				Options: map[string]interface{}{
 					"case":   "kebabCase",
@@ -385,9 +385,9 @@ func TestFilenameCase(t *testing.T) {
 			// Locks in: an empty `ignore` array works the same as omitting
 			// `ignore` — no diagnostics, no spurious empty-pattern matches.
 			{
-				Code: `// lock-in: empty ignore array`,
+				Code:     `// lock-in: empty ignore array`,
 				FileName: "src/foo/foo-bar.js",
-				Options: map[string]interface{}{"case": "kebabCase", "ignore": []interface{}{}},
+				Options:  map[string]interface{}{"case": "kebabCase", "ignore": []interface{}{}},
 			},
 
 			// Latest upstream preserves a leading acronym when the remainder
@@ -411,7 +411,6 @@ func TestFilenameCase(t *testing.T) {
 			// true on an empty filtered list.
 			{Code: `// lock-in: all-ignored basename is valid`, FileName: "src/foo/$$$.js", Options: caseOpt("camelCase")},
 			{Code: `// lock-in: all-ignored basename + leading underscores is valid`, FileName: "src/foo/___$$.js", Options: caseOpt("camelCase")},
-
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Disable-comment INSIDE the file body — does NOT match a
@@ -985,7 +984,7 @@ func TestFilenameCase(t *testing.T) {
 			// A JSON-stringified RegExp object is skipped and does not become
 			// an invalid pattern. The valid sibling does not match this file.
 			{
-				Code: `// lock-in: object ignore entry does not fire invalidIgnorePattern`,
+				Code:     `// lock-in: object ignore entry does not fire invalidIgnorePattern`,
 				FileName: "src/foo/foo_bar.js",
 				Options: map[string]interface{}{
 					"case":   "kebabCase",
@@ -999,7 +998,7 @@ func TestFilenameCase(t *testing.T) {
 			// When object + valid string + invalid string entries coexist, the
 			// invalid string still wins and aborts filename checking.
 			{
-				Code: `// lock-in: object + valid + invalid ignore entries together`,
+				Code:     `// lock-in: object + valid + invalid ignore entries together`,
 				FileName: "src/foo/FOOBAR.js",
 				Options: map[string]interface{}{
 					"case":   "kebabCase",
@@ -1017,7 +1016,7 @@ func TestFilenameCase(t *testing.T) {
 			// test in splitwords_test.go locks the formatter directly; this
 			// proves the rule produces it via the real diagnostic path.)
 			{
-				Code: `// lock-in: oxford-comma 4-item, four legacy cases enabled`,
+				Code:     `// lock-in: oxford-comma 4-item, four legacy cases enabled`,
 				FileName: "src/foo/FOO_BAR.js",
 				Options: casesOpt(map[string]bool{
 					"camelCase": true, "snakeCase": true,
@@ -1033,7 +1032,7 @@ func TestFilenameCase(t *testing.T) {
 			// `_`, because the digit-prefixed word is index 0). Companion
 			// invalid for the unit test in splitwords_test.go.
 			{
-				Code: `// lock-in: first word starting with digit (camel)`,
+				Code:     `// lock-in: first word starting with digit (camel)`,
 				FileName: "src/foo/123-foo.js",
 				Options:  caseOpt("camelCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1045,7 +1044,7 @@ func TestFilenameCase(t *testing.T) {
 			// pascalCase too — the first-word digit also stays unprefixed
 			// in pascal output (`upper(char0)` is identity for digits).
 			{
-				Code: `// lock-in: first word starting with digit (pascal)`,
+				Code:     `// lock-in: first word starting with digit (pascal)`,
 				FileName: "src/foo/123-foo.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1056,7 +1055,7 @@ func TestFilenameCase(t *testing.T) {
 			// Leading acronyms are preserved only when the suffix is already
 			// PascalCase; these latest-upstream counterexamples are normalized.
 			{
-				Code: `// leading acronym followed by invalid suffix`,
+				Code:     `// leading acronym followed by invalid suffix`,
 				FileName: "src/foo/FAQPageFOO.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1065,7 +1064,7 @@ func TestFilenameCase(t *testing.T) {
 				}},
 			},
 			{
-				Code: `// two-letter prefix is not a preserved acronym`,
+				Code:     `// two-letter prefix is not a preserved acronym`,
 				FileName: "src/foo/UIPath.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1081,7 +1080,7 @@ func TestFilenameCase(t *testing.T) {
 			// that proves we still match Node when the all-dots prefix is
 			// shorter than the basename.
 			{
-				Code: `// lock-in: node-extname parity (basename has trailing real ext)`,
+				Code:     `// lock-in: node-extname parity (basename has trailing real ext)`,
 				FileName: "src/foo/...js",
 				Skip:     true, /* SKIP: TS program rejects this odd basename; logic exercised by the unit table inline above */
 			},

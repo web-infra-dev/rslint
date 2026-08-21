@@ -845,8 +845,8 @@ func TestMouseEventsHaveKeyEventsExtras(t *testing.T) {
 
 			// ---- Spread before hover, no pair → report. ----
 			{
-				Code:   `<div {...props} onMouseOver={fn} />`,
-				Tsx:    true,
+				Code: `<div {...props} onMouseOver={fn} />`,
+				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "mouseOver",
 					Message:   "onMouseOver must be accompanied by onFocus for accessibility.",
@@ -856,8 +856,8 @@ func TestMouseEventsHaveKeyEventsExtras(t *testing.T) {
 			},
 			// ---- Multiple spreads + direct hover, no pair → report. ----
 			{
-				Code:   `<div {...a} {...b} onMouseOver={fn} />`,
-				Tsx:    true,
+				Code: `<div {...a} {...b} onMouseOver={fn} />`,
+				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "mouseOver",
 					Message:   "onMouseOver must be accompanied by onFocus for accessibility.",

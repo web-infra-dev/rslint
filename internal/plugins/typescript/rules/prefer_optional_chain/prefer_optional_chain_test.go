@@ -1476,7 +1476,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// Deep mixed checks (long chains with mixed operators)
 		// =================================================================
 		{
-			Code: "a &&\n  a.b != null &&\n  a.b.c !== undefined &&\n  a.b.c !== null &&\n  a.b.c.d != null &&\n  a.b.c.d.e !== null &&\n  a.b.c.d.e !== undefined &&\n  a.b.c.d.e.f != undefined &&\n  typeof a.b.c.d.e.f.g !== 'undefined' &&\n  a.b.c.d.e.f.g !== null &&\n  a.b.c.d.e.f.g.h;",
+			Code:   "a &&\n  a.b != null &&\n  a.b.c !== undefined &&\n  a.b.c !== null &&\n  a.b.c.d != null &&\n  a.b.c.d.e !== null &&\n  a.b.c.d.e !== undefined &&\n  a.b.c.d.e.f != undefined &&\n  typeof a.b.c.d.e.f.g !== 'undefined' &&\n  a.b.c.d.e.f.g !== null &&\n  a.b.c.d.e.f.g.h;",
 			Output: []string{"a?.b?.c?.d?.e?.f?.g?.h;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},

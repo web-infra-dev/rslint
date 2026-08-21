@@ -20,21 +20,21 @@ func TestNoThrowLiteral(t *testing.T) {
 			{Code: `throw Error('error');`},
 			{Code: `var e = new Error(); throw e;`},
 			{Code: `try {throw new Error();} catch (e) {throw e;};`},
-			{Code: `throw a;`},          // Identifier
-			{Code: `throw foo();`},      // CallExpression
-			{Code: `throw new foo();`},  // NewExpression
-			{Code: `throw foo.bar;`},    // PropertyAccessExpression (ESTree MemberExpression)
-			{Code: `throw foo[bar];`},   // ElementAccessExpression (ESTree MemberExpression)
-			{Code: `class C { #field: any; foo() { throw foo.#field; } }`}, // private field member access
-			{Code: `throw foo = new Error();`},                              // AssignmentExpression `=`
-			{Code: `throw foo.bar ||= 'literal'`},                           // logical-assign `||=` (left could be Error)
-			{Code: `throw foo[bar] ??= 'literal'`},                          // logical-assign `??=` (left could be Error)
-			{Code: `throw 1, 2, new Error();`},                              // SequenceExpression (last is Error)
-			{Code: `throw 'literal' && new Error();`},                       // LogicalExpression `&&` (right is Error)
-			{Code: `throw new Error() || 'literal';`},                       // LogicalExpression `||` (left is Error)
-			{Code: `throw foo ? new Error() : 'literal';`},                  // ConditionalExpression (consequent)
-			{Code: `throw foo ? 'literal' : new Error();`},                  // ConditionalExpression (alternate)
-			{Code: "throw tag `${foo}`;"},                                   // TaggedTemplateExpression
+			{Code: `throw a;`},                                                // Identifier
+			{Code: `throw foo();`},                                            // CallExpression
+			{Code: `throw new foo();`},                                        // NewExpression
+			{Code: `throw foo.bar;`},                                          // PropertyAccessExpression (ESTree MemberExpression)
+			{Code: `throw foo[bar];`},                                         // ElementAccessExpression (ESTree MemberExpression)
+			{Code: `class C { #field: any; foo() { throw foo.#field; } }`},    // private field member access
+			{Code: `throw foo = new Error();`},                                // AssignmentExpression `=`
+			{Code: `throw foo.bar ||= 'literal'`},                             // logical-assign `||=` (left could be Error)
+			{Code: `throw foo[bar] ??= 'literal'`},                            // logical-assign `??=` (left could be Error)
+			{Code: `throw 1, 2, new Error();`},                                // SequenceExpression (last is Error)
+			{Code: `throw 'literal' && new Error();`},                         // LogicalExpression `&&` (right is Error)
+			{Code: `throw new Error() || 'literal';`},                         // LogicalExpression `||` (left is Error)
+			{Code: `throw foo ? new Error() : 'literal';`},                    // ConditionalExpression (consequent)
+			{Code: `throw foo ? 'literal' : new Error();`},                    // ConditionalExpression (alternate)
+			{Code: "throw tag `${foo}`;"},                                     // TaggedTemplateExpression
 			{Code: `function* foo() { var index = 0; throw yield index++; }`}, // YieldExpression
 			{Code: `async function foo() { throw await bar; }`},               // AwaitExpression
 			{Code: `throw obj?.foo`},                                          // optional chain (PropertyAccess)

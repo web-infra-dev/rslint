@@ -336,7 +336,6 @@ class Hello {
         });
       `, Tsx: true, Settings: map[string]interface{}{"react": map[string]interface{}{"createClass": "myCreate"}}},
 
-
 		// ---- Edge: logical-OR receiver `(this || other).setState({})` ----
 		// `this || other` is a BinaryExpression(||). SkipParentheses
 		// unwraps the outer parens, but the receiver is still a
@@ -2052,6 +2051,5 @@ class Outer extends React.Component {
 				{MessageId: "noSetState", Line: 3, Column: 11},
 			},
 		},
-
 	})
 }

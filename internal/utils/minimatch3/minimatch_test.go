@@ -354,8 +354,8 @@ func TestMatchNoCase(t *testing.T) {
 		{"[a-]", "-", true},
 	}
 
-	// These mappings were added in Unicode 16 and 17 after the Unicode 15
-	// tables in Go 1.26. Node 26 uses Unicode 17 for regexp canonicalization.
+	// These mappings arrived in Unicode 16 and 17, which is the edition Node 26
+	// canonicalizes a regexp on.
 	unicode17Pairs := [][2]rune{
 		{0x019B, 0xA7DC},
 		{0x0264, 0xA7CB},

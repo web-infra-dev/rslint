@@ -483,14 +483,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 		//      since the rule only checks truthiness, not validity). ----
 		{Code: `<html lang="en" />`, Tsx: true},
 		{Code: `<html lang="en-US" />`, Tsx: true},
-		{Code: `<html lang="en-GB-oed" />`, Tsx: true},                        // grandfathered
-		{Code: `<html lang="zh-Hant-TW" />`, Tsx: true},                       // script + region
-		{Code: `<html lang="cmn-Hans-CN" />`, Tsx: true},                      // macrolanguage
-		{Code: `<html lang="sl-rozaj-biske-1994" />`, Tsx: true},              // multi-variant
-		{Code: `<html lang="en-US-x-twain" />`, Tsx: true},                    // private use
-		{Code: `<html lang="x-pseudo" />`, Tsx: true},                         // private-only
-		{Code: `<html lang="i-default" />`, Tsx: true},                        // grandfathered
-		{Code: `<html lang="art-x-pirate" />`, Tsx: true},                     // artificial + private
+		{Code: `<html lang="en-GB-oed" />`, Tsx: true},           // grandfathered
+		{Code: `<html lang="zh-Hant-TW" />`, Tsx: true},          // script + region
+		{Code: `<html lang="cmn-Hans-CN" />`, Tsx: true},         // macrolanguage
+		{Code: `<html lang="sl-rozaj-biske-1994" />`, Tsx: true}, // multi-variant
+		{Code: `<html lang="en-US-x-twain" />`, Tsx: true},       // private use
+		{Code: `<html lang="x-pseudo" />`, Tsx: true},            // private-only
+		{Code: `<html lang="i-default" />`, Tsx: true},           // grandfathered
+		{Code: `<html lang="art-x-pirate" />`, Tsx: true},        // artificial + private
 
 		// ---- Common HTML attribute combinations on root. ----
 		{Code: `<html lang="en" dir="ltr" />`, Tsx: true},
@@ -506,12 +506,12 @@ func TestHtmlHasLangExtras(t *testing.T) {
 		{Code: `<html lang={"" + lang} />`, Tsx: true},
 
 		// ---- Numeric edge cases (lang doesn't validate, just truthy). ----
-		{Code: `<html lang={0o10} />`, Tsx: true}, // octal 8
-		{Code: `<html lang={0xff} />`, Tsx: true}, // hex 255
-		{Code: `<html lang={0b10} />`, Tsx: true}, // binary 2
-		{Code: `<html lang={1e2} />`, Tsx: true},  // 100
+		{Code: `<html lang={0o10} />`, Tsx: true},  // octal 8
+		{Code: `<html lang={0xff} />`, Tsx: true},  // hex 255
+		{Code: `<html lang={0b10} />`, Tsx: true},  // binary 2
+		{Code: `<html lang={1e2} />`, Tsx: true},   // 100
 		{Code: `<html lang={1_000} />`, Tsx: true}, // numeric separator
-		{Code: `<html lang={1.5} />`, Tsx: true},  // float
+		{Code: `<html lang={1.5} />`, Tsx: true},   // float
 
 		// ---- BigInt non-zero variants. ----
 		{Code: `<html lang={123n} />`, Tsx: true},
