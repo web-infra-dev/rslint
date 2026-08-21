@@ -35,21 +35,32 @@ func parseOptions(rawOptions []any) options {
 	return opts
 }
 
-// isWriteThroughTypeAssertion checks if the identifier reaches its assignment target
-// through an AsExpression or TypeAssertionExpression. ESLint's scope analysis does not
-// track writes through these TS-specific wrappers, so we skip them to match ESLint.
-func isWriteThroughTypeAssertion(node *ast.Node) bool {
-	current := node.Parent
-	for current != nil {
-		switch current.Kind {
-		case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression:
-			return true
-		case ast.KindParenthesizedExpression, ast.KindNonNullExpression:
-			current = current.Parent
-			continue
+// hasStackedTypeWrappers reports whether the identifier reaches a plain `=`
+// assignment's target through more than one TypeScript expression wrapper.
+// ESLint's scope analysis unwraps that target exactly once — an AsExpression,
+// TypeAssertionExpression or NonNullExpression — before asking whether what
+// remains is an assignment pattern, so `(Object as any) = 1` is a write while
+// `((Object as any) as any) = 1` is not. Parentheses never count: the ESTree
+// AST has no node for them. Only the plain `=` form takes that path; compound
+// assignments, update expressions and destructuring patterns recognize a
+// wrapped target however deeply it is nested. A `satisfies` target is not a
+// write at any depth, which IsWriteReference already answers.
+func hasStackedTypeWrappers(node *ast.Node) bool {
+	wrappers := 0
+	current := node
+	for parent := current.Parent; parent != nil; parent = current.Parent {
+		switch parent.Kind {
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindNonNullExpression:
+			wrappers++
+		case ast.KindParenthesizedExpression:
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			return wrappers > 1 && binary != nil && binary.OperatorToken != nil &&
+				binary.OperatorToken.Kind == ast.KindEqualsToken && binary.Left == current
 		default:
 			return false
 		}
+		current = parent
 	}
 	return false
 }
@@ -96,7 +107,7 @@ var NoGlobalAssignRule = rule.Rule{
 					return
 				}
 
-				if isWriteThroughTypeAssertion(node) {
+				if hasStackedTypeWrappers(node) {
 					return
 				}
 
