@@ -62,7 +62,7 @@ var commonJSGlobalsInit = GlobalsInit{entries: languageGlobalCatalog}
 
 var moduleRefStoreInit = RefStoreInit{nonGlobalTopLevelScope: true}
 
-var scriptRefStoreInit = RefStoreInit{globalTopLevelScope: true}
+var globalProgramRefStoreInit = RefStoreInit{globalTopLevelScope: true}
 
 var commonJSRefStoreInit = RefStoreInit{
 	implicitWrapperBindings: []string{"arguments"},
@@ -86,20 +86,20 @@ func isJavaScriptSourceExtension(fileName string) bool {
 // together with effective language options.
 //
 // An omitted source type is filled from the filename for JavaScript files:
-// .js/.mjs select module, .cjs selects commonjs. Other extensions, including
-// .jsx/.ts/.tsx/.cts, keep the empty value. Authored sourceType then selects
-// the inits on every extension. module contributes a non-global top-level
-// scope. commonjs contributes writable exports and read-only
+// .js/.jsx/.mjs select module, .cjs selects commonjs. Other extensions,
+// including .ts/.tsx/.cts, keep the empty value. Authored sourceType then
+// selects the inits on every extension. module contributes a non-global
+// top-level scope. commonjs contributes writable exports and read-only
 // global/module/require everywhere; on espree-parsed extensions
 // (.js/.jsx/.mjs/.cjs) it adds the non-global wrapper scope and the
-// wrapper-local arguments binding, while TypeScript-flavoured extensions stop
-// at the four globals, matching typescript-eslint's scope manager. script
-// forces a global program scope even when module syntax is present; the
-// still-empty TypeScript/JSX value contributes no defaults.
+// wrapper-local arguments binding, while TypeScript-flavoured extensions
+// keep a global program scope, matching typescript-eslint's scope manager.
+// script forces a global program scope even when module syntax is present;
+// the still-empty TypeScript value contributes no defaults.
 func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (GlobalsInit, RefStoreInit, LanguageOptions) {
 	if languageOptions.SourceType == "" {
 		switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
-		case tspath.ExtensionJs, tspath.ExtensionMjs:
+		case tspath.ExtensionJs, tspath.ExtensionJsx, tspath.ExtensionMjs:
 			languageOptions.SourceType = "module"
 		case tspath.ExtensionCjs:
 			languageOptions.SourceType = "commonjs"
@@ -110,11 +110,11 @@ func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (
 		if isJavaScriptSourceExtension(fileName) {
 			return commonJSGlobalsInit, commonJSRefStoreInit, languageOptions
 		}
-		return commonJSGlobalsInit, RefStoreInit{}, languageOptions
+		return commonJSGlobalsInit, globalProgramRefStoreInit, languageOptions
 	case "module":
 		return GlobalsInit{}, moduleRefStoreInit, languageOptions
 	case "script":
-		return GlobalsInit{}, scriptRefStoreInit, languageOptions
+		return GlobalsInit{}, globalProgramRefStoreInit, languageOptions
 	}
 	return GlobalsInit{}, RefStoreInit{}, languageOptions
 }

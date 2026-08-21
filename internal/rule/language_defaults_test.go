@@ -18,7 +18,7 @@ func TestResolveLanguageDefaults(t *testing.T) {
 	}{
 		{fileName: "/repo/file.js", nonGlobalTopLevelScope: true, sourceType: "module"},
 		{fileName: "/repo/file.mjs", nonGlobalTopLevelScope: true, sourceType: "module"},
-		{fileName: "/repo/file.jsx"},
+		{fileName: "/repo/file.jsx", nonGlobalTopLevelScope: true, sourceType: "module"},
 		{fileName: "/repo/file.ts"},
 		{fileName: "/repo/file.cts"},
 		{fileName: "/repo/file.CJS"},
@@ -84,12 +84,12 @@ func TestResolveLanguageDefaults(t *testing.T) {
 			{fileName: "file.js", authored: "script", wantSourceType: "script", globalTopLevelScope: true},
 			{fileName: "file.cjs", authored: "module", wantSourceType: "module", nonGlobalTopLevelScope: true},
 			{fileName: "file.cjs", authored: "script", wantSourceType: "script", globalTopLevelScope: true},
-			{fileName: "file.ts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
+			{fileName: "file.ts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true, globalTopLevelScope: true},
 			{fileName: "file.ts", authored: "module", wantSourceType: "module", nonGlobalTopLevelScope: true},
 			{fileName: "file.tsx", authored: "script", wantSourceType: "script", globalTopLevelScope: true},
 			{fileName: "file.jsx", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true, commonJSWrapper: true, nonGlobalTopLevelScope: true},
-			{fileName: "file.mts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
-			{fileName: "file.cts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true},
+			{fileName: "file.mts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true, globalTopLevelScope: true},
+			{fileName: "file.cts", authored: "commonjs", wantSourceType: "commonjs", commonJSGlobals: true, globalTopLevelScope: true},
 		}
 		for _, test := range tests {
 			t.Run(test.fileName+"/"+test.authored, func(t *testing.T) {

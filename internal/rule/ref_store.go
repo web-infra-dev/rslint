@@ -572,16 +572,14 @@ func (s *RefStore) HasNonGlobalTopLevelScope() bool {
 
 // HasNonGlobalProgramScope reports whether program-level declarations should
 // be treated as living outside the global scope. Module syntax and resolved
-// language defaults can both contribute; an authored script sourceType forces
-// global program scope instead.
-func (s *RefStore) HasNonGlobalProgramScope(sourceFile *ast.SourceFile) bool {
-	if s != nil && s.init.globalTopLevelScope {
+// language defaults can both contribute; an authored global program scope
+// (script, or commonjs on TypeScript-flavoured extensions) forces global
+// program scope instead.
+func (s *RefStore) HasNonGlobalProgramScope() bool {
+	if s == nil || s.init.globalTopLevelScope {
 		return false
 	}
-	if sourceFile != nil && ast.IsExternalModule(sourceFile) {
-		return true
-	}
-	return s != nil && s.init.nonGlobalTopLevelScope
+	return ast.IsExternalModule(s.sourceFile) || s.init.nonGlobalTopLevelScope
 }
 
 // binderReferenceSymbol resolves one reference without checker work. A named

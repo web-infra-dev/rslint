@@ -382,6 +382,26 @@ func TestNoRedeclareExtras(t *testing.T) {
 					builtinError("Object", 1, 5),
 				},
 			},
+			// typescript-eslint keys module scope on sourceType === "module" alone,
+			// so commonjs keeps global program scope even when the file has module syntax.
+			{
+				Code:            "export {};\nvar Object = 0;",
+				FileName:        "a.ts",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 2, 5),
+				},
+			},
+			{
+				Code:            "import x from './y';\nvar Object = 0;",
+				FileName:        "a.ts",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 2, 5),
+				},
+			},
 			// typescript-eslint keys module scope on sourceType alone; script keeps global scope.
 			{
 				Code:            "export {};\nvar Object = 0;",

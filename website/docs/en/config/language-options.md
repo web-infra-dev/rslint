@@ -24,9 +24,9 @@ The `'latest'` value remains semantic rather than being frozen into the config, 
 ## languageOptions.sourceType
 
 - **Type:** `'module' | 'script' | 'commonjs'`
-- **Default:** `.js` / `.mjs` → `'module'`; `.cjs` → `'commonjs'`; otherwise unset
+- **Default:** `.js` / `.jsx` / `.mjs` → `'module'`; `.cjs` → `'commonjs'`; otherwise unset
 
-Selects the module kind used by the per-file language context, including CommonJS globals (`require`, `module`, `exports`, `global`) and whether the top-level scope is the global object. When omitted, `.js` and `.mjs` resolve to `'module'` and `.cjs` to `'commonjs'` before rules see the value. Other extensions such as `.ts`, `.tsx`, and `.jsx` keep the option unset. An authored value applies on every extension.
+Selects the module kind used by the per-file language context, including CommonJS globals (`require`, `module`, `exports`, `global`) and whether the top-level scope is the global object. When omitted, `.js`, `.jsx`, and `.mjs` resolve to `'module'` and `.cjs` to `'commonjs'` before rules see the value. Other extensions such as `.ts` and `.tsx` keep the option unset. An authored value applies on every extension.
 
 This option does not change TypeScript parsing or compiler module resolution. Support in an individual native rule depends on that rule consulting the configured value; rules that still document syntax-based module detection continue to use that behavior.
 

@@ -392,14 +392,15 @@ Before constructing rule contexts, the linter calls `ResolveLanguageDefaults`
 once and passes its concrete `GlobalsInit`, `RefStoreInit`, and effective
 `LanguageOptions` results to their respective consumers. An omitted source
 type is filled from the filename for JavaScript files (`.cjs` → `commonjs`,
-`.js`/`.mjs` → `module`); `.ts`/`.tsx`/`.jsx` and other extensions keep the
+`.js`/`.jsx`/`.mjs` → `module`); `.ts`/`.tsx` and other extensions keep the
 empty value. The resolver then selects inits from that effective source type:
 `commonjs` contributes writable `exports`, read-only `global`, `module`, and
 `require` on every extension, plus — on espree-parsed extensions
 (`.js`/`.jsx`/`.mjs`/`.cjs`) — non-global wrapper scope and the wrapper-local
 `arguments` binding; `module` contributes a non-global top-level scope;
-`script` forces a global program scope even when module syntax is present; the
-still-empty TypeScript/JSX value contributes no defaults.
+`script` forces a global program scope even when module syntax is present;
+TypeScript-flavoured `commonjs` keeps that same global program scope;
+the still-empty TypeScript value contributes no defaults.
 Authored `sourceType` therefore applies on every extension, including
 `.ts`/`.tsx`. The resolver does not inspect `package.json`. A rule reads
 `RuleContext.LanguageOptions` when its upstream behavior depends on them.
