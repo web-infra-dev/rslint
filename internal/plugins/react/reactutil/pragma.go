@@ -3,7 +3,8 @@ package reactutil
 import (
 	"regexp"
 	"strconv"
-	"strings"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // DefaultReactPragma is the fallback object name for createElement calls
@@ -93,7 +94,7 @@ func ParseReactVersion(settings map[string]interface{}) (int, int, int) {
 		return 999, 999, 999
 	}
 	raw, _ := reactSettings["version"].(string)
-	raw = strings.TrimSpace(raw)
+	raw = ecmascript.StringTrim(raw)
 	if raw == "" {
 		return 999, 999, 999
 	}

@@ -9,12 +9,12 @@ async function numberOne(): Promise<number> {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async function 'numberOne' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 25,
+          "line": 2,
         },
         "start": {
           "column": 1,
@@ -39,12 +39,12 @@ const numberOne = async function (): Promise<number> {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async function 'numberOne' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 34,
+          "line": 2,
         },
         "start": {
           "column": 19,
@@ -65,15 +65,15 @@ exports[`require-await > invalid 3`] = `
   "code": "const numberOne = async (): Promise<number> => 1;",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async arrow function 'numberOne' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 49,
+          "column": 47,
           "line": 1,
         },
         "start": {
-          "column": 19,
+          "column": 45,
           "line": 1,
         },
       },
@@ -95,12 +95,12 @@ async function values(): Promise<Array<number>> {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async function 'values' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 22,
+          "line": 2,
         },
         "start": {
           "column": 1,
@@ -127,12 +127,12 @@ exports[`require-await > invalid 5`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 6,
+          "column": 27,
+          "line": 2,
         },
         "start": {
           "column": 9,
@@ -157,12 +157,12 @@ async function* foo(): void {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 20,
+          "line": 2,
         },
         "start": {
           "column": 1,
@@ -187,12 +187,12 @@ async function* foo() {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 20,
+          "line": 2,
         },
         "start": {
           "column": 1,
@@ -217,12 +217,12 @@ const foo = async function* () {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 29,
+          "line": 2,
         },
         "start": {
           "column": 13,
@@ -247,12 +247,12 @@ async function* asyncGenerator() {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'asyncGenerator' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 31,
+          "line": 2,
         },
         "start": {
           "column": 1,
@@ -277,12 +277,12 @@ async function* asyncGenerator(source: Iterable<any>) {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'asyncGenerator' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 31,
+          "line": 2,
         },
         "start": {
           "column": 1,
@@ -312,12 +312,12 @@ async function* asyncGenerator(source: Iterable<any> | AsyncIterable<any>) {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'asyncGenerator' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 9,
+          "column": 31,
+          "line": 5,
         },
         "start": {
           "column": 1,
@@ -345,12 +345,12 @@ async function* asyncGenerator() {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'asyncGenerator' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 7,
+          "column": 31,
+          "line": 5,
         },
         "start": {
           "column": 1,
@@ -375,12 +375,12 @@ async function* asyncGenerator() {
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'asyncGenerator' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 31,
+          "line": 2,
         },
         "start": {
           "column": 1,
@@ -405,15 +405,15 @@ exports[`require-await > invalid 14`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async arrow function 'fn' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 4,
+          "column": 31,
+          "line": 2,
         },
         "start": {
-          "column": 20,
+          "column": 29,
           "line": 2,
         },
       },
@@ -436,12 +436,12 @@ exports[`require-await > invalid 15`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 5,
+          "column": 28,
+          "line": 3,
         },
         "start": {
           "column": 9,
@@ -466,12 +466,12 @@ exports[`require-await > invalid 16`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 4,
+          "column": 28,
+          "line": 2,
         },
         "start": {
           "column": 9,
@@ -496,12 +496,12 @@ exports[`require-await > invalid 17`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async generator function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 4,
+          "column": 28,
+          "line": 2,
         },
         "start": {
           "column": 9,
@@ -526,12 +526,12 @@ exports[`require-await > invalid 18`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 4,
+          "column": 27,
+          "line": 2,
         },
         "start": {
           "column": 9,
@@ -556,12 +556,12 @@ exports[`require-await > invalid 19`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async function has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 4,
+          "column": 25,
+          "line": 2,
         },
         "start": {
           "column": 10,
@@ -586,15 +586,15 @@ exports[`require-await > invalid 20`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async arrow function has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 4,
+          "column": 20,
+          "line": 2,
         },
         "start": {
-          "column": 9,
+          "column": 18,
           "line": 2,
         },
       },
@@ -612,15 +612,15 @@ exports[`require-await > invalid 21`] = `
   "code": "async () => doSomething();",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async arrow function has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 26,
+          "column": 12,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 10,
           "line": 1,
         },
       },
@@ -644,12 +644,12 @@ exports[`require-await > invalid 22`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async method 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 5,
+          "column": 20,
+          "line": 3,
         },
         "start": {
           "column": 11,
@@ -676,12 +676,12 @@ exports[`require-await > invalid 23`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async method 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 5,
+          "column": 20,
+          "line": 3,
         },
         "start": {
           "column": 11,
@@ -708,12 +708,12 @@ exports[`require-await > invalid 24`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async method 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 5,
+          "column": 27,
+          "line": 3,
         },
         "start": {
           "column": 11,
@@ -740,12 +740,12 @@ exports[`require-await > invalid 25`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async method 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 5,
+          "column": 20,
+          "line": 3,
         },
         "start": {
           "column": 11,
@@ -772,12 +772,12 @@ exports[`require-await > invalid 26`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async method has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 5,
+          "column": 19,
+          "line": 3,
         },
         "start": {
           "column": 11,
@@ -804,12 +804,12 @@ exports[`require-await > invalid 27`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 6,
+          "column": 27,
+          "line": 2,
         },
         "start": {
           "column": 9,
@@ -836,15 +836,15 @@ exports[`require-await > invalid 28`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async arrow function has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 5,
+          "column": 29,
+          "line": 3,
         },
         "start": {
-          "column": 18,
+          "column": 27,
           "line": 3,
         },
       },
@@ -868,15 +868,15 @@ exports[`require-await > invalid 29`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async method 'async' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 5,
+          "column": 36,
+          "line": 3,
         },
         "start": {
-          "column": 18,
+          "column": 11,
           "line": 3,
         },
       },
@@ -898,12 +898,12 @@ exports[`require-await > invalid 30`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async function 'foo' has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 4,
+          "column": 41,
+          "line": 2,
         },
         "start": {
           "column": 9,
@@ -931,12 +931,12 @@ exports[`require-await > invalid 31`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async method has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 6,
+          "column": 20,
+          "line": 4,
         },
         "start": {
           "column": 11,
@@ -962,15 +962,15 @@ exports[`require-await > invalid 32`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async arrow function has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 10,
-          "line": 5,
+          "column": 20,
+          "line": 3,
         },
         "start": {
-          "column": 9,
+          "column": 18,
           "line": 3,
         },
       },
@@ -995,12 +995,12 @@ exports[`require-await > invalid 33`] = `
       ",
   "diagnostics": [
     {
-      "message": "Function has no 'await' expression.",
+      "message": "Async method has no 'await' expression.",
       "messageId": "missingAwait",
       "range": {
         "end": {
-          "column": 12,
-          "line": 6,
+          "column": 22,
+          "line": 4,
         },
         "start": {
           "column": 11,

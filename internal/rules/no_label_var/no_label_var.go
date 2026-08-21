@@ -6,21 +6,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func hasEnclosingTypeParameter(node *ast.Node, name string) bool {
-	for current := node.Parent; current != nil; current = current.Parent {
-		if !ast.IsFunctionLikeDeclaration(current) &&
-			current.Kind != ast.KindClassDeclaration && current.Kind != ast.KindClassExpression {
-			continue
-		}
-		for _, typeParameter := range current.TypeParameters() {
-			if typeParameter != nil && typeParameter.Name() != nil && typeParameter.Name().Text() == name {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // https://eslint.org/docs/latest/rules/no-label-var
 //
 // ESLint's `getVariableByName` walks the scope chain all the way to the global
@@ -63,7 +48,7 @@ var NoLabelVarRule = rule.Rule{
 				// scope-manager leaves class type parameters in the lexical scope
 				// chain of static members, while TypeScript's resolver deliberately
 				// hides them there. Preserve the scope-manager answer.
-				if hasEnclosingTypeParameter(node, name) {
+				if utils.HasEnclosingTypeParameter(node, name) {
 					report(node)
 					return
 				}

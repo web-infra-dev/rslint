@@ -2,21 +2,18 @@ package dot_notation
 
 import (
 	_ "embed"
-	"regexp"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
-	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	coreDotNotation "github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 )
 
 //go:embed dot_notation.schema.json
 var schemaJSON []byte
 
-// Options mirrors @typescript-eslint/dot-notation options
+// Options mirrors @typescript-eslint/dot-notation options.
 type Options struct {
 	AllowIndexSignaturePropertyAccess bool   `json:"allowIndexSignaturePropertyAccess"`
 	AllowKeywords                     bool   `json:"allowKeywords"`
@@ -54,343 +51,105 @@ func parseOptions(options []any) Options {
 	return opts
 }
 
-func buildUseDotMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "useDot",
-		Description: "Use dot notation instead of bracket notation.",
-	}
-}
-
-func buildUseBracketsMessage(key string) rule.RuleMessage {
-	// Keep key for parity with ESLint message data (not used in printing now)
-	_ = key
-	return rule.RuleMessage{
-		Id:          "useBrackets",
-		Description: "Property is a keyword - use bracket notation.",
-	}
-}
-
-// Reserved word set mirrored from ESLint's core dot-notation rule
-// (see eslint/lib/rules/utils/keywords.js). This is the ES3 reserved-word
-// list, which is what the core rule uses for its keyword check — regardless
-// of ECMAScript version, because bracket notation on these names is the only
-// ES3-compatible form.
-var keywordSet = map[string]struct{}{
-	"abstract": {}, "boolean": {}, "break": {}, "byte": {}, "case": {}, "catch": {},
-	"char": {}, "class": {}, "const": {}, "continue": {}, "debugger": {}, "default": {},
-	"delete": {}, "do": {}, "double": {}, "else": {}, "enum": {}, "export": {},
-	"extends": {}, "false": {}, "final": {}, "finally": {}, "float": {}, "for": {},
-	"function": {}, "goto": {}, "if": {}, "implements": {}, "import": {}, "in": {},
-	"instanceof": {}, "int": {}, "interface": {}, "long": {}, "native": {}, "new": {},
-	"null": {}, "package": {}, "private": {}, "protected": {}, "public": {}, "return": {},
-	"short": {}, "static": {}, "super": {}, "switch": {}, "synchronized": {}, "this": {},
-	"throw": {}, "throws": {}, "transient": {}, "true": {}, "try": {}, "typeof": {},
-	"var": {}, "void": {}, "volatile": {}, "while": {}, "with": {},
-}
-
-var identRE = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
-
-func isValidIdentifier(name string) bool {
-	return identRE.MatchString(name)
-}
-
-func isKeyword(name string) bool {
-	_, ok := keywordSet[name]
-	return ok
-}
-
 // hasStringLikeIndexSignature reports whether the type exposes an index
-// signature whose key is string-like. Uses the type checker so that mapped
-// types (including Record<K, V>) and template literal index keys are
-// recognized — not just inline `[key: …]: …` declarations.
-//
-// Passes the type through unchanged: on union types the checker returns only
-// index signatures present on *every* member, and on intersections it merges
-// signatures from the parts — which matches typescript-eslint's
-// `checker.getIndexInfosOfType(objectType)` behavior exactly.
+// signature whose key is string-like. The checker handles mapped types,
+// template-literal keys, unions, and intersections with TypeScript semantics.
 func hasStringLikeIndexSignature(tc *checker.Checker, t *checker.Type) bool {
 	if t == nil || tc == nil {
 		return false
 	}
 	for _, info := range tc.GetIndexInfosOfType(t) {
-		if info == nil || info.KeyType() == nil {
-			continue
-		}
-		if info.KeyType().Flags()&checker.TypeFlagsStringLike != 0 {
+		if info != nil && info.KeyType() != nil && info.KeyType().Flags()&checker.TypeFlagsStringLike != 0 {
 			return true
 		}
 	}
 	return false
 }
 
-// literalKey returns the property key string for the argument of a bracket
-// access, matching the set ESLint's core rule handles: string literals,
-// no-substitution template literals (`a[`foo`]`), and the bare `null` /
-// `true` / `false` keyword literals (`a[null]` / `a[true]` / `a[false]`).
-// Computed expressions and number literals are intentionally skipped.
-func literalKey(n *ast.Node) (string, bool) {
-	if ast.IsStringLiteralLike(n) {
-		return n.Text(), true
-	}
-	switch n.Kind {
-	case ast.KindNullKeyword:
-		return "null", true
-	case ast.KindTrueKeyword:
-		return "true", true
-	case ast.KindFalseKeyword:
-		return "false", true
-	}
-	return "", false
-}
-
-type dotNotationFixer struct {
-	sourceFile *ast.SourceFile
-	sourceText string
-}
-
-// buildUseDotFix constructs the bracket-to-dot replacement after the rule has
-// already decided to report. Keeping source ranges, comment inspection, and
-// replacement text construction here lets diagnostics-only consumers skip
-// every fix-specific source operation.
-func (f *dotNotationFixer) buildUseDotFix(
-	node *ast.Node,
-	elem *ast.ElementAccessExpression,
-	propName string,
-) []rule.RuleFix {
-	nodeRange := utils.TrimNodeTextRange(f.sourceFile, node)
-	exprRange := utils.TrimNodeTextRange(f.sourceFile, elem.Expression)
-
-	bracketStart := exprRange.End()
-	for bracketStart < nodeRange.End() && f.sourceText[bracketStart] != '[' {
-		bracketStart++
-	}
-	bracketEnd := nodeRange.End() - 1
-	for bracketEnd > bracketStart && f.sourceText[bracketEnd] != ']' {
-		bracketEnd--
-	}
-
-	insideBrackets := core.NewTextRange(bracketStart+1, bracketEnd)
-	if utils.HasCommentsInRange(f.sourceFile, insideBrackets) {
-		return nil
-	}
-
-	whitespace := ""
-	if bracketStart > exprRange.End() {
-		whitespace = f.sourceText[exprRange.End():bracketStart]
-	}
-	objectText := f.sourceText[exprRange.Pos():exprRange.End()]
-	replacement := objectText + whitespace + "." + propName
-
-	return []rule.RuleFix{rule.RuleFixReplace(f.sourceFile, node, replacement)}
-}
-
-// buildUseBracketsFix constructs the dot-to-bracket replacement after the
-// keyword access has been detected. It deliberately preserves the existing
-// whole-node replacement and trivia behavior; this helper only changes when
-// the work is materialized.
-func (f *dotNotationFixer) buildUseBracketsFix(
-	node *ast.Node,
-	pae *ast.PropertyAccessExpression,
-	name string,
-	isOptional bool,
-) []rule.RuleFix {
-	nameRange := utils.TrimNodeTextRange(f.sourceFile, pae.Name())
-	objRange := utils.TrimNodeTextRange(f.sourceFile, pae.Expression)
-
-	// Locate the start of the access operator — either `?.` (optional
-	// chain) or `.`. Any whitespace between the object end and the
-	// operator belongs to the replacement.
-	accessStart := objRange.End()
-	for accessStart < nameRange.Pos() && f.sourceText[accessStart] != '?' && f.sourceText[accessStart] != '.' {
-		accessStart++
-	}
-
-	// Suppress autofix if a comment lives between the operator and the
-	// property name (ESLint parity). The operator is 1 byte for `.` or
-	// 2 bytes for `?.`.
-	opLen := 1
-	if f.sourceText[accessStart] == '?' {
-		opLen = 2
-	}
-	gapStart := accessStart + opLen
-	if gapStart > nameRange.Pos() {
-		gapStart = nameRange.Pos()
-	}
-	if utils.HasCommentsInRange(f.sourceFile, core.NewTextRange(gapStart, nameRange.Pos())) {
-		return nil
-	}
-
-	objectText := f.sourceText[objRange.Pos():objRange.End()]
-	preOp := f.sourceText[objRange.End():accessStart] // whitespace before operator
-	var replacement string
-	if isOptional {
-		replacement = objectText + preOp + "?.[\"" + name + "\"]"
-	} else {
-		replacement = objectText + preOp + "[\"" + name + "\"]"
-	}
-	return []rule.RuleFix{rule.RuleFixReplace(f.sourceFile, node, replacement)}
-}
-
-// DotNotationRule enforces dot-notation when safe and allowed by options.
-//
-// KNOWN LIMITATION: The test infrastructure in /packages/rule-tester doesn't properly pass
-// TypeScript compiler options from individual test cases. This means tests that rely on
-// specific tsconfig settings (like noPropertyAccessFromIndexSignature) may not work correctly.
-// The test runner always uses the same rslint.json config file for all test cases, which
-// references a fixed tsconfig.json. Individual test cases can specify different tsconfig files
-// via languageOptions.parserOptions.project, but these are ignored by the test runner.
-// See: /packages/rule-tester/src/index.ts line 273 - the lint() call doesn't use per-test config.
+// DotNotationRule extends ESLint core's dot-notation rule with TypeScript's
+// private, protected, and index-signature allowances. Delegating base
+// diagnostics and fixes keeps messages, ranges, and edit behavior aligned with
+// the exact core rule that typescript-eslint extends upstream.
 var DotNotationRule = rule.CreateRule(rule.Rule{
 	Name:             "dot-notation",
 	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
-		// so user patterns using lookaround, backreferences, or `\p{...}` work
-		// identically to the original rule (Go's standard `regexp` / RE2 does not
-		// support those). Invalid regex patterns are silently ignored for parity.
-		var allowRE *esregexp.RegExp
-		if opts.AllowPattern != "" {
-			if re, err := esregexp.Compile(opts.AllowPattern, "u"); err == nil {
-				allowRE = re
-			}
-		}
+		baseListeners := coreDotNotation.DotNotationRule.Run(ctx, options)
 
-		// Derive allowIndexSignaturePropertyAccess from tsconfig option as well (currently not used directly)
-		if ctx.Program() != nil {
-			_ = ctx.Program().Options()
-		}
-
-		fixer := dotNotationFixer{
-			sourceFile: ctx.SourceFile,
-			sourceText: ctx.SourceFile.Text(),
-		}
-		listeners := rule.RuleListeners{}
-
-		// Compute allowIndexSignaturePropertyAccess once — respects both the
-		// rule option and the `noPropertyAccessFromIndexSignature` tsconfig flag
-		// (same derivation as typescript-eslint).
 		allowIndexAccess := opts.AllowIndexSignaturePropertyAccess
-		if ctx.Program() != nil {
-			if copts := ctx.Program().Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
+		if program := ctx.Program(); program != nil {
+			if compilerOptions := program.Options(); compilerOptions != nil && compilerOptions.NoPropertyAccessFromIndexSignature.IsTrue() {
 				allowIndexAccess = true
 			}
 		}
 
-		// Handle bracket → dot (ElementAccessExpression)
-		listeners[ast.KindElementAccessExpression] = func(node *ast.Node) {
-			elem := node.AsElementAccessExpression()
-			if elem == nil || elem.ArgumentExpression == nil {
-				return
+		hasTypeAwareAllowance := opts.AllowPrivateClassPropertyAccess ||
+			opts.AllowProtectedClassPropertyAccess ||
+			allowIndexAccess
+		if !hasTypeAwareAllowance {
+			// The core property-access listener cannot report when keywords are
+			// allowed. Omitting it avoids a callback for every ordinary dot access.
+			if opts.AllowKeywords {
+				delete(baseListeners, ast.KindPropertyAccessExpression)
 			}
+			return baseListeners
+		}
 
-			// Unwrap parentheses on the key so shapes like `a[('foo')]`
-			// are still recognized as a literal key.
-			propName, ok := literalKey(ast.SkipParentheses(elem.ArgumentExpression))
-			if !ok {
-				return
-			}
-
-			// Option: allow pattern — matches the regex filter from the core
-			// rule (JS uses the `u` flag, Go regexp is UTF-8 aware; simple
-			// patterns behave identically, ES-only features like lookbehind
-			// are not supported).
-			if allowRE != nil {
-				if allowRE.TestOrTimeout(propName) {
+		baseElementListener := baseListeners[ast.KindElementAccessExpression]
+		listeners := rule.RuleListeners{
+			ast.KindElementAccessExpression: func(node *ast.Node) {
+				elem := node.AsElementAccessExpression()
+				if elem == nil || elem.ArgumentExpression == nil {
 					return
 				}
-			}
 
-			// Base-rule gating: only flag when value is a valid identifier
-			// AND, when allowKeywords is off, it's not an ES3 reserved word.
-			if !isValidIdentifier(propName) {
-				return
-			}
-			if !opts.AllowKeywords && isKeyword(propName) {
-				return
-			}
-
-			// typescript-eslint only performs the type-based skip when one of
-			// the allow-* options is turned on — skip the checker round-trip
-			// otherwise.
-			if opts.AllowPrivateClassPropertyAccess ||
-				opts.AllowProtectedClassPropertyAccess ||
-				allowIndexAccess {
-
-				objType := ctx.TypeChecker.GetTypeAtLocation(elem.Expression)
-				nnType := ctx.TypeChecker.GetNonNullableType(objType)
-				appType := checker.Checker_getApparentType(ctx.TypeChecker, nnType)
-
-				// Prefer the symbol resolved by the checker at the property
-				// node; fall back to scanning the object type's members.
-				sym := ctx.TypeChecker.GetSymbolAtLocation(elem.ArgumentExpression)
-				if sym == nil {
-					sym = checker.Checker_getPropertyOfType(ctx.TypeChecker, appType, propName)
-				}
-				if sym == nil {
-					for _, s := range checker.Checker_getPropertiesOfType(ctx.TypeChecker, appType) {
-						if s != nil && s.Name == propName {
-							sym = s
-							break
+				tc := ctx.TypeChecker
+				propertySymbol := tc.GetSymbolAtLocation(elem.ArgumentExpression)
+				var objectType *checker.Type
+				if propertySymbol == nil {
+					objectType = tc.GetNonNullableType(tc.GetTypeAtLocation(elem.Expression))
+					keyNode := ast.SkipParentheses(elem.ArgumentExpression)
+					if ast.IsStringLiteral(keyNode) {
+						propertyName := keyNode.Text()
+						apparentType := checker.Checker_getApparentType(tc, objectType)
+						propertySymbol = checker.Checker_getPropertyOfType(tc, apparentType, propertyName)
+						if propertySymbol == nil {
+							for _, candidate := range checker.Checker_getPropertiesOfType(tc, apparentType) {
+								if candidate != nil && candidate.Name == propertyName {
+									propertySymbol = candidate
+									break
+								}
+							}
 						}
 					}
 				}
 
-				if sym != nil {
-					flags := checker.GetDeclarationModifierFlagsFromSymbol(sym)
-					if opts.AllowPrivateClassPropertyAccess && (flags&ast.ModifierFlagsPrivate) != 0 {
+				if propertySymbol != nil {
+					flags := checker.GetDeclarationModifierFlagsFromSymbol(propertySymbol)
+					if opts.AllowPrivateClassPropertyAccess && flags&ast.ModifierFlagsPrivate != 0 {
 						return
 					}
-					if opts.AllowProtectedClassPropertyAccess && (flags&ast.ModifierFlagsProtected) != 0 {
+					if opts.AllowProtectedClassPropertyAccess && flags&ast.ModifierFlagsProtected != 0 {
 						return
 					}
 				} else if allowIndexAccess {
-					// No named property symbol — allowed via string-like index signature.
-					if hasStringLikeIndexSignature(ctx.TypeChecker, appType) {
+					if objectType == nil {
+						objectType = tc.GetNonNullableType(tc.GetTypeAtLocation(elem.Expression))
+					}
+					if hasStringLikeIndexSignature(tc, objectType) {
 						return
 					}
 				}
-			}
 
-			ctx.ReportNodeWithDeferredFixes(elem.ArgumentExpression, buildUseDotMessage(), func() []rule.RuleFix {
-				return fixer.buildUseDotFix(node, elem, propName)
-			})
+				baseElementListener(node)
+			},
 		}
 
-		// Handle dot → bracket (PropertyAccessExpression) when keywords are disallowed.
-		// Mirrors ESLint core behavior: only when property is an Identifier
-		// whose name is in the ES3 reserved-word list.
-		listeners[ast.KindPropertyAccessExpression] = func(node *ast.Node) {
-			if opts.AllowKeywords {
-				return
-			}
-			pae := node.AsPropertyAccessExpression()
-			if pae == nil || pae.Name() == nil || pae.Expression == nil {
-				return
-			}
-			if !ast.IsIdentifier(pae.Name()) {
-				return
-			}
-			name := pae.Name().Text()
-			if !isKeyword(name) {
-				return
-			}
-
-			// `let[...]` parses as a destructuring variable declaration. Skip
-			// the autofix in that exact shape (non-optional access on a bare
-			// `let` identifier).
-			isOptional := pae.QuestionDotToken != nil
-			if !isOptional && ast.IsIdentifier(pae.Expression) && pae.Expression.Text() == "let" {
-				ctx.ReportNode(pae.Name(), buildUseBracketsMessage(name))
-				return
-			}
-
-			ctx.ReportNodeWithDeferredFixes(pae.Name(), buildUseBracketsMessage(name), func() []rule.RuleFix {
-				return fixer.buildUseBracketsFix(node, pae, name, isOptional)
-			})
+		if !opts.AllowKeywords {
+			listeners[ast.KindPropertyAccessExpression] = baseListeners[ast.KindPropertyAccessExpression]
 		}
-
 		return listeners
 	},
 })

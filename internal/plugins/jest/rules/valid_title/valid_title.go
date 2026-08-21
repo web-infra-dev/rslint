@@ -498,7 +498,7 @@ var ValidTitleRule = rule.Rule{
 				if i := strings.IndexByte(title, ' '); i >= 0 {
 					firstTok = title[:i]
 				}
-				if strings.EqualFold(firstTok, unprefixedName) {
+				if ecmascript.EqualsWhenLowercased(firstTok, unprefixedName) {
 					raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 					fix := duplicatePrefixReplacement(raw)
 					ctx.ReportNodeWithFixes(arg, rule.RuleMessage{
