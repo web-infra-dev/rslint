@@ -174,7 +174,7 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 	if argument == nil {
 		return rstestCallbackInfo{}
 	}
-	argument = ast.SkipParentheses(argument)
+	argument = internalUtils.SkipAssertionsAndParens(argument)
 	if argument == nil {
 		return rstestCallbackInfo{}
 	}
@@ -198,7 +198,7 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 		if initializer == nil {
 			return rstestCallbackInfo{}
 		}
-		initializer = ast.SkipParentheses(initializer)
+		initializer = internalUtils.SkipAssertionsAndParens(initializer)
 		if ast.IsFunctionExpressionOrArrowFunction(initializer) {
 			return rstestCallbackInfo{functionNode: initializer, name: name}
 		}
