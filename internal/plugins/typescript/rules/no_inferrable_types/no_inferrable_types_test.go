@@ -23,6 +23,9 @@ func TestNoInferrableTypesRule(t *testing.T) {
 		{Code: `const a = /a/;`},
 		{Code: `const a = 10n;`},
 		{Code: `const a = Symbol('a');`},
+		{Code: `const a: bigint = +10n;`},
+		{Code: `const a: bigint = +BigInt(10);`},
+		{Code: `const a: bigint = (+10n);`},
 
 		// Type annotation with different type - valid
 		{Code: `const a: unknown = 10;`},
@@ -85,6 +88,51 @@ func TestNoInferrableTypesRule(t *testing.T) {
 			},
 		},
 
+		// Upstream treats every ESTree Literal as inferrable for bigint,
+		// including semantically invalid TypeScript programs.
+		{
+			Code:   `const a: bigint = 10;`,
+			Output: []string{`const a = 10;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: bigint = '10';`,
+			Output: []string{`const a = '10';`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: bigint = true;`,
+			Output: []string{`const a = true;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: bigint = null;`,
+			Output: []string{`const a = null;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: bigint = /a/;`,
+			Output: []string{`const a = /a/;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: bigint = -10;`,
+			Output: []string{`const a = -10;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+
 		// boolean
 		{
 			Code:   `const a: boolean = true;`,
@@ -105,6 +153,8 @@ func TestNoInferrableTypesRule(t *testing.T) {
 					MessageId: "noInferrableType",
 					Line:      1,
 					Column:    7,
+					EndLine:   1,
+					EndColumn: 25,
 				},
 			},
 		},
@@ -271,6 +321,28 @@ func TestNoInferrableTypesRule(t *testing.T) {
 			},
 		},
 		{
+			Code:   "declare const value: unknown;\nconst a: string = `${value}`;",
+			Output: []string{"declare const value: unknown;\nconst a = `${value}`;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noInferrableType",
+					Line:      2,
+					Column:    7,
+				},
+			},
+		},
+		{
+			Code:   "const fn = (name: string, description: string = `Description for ${name}`) => {};",
+			Output: []string{"const fn = (name: string, description = `Description for ${name}`) => {};"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noInferrableType",
+					Line:      1,
+					Column:    27,
+				},
+			},
+		},
+		{
 			Code:   `const a: string = String(1);`,
 			Output: []string{`const a = String(1);`},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -319,6 +391,50 @@ func TestNoInferrableTypesRule(t *testing.T) {
 			},
 		},
 
+		// Parentheses are transparent in ESTree but explicit nodes in tsgo.
+		{
+			Code:   `const a: number = (10);`,
+			Output: []string{`const a = (10);`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: number = -(10);`,
+			Output: []string{`const a = -(10);`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: number = (Number)('10');`,
+			Output: []string{`const a = (Number)('10');`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: RegExp = new (RegExp)('a');`,
+			Output: []string{`const a = new (RegExp)('a');`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+		{
+			Code:   "declare const value: unknown;\nconst a: string = (`${value}`);",
+			Output: []string{"declare const value: unknown;\nconst a = (`${value}`);"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 2, Column: 7},
+			},
+		},
+		{
+			Code:   `const a: (number) = 10;`,
+			Output: []string{`const a = 10;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noInferrableType", Line: 1, Column: 7},
+			},
+		},
+
 		// Function parameters (without ignoreParameters option)
 		{
 			Code:   `function fn(a: number = 5) {}`,
@@ -328,6 +444,8 @@ func TestNoInferrableTypesRule(t *testing.T) {
 					MessageId: "noInferrableType",
 					Line:      1,
 					Column:    13,
+					EndLine:   1,
+					EndColumn: 26,
 				},
 			},
 		},
@@ -339,6 +457,25 @@ func TestNoInferrableTypesRule(t *testing.T) {
 					MessageId: "noInferrableType",
 					Line:      1,
 					Column:    13,
+					EndLine:   1,
+					EndColumn: 30,
+				},
+			},
+		},
+		{
+			Code: `class Foo {
+  constructor(public a: boolean = true) {}
+}`,
+			Output: []string{`class Foo {
+  constructor(public a = true) {}
+}`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noInferrableType",
+					Line:      2,
+					Column:    22,
+					EndLine:   2,
+					EndColumn: 39,
 				},
 			},
 		},
@@ -352,6 +489,8 @@ func TestNoInferrableTypesRule(t *testing.T) {
 					MessageId: "noInferrableType",
 					Line:      1,
 					Column:    13,
+					EndLine:   1,
+					EndColumn: 30,
 				},
 			},
 		},
@@ -386,6 +525,44 @@ func TestNoInferrableTypesRule(t *testing.T) {
 					MessageId: "noInferrableType",
 					Line:      2,
 					Column:    3,
+					EndLine:   2,
+					EndColumn: 26,
+				},
+			},
+		},
+		{
+			Code: `class Foo {
+  public static prop: number = 5;
+}`,
+			Output: []string{`class Foo {
+  public static prop = 5;
+}`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noInferrableType",
+					Line:      2,
+					Column:    3,
+					EndLine:   2,
+					EndColumn: 34,
+				},
+			},
+		},
+		{
+			Code: `declare const dec: PropertyDecorator;
+class Foo {
+  @dec decorated: boolean = false;
+}`,
+			Output: []string{`declare const dec: PropertyDecorator;
+class Foo {
+  @dec decorated = false;
+}`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noInferrableType",
+					Line:      3,
+					Column:    3,
+					EndLine:   3,
+					EndColumn: 35,
 				},
 			},
 		},
@@ -439,7 +616,17 @@ func TestNoInferrableTypesEditDemand(t *testing.T) {
 function fn(optional?: boolean = true) {}
 class Example {
   property!: string = 'value';
-}`
+}
+declare const dec: PropertyDecorator;
+class Disabled {
+  // eslint-disable-next-line @typescript-eslint/no-inferrable-types
+  @dec
+  decorated: boolean = false;
+  sameLine: boolean = false; // eslint-disable-line @typescript-eslint/no-inferrable-types
+}
+/* eslint-disable @typescript-eslint/no-inferrable-types */
+const scoped: number = 1;
+/* eslint-enable @typescript-eslint/no-inferrable-types */`
 
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	program, sourceFile, err := helper.CreateTestProgram(
@@ -462,7 +649,7 @@ class Example {
 			ExcludePaths: []string{},
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{{
-					Name:     NoInferrableTypesRule.Name,
+					Name:     "@typescript-eslint/no-inferrable-types",
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return NoInferrableTypesRule.Run(ctx, nil)
@@ -550,7 +737,17 @@ class Example {
 function fn(optional = true) {}
 class Example {
   property = 'value';
-}`
+}
+declare const dec: PropertyDecorator;
+class Disabled {
+  // eslint-disable-next-line @typescript-eslint/no-inferrable-types
+  @dec
+  decorated: boolean = false;
+  sameLine: boolean = false; // eslint-disable-line @typescript-eslint/no-inferrable-types
+}
+/* eslint-disable @typescript-eslint/no-inferrable-types */
+const scoped: number = 1;
+/* eslint-enable @typescript-eslint/no-inferrable-types */`
 	if !fixed || fixedSource != wantFixed {
 		t.Fatalf("fixed source:\n%s\nwant:\n%s", fixedSource, wantFixed)
 	}

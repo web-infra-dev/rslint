@@ -246,14 +246,15 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			environment = *filePlan.environment
 		}
 		baseContext := (rule.RuleContext{
-			SourceFile:     file,
-			Settings:       environment.Settings,
-			Globals:        rule.NewGlobals(environment.LanguageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
-			Comments:       comments,
-			Refs:           refs,
-			BOM:            sourceBOM,
-			TypeChecker:    fileChecker,
-			DisableManager: disableManager,
+			SourceFile:      file,
+			Settings:        environment.Settings,
+			LanguageOptions: environment.LanguageOptions,
+			Globals:         rule.NewGlobals(environment.LanguageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
+			Comments:        comments,
+			Refs:            refs,
+			BOM:             sourceBOM,
+			TypeChecker:     fileChecker,
+			DisableManager:  disableManager,
 		}).WithProgram(sourceProgram).WithFileCache(fileCache)
 
 		for ruleIndex, r := range rules {
@@ -325,10 +326,12 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			case ast.KindSpreadElement, ast.KindSpreadAssignment:
 				patternVisitor(node.Expression())
 			case ast.KindPropertyAssignment:
-				// A computed property name is evaluated as an expression; it is
-				// not part of the assignment target. Visit it through the normal
-				// path before propagating pattern context to the initializer.
-				if name := node.Name(); name != nil && ast.IsComputedPropertyName(name) {
+				// Only the value of a pattern property is an assignment
+				// target; its key stays an ordinary expression (a computed one
+				// is even evaluated as such). ESTree visits that key like any
+				// other child, so visit it through the normal path before
+				// propagating pattern context to the initializer.
+				if name := node.Name(); name != nil {
 					childVisitor(name)
 				}
 				patternVisitor(node.Initializer())

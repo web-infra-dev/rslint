@@ -1,7 +1,9 @@
 package ecmascript
 
 import (
+	"errors"
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 )
@@ -9,12 +11,11 @@ import (
 // NumberToString writes a number the way JavaScript writes one, which is what
 // `String(n)` and string concatenation produce: the shortest run of digits that
 // reads back as the same value, no sign on a zero, and exponential notation
-// once the decimal point sits past the twenty-first place ahead of those digits
-// or more than six places behind them.
+// outside the [1e-6, 1e21) range.
 //
-// Go's strconv agrees on the digits — both pick the shortest representation
-// that round-trips — but not on when to leave fixed notation, nor on how to
-// spell the infinities.
+// Go's strconv agrees on the significant digits — both pick the shortest
+// representation that round-trips — but not on when to leave fixed notation,
+// how to pad exponents, or how to spell the infinities.
 //
 // https://tc39.es/ecma262/2024/multipage/ecmascript-data-types-and-values.html#sec-numeric-types-number-tostring
 func NumberToString(value float64) string {
@@ -31,35 +32,104 @@ func NumberToString(value float64) string {
 
 	sign := ""
 	if value < 0 {
-		sign, value = "-", -value
+		sign = "-"
+		value = -value
 	}
 
-	// The spec names the digits themselves k, and the place the decimal point
-	// sits in front of them n, so that the value is the digits times ten to the
-	// n minus k. Exponential notation hands back both.
-	mantissa, exponent, _ := strings.Cut(strconv.FormatFloat(value, 'e', -1, 64), "e")
+	scientific := strconv.FormatFloat(value, 'e', -1, 64)
+	exponentMarker := strings.LastIndexByte(scientific, 'e')
+	mantissa := scientific[:exponentMarker]
+	exponent, _ := strconv.Atoi(scientific[exponentMarker+1:])
 	digits := strings.Replace(mantissa, ".", "", 1)
-	k := len(digits)
-	n, _ := strconv.Atoi(exponent)
-	n++
 
-	switch {
-	case k <= n && n <= 21:
-		return sign + digits + strings.Repeat("0", n-k)
-	case 0 < n && n <= 21:
-		return sign + digits[:n] + "." + digits[n:]
-	case -6 < n && n <= 0:
-		return sign + "0." + strings.Repeat("0", -n) + digits
+	if exponent >= -6 && exponent < 21 {
+		decimalPosition := exponent + 1
+		switch {
+		case decimalPosition <= 0:
+			return sign + "0." + strings.Repeat("0", -decimalPosition) + digits
+		case decimalPosition >= len(digits):
+			return sign + digits + strings.Repeat("0", decimalPosition-len(digits))
+		default:
+			return sign + digits[:decimalPosition] + "." + digits[decimalPosition:]
+		}
 	}
 
-	// A negative exponent carries its own sign out of strconv; a positive one
-	// is written with a plus in front of it.
-	magnitude := strconv.Itoa(n - 1)
-	if n > 1 {
-		magnitude = "+" + magnitude
+	exponentText := strconv.Itoa(exponent)
+	if exponent >= 0 {
+		exponentText = "+" + exponentText
 	}
-	if k == 1 {
-		return sign + digits + "e" + magnitude
+	if len(digits) == 1 {
+		return sign + digits + "e" + exponentText
 	}
-	return sign + digits[:1] + "." + digits[1:] + "e" + magnitude
+	return sign + digits[:1] + "." + digits[1:] + "e" + exponentText
+}
+
+// StringToNumber applies JavaScript's StringToNumber operation. The boolean is
+// false exactly when JavaScript would produce NaN; infinities and signed zero
+// are valid results.
+func StringToNumber(value string) (float64, bool) {
+	value = StringTrim(value)
+	if value == "" {
+		return 0, true
+	}
+
+	switch value {
+	case "Infinity", "+Infinity":
+		return math.Inf(1), true
+	case "-Infinity":
+		return math.Inf(-1), true
+	}
+
+	if strings.ContainsRune(value, '_') {
+		return 0, false
+	}
+
+	prefixStart := 0
+	if value[0] == '+' || value[0] == '-' {
+		prefixStart = 1
+	}
+	if len(value) > prefixStart+2 && value[prefixStart] == '0' {
+		base := 0
+		switch value[prefixStart+1] {
+		case 'x', 'X':
+			base = 16
+		case 'o', 'O':
+			base = 8
+		case 'b', 'B':
+			base = 2
+		}
+		if base != 0 {
+			// StringToNumber accepts only unsigned non-decimal prefixes.
+			if prefixStart != 0 {
+				return 0, false
+			}
+			digits := value[2:]
+			if digits[0] == '+' || digits[0] == '-' {
+				return 0, false
+			}
+			integer, ok := new(big.Int).SetString(digits, base)
+			if !ok {
+				return 0, false
+			}
+			number, _ := new(big.Float).SetInt(integer).Float64()
+			return number, true
+		}
+	}
+
+	number, err := strconv.ParseFloat(value, 64)
+	if math.IsNaN(number) {
+		return 0, false
+	}
+	if err != nil {
+		// Decimal overflow is a valid infinity. Other parse failures are NaN.
+		if errors.Is(err, strconv.ErrRange) && math.IsInf(number, 0) {
+			return number, true
+		}
+		return 0, false
+	}
+	// ParseFloat additionally accepts Go's Inf spellings; JavaScript does not.
+	if math.IsInf(number, 0) {
+		return 0, false
+	}
+	return number, true
 }
