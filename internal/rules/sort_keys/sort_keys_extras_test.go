@@ -20,6 +20,17 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+// loneSurrogate writes one surrogate the way the compiler carries it in a
+// string value, and so in a diagnostic naming a key that holds one: the three
+// bytes UTF-8 would spell the code point with if surrogates were encodable.
+func loneSurrogate(code rune) string {
+	return string([]byte{
+		byte(0xE0 | code>>12),
+		byte(0x80 | (code>>6)&0x3F),
+		byte(0x80 | code&0x3F),
+	})
+}
+
 func TestSortKeysExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -87,6 +98,14 @@ func TestSortKeysExtras(t *testing.T) {
 			{
 				Code:    "var obj = {\u2029    b: 1,\u2029\u2029    a: 2\u2029};",
 				Options: []any{"asc", map[string]any{"allowLineSeparatedGroups": true}},
+			},
+			// ---- A character outside the basic plane is a pair of surrogates, which rank below the end of the basic plane ----
+			{Code: "var obj = { '\\uD83D\\uDE00': 1, '\\uFFFF': 2 };"},
+			// ---- A lone surrogate key ranks by the code unit it stands for ----
+			{Code: "var obj = { '\\uD800': 1, '\\uD801': 2 };"},
+			{
+				Code:    "var obj = { '\\uD800': 1, '\\uD801': 2 };",
+				Options: []any{"asc", map[string]any{"natural": true}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -292,6 +311,36 @@ func TestSortKeysExtras(t *testing.T) {
 				Code: "({ p: { b, a } = { d: 1, c: 2 } } = obj);",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. 'c' should be before 'd'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 27},
+				},
+			},
+			// ---- A character outside the basic plane sorts by its surrogate pair, so it belongs before the end of the basic plane ----
+			{
+				Code: "var obj = { '\\uFFFF': 1, '\\uD83D\\uDE00': 2 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '\U0001F600' should be before '\uFFFF'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 40},
+				},
+			},
+			// ---- A lone low surrogate outranks a character whose pair starts at U+D800 ----
+			{
+				Code: "var obj = { '\\uDC00': 1, '\\uD800\\uDC00': 2 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '\U00010000' should be before '" + loneSurrogate(0xDC00) + "'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 40},
+				},
+			},
+			// ---- Lone surrogate keys tell apart in natural order too ----
+			{
+				Code:    "var obj = { '\\uD801': 1, '\\uD800': 2 };",
+				Options: []any{"asc", map[string]any{"natural": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in natural ascending order. '" + loneSurrogate(0xD800) + "' should be before '" + loneSurrogate(0xD801) + "'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 34},
+				},
+			},
+			// ---- Lowercasing a lone surrogate key leaves the code unit it stands for ----
+			{
+				Code:    "var obj = { '\\uD801': 1, '\\uD800': 2 };",
+				Options: []any{"asc", map[string]any{"caseSensitive": false}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in insensitive ascending order. '" + loneSurrogate(0xD800) + "' should be before '" + loneSurrogate(0xD801) + "'.", Line: 1, Column: 26, EndLine: 1, EndColumn: 34},
 				},
 			},
 		},

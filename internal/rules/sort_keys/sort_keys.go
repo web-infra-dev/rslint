@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 	"sort"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -100,9 +99,11 @@ func isValidOrder(prevName, thisName string, opts Options) bool {
 	}
 	var cmp int
 	if opts.Natural {
-		cmp = naturalCompare(a, b)
+		cmp = utils.NaturalCompare(a, b)
 	} else {
-		cmp = strings.Compare(a, b)
+		// Upstream asks `a <= b`, which reads both strings by UTF-16 code unit;
+		// see [ecmascript.CompareStrings].
+		cmp = ecmascript.CompareStrings(a, b)
 	}
 	if opts.Order == "desc" {
 		cmp = -cmp

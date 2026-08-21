@@ -112,10 +112,6 @@ The 2nd option is an object with the following properties.
 - `allowLineSeparatedGroups` — if `true`, a blank line after a property resets sorting: the properties that follow only need to be sorted relative to each other, not to the properties before the blank line. Default is `false`.
 - `ignoreComputedKeys` — if `true`, computed keys are ignored entirely and reset the sorting of the keys that follow them. Default is `false`.
 
-## Differences from ESLint
-
-- Key comparison, in every mode (`asc`/`desc`, with or without `natural`), operates on Unicode code points; ESLint compares by UTF-16 code unit. The two agree except for keys containing characters outside the Basic Multilingual Plane (e.g. many emoji), where the sort order may differ.
-
 ## Original Documentation
 
 - [ESLint: sort-keys](https://eslint.org/docs/latest/rules/sort-keys)
