@@ -140,6 +140,9 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			// it opens is still a scope of its own.
 			{Code: `namespace N.Array { const Array = () => 1; Array(); }`},
 			{Code: `namespace N { const Array = () => 1; namespace M.Array { Array(); } }`},
+			// The body of a `declare global` augmentation is a scope of its
+			// own, so its declarations do shadow a call written inside it.
+			{Code: `export {}; declare global { interface Array {} const a: any; Array(); }`},
 
 			// Real-user: eslint/eslint#12273 (closed as intentional — a
 			// single non-spread argument is left alone even when it's
@@ -289,6 +292,26 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 				`namespace N { namespace M.Array { } Array(); }`,
 				`Array()`,
 				`namespace N { namespace M.Array { } []; }`,
+			),
+
+			// ---- Dimension 2: scoping — a `declare global` augmentation is a
+			// scope of its own, in every declaration space, so what it adds to
+			// the global scope never shadows the call in the module carrying
+			// it ----
+			directFixCase(
+				`export {}; declare global { interface Array {} } Array();`,
+				`Array()`,
+				`export {}; declare global { interface Array {} } [];`,
+			),
+			directFixCase(
+				`export {}; declare global { const Array: any; } Array();`,
+				`Array()`,
+				`export {}; declare global { const Array: any; } [];`,
+			),
+			directFixCase(
+				`export {}; declare global { namespace Array {} } Array();`,
+				`Array()`,
+				`export {}; declare global { namespace Array {} } [];`,
 			),
 
 			// ---- Dimension 2: scoping — a decorator or computed name belongs
