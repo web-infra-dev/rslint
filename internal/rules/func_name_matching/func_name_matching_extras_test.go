@@ -116,6 +116,47 @@ func TestFuncNameMatchingExtras(t *testing.T) {
 				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
 			},
 
+			// ---- Dimension 4: auto-accessor class fields are AccessorProperty
+			// nodes in ESTree, which the rule's `Property,
+			// PropertyDefinition[value]` selector never visits; tsgo spells
+			// the same field as a property declaration with an `accessor`
+			// modifier, so the listener has to opt out of it ----
+			{Code: `class C { accessor x = function y() {}; }`},
+			{
+				Code:    `class C { static accessor value = function foo() {}; }`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+			},
+
+			// ---- Divergence lock-in: with the property-name argument missing
+			// entirely, upstream dereferences `arguments[1]` and throws a
+			// TypeError that surfaces as a lint crash; the port checks the
+			// argument count and leaves the descriptor unchecked ----
+			{
+				Code:    `Object.defineProperty({ value: function baz() {} })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+			},
+
+			// ---- Branch lock-in: a shorthand `value` descriptor entry holds
+			// an Identifier, not a FunctionExpression, so no listener applies
+			// no matter which descriptor call encloses it ----
+			{
+				Code:    `Object.defineProperty(foo, 'bar', { value })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+			},
+
+			// ---- Dimension 4: TS-only wrappers that ESTree models as their
+			// own node types — a non-null assertion applied to the assignment
+			// target is a TSNonNullExpression rather than a MemberExpression,
+			// and a wrapped function expression is no longer a
+			// FunctionExpression initializer ----
+			{Code: `obj.foo! = function bar() {};`},
+			{Code: `var foo = (function bar() {})!;`},
+			{Code: `({ foo: function bar() {} as any })`},
+
+			// ---- Branch lock-in: a named class expression is not a function
+			// expression, so the assignment is never compared ----
+			{Code: `foo = class bar {};`},
+
 			// ---- Real-user: named CommonJS export assignment
 			// (`exports.foo = function foo() {}`) — a very common Node.js
 			// idiom distinct from `module.exports`; matches here since names
@@ -250,6 +291,124 @@ func TestFuncNameMatchingExtras(t *testing.T) {
 				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `bar`.", Line: 1, Column: 38},
+				},
+			},
+
+			// ---- Branch lock-in: the reserved-word table esutils applies here
+			// is its non-strict one, so `await`, `let`, `static` and
+			// `implements` are all still identifier-shaped property names and
+			// get compared — at every ecmaVersion, on both the string-literal
+			// key path and the assignment path ----
+			{
+				Code:            `({'await': function foo() {}})`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `foo` should match property name `await`.", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code:            `({'implements': function foo() {}})`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `foo` should match property name `implements`.", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code:            `obj['static'] = function foo() {};`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `foo` should match property name `static`.", Line: 1, Column: 1},
+				},
+			},
+
+			// ---- Dimension 4: an optional call to a descriptor function is
+			// still a CallExpression, and TS type arguments on the callee
+			// leave it one too; a non-null assertion around the callee is a
+			// TSNonNullExpression instead, which no longer matches
+			// `Object.defineProperty` and leaves the plain `value` key as the
+			// compared name ----
+			{
+				Code:    `Object.defineProperty?.(foo, 'bar', { value: function baz() {} })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `bar`.", Line: 1, Column: 39},
+				},
+			},
+			{
+				Code:    `Object.defineProperty<any>(foo, 'bar', { value: function baz() {} })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `bar`.", Line: 1, Column: 42},
+				},
+			},
+			{
+				Code:    `Object.defineProperty!(foo, 'bar', { value: function baz() {} })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `value`.", Line: 1, Column: 38},
+				},
+			},
+
+			// ---- Dimension 4: a TS type assertion around the descriptor map
+			// is a node of its own in both ASTs, so — unlike parentheses — it
+			// breaks the walk from the descriptor up to the enclosing call ----
+			{
+				Code:    `Object.defineProperties(foo, { bar: { value: function baz() {} } } as any)`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `value`.", Line: 1, Column: 39},
+				},
+			},
+
+			// ---- Branch lock-in: the assignment listener is keyed on the
+			// node type, not on the operator, so compound assignments are
+			// compared like plain ones; a chained assignment is compared at
+			// its innermost target, the only one whose right-hand side is the
+			// function expression ----
+			{
+				Code: `foo += function bar() {};`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchVariable", Message: "Function name `bar` should match variable name `foo`.", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `a = b = function foo() {};`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchVariable", Message: "Function name `foo` should match variable name `b`.", Line: 1, Column: 5},
+				},
+			},
+
+			// ---- Dimension 4: async, generator and async-generator function
+			// expressions are all plain FunctionExpressions ----
+			{
+				Code: `foo = async function* bar() {};`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchVariable", Message: "Function name `bar` should match variable name `foo`.", Line: 1, Column: 1},
+				},
+			},
+
+			// ---- Reported positions: columns are counted in UTF-16 units
+			// after an astral-plane literal, and a leading BOM does not shift
+			// the first line's columns ----
+			{
+				Code: `var s = '😀'; ({ 'foo': function bar() {} });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `bar` should match property name `foo`.", Line: 1, Column: 18},
+				},
+			},
+			{
+				Code: "\ufeff({ 'foo': function bar() {} })",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `bar` should match property name `foo`.", Line: 1, Column: 4},
+				},
+			},
+
+			// ---- Dimension 4: a TS namespace body is just another statement
+			// container around the declaration ----
+			{
+				Code: `namespace N { var foo = function bar() {}; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchVariable", Message: "Function name `bar` should match variable name `foo`.", Line: 1, Column: 19},
 				},
 			},
 

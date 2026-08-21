@@ -118,6 +118,13 @@ var FuncNameMatchingRule = rule.Rule{
 			case ast.KindPropertyAssignment:
 				rawInit = node.AsPropertyAssignment().Initializer
 			case ast.KindPropertyDeclaration:
+				// NOTE: an auto-accessor field is an AccessorProperty in
+				// ESTree, which upstream's `Property, PropertyDefinition[value]`
+				// selector never visits; tsgo models it as a property
+				// declaration carrying an `accessor` modifier.
+				if ast.HasSyntacticModifier(node, ast.ModifierFlagsAccessor) {
+					return
+				}
 				rawInit = node.AsPropertyDeclaration().Initializer
 			default:
 				return
