@@ -467,7 +467,6 @@ const x = createElement;
 			Tsx:     true,
 			Options: optsForbid("button"),
 		},
-
 	}, []rule_tester.InvalidTestCase{
 		// ============================================================
 		// Upstream invalid cases (all migrated)

@@ -192,7 +192,7 @@ var listExceptionOptions = map[string]interface{}{
 // null → no comparison.
 //
 // `<img src="example.svg" role="img" />` is valid because the SVG src
-// arm of `implicitRoleForImg` returns '' → null → no comparison.
+// arm of `implicitRoleForImg` returns the empty string → null → no comparison.
 //
 // `<svg role="img" />` is valid because `svg` isn't in the implicitRoles
 // table at all → null → no comparison.

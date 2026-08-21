@@ -253,8 +253,8 @@ func TestApplyRuleFixes(t *testing.T) {
 			name: "insertion followed by replacement starting at same position - should skip replacement",
 			code: "ABCDEFGHIJ",
 			diagnostics: []mockDiagnostic{
-				newMockDiagnostic(newInsertFix(0, "XXX")),      // Insert at 0
-				newMockDiagnostic(newReplaceFix(0, 3, "YYY")),  // Replace ABC with YYY
+				newMockDiagnostic(newInsertFix(0, "XXX")),     // Insert at 0
+				newMockDiagnostic(newReplaceFix(0, 3, "YYY")), // Replace ABC with YYY
 			},
 			expectedCode:        "XXXABCDEFGHIJ",
 			expectedUnapplied:   1,

@@ -15,13 +15,11 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamSetStateNoDepsValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamSetStateNoDepsValid = []rule_tester.ValidTestCase{}
 
 var upstreamSetStateNoDepsInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function Hello() {
   const [state, setState] = useState(0);
   useEffect(() => {
@@ -29,9 +27,9 @@ function Hello() {
   });
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect contains a call to 'setState'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [] as a second argument to the useEffect Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect contains a call to 'setState'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [] as a second argument to the useEffect Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Hello() {
   const [state, setState] = useState(0);
   useEffect(() => {
@@ -39,11 +37,11 @@ function Hello() {
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Hello() {
   const [data, setData] = useState(0);
   useEffect(() => {
@@ -51,9 +49,9 @@ function Hello() {
   });
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect contains a call to 'setData'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [] as a second argument to the useEffect Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect contains a call to 'setData'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [] as a second argument to the useEffect Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Hello() {
   const [data, setData] = useState(0);
   useEffect(() => {
@@ -61,11 +59,11 @@ function Hello() {
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Hello({ country }) {
   const [data, setData] = useState(0);
   useEffect(() => {
@@ -73,9 +71,9 @@ function Hello({ country }) {
   });
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect contains a call to 'setData'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [country] as a second argument to the useEffect Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect contains a call to 'setData'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [country] as a second argument to the useEffect Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Hello({ country }) {
   const [data, setData] = useState(0);
   useEffect(() => {
@@ -83,11 +81,11 @@ function Hello({ country }) {
   }, [country]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Hello({ prop1, prop2 }) {
   const [state, setState] = useState(0);
   useEffect(() => {
@@ -97,9 +95,9 @@ function Hello({ prop1, prop2 }) {
   });
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect contains a call to 'setState'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [prop1, prop2] as a second argument to the useEffect Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect contains a call to 'setState'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [prop1, prop2] as a second argument to the useEffect Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Hello({ prop1, prop2 }) {
   const [state, setState] = useState(0);
   useEffect(() => {
@@ -109,8 +107,8 @@ function Hello({ prop1, prop2 }) {
   }, [prop1, prop2]);
 }
 `}}},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_SetStateNoDeps(t *testing.T) {

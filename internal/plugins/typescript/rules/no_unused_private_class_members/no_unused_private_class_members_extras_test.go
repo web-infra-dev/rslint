@@ -757,7 +757,6 @@ class C {
   }
 }
     `},
-
 	}, []rule_tester.InvalidTestCase{
 		// ---- Locks in member-collection: overloaded method signatures —
 		// only the implementation body matters, all overloads share one

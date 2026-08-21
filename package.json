@@ -34,6 +34,7 @@
     "lint": "rslint --config rslint.config.ts",
     "lint:go": "golangci-lint run ./cmd/... ./internal/...",
     "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
+    "format:go:check": "golangci-lint fmt --diff ./cmd/... ./internal/...",
     "prepare": "husky",
     "migrate:tests": "sg scan -r ast-grep-rule.yml ./packages/rslint-test-tools/tests/typescript-eslint/rules/**/*.test.ts --update-all"
   },

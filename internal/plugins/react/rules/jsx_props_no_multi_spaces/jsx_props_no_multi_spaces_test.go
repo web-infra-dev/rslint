@@ -95,7 +95,7 @@ func TestJsxPropsNoMultiSpacesRule(t *testing.T) {
 		{
 			// TypeScript generic tag name: single space
 			Code: `var x = <App<T> foo bar />`,
-			Tsx: true,
+			Tsx:  true,
 		},
 		{
 			// Multi-line prop value: next prop starts on end line of previous prop — treated as same line

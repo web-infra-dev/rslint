@@ -723,4 +723,3 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 		},
 	)
 }
-

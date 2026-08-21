@@ -192,7 +192,7 @@ func rawTemplateLiteralText(node *ast.Node, sourceText string) string {
 //   - TemplateHead spans `\` … ${`, i.e. trim 1 byte from start (opening
 //     backtick) and 2 bytes from end (`${`).
 //   - TemplateMiddle spans `} … ${`, trim 1 + 2.
-//   - TemplateTail spans `} … \``, trim 1 + 1.
+//   - TemplateTail spans `}` to the closing backtick, trim 1 + 1.
 func templateExpressionRawText(tpl *ast.TemplateExpression, sourceText string) jsValue {
 	var sb strings.Builder
 	if tpl.Head != nil {
@@ -227,7 +227,7 @@ func templateExpressionRawText(tpl *ast.TemplateExpression, sourceText string) j
 
 // rawTemplateSegmentText extracts raw bytes from the source for a
 // TemplateHead/Middle/Tail node, trimming `headTrim` bytes from the start
-// and `tailTrim` from the end (the surrounding `\`` / `${` / `}` syntax).
+// and `tailTrim` from the end (the surrounding backtick, `${` and `}` syntax).
 // Returns "" defensively when the slice would be empty or out of range.
 func rawTemplateSegmentText(node *ast.Node, sourceText string, headTrim, tailTrim int) string {
 	pos := node.Pos() + headTrim

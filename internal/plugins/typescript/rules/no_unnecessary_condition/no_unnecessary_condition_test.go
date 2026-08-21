@@ -171,7 +171,6 @@ func TestNoUnnecessaryCondition(t *testing.T) {
 		// Literal subtype (type is 'falafel' not string, so guard still narrows)
 		{Code: "declare function assertString(x: unknown): asserts x is string;\nassertString('falafel');\n", Options: map[string]interface{}{"checkTypePredicates": true}},
 
-
 		// === exactOptionalPropertyTypes: private optional field with ??= ===
 		{
 			Code:     "class C {\n  #rand?: number;\n  m() { this.#rand ??= Math.random(); }\n}\n",

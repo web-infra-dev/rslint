@@ -7,9 +7,6 @@ run:
 
 linters:
   default: none
-  disable:
-    - errcheck
-    - paralleltest
   enable:
     # Enabled
     - asasalint
@@ -19,7 +16,6 @@ linters:
     - copyloopvar
     - depguard
     - durationcheck
-    - errcheck
     - errchkjson
     - errname
     - errorlint
@@ -42,7 +38,6 @@ linters:
     - nilnesserr
     - nilnil
     # - nolintlint
-    - paralleltest
     - perfsprint
     - predeclared
     - reassign
@@ -126,3 +121,10 @@ linters:
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    paths:
+      - internal/fourslash/tests/gen

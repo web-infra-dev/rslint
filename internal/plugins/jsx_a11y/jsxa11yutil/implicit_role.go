@@ -118,7 +118,7 @@ func GetImplicitRole(elementType string, attrs []*ast.Node) (string, bool) {
 //	return 'img';
 //
 // The empty-alt arm fires only when alt is a LITERAL empty string — the
-// boolean form `<img alt />` extracts as `true`, not `''`, so it stays
+// boolean form `<img alt />` extracts as `true`, not an empty string, so it stays
 // 'img'. Identifiers (`alt={foo}`) extract to null and likewise stay 'img'.
 //
 // The SVG arm uses optional chaining: only literal-string src values
@@ -147,8 +147,11 @@ func implicitRoleForImg(attrs []*ast.Node) string {
 //	range                     → slider
 //	(anything else / absent)  → textbox
 //
-// Upstream coerces the type value with `getLiteralPropValue(type) || ''` then
-// `.toUpperCase()`. The `|| ''` handles `<input type={null}>` (literal "null"),
+// Upstream coerces the type value before `.toUpperCase()`:
+//
+//	getLiteralPropValue(type) || ''
+//
+// The fallback handles `<input type={null}>` (literal "null"),
 // `<input type />` (boolean form → true), and `<input type={undefined}>` —
 // non-string values short-circuit to the `default → textbox` arm.
 func implicitRoleForInput(attrs []*ast.Node) string {

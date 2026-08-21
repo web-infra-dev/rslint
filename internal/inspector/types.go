@@ -222,7 +222,6 @@ type SymbolInfo struct {
 	Exports []*SymbolInfo `json:"exports,omitempty"` // Exported symbols (shallow)
 }
 
-
 // ============================================================================
 // Signature Info
 // ============================================================================
@@ -230,9 +229,9 @@ type SymbolInfo struct {
 // SignatureInfo contains detailed information about a function/method signature
 // For nested types, only basic info is included; use the declaration position to fetch full details
 type SignatureInfo struct {
-	Flags            uint32   `json:"flags"`                   // SignatureFlags
-	FlagNames        []string `json:"flagNames,omitempty"`     // Human-readable flag names
-	MinArgumentCount int      `json:"minArgumentCount"`        // Minimum required arguments
+	Flags            uint32   `json:"flags"`               // SignatureFlags
+	FlagNames        []string `json:"flagNames,omitempty"` // Human-readable flag names
+	MinArgumentCount int      `json:"minArgumentCount"`    // Minimum required arguments
 
 	// Position for on-demand fetching (from declaration)
 	Pos      int    `json:"pos,omitempty"`      // Position to fetch full signature info
@@ -253,10 +252,10 @@ type SignatureInfo struct {
 
 // TypePredicateInfo contains information about a type predicate
 type TypePredicateInfo struct {
-	Kind           int       `json:"kind"`                    // TypePredicateKind numeric value
-	KindName       string    `json:"kindName"`                // Human-readable kind name
+	Kind           int       `json:"kind"`     // TypePredicateKind numeric value
+	KindName       string    `json:"kindName"` // Human-readable kind name
 	ParameterName  string    `json:"parameterName,omitempty"`
-	ParameterIndex int       `json:"parameterIndex"`          // 0 is valid (first param), don't use omitempty
+	ParameterIndex int       `json:"parameterIndex"` // 0 is valid (first param), don't use omitempty
 	Type           *TypeInfo `json:"type,omitempty"`
 }
 

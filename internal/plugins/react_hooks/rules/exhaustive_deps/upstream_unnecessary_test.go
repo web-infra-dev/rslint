@@ -15,13 +15,11 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamUnnecessaryValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamUnnecessaryValid = []rule_tester.ValidTestCase{}
 
 var upstreamUnnecessaryInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = {};
   const local2 = {};
@@ -30,9 +28,9 @@ function MyComponent() {
   }, [local1, local2]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useMemo has an unnecessary dependency: 'local2'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useMemo has an unnecessary dependency: 'local2'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local1 = {};
   const local2 = {};
@@ -41,45 +39,45 @@ function MyComponent() {
   }, [local1]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   useCallback(() => {}, [window]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has an unnecessary dependency: 'window'. Either exclude it or remove the dependency array. Outer scope values like 'window' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has an unnecessary dependency: 'window'. Either exclude it or remove the dependency array. Outer scope values like 'window' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   useCallback(() => {}, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let local = props.foo;
   useCallback(() => {}, [local]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has an unnecessary dependency: 'local'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has an unnecessary dependency: 'local'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let local = props.foo;
   useCallback(() => {}, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const local = {};
   useCallback(() => {
@@ -88,9 +86,9 @@ function MyComponent(props) {
   }, [props, props.foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has an unnecessary dependency: 'props.foo'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has an unnecessary dependency: 'props.foo'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const local = {};
   useCallback(() => {
@@ -99,11 +97,11 @@ function MyComponent(props) {
   }, [props]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {id: 42};
   const fn = useCallback(() => {
@@ -111,9 +109,9 @@ function MyComponent() {
   }, [local.id, local]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has an unnecessary dependency: 'local.id'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has an unnecessary dependency: 'local.id'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {id: 42};
   const fn = useCallback(() => {
@@ -121,31 +119,31 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar.baz);
   }, [props.foo.bar.baz, props.foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has an unnecessary dependency: 'props.foo.bar.baz'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has an unnecessary dependency: 'props.foo.bar.baz'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar.baz);
   }, [props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = {};
   useCallback(() => {
@@ -154,9 +152,9 @@ function MyComponent() {
   }, [local1]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has an unnecessary dependency: 'local1'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has an unnecessary dependency: 'local1'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local1 = {};
   useCallback(() => {
@@ -165,29 +163,29 @@ function MyComponent() {
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = {};
   useCallback(() => {}, [local1]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has an unnecessary dependency: 'local1'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has an unnecessary dependency: 'local1'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local1 = {};
   useCallback(() => {}, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -199,9 +197,9 @@ function MyComponent(props) {
   }, [ref1.current, ref2.current, props.someOtherRefs, props.color]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has unnecessary dependencies: 'ref1.current' and 'ref2.current'. Either exclude them or remove the dependency array. Mutable values like 'ref1.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has unnecessary dependencies: 'ref1.current' and 'ref2.current'. Either exclude them or remove the dependency array. Mutable values like 'ref1.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -213,11 +211,11 @@ function MyComponent(props) {
   }, [props.someOtherRefs, props.color]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -229,9 +227,9 @@ function MyComponent(props) {
   }, [ref1?.current, ref2?.current, props.someOtherRefs, props.color]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has unnecessary dependencies: 'ref1.current' and 'ref2.current'. Either exclude them or remove the dependency array. Mutable values like 'ref1.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has unnecessary dependencies: 'ref1.current' and 'ref2.current'. Either exclude them or remove the dependency array. Mutable values like 'ref1.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -243,11 +241,11 @@ function MyComponent(props) {
   }, [props.someOtherRefs, props.color]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const ref = useRef();
   useEffect(() => {
@@ -255,9 +253,9 @@ function MyComponent() {
   }, [ref.current]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has an unnecessary dependency: 'ref.current'. Either exclude it or remove the dependency array. Mutable values like 'ref.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has an unnecessary dependency: 'ref.current'. Either exclude it or remove the dependency array. Mutable values like 'ref.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const ref = useRef();
   useEffect(() => {
@@ -265,11 +263,11 @@ function MyComponent() {
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ activeTab }) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -279,9 +277,9 @@ function MyComponent({ activeTab }) {
   }, [ref1.current, ref2.current, activeTab]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has unnecessary dependencies: 'ref1.current' and 'ref2.current'. Either exclude them or remove the dependency array. Mutable values like 'ref1.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has unnecessary dependencies: 'ref1.current' and 'ref2.current'. Either exclude them or remove the dependency array. Mutable values like 'ref1.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ activeTab }) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -291,11 +289,11 @@ function MyComponent({ activeTab }) {
   }, [activeTab]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ activeTab, initY }) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -305,9 +303,9 @@ function MyComponent({ activeTab, initY }) {
   }, [ref1.current, ref2.current, activeTab, initY]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has unnecessary dependencies: 'activeTab', 'ref1.current', and 'ref2.current'. Either exclude them or remove the dependency array. Mutable values like 'ref1.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has unnecessary dependencies: 'activeTab', 'ref1.current', and 'ref2.current'. Either exclude them or remove the dependency array. Mutable values like 'ref1.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent({ activeTab, initY }) {
   const ref1 = useRef();
   const ref2 = useRef();
@@ -317,11 +315,11 @@ function MyComponent({ activeTab, initY }) {
   }, [initY]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const ref = useRef();
   useEffect(() => {
@@ -329,9 +327,9 @@ function MyComponent() {
   }, [ref.current, ref]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has an unnecessary dependency: 'ref.current'. Either exclude it or remove the dependency array. Mutable values like 'ref.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has an unnecessary dependency: 'ref.current'. Either exclude it or remove the dependency array. Mutable values like 'ref.current' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const ref = useRef();
   useEffect(() => {
@@ -339,31 +337,31 @@ function MyComponent() {
   }, [ref]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [window]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has an unnecessary dependency: 'window'. Either exclude it or remove the dependency array. Outer scope values like 'window' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has an unnecessary dependency: 'window'. Either exclude it or remove the dependency array. Outer scope values like 'window' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 import MutableStore from 'store';
 
 function MyComponent() {
@@ -372,9 +370,9 @@ function MyComponent() {
   }, [MutableStore.hello]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has an unnecessary dependency: 'MutableStore.hello'. Either exclude it or remove the dependency array. Outer scope values like 'MutableStore.hello' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has an unnecessary dependency: 'MutableStore.hello'. Either exclude it or remove the dependency array. Outer scope values like 'MutableStore.hello' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 import MutableStore from 'store';
 
 function MyComponent() {
@@ -383,11 +381,11 @@ function MyComponent() {
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 import MutableStore from 'store';
 let z = {};
 
@@ -401,9 +399,9 @@ function MyComponent(props) {
   }
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has unnecessary dependencies: 'MutableStore.hello.world', 'global.stuff', and 'z'. Either exclude them or remove the dependency array. Outer scope values like 'MutableStore.hello.world' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has unnecessary dependencies: 'MutableStore.hello.world', 'global.stuff', and 'z'. Either exclude them or remove the dependency array. Outer scope values like 'MutableStore.hello.world' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 import MutableStore from 'store';
 let z = {};
 
@@ -417,11 +415,11 @@ function MyComponent(props) {
   }
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 import MutableStore from 'store';
 let z = {};
 
@@ -435,9 +433,9 @@ function MyComponent(props) {
   }
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has unnecessary dependencies: 'MutableStore.hello.world', 'global.stuff', and 'z'. Either exclude them or remove the dependency array. Outer scope values like 'MutableStore.hello.world' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has unnecessary dependencies: 'MutableStore.hello.world', 'global.stuff', and 'z'. Either exclude them or remove the dependency array. Outer scope values like 'MutableStore.hello.world' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 import MutableStore from 'store';
 let z = {};
 
@@ -451,11 +449,11 @@ function MyComponent(props) {
   }
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 import MutableStore from 'store';
 let z = {};
 
@@ -469,9 +467,9 @@ function MyComponent(props) {
   }
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has unnecessary dependencies: 'MutableStore.hello.world', 'global.stuff', 'props.foo', 'x', 'y', and 'z'. Either exclude them or remove the dependency array. Outer scope values like 'MutableStore.hello.world' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has unnecessary dependencies: 'MutableStore.hello.world', 'global.stuff', 'props.foo', 'x', 'y', and 'z'. Either exclude them or remove the dependency array. Outer scope values like 'MutableStore.hello.world' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 import MutableStore from 'store';
 let z = {};
 
@@ -485,11 +483,11 @@ function MyComponent(props) {
   }
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 import MutableStore from 'store';
 let z = {};
 
@@ -503,9 +501,9 @@ function MyComponent(props) {
   }
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has unnecessary dependencies: 'MutableStore.hello.world', 'global.stuff', 'props.foo', 'x', 'y', and 'z'. Either exclude them or remove the dependency array. Outer scope values like 'MutableStore.hello.world' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has unnecessary dependencies: 'MutableStore.hello.world', 'global.stuff', 'props.foo', 'x', 'y', and 'z'. Either exclude them or remove the dependency array. Outer scope values like 'MutableStore.hello.world' aren't valid dependencies because mutating them doesn't re-render the component.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 import MutableStore from 'store';
 let z = {};
 
@@ -519,11 +517,11 @@ function MyComponent(props) {
   }
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Thing() {
   useEffect(() => {
     const fetchData = async () => {};
@@ -531,9 +529,9 @@ function Thing() {
   }, [fetchData]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has an unnecessary dependency: 'fetchData'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has an unnecessary dependency: 'fetchData'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Thing() {
   useEffect(() => {
     const fetchData = async () => {};
@@ -541,28 +539,28 @@ function Thing() {
   }, []);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Example() {
   const foo = useCallback(() => {
     foo();
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useCallback has an unnecessary dependency: 'foo'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useCallback has an unnecessary dependency: 'foo'. Either exclude it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function Example() {
   const foo = useCallback(() => {
     foo();
   }, []);
 }
 `}}},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_Unnecessary(t *testing.T) {

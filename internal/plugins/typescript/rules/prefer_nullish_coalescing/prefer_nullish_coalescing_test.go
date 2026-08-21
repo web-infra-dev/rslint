@@ -2820,10 +2820,10 @@ class User {
 		// Tagged template result fallback.
 		invalidWith(`
 declare function tag(s: TemplateStringsArray): string | null;
-const x = tag` + "`hello`" + ` || 'default';
+const x = tag`+"`hello`"+` || 'default';
 `, `
 declare function tag(s: TemplateStringsArray): string | null;
-const x = tag` + "`hello`" + ` ?? 'default';
+const x = tag`+"`hello`"+` ?? 'default';
 `, "preferNullishOverOr", nil),
 		// Function-call result that may be undefined (Array.find).
 		invalidWith(`

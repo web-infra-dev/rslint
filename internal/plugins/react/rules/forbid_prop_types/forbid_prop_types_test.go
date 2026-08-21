@@ -1164,7 +1164,7 @@ func TestForbidPropTypesRule(t *testing.T) {
 			Code: `
         class Component {}
       `,
-			Tsx: true,
+			Tsx:  true,
 			Skip: true, // SKIP: tsgo parser doesn't parse this babel-eslint-only shape
 		},
 	}, []rule_tester.InvalidTestCase{
@@ -1507,7 +1507,7 @@ func TestForbidPropTypesRule(t *testing.T) {
           }
         });
       `,
-			Tsx: true,
+			Tsx:     true,
 			Options: map[string]interface{}{"forbid": []interface{}{"instanceOf"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "forbiddenPropType", Message: `Prop type "instanceOf" is forbidden`},

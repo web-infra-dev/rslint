@@ -164,7 +164,7 @@ func isEvaluatedString(node *ast.Node) bool {
 //   - TypeOfExpression: always yields a string if the operand resolves
 //   - VoidExpression: always undefined
 //   - CallExpression: `String(x)` / `String()` with resolvable arg
-//   - TaggedTemplateExpression: `String.raw`…``  with resolvable subs
+//   - TaggedTemplateExpression: a `String.raw` tagged template with resolvable subs
 //   - TemplateExpression: substitution folding
 //
 // Returns foldResult{} (value==nil) when the node can't be statically resolved.
@@ -789,7 +789,7 @@ func (s *strCtx) propertyKeyMatches(nameNode *ast.Node, key string) bool {
 	return false
 }
 
-// foldStringRawTag handles `` String.raw`...` `` — ESLint's getStaticValue
+// foldStringRawTag handles a `String.raw` tagged template — ESLint's getStaticValue
 // recognises the built-in tag and folds the template with each substitution
 // recursively evaluated.
 func (s *strCtx) foldStringRawTag(node *ast.Node) foldResult {

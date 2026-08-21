@@ -15,60 +15,58 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamDepArrayValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamDepArrayValid = []rule_tester.ValidTestCase{}
 
 var upstreamDepArrayInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useSpecialEffect(() => {
     console.log(props.foo);
   }, null);
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useSpecialEffect"},
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useSpecialEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies."},
-		{Message: "React Hook useSpecialEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useSpecialEffect"},
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useSpecialEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies."},
+			{Message: "React Hook useSpecialEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   useSpecialEffect(() => {
     console.log(props.foo);
   }, [props.foo]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   useEffect(() => {}, ['foo']);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' literal is not a valid dependency because it never changes. You can safely remove it."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' literal is not a valid dependency because it never changes. You can safely remove it."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const dependencies = [];
   useEffect(() => {}, dependencies);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   const dependencies = [local];
@@ -77,10 +75,10 @@ function MyComponent() {
   }, dependencies);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies."},
-		{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies."},
+			{Message: "React Hook useEffect has a missing dependency: 'local'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent() {
   const local = {};
   const dependencies = [local];
@@ -89,11 +87,11 @@ function MyComponent() {
   }, [local]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = someFunc();
   useEffect(() => {
@@ -101,63 +99,63 @@ function MyComponent() {
   }, [local, ...dependencies]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a spread element in its dependency array. This means we can't statically verify whether you've passed the correct dependencies."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a spread element in its dependency array. This means we can't statically verify whether you've passed the correct dependencies."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.items[0]);
   }, [props.items, props.items[0]]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ items }) {
   useEffect(() => {
     console.log(items[0]);
   }, [items, items[0]]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {}, [props?.attribute.method()]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {}, [props.method()]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_DepArray(t *testing.T) {

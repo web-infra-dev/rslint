@@ -130,7 +130,7 @@ jobs:
         run: npm run lint:go
 
       - name: go fmt
-        run: npm run format:go
+        run: npm run format:go:check
 
       - name: Check Spell
         run: pnpm check-spell

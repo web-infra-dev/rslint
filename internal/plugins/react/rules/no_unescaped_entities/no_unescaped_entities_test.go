@@ -90,8 +90,8 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 18,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 18,
 					Suggestions: apostropheSuggestions(`var Hello = <div>`, `</div>`),
 				},
 			},
@@ -102,8 +102,8 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 21,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 21,
 					Suggestions: apostropheSuggestions(`var Hello = <div>Don`, `t do that</div>`),
 				},
 			},
@@ -114,8 +114,8 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 17,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 17,
 					Suggestions: apostropheSuggestions(`var Hello = <>it`, `s a trap</>`),
 				},
 			},
@@ -126,13 +126,13 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 26,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 26,
 					Suggestions: apostropheSuggestions("var Hello = <div>line one", "s\n            line two's</div>"),
 				},
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        2, Column: 21,
+					MessageId: "unescapedEntityAlts",
+					Line:      2, Column: 21,
 					Suggestions: apostropheSuggestions("var Hello = <div>line one's\n            line two", "s</div>"),
 				},
 			},
@@ -143,13 +143,13 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 19,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 19,
 					Suggestions: apostropheSuggestions(`var Hello = <div>a`, `'b</div>`),
 				},
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 20,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 20,
 					Suggestions: apostropheSuggestions(`var Hello = <div>a'`, `b</div>`),
 				},
 			},
@@ -160,18 +160,18 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 18,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 18,
 					Suggestions: quoteSuggestions(`var Hello = <div>`, `don't"</div>`),
 				},
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 22,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 22,
 					Suggestions: apostropheSuggestions(`var Hello = <div>"don`, `t"</div>`),
 				},
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 24,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 24,
 					Suggestions: quoteSuggestions(`var Hello = <div>"don't`, `</div>`),
 				},
 			},
@@ -182,13 +182,13 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 34,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 34,
 					Suggestions: quoteSuggestions(`var Hello = <script>window.foo = `, `bar"</script>`),
 				},
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 38,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 38,
 					Suggestions: quoteSuggestions(`var Hello = <script>window.foo = "bar`, `</script>`),
 				},
 			},
@@ -350,8 +350,8 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 22,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 22,
 					Suggestions: apostropheSuggestions("var Hello = <div>café", "s</div>"),
 				},
 			},
@@ -365,8 +365,8 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 20,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 20,
 					Suggestions: apostropheSuggestions("var Hello = <div>🚀", "s</div>"),
 				},
 			},
@@ -377,8 +377,8 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 20,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 20,
 					Suggestions: apostropheSuggestions(`var Hello = (<div>a`, `s</div>) as any`),
 				},
 			},
@@ -389,8 +389,8 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 27,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 27,
 					Suggestions: apostropheSuggestions(`var Hello = cond && <div>a`, `s</div>`),
 				},
 			},
@@ -412,13 +412,13 @@ func TestNoUnescapedEntitiesRule(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 19,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 19,
 					Suggestions: apostropheSuggestions(`var Hello = <div>a`, `s {x} b's</div>`),
 				},
 				{
-					MessageId:   "unescapedEntityAlts",
-					Line:        1, Column: 27,
+					MessageId: "unescapedEntityAlts",
+					Line:      1, Column: 27,
 					Suggestions: apostropheSuggestions(`var Hello = <div>a's {x} b`, `s</div>`),
 				},
 			},

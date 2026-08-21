@@ -100,8 +100,8 @@ func TestJsxMaxPropsPerLineRule(t *testing.T) {
 			},
 		},
 		{
-			Code: `var x = <div foo="bar" baz="qux" />`,
-			Tsx:  true,
+			Code:   `var x = <div foo="bar" baz="qux" />`,
+			Tsx:    true,
 			Output: []string{"var x = <div foo=\"bar\"\nbaz=\"qux\" />"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -174,8 +174,8 @@ func TestJsxMaxPropsPerLineRule(t *testing.T) {
 		},
 		{
 			// Three props with default max=1: one error at first excess prop
-			Code: `var x = <App foo bar baz />`,
-			Tsx:  true,
+			Code:   `var x = <App foo bar baz />`,
+			Tsx:    true,
 			Output: []string{"var x = <App foo\nbar baz />", "var x = <App foo\nbar\nbaz />"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -187,8 +187,8 @@ func TestJsxMaxPropsPerLineRule(t *testing.T) {
 		},
 		{
 			// Spread attribute with max=1: first excess prop is bar
-			Code: `var x = <App {...this.props} bar />`,
-			Tsx:  true,
+			Code:   `var x = <App {...this.props} bar />`,
+			Tsx:    true,
 			Output: []string{"var x = <App {...this.props}\nbar />"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -207,7 +207,7 @@ func TestJsxMaxPropsPerLineRule(t *testing.T) {
 />`,
 			Tsx:     true,
 			Options: map[string]interface{}{"maximum": float64(2)},
-			Output: []string{"var x = <App\n  foo={{\n    a: 1\n  }} bar\nbaz\n/>"},
+			Output:  []string{"var x = <App\n  foo={{\n    a: 1\n  }} bar\nbaz\n/>"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "newLine",
@@ -223,7 +223,7 @@ func TestJsxMaxPropsPerLineRule(t *testing.T) {
 />`,
 			Tsx:     true,
 			Options: map[string]interface{}{"maximum": float64(2)},
-			Output: []string{"var x = <App\n  foo bar\nbaz\n/>"},
+			Output:  []string{"var x = <App\n  foo bar\nbaz\n/>"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "newLine",

@@ -457,7 +457,7 @@ func TestIsBlockDisabled(t *testing.T) {
 			want:     false,
 		},
 		{
-			name: "query line 0 with no directives",
+			name:       "query line 0 with no directives",
 			directives: nil,
 			ruleName:   "no-console",
 			line:       0,

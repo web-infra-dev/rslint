@@ -300,4 +300,3 @@ func TestRule_Combo_OutsideClassNeverFires(t *testing.T) {
 		}
 	}
 }
-
