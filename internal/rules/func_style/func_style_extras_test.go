@@ -105,11 +105,17 @@ export default function test(a: unknown) { return a; }
 			{Code: "var foo = () => ({ get [this.k]() { return 1; } });", Options: []any{"declaration"}},
 			{Code: "class A { m() { var foo = () => class { @this.dec n() {} }; } }", Options: []any{"declaration"}},
 
+			// ---- A class decorator is not member metadata: ESTree keeps it on
+			// the ClassDeclaration, which is not a frame either, so it stays
+			// attributed to the enclosing arrow exactly as tsgo has it ----
+			{Code: "var foo = () => { @this.dec class C {} };", Options: []any{"declaration"}},
+
 			// ---- Locks in isOverloadedFunction's wrapper matching: upstream
 			// pairs an exported implementation only with `export`ed signatures,
 			// so a set whose export modifiers agree stays exempt ----
 			{Code: "export function foo(a: string): void;\nexport function foo(a: any): void {}", Options: []any{"expression"}},
 			{Code: "function foo(a: string): void;\nfunction foo(a: any): void {}", Options: []any{"expression"}},
+			{Code: "export declare function foo(a: string): void;\nexport function foo(a: any): void {}", Options: []any{"expression"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: `(X).y`-style single/multi-level parenthesized
@@ -258,6 +264,47 @@ export default function test(a: unknown) { return a; }
 				Options: []any{"declaration"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "declaration", Line: 1, Column: 5, EndLine: 1, EndColumn: 57},
+				},
+			},
+
+			// ---- Only the innermost member's frame is hidden: the `this` here
+			// belongs to the arrow inside the computed name, and the outer
+			// arrow is still reported ----
+			{
+				Code:    "var foo = () => ({ [(() => this.x)()]() {} });",
+				Options: []any{"declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "declaration", Line: 1, Column: 5, EndLine: 1, EndColumn: 46},
+				},
+			},
+			// ---- ... and a computed name nested one member deeper is hidden
+			// from that member's frame, not from the arrow's ----
+			{
+				Code:    "var foo = () => class { m() { return class { [this.k]() {} }; } };",
+				Options: []any{"declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "declaration", Line: 1, Column: 5, EndLine: 1, EndColumn: 66},
+				},
+			},
+			// ---- A parameter decorator hangs off the parameter, which ESTree
+			// keeps inside the FunctionExpression value, so it stays within
+			// the member's frame and the arrow is still reported ----
+			{
+				Code:    "var foo = () => { class C { m(@this.dec a) {} } };",
+				Options: []any{"declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "declaration", Line: 1, Column: 5, EndLine: 1, EndColumn: 50},
+				},
+			},
+
+			// ---- Locks in isOverloadedFunction's wrapper matching inside a
+			// namespace body, where the container is a ModuleBlock rather than
+			// the SourceFile ----
+			{
+				Code:    "namespace N { function foo(a: string): void; export function foo(a: any): void {} }",
+				Options: []any{"expression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expression", Line: 1, Column: 53, EndLine: 1, EndColumn: 82},
 				},
 			},
 
