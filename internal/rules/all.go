@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/block_scoped_var"
+	"github.com/web-infra-dev/rslint/internal/rules/capitalized_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_this"
@@ -184,6 +185,7 @@ func GetAllRules() []rule.Rule {
 		array_callback_return.ArrayCallbackReturnRule,
 		arrow_body_style.ArrowBodyStyleRule,
 		block_scoped_var.BlockScopedVarRule,
+		capitalized_comments.CapitalizedCommentsRule,
 		complexity.ComplexityRule,
 		consistent_return.ConsistentReturnRule,
 		consistent_this.ConsistentThisRule,
