@@ -1,0 +1,141 @@
+package id_match_test
+
+// TestIdMatchExtrasNoProject locks in the answers the rule must give for a
+// file no tsconfig owns, which rslint lints through a parsed-only Program that
+// has no TypeChecker. Every other suite runs against a compiler-backed
+// Program, where the checker can supply a declaration the binder scope walk
+// never sees; these cases exist so the standard library's type names stay
+// exempt either way. Its siblings are id_match_extras_branches_test.go,
+// id_match_extras_dim4_test.go, id_match_extras_realuser_test.go and
+// id_match_extras_typescript_test.go.
+
+import (
+	"testing"
+
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/id_match"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
+
+func TestIdMatchExtrasNoProject(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		code    string
+		options []any
+		want    []string
+	}{
+		{
+			// ---- A standard-library type is not the author's to name ----
+			name:    "library type",
+			code:    "let x: Record<string, number>;",
+			options: []any{`^x$`},
+		},
+		{
+			name:    "library type as a type argument",
+			code:    "let x: Array<Uppercase<string>>;",
+			options: []any{`^x$`},
+		},
+		{
+			// ---- A name the file declares itself is the author's ----
+			name:    "shadowed library type",
+			code:    "type Record = 1;\nlet x: Record;",
+			options: []any{`^x$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^x$'.",
+				"Identifier 'Record' does not match the pattern '^x$'.",
+			},
+		},
+		{
+			// ---- A library name spelled in a value position is a value ----
+			name:    "library name as a value",
+			code:    "let x = Record;",
+			options: []any{`^x$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^x$'.",
+			},
+		},
+		{
+			// ---- A type nothing declares is still the author's to fix ----
+			name:    "unresolved type",
+			code:    "let x: Unknown_1;",
+			options: []any{`^[^_]+$`},
+			want: []string{
+				"Identifier 'Unknown_1' does not match the pattern '^[^_]+$'.",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := lintWithoutProject(t, testCase.code, testCase.options)
+			if len(got) != len(testCase.want) {
+				t.Fatalf("got %d diagnostics %q, want %d %q", len(got), got, len(testCase.want), testCase.want)
+			}
+			for index, want := range testCase.want {
+				if got[index] != want {
+					t.Errorf("diagnostic %d = %q, want %q", index+1, got[index], want)
+				}
+			}
+		})
+	}
+}
+
+// lintWithoutProject runs the rule over code through a parsed-only Program,
+// the source generation rslint builds for a lint target no tsconfig claims.
+func lintWithoutProject(t *testing.T, code string, options []any) []string {
+	t.Helper()
+
+	const root = "/id-match-no-project"
+	fileName := tspath.ResolvePath(root, "file.ts")
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{fileName: code})
+	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            utils.CreateCompilerHost(root, fs),
+		CompilerOptions: &core.CompilerOptions{},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatalf("NewFromRoots: %v", err)
+	}
+
+	messages := make([]string, 0, 2)
+	if _, err := linter.RunLinter(linter.RunLinterOptions{
+		Programs:       []*lintprogram.Program{sourceProgram},
+		SingleThreaded: true,
+		Scope:          linter.FileScope{Files: []string{fileName}},
+		ExcludePaths:   []string{},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:        "id-match",
+				Environment: &rule.RuleEnvironment{},
+				Severity:    rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if ctx.TypeChecker != nil {
+						t.Error("a parsed-only Program must not supply a TypeChecker")
+					}
+					return id_match.IdMatchRule.Run(ctx, options)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				messages = append(messages, diagnostic.Message.Description)
+			},
+		},
+	}); err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	return messages
+}
