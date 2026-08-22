@@ -85,6 +85,18 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `let handler: (value: unknown) => void; beforeEach(() => { handler = value => expect(value).toBe(1); }); test("case", () => promise.then(handler));`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// A key behind parentheses is a chain the identifier table cannot
+			// answer, so it also covers the raw-text fallback in
+			// sourceMayContainPromiseChain.
+			{
+				Code: `test("case", () => { promise[("then")](value => expect(value).toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Message:   "This promise should either be returned or awaited to ensure the assertions in its chain are called",
+					Line:      1,
+					Column:    22,
+				}},
+			},
 			{
 				Code: `test("case", (context) => { promise.then(value => context.expect(value).toBe(1)); });`,
 				Errors: []rule_tester.InvalidTestCaseError{{
