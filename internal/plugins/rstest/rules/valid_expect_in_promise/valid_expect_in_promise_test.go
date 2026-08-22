@@ -86,7 +86,8 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			// A key behind parentheses is a chain the identifier table cannot
-			// answer, so it also covers the source prescan's fallback.
+			// answer, so it also covers the raw-text fallback in
+			// sourceMayContainPromiseChain.
 			{
 				Code: `test("case", () => { promise[("then")](value => expect(value).toBe(1)); });`,
 				Errors: []rule_tester.InvalidTestCaseError{{
