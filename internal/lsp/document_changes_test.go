@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -328,7 +329,6 @@ func lintOffTheEditorPath(program *compiler.Program, file string, resolver *conf
 // Each case is run off the editor path too, where it does report: the silence
 // is the language server's doing, and not a rule that never had anything to say.
 func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
-	config.RegisterAllRules()
 
 	for _, test := range []struct {
 		name    string
@@ -361,7 +361,7 @@ func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
 			}
 
 			cfg := config.RslintConfig{{Rules: config.Rules{"unicode-bom": test.option}}}
-			resolver := config.NewFileConfigResolver(cfg, dir, false)
+			resolver := config.NewFileConfigResolver(cfg, dir, rules.All(), false)
 
 			target := lspConfigTarget(file, dir, fs)
 			served := lintSingleFile(
@@ -391,7 +391,6 @@ func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
 // Only unicode-bom is held back: another rule configured for the same file in
 // the same pass reports and keeps its fix.
 func TestOtherRulesStillRunInTheEditor(t *testing.T) {
-	config.RegisterAllRules()
 
 	// `export` makes this a module and the function gives the `var` a local
 	// scope: no-var declines to fix a global in script mode, and the point here
@@ -408,7 +407,7 @@ func TestOtherRulesStillRunInTheEditor(t *testing.T) {
 			"no-var":      "error",
 		},
 	}}
-	resolver := config.NewFileConfigResolver(cfg, dir, false)
+	resolver := config.NewFileConfigResolver(cfg, dir, rules.All(), false)
 
 	target := lspConfigTarget(file, dir, fs)
 	served := lintSingleFile(

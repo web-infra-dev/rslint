@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -176,27 +175,6 @@ func TestParserOptionsProjectServicePtr(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// TestRegisterAllRules_ConcurrentSafe verifies that RegisterAllRules can be
-// called from multiple goroutines without panicking (concurrent map writes).
-// Run with -race to detect data races: go test -race ./internal/config/...
-func TestRegisterAllRules_ConcurrentSafe(t *testing.T) {
-	var wg sync.WaitGroup
-	for range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			RegisterAllRules()
-		}()
-	}
-	wg.Wait()
-
-	// Verify rules were actually registered
-	rules := GlobalRuleRegistry.GetAllRules()
-	if len(rules) == 0 {
-		t.Error("Expected rules to be registered after concurrent calls")
 	}
 }
 
@@ -580,12 +558,11 @@ func TestValidateConfigECMAVersion(t *testing.T) {
 	}
 }
 
-func TestRuleRegistryPropagatesLanguageOptions(t *testing.T) {
+func TestConfiguredRulesPropagatesLanguageOptions(t *testing.T) {
 	t.Parallel()
 
-	registry := NewRuleRegistry()
-	registry.Register("probe", rule.Rule{Name: "probe"})
-	configured, _ := registry.GetEnabledRules(RslintConfig{{
+	catalog := rule.NewCatalog(rule.Rule{Name: "probe"})
+	configured, _ := ResolveEnabledRules(catalog, RslintConfig{{
 		LanguageOptions: &LanguageOptions{Raw: map[string]any{
 			"ecmaVersion": float64(16),
 		}},

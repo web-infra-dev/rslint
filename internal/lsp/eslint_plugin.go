@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 // methodPluginLint is the server→client reverse request that asks the
@@ -19,6 +20,29 @@ import (
 // and return the diagnostics. It is the LSP equivalent of the CLI's
 // `pluginLint` IPC request.
 const methodPluginLint = lsproto.Method("rslint/pluginLint")
+
+// deriveLSPRuleCatalog preserves the LSP's established generation gate: an
+// empty object-form plugin rule name is not resolvable in Go, even though the
+// CLI and API historically accepted the same metadata.
+func deriveLSPRuleCatalog(
+	base *rule.Catalog,
+	plugins []config.EslintPluginEntry,
+) (*rule.Catalog, []string) {
+	filtered := make([]config.EslintPluginEntry, 0, len(plugins))
+	for _, plugin := range plugins {
+		ruleNames := make([]string, 0, len(plugin.RuleNames))
+		for _, ruleName := range plugin.RuleNames {
+			if ruleName != "" {
+				ruleNames = append(ruleNames, ruleName)
+			}
+		}
+		filtered = append(filtered, config.EslintPluginEntry{
+			Prefix:    plugin.Prefix,
+			RuleNames: ruleNames,
+		})
+	}
+	return base.ForESLintPlugins(filtered)
+}
 
 // installEslintPluginDispatch lazily builds the dispatcher closure once. It
 // sends one plugin-lint batch over the reverse request and decodes the
@@ -83,12 +107,17 @@ func (s *Server) buildPluginFileInputWithConfig(
 	configCwd string,
 	isJSConfig bool,
 ) (linter.EslintPluginFileInput, bool) {
+	ruleCatalog := rules.All()
+	if isJSConfig {
+		ruleCatalog = s.currentRuleCatalog()
+	}
 	return s.buildPluginFileInputWithSnapshot(
 		uri,
 		textOverride,
 		resolveDocumentLintSnapshotConfig(documentLintSnapshot{
 			target:               lspConfigTarget(uriToPath(uri), configCwd, s.fs),
 			config:               rslintConfig,
+			ruleCatalog:          ruleCatalog,
 			usesJavaScriptConfig: isJSConfig,
 		}, s.fs),
 	)
@@ -134,45 +163,8 @@ func (s *Server) buildPluginFileInputWithSnapshot(
 
 	// sourceFile=nil: the LSP rebuilds against the overlay Text (the worker
 	// linted that same string). Shared filter/assembly with the CLI (F1).
-	enabledRules = s.pluginRulesForCurrentGeneration(enabledRules)
 	languageOptions, settings := config.PluginMergedMaps(merged)
 	return linter.BuildEslintPluginFileInput(filePath, configKey, enabledRules, languageOptions, settings, text, nil)
-}
-
-// eslintPluginRuleSet expands activation metadata into the exact rule names
-// the matching Node generation can execute. It always returns a non-nil map:
-// an activated generation with no community plugins must block placeholders
-// retained in the process-wide registry by older generations.
-func eslintPluginRuleSet(entries []config.EslintPluginEntry) map[string]struct{} {
-	rules := make(map[string]struct{})
-	for _, entry := range entries {
-		if entry.Prefix == "" {
-			continue
-		}
-		for _, ruleName := range entry.RuleNames {
-			if ruleName != "" {
-				rules[entry.Prefix+"/"+ruleName] = struct{}{}
-			}
-		}
-	}
-	return rules
-}
-
-func (s *Server) pluginRulesForCurrentGeneration(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
-	if s.eslintPluginRules == nil {
-		return rules
-	}
-	filtered := make([]rule.ConfiguredRule, 0, len(rules))
-	for _, configuredRule := range rules {
-		if !configuredRule.IsEslintPluginRule {
-			filtered = append(filtered, configuredRule)
-			continue
-		}
-		if _, ok := s.eslintPluginRules[configuredRule.Name]; ok {
-			filtered = append(filtered, configuredRule)
-		}
-	}
-	return filtered
 }
 
 // pluginConfigKeyForURI returns the owning config directory's absolute path.

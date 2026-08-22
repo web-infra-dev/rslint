@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 func rootProgramTestPlan(dir string, names ...string) rslintconfig.LintTargetPlan {
@@ -694,6 +695,7 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *testLintConfigResolv
 			opts.Config,
 			opts.CurrentDirectory,
 			opts.FS,
+			rules.All(),
 			false,
 		),
 		lintTargetBySource: opts.LintTargetBySourcePath,

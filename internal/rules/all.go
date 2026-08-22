@@ -1,6 +1,17 @@
 package rules
 
 import (
+	"sync"
+
+	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
+	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
+	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
+	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
+	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
+	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
+	rstestPlugin "github.com/web-infra-dev/rslint/internal/plugins/rstest"
+	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
+	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
@@ -181,7 +192,32 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
 
-func GetAllRules() []rule.Rule {
+var allRuleCatalog = sync.OnceValue(func() *rule.Catalog {
+	return rule.NewCatalog(allRules()...)
+})
+
+func allRules() []rule.Rule {
+	var implementedRules []rule.Rule
+	implementedRules = append(implementedRules, typescriptPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, importPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, reactPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, reactHooksPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, jestPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, rstestPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, jsxA11yPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, promisePlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, unicornPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, coreRules()...)
+	return implementedRules
+}
+
+// All returns the shared immutable catalog containing every rule implemented
+// in Go. It is safe to share across concurrent lint runs.
+func All() *rule.Catalog {
+	return allRuleCatalog()
+}
+
+func coreRules() []rule.Rule {
 	return []rule.Rule{
 		accessor_pairs.AccessorPairsRule,
 		array_callback_return.ArrayCallbackReturnRule,

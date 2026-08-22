@@ -286,12 +286,22 @@ func writeConfigCandidate(t *testing.T, root string) {
 }
 
 func installLastGoodConfig(s *Server, root string) {
-	entries := config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
+	entries := config.RslintConfig{{
+		Plugins: []string{"last-good"},
+		Rules: config.Rules{
+			"no-console":      "error",
+			"last-good/check": "error",
+		},
+	}}
 	s.jsConfigs = map[string]config.RslintConfig{root: entries}
 	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
 	s.tsConfigPathsByConfig = map[string][]string{root: nil}
 	s.eslintPluginConfigGeneration = "last-good"
+	s.ruleCatalog, _ = deriveLSPRuleCatalog(s.currentRuleCatalog(), []config.EslintPluginEntry{{
+		Prefix:    "last-good",
+		RuleNames: []string{"check"},
+	}})
 	s.configDiscoveryHasLastGood = true
 	// Tests using this helper model a catalog committed by an earlier automatic
 	// initial refresh, then exercise a later config/dependency/watch refresh.
@@ -299,8 +309,14 @@ func installLastGoodConfig(s *Server, root string) {
 	s.configRefreshConfigPath = ""
 }
 
+func assertLastGoodRuleCatalog(t *testing.T, s *Server) {
+	t.Helper()
+	if ruleImpl, ok := s.ruleCatalog.Lookup("last-good/check"); !ok || !ruleImpl.IsEslintPluginRule {
+		t.Fatalf("last-good plugin catalog was replaced: %+v", ruleImpl)
+	}
+}
+
 func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 
@@ -351,12 +367,9 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 	if got := s.pluginConfigKeyForURI(fileURI); got != root {
 		t.Fatalf("plugin configKey = %q, want exact catalog path %q", got, root)
 	}
-	if _, active := s.eslintPluginRules[pluginRuleName]; !active {
-		t.Fatalf("committed plugin rule set does not contain %q", pluginRuleName)
-	}
-	registered, ok := config.GlobalRuleRegistry.GetRule(pluginRuleName)
+	registered, ok := s.ruleCatalog.Lookup(pluginRuleName)
 	if !ok || !registered.IsEslintPluginRule {
-		t.Fatalf("plugin placeholder %q was not registered: %+v", pluginRuleName, registered)
+		t.Fatalf("committed rule catalog does not contain plugin rule %q: %+v", pluginRuleName, registered)
 	}
 }
 
@@ -434,7 +447,6 @@ func TestHandleConfigRefreshRequiresInitialBeforeMutation(t *testing.T) {
 }
 
 func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	if err := os.WriteFile(filepath.Join(root, "rslint.jsonc"), []byte("{"), 0o644); err != nil {
@@ -483,7 +495,7 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	}
 	entries, resolvedDirectory, isJSConfig := s.getConfigForURI(documentURIFromPath(targetPath))
 	if !isJSConfig || resolvedDirectory != configDir ||
-		config.NewFileConfigResolverWithFS(entries, resolvedDirectory, s.fs, false).ConfigForFile(targetPath) == nil {
+		config.NewFileConfigResolverWithFS(entries, resolvedDirectory, s.fs, s.currentRuleCatalog(), false).ConfigForFile(targetPath) == nil {
 		t.Fatalf("explicit external config did not govern workspace target from its authored base")
 	}
 
@@ -544,7 +556,6 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 }
 
 func TestHandleConfigRefreshKeepsExplicitPathAfterInitialLoadFailure(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, _ := newConfigRefreshTestServer(t)
 	configPath := filepath.Join(t.TempDir(), "generated-rstack-config.mjs")
 	if err := os.WriteFile(configPath, []byte("export default [];\n"), 0o644); err != nil {
@@ -651,7 +662,6 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 }
 
 func TestHandleConfigRefreshInitialPluginHostFailureCommitsNativeCatalog(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 
@@ -685,15 +695,14 @@ func TestHandleConfigRefreshInitialPluginHostFailureCommitsNativeCatalog(t *test
 	}
 	entries := s.jsConfigs[root]
 	if value, found := configRuleValue(entries, "no-debugger"); !found || value != "error" {
-		t.Fatalf("native catalog was lost with plugin host: %+v", s.jsConfigs)
+		t.Fatalf("base rule catalog was lost with plugin host: %+v", s.jsConfigs)
 	}
-	if len(s.eslintPluginRules) != 0 {
-		t.Fatalf("degraded plugin host committed unroutable plugin rules: %+v", s.eslintPluginRules)
+	if _, ok := s.ruleCatalog.Lookup("community/check"); ok {
+		t.Fatal("degraded plugin host committed an unroutable plugin rule")
 	}
 }
 
 func TestHandleConfigRefreshActivationFailureAbortsAndKeepsLastGood(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	installLastGoodConfig(s, root)
@@ -726,10 +735,10 @@ func TestHandleConfigRefreshActivationFailureAbortsAndKeepsLastGood(t *testing.T
 	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("failed activation replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
 	}
+	assertLastGoodRuleCatalog(t, s)
 }
 
 func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	installLastGoodConfig(s, root)
@@ -761,10 +770,10 @@ func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.
 	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("invalid options replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
 	}
+	assertLastGoodRuleCatalog(t, s)
 }
 
 func TestHandleConfigRefreshCommitFailureAbortsAndKeepsLastGood(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	installLastGoodConfig(s, root)
@@ -793,10 +802,10 @@ func TestHandleConfigRefreshCommitFailureAbortsAndKeepsLastGood(t *testing.T) {
 	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("failed commit replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
 	}
+	assertLastGoodRuleCatalog(t, s)
 }
 
 func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	if err := os.WriteFile(
@@ -848,7 +857,6 @@ func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *test
 }
 
 func TestHandleConfigRefreshPartialCatalogCommitsUnavailableParentAndUsableChild(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -1004,7 +1012,6 @@ func TestFailureAtCommittedConfigBoundaryUsesLexicalIdentity(t *testing.T) {
 }
 
 func TestHandleConfigRefreshAllFailedAbortsWhenUsableLastGoodExists(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	installLastGoodConfig(s, root)
@@ -1032,7 +1039,6 @@ func TestHandleConfigRefreshAllFailedAbortsWhenUsableLastGoodExists(t *testing.T
 }
 
 func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -1078,7 +1084,6 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 }
 
 func TestHandleConfigRefreshNewFailedBoundaryUsesParentFallback(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -1117,21 +1122,30 @@ func TestHandleConfigRefreshNewFailedBoundaryUsesParentFallback(t *testing.T) {
 }
 
 func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 
 	first := startConfigRefreshForTest(s, "initial")
 	firstLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	firstLoadRequest, firstLoadResponse := loadedConfigResponse(t, firstLoad, config.RslintConfig{{}})
+	firstLoadRequest, firstLoadResponse := loadedConfigResponse(t, firstLoad, config.RslintConfig{{
+		Plugins: []string{"generation-plugin"},
+		Rules:   config.Rules{"generation-plugin/check": "error"},
+	}})
 	respondToConfigReverseRequest(t, s, firstLoad, firstLoadResponse, nil)
 	firstActivation := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
 	_, firstActivationResponse := activationResponseForRequest(t, firstActivation, true)
+	firstActivationResponse.EslintPluginEntries = []config.EslintPluginEntry{{
+		Prefix:    "generation-plugin",
+		RuleNames: []string{"check"},
+	}}
 	respondToConfigReverseRequest(t, s, firstActivation, firstActivationResponse, nil)
 	firstCommit := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
 	respondToConfigReverseRequest(t, s, firstCommit, commitResponseForRequest(t, firstCommit, true), nil)
 	if completed := awaitConfigRefreshResult(t, first); completed.err != nil {
 		t.Fatalf("initial configRefresh failed: %v", completed.err)
+	}
+	if _, ok := s.ruleCatalog.Lookup("generation-plugin/check"); !ok {
+		t.Fatal("initial generation did not commit its plugin rule")
 	}
 
 	if err := os.Remove(filepath.Join(root, "rslint.config.mjs")); err != nil {
@@ -1179,6 +1193,9 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 	if s.eslintPluginConfigGeneration != secondActivationRequest.TransactionID {
 		t.Fatalf("empty catalog generation = %q, want %q", s.eslintPluginConfigGeneration, secondActivationRequest.TransactionID)
 	}
+	if _, ok := s.ruleCatalog.Lookup("generation-plugin/check"); ok {
+		t.Fatal("deleted config's plugin rule leaked into the empty generation")
+	}
 	if s.configDiscoveryHasLastGood {
 		t.Fatal("empty JavaScript catalog was marked as a usable JavaScript last-good generation")
 	}
@@ -1215,7 +1232,6 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 }
 
 func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterDeletion(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "ignored"))
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -1281,7 +1297,6 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterDeletion(t *testing.
 }
 
 func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterCreation(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	target := tspath.NormalizePath(filepath.Join(root, "source.ts"))
@@ -1341,7 +1356,6 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterCreation(t *testing.
 }
 
 func TestGitignoreWatcherRetriesRefreshAndPreservesLastGoodOnFailure(t *testing.T) {
-	config.RegisterAllRules()
 	workspace := tspath.NormalizePath(t.TempDir())
 	writeConfigCandidate(t, workspace)
 	gitignorePath := filepath.Join(workspace, ".gitignore")

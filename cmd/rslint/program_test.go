@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -43,7 +44,6 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 		t.Fatalf("load source-only Program: programs=%d err=%v", len(loaded.Programs), err)
 	}
 
-	rslintconfig.RegisterAllRules()
 	cfg := rslintconfig.RslintConfig{
 		rslintconfig.ConfigEntry{
 			Files:   []string{"**/*.ts"},
@@ -52,15 +52,15 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 		},
 	}
 	// Deliberately bypass the config resolver's type-info gate.
-	rules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(cfg, targetFile, tmpDir, false)
-	if len(rules) != 1 || rules[0].Name != "@typescript-eslint/no-unsafe-member-access" || !rules[0].RequiresTypeInfo {
-		t.Fatalf("fixture did not resolve the expected type-aware rule: %+v", rules)
+	configuredRules, _ := rslintconfig.ResolveEnabledRules(rules.All(), cfg, targetFile, tmpDir, false)
+	if len(configuredRules) != 1 || configuredRules[0].Name != "@typescript-eslint/no-unsafe-member-access" || !configuredRules[0].RequiresTypeInfo {
+		t.Fatalf("fixture did not resolve the expected type-aware rule: %+v", configuredRules)
 	}
 	result, err := linter.RunLinter(linter.RunLinterOptions{
 		Programs: loaded.Programs,
 		Scope:    linter.FileScope{Files: []string{targetFile}},
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return rules
+			return configuredRules
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(rule.RuleDiagnostic) {},

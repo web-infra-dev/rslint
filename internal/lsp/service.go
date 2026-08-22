@@ -33,6 +33,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -46,27 +47,39 @@ type lintPassResult struct {
 }
 
 // documentLintSnapshot freezes every config-sensitive fact for one editor
-// operation. Owner selection, project selection, native rules, plugin rules,
+// operation. Owner selection, project selection, Go rules, plugin rules,
 // and fixes must all consume this same target/config pair; none may rediscover
 // the target identity from the filesystem mid-operation.
 type documentLintSnapshot struct {
 	target                config.DiscoveredLintTarget
 	config                config.RslintConfig
 	resolvedConfig        config.ResolvedFileConfig
+	ruleCatalog           *rule.Catalog
 	configResolved        bool
 	typeScriptConfigPaths []string
 	usesJavaScriptConfig  bool
 	unavailable           bool
 }
 
+func (s *Server) currentRuleCatalog() *rule.Catalog {
+	if s == nil || s.ruleCatalog == nil {
+		panic("LSP rule catalog is not initialized")
+	}
+	return s.ruleCatalog
+}
+
 func resolveDocumentLintSnapshotConfig(
 	snapshot documentLintSnapshot,
 	fs vfs.FS,
 ) documentLintSnapshot {
+	if snapshot.ruleCatalog == nil {
+		panic("document lint snapshot requires a rule catalog")
+	}
 	resolver := config.NewFileConfigResolverWithFS(
 		snapshot.config,
 		snapshot.target.ConfigDirectory,
 		fs,
+		snapshot.ruleCatalog,
 		snapshot.usesJavaScriptConfig,
 	)
 	snapshot.resolvedConfig = resolver.ResolveTarget(snapshot.target)
@@ -143,9 +156,6 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		ptrIsTrue(s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.DynamicRegistration) {
 		s.watchEnabled = true
 	}
-
-	config.RegisterAllRules()
-
 	if s.watchEnabled && s.outgoingQueue != nil {
 		relativePatterns := ptrIsTrue(
 			s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.RelativePatternSupport,
@@ -186,10 +196,6 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 	if s.watchEnabled && s.outgoingQueue != nil {
 		s.lintPrograms = newLintProgramStore(s)
 	}
-
-	// Populate the global rule registry once per process; the LSP request path
-	// resolves rule names against it after config merging.
-	config.RegisterAllRules()
 
 	// Load the JSON config used before the first JS/TS catalog transaction and
 	// as fallback for files outside every discovered JS/TS config boundary.
@@ -279,7 +285,7 @@ func fileURIFromPath(filePath string) lsproto.URI {
 // run only when the governing config's first containing project supplies type
 // information.
 func (s *Server) reloadConfig() error {
-	loader := config.NewConfigLoader(s.fs, s.cwd)
+	loader := config.NewConfigLoader(s.fs, s.cwd, rules.All())
 	rslintConfig, _, err := loader.LoadRslintConfig(s.rslintConfigPath)
 	if err != nil {
 		return fmt.Errorf("could not load rslint config: %w", err)
@@ -312,8 +318,9 @@ func (s *Server) invalidateLintProjectCaches() {
 func validateRuleOptionsForConfig(
 	entries config.RslintConfig,
 	configDirectory string,
+	catalog *rule.Catalog,
 ) (config.RslintConfig, error) {
-	normalized, optionsErrs := config.ValidateRuleOptions(entries, config.GlobalRuleRegistry)
+	normalized, optionsErrs := config.ValidateRuleOptions(entries, catalog)
 	if len(optionsErrs) == 0 {
 		return normalized, nil
 	}
@@ -1032,6 +1039,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 	snapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshot{
 		target:                lspConfigTarget(uriToPath(uri), cwd, fs),
 		config:                rslintConfig,
+		ruleCatalog:           rules.All(),
 		typeScriptConfigPaths: tsConfigPaths,
 		usesJavaScriptConfig:  enforcePlugins,
 	}, fs)
@@ -1518,9 +1526,14 @@ func (s *Server) runConfiguredLintForContent(
 	enforcePlugins bool,
 	tsConfigPaths []string,
 ) (lintPassResult, error) {
+	ruleCatalog := rules.All()
+	if enforcePlugins {
+		ruleCatalog = s.currentRuleCatalog()
+	}
 	snapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshot{
 		target:                lspConfigTarget(uriToPath(uri), cwd, s.fs),
 		config:                rslintConfig,
+		ruleCatalog:           ruleCatalog,
 		typeScriptConfigPaths: tsConfigPaths,
 		usesJavaScriptConfig:  enforcePlugins,
 	}, s.fs)
@@ -1786,6 +1799,7 @@ func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 type documentConfigSelection struct {
 	entries       config.RslintConfig
 	resolved      config.ResolvedFileConfig
+	ruleCatalog   *rule.Catalog
 	directory     string
 	configKey     string
 	usesJSConfig  bool
@@ -1794,6 +1808,7 @@ type documentConfigSelection struct {
 
 func (s *Server) selectDocumentConfig(
 	target config.DiscoveredLintTarget,
+	jsRuleCatalog *rule.Catalog,
 ) documentConfigSelection {
 	evaluationFS := s.fs
 	jsOwnerResolver := s.jsConfigOwnerResolver
@@ -1813,6 +1828,7 @@ func (s *Server) selectDocumentConfig(
 		entries config.RslintConfig,
 		configDirectory string,
 		ownerResolver *config.ConfigOwnerResolver,
+		catalog *rule.Catalog,
 		enforcePlugins bool,
 	) (config.RslintConfig, config.ResolvedFileConfig, bool) {
 		configDirectory = tspath.NormalizePath(configDirectory)
@@ -1834,6 +1850,7 @@ func (s *Server) selectDocumentConfig(
 		resolvedEntries, resolved, ok := ownerResolver.ResolveConfigTarget(
 			configDirectory,
 			target,
+			catalog,
 			enforcePlugins,
 		)
 		return resolvedEntries, resolved, ok
@@ -1849,11 +1866,13 @@ func (s *Server) selectDocumentConfig(
 					entries,
 					configKey,
 					jsOwnerResolver,
+					jsRuleCatalog,
 					true,
 				)
 				return documentConfigSelection{
 					entries:       entries,
 					resolved:      resolved,
+					ruleCatalog:   jsRuleCatalog,
 					directory:     configKey,
 					configKey:     configKey,
 					usesJSConfig:  true,
@@ -1862,19 +1881,21 @@ func (s *Server) selectDocumentConfig(
 			}
 		} else if jsOwnerResolver != nil {
 			configKey, entries, resolved, ok :=
-				jsOwnerResolver.ResolveTargetConfig(target, true)
+				jsOwnerResolver.ResolveTargetConfig(target, jsRuleCatalog, true)
 			if ok {
 				if !s.configSnapshotIncludesGitignore {
 					entries, resolved, ok = evaluateKnownConfig(
 						entries,
 						configKey,
 						nil,
+						jsRuleCatalog,
 						true,
 					)
 				}
 				return documentConfigSelection{
 					entries:       entries,
 					resolved:      resolved,
+					ruleCatalog:   jsRuleCatalog,
 					directory:     configKey,
 					configKey:     configKey,
 					usesJSConfig:  true,
@@ -1885,15 +1906,18 @@ func (s *Server) selectDocumentConfig(
 	}
 
 	configDirectory := tspath.NormalizePath(s.cwd)
+	goRuleCatalog := rules.All()
 	entries, resolved, ok := evaluateKnownConfig(
 		s.jsonConfig,
 		configDirectory,
 		s.jsonConfigResolver,
+		goRuleCatalog,
 		false,
 	)
 	return documentConfigSelection{
 		entries:       entries,
 		resolved:      resolved,
+		ruleCatalog:   goRuleCatalog,
 		directory:     configDirectory,
 		configMissing: !ok,
 	}
@@ -1904,7 +1928,8 @@ func (s *Server) selectDocumentConfig(
 // the only production entry from an editor URI into lint configuration.
 func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnapshot {
 	target := lspTargetIdentity(uriToPath(uri), s.fs)
-	selection := s.selectDocumentConfig(target)
+	ruleCatalog := s.currentRuleCatalog()
+	selection := s.selectDocumentConfig(target, ruleCatalog)
 	target.ConfigDirectory = selection.directory
 	typeScriptConfigPaths := s.tsConfigPaths
 	if selection.usesJSConfig {
@@ -1915,6 +1940,7 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 		target:                target,
 		config:                selection.entries,
 		resolvedConfig:        selection.resolved,
+		ruleCatalog:           selection.ruleCatalog,
 		configResolved:        !selection.configMissing,
 		typeScriptConfigPaths: typeScriptConfigPaths,
 		usesJavaScriptConfig:  selection.usesJSConfig,
@@ -1927,7 +1953,7 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 // cannot be resolved in separate filesystem observations.
 func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	target := lspTargetIdentity(uriToPath(uri), s.fs)
-	selection := s.selectDocumentConfig(target)
+	selection := s.selectDocumentConfig(target, s.currentRuleCatalog())
 	return selection.entries, selection.directory, selection.usesJSConfig
 }
 
