@@ -17,35 +17,38 @@ import (
 // `finally` reached either as a property access or as a bracket access keyed by
 // a string or no-substitution template literal.
 //
-// The two forms are gated differently. A property access spells the member as
-// an identifier — a keyword-named property is interned like any other — so the
-// source file's identifier table answers that form exactly and in O(1). It also
-// excludes the `catch` of a `try`/`catch`, which stays a keyword token and never
-// reaches the table; gating on the raw source text instead let every file with a
-// `try`/`catch`, and every file with a backslash, through to the AST walk this
-// function exists to avoid.
+// The source file's identifier table answers nearly every form exactly and in
+// O(1). A property access spells the member as an identifier, and a keyword-named
+// property is interned like any other; the parser also interns the cooked text of
+// a string, no-substitution template or numeric element-access key, so
+// promise["then"](), promise[`finally`]() and the escaped promise["\x74hen"]()
+// put the member name in the same table. The table excludes the `catch` of a
+// `try`/`catch`, which stays a keyword token and never reaches it; gating on the
+// raw source text instead let every file with a `try`/`catch`, and every file
+// with a backslash, through to the AST walk this function exists to avoid.
 //
-// A bracket access keys the member off a literal that never reaches the
-// identifier table, so it keeps a text scan. That scan stays narrow by first
-// requiring a quote or backtick directly after `[`. The backslash check remains
-// for escaped keys such as promise["\x74hen"](), whose source text does not
-// spell the member name.
+// The one form the table cannot answer is a key behind parentheses, as in
+// promise[("then")](): the parser interns a key that is a literal itself, while
+// IsPromiseChainCall reaches through parentheses with ast.SkipParentheses. Such
+// a call opens its bracket on a parenthesis, and its raw text spells the member
+// name unless the key is escaped, so requiring both keeps the fallback sound
+// without paying for the brackets a test file spells everywhere else.
 func sourceMayContainPromiseChain(sourceFile *ast.SourceFile) bool {
 	if sourceFile == nil {
 		return true
 	}
 	// Reading a nil identifier table is well defined; a file with no identifiers
-	// has no property-access chain either way.
+	// has no promise chain either way.
 	for _, name := range promiseChainMemberNames {
 		if _, ok := sourceFile.Identifiers[name]; ok {
 			return nodeContainsPromiseChain(sourceFile.AsNode())
 		}
 	}
 
+	// The bracket scan runs first: it answers almost every file with a single
+	// IndexByte pass, while the four substring searches below cost a pass each.
 	text := sourceFile.Text()
-	if !strings.Contains(text, `["`) &&
-		!strings.Contains(text, `['`) &&
-		!strings.Contains(text, "[`") {
+	if !bracketOpensOnParenthesis(text) {
 		return false
 	}
 	if !strings.Contains(text, "then") &&
@@ -55,6 +58,58 @@ func sourceMayContainPromiseChain(sourceFile *ast.SourceFile) bool {
 		return false
 	}
 	return nodeContainsPromiseChain(sourceFile.AsNode())
+}
+
+// bracketOpensOnParenthesis reports whether any `[` in the text is followed,
+// past whitespace and comments, by `(`. It reads the raw text rather than the
+// AST, so a bracket inside a string or a regular expression counts too; that
+// only costs a walk the caller would otherwise skip, and never hides one.
+func bracketOpensOnParenthesis(text string) bool {
+	for index := strings.IndexByte(text, '['); index >= 0; {
+		if next := skipTrivia(text, index+1); next < len(text) && text[next] == '(' {
+			return true
+		}
+		offset := strings.IndexByte(text[index+1:], '[')
+		if offset < 0 {
+			return false
+		}
+		index += offset + 1
+	}
+	return false
+}
+
+// skipTrivia returns the first index at or after index that starts neither
+// whitespace nor a comment.
+func skipTrivia(text string, index int) int {
+	for index < len(text) {
+		switch text[index] {
+		case ' ', '\t', '\r', '\n', '\v', '\f':
+			index++
+		case '/':
+			if index+1 >= len(text) {
+				return index
+			}
+			switch text[index+1] {
+			case '/':
+				end := strings.IndexByte(text[index:], '\n')
+				if end < 0 {
+					return len(text)
+				}
+				index += end + 1
+			case '*':
+				end := strings.Index(text[index+2:], "*/")
+				if end < 0 {
+					return len(text)
+				}
+				index += end + 4
+			default:
+				return index
+			}
+		default:
+			return index
+		}
+	}
+	return index
 }
 
 var promiseChainMemberNames = [...]string{"then", "catch", "finally"}
