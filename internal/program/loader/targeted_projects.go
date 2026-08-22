@@ -17,7 +17,8 @@ import (
 
 type projectTargetBinding struct {
 	targets []rslintconfig.DiscoveredLintTarget
-	owners  []int
+	// owners is complete: direct-root owner, import-fallback owner, or -1.
+	owners []int
 }
 
 type targetedProjectSlot struct {
@@ -305,7 +306,7 @@ func runTargetConfigTasks(
 
 func (execution *targetedProjectExecution) projectSet(
 	keep []bool,
-	directProjectByTarget []int,
+	ownerProjectByTarget []int,
 	targets []rslintconfig.DiscoveredLintTarget,
 ) ProjectSet {
 	binding := &projectTargetBinding{
@@ -335,7 +336,7 @@ func (execution *targetedProjectExecution) projectSet(
 		set.configOrders = append(set.configOrders, execution.plan.specs[index].configOrders)
 		projectSetIndexByPlanIndex[index] = len(set.compilerPrograms) - 1
 	}
-	for targetIndex, projectIndex := range directProjectByTarget {
+	for targetIndex, projectIndex := range ownerProjectByTarget {
 		if projectIndex < 0 || targetIndex >= len(targets) {
 			continue
 		}
@@ -392,9 +393,9 @@ func (s *Session) BuildTargetProjects(
 
 	execution := newTargetedProjectExecution(s, plan, singleThreaded)
 	directBuilds := newTargetedProjectBuildQueue(execution)
-	directProjectByTarget := make([]int, len(targetPlan.Targets))
-	for index := range directProjectByTarget {
-		directProjectByTarget[index] = -1
+	ownerProjectByTarget := make([]int, len(targetPlan.Targets))
+	for index := range ownerProjectByTarget {
+		ownerProjectByTarget[index] = -1
 	}
 	targetIndexesByConfig := make(map[string][]int)
 	for targetIndex, target := range targetPlan.Targets {
@@ -420,12 +421,12 @@ func (s *Session) BuildTargetProjects(
 			}
 			selected := false
 			for _, targetIndex := range targetIndexes {
-				if directProjectByTarget[targetIndex] >= 0 {
+				if ownerProjectByTarget[targetIndex] >= 0 {
 					continue
 				}
 				target := targetPlan.Targets[targetIndex]
 				if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
-					directProjectByTarget[targetIndex] = projectIndex
+					ownerProjectByTarget[targetIndex] = projectIndex
 					unresolved--
 					selected = true
 				}
@@ -509,7 +510,7 @@ func (s *Session) BuildTargetProjects(
 		return ProjectSet{}, err
 	}
 	validatedDirectBuilds := make(map[int]struct{})
-	for _, projectIndex := range directProjectByTarget {
+	for _, projectIndex := range ownerProjectByTarget {
 		if projectIndex < 0 {
 			continue
 		}
@@ -523,12 +524,12 @@ func (s *Session) BuildTargetProjects(
 	}
 
 	keep := make([]bool, len(plan.specs))
-	for _, projectIndex := range directProjectByTarget {
+	for _, projectIndex := range ownerProjectByTarget {
 		if projectIndex >= 0 {
 			keep[projectIndex] = true
 		}
 	}
-	for targetIndex, projectIndex := range directProjectByTarget {
+	for targetIndex, projectIndex := range ownerProjectByTarget {
 		if projectIndex >= 0 && !execution.containsTarget(projectIndex, targetPlan.Targets[targetIndex]) {
 			return ProjectSet{}, fmt.Errorf(
 				"project root %q from %q was absent from its TypeScript Program",
@@ -548,7 +549,7 @@ func (s *Session) BuildTargetProjects(
 	err = runTargetConfigTasks(configDirs, singleThreaded, func(configDir string) error {
 		pending := make(map[int]struct{})
 		for _, targetIndex := range targetIndexesByConfig[configDir] {
-			if directProjectByTarget[targetIndex] < 0 {
+			if ownerProjectByTarget[targetIndex] < 0 {
 				pending[targetIndex] = struct{}{}
 			}
 		}
@@ -580,6 +581,7 @@ func (s *Session) BuildTargetProjects(
 			for targetIndex := range pending {
 				if execution.containsTarget(projectIndex, targetPlan.Targets[targetIndex]) {
 					delete(pending, targetIndex)
+					ownerProjectByTarget[targetIndex] = projectIndex
 					selected = true
 				}
 			}
@@ -595,7 +597,7 @@ func (s *Session) BuildTargetProjects(
 		return ProjectSet{}, err
 	}
 
-	return execution.projectSet(keep, directProjectByTarget, targetPlan.Targets), nil
+	return execution.projectSet(keep, ownerProjectByTarget, targetPlan.Targets), nil
 }
 
 func (s *Session) BuildTargetProject(

@@ -54,7 +54,9 @@ type discoveryWalkNode struct {
 	gitDirectory       string
 	gitCursor          gitignore.Cursor
 	gitActive          bool
-	targets            *discoveryTargetTrie
+	// The parent already accepted this directory under ownerPath.
+	ownerGlobalIgnoreChecked bool
+	targets                  *discoveryTargetTrie
 }
 
 // discoveryTargetTrie bounds a directory walk to branches that can govern an
@@ -1143,6 +1145,7 @@ func (builder *configCatalogBuilder) walkDirectories(roots []discoveryWalkNode) 
 					}
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
+					item.node.ownerGlobalIgnoreChecked = false
 					item.node.gitCursor = gitignore.NewCursor(
 						state.candidate.directory,
 						builder.fs.UseCaseSensitiveFileNames(),
@@ -1204,7 +1207,8 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 	if err := builder.ctx.Err(); err != nil {
 		return discoveryWalkResult{err: err}
 	}
-	if builder.isGloballyIgnoredDirectory(node.ownerPath, node.directory, node.canonicalDirectory) {
+	if !node.ownerGlobalIgnoreChecked &&
+		builder.isGloballyIgnoredDirectory(node.ownerPath, node.directory, node.canonicalDirectory) {
 		return discoveryWalkResult{directoriesPruned: 1}
 	}
 	result := discoveryWalkResult{}
@@ -1302,14 +1306,15 @@ func (builder *configCatalogBuilder) processWalkNode(node discoveryWalkNode) dis
 			childGitActive = true
 		}
 		children = append(children, discoveryWalkNode{
-			directory:          child,
-			canonicalDirectory: canonicalChild,
-			ownerDir:           node.ownerDir,
-			ownerPath:          node.ownerPath,
-			gitDirectory:       childGitDirectory,
-			gitCursor:          childGitCursor,
-			gitActive:          childGitActive,
-			targets:            childTargets,
+			directory:                child,
+			canonicalDirectory:       canonicalChild,
+			ownerDir:                 node.ownerDir,
+			ownerPath:                node.ownerPath,
+			gitDirectory:             childGitDirectory,
+			gitCursor:                childGitCursor,
+			gitActive:                childGitActive,
+			ownerGlobalIgnoreChecked: true,
+			targets:                  childTargets,
 		})
 	}
 	result.children = children

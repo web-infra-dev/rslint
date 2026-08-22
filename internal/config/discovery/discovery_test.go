@@ -1314,6 +1314,9 @@ func TestConfigDiscoveryBoundsExpandedTargetWalkToAncestorTrie(t *testing.T) {
 		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{rootConfig}) {
 			t.Fatalf("parent-ignore branch evaluated nested config: %v", got)
 		}
+		if catalog.Stats.DirectoriesVisited != 2 || catalog.Stats.DirectoriesPruned != 1 {
+			t.Fatalf("parent-ignore traversal changed: %+v", catalog.Stats)
+		}
 	})
 
 	t.Run("gitignore prunes a target branch before its config", func(t *testing.T) {

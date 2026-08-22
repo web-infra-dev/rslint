@@ -80,11 +80,12 @@ func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.S
 }
 
 // programFileIndex joins lint targets to Program sources by exact physical
-// path. It is scoped to one binding pass and builds the governing config's
-// Program indexes only after one of them misses an exact lexical lookup.
+// path. It is scoped to one binding pass and builds only the requested Program
+// indexes after an exact lexical lookup misses. Focused binding requests its
+// selected owner alone; eager binding may request the governing config's batch.
 // Canonical target identities established during discovery are reused before
 // consulting the filesystem, and unknown source paths are resolved at most once
-// across all Programs in the pass.
+// across the Programs inspected in the pass.
 type programFileIndex struct {
 	programs              []*compiler.Program
 	targets               []rslintconfig.DiscoveredLintTarget

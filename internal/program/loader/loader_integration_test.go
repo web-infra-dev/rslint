@@ -1298,6 +1298,9 @@ func TestBuildTargetProjectFallsBackToFirstImportOnlyAfterRootScan(t *testing.T)
 	if got := readCounter.readCount(tspath.ResolvePath(dir, "later-main.ts")); got != 0 {
 		t.Fatalf("fallback built the later project %d time(s) after the first match", got)
 	}
+	if set.targetBinding == nil || !slices.Equal(set.targetBinding.owners, []int{0}) {
+		t.Fatalf("fallback owner binding = %v, want first retained project", set.targetBinding)
+	}
 	binding, err := sessionForTest(context).LoadAPI(set, plan, dir, true)
 	if err != nil {
 		t.Fatalf("LoadAPI: %v", err)
@@ -1372,6 +1375,9 @@ func TestBuildTargetProjectKeepsDirectAndImportFallbackTiersPerTarget(t *testing
 	}
 	if set.Len() != 2 {
 		t.Fatalf("selected Programs = %d, want direct and fallback projects", set.Len())
+	}
+	if set.targetBinding == nil || !slices.Equal(set.targetBinding.owners, []int{1, 0}) {
+		t.Fatalf("complete target owners = %v, want direct then fallback tiers", set.targetBinding)
 	}
 	binding, err := sessionForTest(context).LoadAPI(set, plan, dir, false)
 	if err != nil {

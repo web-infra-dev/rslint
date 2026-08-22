@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -209,6 +210,110 @@ func TestProgramFileIndex_IsTargetAwareAndLazyPerGoverningGroup(t *testing.T) {
 	if sources := index.sourcesByProgram[0]; len(sources) != 1 {
 		t.Fatalf("per-Program index retained non-target identities: %v", sources)
 	}
+}
+
+func TestLoadCanonicalBindingIndexesOnlySelectedOwner(t *testing.T) {
+	const (
+		configDir    = "/repo"
+		targetPath   = "/physical/target.ts"
+		ownerAlias   = "/owner/target.ts"
+		catalogOnly  = "/catalog/unrelated.ts"
+		catalogMatch = "/physical/unrelated.ts"
+	)
+	fsys := newBindingIndexTestFS(
+		[]string{ownerAlias, catalogOnly},
+		map[string]string{
+			ownerAlias:  targetPath,
+			catalogOnly: catalogMatch,
+		},
+	)
+	catalogProgram := createBindingIndexTestProgram(t, fsys, catalogOnly)
+	ownerProgram := createBindingIndexTestProgram(t, fsys, ownerAlias)
+	target := rslintconfig.DiscoveredLintTarget{
+		Path: targetPath, CanonicalPath: targetPath, ConfigDirectory: configDir,
+	}
+	programs := []*compiler.Program{catalogProgram, ownerProgram}
+	set := ProjectSet{
+		compilerPrograms: programs,
+		programs:         lintprogram.NewFromCompilers(programs),
+		configOrders: []configOrders{
+			{exactPathID(configDir): 0},
+			{exactPathID(configDir): 1},
+		},
+		targetBinding: &projectTargetBinding{
+			targets: []rslintconfig.DiscoveredLintTarget{target},
+			owners:  []int{1},
+		},
+	}
+	fsys.resetCalls()
+
+	binding, err := sessionForTest(newBuildContext(fsys)).LoadAPI(
+		set,
+		rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{target}},
+		configDir,
+		true,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := binding.TargetsByProgram; len(got) != 2 || len(got[0]) != 0 ||
+		len(got[1]) != 1 || got[1][0] != ownerAlias {
+		t.Fatalf("selected owner projection = %v", got)
+	}
+	if calls := fsys.callCount(catalogOnly); calls != 0 {
+		t.Fatalf("catalog-only source participated in lint binding: Realpath calls=%d", calls)
+	}
+}
+
+func TestLoadConsumesCompleteTargetBindingWithoutReselection(t *testing.T) {
+	const (
+		configDir  = "/repo"
+		targetPath = "/repo/target.ts"
+	)
+	fsys := newBindingIndexTestFS([]string{targetPath}, nil)
+	first := createBindingIndexTestProgram(t, fsys, targetPath)
+	second := createBindingIndexTestProgram(t, fsys, targetPath)
+	target := rslintconfig.DiscoveredLintTarget{
+		Path: targetPath, CanonicalPath: targetPath, ConfigDirectory: configDir,
+	}
+	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{target}}
+	newSet := func(owner int) ProjectSet {
+		programs := []*compiler.Program{first, second}
+		return ProjectSet{
+			compilerPrograms: programs,
+			programs:         lintprogram.NewFromCompilers(programs),
+			configOrders: []configOrders{
+				{exactPathID(configDir): 0},
+				{exactPathID(configDir): 1},
+			},
+			targetBinding: &projectTargetBinding{
+				targets: plan.Targets,
+				owners:  []int{owner},
+			},
+		}
+	}
+	session := sessionForTest(newBuildContext(fsys))
+
+	t.Run("selected owner is authoritative", func(t *testing.T) {
+		binding, err := session.LoadAPI(newSet(1), plan, configDir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := binding.TargetsByProgram; len(got) != 2 || len(got[0]) != 0 || len(got[1]) != 1 {
+			t.Fatalf("Load reselected an earlier containing Program: %v", got)
+		}
+	})
+
+	t.Run("no owner remains source only", func(t *testing.T) {
+		binding, err := session.LoadAPI(newSet(-1), plan, configDir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := binding.TargetsByProgram; len(got) != 3 || len(got[0]) != 0 ||
+			len(got[1]) != 0 || len(got[2]) != 1 {
+			t.Fatalf("Load rebound an authoritative unowned target: %v", got)
+		}
+	})
 }
 
 func TestProgramFileIndex_BuildsGoverningGroupInOneBatch(t *testing.T) {
