@@ -1792,6 +1792,9 @@ func TestCLIExplicitFileOutsideFilesCountsWithNoRules(t *testing.T) {
 	if strings.Contains(stdout, "no-debugger") {
 		t.Fatalf("files-scope miss must not run no-debugger, stdout=%q", stdout)
 	}
+	if strings.Contains(stderr, "explicit.js") {
+		t.Fatalf("files-scope miss must not be reported as skipped, stderr=%q", stderr)
+	}
 }
 
 func TestCLIExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *testing.T) {
@@ -1821,6 +1824,12 @@ func TestCLIExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *testing.
 	}
 	if !strings.Contains(stdout, "TypeScript(TS1134)") {
 		t.Fatalf("selected zero-rule target must surface syntax diagnostics, stdout=%q stderr=%q", stdout, stderr)
+	}
+	if strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("files-scope miss must not run no-debugger, stdout=%q", stdout)
+	}
+	if strings.Contains(stderr, "explicit.js") {
+		t.Fatalf("files-scope miss must not be reported as skipped, stderr=%q", stderr)
 	}
 }
 
