@@ -336,5 +336,39 @@ ruleTester.run('prefer-each', {} as never, {
         },
       ],
     },
+    {
+      code: `
+        test('outer', () => {
+          for (const row of rows) {
+            test(row.name, () => {});
+          }
+        });
+      `,
+      errors: [
+        {
+          messageId: 'preferEach',
+          message: 'prefer using `test.each` rather than a manual loop',
+          line: 3,
+          column: 11,
+        },
+      ],
+    },
+    {
+      code: `
+        for (const row of rows) {
+          test(row.name, () => {
+            beforeEach(() => {});
+          });
+        }
+      `,
+      errors: [
+        {
+          messageId: 'preferEach',
+          message: 'prefer using `describe.each` rather than a manual loop',
+          line: 2,
+          column: 9,
+        },
+      ],
+    },
   ],
 });

@@ -37,56 +37,47 @@ var PreferEachRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
-		callbacks := analysis.Callbacks().Functions
-		// NOTE: Unlike eslint-plugin-jest's single boolean, rstest tracks the
-		// callback depth from analysis.Callbacks().Functions so nested test
-		// registrations inside a test callback do not accidentally re-enable
-		// reporting for later business loops in the outer callback.
-		pending := make([]pendingRegistration, 0, 4)
-		testCallbackDepth := 0
+		// NOTE: eslint-plugin-jest keeps one flat list of registrations for the
+		// whole file and decides what to do with it from an `inTestCaseCall`
+		// boolean that is set by every `test(...)` call and cleared by every
+		// `test(...)` exit. Both halves of that leak across scopes: registrations
+		// made before a loop can survive into the loop's report, a nested test
+		// clears the flag while the outer test is still open, and a loop that
+		// runs while the flag happens to be set is skipped entirely.
+		//
+		// This rule gives each loop its own frame instead. A registration is
+		// recorded against the innermost loop that lexically contains it, and a
+		// loop is reported from its own frame alone, so what the report says is
+		// exactly what the loop registers. A loop that only runs business logic
+		// has an empty frame and is never reported, whether or not it sits inside
+		// a test callback.
+		frames := make([][]pendingRegistration, 0, 4)
 
 		enterLoop := func(node *ast.Node) {
-			if testCallbackDepth > 0 || len(pending) == 0 {
-				return
-			}
-			pending = pending[:0]
+			frames = append(frames, nil)
 		}
 
 		exitLoop := func(node *ast.Node) {
-			if testCallbackDepth > 0 || len(pending) == 0 {
+			if len(frames) == 0 {
 				return
 			}
-			ctx.ReportNode(node, buildPreferEachMessage(recommendFn(pending)))
-			pending = pending[:0]
-		}
-
-		enterFunction := func(node *ast.Node) {
-			if callbacks[node] {
-				testCallbackDepth++
+			frame := frames[len(frames)-1]
+			frames = frames[:len(frames)-1]
+			if len(frame) == 0 {
+				return
 			}
-		}
-
-		exitFunction := func(node *ast.Node) {
-			if callbacks[node] {
-				testCallbackDepth--
-			}
+			ctx.ReportNode(node, buildPreferEachMessage(recommendFn(frame)))
 		}
 
 		return rule.RuleListeners{
-			ast.KindForStatement:                             enterLoop,
-			ast.KindForInStatement:                           enterLoop,
-			ast.KindForOfStatement:                           enterLoop,
-			rule.ListenerOnExit(ast.KindForStatement):        exitLoop,
-			rule.ListenerOnExit(ast.KindForInStatement):      exitLoop,
-			rule.ListenerOnExit(ast.KindForOfStatement):      exitLoop,
-			ast.KindFunctionDeclaration:                      enterFunction,
-			ast.KindFunctionExpression:                       enterFunction,
-			ast.KindArrowFunction:                            enterFunction,
-			rule.ListenerOnExit(ast.KindFunctionDeclaration): exitFunction,
-			rule.ListenerOnExit(ast.KindFunctionExpression):  exitFunction,
-			rule.ListenerOnExit(ast.KindArrowFunction):       exitFunction,
+			ast.KindForStatement:                        enterLoop,
+			ast.KindForInStatement:                      enterLoop,
+			ast.KindForOfStatement:                      enterLoop,
+			rule.ListenerOnExit(ast.KindForStatement):   exitLoop,
+			rule.ListenerOnExit(ast.KindForInStatement): exitLoop,
+			rule.ListenerOnExit(ast.KindForOfStatement): exitLoop,
 			ast.KindCallExpression: func(node *ast.Node) {
-				if testCallbackDepth > 0 {
+				if len(frames) == 0 {
 					return
 				}
 				parsed := analysis.ParseFnCall(node)
@@ -97,7 +88,8 @@ var PreferEachRule = rule.Rule{
 				case testFramework.FnKindTest,
 					testFramework.FnKindDescribe,
 					testFramework.FnKindHook:
-					pending = append(pending, pendingRegistration{
+					top := len(frames) - 1
+					frames[top] = append(frames[top], pendingRegistration{
 						kind: parsed.Kind,
 						name: parsed.Name,
 					})

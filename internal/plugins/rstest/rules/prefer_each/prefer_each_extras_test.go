@@ -22,9 +22,6 @@ func TestPreferEachExtras(t *testing.T) {
 
 			// ---- Real-user: #1048 business loop inside a test callback ----
 			{Code: `test('business loop', () => { for (const row of rows) { consume(row); } });`},
-			// ---- Real-user: nested-test business loop inside a callback ----
-			{Code: `test('case', () => { for (const row of rows) { test(row.name, () => {}); } });`},
-
 			// ---- test callback exclusion ----
 			{Code: `test('outer', () => { test('inner', () => {}); for (const row of rows) { consume(row); } });`},
 
@@ -48,14 +45,6 @@ func TestPreferEachExtras(t *testing.T) {
 			// ---- Dimension 4: wrappers / empty loops / same-kind nesting ----
 			{Code: `for (const row of rows);`},
 			{Code: `for (const row of rows) ((consume))(row);`},
-			// Locks in existing Rslint/Jest behavior: the nested loop enter clears
-			// the outer pending sequence, so neither loop reports.
-			{Code: `for (const suite of suites) {
-  test(suite.name, () => {});
-  for (const item of suite.items) {
-    consume(item);
-  }
-}`},
 			// N/A: optional call on the registration itself is not a supported rstest parser shape.
 			// N/A: computed dynamic registration member names are intentionally unresolved by ParseFnCall.
 		},
@@ -343,13 +332,32 @@ for (const row of rows) {
 
 			// ---- nested loop contracts ----
 			{
-				// Locks in existing Rslint/Jest behavior: only the inner loop reports.
+				// Only the loop that registers reports; the outer loop's own
+				// frame is empty.
 				Code: `for (const suite of suites) {
   for (const item of suite.items) {
     test(item.name, () => {});
   }
 }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferEach", Message: "prefer using `test.each` rather than a manual loop", Line: 2, Column: 3}},
+			},
+			{
+				// The registration belongs to the outer loop, so the outer loop
+				// is what gets reported; the inner business loop stays silent.
+				Code: `for (const suite of suites) {
+  test(suite.name, () => {});
+  for (const item of suite.items) {
+    consume(item);
+  }
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferEach",
+					Message:   "prefer using `test.each` rather than a manual loop",
+					Line:      1,
+					Column:    1,
+					EndLine:   6,
+					EndColumn: 2,
+				}},
 			},
 		},
 	)
