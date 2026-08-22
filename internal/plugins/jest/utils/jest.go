@@ -9,7 +9,9 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -163,6 +165,83 @@ func GetJestKind(name string) JestFnType {
 
 func GetJestFnMemberEntries(node *ast.Node) []ParsedJestFnMemberEntry {
 	return testFramework.GetMemberEntries(node)
+}
+
+// AssertionFunctionOptions contains the options shared by Jest rules that
+// recognize assertion calls and additional test block functions.
+type AssertionFunctionOptions struct {
+	AssertFunctionNames          []string
+	AdditionalTestBlockFunctions []string
+}
+
+// ParseAssertionFunctionOptions parses the option shape shared by
+// expect-expect and prefer-ending-with-an-expect.
+func ParseAssertionFunctionOptions(options []any) AssertionFunctionOptions {
+	parsed := AssertionFunctionOptions{
+		AssertFunctionNames:          []string{"expect"},
+		AdditionalTestBlockFunctions: []string{},
+	}
+
+	if len(options) == 0 {
+		return parsed
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if optsMap == nil {
+		return parsed
+	}
+	if names := internalUtils.ToStringSlice(optsMap["assertFunctionNames"]); names != nil {
+		parsed.AssertFunctionNames = names
+	}
+	if additional := internalUtils.ToStringSlice(optsMap["additionalTestBlockFunctions"]); additional != nil {
+		parsed.AdditionalTestBlockFunctions = additional
+	}
+
+	return parsed
+}
+
+// CompileAssertFunctionNamePatterns compiles eslint-plugin-jest's star-pattern
+// syntax. A single star matches within a dotted segment, while a double star
+// segment can span dots.
+func CompileAssertFunctionNamePatterns(patterns []string) []*esregexp.RegExp {
+	compiled := make([]*esregexp.RegExp, 0, len(patterns))
+	for _, pattern := range patterns {
+		compiled = append(compiled, compileAssertFunctionNamePattern(pattern))
+	}
+	return compiled
+}
+
+func compileAssertFunctionNamePattern(pattern string) *esregexp.RegExp {
+	segments := strings.Split(pattern, ".")
+	parts := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		if segment == "**" {
+			parts = append(parts, `[a-zA-Z0-9.]*`)
+		} else {
+			parts = append(parts, strings.ReplaceAll(segment, "*", `[a-zA-Z0-9]*`))
+		}
+	}
+
+	// Other regular-expression characters are intentionally preserved because
+	// upstream passes configured patterns directly to RegExp.
+	re, err := esregexp.Compile(`^(?:`+strings.Join(parts, `\.`)+`)(?:\.|$)`, "iu")
+	if err != nil {
+		return nil
+	}
+	return re
+}
+
+// MatchesAssertFunctionName reports whether name matches one of the compiled
+// assertion function patterns.
+func MatchesAssertFunctionName(name string, compiled []*esregexp.RegExp) bool {
+	if name == "" {
+		return false
+	}
+	for _, re := range compiled {
+		if re != nil && re.TestOrTimeout(name) {
+			return true
+		}
+	}
+	return false
 }
 
 // DefaultJestVersion is used when the Jest version cannot be resolved from settings or package.json.
