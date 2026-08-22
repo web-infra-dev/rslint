@@ -47,6 +47,20 @@ func TestNoHooksExtras(t *testing.T) {
 			{Code: `import { test } from '@rstest/core'; test.beforeEach(() => {});`},
 			{Code: `import { test } from '@rstest/playwright'; test.skip.beforeEach(() => {});`},
 			{Code: `import { test } from '@rstest/playwright'; test.beforeEach.only(() => {});`},
+			// ---- Locks in parser contract: non-identifier receivers never resolve ----
+			// jest/no-hooks reports all four of these; ParseRstestFnCall does not.
+			{Code: `new A().beforeEach()`},
+			{Code: `arr[0].beforeEach()`},
+			{Code: `this.beforeEach()`},
+			{Code: `(<any>x).beforeEach()`},
+			// ---- Locks in parser contract: a trailing chain is not a hook registration ----
+			{Code: `beforeEach.skip(() => {})`},
+			{Code: `beforeEach.each([1])(() => {})`},
+			// ---- Locks in parser contract: non-plain-call positions ----
+			{Code: `new beforeEach()`},
+			{Code: "beforeEach`x`"},
+			{Code: `(0, beforeEach)(() => {})`},
+			{Code: `globalThis.beforeEach(() => {})`},
 			// ---- Locks in upstream create() branch: non-hook CallExpression is ignored ----
 			{Code: `notAHook(() => {})`},
 			// ---- Locks in upstream create() branch: foreign imports are ignored ----
@@ -201,6 +215,94 @@ func TestNoHooksExtras(t *testing.T) {
 					Line:      1,
 					Column:    44,
 				}},
+			},
+			// ---- Locks in parser branch: element access on a resolved namespace ----
+			{
+				Code: `import * as rstest from '@rstest/core'; rstest["beforeEach"](() => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedHook",
+					Message:   "Unexpected 'beforeEach' hook",
+					Line:      1,
+					Column:    41,
+					EndLine:   1,
+					EndColumn: 71,
+				}},
+			},
+			// ---- Locks in upstream create() branch: the report does not inspect arguments ----
+			{
+				Code: `beforeEach()`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedHook",
+					Message:   "Unexpected 'beforeEach' hook",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 13,
+				}},
+			},
+			{
+				Code: `beforeEach?.(() => {})`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedHook",
+					Message:   "Unexpected 'beforeEach' hook",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 23,
+				}},
+			},
+			{
+				Code: `beforeEach(...fns)`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedHook",
+					Message:   "Unexpected 'beforeEach' hook",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 19,
+				}},
+			},
+			// ---- Real-user: the shape every suite uses, a hook inside a describe callback ----
+			{
+				Code: `
+import { describe, it, beforeEach } from '@rstest/core';
+
+describe("suite", () => {
+	beforeEach(() => {});
+
+	it("works", () => {});
+});
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedHook",
+					Message:   "Unexpected 'beforeEach' hook",
+					Line:      5,
+					Column:    2,
+					EndLine:   5,
+					EndColumn: 22,
+				}},
+			},
+			// ---- Locks in upstream create() branch: one file reports every hook, outermost first ----
+			{
+				Code: `beforeEach(() => { afterEach(() => {}) })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "unexpectedHook",
+						Message:   "Unexpected 'beforeEach' hook",
+						Line:      1,
+						Column:    1,
+						EndLine:   1,
+						EndColumn: 42,
+					},
+					{
+						MessageId: "unexpectedHook",
+						Message:   "Unexpected 'afterEach' hook",
+						Line:      1,
+						Column:    20,
+						EndLine:   1,
+						EndColumn: 39,
+					},
+				},
 			},
 			// ---- Locks in upstream allow.includes(name) false arm with semantic alias ----
 			{
