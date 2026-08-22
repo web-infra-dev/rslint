@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -313,6 +314,100 @@ func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
 	}
 }
 
+func TestBuildPluginFileInputPreservesTargetIdentityAcrossAuthoredConfigBases(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpauthoredbase", RuleNames: []string{"no-foo"}},
+	})
+
+	root := t.TempDir()
+	workspace := filepath.Join(root, "workspace")
+	configDir := filepath.Join(root, "physical", "package")
+	physicalSourceDir := filepath.Join(configDir, "src")
+	aliasSourceDir := filepath.Join(workspace, "linked-src")
+	for _, directory := range []string{workspace, physicalSourceDir} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(physicalSourceDir, aliasSourceDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	aliasFile := filepath.Join(aliasSourceDir, "index.ts")
+	if err := os.WriteFile(aliasFile, []byte("foo();\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	effective := config.ConfigWithAuthoredPathBase(config.RslintConfig{{
+		Files:   []string{"linked-src/**/*.ts"},
+		Plugins: []string{"tpauthoredbase"},
+		Rules:   config.Rules{"tpauthoredbase/no-foo": "error"},
+	}}, workspace)
+
+	s := newTestServer()
+	s.cwd = workspace
+	s.fs = osvfs.FS()
+	uri := documentURIFromPath(aliasFile)
+	s.documents[uri] = "foo();\n"
+	input, ok := s.buildPluginFileInputWithConfig(uri, nil, effective, configDir, true)
+	if !ok {
+		t.Fatal("workspace-authored plugin rule lost the lexical symlink target")
+	}
+	if len(input.Rules) != 1 || input.Rules[0].Name != "tpauthoredbase/no-foo" {
+		t.Fatalf("unexpected plugin rules: %+v", input.Rules)
+	}
+}
+
+func TestBuildPluginFileInputExternalConfigPreservesGitignoreTargetIdentity(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpexternalgit", RuleNames: []string{"no-foo"}},
+	})
+
+	root := t.TempDir()
+	workspace := filepath.Join(root, "workspace")
+	configDir := filepath.Join(root, "physical", "package")
+	physicalSourceDir := filepath.Join(configDir, "src")
+	aliasSourceDir := filepath.Join(workspace, "linked-src")
+	for _, directory := range []string{workspace, physicalSourceDir} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(physicalSourceDir, aliasSourceDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	aliasFile := filepath.Join(aliasSourceDir, "ignored.ts")
+	if err := os.WriteFile(aliasFile, []byte("foo();\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(workspace, ".gitignore"),
+		[]byte("linked-src/ignored.ts\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	effective := config.ConfigWithGitignoreForTargetsFromRoot(
+		config.RslintConfig{{
+			Files:   []string{"src/**/*.ts"},
+			Plugins: []string{"tpexternalgit"},
+			Rules:   config.Rules{"tpexternalgit/no-foo": "error"},
+		}},
+		configDir,
+		workspace,
+		osvfs.FS(),
+		[]string{aliasFile},
+		nil,
+	)
+
+	s := newTestServer()
+	s.cwd = workspace
+	s.fs = osvfs.FS()
+	uri := documentURIFromPath(aliasFile)
+	s.documents[uri] = "foo();\n"
+	if input, ok := s.buildPluginFileInputWithConfig(uri, nil, effective, configDir, true); ok {
+		t.Fatalf("external-config Git ignore produced plugin input: %+v", input)
+	}
+}
+
 func TestBuildPluginFileInput_RespectsGitignore(t *testing.T) {
 	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
 		{Prefix: "tpgitignore", RuleNames: []string{"no-foo"}},
@@ -586,7 +681,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	// Injected native lint: fix the first "1" → "2" wherever it appears. Returns
 	// no fix once the digit is gone (so the loop converges).
 	var nativePasses int
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ documentLintSnapshot) (lintPassResult, error) {
 		nativePasses++
 		idx := strings.Index(content, "1")
 		if idx < 0 {
@@ -601,8 +696,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 		}}}, nil
 	}
 
-	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
+	got := s.computeFixAllContent(context.Background(), uri, original, s.documentLintSnapshot(uri))
 
 	// Both fixes applied (native "1"→"2" AND plugin "bar"→"baz") proves the
 	// fold: the plugin fix survived alongside the native one in the same pass.
@@ -612,6 +706,220 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	// Pass 0 fixes both; pass 1 sees neither "1" nor "bar" → no fix → converge.
 	if nativePasses != 2 || pluginPasses != 2 {
 		t.Errorf("expected 2 native + 2 plugin passes (1 fixing, 1 converging), got native=%d plugin=%d", nativePasses, pluginPasses)
+	}
+}
+
+type retargetingDocumentFS struct {
+	mockFS
+	targetPath string
+	targets    []string
+	targetCall int
+}
+
+type retargetingConfigEvaluationFS struct {
+	mockFS
+	targetPath       string
+	targetParentPath string
+	configPath       string
+	configCalls      int
+}
+
+func (fsys *retargetingConfigEvaluationFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	switch filePath {
+	case fsys.targetPath:
+		return "/owner-a/src/index.ts"
+	case fsys.targetParentPath:
+		return "/owner-a/src"
+	case fsys.configPath:
+		fsys.configCalls++
+		if fsys.configCalls == 1 {
+			return "/owner-a"
+		}
+		return "/owner-b"
+	default:
+		return filePath
+	}
+}
+
+func TestDocumentLintSnapshotCollectsGitignoreFromFrozenTarget(t *testing.T) {
+	uri := lsproto.DocumentUri("file:///alias/source.ts")
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	fsys := &retargetingDocumentFS{
+		targetPath: filePath,
+		targets:    []string{"/owner-a/source.ts", "/owner-b/source.ts"},
+	}
+	s := newTestServer()
+	s.cwd = "/alias"
+	s.fs = fsys
+	s.jsonConfig = config.RslintConfig{{}}
+
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.target.CanonicalPath != "/owner-a/source.ts" {
+		t.Fatalf("snapshot target = %+v", snapshot.target)
+	}
+	if fsys.targetCall != 1 {
+		t.Fatalf("target Realpath calls = %d, want one identity observation", fsys.targetCall)
+	}
+}
+
+func TestDocumentLintSnapshotFreezesBootstrapConfigEvaluation(t *testing.T) {
+	uri := lsproto.DocumentUri("file:///outside-link/src/index.ts")
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	configPath := "/config-link"
+	fsys := &retargetingConfigEvaluationFS{
+		targetPath:       filePath,
+		targetParentPath: tspath.GetDirectoryPath(filePath),
+		configPath:       configPath,
+	}
+	s := newTestServer()
+	s.cwd = configPath
+	s.fs = fsys
+	s.jsonConfig = config.RslintConfig{{
+		Files: []string{"src/*.ts"},
+		Rules: config.Rules{"no-debugger": "error"},
+	}}
+
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.target.CanonicalPath != "/owner-a/src/index.ts" ||
+		snapshot.resolvedConfig.MergedConfig == nil {
+		t.Fatalf("bootstrap snapshot mixed config generations: %+v", snapshot)
+	}
+	if fsys.configCalls != 1 {
+		t.Fatalf("config directory Realpath calls = %d, want one evaluation observation", fsys.configCalls)
+	}
+}
+
+func TestNativeFixPassUsesFrozenTargetOverlay(t *testing.T) {
+	config.RegisterAllRules()
+	uri := lsproto.DocumentUri("file:///alias/source.ts")
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	fsys := &retargetingDocumentFS{
+		targetPath: filePath,
+		targets:    []string{"/owner-a/source.ts", "/owner-b/source.ts"},
+	}
+	s := newTestServer()
+	s.cwd = "/alias"
+	s.fs = fsys
+	s.configSnapshotIncludesGitignore = true
+	s.jsonConfig = config.RslintConfig{{
+		Rules: config.Rules{"no-debugger": "error"},
+	}}
+	const content = "debugger;\n"
+	s.documents[uri] = content
+	snapshot := s.documentLintSnapshot(uri)
+
+	result, err := s.runConfiguredLintForContentWithSnapshot(
+		uri,
+		context.Background(),
+		content,
+		snapshot,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("native diagnostics = %+v", result.Diagnostics)
+	}
+	if fsys.targetCall != 1 {
+		t.Fatalf("target Realpath calls = %d, want one frozen observation", fsys.targetCall)
+	}
+}
+
+func (fsys *retargetingDocumentFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	if filePath != fsys.targetPath {
+		return filePath
+	}
+	index := fsys.targetCall
+	fsys.targetCall++
+	if index >= len(fsys.targets) {
+		index = len(fsys.targets) - 1
+	}
+	return fsys.targets[index]
+}
+
+func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpfrozentarget", RuleNames: []string{"owner-a", "owner-b"}},
+	})
+	uri := lsproto.DocumentUri("file:///alias/source.ts")
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	fsys := &retargetingDocumentFS{
+		targetPath: filePath,
+		targets:    []string{"/owner-a/source.ts", "/owner-b/source.ts"},
+	}
+	s := newTestServer()
+	s.cwd = "/alias"
+	s.fs = fsys
+	s.configSnapshotIncludesGitignore = true
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/owner-a": {{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"tpfrozentarget"},
+			Rules:   config.Rules{"tpfrozentarget/owner-a": "error"},
+		}},
+		"/owner-b": {{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"tpfrozentarget"},
+			Rules:   config.Rules{"tpfrozentarget/owner-b": "error"},
+		}},
+	})
+	s.tsConfigPathsByConfig = map[string][]string{
+		"/owner-a": {"/owner-a/tsconfig.json"},
+		"/owner-b": {"/owner-b/tsconfig.json"},
+	}
+	const source = "const value = 1;"
+	s.documents[uri] = source
+
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.target.CanonicalPath != "/owner-a/source.ts" ||
+		snapshot.target.ConfigDirectory != "/owner-a" ||
+		len(snapshot.typeScriptConfigPaths) != 1 ||
+		snapshot.typeScriptConfigPaths[0] != "/owner-a/tsconfig.json" {
+		t.Fatalf("snapshot mixed target/config/project owners: %+v", snapshot)
+	}
+
+	nativeCalls := 0
+	s.fixAllNativeLint = func(
+		_ context.Context,
+		_ lsproto.DocumentUri,
+		_ int,
+		_ string,
+		got documentLintSnapshot,
+	) (lintPassResult, error) {
+		nativeCalls++
+		if got.target != snapshot.target ||
+			len(got.typeScriptConfigPaths) != 1 ||
+			got.typeScriptConfigPaths[0] != "/owner-a/tsconfig.json" {
+			t.Fatalf("native pass received a different snapshot: %+v", got)
+		}
+		return lintPassResult{}, nil
+	}
+	pluginCalls := 0
+	s.eslintPluginDispatch = func(
+		_ context.Context,
+		req linter.EslintPluginLintRequest,
+	) (*linter.EslintPluginLintResult, error) {
+		pluginCalls++
+		_, hasOwnerA := req.Rules["tpfrozentarget/owner-a"]
+		if len(req.Files) != 1 || len(req.Rules) != 1 || !hasOwnerA ||
+			req.Files[0].ConfigKey != "/owner-a" {
+			t.Fatalf("plugin pass received a different owner: %+v", req.Files)
+		}
+		return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+			FilePath: req.Files[0].Path,
+		}}}, nil
+	}
+
+	if got := s.computeFixAllContent(context.Background(), uri, source, snapshot); got != source {
+		t.Fatalf("fixAll changed source without fixes: %q", got)
+	}
+	if nativeCalls != 1 || pluginCalls != 1 {
+		t.Fatalf("native/plugin calls = %d/%d, want 1/1", nativeCalls, pluginCalls)
+	}
+	if fsys.targetCall != 1 {
+		t.Fatalf("target Realpath calls = %d, want one frozen observation", fsys.targetCall)
 	}
 }
 
@@ -645,7 +953,7 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 		return nil, ctx.Err()
 	}
 	// Injected native lint: fix the first "1" → "2", nothing once it is gone.
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ documentLintSnapshot) (lintPassResult, error) {
 		idx := strings.Index(content, "1")
 		if idx < 0 {
 			return lintPassResult{}, nil
@@ -660,8 +968,7 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	}
 
 	start := time.Now()
-	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
+	got := s.computeFixAllContent(context.Background(), uri, original, s.documentLintSnapshot(uri))
 	elapsed := time.Since(start)
 
 	// Native fix applied; the wedged plugin pass timed out and was dropped
@@ -694,11 +1001,16 @@ func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
 		pluginCalls++
 		return &linter.EslintPluginLintResult{}, nil
 	}
-	s.fixAllNativeLint = func(context.Context, lsproto.DocumentUri, int, string, config.RslintConfig, string, bool, []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(context.Context, lsproto.DocumentUri, int, string, documentLintSnapshot) (lintPassResult, error) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}, HasSyntaxErrors: true}, nil
 	}
 
-	got := s.computeFixAllContent(context.Background(), uri, malformed, config.RslintConfig{}, "", true, nil)
+	got := s.computeFixAllContent(
+		context.Background(),
+		uri,
+		malformed,
+		documentLintSnapshotForTest(s, uri, config.RslintConfig{}, "", true, nil),
+	)
 	if got != malformed {
 		t.Fatalf("syntax-error fixAll changed content to %q", got)
 	}

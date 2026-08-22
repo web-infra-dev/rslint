@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
+	"github.com/web-infra-dev/rslint/internal/config"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -126,7 +127,7 @@ type selectedLintProject struct {
 
 func selectConfiguredLintProject(
 	tsConfigPaths []string,
-	targetPath string,
+	target config.DiscoveredLintTarget,
 	loaders lintProjectLoaders,
 ) (selectedLintProject, bool, error) {
 	metadataByProject := make([]*lintProjectMetadata, len(tsConfigPaths))
@@ -145,11 +146,11 @@ func selectConfiguredLintProject(
 			}
 			metadataByProject[index] = metadata
 			if metadata == nil || metadata.rootFiles == nil ||
-				!metadata.rootFiles.Contains(targetPath, "") {
+				!metadata.rootFiles.Contains(target.Path, target.CanonicalPath) {
 				continue
 			}
 			if loaders.program == nil {
-				return selectedLintProject{}, false, fmt.Errorf("configured project root %q cannot load %q", targetPath, tsConfigPath)
+				return selectedLintProject{}, false, fmt.Errorf("configured project root %q cannot load %q", target.Path, tsConfigPath)
 			}
 			program, sourceFile, err := loaders.program(tsConfigPath)
 			if err != nil {
@@ -158,7 +159,7 @@ func selectConfiguredLintProject(
 			if program == nil || sourceFile == nil {
 				return selectedLintProject{}, false, fmt.Errorf(
 					"configured project root %q was absent from %q",
-					targetPath,
+					target.Path,
 					tsConfigPath,
 				)
 			}
@@ -176,7 +177,7 @@ func selectConfiguredLintProject(
 	}
 	for index, tsConfigPath := range tsConfigPaths {
 		metadata := metadataByProject[index]
-		if metadata != nil && !metadata.supportsFileName(targetPath) {
+		if metadata != nil && !metadata.supportsFileName(target.Path) {
 			continue
 		}
 		program, sourceFile, err := loaders.program(tsConfigPath)
@@ -201,28 +202,32 @@ func selectConfiguredLintProject(
 // project snapshot. Root probing and Program construction share it, so a
 // config cannot be parsed twice or change meaning halfway through selection.
 type standaloneLintProjectRequest struct {
-	targetPath string
-	fs         vfs.FS
-	loadFS     func() vfs.FS
-	projects   map[string]*lintProjectMetadata
+	target   config.DiscoveredLintTarget
+	fs       vfs.FS
+	loadFS   func() vfs.FS
+	projects map[string]*lintProjectMetadata
 }
 
 func newStandaloneLintProjectRequest(
-	targetPath string,
+	target config.DiscoveredLintTarget,
 	loadFS func() vfs.FS,
 ) *standaloneLintProjectRequest {
+	target.Path = tspath.NormalizePath(target.Path)
+	if target.CanonicalPath != "" {
+		target.CanonicalPath = tspath.NormalizePath(target.CanonicalPath)
+	}
 	return &standaloneLintProjectRequest{
-		targetPath: tspath.NormalizePath(targetPath),
-		loadFS:     loadFS,
-		projects:   make(map[string]*lintProjectMetadata),
+		target:   target,
+		loadFS:   loadFS,
+		projects: make(map[string]*lintProjectMetadata),
 	}
 }
 
 func newStandaloneLintProjectRequestWithFS(
-	targetPath string,
+	target config.DiscoveredLintTarget,
 	fs vfs.FS,
 ) *standaloneLintProjectRequest {
-	request := newStandaloneLintProjectRequest(targetPath, nil)
+	request := newStandaloneLintProjectRequest(target, nil)
 	request.fs = fs
 	return request
 }
@@ -262,7 +267,7 @@ func (request *standaloneLintProjectRequest) program(
 	if err != nil {
 		return nil, nil, err
 	}
-	return program, sourceFileForPath(program, request.targetPath, request.filesystem()), nil
+	return program, sourceFileForTarget(program, request.target, request.filesystem()), nil
 }
 
 func (request *standaloneLintProjectRequest) loadMetadata(

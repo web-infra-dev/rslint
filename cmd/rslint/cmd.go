@@ -121,8 +121,12 @@ func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnos
 // space when a TypeScript Program represents that target by another lexical or
 // canonical source-file path. SourceFile remains unchanged because ranges and
 // fixes are defined against its text; FilePath controls display and disk writes.
-func remapDiagnosticTargetPaths(diags []rule.RuleDiagnostic, targetPathBySourcePath map[string]string, filesystems ...vfs.FS) {
-	if len(targetPathBySourcePath) == 0 {
+func remapDiagnosticTargetPaths(
+	diags []rule.RuleDiagnostic,
+	lintTargetBySourcePath map[string]rslintconfig.DiscoveredLintTarget,
+	filesystems ...vfs.FS,
+) {
+	if len(lintTargetBySourcePath) == 0 {
 		return
 	}
 	var fsys vfs.FS
@@ -130,12 +134,8 @@ func remapDiagnosticTargetPaths(diags []rule.RuleDiagnostic, targetPathBySourceP
 		fsys = filesystems[0]
 	}
 	for i := range diags {
-		targetPath := targetPathBySourcePath[diags[i].FilePath]
-		if targetPath == "" {
-			targetPath = targetPathBySourcePath[canonicalFilesystemPathID(diags[i].FilePath, fsys)]
-		}
-		if targetPath != "" {
-			diags[i].FilePath = targetPath
+		if target, ok := lookupLintTarget(lintTargetBySourcePath, diags[i].FilePath, fsys); ok {
+			diags[i].FilePath = target.Path
 		}
 	}
 }
@@ -307,11 +307,11 @@ func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions)
 	return ""
 }
 
-// collectAllowFileWarnings explains, for each CLI-specified file in
-// allowFiles, why it won't be visited by Phase 1 (lint). Program membership
-// is deliberately not consulted: lint targets are resolved before type-info
-// binding, so a file outside every tsconfig can still be linted.
-// Returns nil for empty allowFiles.
+// collectAllowFileWarnings maps config-owned explicit-file outcomes to CLI
+// messages. It performs no filesystem or config lookup: target selection has
+// already frozen the file identity, owner, ignore decision, and existence.
+// Program membership is deliberately not consulted because a file outside
+// every tsconfig can still be linted.
 //
 // This is a Phase-1 concern only. In --type-check-only mode the lint phase
 // is skipped, so callers MUST gate emission on `!typeCheckOnly` — otherwise
@@ -320,57 +320,20 @@ func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions)
 // file. See website/docs/en/guide/type-checking.md ("type-check is not
 // constrained by `files`/`ignores`").
 func collectAllowFileWarnings(
-	allowFiles []string,
-	configMap map[string]rslintconfig.RslintConfig,
-	rslintConfig rslintconfig.RslintConfig,
-	currentDirectory string,
-	useCaseSensitive bool,
-	filesystems ...vfs.FS,
+	outcomes []rslintconfig.ExplicitFileOutcome,
 ) []allowFileWarning {
-	if len(allowFiles) == 0 {
+	if len(outcomes) == 0 {
 		return nil
 	}
 
-	var fsys vfs.FS
-	if len(filesystems) > 0 {
-		fsys = filesystems[0]
-	}
-	var configOwnerResolver *rslintconfig.ConfigOwnerResolver
-	if configMap != nil {
-		configOwnerResolver = rslintconfig.NewConfigOwnerResolver(configMap, fsys)
-	}
-
 	var out []allowFileWarning
-	for _, f := range allowFiles {
-		var cfgDir string
-		var cfg rslintconfig.RslintConfig
-		if configMap != nil {
-			// Canonical fallback is file-specific: two symlinked files in the
-			// same lexical directory can resolve to different config roots.
-			cfgDir, cfg = configOwnerResolver.Resolve(f)
-		} else {
-			cfgDir = currentDirectory
-			cfg = rslintConfig
-		}
-		matchFile := f
-		matchDir := cfgDir
-		if fsys != nil && cfgDir != "" {
-			canonicalPath := authoritativeFilesystemPath(f, fsys)
-			matchFile = (rslintconfig.DiscoveredLintTarget{
-				Path:            tspath.NormalizePath(f),
-				CanonicalPath:   canonicalPath,
-				ConfigDirectory: cfgDir,
-			}).MatchPath(fsys)
-			matchDir = authoritativeFilesystemPath(cfgDir, fsys)
-		}
-		if rslintconfig.IsDefaultExcludedPath(matchFile, matchDir, useCaseSensitive) ||
-			(cfg != nil && cfg.IsFileIgnored(matchFile, matchDir)) {
-			out = append(out, allowFileWarning{Path: f, Kind: allowFileIgnored})
+	for _, outcome := range outcomes {
+		if outcome.Ignored {
+			out = append(out, allowFileWarning{Path: outcome.Path, Kind: allowFileIgnored})
 			continue
 		}
-
-		if _, err := os.Stat(f); err != nil {
-			out = append(out, allowFileWarning{Path: f, Kind: allowFileNotFound})
+		if !outcome.Exists {
+			out = append(out, allowFileWarning{Path: outcome.Path, Kind: allowFileNotFound})
 			continue
 		}
 	}
@@ -496,6 +459,7 @@ func resolveStartTime(startTimeMs int64) time.Time {
 func loadGitignoreAndProjects(
 	config rslintconfig.RslintConfig,
 	configDirectory string,
+	gitignoreRoot string,
 	targetFiles []string,
 	targetDirectories []string,
 	singleThreaded bool,
@@ -508,9 +472,10 @@ func loadGitignoreAndProjects(
 	)
 	work := core.NewWorkGroup(singleThreaded)
 	work.Queue(func() {
-		configWithIgnores = rslintconfig.ConfigWithGitignoreForTargets(
+		configWithIgnores = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
 			config,
 			configDirectory,
+			gitignoreRoot,
 			session.FS(),
 			targetFiles,
 			targetDirectories,
@@ -802,23 +767,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
-		if config != "" {
-			// Explicit --config follows flat-config invocation semantics: file,
-			// ignore, project, and implicit no-args target scope are rooted at
-			// the cwd where rslint was invoked, not the config file's directory.
-			currentDirectory = workingDirectory
-		}
-
 		if typeCheckOnly {
 			projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
 		} else if buildAllPrograms {
 			rslintConfig, projectSet, err = loadGitignoreAndProjects(
-				rslintConfig, currentDirectory, allowFiles, allowDirs, singleThreaded, programSession,
+				rslintConfig, currentDirectory, workingDirectory, allowFiles, allowDirs, singleThreaded, programSession,
 			)
 		} else {
-			rslintConfig = rslintconfig.ConfigWithGitignoreForTargets(
+			rslintConfig = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
 				rslintConfig,
 				currentDirectory,
+				workingDirectory,
 				fs,
 				allowFiles,
 				allowDirs,
@@ -895,26 +854,25 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	programConfigMap := configMap
 	buildSingleConfigPrograms := buildAllPrograms
 	var (
-		targetPlan                 rslintconfig.LintTargetPlan
-		loadedPrograms             loader.LoadResult
-		targetsByProgram           [][]string
-		targetPathBySourcePath     map[string]string
-		configPathBySourcePath     map[string]string
-		ownerConfigDirBySourcePath map[string]string
+		targetPlan             rslintconfig.LintTargetPlan
+		loadedPrograms         loader.LoadResult
+		targetsByProgram       [][]string
+		lintTargetBySourcePath map[string]rslintconfig.DiscoveredLintTarget
 	)
 	// --type-check-only is program-wide and pays no lint-target discovery,
 	// target binding/parsing, config-resolution, or Program-loading cost.
 	if !typeCheckOnly {
-		targetPlan, err = rslintconfig.ResolveLintTargetPlan(
-			targetConfigMap,
-			targetRslintConfig,
-			currentDirectory,
-			configTargetScopes,
-			fs,
-			allowFiles,
-			allowDirs,
-			singleThreaded,
-		)
+		targetPlan, err = rslintconfig.ResolveLintTargetPlan(rslintconfig.LintTargetPlanRequest{
+			ConfigMap:       targetConfigMap,
+			Config:          targetRslintConfig,
+			ConfigDirectory: currentDirectory,
+			ScanRoot:        workingDirectory,
+			ConfigScopes:    configTargetScopes,
+			FS:              fs,
+			Files:           allowFiles,
+			Directories:     allowDirs,
+			SingleThreaded:  singleThreaded,
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
@@ -947,9 +905,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 		programs = loadedPrograms.Programs
 		targetsByProgram = loadedPrograms.TargetsByProgram
-		targetPathBySourcePath = loadedPrograms.TargetPathBySourcePath
-		configPathBySourcePath = loadedPrograms.ConfigPathBySourcePath
-		ownerConfigDirBySourcePath = loadedPrograms.OwnerConfigDirBySourcePath
+		lintTargetBySourcePath = loadedPrograms.LintTargetBySourcePath
 	}
 
 	// Rebuild ts-go Programs and bind the original stable target plan again on
@@ -996,14 +952,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	enforcePlugins := usesJSConfig
 	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:                  configMap,
-		Config:                     rslintConfig,
-		CurrentDirectory:           currentDirectory,
-		EnforcePlugins:             enforcePlugins,
-		ConfigPathBySourcePath:     configPathBySourcePath,
-		OwnerConfigDirBySourcePath: ownerConfigDirBySourcePath,
-		SourceMappingsCanonical:    true,
-		FS:                         fs,
+		ConfigMap:               configMap,
+		Config:                  rslintConfig,
+		CurrentDirectory:        currentDirectory,
+		EnforcePlugins:          enforcePlugins,
+		LintTargetBySourcePath:  lintTargetBySourcePath,
+		SourceMappingsCanonical: true,
+		TargetPlan:              &targetPlan,
+		FS:                      fs,
 	})
 	getRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 		return fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
@@ -1092,15 +1048,15 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	if pluginCh != nil {
 		allDiags = append(allDiags, (<-pluginCh)...)
 	}
-	remapDiagnosticTargetPaths(allDiags, targetPathBySourcePath, fs)
+	remapDiagnosticTargetPaths(allDiags, lintTargetBySourcePath, fs)
 
 	// Emit per-file warnings for CLI-specified files that won't be linted.
-	// Distinguishes "not found in project" vs "ignored by pattern", aligned
+	// Distinguishes "not found on disk" vs "ignored by pattern", aligned
 	// with ESLint v10's warning behavior. Skipped in --type-check-only mode:
 	// these are lint-phase concepts and would mislead users about Phase 2
 	// (which runs program-wide regardless of CLI scope and rslint ignores).
 	if !typeCheckOnly {
-		warnings := collectAllowFileWarnings(allowFiles, configMap, rslintConfig, currentDirectory, fs.UseCaseSensitiveFileNames(), fs)
+		warnings := collectAllowFileWarnings(targetPlan.ExplicitFileOutcomes)
 		for _, w := range warnings {
 			fmt.Fprintln(os.Stderr, formatAllowFileWarning(w, comparePathOptions))
 		}
@@ -1144,16 +1100,16 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 			// Re-lint using the fresh binding derived from the stable target plan.
 			fixTargetsByProgram := newBinding.TargetsByProgram
-			fixTargetPathBySourcePath := newBinding.TargetPathBySourcePath
+			fixLintTargetBySourcePath := newBinding.LintTargetBySourcePath
 			fixConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-				ConfigMap:                  configMap,
-				Config:                     rslintConfig,
-				CurrentDirectory:           currentDirectory,
-				EnforcePlugins:             enforcePlugins,
-				ConfigPathBySourcePath:     newBinding.ConfigPathBySourcePath,
-				OwnerConfigDirBySourcePath: newBinding.OwnerConfigDirBySourcePath,
-				SourceMappingsCanonical:    true,
-				FS:                         fs,
+				ConfigMap:               configMap,
+				Config:                  rslintConfig,
+				CurrentDirectory:        currentDirectory,
+				EnforcePlugins:          enforcePlugins,
+				LintTargetBySourcePath:  newBinding.LintTargetBySourcePath,
+				SourceMappingsCanonical: true,
+				TargetPlan:              &targetPlan,
+				FS:                      fs,
 			})
 			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 				return fixConfigResolver.EnabledRulesForFile(sourceFile.FileName())
@@ -1228,7 +1184,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// Merge this pass's plugin diagnostics before applying fixes so
 			// plugin fixes participate and plugin diagnostics survive.
 			passDiags = append(passDiags, fixPluginDiags...)
-			remapDiagnosticTargetPaths(passDiags, fixTargetPathBySourcePath, fs)
+			remapDiagnosticTargetPaths(passDiags, fixLintTargetBySourcePath, fs)
 
 			// Replace allDiags with latest post-fix diagnostics.
 			allDiags = passDiags

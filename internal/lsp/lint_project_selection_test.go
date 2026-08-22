@@ -52,7 +52,7 @@ func TestSelectConfiguredLintProjectDirectRootOutranksEarlierImport(t *testing.T
 	var programCalls []string
 	selected, found, err := selectConfiguredLintProject(
 		[]string{firstConfig, secondConfig},
-		target,
+		config.DiscoveredLintTarget{Path: target, CanonicalPath: target},
 		lintProjectLoaders{
 			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 				return metadata[configPath], true, nil
@@ -98,7 +98,7 @@ func TestSelectConfiguredLintProjectFallbackOrderAndExtensionFilter(t *testing.T
 	var programCalls []string
 	selected, found, err := selectConfiguredLintProject(
 		[]string{firstConfig, secondConfig},
-		target,
+		config.DiscoveredLintTarget{Path: target, CanonicalPath: target},
 		lintProjectLoaders{
 			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 				return metadata[configPath], true, nil
@@ -150,7 +150,13 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 		FS:     bundled.WrapFS(osvfs.FS()),
 		target: tspath.NormalizePath(configPath),
 	}
-	request := newStandaloneLintProjectRequestWithFS(firstSource, fs)
+	request := newStandaloneLintProjectRequestWithFS(
+		config.DiscoveredLintTarget{
+			Path:          firstSource,
+			CanonicalPath: firstSource,
+		},
+		fs,
+	)
 	metadata, err := request.metadata(configPath)
 	if err != nil {
 		t.Fatal(err)

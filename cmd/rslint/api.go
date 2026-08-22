@@ -277,6 +277,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			if err := rslintconfig.ValidateConfig(overrideConfig); err != nil {
 				return nil, fmt.Errorf("invalid configDiscovery.overrideConfig: %w", err)
 			}
+			overrideConfig = rslintconfig.ConfigWithAuthoredPathBase(overrideConfig, currentDirectory)
 		}
 		discoveryRequest := discovery.ConfigDiscoveryRequest{
 			CWD:                       currentDirectory,
@@ -326,10 +327,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				fs,
 				loader,
 				discovery.ExplicitConfigRequest{
-					CWD:         currentDirectory,
-					ConfigPath:  resolveRequestPath(configDiscovery.ExplicitConfigPath),
-					TargetFiles: targetFiles,
-					Fresh:       true,
+					CWD:               currentDirectory,
+					ConfigPath:        resolveRequestPath(configDiscovery.ExplicitConfigPath),
+					TargetFiles:       targetFiles,
+					TargetDirectories: append([]string(nil), discoveryRequest.Directories...),
+					Fresh:             true,
 				},
 			)
 		} else {
@@ -384,7 +386,14 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	}
 
 	if configMap == nil && !configGitignoreFrozen {
-		rslintConfig = rslintconfig.ConfigWithGitignore(rslintConfig, configDirectory, fs, allowedFiles)
+		rslintConfig = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
+			rslintConfig,
+			configDirectory,
+			currentDirectory,
+			fs,
+			allowedFiles,
+			nil,
+		)
 	}
 	var optionsMessages []string
 	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig)
@@ -414,7 +423,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	}
 
 	responsePathBase := configDirectory
-	if configMap != nil {
+	if req.ConfigDiscovery != nil {
+		// ConfigDiscovery is the high-level API: request and response paths use
+		// WorkingDirectory even when an explicitly selected config lives elsewhere.
+		// The low-level Config API keeps its ConfigDirectory-relative contract.
 		responsePathBase = currentDirectory
 	}
 	comparePathOptions := tspath.ComparePathsOptions{
@@ -430,7 +442,15 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// invocation-wide single-config paths.
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	targetPlan, err := rslintconfig.ResolveLintTargetPlan(configMap, rslintConfig, configDirectory, configTargetScopes, fs, allowedFiles, nil, false)
+	targetPlan, err := rslintconfig.ResolveLintTargetPlan(rslintconfig.LintTargetPlanRequest{
+		ConfigMap:       configMap,
+		Config:          rslintConfig,
+		ConfigDirectory: configDirectory,
+		ScanRoot:        currentDirectory,
+		ConfigScopes:    configTargetScopes,
+		FS:              fs,
+		Files:           allowedFiles,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
 	}
@@ -463,20 +483,19 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	}
 	programs := binding.Programs
 	targetsByProgram := binding.TargetsByProgram
-	targetPathBySourcePath := binding.TargetPathBySourcePath
 	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:                  configMap,
-		Config:                     rslintConfig,
-		CurrentDirectory:           configDirectory,
-		EnforcePlugins:             true,
-		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
-		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
-		SourceMappingsCanonical:    true,
-		FS:                         fs,
+		ConfigMap:               configMap,
+		Config:                  rslintConfig,
+		CurrentDirectory:        configDirectory,
+		EnforcePlugins:          true,
+		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
+		SourceMappingsCanonical: true,
+		TargetPlan:              &targetPlan,
+		FS:                      fs,
 	})
 	targetPathForSourcePath := func(sourcePath string) string {
-		if targetPath := targetPathBySourcePath[sourcePath]; targetPath != "" {
-			return targetPath
+		if target, bound := fileConfigResolver.targetForFile(sourcePath); bound {
+			return target.Path
 		}
 		return sourcePath
 	}

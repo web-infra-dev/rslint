@@ -199,7 +199,6 @@ func bindTargetToProgram(
 	programIndexes []int,
 	programIndex int,
 	target rslintconfig.DiscoveredLintTarget,
-	fsys vfs.FS,
 ) bool {
 	if programIndex < 0 || programIndex >= len(set.compilerPrograms) {
 		return false
@@ -213,11 +212,7 @@ func bindTargetToProgram(
 	}
 	sourcePath := sourceFile.FileName()
 	binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-	storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.ConfigDirectory)
-	storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, target.MatchPath(fsys))
-	if tspath.NormalizePath(sourcePath) != target.Path {
-		storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.CanonicalPath, target.Path)
-	}
+	storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath, target.CanonicalPath, target)
 	return true
 }
 
@@ -228,12 +223,10 @@ func (s *Session) bindTargetsToProjects(
 ) (LoadResult, []rslintconfig.DiscoveredLintTarget) {
 	fsys := s.FS()
 	binding := LoadResult{
-		compilerPrograms:           append([]*compiler.Program(nil), set.compilerPrograms...),
-		Programs:                   append([]*lintprogram.Program(nil), set.programs...),
-		TargetsByProgram:           make([][]string, len(set.compilerPrograms)),
-		TargetPathBySourcePath:     make(map[string]string),
-		ConfigPathBySourcePath:     make(map[string]string),
-		OwnerConfigDirBySourcePath: make(map[string]string),
+		compilerPrograms:       append([]*compiler.Program(nil), set.compilerPrograms...),
+		Programs:               append([]*lintprogram.Program(nil), set.programs...),
+		TargetsByProgram:       make([][]string, len(set.compilerPrograms)),
+		LintTargetBySourcePath: make(map[string]rslintconfig.DiscoveredLintTarget),
 	}
 
 	var unbound []rslintconfig.DiscoveredLintTarget
@@ -253,7 +246,6 @@ func (s *Session) bindTargetsToProjects(
 			programIndexes,
 			directOwners[targetIndex],
 			target,
-			fsys,
 		) {
 			continue
 		}
@@ -267,7 +259,6 @@ func (s *Session) bindTargetsToProjects(
 				programIndexes,
 				programIndex,
 				target,
-				fsys,
 			) {
 				bound = true
 				break
@@ -275,8 +266,7 @@ func (s *Session) bindTargetsToProjects(
 		}
 		if !bound {
 			unbound = append(unbound, target)
-			storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, target.Path, target.CanonicalPath, target.ConfigDirectory)
-			storeSourcePathMapping(binding.ConfigPathBySourcePath, target.Path, target.CanonicalPath, target.MatchPath(fsys))
+			storeSourceTargetMapping(binding.LintTargetBySourcePath, target.Path, target.CanonicalPath, target)
 		}
 	}
 	return binding, unbound

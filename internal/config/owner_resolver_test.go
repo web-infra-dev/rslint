@@ -12,6 +12,24 @@ type configPathSpaceFS struct {
 	caseSensitive bool
 }
 
+type retargetingConfigDirectoryFS struct {
+	vfs.FS
+	configPath  string
+	configCalls int
+}
+
+func (fs *retargetingConfigDirectoryFS) UseCaseSensitiveFileNames() bool { return true }
+func (fs *retargetingConfigDirectoryFS) Realpath(filePath string) string {
+	if filePath != fs.configPath {
+		return filePath
+	}
+	fs.configCalls++
+	if fs.configCalls == 1 {
+		return "/owner-a"
+	}
+	return "/owner-b"
+}
+
 func (fs *configPathSpaceFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
 func (fs *configPathSpaceFS) Realpath(filePath string) string {
 	if realPath := fs.realPaths[filePath]; realPath != "" {
@@ -24,7 +42,7 @@ func resolveConfigOwner(filePath string, configMap map[string]RslintConfig) (str
 	return NewConfigOwnerResolver(configMap, nil).Resolve(filePath)
 }
 
-func TestResolveConfigPathSpace(t *testing.T) {
+func TestResolveConfigFilePathSpace(t *testing.T) {
 	t.Run("symlink aliases use the physical config root", func(t *testing.T) {
 		fs := &configPathSpaceFS{
 			caseSensitive: true,
@@ -35,9 +53,9 @@ func TestResolveConfigPathSpace(t *testing.T) {
 			},
 		}
 		for _, filePath := range []string{"/alias/src/a.ts", "/real/src/a.ts"} {
-			matchFile, matchDir := ResolveConfigPathSpace(filePath, "/alias", fs)
+			matchFile, matchDir := ResolveConfigFilePathSpace(filePath, "/alias", fs)
 			if matchFile != "/real/src/a.ts" || matchDir != "/real" {
-				t.Fatalf("ResolveConfigPathSpace(%q) = (%q, %q)", filePath, matchFile, matchDir)
+				t.Fatalf("ResolveConfigFilePathSpace(%q) = (%q, %q)", filePath, matchFile, matchDir)
 			}
 		}
 	})
@@ -50,7 +68,7 @@ func TestResolveConfigPathSpace(t *testing.T) {
 				"c:/repo/src/index.ts": "C:/Repo/src/index.ts",
 			},
 		}
-		matchFile, matchDir := ResolveConfigPathSpace("c:/repo/src/index.ts", "C:/Repo", fs)
+		matchFile, matchDir := ResolveConfigFilePathSpace("c:/repo/src/index.ts", "C:/Repo", fs)
 		if matchFile != "C:/Repo/src/index.ts" || matchDir != "C:/Repo" {
 			t.Fatalf("case-insensitive path space = (%q, %q)", matchFile, matchDir)
 		}
@@ -64,7 +82,7 @@ func TestResolveConfigPathSpace(t *testing.T) {
 				"c:/repo/src/index.ts": "c:/repo/src/index.ts",
 			},
 		}
-		matchFile, matchDir := ResolveConfigPathSpace("c:/repo/src/index.ts", "C:/Repo", fs)
+		matchFile, matchDir := ResolveConfigFilePathSpace("c:/repo/src/index.ts", "C:/Repo", fs)
 		if matchFile != "c:/repo/src/index.ts" || matchDir != "C:/Repo" {
 			t.Fatalf("distinct physical roots were collapsed: (%q, %q)", matchFile, matchDir)
 		}
@@ -79,11 +97,154 @@ func TestResolveConfigPathSpace(t *testing.T) {
 				"/repo/project/link.ts": "/repo/shared.ts",
 			},
 		}
-		matchFile, matchDir := ResolveConfigPathSpace("/repo/project/link.ts", "/repo/Project", fs)
+		matchFile, matchDir := ResolveConfigFilePathSpace("/repo/project/link.ts", "/repo/Project", fs)
 		if matchFile != "/repo/Project/link.ts" || matchDir != "/repo/Project" {
 			t.Fatalf("native alias path space = (%q, %q)", matchFile, matchDir)
 		}
 	})
+
+	t.Run("external target canonical identity does not replace its lexical selector path", func(t *testing.T) {
+		fs := &configPathSpaceFS{
+			caseSensitive: true,
+			realPaths: map[string]string{
+				"/repo/config":            "/physical/config",
+				"/repo/workspace/link.js": "/elsewhere/source.js",
+			},
+		}
+		matchFile, matchDir := ResolveConfigFilePathSpaceWithCanonical(
+			"/repo/workspace/link.js",
+			"/elsewhere/source.js",
+			"/repo/config",
+			fs,
+		)
+		if matchFile != "/repo/workspace/link.js" || matchDir != "/repo/config" {
+			t.Fatalf("external lexical path space = (%q, %q)", matchFile, matchDir)
+		}
+
+		matchFile, matchDir = ResolveConfigFilePathSpaceWithCanonical(
+			"/repo/workspace/inside-link.js",
+			"/physical/config/source.js",
+			"/repo/config",
+			fs,
+		)
+		if matchFile != "/repo/workspace/inside-link.js" || matchDir != "/repo/config" {
+			t.Fatalf("external link into config tree changed selector path = (%q, %q)", matchFile, matchDir)
+		}
+	})
+
+	t.Run("shared alias ancestor keeps sibling relative selectors", func(t *testing.T) {
+		fs := &configPathSpaceFS{
+			caseSensitive: true,
+			realPaths: map[string]string{
+				"/alias":                     "/real",
+				"/alias/config":              "/real/config",
+				"/real/workspace":            "/real/workspace",
+				"/real/workspace/visible.ts": "/real/workspace/visible.ts",
+			},
+		}
+		matchFile, matchDir := ResolveConfigFilePathSpace(
+			"/real/workspace/visible.ts",
+			"/alias/config",
+			fs,
+		)
+		if matchFile != "/real/workspace/visible.ts" || matchDir != "/real/config" {
+			t.Fatalf("shared alias path space = (%q, %q)", matchFile, matchDir)
+		}
+
+		entries := RslintConfig{{
+			Files: []string{"../workspace/*.ts"},
+			Rules: Rules{"rule": "error"},
+		}}
+		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, false).
+			ConfigForFile("/real/workspace/visible.ts"); merged == nil || merged.Rules["rule"] == nil {
+			t.Fatalf("shared alias selector did not match: %#v", merged)
+		}
+	})
+
+	t.Run("shared alias ancestor preserves a file symlink basename", func(t *testing.T) {
+		fs := &configPathSpaceFS{
+			caseSensitive: true,
+			realPaths: map[string]string{
+				"/alias":                  "/real",
+				"/alias/config":           "/real/config",
+				"/real/workspace":         "/real/workspace",
+				"/real/workspace/link.ts": "/elsewhere/source.ts",
+				"/elsewhere/source.ts":    "/elsewhere/source.ts",
+			},
+		}
+		matchFile, matchDir := ResolveConfigFilePathSpace(
+			"/real/workspace/link.ts",
+			"/alias/config",
+			fs,
+		)
+		if matchFile != "/real/workspace/link.ts" || matchDir != "/real/config" {
+			t.Fatalf("shared alias file-symlink path space = (%q, %q)", matchFile, matchDir)
+		}
+
+		entries := RslintConfig{{
+			Files: []string{"../workspace/link.ts"},
+			Rules: Rules{"rule": "error"},
+		}}
+		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, false).
+			ConfigForFile("/real/workspace/link.ts"); merged == nil || merged.Rules["rule"] == nil {
+			t.Fatalf("shared alias file-symlink selector did not match: %#v", merged)
+		}
+	})
+}
+
+func TestResolveConfigDirectoryPathSpace(t *testing.T) {
+	fs := &configPathSpaceFS{
+		caseSensitive: true,
+		realPaths: map[string]string{
+			"/repo/config-link": "/physical/config",
+			"/repo/workspace":   "/repo/workspace",
+		},
+	}
+
+	matchDirectory, matchConfigDirectory := ResolveConfigDirectoryPathSpace(
+		"/repo/config-link",
+		"/physical/config",
+		fs,
+	)
+	if matchDirectory != "/physical/config" || matchConfigDirectory != "/physical/config" {
+		t.Fatalf("directory alias into config tree = (%q, %q)", matchDirectory, matchConfigDirectory)
+	}
+
+	matchDirectory, matchConfigDirectory = ResolveConfigDirectoryPathSpace(
+		"/repo/workspace",
+		"/repo/config-link",
+		fs,
+	)
+	if matchDirectory != "/repo/workspace" || matchConfigDirectory != "/repo/config-link" {
+		t.Fatalf("external directory projection = (%q, %q)", matchDirectory, matchConfigDirectory)
+	}
+}
+
+func TestResolveConfigFilePathSpacePreservesExternalRelativeDepth(t *testing.T) {
+	fs := &configPathSpaceFS{
+		caseSensitive: true,
+		realPaths: map[string]string{
+			"/alias/config":        "/real/config",
+			"/real/workspace/a.ts": "/real/workspace/a.ts",
+			"/real/workspace":      "/real/workspace",
+		},
+	}
+	matchFile, matchDirectory := ResolveConfigFilePathSpaceWithCanonical(
+		"/real/workspace/a.ts",
+		"/real/workspace/a.ts",
+		"/alias/config",
+		fs,
+	)
+	if matchFile != "/real/workspace/a.ts" || matchDirectory != "/alias/config" {
+		t.Fatalf("external lexical pair = (%q, %q)", matchFile, matchDirectory)
+	}
+	config := RslintConfig{{
+		Files: []string{"../../real/workspace/**"},
+		Rules: Rules{"rule": "error"},
+	}}
+	if config.GetConfigForFile(matchFile, matchDirectory) == nil {
+		t.Fatal("external selector lost its lexical ../ depth")
+	}
 }
 
 func TestConfigOwnerResolverUsesVerifiedNativeCaseAliasBeforeFileRealpath(t *testing.T) {
@@ -101,6 +262,36 @@ func TestConfigOwnerResolverUsesVerifiedNativeCaseAliasBeforeFileRealpath(t *tes
 	dir, cfg := NewConfigOwnerResolver(configMap, fs).Resolve("/repo/project/link.ts")
 	if dir != "/repo/Project" || cfg == nil {
 		t.Fatalf("native case alias did not retain config owner: dir=%q cfg=%v", dir, cfg)
+	}
+}
+
+func TestConfigOwnerResolverFreezesOwnerAndAuthoredBaseTogether(t *testing.T) {
+	const configDirectory = "/config-link"
+	fs := &retargetingConfigDirectoryFS{
+		FS:         &configPathSpaceFS{caseSensitive: true},
+		configPath: configDirectory,
+	}
+	resolver := NewConfigOwnerResolver(map[string]RslintConfig{
+		configDirectory: {{
+			Files: []string{"src/*.ts"},
+			Rules: Rules{"selected": "error"},
+		}},
+	}, fs)
+	target := DiscoveredLintTarget{
+		Path:                "/outside-link/src/index.ts",
+		CanonicalPath:       "/owner-a/src/index.ts",
+		CanonicalParentPath: "/owner-a/src",
+	}
+
+	configDir, _, resolved, ok := resolver.ResolveTargetConfig(target, false)
+	if !ok || configDir != configDirectory || resolved.MergedConfig == nil {
+		t.Fatalf("frozen owner/config resolution = %q, %+v, %v", configDir, resolved, ok)
+	}
+	if _, selected := resolved.MergedConfig.Rules["selected"]; !selected {
+		t.Fatalf("frozen authored base lost selected rules: %+v", resolved.MergedConfig.Rules)
+	}
+	if fs.configCalls != 1 {
+		t.Fatalf("config directory Realpath calls = %d, want one catalog observation", fs.configCalls)
 	}
 }
 

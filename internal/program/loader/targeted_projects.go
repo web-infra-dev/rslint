@@ -185,7 +185,7 @@ func (execution *targetedProjectExecution) containsTarget(
 	})
 	slot.lookupMu.Lock()
 	defer slot.lookupMu.Unlock()
-	return slot.lookup.SourceFileForPath(target.Path) != nil
+	return slot.lookup.SourceFileForTarget(target.Path, target.CanonicalPath) != nil
 }
 
 func (execution *targetedProjectExecution) supportsTarget(

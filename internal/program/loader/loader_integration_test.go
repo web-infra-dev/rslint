@@ -31,6 +31,22 @@ type targetPlanRealpathCountingFS struct {
 	calls map[string]int
 }
 
+type retargetingFrozenTargetFS struct {
+	vfs.FS
+	targetPath        string
+	liveCanonicalPath string
+	targetCalls       int
+}
+
+func (fsys *retargetingFrozenTargetFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	if filePath == fsys.targetPath {
+		fsys.targetCalls++
+		return fsys.liveCanonicalPath
+	}
+	return fsys.FS.Realpath(filePath)
+}
+
 type blockingProgramConfigFS struct {
 	vfs.FS
 	paths      map[string]struct{}
@@ -519,7 +535,7 @@ func TestLoadProgramsBindsRealpathTargetToProgramSourceName(t *testing.T) {
 	programs = binding.compilerPrograms
 	targetFiles := []string{plan.Targets[0].Path}
 	targetsByProgram := binding.TargetsByProgram
-	targetPathBySourcePath := binding.TargetPathBySourcePath
+	lintTargetBySourcePath := binding.LintTargetBySourcePath
 	if len(programs) != 1 {
 		t.Fatalf("realpath target should reuse existing Program, got %d programs", len(programs))
 	}
@@ -529,8 +545,8 @@ func TestLoadProgramsBindsRealpathTargetToProgramSourceName(t *testing.T) {
 	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 || targetsByProgram[0][0] != sourceName {
 		t.Fatalf("expected realpath target to bind back to source name %q, got %v", sourceName, targetsByProgram)
 	}
-	if targetPathBySourcePath[sourceName] != realTarget {
-		t.Fatalf("expected source path %q to resolve config through target path %q, got %v", sourceName, realTarget, targetPathBySourcePath)
+	if target := lintTargetBySourcePath[sourceName]; target.Path != realTarget {
+		t.Fatalf("expected source path %q to retain lint target %q, got %+v", sourceName, realTarget, target)
 	}
 }
 
@@ -570,18 +586,17 @@ func TestLoadProgramsUsesPhysicalConfigSpaceForSymlinkedConfigRoot(t *testing.T)
 		t.Fatalf("expected real target to bind to config Program, got %v", binding.TargetsByProgram)
 	}
 	sourcePath := binding.TargetsByProgram[0][0]
-	configPath := binding.ConfigPathBySourcePath[sourcePath]
-	if canonicalPathID(configPath, fsys) != canonicalPathID(realTarget, fsys) {
-		t.Fatalf("config path must stay in the physical config-root space: source=%q config=%q target=%q", sourcePath, configPath, realTarget)
+	lintTarget := binding.LintTargetBySourcePath[sourcePath]
+	if canonicalPathID(lintTarget.CanonicalPath, fsys) != canonicalPathID(realTarget, fsys) {
+		t.Fatalf("binding lost canonical target identity: source=%q binding=%+v target=%q", sourcePath, lintTarget, realTarget)
 	}
 
 	rslintconfig.RegisterAllRules()
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		Config:                     cfg,
-		CurrentDirectory:           linkDir,
-		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
-		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
-		FS:                         fsys,
+		Config:                 cfg,
+		CurrentDirectory:       linkDir,
+		LintTargetBySourcePath: binding.LintTargetBySourcePath,
+		FS:                     fsys,
 	})
 	rules := resolver.EnabledRulesForFile(sourcePath)
 	if len(rules) != 1 || rules[0].Name != "no-debugger" {
@@ -630,18 +645,17 @@ func TestLoadProgramsConfigMatchingDoesNotDependOnProgramSourcePath(t *testing.T
 	if canonicalPathID(sourcePath, fsys) != canonicalPathID(expectedSourcePath, fsys) {
 		t.Fatalf("fixture must bind through physical Program source %q, got %q", expectedSourcePath, sourcePath)
 	}
-	expectedConfigPath := tspath.ResolvePath(authoritativePath(rootDir, fsys), "link.ts")
-	if configPath := binding.ConfigPathBySourcePath[sourcePath]; configPath != expectedConfigPath {
-		t.Fatalf("config matching must retain lexical target %q, got %q", expectedConfigPath, configPath)
+	expectedTargetPath := linkPath
+	if target := binding.LintTargetBySourcePath[sourcePath]; target.Path != expectedTargetPath {
+		t.Fatalf("binding must retain lexical target %q, got %+v", expectedTargetPath, target)
 	}
 
 	rslintconfig.RegisterAllRules()
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		Config:                     cfg,
-		CurrentDirectory:           rootDir,
-		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
-		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
-		FS:                         fsys,
+		Config:                 cfg,
+		CurrentDirectory:       rootDir,
+		LintTargetBySourcePath: binding.LintTargetBySourcePath,
+		FS:                     fsys,
 	})
 	rules := resolver.EnabledRulesForFile(sourcePath)
 	if len(rules) != 1 || rules[0].Name != "no-console" {
@@ -698,8 +712,8 @@ func TestLoadProgramsBindsFileSymlinkOutsideProgramRoot(t *testing.T) {
 	if len(binding.TargetsByProgram[0]) != 1 || binding.TargetsByProgram[0][0] != sourceName {
 		t.Fatalf("expected target to bind to Program source %q, got %v", sourceName, binding.TargetsByProgram)
 	}
-	if owner := binding.OwnerConfigDirBySourcePath[sourceName]; owner != repoDir {
-		t.Fatalf("expected bound source owner %q, got %q", repoDir, owner)
+	if target := binding.LintTargetBySourcePath[sourceName]; target.ConfigDirectory != repoDir {
+		t.Fatalf("expected bound source owner %q, got %+v", repoDir, target)
 	}
 }
 
@@ -759,8 +773,8 @@ func TestLoadProgramsDoesNotBorrowParentConfigProgram(t *testing.T) {
 		t.Fatalf("expected target only in a source-only Program, got targets=%v", binding.TargetsByProgram)
 	}
 	sourceOnlySource := binding.TargetsByProgram[1][0]
-	if owner := binding.OwnerConfigDirBySourcePath[sourceOnlySource]; owner != tspath.NormalizePath(childDir) {
-		t.Fatalf("expected source-only owner %q, got %q", tspath.NormalizePath(childDir), owner)
+	if target := binding.LintTargetBySourcePath[sourceOnlySource]; target.ConfigDirectory != tspath.NormalizePath(childDir) {
+		t.Fatalf("expected source-only owner %q, got %+v", tspath.NormalizePath(childDir), target)
 	}
 	if binding.Programs[1].CanProvideTypeChecker(binding.Programs[1].SourceFiles()[0]) {
 		t.Fatal("child-owned target unexpectedly received type services")
@@ -802,7 +816,7 @@ func TestTypeCheckDeduplicatesSyntaxFromSourceOnlyAndParentProgram(t *testing.T)
 		t.Fatalf("expected one malformed source-only lint target, got %v", diagnostics)
 	}
 	diagnostics = append(diagnostics, collectProgramTypeDiagnostics(t, binding.Programs)...)
-	remapDiagnosticTargetPaths(diagnostics, binding.TargetPathBySourcePath)
+	remapDiagnosticTargetPaths(diagnostics, binding.LintTargetBySourcePath)
 	if len(diagnostics) < 2 {
 		t.Fatalf("fixture must exercise both source-only syntax and parent Program type-check paths, got %+v", diagnostics)
 	}
@@ -1517,6 +1531,85 @@ func TestBuildTargetProjectStreamsConfirmedBuildsDuringRootScan(t *testing.T) {
 	}
 	if err := <-done; err != nil {
 		t.Fatalf("BuildTargetProject: %v", err)
+	}
+}
+
+func TestBuildTargetProjectUsesFrozenTargetIdentityForMembership(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+	}{
+		{
+			name: "direct root validation",
+			files: map[string]string{
+				"target.ts":     `export const target = 1;`,
+				"tsconfig.json": `{"files":["target.ts"],"compilerOptions":{"noLib":true}}`,
+			},
+		},
+		{
+			name: "import fallback membership",
+			files: map[string]string{
+				"main.ts":       `import "./target";`,
+				"target.ts":     `export const target = 1;`,
+				"tsconfig.json": `{"files":["main.ts"],"compilerOptions":{"noLib":true}}`,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			projectDir := tspath.NormalizePath(t.TempDir())
+			writeProgramTestFiles(t, projectDir, test.files)
+			baseFS := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			frozenCanonicalPath := tspath.NormalizePath(
+				baseFS.Realpath(tspath.ResolvePath(projectDir, "target.ts")),
+			)
+			frozenCanonicalParent := tspath.NormalizePath(baseFS.Realpath(projectDir))
+
+			requestDir := tspath.NormalizePath(t.TempDir())
+			requestedPath := tspath.ResolvePath(requestDir, "target.ts")
+			liveDir := tspath.NormalizePath(t.TempDir())
+			writeProgramTestFiles(t, liveDir, map[string]string{
+				"target.ts": `export const replacement = 2;`,
+			})
+			fsys := &retargetingFrozenTargetFS{
+				FS:         baseFS,
+				targetPath: requestedPath,
+				liveCanonicalPath: tspath.NormalizePath(
+					baseFS.Realpath(tspath.ResolvePath(liveDir, "target.ts")),
+				),
+			}
+			plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
+				Path:                requestedPath,
+				CanonicalPath:       frozenCanonicalPath,
+				CanonicalParentPath: frozenCanonicalParent,
+				ConfigDirectory:     projectDir,
+			}}}
+
+			session := sessionForTest(newBuildContext(fsys))
+			set, err := session.BuildTargetProject(
+				projectDir,
+				projectConfig("./tsconfig.json"),
+				plan,
+				true,
+			)
+			if err != nil {
+				t.Fatalf("BuildTargetProject: %v", err)
+			}
+			if set.Len() != 1 {
+				t.Fatalf("selected projects = %d, want frozen project", set.Len())
+			}
+			binding, err := session.LoadAPI(set, plan, projectDir, true)
+			if err != nil {
+				t.Fatalf("LoadAPI: %v", err)
+			}
+			if len(binding.TargetsByProgram) != 1 || len(binding.TargetsByProgram[0]) != 1 {
+				t.Fatalf("frozen target binding = %v, want one project target", binding.TargetsByProgram)
+			}
+			if fsys.targetCalls != 0 {
+				t.Fatalf("requested target Realpath calls = %d, want frozen identity only", fsys.targetCalls)
+			}
+		})
 	}
 }
 

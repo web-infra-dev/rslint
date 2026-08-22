@@ -96,6 +96,8 @@ export interface ParserOptions {
   projectService?: boolean;
   /**
    * tsconfig.json path(s) used for typed linting. Glob patterns are supported.
+   * Omit this field to use a governing config's default `tsconfig.json`; pass
+   * an empty array to disable that fallback.
    *
    * @example
    * project: './tsconfig.json'
