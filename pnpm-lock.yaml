@@ -448,7 +448,7 @@ importers:
         version: 26.2.0
       '@typescript-eslint/parser':
         specifier: 'catalog:'
-        version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
+        version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@5.9.3)
       '@typescript-eslint/rule-tester':
         specifier: workspace:*
         version: link:../rule-tester
@@ -460,7 +460,7 @@ importers:
         version: 10.8.0(jiti@2.7.0)
       eslint-plugin-cypress:
         specifier: 'catalog:'
-        version: 6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.0(jiti@2.7.0))
+        version: 6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.8.0(jiti@2.7.0))
       eslint-plugin-es-x:
         specifier: 'catalog:'
         version: 9.7.0(eslint@10.8.0(jiti@2.7.0))
@@ -515,7 +515,7 @@ importers:
         version: 4.68.0
       prebundle:
         specifier: 'catalog:'
-        version: 1.6.5(typescript@6.0.3)
+        version: 1.6.5(typescript@5.9.3)
 
   packages/rule-tester:
     dependencies:
@@ -568,8 +568,8 @@ importers:
         specifier: 'catalog:'
         version: 26.2.0
       '@types/vscode':
-        specifier: ^1.125.0
-        version: 1.125.0
+        specifier: ^1.134.0
+        version: 1.134.0
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20250904.1
@@ -3072,8 +3072,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/vscode@1.125.0':
-    resolution: {integrity: sha512-0icm/ZQAaism87P0ekHqi4/Ju9du+Tm0RUW+y7vqRsxY2cY0FNRX1nAnaW7nT6npPt2tfHiheZ55Zm9UhqonFA==}
+  '@types/vscode@1.134.0':
+    resolution: {integrity: sha512-NDEu0hg4sF7+vvFsADsktqUJ6f80LHSZvVK2Ovo1XiQ0/VHck1O3zst+ZZyVA/uvz6vo6LcuoqU2q48YMqOwWw==}
 
   '@typescript-eslint/parser@8.65.0':
     resolution: {integrity: sha512-CZ4nMxWwgu1HEEFNkeaCptra9QCtkmKdgf3sWh1rl1trIhmxLilgTV4cwcbQ4wemnT4sWQN8CaKOmdYx+g2gMA==}
@@ -8814,26 +8814,26 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/vscode@1.125.0': {}
+  '@types/vscode@1.134.0': {}
 
-  '@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)':
+  '@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.65.0
       '@typescript-eslint/types': 8.65.0
-      '@typescript-eslint/typescript-estree': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/typescript-estree': 8.65.0(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.65.0
       debug: 4.4.3(supports-color@8.1.1)
       eslint: 10.8.0(jiti@2.7.0)
-      typescript: 6.0.3
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.65.0(typescript@6.0.3)':
+  '@typescript-eslint/project-service@8.65.0(typescript@5.9.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@5.9.3)
       '@typescript-eslint/types': 8.65.0
       debug: 4.4.3(supports-color@8.1.1)
-      typescript: 6.0.3
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
@@ -8842,24 +8842,24 @@ snapshots:
       '@typescript-eslint/types': 8.65.0
       '@typescript-eslint/visitor-keys': 8.65.0
 
-  '@typescript-eslint/tsconfig-utils@8.65.0(typescript@6.0.3)':
+  '@typescript-eslint/tsconfig-utils@8.65.0(typescript@5.9.3)':
     dependencies:
-      typescript: 6.0.3
+      typescript: 5.9.3
 
   '@typescript-eslint/types@8.65.0': {}
 
-  '@typescript-eslint/typescript-estree@8.65.0(typescript@6.0.3)':
+  '@typescript-eslint/typescript-estree@8.65.0(typescript@5.9.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.65.0(typescript@6.0.3)
-      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/project-service': 8.65.0(typescript@5.9.3)
+      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@5.9.3)
       '@typescript-eslint/types': 8.65.0
       '@typescript-eslint/visitor-keys': 8.65.0
       debug: 4.4.3(supports-color@8.1.1)
       minimatch: 10.2.5
       semver: 7.8.5
       tinyglobby: 0.2.17
-      ts-api-utils: 2.5.0(typescript@6.0.3)
-      typescript: 6.0.3
+      ts-api-utils: 2.5.0(typescript@5.9.3)
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
@@ -9783,12 +9783,12 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-plugin-cypress@6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.0(jiti@2.7.0)):
+  eslint-plugin-cypress@6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.8.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.8.0(jiti@2.7.0)
       globals: 17.9.0
     optionalDependencies:
-      '@typescript-eslint/parser': 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
+      '@typescript-eslint/parser': 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@5.9.3)
 
   eslint-plugin-es-x@9.7.0(eslint@10.8.0(jiti@2.7.0)):
     dependencies:
@@ -11724,13 +11724,13 @@ snapshots:
       tunnel-agent: 0.6.0
     optional: true
 
-  prebundle@1.6.5(typescript@6.0.3):
+  prebundle@1.6.5(typescript@5.9.3):
     dependencies:
       '@vercel/ncc': 0.38.4
       cac: 7.0.0
       prettier: 3.9.6
       rollup: 4.62.2
-      rollup-plugin-dts: 6.4.1(rollup@4.62.2)(typescript@6.0.3)
+      rollup-plugin-dts: 6.4.1(rollup@4.62.2)(typescript@5.9.3)
       terser: 5.49.0
     transitivePeerDependencies:
       - typescript
@@ -12086,14 +12086,14 @@ snapshots:
       hash-base: 3.1.2
       inherits: 2.0.4
 
-  rollup-plugin-dts@6.4.1(rollup@4.62.2)(typescript@6.0.3):
+  rollup-plugin-dts@6.4.1(rollup@4.62.2)(typescript@5.9.3):
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.5.5
       convert-source-map: 2.0.0
       magic-string: 0.30.21
       rollup: 4.62.2
-      typescript: 6.0.3
+      typescript: 5.9.3
     optionalDependencies:
       '@babel/code-frame': 7.29.7
 
@@ -12651,6 +12651,10 @@ snapshots:
   trim-lines@3.0.1: {}
 
   trough@2.2.0: {}
+
+  ts-api-utils@2.5.0(typescript@5.9.3):
+    dependencies:
+      typescript: 5.9.3
 
   ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
