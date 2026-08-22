@@ -25,6 +25,16 @@ template.replace('{url}', () => htmlEscape(url));
 template.replaceAll('{url}', String.raw`https://example.com`);
 ```
 
+This rule uses type information to decide whether the receiver is a string, and
+is skipped on files where type information is unavailable.
+
+## Differences from the original rule
+
+The original rule classifies the receiver syntactically before it consults type
+information. This rule always uses type information, so it reports receivers
+typed as a no-substitution template literal type (`` `x` ``), which are strings,
+and it stays quiet on receivers whose type reduces to `never`.
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: no-unsafe-string-replacement](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v73.0.0/docs/rules/no-unsafe-string-replacement.md)

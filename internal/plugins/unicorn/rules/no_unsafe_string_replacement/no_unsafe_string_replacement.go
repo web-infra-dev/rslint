@@ -18,9 +18,16 @@ func unsafeReplacementMessage(method string) rule.RuleMessage {
 	}
 }
 
+// NoUnsafeStringReplacementRule mirrors eslint-plugin-unicorn's
+// no-unsafe-string-replacement. Upstream classifies the receiver syntactically
+// before consulting type information; this rule always uses type information
+// and declares RequiresTypeInfo, so it is skipped rather than guessing on
+// files where none is available. See the rule doc for the divergences that
+// follow from dropping the syntactic classifier.
 var NoUnsafeStringReplacementRule = rule.Rule{
-	Name:   "unicorn/no-unsafe-string-replacement",
-	Schema: rule.EmptyArraySchema,
+	Name:             "unicorn/no-unsafe-string-replacement",
+	Schema:           rule.EmptyArraySchema,
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -152,15 +159,10 @@ func isPlainObjectProperty(property *ast.Node) bool {
 	return ok && !objectCoercionPropertyNames[staticName]
 }
 
+// isKnownNonStringReceiver mirrors the type-information half of Unicorn's
+// createTypeCheckers. Unlike upstream there is no syntax-level fallback: the
+// rule declares RequiresTypeInfo, so a TypeChecker is always present.
 func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
-	if classifyStringReceiverSyntax(ctx, node, map[*ast.Symbol]bool{}) == unicornutil.TypeNonTarget {
-		return true
-	}
-
-	if ctx.TypeChecker == nil {
-		return false
-	}
-
 	t := ctx.TypeChecker.GetTypeAtLocation(node)
 	return unicornutil.ClassifyType(ctx, t, unicornutil.TypeClassifierOptions{
 		HeritageSymbolFlags:        ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
@@ -169,197 +171,4 @@ func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
 			return utils.IsTypeFlagSet(t, checker.TypeFlagsStringLike)
 		},
 	}) == unicornutil.TypeNonTarget
-}
-
-// classifyStringReceiverSyntax mirrors the syntax-only part of Unicorn's
-// createTypeCheckers. It matters for source-only TypeScript Programs: those
-// files have binder / RefStore services but intentionally no TypeChecker.
-func classifyStringReceiverSyntax(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) unicornutil.TypeClass {
-	if node == nil {
-		return unicornutil.TypeUnknown
-	}
-
-	switch node.Kind {
-	case ast.KindParenthesizedExpression, ast.KindNonNullExpression:
-		return classifyStringReceiverSyntax(ctx, node.Expression(), visiting)
-	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		if class := classifyStringTypeSyntax(ctx, node.Type(), visiting); class != unicornutil.TypeUnknown {
-			return class
-		}
-		return classifyStringReceiverSyntax(ctx, node.Expression(), visiting)
-	case ast.KindSatisfiesExpression:
-		// `satisfies` validates without changing the expression's type.
-		return classifyStringReceiverSyntax(ctx, node.Expression(), visiting)
-	case ast.KindIdentifier:
-		if ctx.Refs == nil {
-			return unicornutil.TypeUnknown
-		}
-		symbol := ctx.Refs.Resolve(node)
-		// getTypeFromVariable() in Unicorn only reasons about a variable with one
-		// definition. A merged type/value symbol must stay unknown: selecting the
-		// type declaration could otherwise hide the value receiver's diagnostic.
-		if symbol == nil || visiting[symbol] || len(symbol.Declarations) != 1 {
-			return unicornutil.TypeUnknown
-		}
-		visiting[symbol] = true
-		defer delete(visiting, symbol)
-
-		if typeAnnotation := bindingTypeAnnotation(symbol.Declarations[0]); typeAnnotation != nil {
-			if class := classifyStringTypeSyntax(ctx, typeAnnotation, visiting); class != unicornutil.TypeUnknown {
-				return class
-			}
-		}
-		if initializer := utils.GetConstVariableInitializer(node, nil); initializer != nil {
-			return classifyStringReceiverSyntax(ctx, initializer, visiting)
-		}
-	}
-
-	return unicornutil.TypeUnknown
-}
-
-// bindingTypeAnnotation returns only a type annotation on the binding itself.
-// In particular, FunctionDeclaration.Type() is its return type, not a type for
-// the function binding; Unicorn's definition.name.typeAnnotation does not read
-// that return type.
-func bindingTypeAnnotation(declaration *ast.Node) *ast.Node {
-	if declaration == nil {
-		return nil
-	}
-	switch declaration.Kind {
-	case ast.KindVariableDeclaration:
-		return declaration.AsVariableDeclaration().Type
-	case ast.KindParameter:
-		return declaration.AsParameterDeclaration().Type
-	default:
-		return nil
-	}
-}
-
-func classifyStringTypeSyntax(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) unicornutil.TypeClass {
-	if node == nil {
-		return unicornutil.TypeUnknown
-	}
-
-	switch node.Kind {
-	case ast.KindStringKeyword:
-		return unicornutil.TypeTarget
-	case ast.KindLiteralType:
-		literal := node.AsLiteralTypeNode().Literal
-		if literal != nil && literal.Kind == ast.KindStringLiteral {
-			return unicornutil.TypeTarget
-		}
-		return unicornutil.TypeNonTarget
-	case ast.KindBigIntKeyword, ast.KindBooleanKeyword, ast.KindNeverKeyword,
-		ast.KindNumberKeyword, ast.KindSymbolKeyword,
-		ast.KindUndefinedKeyword, ast.KindVoidKeyword, ast.KindArrayType, ast.KindTupleType,
-		ast.KindTypeLiteral, ast.KindFunctionType, ast.KindConstructorType:
-		return unicornutil.TypeNonTarget
-	case ast.KindParenthesizedType:
-		return classifyStringTypeSyntax(ctx, node.Type(), visiting)
-	case ast.KindTypeOperator:
-		operator := node.AsTypeOperatorNode()
-		if operator.Operator == ast.KindReadonlyKeyword {
-			return classifyStringTypeSyntax(ctx, operator.Type, visiting)
-		}
-		return unicornutil.TypeUnknown
-	case ast.KindUnionType:
-		return combineStringTypeSyntax(node.AsUnionTypeNode().Types.Nodes, ctx, visiting, false)
-	case ast.KindIntersectionType:
-		return combineStringTypeSyntax(node.AsIntersectionTypeNode().Types.Nodes, ctx, visiting, true)
-	case ast.KindTypeReference:
-		return classifyStringTypeReference(ctx, node.AsTypeReferenceNode().TypeName, visiting)
-	}
-
-	return unicornutil.TypeUnknown
-}
-
-func combineStringTypeSyntax(parts []*ast.Node, ctx rule.RuleContext, visiting map[*ast.Symbol]bool, intersection bool) unicornutil.TypeClass {
-	if len(parts) == 0 {
-		return unicornutil.TypeUnknown
-	}
-
-	allNonTarget := true
-	allTarget := true
-	for _, part := range parts {
-		class := classifyStringTypeSyntax(ctx, part, visiting)
-		if intersection && class == unicornutil.TypeTarget {
-			return unicornutil.TypeTarget
-		}
-		allTarget = allTarget && class == unicornutil.TypeTarget
-		allNonTarget = allNonTarget && class == unicornutil.TypeNonTarget
-	}
-	if allTarget {
-		return unicornutil.TypeTarget
-	}
-	if allNonTarget {
-		return unicornutil.TypeNonTarget
-	}
-	return unicornutil.TypeUnknown
-}
-
-func classifyStringTypeReference(ctx rule.RuleContext, typeName *ast.Node, visiting map[*ast.Symbol]bool) unicornutil.TypeClass {
-	if typeName == nil || !ast.IsIdentifier(typeName) || ctx.Refs == nil {
-		return unicornutil.TypeUnknown
-	}
-	symbol := ctx.Refs.Resolve(typeName)
-	if symbol == nil || visiting[symbol] {
-		return unicornutil.TypeUnknown
-	}
-	visiting[symbol] = true
-	defer delete(visiting, symbol)
-
-	for _, declaration := range symbol.Declarations {
-		switch declaration.Kind {
-		case ast.KindTypeAliasDeclaration:
-			if class := classifyStringTypeSyntax(ctx, declaration.Type(), visiting); class != unicornutil.TypeUnknown {
-				return class
-			}
-		case ast.KindTypeParameter:
-			return classifyStringTypeSyntax(ctx, declaration.AsTypeParameterDeclaration().Constraint, visiting)
-		case ast.KindInterfaceDeclaration:
-			interfaces := ast.GetHeritageElements(declaration, ast.KindExtendsKeyword)
-			if len(interfaces) == 0 {
-				return unicornutil.TypeNonTarget
-			}
-			parts := make([]*ast.Node, 0, len(interfaces))
-			for _, base := range interfaces {
-				if base.Kind == ast.KindExpressionWithTypeArguments {
-					parts = append(parts, base.AsExpressionWithTypeArguments().Expression)
-				}
-			}
-			return combineStringTypeExpressions(parts, ctx, visiting)
-		case ast.KindClassDeclaration:
-			extends := ast.GetHeritageElements(declaration, ast.KindExtendsKeyword)
-			if len(extends) == 0 {
-				return unicornutil.TypeNonTarget
-			}
-			parts := make([]*ast.Node, 0, len(extends))
-			for _, base := range extends {
-				if base.Kind == ast.KindExpressionWithTypeArguments {
-					parts = append(parts, base.AsExpressionWithTypeArguments().Expression)
-				}
-			}
-			return combineStringTypeExpressions(parts, ctx, visiting)
-		}
-	}
-
-	return unicornutil.TypeUnknown
-}
-
-func combineStringTypeExpressions(parts []*ast.Node, ctx rule.RuleContext, visiting map[*ast.Symbol]bool) unicornutil.TypeClass {
-	if len(parts) == 0 {
-		return unicornutil.TypeUnknown
-	}
-	allNonTarget := true
-	for _, part := range parts {
-		class := classifyStringTypeReference(ctx, part, visiting)
-		if class == unicornutil.TypeTarget {
-			return unicornutil.TypeTarget
-		}
-		allNonTarget = allNonTarget && class == unicornutil.TypeNonTarget
-	}
-	if allNonTarget {
-		return unicornutil.TypeNonTarget
-	}
-	return unicornutil.TypeUnknown
 }

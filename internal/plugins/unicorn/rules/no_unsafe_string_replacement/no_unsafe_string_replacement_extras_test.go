@@ -7,15 +7,9 @@ package no_unsafe_string_replacement_test
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
-	lintprogram "github.com/web-infra-dev/rslint/internal/program"
-	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoUnsafeStringReplacementExtras(t *testing.T) {
@@ -87,11 +81,6 @@ router.replace("/about", options);`),
 			// Boolean literals have intrinsic names upstream and are known non-string.
 			tsValid(`declare const value: {flag: true}; value.flag.replace("x", replacement)`),
 			tsValid(`declare function getFlag(): true; getFlag().replace("x", replacement)`),
-			// A no-substitution template literal type is a TSLiteralType whose
-			// literal is a TemplateLiteral upstream, so it is known non-string.
-			tsValid("declare const value: `x`; value.replace(\"x\", replacement)"),
-			tsValid("declare const value: `x` | 1; value.replace(\"x\", replacement)"),
-			tsValid("declare const value: `x` & {}; value.replace(\"x\", replacement)"),
 			// Locks in upstream type-parameter constraint recursion.
 			tsValid(`function run<T extends number>(value: T) { value.replace("x", replacement); }`),
 			// Locks in upstream class-heritage recursion: String wrapper subclasses are non-string receivers.
@@ -176,87 +165,18 @@ router.replace("/about", options);`),
 			// Template literal types with substitutions are not TSLiteralType and
 			// remain string targets.
 			tsInvalid("declare const value: `a${string}`; value.replace(\"x\", replacement)", `replacement`, "replace"),
+			// Deliberate divergence from upstream: a no-substitution template
+			// literal type is a string, so the receiver is a target here even
+			// though upstream's isStringTypeAnnotation() rejects it. Every route
+			// to the literal type behaves the same.
+			tsInvalid("declare const value: `x`; value.replace(\"x\", replacement)", `replacement`, "replace"),
+			tsInvalid("declare const value: `x` | 1; value.replace(\"x\", replacement)", `replacement`, "replace"),
+			tsInvalid("declare const value: `x` & {}; value.replace(\"x\", replacement)", `replacement`, "replace"),
+			tsInvalid("type T = `x`; declare const value: T; value.replace(\"x\", replacement)", `replacement`, "replace"),
+			tsInvalid("function run<T extends `x`>(value: T) { value.replace(\"x\", replacement); }", `replacement`, "replace"),
 			// A merged type/value name has multiple definitions and must remain unknown.
 			tsInvalid(`type Sep = number; const Sep = "-"; Sep.replace("x", replacement)`, `replacement`, "replace"),
 			tsInvalid(`type T = {a: 1}; const T = "x"; T.replace("x", replacement)`, `replacement`, "replace"),
 		},
 	)
-}
-
-// TestNoUnsafeStringReplacementSourceOnlyTypeSyntax locks in ESLint's
-// syntax-only isKnownNonString path. A source-only rslint Program deliberately
-// withholds TypeChecker, but still has binder / RefStore services.
-func TestNoUnsafeStringReplacementSourceOnlyTypeSyntax(t *testing.T) {
-	t.Parallel()
-
-	root := fixtures.GetRootDir()
-	fileName := "source-only.ts"
-	filePath := tspath.ResolvePath(root.Dir, fileName)
-	code := `
-declare const router: { replace(a: string, b: unknown): void };
-declare const path: string;
-declare const options: unknown;
-router.replace(path, options);
-
-declare const undefinedValue: undefined;
-undefinedValue.replace("x", options);
-
-function constrained<T extends number>(value: T) {
-	value.replace("x", options);
-}
-
-function functionValue(): number { return 1; }
-functionValue.replace("x", options);
-
-declare const objectValue: object;
-objectValue.replace("x", options);
-
-declare const objectUnion: object | number;
-objectUnion.replace("x", options);
-
-declare const objectIntersection: object & {a: 1};
-objectIntersection.replace("x", options);
-`
-	fs := utils.NewOverlayVFS(root.FS, map[string]string{filePath: code})
-	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
-	if err != nil {
-		t.Fatalf("create source program: %v", err)
-	}
-	sourceFile := program.GetSourceFile(fileName)
-	if sourceFile == nil {
-		t.Fatal("source fixture was not loaded")
-	}
-	sourceProgram, err := lintprogram.NewFromBoundSources(program, []*ast.SourceFile{sourceFile})
-	if err != nil {
-		t.Fatalf("create source-only Program: %v", err)
-	}
-
-	var diagnostics []rule.RuleDiagnostic
-	linter.RunLinterInProgram(
-		sourceProgram,
-		[]string{filePath},
-		nil,
-		[]string{},
-		func(file *ast.SourceFile) []linter.ConfiguredRule {
-			if file.FileName() != filePath {
-				return nil
-			}
-			return []linter.ConfiguredRule{{
-				Name:     no_unsafe_string_replacement.NoUnsafeStringReplacementRule.Name,
-				Severity: rule.SeverityError,
-				Run: func(ctx rule.RuleContext) rule.RuleListeners {
-					if ctx.TypeChecker != nil {
-						t.Error("source-only Program unexpectedly supplied a TypeChecker")
-					}
-					return no_unsafe_string_replacement.NoUnsafeStringReplacementRule.Run(ctx, nil)
-				},
-			}}
-		},
-		false,
-		func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
-		nil,
-	)
-	if len(diagnostics) != 4 {
-		t.Fatalf("source-only syntax classification produced %d diagnostics, want 4: %+v", len(diagnostics), diagnostics)
-	}
 }
