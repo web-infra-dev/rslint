@@ -152,31 +152,13 @@ var obj = {
   },
 };
     `},
-			// ---- Wrapper-bug lock-in: `this` in computed key of class field is masked ----
-			// Upstream wrapper pushes `valid=true` on `PropertyDefinition` /
-			// `AccessorProperty` entry, which fires BEFORE the computed key
-			// is visited. The wrapper's `ThisExpression` listener then
-			// short-circuits and never delegates to baseRule, so the
-			// otherwise-valid report at top-level is silently masked. rslint
-			// reproduces this behavior verbatim for byte-level alignment with
-			// `@typescript-eslint/no-invalid-this`. A separate Layer-3 test
-			// (the method/accessor counterpart above) confirms that
-			// non-field computed keys still report correctly.
-			{Code: `
-class A {
-  [this.foo] = 1;
-}
-    `},
-			{Code: `
-class A {
-  accessor [this.foo] = 1;
-}
-    `},
 			// ---- Wrapper-bug lock-in: `this` in decorator on a field is masked ----
 			// PropertyDefinition / AccessorProperty push happens on entry,
 			// so decorators on these (visited after entry) see the field's
-			// frame and the report is silently swallowed. Methods don't
-			// share this masking (see Layer-3 method-decorator tests).
+			// frame and the report is silently swallowed — the
+			// `FieldFrameScopedToValue: false` policy point.
+			// Methods don't share this masking (see Layer-3
+			// method-decorator tests), and ESLint core reports here.
 			{Code: `
 class A {
   @deco(this)
@@ -187,6 +169,41 @@ class A {
 class A {
   @deco(this)
   accessor foo = 1;
+}
+    `},
+			// ---- Wrapper-bug lock-in: `this` in a computed key of a field is masked ----
+			// The same entry push covers the key, which ESTree visits after
+			// the `PropertyDefinition` / `AccessorProperty` node itself.
+			// Method-likes don't share the masking (see the computed
+			// method/accessor key cases below), and ESLint core reports here.
+			{Code: `
+class A {
+  [this.foo] = 1;
+}
+    `},
+			{Code: `
+class A {
+  accessor [this.foo] = 1;
+}
+    `},
+			// A computed key doesn't defer the field's push the way it does
+			// for a method-like, so a decorator on such a field is masked too.
+			{Code: `
+class A {
+  @deco(this)
+  [bar] = 1;
+}
+    `},
+			// ---- Wrapper-bug lock-in: masking also covers members nested inside a field decorator ----
+			// The field frame is on top for everything the decorator
+			// contains, so the walk stops at the field instead of peeking
+			// out to `outer` — same policy point as the two cases above.
+			{Code: `
+function outer() {
+  class C {
+    @deco(class I { [this]() {} })
+    x = 1;
+  }
 }
     `},
 			// ---- Lock-in: `this` in decorator of a computed-key method nested in another method ----
@@ -804,6 +821,34 @@ var func = function bar() {
 };
       `,
 				Errors: unexpected(3, 3),
+			},
+
+			// ---- A member nested inside a method decorator doesn't restore the decorated member's frame ----
+			// `I`'s computed key is evaluated while the decorator runs, in
+			// `outer`'s scope; its own frame is deferred, so the walk passes
+			// through it and still peeks past `C.foo`.
+			{
+				Code: `
+function outer() {
+  class C {
+    @deco(class I { [this]() {} })
+    foo() {}
+  }
+}
+      `,
+				Errors: unexpected(4, 22),
+			},
+			// ---- Each nested decorator hop peeks past its own member ----
+			{
+				Code: `
+function outer() {
+  class C {
+    @deco(class I { @deco2(class J { [this]() {} }) bar() {} })
+    foo() {}
+  }
+}
+      `,
+				Errors: unexpected(4, 39),
 			},
 		},
 	)

@@ -190,6 +190,10 @@ class Foo {
 }
 ```
 
+## Differences from ESLint
+
+- rslint treats every file as an ES module, so top-level `this` is always reported and every function body is checked as strict-mode code. `@typescript-eslint/no-invalid-this` derives both from `languageOptions.sourceType`, which rslint does not expose.
+
 ## When Not To Use It
 
 If you do not want to be notified about usage of the `this` keyword outside of classes or class-like objects, you can safely disable this rule.
