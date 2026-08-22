@@ -42,7 +42,20 @@ func TestNoAliasMethodsExtras(t *testing.T) {
 			{Code: `expect(spy).ok.and.toBeCalled()`},
 			{Code: `expect(spy).a("function").and.toBeCalled()`},
 
-			// ---- C. strict computed-identifier fallback fail-closed boundaries ----
+			// ---- C. Computed keys are never reported ----
+			// The alias table can only be consulted with a matcher name, and a
+			// computed key supplies one at runtime. Upstream matches the
+			// variable's own name instead and autofixes the result, so all of
+			// these are upstream errors; matching that would report
+			// `const toBeCalled = "toHaveBeenCalled"` as an alias use.
+			{Code: `const toBeCalled = "toBeCalled";
+expect(spy)[toBeCalled]()`},
+			{Code: `const toBeCalled = "toBeCalled";
+expect(spy)[(toBeCalled)]()`},
+			{Code: `const toThrowError = "toThrowError";
+expect(spy).not[toThrowError]()`},
+			{Code: `const toBeCalled = "toBeCalled";
+expect.soft(spy)[toBeCalled]()`},
 			{Code: `expect(spy).to.have[toBeCalled]()`},
 			{Code: `expect(spy).equal(other)[toBeCalled]()`},
 			{Code: `expect(spy).ok[toBeCalled]()`},
@@ -152,26 +165,48 @@ func TestNoAliasMethodsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 1, Column: 26}},
 			},
 
-			// ---- C. strict computed-identifier fallback hit ----
+			// ---- C. Template-literal keys are compared by their cooked value ----
+			// Upstream compares quasis[0].value.raw and reports nothing here.
+			// The cooked value is the property name the runtime looks up.
 			{
-				Code: `const toBeCalled = "toBeCalled";
-expect(spy)[toBeCalled]();`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 2, Column: 13}},
+				Code:   "expect(spy)[`toBeCall\\u0065d`]()",
+				Output: []string{"expect(spy)[`toHaveBeenCalled`]()"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 1, Column: 13}},
+			},
+
+			// ---- C. The chain ends at the first member the grammar rejects ----
+			// A member after the matcher call reads a property of the
+			// assertion's own result, and a computed key names a matcher only
+			// at runtime. Neither undoes the alias that already parsed.
+			{
+				Code:   `expect(spy).toBeCalled().foo`,
+				Output: []string{`expect(spy).toHaveBeenCalled().foo`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 1, Column: 13}},
 			},
 			{
-				Code: `const toBeCalled = "toBeCalled";
-expect(spy)[(toBeCalled)]();`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 2, Column: 14}},
+				Code:   `expect(spy).toReturn()['x']`,
+				Output: []string{`expect(spy).toHaveReturned()['x']`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 1, Column: 13}},
 			},
 			{
-				Code: `const toThrowError = "toThrowError";
-expect(spy).not[toThrowError]();`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 2, Column: 17}},
+				Code:   `const r = expect(spy).toBeCalled().message;`,
+				Output: []string{`const r = expect(spy).toHaveBeenCalled().message;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 1, Column: 23}},
 			},
 			{
-				Code: `const toBeCalled = "toBeCalled";
-expect.soft(spy)[toBeCalled]();`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 2, Column: 18}},
+				Code:   `expect(spy).toReturn()[toBeCalled]()`,
+				Output: []string{`expect(spy).toHaveReturned()[toBeCalled]()`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 1, Column: 13}},
+			},
+			{
+				Code:   `expect(spy).toBeCalledWith(1)[key]()`,
+				Output: []string{`expect(spy).toHaveBeenCalledWith(1)[key]()`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 1, Column: 13}},
+			},
+			{
+				Code:   `expect(spy).toBeCalled()[key]`,
+				Output: []string{`expect(spy).toHaveBeenCalled()[key]`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaceAlias", Line: 1, Column: 13}},
 			},
 
 			// ---- D. 15 real Rstest expect sources ----
@@ -363,8 +398,7 @@ func TestNoAliasMethodsEditDemand(t *testing.T) {
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	program, sourceFile, err := helper.CreateTestProgram(
 		`expect(fn).toBeCalled();
-const toThrowError = "toThrowError";
-expect(fn).not[toThrowError]();`,
+expect(fn).not['toThrowError']();`,
 		"edit-demand.ts",
 		"tsconfig.json",
 	)
@@ -442,10 +476,12 @@ expect(fn).not[toThrowError]();`,
 	if autofixOnly[0].FixesPtr == nil || !reflect.DeepEqual(autofixOnly[0].FixesPtr, allEdits[0].FixesPtr) {
 		t.Fatal("fixable alias produced inconsistent fixes between autofix and all demands")
 	}
-	if len(*autofixOnly[0].FixesPtr) != 1 {
-		t.Fatalf("fixable alias produced %d fixes, want 1", len(*autofixOnly[0].FixesPtr))
+	if autofixOnly[1].FixesPtr == nil || !reflect.DeepEqual(autofixOnly[1].FixesPtr, allEdits[1].FixesPtr) {
+		t.Fatal("fixable alias produced inconsistent fixes between autofix and all demands")
 	}
-	if autofixOnly[1].FixesPtr != nil || allEdits[1].FixesPtr != nil {
-		t.Fatal("computed-identifier fallback must report without fixes under every demand")
+	for index, fixes := range []*[]rule.RuleFix{autofixOnly[0].FixesPtr, autofixOnly[1].FixesPtr} {
+		if len(*fixes) != 1 {
+			t.Fatalf("fixable alias %d produced %d fixes, want 1", index, len(*fixes))
+		}
 	}
 }

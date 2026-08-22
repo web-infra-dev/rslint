@@ -36,10 +36,7 @@ var NoAliasMethodsRule = rule.Rule{
 
 				hit, ok := firstAliasHit(parsed)
 				if !ok {
-					hit, ok = strictComputedIdentifierFallback(parsed, node)
-					if !ok {
-						return
-					}
+					return
 				}
 
 				message := buildReplaceAliasMessage(hit.alias, hit.canonical)
@@ -78,71 +75,4 @@ func firstAliasHit(parsed *rstestUtils.ParsedRstestExpectCall) (aliasHit, bool) 
 		canonical: canonical,
 		node:      parsed.MatcherEntry.Node,
 	}, true
-}
-
-func strictComputedIdentifierFallback(
-	parsed *rstestUtils.ParsedRstestExpectCall,
-	listenerNode *ast.Node,
-) (aliasHit, bool) {
-	if parsed == nil ||
-		parsed.Head == nil ||
-		parsed.Reason != rstestUtils.RstestExpectParseReasonMatcherNotFound ||
-		parsed.MatcherEntry != nil ||
-		len(parsed.MemberEntries) == 0 {
-		return aliasHit{}, false
-	}
-
-	last := parsed.MemberEntries[len(parsed.MemberEntries)-1]
-	if !testFramework.IsComputedIdentifierAccessor(last.Node) || last.Call != listenerNode {
-		return aliasHit{}, false
-	}
-
-	canonical, ok := rstestUtils.RSTEST_MATCHER_ALIASES[last.Name]
-	if !ok {
-		return aliasHit{}, false
-	}
-
-	if !strictFallbackPrefixAllowed(parsed.MemberEntries[:len(parsed.MemberEntries)-1], parsed.Head) {
-		return aliasHit{}, false
-	}
-
-	return aliasHit{
-		alias:     last.Name,
-		canonical: canonical,
-		node:      last.Node,
-	}, true
-}
-
-func strictFallbackPrefixAllowed(
-	prefix []rstestUtils.ParsedRstestFnMemberEntry,
-	head *ast.Node,
-) bool {
-	notCount := 0
-	promiseModifierCount := 0
-	for _, entry := range prefix {
-		if entry.Call == head {
-			continue
-		}
-		if entry.Call != nil {
-			return false
-		}
-		if testFramework.IsComputedIdentifierAccessor(entry.Node) {
-			return false
-		}
-		if !rstestUtils.RSTEST_EXPECT_MODIFIER_NAMES[entry.Name] {
-			return false
-		}
-		if entry.Name == "not" {
-			notCount++
-			if notCount > 1 {
-				return false
-			}
-			continue
-		}
-		promiseModifierCount++
-		if promiseModifierCount > 1 {
-			return false
-		}
-	}
-	return true
 }
