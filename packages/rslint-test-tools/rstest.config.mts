@@ -494,6 +494,7 @@ export default defineConfig({
     './tests/eslint/rules/no-unused-expressions.test.ts',
     './tests/eslint/rules/no-unused-labels.test.ts',
     './tests/eslint/rules/no-lone-blocks.test.ts',
+    './tests/eslint/rules/no-lonely-if.test.ts',
     './tests/eslint/rules/no-loop-func.test.ts',
     './tests/eslint/rules/no-multi-assign.test.ts',
     './tests/eslint/rules/no-multi-str.test.ts',
