@@ -2,6 +2,7 @@ package rstest
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/expect_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_alias_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_disabled_tests"
@@ -22,6 +23,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		expect_expect.ExpectExpectRule,
+		no_alias_methods.NoAliasMethodsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_conditional_expect.NoConditionalExpectRule,
 		no_disabled_tests.NoDisabledTestsRule,
