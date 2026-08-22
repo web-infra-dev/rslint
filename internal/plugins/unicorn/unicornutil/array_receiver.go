@@ -146,7 +146,7 @@ func classifyArrayReceiverInner(
 
 	if ctx.TypeChecker != nil {
 		t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
-		if class := classifyArrayType(ctx, t, targetNames, nonTargetNames); class != arrayClassUnknown {
+		if class := classifyArrayType(ctx, t, targetNames); class != arrayClassUnknown {
 			return class
 		}
 	}
@@ -204,16 +204,18 @@ func classifyArrayIdentifier(
 }
 
 // arrayBindingTypeAnnotation mirrors definition.name?.typeAnnotation in
-// @typescript-eslint/scope-manager. Function-like declarations are excluded:
-// Node.Type() exposes their return type, but that is not an annotation on the
-// identifier binding.
+// @typescript-eslint/scope-manager, whose Definition kinds carry a binding
+// annotation only for variables and parameters. Function-like declarations are
+// excluded because Node.Type() exposes their return type, which is not an
+// annotation on the identifier binding. Class properties and interface members
+// are not reachable here: the caller resolves a bare identifier, which never
+// binds to one.
 func arrayBindingTypeAnnotation(declaration *ast.Node) *ast.Node {
 	if declaration == nil {
 		return nil
 	}
 	switch declaration.Kind {
-	case ast.KindVariableDeclaration, ast.KindParameter,
-		ast.KindPropertyDeclaration, ast.KindPropertySignature:
+	case ast.KindVariableDeclaration, ast.KindParameter:
 		return declaration.Type()
 	default:
 		return nil
@@ -467,7 +469,12 @@ func isSyntacticNonArrayNode(node *ast.Node) bool {
 	return false
 }
 
-func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames, nonTargetNames *utils.Set[string]) arrayClass {
+// classifyArrayType mirrors unicorn's getTypeScriptType. It takes no
+// non-target name set: upstream ends with targetTypeNames.has(typeName) ? target
+// : nonTarget, so a name that is not a target is already non-target. Name-based
+// non-target matching belongs to the syntactic path, in
+// classifyKnownArrayTypeName.
+func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames *utils.Set[string]) arrayClass {
 	if t == nil {
 		return arrayClassUnknown
 	}
@@ -483,13 +490,13 @@ func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames, nonTa
 		if constraint == nil {
 			return arrayClassUnknown
 		}
-		return classifyArrayType(ctx, constraint, targetNames, nonTargetNames)
+		return classifyArrayType(ctx, constraint, targetNames)
 	}
 	if utils.IsUnionType(t) {
-		return combineArrayUnion(ctx, utils.UnionTypeParts(t), targetNames, nonTargetNames)
+		return combineArrayUnion(ctx, utils.UnionTypeParts(t), targetNames)
 	}
 	if utils.IsIntersectionType(t) {
-		return combineArrayIntersection(ctx, utils.IntersectionTypeParts(t), targetNames, nonTargetNames)
+		return combineArrayIntersection(ctx, utils.IntersectionTypeParts(t), targetNames)
 	}
 
 	if targetNames.Has("Array") && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
@@ -498,7 +505,7 @@ func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames, nonTa
 
 	constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
 	if constraint != nil && constraint != t {
-		return classifyArrayType(ctx, constraint, targetNames, nonTargetNames)
+		return classifyArrayType(ctx, constraint, targetNames)
 	}
 
 	symbol := arrayTypeSymbol(t)
@@ -514,10 +521,10 @@ func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames, nonTa
 	return arrayClassNonTarget
 }
 
-func combineArrayUnion(ctx rule.RuleContext, parts []*checker.Type, targetNames, nonTargetNames *utils.Set[string]) arrayClass {
+func combineArrayUnion(ctx rule.RuleContext, parts []*checker.Type, targetNames *utils.Set[string]) arrayClass {
 	classes := make([]arrayClass, 0, len(parts))
 	for _, part := range parts {
-		classes = append(classes, classifyArrayType(ctx, part, targetNames, nonTargetNames))
+		classes = append(classes, classifyArrayType(ctx, part, targetNames))
 	}
 	if len(classes) == 0 {
 		return arrayClassNonTarget
@@ -541,10 +548,10 @@ func combineArrayUnion(ctx rule.RuleContext, parts []*checker.Type, targetNames,
 	return arrayClassUnknown
 }
 
-func combineArrayIntersection(ctx rule.RuleContext, parts []*checker.Type, targetNames, nonTargetNames *utils.Set[string]) arrayClass {
+func combineArrayIntersection(ctx rule.RuleContext, parts []*checker.Type, targetNames *utils.Set[string]) arrayClass {
 	classes := make([]arrayClass, 0, len(parts))
 	for _, part := range parts {
-		classes = append(classes, classifyArrayType(ctx, part, targetNames, nonTargetNames))
+		classes = append(classes, classifyArrayType(ctx, part, targetNames))
 	}
 	for _, class := range classes {
 		if class == arrayClassTarget {

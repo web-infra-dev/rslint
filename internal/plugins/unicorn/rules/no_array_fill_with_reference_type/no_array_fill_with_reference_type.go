@@ -15,8 +15,15 @@ var referenceFillValueMessage = rule.RuleMessage{
 }
 
 // NoArrayFillWithReferenceTypeRule mirrors eslint-plugin-unicorn's
-// no-array-fill-with-reference-type rule. It is syntactic-first and only uses
-// type information, when available, to avoid known non-array receivers.
+// no-array-fill-with-reference-type rule. It is syntactic-first: reporting is
+// decided by the shape of the fill value, and the type checker is only
+// consulted (when available) to skip receivers that are known non-arrays. On JS
+// / gap files (`ctx.TypeChecker == nil`) that check degrades to "unknown",
+// exactly like upstream when no parser services are present — so the rule stays
+// useful and MUST NOT declare RequiresTypeInfo. `.fill()` called with an object
+// literal, array literal, class expression or `new` expression has no
+// non-array receiver in the platform to confuse it with: typed arrays take
+// numbers and `CanvasRenderingContext2D#fill()` takes no reference value.
 var NoArrayFillWithReferenceTypeRule = rule.Rule{
 	Name:   "unicorn/no-array-fill-with-reference-type",
 	Schema: rule.EmptyArraySchema,
