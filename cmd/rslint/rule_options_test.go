@@ -15,6 +15,7 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/rules/catalog"
 )
 
 // The rule-options validation step runs after configuration is fully
@@ -103,7 +104,7 @@ func TestValidateResolvedRuleOptionsReturnsNormalizedSingleConfig(t *testing.T) 
 		},
 	}}
 
-	normalizedMap, normalized, messages := validateResolvedRuleOptions(nil, input)
+	normalizedMap, normalized, messages := validateResolvedRuleOptions(nil, input, catalog.Native())
 	if normalizedMap != nil {
 		t.Fatalf("single-config mode returned a non-nil config map: %#v", normalizedMap)
 	}
@@ -122,6 +123,7 @@ func TestValidateResolvedRuleOptionsPreservesMultiConfigMode(t *testing.T) {
 	normalizedMap, _, messages := validateResolvedRuleOptions(
 		map[string]rslintconfig.RslintConfig{},
 		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"unused": "error"}}},
+		catalog.Native(),
 	)
 	if normalizedMap == nil || len(normalizedMap) != 0 {
 		t.Fatalf("non-nil empty config map changed mode: %#v", normalizedMap)
@@ -138,7 +140,7 @@ func TestValidateResolvedRuleOptionsPreservesMultiConfigMode(t *testing.T) {
 			},
 		}},
 	}
-	normalizedMap, _, messages = validateResolvedRuleOptions(inputMap, nil)
+	normalizedMap, _, messages = validateResolvedRuleOptions(inputMap, nil, catalog.Native())
 	if len(messages) != 0 {
 		t.Fatalf("unexpected validation messages: %v", messages)
 	}
@@ -167,8 +169,8 @@ func TestHandleLintFirstRequestValidatesRuleOptions(t *testing.T) {
 		return
 	}
 
-	// Run this assertion in a fresh test process so no earlier API request can
-	// have populated the process-global rule registry and hidden an ordering bug.
+	// Run this assertion in a fresh test process so first-request catalog setup
+	// cannot accidentally depend on initialization performed by an earlier call.
 	cmd := exec.Command(os.Args[0], "-test.run=^TestHandleLintFirstRequestValidatesRuleOptions$")
 	cmd.Env = append(os.Environ(), apiFirstRuleOptionsValidationProcess+"=1")
 	if output, err := cmd.CombinedOutput(); err != nil {

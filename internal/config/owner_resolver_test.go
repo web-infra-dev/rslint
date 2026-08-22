@@ -155,7 +155,7 @@ func TestResolveConfigFilePathSpace(t *testing.T) {
 			Files: []string{"../workspace/*.ts"},
 			Rules: Rules{"rule": "error"},
 		}}
-		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, false).
+		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, nativeRuleCatalog(), false).
 			ConfigForFile("/real/workspace/visible.ts"); merged == nil || merged.Rules["rule"] == nil {
 			t.Fatalf("shared alias selector did not match: %#v", merged)
 		}
@@ -185,7 +185,7 @@ func TestResolveConfigFilePathSpace(t *testing.T) {
 			Files: []string{"../workspace/link.ts"},
 			Rules: Rules{"rule": "error"},
 		}}
-		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, false).
+		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, nativeRuleCatalog(), false).
 			ConfigForFile("/real/workspace/link.ts"); merged == nil || merged.Rules["rule"] == nil {
 			t.Fatalf("shared alias file-symlink selector did not match: %#v", merged)
 		}
@@ -283,7 +283,7 @@ func TestConfigOwnerResolverFreezesOwnerAndAuthoredBaseTogether(t *testing.T) {
 		CanonicalParentPath: "/owner-a/src",
 	}
 
-	configDir, _, resolved, ok := resolver.ResolveTargetConfig(target, false)
+	configDir, _, resolved, ok := resolver.ResolveTargetConfig(target, nativeRuleCatalog(), false)
 	if !ok || configDir != configDirectory || resolved.MergedConfig == nil {
 		t.Fatalf("frozen owner/config resolution = %q, %+v, %v", configDir, resolved, ok)
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // LintTargetPlan is the stable, config-owned projection of one lint target
@@ -133,6 +134,7 @@ func (plan LintTargetPlan) NewFileConfigResolver(
 	config RslintConfig,
 	configDirectory string,
 	fsys vfs.FS,
+	catalog *rule.Catalog,
 	enforcePlugins bool,
 ) *FileConfigResolver {
 	if len(plan.frozenConfigBases) == 0 {
@@ -140,19 +142,21 @@ func (plan LintTargetPlan) NewFileConfigResolver(
 			config,
 			configDirectory,
 			fsys,
+			catalog,
 			enforcePlugins,
 		)
 	}
-	return &FileConfigResolver{
-		config:         config,
-		enforcePlugins: enforcePlugins,
-		targetResolver: newConfigTargetResolverWithBases(
+	return newFileConfigResolver(
+		config,
+		catalog,
+		enforcePlugins,
+		newConfigTargetResolverWithBases(
 			config,
 			configDirectory,
 			fsys,
 			plan.frozenConfigBases,
 		),
-	}
+	)
 }
 
 func normalizeLintTarget(target DiscoveredLintTarget, defaultConfigDirectory string, fsys vfs.FS) DiscoveredLintTarget {

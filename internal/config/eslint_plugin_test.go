@@ -5,75 +5,8 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/catalog"
 )
-
-func preserveGlobalRuleRegistryEntries(t *testing.T, names ...string) {
-	t.Helper()
-
-	type savedRule struct {
-		value  rule.Rule
-		exists bool
-	}
-	saved := make(map[string]savedRule, len(names))
-	for _, name := range names {
-		value, exists := GlobalRuleRegistry.GetRule(name)
-		saved[name] = savedRule{value: value, exists: exists}
-	}
-
-	t.Cleanup(func() {
-		for name, entry := range saved {
-			if entry.exists {
-				GlobalRuleRegistry.rules[name] = entry.value
-			} else {
-				delete(GlobalRuleRegistry.rules, name)
-			}
-		}
-	})
-}
-
-func TestRegisterEslintPluginRules_RegistersPlaceholders(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "testplugA/no-foo", "testplugA/no-bar")
-
-	RegisterEslintPluginRules([]EslintPluginEntry{
-		{Prefix: "testplugA", RuleNames: []string{"no-foo", "no-bar"}},
-	})
-
-	r, ok := GlobalRuleRegistry.GetRule("testplugA/no-foo")
-	if !ok {
-		t.Fatal("expected testplugA/no-foo to be registered as a placeholder")
-	}
-	if !r.IsEslintPluginRule {
-		t.Error("expected IsEslintPluginRule=true for a plugin placeholder")
-	}
-	if r.RequiresTypeInfo {
-		t.Error("expected RequiresTypeInfo=false for a plugin placeholder")
-	}
-	if _, ok := GlobalRuleRegistry.GetRule("testplugA/no-bar"); !ok {
-		t.Error("expected testplugA/no-bar to be registered")
-	}
-}
-
-func TestRegisterEslintPluginRules_NativeWins(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "testplugB/native-rule")
-
-	// Pre-register a native rule (IsEslintPluginRule=false), then try to
-	// mount a plugin rule of the same fully-qualified name.
-	GlobalRuleRegistry.Register("testplugB/native-rule", rule.Rule{
-		Name:               "testplugB/native-rule",
-		IsEslintPluginRule: false,
-	})
-	RegisterEslintPluginRules([]EslintPluginEntry{
-		{Prefix: "testplugB", RuleNames: []string{"native-rule"}},
-	})
-
-	r, ok := GlobalRuleRegistry.GetRule("testplugB/native-rule")
-	if !ok {
-		t.Fatal("expected testplugB/native-rule present")
-	}
-	if r.IsEslintPluginRule {
-		t.Error("native rule must win: IsEslintPluginRule should stay false")
-	}
-}
 
 func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 	// UnmarshalJSON must capture the FULL raw object (sourceType / globals /
@@ -142,10 +75,8 @@ func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "testplugC/no-null")
-
-	RegisterEslintPluginRules([]EslintPluginEntry{
+func TestResolveEnabledRules_PluginGateAndResolution(t *testing.T) {
+	derivedCatalog, _ := catalog.WithESLintPlugins(nativeRuleCatalog(), []EslintPluginEntry{
 		{Prefix: "testplugC", RuleNames: []string{"no-null"}},
 	})
 	cwd := "/proj"
@@ -158,7 +89,7 @@ func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
 			Rules:   Rules{"testplugC/no-null": "error"},
 		},
 	}
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/a.ts", cwd, true)
+	rules, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/a.ts", cwd, true)
 	if len(rules) != 1 {
 		t.Fatalf("expected exactly 1 enabled rule, got %d", len(rules))
 	}
@@ -179,22 +110,19 @@ func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
 			Rules: Rules{"testplugC/no-null": "error"},
 		},
 	}
-	rulesNoGate, _ := GlobalRuleRegistry.GetEnabledRules(cfgNoGate, "/proj/a.ts", cwd, true)
+	rulesNoGate, _ := ResolveEnabledRules(derivedCatalog, cfgNoGate, "/proj/a.ts", cwd, true)
 	if len(rulesNoGate) != 0 {
 		t.Errorf("expected the gate to drop the rule when its prefix is not declared, got %d", len(rulesNoGate))
 	}
 }
 
-// TestGetEnabledRules_SplitEntryNativeAndCommunity pins the documented combine
+// TestResolveEnabledRules_SplitEntryNativeAndCommunity pins the documented combine
 // workflow: native plugins in one (array-form) entry and community plugins in a
-// separate entry. For a file matching both, GetEnabledRules must return BOTH
+// separate entry. For a file matching both, ResolveEnabledRules must return BOTH
 // rules, each carrying the correct IsEslintPluginRule routing flag (native runs
 // in Go, community routes to the worker).
-func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "testplugSplit/no-foo")
-
-	RegisterAllRules()
-	RegisterEslintPluginRules([]EslintPluginEntry{
+func TestResolveEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
+	derivedCatalog, _ := catalog.WithESLintPlugins(nativeRuleCatalog(), []EslintPluginEntry{
 		{Prefix: "testplugSplit", RuleNames: []string{"no-foo"}},
 	})
 	cfg := RslintConfig{
@@ -207,7 +135,7 @@ func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
 			Rules:   Rules{"testplugSplit/no-foo": "error"},
 		},
 	}
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/a.ts", "/proj", true)
+	rules, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/a.ts", "/proj", true)
 
 	routing := map[string]bool{} // rule name -> IsEslintPluginRule
 	for _, r := range rules {
@@ -233,11 +161,8 @@ func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
 
 // Config resolution retains native and community rules independently of source
 // capabilities. The linter plan owns type-aware eligibility.
-func TestGetEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "unicornGap/no-null")
-
-	RegisterAllRules()
-	RegisterEslintPluginRules([]EslintPluginEntry{
+func TestResolveEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
+	derivedCatalog, _ := catalog.WithESLintPlugins(nativeRuleCatalog(), []EslintPluginEntry{
 		{Prefix: "unicornGap", RuleNames: []string{"no-null"}},
 	})
 	cfg := RslintConfig{
@@ -251,7 +176,7 @@ func TestGetEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
 			Rules:   Rules{"unicornGap/no-null": "error"},
 		},
 	}
-	gap, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/gap.ts", "/proj", true)
+	gap, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/gap.ts", "/proj", true)
 	gapRouting := map[string]bool{}
 	for _, r := range gap {
 		gapRouting[r.Name] = r.IsEslintPluginRule
@@ -267,7 +192,7 @@ func TestGetEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
 		t.Error("the surviving community rule must keep IsEslintPluginRule=true (routes to the worker)")
 	}
 
-	covered, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/covered.ts", "/proj", true)
+	covered, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/covered.ts", "/proj", true)
 	coveredNames := map[string]bool{}
 	for _, r := range covered {
 		coveredNames[r.Name] = true

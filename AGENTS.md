@@ -6,7 +6,8 @@ This document summarizes how to work on rslint effectively and consistently.
 
 - `architecture.md`: Current high-level architecture, major runtime flows, and subsystem relationships.
 - `cmd/rslint/`: CLI entry (default), IPC API (`--api`), LSP (`--lsp`).
-- `internal/config/`: Config types/loader, rule registry and registration.
+- `internal/config/`: Config types/loader, matching, target planning, and configured-rule resolution.
+- `internal/rules/catalog/`: Native rule-catalog assembly and scoped ESLint-plugin overlays.
 - `internal/program/`: Unified source Program, module resolution/graph, and generation-scoped derived caches.
 - `internal/linter/`: Linter engine, traversal, and fix application.
 - `internal/rule/`: Rule descriptors/environment, context, diagnostics, disable manager, listeners.

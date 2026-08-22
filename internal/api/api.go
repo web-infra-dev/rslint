@@ -109,8 +109,8 @@ type LintRequest struct {
 	PluginConfigDirectory string            `json:"pluginConfigDirectory,omitempty"`
 	WorkingDirectory      string            `json:"workingDirectory,omitempty"`
 	FileContents          map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
-	// EslintPlugins carries the names Go must register as Node-dispatched rule
-	// placeholders. The live plugin implementations remain in the JS host.
+	// EslintPlugins carries the names included as Node-dispatched placeholders
+	// in this request's rule catalog. The live implementations remain in JS.
 	EslintPlugins []EslintPluginEntry `json:"eslintPlugins,omitempty"`
 	// Fix, when true, applies rule auto-fixes in-band and returns the fixed
 	// source per file in LintResponse.Output (ESLint's `fix: true`). The fix is

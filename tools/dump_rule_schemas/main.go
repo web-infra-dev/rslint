@@ -1,6 +1,6 @@
-// Command dump_rule_schemas registers every native rule and dumps each one's
+// Command dump_rule_schemas loads every native rule and dumps each one's
 // name and options JSON Schema as JSON on stdout, straight from
-// internal/config.GlobalRuleRegistry — the single source of truth for rule
+// the native rule catalog — the single source of truth for rule
 // IDs/prefixes and declared schemas. It's a build-time tool invocation for
 // scripts/generate-rule-option-types.mjs, not part of the rslint CLI surface
 // (see cmd/rslint), which is why it's a standalone command rather than a
@@ -13,23 +13,22 @@ import (
 	"os"
 	"sort"
 
-	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/rules/catalog"
 )
 
-// ruleSchemaEntry is one registered rule's name and raw options schema.
+// ruleSchemaEntry is one catalogued rule's name and raw options schema.
 type ruleSchemaEntry struct {
 	Name   string          `json:"name"`
 	Schema json.RawMessage `json:"schema"`
 }
 
-// collectRuleSchemas registers every native rule and returns the name +
+// collectRuleSchemas loads every native rule and returns the name +
 // raw schema JSON for each one that declares a Schema. Every native rule
 // declares one; the nil guard covers rules mounted without a Go schema, such
 // as ESLint-plugin placeholders. The TypeScript side falls back to `any[]`
 // for any rule ID it doesn't see here.
 func collectRuleSchemas() []ruleSchemaEntry {
-	rslintconfig.RegisterAllRules()
-	rules := rslintconfig.GlobalRuleRegistry.GetAllRules()
+	rules := catalog.Native().AllRules()
 
 	names := make([]string, 0, len(rules))
 	for name := range rules {

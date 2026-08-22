@@ -6,20 +6,9 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
-	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
-	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
-	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
-	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
-	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
-	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
-	rstestPlugin "github.com/web-infra-dev/rslint/internal/plugins/rstest"
-	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
-	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	coreRules "github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -541,83 +530,6 @@ func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
 	return rule.ParseSeverity(rc.Level)
 }
 
-// PluginInfo defines a known plugin with its rule prefix and all accepted declaration names.
-type PluginInfo struct {
-	RulePrefix  string   // Rule name prefix, e.g. "import"
-	DeclNames   []string // All accepted declaration names, e.g. ["eslint-plugin-import", "import"]
-	getAllRules func() []rule.Rule
-}
-
-// KnownPlugins is the single source of truth for all supported plugins.
-var KnownPlugins = []PluginInfo{
-	{
-		RulePrefix:  "@typescript-eslint",
-		DeclNames:   []string{"@typescript-eslint"},
-		getAllRules: func() []rule.Rule { return typescriptPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "import",
-		DeclNames:   []string{"eslint-plugin-import", "import"},
-		getAllRules: func() []rule.Rule { return importPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "jest",
-		DeclNames:   []string{"eslint-plugin-jest", "jest"},
-		getAllRules: func() []rule.Rule { return jestPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "jsx-a11y",
-		DeclNames:   []string{"eslint-plugin-jsx-a11y", "jsx-a11y"},
-		getAllRules: func() []rule.Rule { return jsxA11yPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "promise",
-		DeclNames:   []string{"eslint-plugin-promise", "promise"},
-		getAllRules: func() []rule.Rule { return promisePlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "react",
-		DeclNames:   []string{"react"},
-		getAllRules: func() []rule.Rule { return reactPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "react-hooks",
-		DeclNames:   []string{"eslint-plugin-react-hooks", "react-hooks"},
-		getAllRules: func() []rule.Rule { return reactHooksPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "rstest",
-		DeclNames:   []string{"rstest"},
-		getAllRules: func() []rule.Rule { return rstestPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "unicorn",
-		DeclNames:   []string{"eslint-plugin-unicorn", "unicorn"},
-		getAllRules: func() []rule.Rule { return unicornPlugin.GetAllRules() },
-	},
-}
-
-// pluginByDeclName is a lookup table built from KnownPlugins: declaration name → *PluginInfo.
-var pluginByDeclName map[string]*PluginInfo
-
-func init() {
-	pluginByDeclName = make(map[string]*PluginInfo)
-	for i := range KnownPlugins {
-		for _, name := range KnownPlugins[i].DeclNames {
-			pluginByDeclName[name] = &KnownPlugins[i]
-		}
-	}
-}
-
-// NormalizePluginName converts a plugin declaration name to its rule prefix form.
-// Looks up KnownPlugins; returns the input unchanged if not found.
-func NormalizePluginName(pluginName string) string {
-	if info, ok := pluginByDeclName[pluginName]; ok {
-		return info.RulePrefix
-	}
-	return pluginName
-}
-
 // parseArrayRuleConfig parses array-style rule configuration like ["error", {...options}]
 // Supports ESLint-compatible formats:
 // - ["off"] -> disabled rule
@@ -714,83 +626,6 @@ func invalidRuleSeverity(value any) error {
 		value,
 		value,
 	)
-}
-
-var registerOnce sync.Once
-
-func RegisterAllRules() {
-	registerOnce.Do(func() {
-		registerAllTypeScriptEslintPluginRules()
-		registerAllImportPluginRules()
-		registerAllReactPluginRules()
-		registerAllReactHooksPluginRules()
-		registerAllJestPluginRules()
-		registerAllRstestPluginRules()
-		registerAllJsxA11yPluginRules()
-		registerAllPromisePluginRules()
-		registerAllUnicornPluginRules()
-		registerAllCoreEslintRules()
-	})
-}
-
-func registerAllReactPluginRules() {
-	for _, rule := range reactPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllReactHooksPluginRules() {
-	for _, rule := range reactHooksPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllJestPluginRules() {
-	for _, rule := range jestPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllRstestPluginRules() {
-	for _, rule := range rstestPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllJsxA11yPluginRules() {
-	for _, rule := range jsxA11yPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllPromisePluginRules() {
-	for _, rule := range promisePlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllUnicornPluginRules() {
-	for _, rule := range unicornPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllTypeScriptEslintPluginRules() {
-	for _, rule := range typescriptPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllImportPluginRules() {
-	for _, rule := range importPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllCoreEslintRules() {
-	for _, rule := range coreRules.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
 }
 
 // normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
@@ -1231,11 +1066,6 @@ func RulePluginPrefix(ruleName string) string {
 		return ""
 	}
 	return ruleName[:lastSlash]
-}
-
-// GetCoreRules returns core ESLint rules (those without a "/" prefix in their registered name).
-func GetCoreRules() []rule.Rule {
-	return coreRules.GetAllRules()
 }
 
 // InitDefaultConfig, createDefaultConfig, migrateJSONConfig and related helpers

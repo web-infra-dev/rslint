@@ -8,8 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_FiltersByEnabledState(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -21,7 +20,7 @@ func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
 		},
 	}
 
-	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", false)
+	rules, mergedConfig := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", false)
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
 		return
@@ -58,7 +57,7 @@ func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_IgnoredFileReturnsNil(t *testing.T) {
+func TestResolveEnabledRules_IgnoredFileReturnsNil(t *testing.T) {
 	config := RslintConfig{
 		{
 			Ignores: []string{"dist/**"},
@@ -68,7 +67,7 @@ func TestGetEnabledRules_IgnoredFileReturnsNil(t *testing.T) {
 		},
 	}
 
-	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "dist/bundle.js", "", false)
+	rules, mergedConfig := ResolveEnabledRules(nativeRuleCatalog(), config, "dist/bundle.js", "", false)
 	if rules != nil {
 		t.Error("Expected nil rules for ignored file")
 	}
@@ -79,8 +78,7 @@ func TestGetEnabledRules_IgnoredFileReturnsNil(t *testing.T) {
 
 // ======== Plugin enforcement tests (enforcePlugins=true, JS/TS config) ========
 
-func TestGetEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T) {
 
 	// JS config: rules declared but plugin NOT declared
 	config := RslintConfig{
@@ -92,7 +90,7 @@ func TestGetEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T) {
 		},
 	}
 
-	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, mergedConfig := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
 		return
@@ -114,8 +112,7 @@ func TestGetEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
 
 	// JS config: rules declared AND plugin declared
 	config := RslintConfig{
@@ -128,7 +125,7 @@ func TestGetEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
 		},
 	}
 
-	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, mergedConfig := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
 		return
@@ -148,8 +145,7 @@ func TestGetEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
 
 	// Plugin declared with eslint-plugin- prefix
 	config := RslintConfig{
@@ -161,7 +157,7 @@ func TestGetEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -174,8 +170,7 @@ func TestGetEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_EnforcePlugins_MultiplePlugins(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_MultiplePlugins(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -187,7 +182,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePlugins(t *testing.T) {
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.tsx", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.tsx", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -205,8 +200,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePlugins(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_NoEnforcePlugins_AllowsAll(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_NoEnforcePlugins_AllowsAll(t *testing.T) {
 
 	// JSON config behavior: enforcePlugins=false, no plugin gating
 	config := RslintConfig{
@@ -218,7 +212,7 @@ func TestGetEnabledRules_NoEnforcePlugins_AllowsAll(t *testing.T) {
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", false)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", false)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -234,8 +228,7 @@ func TestGetEnabledRules_NoEnforcePlugins_AllowsAll(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_EnforcePlugins_PluginFromDifferentEntry(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_PluginFromDifferentEntry(t *testing.T) {
 
 	// Plugin declared in one entry, rule in another — both match the same file
 	config := RslintConfig{
@@ -249,7 +242,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginFromDifferentEntry(t *testing.T) {
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -262,8 +255,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginFromDifferentEntry(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_EnforcePlugins_PluginEntryDoesNotMatchFile(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_PluginEntryDoesNotMatchFile(t *testing.T) {
 
 	// Plugin declared in entry that doesn't match the file
 	config := RslintConfig{
@@ -279,7 +271,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginEntryDoesNotMatchFile(t *testing.T
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -294,8 +286,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginEntryDoesNotMatchFile(t *testing.T
 }
 
 // Case 2: Preset-like spread + local override
-func TestGetEnabledRules_EnforcePlugins_PresetPlusOverride(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_PresetPlusOverride(t *testing.T) {
 
 	// Simulates: [...ts.configs.recommended, { rules: { override } }]
 	// Entry1 = preset (has plugins + rules), Entry2 = user override (no plugins)
@@ -316,7 +307,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusOverride(t *testing.T) {
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -335,8 +326,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusOverride(t *testing.T) {
 }
 
 // Multiple plugins declared in the same entry array
-func TestGetEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -349,7 +339,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T)
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.tsx", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.tsx", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -369,8 +359,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T)
 }
 
 // Case 4: Plugins declared in a LATER entry (reversed order from Case 3)
-func TestGetEnabledRules_EnforcePlugins_PluginInLaterEntry(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_PluginInLaterEntry(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -385,7 +374,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginInLaterEntry(t *testing.T) {
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -399,8 +388,7 @@ func TestGetEnabledRules_EnforcePlugins_PluginInLaterEntry(t *testing.T) {
 }
 
 // Case 7 complete: Multiple plugins from different entries, both declared
-func TestGetEnabledRules_EnforcePlugins_MultiplePluginsBothDeclared(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_MultiplePluginsBothDeclared(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -419,7 +407,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsBothDeclared(t *testing.T
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.tsx", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.tsx", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -436,8 +424,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsBothDeclared(t *testing.T
 }
 
 // Case 9: Preset + additional plugin in separate entry
-func TestGetEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T) {
 
 	// Simulates: [...ts.configs.recommended, { plugins: ['react'], rules: { react/... } }]
 	config := RslintConfig{
@@ -458,7 +445,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T)
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.tsx", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.tsx", "", true)
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -479,8 +466,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T)
 }
 
 // Case 10: Entry-level ignores prevent plugins from being merged
-func TestGetEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -493,7 +479,7 @@ func TestGetEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testing.T)
 	}
 
 	// Non-ignored file: entry matches, plugin and rule both apply
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
@@ -503,7 +489,7 @@ func TestGetEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testing.T)
 	}
 
 	// Ignored file: entry is skipped entirely, no config returned (nil)
-	rules2, merged := GlobalRuleRegistry.GetEnabledRules(config, "src/app.test.ts", "", true)
+	rules2, merged := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.test.ts", "", true)
 	if merged != nil {
 		t.Error("Expected nil merged config for ignored file")
 	}
@@ -513,8 +499,7 @@ func TestGetEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testing.T)
 }
 
 // Case 10b: Ignores in one entry, plugin+rule in another → test file still gets plugin from second entry
-func TestGetEnabledRules_EnforcePlugins_IgnoresOnlyAffectsOwnEntry(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_IgnoresOnlyAffectsOwnEntry(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -532,7 +517,7 @@ func TestGetEnabledRules_EnforcePlugins_IgnoresOnlyAffectsOwnEntry(t *testing.T)
 	}
 
 	// test.ts: entry1 ignores it (plugin not merged from entry1), entry2 matches (no plugin)
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.test.ts", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.test.ts", "", true)
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
@@ -548,8 +533,7 @@ func TestGetEnabledRules_EnforcePlugins_IgnoresOnlyAffectsOwnEntry(t *testing.T)
 	}
 }
 
-func TestGetEnabledRules_EnforcePlugins_OffRuleNotBlocked(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRules_EnforcePlugins_OffRuleNotBlocked(t *testing.T) {
 
 	// A rule set to "off" with no plugin declared should not appear in enabled rules
 	// (it shouldn't appear regardless — this tests there's no false positive)
@@ -561,7 +545,7 @@ func TestGetEnabledRules_EnforcePlugins_OffRuleNotBlocked(t *testing.T) {
 		},
 	}
 
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(nativeRuleCatalog(), config, "src/app.ts", "", true)
 
 	for _, r := range rules {
 		if r.Name == "@typescript-eslint/no-explicit-any" {
@@ -570,8 +554,7 @@ func TestGetEnabledRules_EnforcePlugins_OffRuleNotBlocked(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRulesLeavesTypeEligibilityToLinter(t *testing.T) {
-	RegisterAllRules()
+func TestResolveEnabledRulesLeavesTypeEligibilityToLinter(t *testing.T) {
 
 	cfg := RslintConfig{
 		{
@@ -582,7 +565,7 @@ func TestGetEnabledRulesLeavesTypeEligibilityToLinter(t *testing.T) {
 		},
 	}
 
-	enabled, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "src/uncovered.ts", "", false)
+	enabled, _ := ResolveEnabledRules(nativeRuleCatalog(), cfg, "src/uncovered.ts", "", false)
 	if len(enabled) != 2 {
 		t.Fatalf("Expected config resolution to return 2 rules, got %d: %v", len(enabled), ruleNames(enabled))
 	}
@@ -600,8 +583,7 @@ func TestGetEnabledRulesLeavesTypeEligibilityToLinter(t *testing.T) {
 	}
 }
 
-func TestFileConfigResolver_MatchesRegistry(t *testing.T) {
-	RegisterAllRules()
+func TestFileConfigResolver_MatchesDirectResolution(t *testing.T) {
 
 	cfg := RslintConfig{
 		{
@@ -618,30 +600,30 @@ func TestFileConfigResolver_MatchesRegistry(t *testing.T) {
 			},
 		},
 	}
-	resolver := NewFileConfigResolver(cfg, "/repo", false)
+	resolver := NewFileConfigResolver(cfg, "/repo", nativeRuleCatalog(), false)
 
 	filePath := "/repo/src/app.ts"
 	cachedRules, cachedMerged := resolver.EnabledRulesForFile(filePath)
-	registryRules, registryMerged := GlobalRuleRegistry.GetEnabledRules(cfg, filePath, "/repo", false)
-	if cachedMerged == nil || registryMerged == nil {
-		t.Fatalf("expected both resolver and registry to return merged config")
+	directRules, directMerged := ResolveEnabledRules(nativeRuleCatalog(), cfg, filePath, "/repo", false)
+	if cachedMerged == nil || directMerged == nil {
+		t.Fatalf("expected both resolution paths to return merged config")
 	}
-	if got, want := ruleNameSet(cachedRules), ruleNameSet(registryRules); len(got) != len(want) {
-		t.Fatalf("resolver rules differ from registry rules: got %v want %v", ruleNames(cachedRules), ruleNames(registryRules))
+	if got, want := ruleNameSet(cachedRules), ruleNameSet(directRules); len(got) != len(want) {
+		t.Fatalf("cached rules differ from direct rules: got %v want %v", ruleNames(cachedRules), ruleNames(directRules))
 	} else {
 		for name := range want {
 			if !got[name] {
-				t.Fatalf("resolver rules differ from registry rules: got %v want %v", ruleNames(cachedRules), ruleNames(registryRules))
+				t.Fatalf("cached rules differ from direct rules: got %v want %v", ruleNames(cachedRules), ruleNames(directRules))
 			}
 		}
 	}
-	for _, rules := range [][]rule.ConfiguredRule{cachedRules, registryRules} {
+	for _, rules := range [][]rule.ConfiguredRule{cachedRules, directRules} {
 		for _, rule := range rules {
 			if rule.Environment.Globals["readonlyGlobal"] != utils.GlobalAccessReadonly {
-				t.Fatalf("expected resolver/registry rule %q to carry declared global", rule.Name)
+				t.Fatalf("expected resolved rule %q to carry declared global", rule.Name)
 			}
 			if rule.Environment.Globals["disabledGlobal"] != utils.GlobalAccessOff {
-				t.Fatalf("expected resolver/registry rule %q to carry disabled global as off", rule.Name)
+				t.Fatalf("expected resolved rule %q to carry disabled global as off", rule.Name)
 			}
 		}
 	}
@@ -656,7 +638,6 @@ func TestFileConfigResolver_MatchesRegistry(t *testing.T) {
 }
 
 func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
-	RegisterAllRules()
 
 	cfg := RslintConfig{
 		{
@@ -667,7 +648,7 @@ func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
 			},
 		},
 	}
-	resolver := NewFileConfigResolver(cfg, "/repo", false)
+	resolver := NewFileConfigResolver(cfg, "/repo", nativeRuleCatalog(), false)
 	paths := []string{
 		"/repo/src/a.ts",
 		"/repo/src/b.ts",

@@ -11,6 +11,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -18,13 +19,19 @@ import (
 type ConfigLoader struct {
 	fs               vfs.FS
 	currentDirectory string
+	ruleCatalog      *rule.Catalog
 }
 
-// NewConfigLoader creates a new configuration loader
-func NewConfigLoader(fs vfs.FS, currentDirectory string) *ConfigLoader {
+// NewConfigLoader creates a configuration loader whose JSON normalization
+// reads available rules only from ruleCatalog.
+func NewConfigLoader(fs vfs.FS, currentDirectory string, ruleCatalog *rule.Catalog) *ConfigLoader {
+	if ruleCatalog == nil {
+		panic("rule catalog is required")
+	}
 	return &ConfigLoader{
 		fs:               fs,
 		currentDirectory: currentDirectory,
+		ruleCatalog:      ruleCatalog,
 	}
 }
 
@@ -60,7 +67,7 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 
 	// Normalize JSON config: inject core rules and plugin rules into each entry's Rules map.
 	// User-specified rules take precedence (they are applied after the defaults).
-	config = normalizeJSONConfig(config)
+	config = normalizeJSONConfig(config, loader.ruleCatalog)
 
 	// Update current directory to the config file's directory
 	configDirectory := tspath.GetDirectoryPath(configFileName)
@@ -71,7 +78,12 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 // This ensures JSON config and JS config are processed identically in GetConfigForFile.
 // User-specified rules always take precedence over auto-enabled defaults.
 // NOTE: This function mutates the input slice in-place (modifies entry Rules maps directly).
-func normalizeJSONConfig(config RslintConfig) RslintConfig {
+func normalizeJSONConfig(config RslintConfig, catalog *rule.Catalog) RslintConfig {
+	if catalog == nil {
+		panic("rule catalog is required")
+	}
+	coreRuleNames := catalog.RuleNamesForNamespace("")
+	pluginRuleNames := make(map[string][]string)
 	for i := range config {
 		entry := &config[i]
 
@@ -85,21 +97,26 @@ func normalizeJSONConfig(config RslintConfig) RslintConfig {
 		}
 
 		// Auto-enable core rules as defaults
-		for _, r := range GetCoreRules() {
-			if _, exists := entry.Rules[r.Name]; !exists {
-				entry.Rules[r.Name] = "error"
+		for _, ruleName := range coreRuleNames {
+			if _, exists := entry.Rules[ruleName]; !exists {
+				entry.Rules[ruleName] = "error"
 			}
 		}
 
 		// Auto-enable plugin rules as defaults
-		for _, plugin := range entry.Plugins {
-			info, ok := pluginByDeclName[plugin]
+		for _, declarationName := range entry.Plugins {
+			plugin, ok := nativePluginByDeclarationName[declarationName]
 			if !ok {
 				continue
 			}
-			for _, r := range info.getAllRules() {
-				if _, exists := entry.Rules[r.Name]; !exists {
-					entry.Rules[r.Name] = "error"
+			ruleNames, loaded := pluginRuleNames[plugin.rulePrefix]
+			if !loaded {
+				ruleNames = catalog.RuleNamesForNamespace(plugin.rulePrefix)
+				pluginRuleNames[plugin.rulePrefix] = ruleNames
+			}
+			for _, ruleName := range ruleNames {
+				if _, exists := entry.Rules[ruleName]; !exists {
+					entry.Rules[ruleName] = "error"
 				}
 			}
 		}
@@ -174,7 +191,7 @@ func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]s
 	if fs == nil {
 		return nil, nil
 	}
-	loader := NewConfigLoader(fs, cwd)
+	loader := &ConfigLoader{fs: fs, currentDirectory: cwd}
 	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, cwd)
 	if err != nil {
 		return nil, err
