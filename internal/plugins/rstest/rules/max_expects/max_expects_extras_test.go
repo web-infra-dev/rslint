@@ -315,7 +315,9 @@ function callback() {
 			{Code: `const expect = () => ({ toBe() {} }); test('case', () => { expect(1).toBe(1); });`, Options: max1Option},
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- Locks in upstream create() arm: detached helper restores outer count ----
+			// ---- Deliberate divergence: a detached helper gets its own count
+			// and restores the enclosing one, where upstream resets the count to
+			// zero on both entry and exit and loses the enclosing tally ----
 			{
 				Code: `test('restores outer count after detached helper', () => {
   expect(1).toBe(1);

@@ -183,6 +183,29 @@ func containsFallbackFunction(node *ast.Node) bool {
 	return found
 }
 
+// fallbackCandidateRoot is the argument subtree a callback may be found in. An
+// object literal is never one: it is the options argument of an overload, and
+// a function inside it is a property, not the registered callback.
+func fallbackCandidateRoot(node *ast.Node) *ast.Node {
+	node = internalUtils.SkipAssertionsAndParens(node)
+	if node == nil || isObjectLiteralLike(node) {
+		return nil
+	}
+	return node
+}
+
+// hookFallbackCandidateRoots answers the same question for a lifecycle hook,
+// whose callback is the first argument rather than the second.
+func hookFallbackCandidateRoots(call *ast.CallExpression) []*ast.Node {
+	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+		return nil
+	}
+	if root := fallbackCandidateRoot(call.Arguments.Nodes[0]); root != nil {
+		return []*ast.Node{root}
+	}
+	return nil
+}
+
 func registrationFallbackCandidateRoots(call *ast.CallExpression) []*ast.Node {
 	if call == nil || call.Arguments == nil {
 		return nil
@@ -193,13 +216,7 @@ func registrationFallbackCandidateRoots(call *ast.CallExpression) []*ast.Node {
 		return nil
 	}
 
-	candidateRoot := func(node *ast.Node) *ast.Node {
-		node = internalUtils.SkipAssertionsAndParens(node)
-		if node == nil || isObjectLiteralLike(node) {
-			return nil
-		}
-		return node
-	}
+	candidateRoot := fallbackCandidateRoot
 
 	if len(args) == 2 {
 		if root := candidateRoot(args[1]); root != nil {
@@ -266,7 +283,14 @@ var MaxExpectsRule = rule.Rule{
 
 		enterFunction := func(node *ast.Node) {
 			kind := functionPushForNode(node, callbacks)
-			if kind == functionPushNone &&
+			// A callback the parser could not resolve is recognised by position:
+			// any function inside the registration's callback argument activates
+			// the registration frame. That has to be checked on the detached
+			// branch as well, because only a function whose immediate parent is
+			// the wrapping call reaches functionPushNone — nesting it in a `new`,
+			// an array, an object property, or a conditional makes it detached,
+			// and pushing an inactive frame there would leave the body uncounted.
+			if (kind == functionPushNone || kind == functionPushDetached) &&
 				node != nil &&
 				node.Body() != nil &&
 				canActivateRegistrationFallback(stack.top(), node) {
@@ -321,6 +345,21 @@ var MaxExpectsRule = rule.Rule{
 						false,
 						node,
 						registrationFallbackCandidateRoots(node.AsCallExpression()),
+					)
+					pushedRegistrations[node] = true
+					return
+				}
+
+				// A hook body is test code and gets its own tally, the same as a
+				// test body. Hooks have no resolved callback set, so the frame is
+				// activated positionally, through the same candidate roots.
+				if parsed := analysis.ParseFnCall(node); parsed != nil &&
+					parsed.Kind == rstestUtils.RstestFnTypeHook {
+					stack.push(
+						frameRegistrationFallback,
+						false,
+						node,
+						hookFallbackCandidateRoots(node.AsCallExpression()),
 					)
 					pushedRegistrations[node] = true
 					return

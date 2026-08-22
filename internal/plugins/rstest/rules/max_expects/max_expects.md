@@ -56,8 +56,24 @@ test("case", () => {
 - Chai property and chained assertions still count once per assertion factory:
   `expect(value).to.be.ok` and
   `expect(value).to.be.a("string").and.not.be.empty` each count as one.
-- Assertions outside test callbacks are ignored. Detached helpers inside a test
-  get their own count and do not leak into sibling tests.
+- A test body and a lifecycle hook body each carry their own count:
+  `beforeEach`, `beforeAll`, `afterEach`, and `afterAll` are test code and are
+  limited the same way a test is.
+- A callback the rule cannot resolve is still counted when it is written inside
+  the registration's callback argument, wherever in that argument it sits:
+  `test("a", fakeAsync(() => …))`, `test("a", new Wrapper(() => …))`,
+  `test("a", wrap({ cb: () => … }))`, and `test("a", cond ? () => … : null)`
+  all count. A function held in an options object — the `{ retry: 2 }` argument
+  of the `(name, options, callback)` overload — is not a callback and is not
+  counted.
+- A callback written outside the registration and reached through a member
+  expression is not counted: in `const suite = { run: () => … };
+  test("a", suite.run)`, and likewise for a class property, nothing at the
+  registration ties the function to it.
+- Assertions at the top level of a file, or directly in a `describe` body, are
+  ignored: they do not belong to a test body.
+- A detached helper inside a test gets its own count and does not leak into
+  sibling tests.
 
 ## Options
 

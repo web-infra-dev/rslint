@@ -197,5 +197,35 @@ test('callback behind as expression', (() => {
         },
       ],
     },
+    {
+      code: `beforeEach(() => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+});`,
+      options: [{ max: 1 }],
+      errors: [
+        {
+          messageId: 'exceededMaxAssertion',
+          message: 'Too many assertion calls (2) - maximum allowed is 1',
+          line: 3,
+          column: 3,
+        },
+      ],
+    },
+    {
+      code: `test('callback nested inside the wrapping argument', wrap({ cb: () => {
+  expect(1).toBe(1);
+  expect(2).toBe(2);
+} }));`,
+      options: [{ max: 1 }],
+      errors: [
+        {
+          messageId: 'exceededMaxAssertion',
+          message: 'Too many assertion calls (2) - maximum allowed is 1',
+          line: 3,
+          column: 3,
+        },
+      ],
+    },
   ],
 });
