@@ -72,6 +72,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_implicit_coercion"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_inline_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
 	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
@@ -248,6 +249,7 @@ func GetAllRules() []rule.Rule {
 		no_implicit_coercion.NoImplicitCoercionRule,
 		no_implied_eval.NoImpliedEvalRule,
 		no_import_assign.NoImportAssignRule,
+		no_inline_comments.NoInlineCommentsRule,
 		no_inner_declarations.NoInnerDeclarationsRule,
 		no_irregular_whitespace.NoIrregularWhitespaceRule,
 		no_lone_blocks.NoLoneBlocksRule,
