@@ -171,6 +171,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_await"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
+	"github.com/web-infra-dev/rslint/internal/rules/sort_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
 	"github.com/web-infra-dev/rslint/internal/rules/symbol_description"
 	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
@@ -354,5 +355,6 @@ func GetAllRules() []rule.Rule {
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
 		unicode_bom.UnicodeBomRule,
 		operator_assignment.OperatorAssignmentRule,
+		sort_keys.SortKeysRule,
 	}
 }
