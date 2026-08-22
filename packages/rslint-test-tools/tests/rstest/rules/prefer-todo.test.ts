@@ -15,7 +15,6 @@ ruleTester.run('prefer-todo', {} as never, {
     { code: 'test("foo", 1)' },
     { code: 'test("stub", () => expect(1).toBe(1));' },
     { code: 'test.concurrent("stub", () => expect(1).toBe(1));' },
-    { code: 'test.skip.skip("stub", () => {});' },
     {
       code: [
         'const core = require("@rstest/core");',
@@ -25,6 +24,23 @@ ruleTester.run('prefer-todo', {} as never, {
     },
   ],
   invalid: [
+    {
+      // Reported without a fix: rewriting either accessor leaves the other
+      // skip active, so no one-accessor rewrite delivers a todo.
+      code: 'test.skip.skip("stub", () => {});',
+      errors: [{ messageId: 'emptyTest' }],
+    },
+    {
+      code: [
+        'const { test } = import.meta.rstest;',
+        'test("i need to write this test");',
+      ].join('\n'),
+      output: [
+        'const { test } = import.meta.rstest;',
+        'test.todo("i need to write this test");',
+      ].join('\n'),
+      errors: [{ messageId: 'unimplementedTest' }],
+    },
     {
       code: `test("i need to write this test");`,
       output: 'test.todo("i need to write this test");',

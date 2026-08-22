@@ -43,7 +43,6 @@ func TestPreferTodoExtras(t *testing.T) {
 			{Code: `test.for([1])("case");`},
 			{Code: `test.extend(fixtures)("case");`},
 			// ---- Same-file alias fail-closed rows from the spec.
-			{Code: `const skipped = test.skip; skipped("case", () => {});`},
 			{Code: `const failing = test.fails; failing("case");`},
 			{Code: `const eachCase = test.each([1]); eachCase("case");`},
 			{Code: `const todoCase = test.todo; todoCase("case");`},
@@ -51,10 +50,6 @@ func TestPreferTodoExtras(t *testing.T) {
 			{Code: `const focused = test.only; focused.skip("case", () => {});`},
 			{Code: `const failing = test.fails; failing.skip("case", () => {});`},
 			{Code: `const ext = test.extend(fixtures); ext.skip("case", () => {});`},
-			// Repeated skip modifiers cannot be reduced to todo with one safe
-			// accessor replacement: rewriting either skip leaves the other active.
-			{Code: `test.skip.skip("case", () => {});`},
-			{Code: `test["skip"].skip("case", () => {});`},
 			// ---- API sources and reverse sources.
 			{Code: `import { test } from "node:test"; test("case");`},
 			{Code: `import { test } from "vitest"; test("case");`},
@@ -69,7 +64,26 @@ func TestPreferTodoExtras(t *testing.T) {
 			{Code: `const core = require("@rstest/core"); core.test = custom; core.test("case");`},
 			{Code: `const playwright = require("@rstest/playwright"); playwright.test("case");`},
 			{Code: `const test = createRunner(); test("case");`},
+			// The computed member is not statically known, so the run mode is
+			// unknown too: it may be `.only` or `.each`, neither of which this rule
+			// reports. Nothing is reported rather than guess at the mode.
 			{Code: `test[skip]("case", () => {});`},
+			// ---- `import.meta` at the root of a longer chain is a different object.
+			{Code: `let api = import.meta.rstest; api = other; api.test("case");`},
+			{Code: `import.meta.env.rstest.test("case");`},
+			{Code: `import.meta.glob("x").rstest.test("case");`},
+			// ---- A destructure has to read the namespace's own `test`/`it`.
+			{Code: `const { runner: { test } } = import.meta.rstest; test("case");`},
+			{Code: `const { test = fallback } = import.meta.rstest; test("case");`},
+			{Code: `const { ...rest } = import.meta.rstest; rest.test("case");`},
+			{Code: `const { skip: test } = import.meta.rstest; test("case");`},
+			{Code: `let { test } = import.meta.rstest; test("case");`},
+			{Code: `const core = require("@rstest/core"); const { test } = core; test("case");`},
+			// Destructuring an ES namespace import binding is not resolved by the
+			// shared parser, so no rstest rule sees this as a registration.
+			{Code: `import * as rstest from "@rstest/core";
+const { test } = rstest;
+test("case");`},
 			// ---- Malformed / graceful degradation.
 			{Code: `test("case", () => {}, () => {});`},
 			{Code: `test("case", {}, () => {}, 1);`},
@@ -77,6 +91,58 @@ func TestPreferTodoExtras(t *testing.T) {
 			{Code: `(test?.skip)("case", () => {});`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- A registration the parser has proved is reported even when no
+			// rewrite delivers a todo. `rstest/no-disabled-tests` already tells the
+			// user these tests have no body; staying silent here would be the only
+			// rule in the plugin that does not.
+			{
+				Code:   `const skipped = test.skip; skipped("case", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 28}},
+			},
+			{
+				Code:   `test.skip.skip("case", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test["skip"].skip("case", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			// ---- source forms: `import.meta.rstest` object destructuring.
+			{
+				Code: `const { test } = import.meta.rstest;
+test("case");`,
+				Output: []string{`const { test } = import.meta.rstest;
+test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unimplementedTest", Line: 2, Column: 1}},
+			},
+			{
+				Code: `const { test } = import.meta.rstest;
+test("case", () => {});`,
+				Output: []string{`const { test } = import.meta.rstest;
+test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 2, Column: 1}},
+			},
+			{
+				Code: `const { it } = import.meta.rstest;
+it("case");`,
+				Output: []string{`const { it } = import.meta.rstest;
+it.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unimplementedTest", Line: 2, Column: 1}},
+			},
+			{
+				Code: `const { test: case_ } = import.meta.rstest;
+case_("case");`,
+				Output: []string{`const { test: case_ } = import.meta.rstest;
+case_.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unimplementedTest", Line: 2, Column: 1}},
+			},
+			{
+				Code: `const { test } = import.meta.rstest;
+test.skip("case", () => {});`,
+				Output: []string{`const { test } = import.meta.rstest;
+test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 2, Column: 1}},
+			},
 			// ---- overload matrix: one-arg missing.
 			{
 				Code:   `test("case");`,

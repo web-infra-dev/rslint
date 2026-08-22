@@ -40,9 +40,14 @@ type callbackClassification struct {
 
 // PreferTodoRule ports eslint-plugin-jest's prefer-todo semantics to Rstest's
 // wider registration surface. Unlike the Jest rule, it must classify Rstest's
-// `(title, fn, timeout)` and `(title, options, fn?)` overloads conservatively
-// and refuse fixes for same-file aliases that hide modifiers such as `.skip` or
-// `.fails` inside the alias initializer.
+// `(title, fn, timeout)` and `(title, options, fn?)` overloads conservatively.
+//
+// Reporting and fixing are two separate decisions. A registration the parser
+// has proved to be a bare Rstest test is reported even when no safe rewrite
+// exists — a same-file alias that hides `.skip`, or a repeated `.skip` chain,
+// both report without a fix. A call site the parser cannot prove is still an
+// Rstest test at run time, such as a whole-module CommonJS namespace whose
+// properties are writable, is not reported at all.
 var PreferTodoRule = rule.Rule{
 	Name:   "rstest/prefer-todo",
 	Schema: rule.EmptyArraySchema,
@@ -101,6 +106,9 @@ var PreferTodoRule = rule.Rule{
 type callSiteClassification struct {
 	bareRoot  bool
 	skipEntry *rstestUtils.ParsedRstestFnMemberEntry
+	// fixable is false for a call site that is reported but has no rewrite
+	// that delivers a todo test.
+	fixable bool
 }
 
 func classifyCallSite(
@@ -113,30 +121,30 @@ func classifyCallSite(
 	}
 
 	if len(parsed.Members) == 0 {
-		if parsed.Skipped {
-			// Same-file aliases such as `const skipped = test.skip; skipped()` have
-			// hidden modifiers and no call-site accessor to rewrite safely.
-			return callSiteClassification{}, false
-		}
 		if isSafeBareCallSiteReference(ctx, call.Expression) {
-			return callSiteClassification{bareRoot: true}, true
+			return callSiteClassification{bareRoot: true, fixable: true}, true
+		}
+		if parsed.Skipped {
+			// `const skipped = test.skip; skipped('case')`. The parser resolved
+			// the alias, so this is a skipped Rstest test with no body, but the
+			// `.skip` lives in the alias initializer and there is no accessor at
+			// the call site to rewrite. Report it without a fix.
+			return callSiteClassification{}, true
 		}
 		return callSiteClassification{}, false
 	}
 
 	var skipEntry *rstestUtils.ParsedRstestFnMemberEntry
+	repeatedSkip := false
 	for i, member := range parsed.Members {
-		switch member {
-		case "skip":
-			if skipEntry != nil {
-				// Rewriting either accessor in `test.skip.skip()` leaves the
-				// other skip active, so a one-accessor fix cannot produce todo.
-				return callSiteClassification{}, false
-			}
-			skipEntry = &parsed.MemberEntries[i]
-		default:
+		if member != "skip" {
 			return callSiteClassification{}, false
 		}
+		if skipEntry != nil {
+			repeatedSkip = true
+			continue
+		}
+		skipEntry = &parsed.MemberEntries[i]
 	}
 	if skipEntry == nil {
 		return callSiteClassification{}, false
@@ -145,7 +153,12 @@ func classifyCallSite(
 	if !isSafeBareCallSiteReference(ctx, receiver) {
 		return callSiteClassification{}, false
 	}
-	return callSiteClassification{skipEntry: skipEntry}, true
+	if repeatedSkip {
+		// Rewriting either accessor in `test.skip.skip()` leaves the other skip
+		// active, so no one-accessor fix produces a todo. Report without one.
+		return callSiteClassification{}, true
+	}
+	return callSiteClassification{skipEntry: skipEntry, fixable: true}, true
 }
 
 func isSafeBareCallSiteReference(ctx rule.RuleContext, node *ast.Node) bool {
@@ -238,9 +251,6 @@ func isSafeRstestNamespaceReceiver(
 		return false
 	}
 	if isRstestNamespaceImportSymbol(symbol) {
-		return true
-	}
-	if isImportMetaRstestAliasSymbol(symbol) {
 		return true
 	}
 
@@ -393,6 +403,9 @@ func isSafeBareAliasDeclaration(
 	visited map[*ast.Symbol]bool,
 	depth int,
 ) bool {
+	if declaration != nil && declaration.Kind == ast.KindBindingElement {
+		return isSafeBareBindingElement(ctx, declaration, visited, depth)
+	}
 	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 		return false
 	}
@@ -416,19 +429,68 @@ func isSafeBareAliasDeclaration(
 	}
 }
 
-func isImportMetaRstestAliasSymbol(symbol *ast.Symbol) bool {
-	if symbol == nil {
+// isSafeBareBindingElement accepts a `test` or `it` pulled straight out of an
+// Rstest namespace by a `const` object destructure, such as
+// `const { test } = import.meta.rstest`. The property being read has to be the
+// bare test API itself, so a rename keeps the original property name as the
+// thing that must be `test` or `it`. A default value, a rest element, an array
+// pattern, or a nested pattern all break that guarantee and are refused.
+func isSafeBareBindingElement(
+	ctx rule.RuleContext,
+	declaration *ast.Node,
+	visited map[*ast.Symbol]bool,
+	depth int,
+) bool {
+	if declaration == nil || declaration.Kind != ast.KindBindingElement || depth > 16 {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
-			continue
-		}
-		if isImportMetaRstest(declaration.AsVariableDeclaration().Initializer) {
-			return true
-		}
+	binding := declaration.AsBindingElement()
+	if binding == nil || binding.DotDotDotToken != nil || binding.Initializer != nil {
+		return false
 	}
-	return false
+	if binding.Name() == nil || binding.Name().Kind != ast.KindIdentifier {
+		return false
+	}
+
+	name := ""
+	if binding.PropertyName != nil {
+		var ok bool
+		name, ok = internalUtils.GetStaticStringLiteralValue(binding.PropertyName)
+		if !ok {
+			if binding.PropertyName.Kind != ast.KindIdentifier {
+				return false
+			}
+			name = binding.PropertyName.AsIdentifier().Text
+		}
+	} else {
+		name = binding.Name().AsIdentifier().Text
+	}
+	if name != "test" && name != "it" {
+		return false
+	}
+
+	// Only a direct property of the namespace qualifies. Walking up through
+	// nested patterns would accept `const { runner: { test } } = ns`, where the
+	// binding names a property of something else entirely.
+	pattern := declaration.Parent
+	if pattern == nil || pattern.Kind != ast.KindObjectBindingPattern {
+		return false
+	}
+	variable := pattern.Parent
+	if variable == nil || variable.Kind != ast.KindVariableDeclaration {
+		return false
+	}
+	if variable.Parent == nil ||
+		variable.Parent.Kind != ast.KindVariableDeclarationList ||
+		variable.Parent.Flags&ast.NodeFlagsConst == 0 {
+		return false
+	}
+
+	initializer := ast.SkipParentheses(variable.AsVariableDeclaration().Initializer)
+	if initializer == nil {
+		return false
+	}
+	return isSafeRstestNamespaceReceiver(ctx, initializer, visited, depth+1)
 }
 
 func isImportMetaRstest(node *ast.Node) bool {
@@ -465,29 +527,20 @@ func isImportMetaRstest(node *ast.Node) bool {
 	default:
 		return false
 	}
-	return name == "rstest" && containsImportMeta(expression)
+	return name == "rstest" && isImportMeta(expression)
 }
 
-func containsImportMeta(node *ast.Node) bool {
+// isImportMeta matches `import.meta` itself. Anything with `import.meta` merely
+// at the root of a longer chain, such as `import.meta.env.rstest` or
+// `import.meta.glob('x').rstest`, names some other object and is not the Rstest
+// namespace.
+func isImportMeta(node *ast.Node) bool {
 	node = ast.SkipParentheses(node)
-	if node == nil {
+	if node == nil || node.Kind != ast.KindMetaProperty {
 		return false
 	}
-	if node.Kind == ast.KindMetaProperty {
-		meta := node.AsMetaProperty()
-		return meta != nil && meta.Name() != nil && meta.Name().Text() == "meta"
-	}
-
-	switch node.Kind {
-	case ast.KindCallExpression:
-		return containsImportMeta(node.AsCallExpression().Expression)
-	case ast.KindPropertyAccessExpression:
-		return containsImportMeta(node.AsPropertyAccessExpression().Expression)
-	case ast.KindElementAccessExpression:
-		return containsImportMeta(node.AsElementAccessExpression().Expression)
-	default:
-		return false
-	}
+	meta := node.AsMetaProperty()
+	return meta != nil && meta.Name() != nil && meta.Name().Text() == "meta"
 }
 
 func classifyCallback(args []*ast.Node) callbackClassification {
@@ -612,7 +665,7 @@ func buildFixes(
 	callSite callSiteClassification,
 	classification callbackClassification,
 ) []rule.RuleFix {
-	if ctx.SourceFile == nil || call == nil {
+	if ctx.SourceFile == nil || call == nil || !callSite.fixable {
 		return nil
 	}
 
