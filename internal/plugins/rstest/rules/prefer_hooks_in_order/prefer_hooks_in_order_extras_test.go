@@ -10,7 +10,7 @@ import (
 
 // TestPreferHooksInOrderExtras locks in branches and edge shapes that the
 // upstream Jest suite does not exercise for Rstest. Each case carries an inline
-// comment for the continuity rule, source shape, or hook-depth branch it
+// comment for the continuity rule, source shape, or hook-frame branch it
 // protects so future refactors cannot silently regress it.
 func TestPreferHooksInOrderExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
@@ -282,7 +282,7 @@ beforeEach(() => {});`,
 					reorderHooksError("beforeEach", "afterEach", 4, 1),
 				},
 			},
-			// ---- Locks in shared depth fix: nested hook callbacks do not end the outer frame ----
+			// ---- Locks in shared frame fix: nested hook callbacks do not end the outer run ----
 			{
 				Code: `afterAll(() => {
   beforeEach(() => {});
@@ -293,7 +293,7 @@ beforeAll(() => {});`,
 					reorderHooksError("beforeAll", "afterAll", 5, 1),
 				},
 			},
-			// ---- Locks in shared depth fix: nested hook itself is ignored, not compared ----
+			// ---- Locks in shared frame fix: a nested run is checked on its own terms ----
 			{
 				Code: `afterAll(() => {
   beforeEach(() => {});

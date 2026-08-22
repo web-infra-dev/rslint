@@ -29,10 +29,16 @@ func buildReorderHooksMessage(currentHook, previousHook string) rule.RuleMessage
 	}
 }
 
-// NOTE: Unlike eslint-plugin-jest's bool-based inHook flag, this shared body
-// tracks hook call depth so nested hook callbacks cannot accidentally clear the
-// outer hook frame on exit. This preserves call-event continuity across hook
-// callback internals instead of ending the outer run early.
+// NOTE: eslint-plugin-jest tracks "am I inside a hook" as a single boolean and
+// ignores every call made while it is set. That conflates two separate scopes:
+// the boolean is cleared as soon as any nested hook call exits, so the run that
+// surrounds the outer hook ends early, and hooks written inside a hook callback
+// are compared against whatever index leaked in from the enclosing run.
+//
+// This body keeps one previousHookIndex per hook frame instead. Entering a hook
+// pushes a fresh frame for its callback, exiting pops it, so a run is only ever
+// compared against hooks declared at its own nesting level: the surrounding run
+// survives nested callbacks, and nested runs are checked on their own terms.
 func NewRule(config Config) rule.Rule {
 	return rule.Rule{
 		Name:   config.Name,
@@ -43,68 +49,55 @@ func NewRule(config Config) rule.Rule {
 				return rule.RuleListeners{}
 			}
 
-			previousHookIndex := -1
-			hookCallDepth := 0
+			// previousHookIndexes[len-1] is the run currently being checked; a
+			// value of -1 means the run has no hook to compare against yet.
+			previousHookIndexes := []int{-1}
+			// Hook calls that pushed a frame on entry, so exit pops exactly the
+			// frames that were pushed even if parsing is not stable across the
+			// two visits.
 			enteredHooks := map[*ast.Node]bool{}
-			parsedCalls := map[*ast.Node]*testFramework.ParsedCall{}
 
 			return rule.RuleListeners{
 				ast.KindCallExpression: func(node *ast.Node) {
+					top := len(previousHookIndexes) - 1
 					parsed := runtime.Parse(node)
-					parsedCalls[node] = parsed
-
-					if hookCallDepth > 0 {
-						if testFramework.IsCallOfKind(parsed, testFramework.FnKindHook) {
-							enteredHooks[node] = true
-							hookCallDepth++
-						}
-						return
-					}
 
 					if !testFramework.IsCallOfKind(parsed, testFramework.FnKindHook) {
-						previousHookIndex = -1
+						// Any other call ends the current run.
+						previousHookIndexes[top] = -1
 						return
 					}
 
 					enteredHooks[node] = true
-					hookCallDepth++
+					previousHookIndexes = append(previousHookIndexes, -1)
 
 					currentHookIndex := testFramework.HookOrderIndex(parsed.Name)
 					if currentHookIndex < 0 {
-						previousHookIndex = -1
+						previousHookIndexes[top] = -1
 						return
 					}
 
-					if currentHookIndex < previousHookIndex {
+					if currentHookIndex < previousHookIndexes[top] {
 						ctx.ReportNode(
 							node,
 							buildReorderHooksMessage(
 								parsed.Name,
-								testFramework.HooksOrder[previousHookIndex],
+								testFramework.HooksOrder[previousHookIndexes[top]],
 							),
 						)
 						return
 					}
 
-					previousHookIndex = currentHookIndex
+					previousHookIndexes[top] = currentHookIndex
 				},
 				rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-					parsed := parsedCalls[node]
-					delete(parsedCalls, node)
-
-					if enteredHooks[node] && testFramework.IsCallOfKind(parsed, testFramework.FnKindHook) {
+					if enteredHooks[node] {
 						delete(enteredHooks, node)
-						if hookCallDepth > 0 {
-							hookCallDepth--
-						}
+						previousHookIndexes = previousHookIndexes[:len(previousHookIndexes)-1]
 						return
 					}
 
-					if hookCallDepth > 0 {
-						return
-					}
-
-					previousHookIndex = -1
+					previousHookIndexes[len(previousHookIndexes)-1] = -1
 				},
 			}
 		},

@@ -19,6 +19,16 @@ ruleTester.run('prefer-hooks-in-order', {} as never, {
         beforeAll(() => {});
       `,
     },
+    {
+      // Hooks inside a hook callback form their own run and are not compared
+      // against the hook that encloses them.
+      code: `
+        afterAll(() => {
+          beforeEach(() => {});
+          afterEach(() => {});
+        });
+      `,
+    },
   ],
   invalid: [
     {
@@ -101,6 +111,25 @@ ruleTester.run('prefer-hooks-in-order', {} as never, {
           data: { currentHook: 'beforeAll', previousHook: 'beforeEach' },
           line: 8,
           column: 3,
+        },
+      ],
+    },
+    {
+      // The surrounding run survives a hook callback, and keeps its own
+      // previous hook for the report.
+      code: `
+        afterEach(() => {
+          beforeEach(() => {});
+          afterAll(() => {});
+        });
+        beforeAll(() => {});
+      `,
+      errors: [
+        {
+          messageId: 'reorderHooks',
+          data: { currentHook: 'beforeAll', previousHook: 'afterEach' },
+          line: 6,
+          column: 1,
         },
       ],
     },
