@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/block_scoped_var"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
+	"github.com/web-infra-dev/rslint/internal/rules/consistent_this"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
@@ -15,8 +16,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
+	"github.com/web-infra-dev/rslint/internal/rules/func_names"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/id_length"
 	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/max_classes_per_file"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
@@ -69,6 +72,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_implicit_coercion"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_inline_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
 	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
@@ -76,8 +80,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_lone_blocks"
+	"github.com/web-infra-dev/rslint/internal/rules/no_lonely_if"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
+	"github.com/web-infra-dev/rslint/internal/rules/no_magic_numbers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_misleading_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
@@ -91,6 +97,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_nonoctal_decimal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
+	"github.com/web-infra-dev/rslint/internal/rules/no_object_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_param_reassign"
@@ -120,6 +127,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undefined"
+	"github.com/web-infra-dev/rslint/internal/rules/no_underscore_dangle"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
@@ -181,14 +189,17 @@ func GetAllRules() []rule.Rule {
 		block_scoped_var.BlockScopedVarRule,
 		complexity.ComplexityRule,
 		consistent_return.ConsistentReturnRule,
+		consistent_this.ConsistentThisRule,
 		constructor_super.ConstructorSuperRule,
 		curly.CurlyRule,
 		default_case.DefaultCaseRule,
 		default_case_last.DefaultCaseLastRule,
 		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
+		func_names.FuncNamesRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
+		id_length.IdLengthRule,
 		init_declarations.InitDeclarationsRule,
 		max_classes_per_file.MaxClassesPerFileRule,
 		max_depth.MaxDepthRule,
@@ -239,16 +250,20 @@ func GetAllRules() []rule.Rule {
 		no_implicit_coercion.NoImplicitCoercionRule,
 		no_implied_eval.NoImpliedEvalRule,
 		no_import_assign.NoImportAssignRule,
+		no_inline_comments.NoInlineCommentsRule,
 		no_inner_declarations.NoInnerDeclarationsRule,
 		no_irregular_whitespace.NoIrregularWhitespaceRule,
 		no_lone_blocks.NoLoneBlocksRule,
+		no_lonely_if.NoLonelyIfRule,
 		no_loop_func.NoLoopFuncRule,
 		no_loss_of_precision.NoLossOfPrecisionRule,
+		no_magic_numbers.NoMagicNumbersRule,
 		no_misleading_character_class.NoMisleadingCharacterClassRule,
 		no_new.NoNewRule,
 		no_new_func.NoNewFuncRule,
 		no_new_native_nonconstructor.NoNewNativeNonconstructorRule,
 		no_new_wrappers.NoNewWrappersRule,
+		no_object_constructor.NoObjectConstructorRule,
 		no_restricted_globals.NoRestrictedGlobalsRule,
 		no_restricted_imports.NoRestrictedImportsRule,
 		no_restricted_syntax.NoRestrictedSyntaxRule,
@@ -284,6 +299,7 @@ func GetAllRules() []rule.Rule {
 		no_undef.NoUndefRule,
 		no_undef_init.NoUndefInitRule,
 		no_undefined.NoUndefinedRule,
+		no_underscore_dangle.NoUnderscoreDangleRule,
 		no_unassigned_vars.NoUnassignedVarsRule,
 		prefer_const.PreferConstRule,
 		prefer_destructuring.PreferDestructuringRule,

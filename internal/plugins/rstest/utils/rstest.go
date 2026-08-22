@@ -22,9 +22,21 @@ const (
 	RstestParameterizedFor  RstestParameterizedKind = "for"
 )
 
+// RstestExecutionMode records the mode explicitly applied to a registration.
+// Default registrations inherit from an enclosing describe callback; explicit
+// concurrent or sequential registrations override that inherited mode.
+type RstestExecutionMode uint8
+
+const (
+	RstestExecutionDefault RstestExecutionMode = iota
+	RstestExecutionConcurrent
+	RstestExecutionSequential
+)
+
 type ParsedRstestFnCall struct {
 	testFramework.ParsedCall
 	ParameterizedKind RstestParameterizedKind
+	ExecutionMode     RstestExecutionMode
 	// Skipped and Todo report whether the call carries `.skip` / `.todo`.
 	// Like ParameterizedKind these are semantic conclusions that survive alias
 	// resolution, so prefer them over scanning Members, which is call-site only.

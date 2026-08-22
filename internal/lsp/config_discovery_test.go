@@ -445,9 +445,21 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte("module.exports = [];\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	targetPath := filepath.Join(root, "src", "index.ts")
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(targetPath, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	relativeTarget, err := filepath.Rel(externalRoot, targetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	initial := startExplicitConfigRefreshForTest(s, "initial", configPath)
 	loadRequest := completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{
+		Files: []string{filepath.ToSlash(relativeTarget)},
 		Rules: config.Rules{"no-debugger": "error"},
 	}})
 	if completed := awaitConfigRefreshResult(t, initial); completed.err != nil {
@@ -456,8 +468,9 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if len(loadRequest.Candidates) != 1 || loadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
 		t.Fatalf("explicit candidates = %+v, want only %q", loadRequest.Candidates, configPath)
 	}
-	if loadRequest.Candidates[0].ConfigDirectory != root {
-		t.Fatalf("explicit configDirectory = %q, want cwd %q", loadRequest.Candidates[0].ConfigDirectory, root)
+	configDir := tspath.NormalizePath(externalRoot)
+	if loadRequest.Candidates[0].ConfigDirectory != configDir {
+		t.Fatalf("explicit configDirectory = %q, want config directory %q", loadRequest.Candidates[0].ConfigDirectory, configDir)
 	}
 	if !s.configRefreshInitialized || s.configRefreshConfigPath != tspath.NormalizePath(configPath) {
 		t.Fatalf("fixed config path = %q, initialized=%t", s.configRefreshConfigPath, s.configRefreshInitialized)
@@ -465,8 +478,13 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if s.rslintConfigPath != "" || len(s.jsonConfig) != 0 {
 		t.Fatalf("explicit config retained JSON fallback: path=%q config=%+v", s.rslintConfigPath, s.jsonConfig)
 	}
-	if value, found := configRuleValue(s.jsConfigs[root], "no-debugger"); !found || value != "error" {
-		t.Fatalf("explicit config was not committed at cwd: %+v", s.jsConfigs)
+	if value, found := configRuleValue(s.jsConfigs[configDir], "no-debugger"); !found || value != "error" {
+		t.Fatalf("explicit config was not committed at its directory: %+v", s.jsConfigs)
+	}
+	entries, resolvedDirectory, isJSConfig := s.getConfigForURI(documentURIFromPath(targetPath))
+	if !isJSConfig || resolvedDirectory != configDir ||
+		config.NewFileConfigResolverWithFS(entries, resolvedDirectory, s.fs, false).ConfigForFile(targetPath) == nil {
+		t.Fatalf("explicit external config did not govern workspace target from its authored base")
 	}
 
 	reload := startExplicitConfigRefreshForTest(s, "config-change", configPath)
@@ -527,7 +545,7 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 
 func TestHandleConfigRefreshKeepsExplicitPathAfterInitialLoadFailure(t *testing.T) {
 	config.RegisterAllRules()
-	s, outgoing, root := newConfigRefreshTestServer(t)
+	s, outgoing, _ := newConfigRefreshTestServer(t)
 	configPath := filepath.Join(t.TempDir(), "generated-rstack-config.mjs")
 	if err := os.WriteFile(configPath, []byte("export default [];\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -552,7 +570,8 @@ func TestHandleConfigRefreshKeepsExplicitPathAfterInitialLoadFailure(t *testing.
 	if s.configRefreshConfigPath != tspath.NormalizePath(configPath) || !s.configRefreshInitialized {
 		t.Fatalf("failed initial load lost fixed path: path=%q initialized=%t", s.configRefreshConfigPath, s.configRefreshInitialized)
 	}
-	if _, unavailable := s.jsUnavailableConfigs[root]; !unavailable || s.configDiscoveryHasLastGood {
+	configDir := tspath.NormalizePath(filepath.Dir(configPath))
+	if _, unavailable := s.jsUnavailableConfigs[configDir]; !unavailable || s.configDiscoveryHasLastGood {
 		t.Fatalf("explicit failure state: unavailable=%t lastGood=%t", unavailable, s.configDiscoveryHasLastGood)
 	}
 	if _, err := s.handleConfigRefresh(context.Background(), configRefreshRequest{

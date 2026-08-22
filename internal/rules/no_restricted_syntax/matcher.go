@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -850,7 +851,7 @@ func rightRelationalPrimitive(value attrValue) (text string, isString bool, numb
 }
 
 func jsStringToNumber(value string) (float64, bool) {
-	value = strings.TrimSpace(value)
+	value = ecmascript.StringTrim(value)
 	if value == "" {
 		return 0, true
 	}

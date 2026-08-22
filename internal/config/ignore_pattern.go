@@ -13,24 +13,19 @@ import (
 // paths plus an optional canonical fallback; matcher internals stay private so
 // both discovery flows cannot accidentally diverge on ignore semantics.
 type GlobalIgnoreMatcher struct {
-	configDir string
-	fs        vfs.FS
-	patterns  []IgnorePattern
+	resolver *configTargetResolver
 }
 
 func NewGlobalIgnoreMatcher(config RslintConfig, configDir string, fsys vfs.FS) GlobalIgnoreMatcher {
 	return GlobalIgnoreMatcher{
-		configDir: tspath.NormalizePath(configDir),
-		fs:        fsys,
-		patterns:  extractConfigIgnores(config),
+		resolver: newConfigTargetResolver(config, configDir, fsys),
 	}
 }
 
 // BlocksDirectory reports whether global ignores form an absolute traversal
 // boundary at directory.
 func (matcher GlobalIgnoreMatcher) BlocksDirectory(directory string, canonicalDirectory string) bool {
-	relative, ok := matcher.relativePath(directory, canonicalDirectory)
-	return ok && len(matcher.patterns) > 0 && isDirAbsolutelyBlocked(relative, matcher.patterns)
+	return matcher.resolver != nil && matcher.resolver.blocksDirectory(directory, canonicalDirectory)
 }
 
 // ReopensDirectoryNode reports whether the ordered authored global-ignore
@@ -42,50 +37,22 @@ func (matcher GlobalIgnoreMatcher) BlocksDirectory(directory string, canonicalDi
 // semantics and are checked by BlocksDirectory before callers consult this
 // method.
 func (matcher GlobalIgnoreMatcher) ReopensDirectoryNode(directory string, canonicalDirectory string) bool {
-	relative, ok := matcher.relativePath(directory, canonicalDirectory)
-	if !ok || len(matcher.patterns) == 0 {
-		return false
-	}
-	relative = strings.TrimSuffix(relative, "/")
-	reopened := false
-	for _, pattern := range matcher.patterns {
-		if ignorePatternMatches(pattern, relative) ||
-			ignorePatternMatches(pattern, relative+"/") {
-			reopened = pattern.Negated
-		}
-	}
-	return reopened
+	return matcher.resolver != nil && matcher.resolver.reopensDirectory(directory, canonicalDirectory)
 }
 
 // IgnoresPath reports whether global ignores exclude a config candidate.
 func (matcher GlobalIgnoreMatcher) IgnoresPath(filePath string, canonicalPath string) bool {
-	relative, ok := matcher.relativePath(filePath, canonicalPath)
-	if !ok || len(matcher.patterns) == 0 {
+	if matcher.resolver == nil {
 		return false
 	}
-	return isDirBlockedByIgnores(relative, matcher.patterns, "") ||
-		isFileIgnored(relative, matcher.patterns, "")
+	target, matches := matcher.resolver.resolvePathSpaces(filePath, canonicalPath, false)
+	return matcher.resolver.globallyIgnores(target, matches)
 }
 
-func (matcher GlobalIgnoreMatcher) relativePath(targetPath string, canonicalPath string) (string, bool) {
-	if matcher.configDir == "" {
-		return "", false
-	}
-	caseSensitive := matcher.fs == nil || matcher.fs.UseCaseSensitiveFileNames()
-	relative, ok := RelativePathWithinConfigRoot(targetPath, matcher.configDir, caseSensitive)
-	if !ok && canonicalPath != "" {
-		matchPath, matchConfigDir := ResolveConfigPathSpaceWithCanonical(
-			targetPath,
-			canonicalPath,
-			matcher.configDir,
-			matcher.fs,
-		)
-		relative, ok = RelativePathWithinConfigRoot(matchPath, matchConfigDir, true)
-	}
-	if !ok || relative == "" {
-		return "", false
-	}
-	return strings.ReplaceAll(tspath.NormalizePath(relative), "\\", "/"), true
+// IgnoresTarget evaluates a frozen file and parent identity without resolving
+// either target path through the filesystem again.
+func (matcher GlobalIgnoreMatcher) IgnoresTarget(target DiscoveredLintTarget) bool {
+	return matcher.resolver != nil && matcher.resolver.resolveTarget(target).globallyIgnored
 }
 
 // dirKind classifies an ignore pattern by how it bears on DIRECTORY decisions.
@@ -128,7 +95,22 @@ type IgnorePattern struct {
 	GitPattern       bool
 	GitDirectoryOnly bool
 	GitContentsOnly  bool
+	// MatchDirectory is the Git root projected into the config owner's match
+	// space. PhysicalMatchDirectory and LexicalMatchDirectory retain the Git
+	// root's own identities. Target matching pairs lexical-to-lexical and
+	// canonical-to-physical first, then uses the projected pair as a compatibility
+	// fallback; it never mixes an arbitrary target identity with an unrelated
+	// root identity.
+	MatchDirectory         string
+	PhysicalMatchDirectory string
+	LexicalMatchDirectory  string
+	// gitScope is the one-based index of the active collection scope that
+	// supplied this Git pattern. Zero is reserved for authored/unscoped ignore
+	// patterns. It is process-local matcher metadata and is never serialized.
+	gitScope uint32
 }
+
+const unmatchedGitScope = ^uint32(0)
 
 // ParseIgnorePattern parses one raw ignore string (user config or a
 // gitignore-converted glob) into the structured form. This is the SINGLE place
@@ -203,8 +185,20 @@ func isFileIgnored(filePath string, patterns []IgnorePattern, cwd string) bool {
 }
 
 func (path *fileMatchPath) isIgnored(patterns []IgnorePattern) bool {
+	return path.applyIgnorePatterns(patterns, false)
+}
+
+// applyIgnorePatterns applies one ordered pattern segment on top of an
+// existing ignore state. This is used when a flat config contains global
+// ignore entries authored from different base directories: each segment gets
+// its own target-relative path, while later matches still override earlier
+// segments exactly as one flat ordered list would.
+func (path *fileMatchPath) applyIgnorePatterns(patterns []IgnorePattern, ignored bool) bool {
 	if len(patterns) == 0 {
-		return false
+		return ignored
+	}
+	if hasPatternMatchDirectory(patterns) {
+		return path.applyIgnorePatternsAcrossMatchDirectories(patterns, ignored)
 	}
 	normalizedPath, unixPath := path.normalizedPaths()
 	if path.cwd != "" && pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
@@ -216,7 +210,222 @@ func (path *fileMatchPath) isIgnored(patterns []IgnorePattern) bool {
 		normalizedPath = normalizePathWithCaseSensitivity(path.original, path.cwd, false)
 		unixPath = strings.ReplaceAll(normalizedPath, "\\", "/")
 	}
-	return isFileIgnoredNormalized(normalizedPath, unixPath, patterns)
+	return applyFileIgnorePatternsNormalized(normalizedPath, unixPath, patterns, ignored)
+}
+
+func hasPatternMatchDirectory(patterns []IgnorePattern) bool {
+	for _, pattern := range patterns {
+		if patternHasMatchDirectory(pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func patternHasMatchDirectory(pattern IgnorePattern) bool {
+	return pattern.MatchDirectory != "" ||
+		pattern.PhysicalMatchDirectory != "" ||
+		pattern.LexicalMatchDirectory != ""
+}
+
+// applyIgnorePatternsAcrossMatchDirectories keeps the ordered flat-config ignore
+// sequence while evaluating each collected Git group in the path space where
+// it was authored. This is the uncommon explicit-config-outside-cwd path; the
+// ordinary single-directory path stays on isFileIgnoredNormalized above.
+func (path *fileMatchPath) applyIgnorePatternsAcrossMatchDirectories(patterns []IgnorePattern, ignored bool) bool {
+	return applyIgnorePatternsAcrossPathGroups(patterns, ignored, path.pathsForPatternGroup)
+}
+
+// applyIgnorePatternsAcrossPathGroups preserves the ordered ignore sequence
+// while letting the caller choose the target coordinate for each pattern
+// group. Config-authored patterns use their entry's projected path; collected
+// Git patterns use the original lint target relative to the Git root that
+// supplied the group.
+func applyIgnorePatternsAcrossPathGroups(
+	patterns []IgnorePattern,
+	ignored bool,
+	pathsForGroup func([]IgnorePattern) (string, string, bool),
+) bool {
+	for index := 0; index < len(patterns); {
+		pattern := patterns[index]
+		if pattern.GitPattern {
+			end := index + 1
+			for end < len(patterns) &&
+				patterns[end].GitPattern &&
+				patterns[end].gitScope == pattern.gitScope &&
+				patterns[end].MatchDirectory == pattern.MatchDirectory &&
+				patterns[end].PhysicalMatchDirectory == pattern.PhysicalMatchDirectory &&
+				patterns[end].LexicalMatchDirectory == pattern.LexicalMatchDirectory {
+				end++
+			}
+			normalizedPath, unixPath, ok := pathsForGroup(patterns[index:end])
+			if ok {
+				ignored = applyIgnorePatternGroup(
+					patterns[index:end],
+					normalizedPath,
+					unixPath,
+					ignored,
+				)
+			}
+			index = end
+			continue
+		}
+
+		normalizedPath, unixPath, ok := pathsForGroup(patterns[index : index+1])
+		if ok {
+			ignored = applyIgnorePatternGroup(
+				patterns[index:index+1],
+				normalizedPath,
+				unixPath,
+				ignored,
+			)
+		}
+		index++
+	}
+	return ignored
+}
+
+// applyIgnorePatternGroup evaluates one pre-grouped segment against a single
+// target coordinate. Collected Git rules share one path-state evaluation;
+// authored rules retain their ordered last-match-wins behavior.
+func applyIgnorePatternGroup(
+	patterns []IgnorePattern,
+	normalizedPath string,
+	unixPath string,
+	ignored bool,
+) bool {
+	if len(patterns) == 0 {
+		return ignored
+	}
+	if patterns[0].GitPattern {
+		gitState := newGitIgnorePathState(unixPath)
+		groupIgnored := gitState.evaluate(patterns)
+		if gitState.matched {
+			return groupIgnored
+		}
+		return ignored
+	}
+	for index := range patterns {
+		pattern := patterns[index]
+		matched := ignorePatternMatches(pattern, normalizedPath)
+		if !matched && unixPath != normalizedPath {
+			matched = ignorePatternMatches(pattern, unixPath)
+		}
+		if matched {
+			ignored = !pattern.Negated
+		}
+	}
+	return ignored
+}
+
+// pathsForGitPatternGroup derives one Git-relative target spelling directly
+// from the immutable lexical/canonical target pair. The caller-visible lexical
+// path wins whenever it is inside a verified identity of the Git root;
+// canonical identity is only a fallback. This prevents projection into a
+// config owner's path space from erasing a symlink component named by
+// .gitignore, while still supporting a Git root itself reached through an
+// alias.
+func pathsForGitPatternGroup(
+	lexicalPath string,
+	canonicalPath string,
+	projectedPath string,
+	patterns []IgnorePattern,
+) (string, string, bool) {
+	pattern := patterns[0]
+	lexicalRoot := pattern.LexicalMatchDirectory
+	if lexicalRoot == "" {
+		lexicalRoot = pattern.MatchDirectory
+	}
+	physicalRoot := pattern.PhysicalMatchDirectory
+	if physicalRoot == "" {
+		physicalRoot = pattern.MatchDirectory
+	}
+	candidates := [3]struct {
+		path string
+		root string
+	}{
+		{path: lexicalPath, root: lexicalRoot},
+		{path: canonicalPath, root: physicalRoot},
+		{path: projectedPath, root: pattern.MatchDirectory},
+	}
+	for index := range candidates {
+		candidate := candidates[index]
+		if candidate.path == "" || candidate.root == "" {
+			continue
+		}
+		duplicate := false
+		for previous := range index {
+			if candidates[previous] == candidate {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
+			continue
+		}
+		matchPath := newFileMatchPath(candidate.path, candidate.root)
+		normalizedPath, unixPath := matchPath.normalizedPaths()
+		if pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
+			normalizedPath = normalizePathWithCaseSensitivity(candidate.path, candidate.root, false)
+			unixPath = strings.ReplaceAll(normalizedPath, "\\", "/")
+		}
+		if !pathEscapesCwd(unixPath) {
+			return normalizedPath, unixPath, true
+		}
+	}
+	return "", "", false
+}
+
+func (path *fileMatchPath) pathsForPatternGroup(patterns []IgnorePattern) (string, string, bool) {
+	if !patternHasMatchDirectory(patterns[0]) {
+		normalizedPath, unixPath := path.normalizedPaths()
+		if path.cwd != "" && pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
+			normalizedPath = normalizePathWithCaseSensitivity(path.original, path.cwd, false)
+			unixPath = strings.ReplaceAll(normalizedPath, "\\", "/")
+		}
+		return normalizedPath, unixPath, true
+	}
+
+	matchDirectories := patternMatchDirectories(patterns[0], path.cwd)
+	for index, directory := range matchDirectories {
+		if directory == "" || repeatedMatchDirectory(matchDirectories, index) {
+			continue
+		}
+		matchPath := newFileMatchPath(path.original, directory)
+		normalizedPath, unixPath := matchPath.normalizedPaths()
+		if pathEscapesCwd(unixPath) && hasCaseInsensitivePattern(patterns) {
+			normalizedPath = normalizePathWithCaseSensitivity(path.original, directory, false)
+			unixPath = strings.ReplaceAll(normalizedPath, "\\", "/")
+		}
+		if !pathEscapesCwd(unixPath) {
+			return normalizedPath, unixPath, true
+		}
+	}
+	// A .gitignore rooted at one invocation directory never governs a target
+	// outside every verified identity of that directory. Authored config patterns retain
+	// the existing ability to select ../ paths because MatchDirectory is empty.
+	return "", "", false
+}
+
+func patternMatchDirectories(pattern IgnorePattern, defaultDirectory string) [3]string {
+	matchDirectory := pattern.MatchDirectory
+	if matchDirectory == "" {
+		matchDirectory = defaultDirectory
+	}
+	return [3]string{
+		matchDirectory,
+		pattern.PhysicalMatchDirectory,
+		pattern.LexicalMatchDirectory,
+	}
+}
+
+func repeatedMatchDirectory(directories [3]string, index int) bool {
+	for previous := range index {
+		if directories[previous] == directories[index] {
+			return true
+		}
+	}
+	return false
 }
 
 func pathEscapesCwd(path string) bool {
@@ -251,7 +460,10 @@ func isFileIgnoredSimple(filePath string, patterns []IgnorePattern) bool {
 }
 
 func isFileIgnoredNormalized(path string, unixPath string, patterns []IgnorePattern) bool {
-	ignored := false
+	return applyFileIgnorePatternsNormalized(path, unixPath, patterns, false)
+}
+
+func applyFileIgnorePatternsNormalized(path string, unixPath string, patterns []IgnorePattern, ignored bool) bool {
 	for index := 0; index < len(patterns); {
 		p := patterns[index]
 		if p.GitPattern {
@@ -331,7 +543,7 @@ func newGitIgnorePathState(path string) gitIgnorePathState {
 
 func (state *gitIgnorePathState) evaluate(patterns []IgnorePattern) bool {
 	for index := len(patterns) - 1; index >= 0 && state.unresolved > 0; index-- {
-		if state.apply(patterns[index]) {
+		if state.apply(&patterns[index]) {
 			return true
 		}
 	}
@@ -341,7 +553,7 @@ func (state *gitIgnorePathState) evaluate(patterns []IgnorePattern) bool {
 // apply reports whether pattern is the final positive decision for any still
 // unresolved path node. That is enough to ignore the target immediately:
 // reverse traversal guarantees no earlier rule can override that node.
-func (state *gitIgnorePathState) apply(pattern IgnorePattern) bool {
+func (state *gitIgnorePathState) apply(pattern *IgnorePattern) bool {
 	if state.fileDepth < 0 {
 		return false
 	}
@@ -399,7 +611,7 @@ func (state *gitIgnorePathState) apply(pattern IgnorePattern) bool {
 // basename glob against path components avoids repeatedly running a **/ glob
 // over growing full-path prefixes. A rooted "/**/name" rule has the same
 // config-root semantics and is safe to take through this path too.
-func gitIgnoreRootBasenameGlob(pattern IgnorePattern) (string, bool) {
+func gitIgnoreRootBasenameGlob(pattern *IgnorePattern) (string, bool) {
 	const prefix = "**/"
 	nodeGlob := gitIgnoreNodeGlob(pattern)
 	if !strings.HasPrefix(nodeGlob, prefix) ||
@@ -410,7 +622,7 @@ func gitIgnoreRootBasenameGlob(pattern IgnorePattern) (string, bool) {
 	return glob, glob != "" && !strings.Contains(glob, "/")
 }
 
-func (state *gitIgnorePathState) applyRootBasename(pattern IgnorePattern, path string, glob string) bool {
+func (state *gitIgnorePathState) applyRootBasename(pattern *IgnorePattern, path string, glob string) bool {
 	var end int
 	depth := state.fileDepth
 	if pattern.GitDirectoryOnly {
@@ -496,7 +708,7 @@ func (state *gitIgnorePathState) resolveDepth(depth int) {
 	state.resolvedDepthsOverflow[index] = true
 }
 
-func gitIgnorePatternMatchesNode(pattern IgnorePattern, path string) bool {
+func gitIgnorePatternMatchesNode(pattern *IgnorePattern, path string) bool {
 	if pattern.GitContentsOnly {
 		// Glob is NodeGlob with a required final component (/**/*), which
 		// expresses Git's true trailing-/** semantics without ambiguity when
@@ -506,7 +718,7 @@ func gitIgnorePatternMatchesNode(pattern IgnorePattern, path string) bool {
 	return utils.MatchGlob(gitIgnoreNodeGlob(pattern), path)
 }
 
-func gitIgnoreNodeGlob(pattern IgnorePattern) string {
+func gitIgnoreNodeGlob(pattern *IgnorePattern) string {
 	if pattern.GitNodeGlobEnd <= 0 || pattern.GitNodeGlobEnd > len(pattern.Glob) {
 		return ""
 	}

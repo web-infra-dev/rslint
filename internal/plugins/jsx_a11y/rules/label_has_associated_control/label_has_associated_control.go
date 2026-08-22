@@ -41,12 +41,12 @@ package label_has_associated_control
 
 import (
 	_ "embed"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed label_has_associated_control.schema.json
@@ -379,7 +379,7 @@ func validateHtmlFor(openingAttrs []*ast.Node, htmlForAttributes []string) bool 
 			if a.Kind != ast.KindJsxAttribute {
 				continue
 			}
-			if strings.EqualFold(reactutil.GetJsxPropName(a), name) {
+			if ecmascript.EqualsWhenUppercased(reactutil.GetJsxPropName(a), name) {
 				hasDirect = true
 				break
 			}

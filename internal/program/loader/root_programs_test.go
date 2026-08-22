@@ -505,16 +505,17 @@ func resolveTargetPlanForTest(
 	allowDirs []string,
 	singleThreaded bool,
 ) (rslintconfig.LintTargetPlan, error) {
-	return rslintconfig.ResolveLintTargetPlan(
-		configMap,
-		config,
-		currentDirectory,
-		scopes,
-		fsys,
-		allowFiles,
-		allowDirs,
-		singleThreaded,
-	)
+	return rslintconfig.ResolveLintTargetPlan(rslintconfig.LintTargetPlanRequest{
+		ConfigMap:       configMap,
+		Config:          config,
+		ConfigDirectory: currentDirectory,
+		ScanRoot:        currentDirectory,
+		ConfigScopes:    scopes,
+		FS:              fsys,
+		Files:           allowFiles,
+		Directories:     allowDirs,
+		SingleThreaded:  singleThreaded,
+	})
 }
 
 func activeConfigsForTest(
@@ -620,10 +621,13 @@ func collectTargetSyntacticDiagnostics(
 	return diagnostics
 }
 
-func remapDiagnosticTargetPaths(diagnostics []rule.RuleDiagnostic, mapping map[string]string) {
+func remapDiagnosticTargetPaths(
+	diagnostics []rule.RuleDiagnostic,
+	mapping map[string]rslintconfig.DiscoveredLintTarget,
+) {
 	for index := range diagnostics {
-		if target := mapping[diagnostics[index].FilePath]; target != "" {
-			diagnostics[index].FilePath = target
+		if target, ok := mapping[diagnostics[index].FilePath]; ok {
+			diagnostics[index].FilePath = target.Path
 		}
 	}
 }
@@ -673,30 +677,35 @@ func deduplicateTypeScriptDiagnostics(
 }
 
 type lintConfigResolverOptions struct {
-	Config                     rslintconfig.RslintConfig
-	CurrentDirectory           string
-	ConfigPathBySourcePath     map[string]string
-	OwnerConfigDirBySourcePath map[string]string
-	FS                         vfs.FS
+	Config                 rslintconfig.RslintConfig
+	CurrentDirectory       string
+	LintTargetBySourcePath map[string]rslintconfig.DiscoveredLintTarget
+	FS                     vfs.FS
 }
 
 type testLintConfigResolver struct {
-	resolver   *rslintconfig.FileConfigResolver
-	pathByFile map[string]string
+	resolver           *rslintconfig.FileConfigResolver
+	lintTargetBySource map[string]rslintconfig.DiscoveredLintTarget
 }
 
 func newLintConfigResolver(opts lintConfigResolverOptions) *testLintConfigResolver {
 	return &testLintConfigResolver{
-		resolver:   rslintconfig.NewFileConfigResolver(opts.Config, authoritativePath(opts.CurrentDirectory, opts.FS), false),
-		pathByFile: opts.ConfigPathBySourcePath,
+		resolver: rslintconfig.NewFileConfigResolverWithFS(
+			opts.Config,
+			opts.CurrentDirectory,
+			opts.FS,
+			false,
+		),
+		lintTargetBySource: opts.LintTargetBySourcePath,
 	}
 }
 
 func (resolver *testLintConfigResolver) EnabledRulesForFile(fileName string) []rule.ConfiguredRule {
-	if mapped := resolver.pathByFile[fileName]; mapped != "" {
-		fileName = mapped
+	target, ok := resolver.lintTargetBySource[fileName]
+	if !ok {
+		target.Path = fileName
 	}
-	rules, _ := resolver.resolver.EnabledRulesForFile(fileName)
+	rules, _ := resolver.resolver.EnabledRulesForTarget(target.Path, target.CanonicalPath)
 	return rules
 }
 

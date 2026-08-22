@@ -1,0 +1,209 @@
+// Rstest Snapshot v1
+
+exports[`func-names > invalid 1`] = `
+{
+  "code": "Foo.prototype.bar = function() {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected unnamed function.",
+      "messageId": "unnamed",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-names > invalid 2`] = `
+{
+  "code": "f(function(){})",
+  "diagnostics": [
+    {
+      "message": "Unexpected unnamed function.",
+      "messageId": "unnamed",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-names > invalid 3`] = `
+{
+  "code": "var {foo} = function(){};",
+  "diagnostics": [
+    {
+      "message": "Unexpected unnamed function.",
+      "messageId": "unnamed",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-names > invalid 4`] = `
+{
+  "code": "var x = function foo() {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected named function 'foo'.",
+      "messageId": "named",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-names > invalid 5`] = `
+{
+  "code": "({foo: function foo() {}})",
+  "diagnostics": [
+    {
+      "message": "Unexpected named method 'foo'.",
+      "messageId": "named",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-names > invalid 6`] = `
+{
+  "code": "export default function() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected unnamed function.",
+      "messageId": "unnamed",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-names > invalid 7`] = `
+{
+  "code": "var foo = function*() {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected unnamed generator function.",
+      "messageId": "unnamed",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-names > invalid 8`] = `
+{
+  "code": "class C { foo = function() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected unnamed method 'foo'.",
+      "messageId": "unnamed",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

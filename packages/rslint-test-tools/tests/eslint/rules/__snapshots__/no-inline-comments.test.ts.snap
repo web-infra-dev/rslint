@@ -1,0 +1,398 @@
+// Rstest Snapshot v1
+
+exports[`no-inline-comments > invalid 1`] = `
+{
+  "code": "var a = 1; /*A block comment inline after code*/",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 2`] = `
+{
+  "code": "/*A block comment inline before code*/ var a = 2;",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 3`] = `
+{
+  "code": "/* something */ var a = 2;",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 4`] = `
+{
+  "code": "var a = 3; //A comment inline with code",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 5`] = `
+{
+  "code": "var a = 3; // someday use eslint-disable-line here",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 6`] = `
+{
+  "code": "var a = 3; // other line comment",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 7`] = `
+{
+  "code": "var a = 4;
+/**A
+ * block
+ * comment
+ * inline
+ * between
+ * code*/ var foo = a;",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 8`] = `
+{
+  "code": "var a = 
+{/**/}",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 2,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 9`] = `
+{
+  "code": "var a = (
+                <div>{/* comment */}</div>
+            )",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 10`] = `
+{
+  "code": "var a = (
+                <div>{// comment
+                }
+                </div>
+            )",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 11`] = `
+{
+  "code": "var a = (
+                <div>{/* comment */
+                }
+                </div>
+            )",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 12`] = `
+{
+  "code": "var a = (
+                <div>
+                { /* two comments on the same line... */ /* ...are not allowed, same as with a non-JSX code */}
+                </div>
+            )",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 111,
+          "line": 3,
+        },
+        "start": {
+          "column": 58,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inline-comments > invalid 13`] = `
+{
+  "code": "var a = (
+                <div>
+                {
+                    /* overlapping
+                    */ /*
+                       lines */
+                }
+                </div>
+            )",
+  "diagnostics": [
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+    {
+      "message": "Unexpected comment inline with code.",
+      "messageId": "unexpectedInlineComment",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 6,
+        },
+        "start": {
+          "column": 24,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-inline-comments",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

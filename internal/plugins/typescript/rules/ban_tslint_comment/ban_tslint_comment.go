@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // tslint regex
@@ -82,7 +83,7 @@ func extractCommentText(text string, comment *ast.CommentRange) string {
 	if comment.Pos() < 0 || comment.End() > len(text) {
 		return ""
 	}
-	return strings.TrimSpace(text[comment.Pos():comment.End()])
+	return ecmascript.StringTrim(text[comment.Pos():comment.End()])
 }
 
 func buildFix(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int) rule.RuleFix {

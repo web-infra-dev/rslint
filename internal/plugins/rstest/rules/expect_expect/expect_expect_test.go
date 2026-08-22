@@ -104,6 +104,15 @@ test("case", () => {});`},
 				Code:    `foo.todo("eventual test");`,
 				Options: []interface{}{map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"foo.todo"}}},
 			},
+			// An empty additionalTestBlockFunctions entry is an accepted config
+			// (the option's items carry no minLength). It must not turn calls
+			// CalleeChainName cannot name into reported test blocks.
+			{
+				Code: `arr[0](); obj[key](); (arr[0] ?? obj[key])();`,
+				Options: []interface{}{map[string]interface{}{
+					"additionalTestBlockFunctions": []interface{}{""},
+				}},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

@@ -7,7 +7,12 @@ import (
 
 var unexpectedMessage = rule.RuleMessage{
 	Id:          "unexpected",
-	Description: "Unexpected lexical declaration in case clause.",
+	Description: "Unexpected lexical declaration in case block.",
+}
+
+var addBracketsMessage = rule.RuleMessage{
+	Id:          "addBrackets",
+	Description: "Add {} brackets around the case block.",
 }
 
 // https://eslint.org/docs/latest/rules/no-case-declarations
@@ -26,12 +31,26 @@ var NoCaseDeclarationsRule = rule.Rule{
 				// for every case/default clause.
 				for _, clauseNode := range caseBlock.Clauses.Nodes {
 					clause := clauseNode.AsCaseOrDefaultClause()
-					if clause == nil || clause.Statements == nil {
+					if clause == nil || clause.Statements == nil || len(clause.Statements.Nodes) == 0 {
 						continue
 					}
-					for _, statement := range clause.Statements.Nodes {
+
+					statements := clause.Statements.Nodes
+					firstStatement := statements[0]
+					lastStatement := statements[len(statements)-1]
+					buildSuggestion := func() []rule.RuleSuggestion {
+						return []rule.RuleSuggestion{{
+							Message: addBracketsMessage,
+							FixesArr: []rule.RuleFix{
+								rule.RuleFixInsertBefore(ctx.SourceFile, firstStatement, "{ "),
+								rule.RuleFixInsertAfter(lastStatement, " }"),
+							},
+						}}
+					}
+
+					for _, statement := range statements {
 						if isLexicalDeclaration(statement) {
-							ctx.ReportNode(statement, unexpectedMessage)
+							ctx.ReportNodeWithDeferredSuggestions(statement, unexpectedMessage, buildSuggestion)
 						}
 					}
 				}
@@ -49,8 +68,8 @@ func isLexicalDeclaration(node *ast.Node) bool {
 	case ast.KindVariableStatement:
 		varStmt := node.AsVariableStatement()
 		if varStmt != nil && varStmt.DeclarationList != nil {
-			// NOTE: We also check `using` (TC39 Stage 3) since it has the same block-scoping
-			// semantics as let/const. ESLint does not check `using` yet.
+			// BlockScoped covers let, const, using, and await using, matching
+			// upstream's check for every variable declaration kind except var.
 			return varStmt.DeclarationList.Flags&ast.NodeFlagsBlockScoped != 0
 		}
 	}

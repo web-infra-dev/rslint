@@ -23,8 +23,8 @@ type ConfiguredRule struct {
 // configured rule in one resolved config shape.
 type RuleEnvironment struct {
 	Settings map[string]interface{}
-	// LanguageOptions is normalized once and used to construct ctx.Globals. Its
-	// zero value selects latest.
+	// LanguageOptions is normalized once and exposed through ctx.LanguageOptions;
+	// it also selects the language-global catalog. Its zero value selects latest.
 	LanguageOptions LanguageOptions
 	// Globals contains config-declared language globals. Inline declarations
 	// are merged once per source file during execution.

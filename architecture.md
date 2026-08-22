@@ -190,7 +190,7 @@ and cannot observe which construction path supplied it.
 ### Detailed Pipeline Steps
 
 1. **Source and Metadata Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays. Each CLI run or API request creates one `program/loader.Session` around its final VFS view. The session's private compiler hosts keep source snapshots keyed by the exact normalized source path, storing the first successful text read and its xxh3 hash for the current generation. The same request scope snapshots successful `package.json` and explicitly registered tsconfig reads by the exact requested path; other JSON, source, ignore, and config-discovery reads remain uncached. When multiple Programs are constructed concurrently, a derived context view coalesces their concurrent cold realpath queries for the same exact path while sharing all parent caches. CLI fix writes replace the source generation before rebuilding Programs; API snapshots end with the request. LSP follows document events and its own session/versioned cache lifecycle instead.
-2. **Program Loading**: `internal/config` first resolves a stable, config-owned lint-target plan. `internal/program/loader` builds ts-go projects only for governing configs that own selected targets, adapts them to generation-scoped rslint Programs, and binds each target in governing-project order. Targets outside those projects are loaded into source-only rslint Programs with parser, binder, package/module metadata, and direct-import resolution but without recursively loading a project graph. If a root is unsupported by the direct parser path, the loader may use a compatibility ts-go host internally; callers still receive the same Program facade and query capabilities instead of construction kind. A request-local implementation of ts-go's `ExtendedConfigCache` reuses common `extends` parses without modifying ts-go, while root and project-reference configs are explicitly registered for raw-read snapshots. Program-wide type-check modes build every project declared by the effective loaded config catalog. LSP bypasses the request loader and wraps matching Programs from ts-go `project.Session` directly. For a declared custom tsconfig that Session has not loaded, rslint can retain the existing session-external ts-go Program by exact config path and advance source-only edits through ts-go's `Program.UpdateProgram`. Project-shape events discard it, and dependency reads are registered through ts-go's watcher mapper before the Program becomes resident. If watcher coverage cannot be established, rslint transparently keeps the original fresh construction. Speculative fix Programs remain isolated and request-local.
+2. **Program Loading**: `internal/config` first resolves a stable, config-owned lint-target plan and the ordered tsconfig declarations; project ownership remains private to `internal/program/loader`. Focused file/subdirectory lint parses TypeScript configs in declaration order and uses the authoritative `ParsedCommandLine.FileNames` root set to select the first direct project for each target without constructing the full declared project set. Each parsed config is retained by that selection execution and reused if its Program is built. Selected direct projects build through the bounded worker pool. Only targets absent from every declared root enter the compatibility fallback, which lazily constructs projects in declaration order until the first import-containing Program is found; projects whose compiler options cannot admit the target's extension are skipped. Full-CWD/no-argument lint retains the original eager parallel construction path, then derives direct-root ownership in a separate batched exact/canonical binding step. Program-wide type-check modes still build every project declared by the effective loaded config catalog. Targets outside all projects are loaded into source-only rslint Programs with parser, binder, package/module metadata, and direct-import resolution but without recursively loading a project graph. If a root is unsupported by the direct parser path, the loader may use a compatibility ts-go host internally; callers still receive the same Program facade and query capabilities instead of construction kind. A request-local implementation of ts-go's `ExtendedConfigCache` reuses common `extends` parses without modifying ts-go, while root and project-reference configs are explicitly registered for raw-read snapshots. LSP bypasses the request loader but applies the same root-first, extension-filtered import-fallback policy through one selector shared by normal diagnostics and speculative fixes. Session-owned projects expose their authored command-line roots through a generation cache; unloaded custom projects expose watcher-protected parsed metadata, and Program construction reuses that exact parse. Lexical tsconfig declaration paths remain distinct so symlink-relative includes keep TypeScript's declared-path meaning. For a declared custom tsconfig that Session has not loaded, rslint can retain the existing session-external ts-go Program by exact config path and advance source-only edits through ts-go's `Program.UpdateProgram`; fallback Programs that do not contain the target remain transient. Project-shape events discard resident metadata and Programs, and dependency reads are registered through ts-go's watcher mapper before either becomes resident. If watcher coverage cannot be established, rslint transparently keeps fresh request-local construction. Speculative fix Programs remain isolated and request-local.
 3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes. Source-only roots additionally run the ts-go binder so syntax-only rules retain symbols and lexical scopes before their rslint Program is published.
 4. **Semantic Analysis**: The lint plan reads each Program's per-file checker capability once, freezes that result with the file's configured rules, and acquires a checker only for eligible files. LSP can additionally narrow rule eligibility for a request before planning. Program capability, configured-rule eligibility, actual checker delivery, and program-wide diagnostics remain separate decisions.
 5. **Rule Registration**: Enabled rules register listeners keyed by AST kind.
@@ -285,6 +285,7 @@ instead of re-exporting aliases.
 type RuleContext struct {
     SourceFile     *ast.SourceFile
     Settings       map[string]interface{}
+    LanguageOptions LanguageOptions
     Globals        Globals
     Comments       *CommentStore
     Refs           *RefStore
@@ -366,8 +367,11 @@ supports scope rules whose query location is not itself an identifier
 reference. `HasNonGlobalTopLevelScope` exposes the corresponding scope fact
 without exposing a language mode or requiring rules to parse paths.
 Config resolution normalizes the per-file `ecmaVersion` into `LanguageOptions`;
-its zero value means the moving `latest` edition. The linter uses it to build
-one `Globals` value for each native rule context. `Globals` owns the
+its zero value means the moving `latest` edition. The linter exposes the
+normalized value through `RuleContext.LanguageOptions` and also uses it to
+build one `Globals` value for each native rule context. Rules read
+`LanguageOptions` when upstream behavior depends on language configuration;
+they use `Globals` for variable-availability decisions. `Globals` owns the
 ESLint-versioned language-global set, resolved language defaults, the authored
 `languageOptions.globals` source, inline `/* global */` settings and ranges,
 and the effective access after applying their precedence. Rules use
@@ -376,9 +380,8 @@ accessors only when upstream behavior depends on provenance, instead of
 rebuilding the merge. A rule whose upstream semantics add another source, such
 as TypeScript library globals, applies this view last so `ecmaVersion` and
 authored overrides remain authoritative. This keeps the language-global
-composition point extensible for future language options such as `sourceType`
-without exposing those options directly to every rule; non-global wrapper
-bindings remain a `RefStore` initialization concern.
+composition point extensible for future language options such as `sourceType`;
+non-global wrapper bindings remain a `RefStore` initialization concern.
 
 Before constructing rule contexts, the linter calls `ResolveLanguageDefaults`
 once and passes its concrete `GlobalsInit` and `RefStoreInit` results to their
@@ -785,8 +788,9 @@ The transport and target phase differ by surface:
 - Each selected runtime starts `rslint/configRefresh`. With no `configPath`, Go
   scans that process's workspace-folder cwd with a transaction-scoped cached
   VFS. A client may instead repeat one fixed absolute JS/TS `configPath` on
-  every refresh; Go loads exactly that module while retaining the process cwd
-  as its invocation-wide matching root. The client owns change notifications
+  every refresh; Go loads exactly that module, uses the module's directory as
+  its authored config base, and retains the process cwd as the invocation-wide
+  target scope. The client owns change notifications
   for the explicit path, while Go's existing `.gitignore` watcher refreshes
   the already-fixed source. Go sends
   `rslint/loadConfigs` and
@@ -820,8 +824,9 @@ model. The independent numeric document generation only rejects stale async
 diagnostics after edits, closes, or config commits.
 
 An explicit JS/TS `--config` or API `overrideConfigFile` bypasses automatic
-candidate selection and loads the exact module. The invocation cwd remains its
-matching directory. The exact config path is never gated by `.gitignore`;
+candidate selection and loads the exact module. Its directory remains the
+authored base for relative config content, while the invocation cwd remains the
+implicit scan and response-path root. The exact config path is never gated by `.gitignore`;
 only after it loads does a fixed-owner frontier freeze the invocation-scoped
 Git projection used to filter lint targets. That frontier never probes or
 activates nested config candidates. Automatic candidates instead use Git
@@ -865,15 +870,70 @@ immutable effective config/rule plan. Files with the same set share one plan for
 that resolver's lifetime. Shape identity is collision-free (`uint64` for the
 first 64 entries plus the complete remaining bitset), resolver-local, and
 independent of path identity. File-cache keys remain the exact caller strings;
-the resolver does not clean, case-fold, canonicalize, or merge symlink aliases.
-The direct `GetConfigForFile()` compatibility path uses the same match/merge
-primitives without retaining a cache.
+filesystem identity may select the matching space, but it never changes the
+cache identity or merges distinct lexical targets.
+The direct `GetConfigForFile()` compatibility path retains its allocation-light
+single-origin matcher and delegates composed multi-origin arrays to the target
+resolver; both paths feed the same ordered merge policy without retaining a
+plan cache.
 
 The staged coordinator builds the effective catalog used by
-`ConfigOwnerResolver.Resolve()` before `GetConfigForFile()` merges the selected
-entries. Staged CLI, native API, and transactional LSP paths therefore reuse the
-same Go ownership rules instead of independently reconstructing hierarchy on
-the Node side.
+`ConfigOwnerResolver` before the target resolver merges the selected entries.
+CLI/API target plans call ownership once during discovery and carry that owner
+through Program binding. Each target records four separate facts: the caller's
+lexical `Path`, the file's `CanonicalPath`, the lexical parent's physical
+`CanonicalParentPath`, and the governing `ConfigDirectory`. The parent identity
+distinguishes a leaf file symlink from a directory alias; it is not treated as
+proof of the target's complete ancestor chain. Native-case owner aliases may be
+verified once while the target's owner is selected. LSP then freezes one
+document lint snapshot containing the same complete target plus its selected
+owner, resolved config, and project paths; native rules, plugin rules,
+diagnostics, resident Programs, and every fix pass consume that snapshot. No
+later stage resolves the target file or selects its owner again. Staged CLI,
+native API, and transactional LSP paths therefore reuse the same Go ownership
+rules instead of independently reconstructing hierarchy on the Node side.
+
+Configuration meaning and invocation scope are separate inputs. For one
+invocation-wide config, `ConfigDirectory` is the config file's directory and is
+the authored base used by `files`, `ignores`, and `parserOptions.project`;
+`ScanRoot` is the invocation working directory used by implicit/no-argument
+target discovery and the default `.gitignore` collection scope. Supplying an external config therefore does not scan
+the config directory unless the user also targets it, and does not rebase the
+config's relative patterns onto the invocation cwd. A composed config entry may
+retain a different authored base (the native API's inline `overrideConfig` is
+the current case), so matching resolves every entry from its own origin before
+merging the matched shape, and project declarations resolve from that same
+origin before they reach the Program loader. Automatic config catalogs already
+encode one owner directory per config and do not use the invocation-wide
+`ScanRoot` to infer ownership.
+
+`LintTargetPlanRequest` is the config-layer boundary for CLI/API target
+selection. Explicit files and recursive directories form one union; omitted
+CLI targets become the invocation cwd, and multiple files/directories do not
+change one another's config matching. Each planned target retains its
+caller-visible path, file and parent filesystem identities, and established
+config owner. For each literal file request, the plan also carries the
+existence and ignore outcome produced by that same discovery decision; CLI
+warning rendering never re-reads the filesystem or re-resolves ownership. The
+plan retains the authored config-base path spaces observed during discovery,
+but not the execution config value: CLI `--rule` and API overrides are layered
+after target selection and are evaluated in those same frozen path spaces.
+`internal/program/loader` consumes the plan but cannot add targets, change
+ownership, or reinterpret config-relative paths.
+
+Git collection scope is independent from config-entry origin. Targets
+representable beneath `ScanRoot` share its scope; every requested directory
+outside that tree creates an independent scope, while an exact outside file
+does not invent a directory scope. The synthetic Git entry retains every active
+scope, including a scope that produced no patterns. Matching first assigns a
+target to exactly one scope by lexical containment, falling back to the same
+ordered scope list by canonical-to-physical containment only when no lexical
+scope applies. Final ignore decisions, directory pruning, and negation-based
+reopening all consume that one assignment, so aliases and sibling directory
+arguments cannot borrow or override one another's `.gitignore` policy. A
+requested physical ancestor of an aliased `ScanRoot` is outside, not beneath,
+that root and therefore receives its own scope; this keeps every directory the
+target walker can scan covered by the same Git-source frontier.
 
 Ownership lookup never compares depth across lexical and physical path spaces:
 the nearest exact lexical config wins, a native case alias is accepted only
@@ -888,12 +948,15 @@ allowed alias.
 Additional current behaviors:
 
 - `.gitignore` is injected as a global-ignore entry through the shared
-  `ConfigWithCollectedGitignore`/`ConfigWithGitignore` policy. The governing
-  config directory is a hard upper boundary: its own and nested `.gitignore`
-  files apply, while parent `.gitignore` files do not. In staged JS/TS catalogs,
-  the walk records sources by owner and case-aware source identity, orders them
-  parent-before-child, and materializes the synthetic Git entry before
-  publishing. Direct automatically reachable child config directories are
+  `ConfigWithCollectedGitignore`/`ConfigWithGitignore` policy. Automatic config
+  owners use their config directory as the hard upper collection boundary; an
+  explicit invocation-wide config instead uses the invocation Git scopes
+  described above, even when the config file is external. Sources below each
+  scope boundary apply, while sources in its parents do not. In staged JS/TS
+  catalogs, the walk records sources by owner, scope, and case-aware source
+  identity, orders them parent-before-child within that scope, and
+  materializes the synthetic Git entry before publishing. Direct automatically
+  reachable child config directories are
   downward ownership handoff boundaries; an explicitly selected config remains
   the fixed invocation-wide owner and never creates nested handoffs.
   Configs loaded only for explicit targets bound only their literal target
@@ -901,8 +964,12 @@ Additional current behaviors:
   target's `.gitignore` sources. This preserves ESLint v10's per-target global
   ignore behavior: adding another literal target cannot change whether an
   existing target is ignored. File-only CLI/API requests read only target
-  directory chains within each governing config. The synthetic Git entry is
-  ordered before authored entries, so a later config `!` may re-include a target
+  directory chains within each governing config. Explicit JS/TS and JSON CLI
+  directory requests read the target ancestry and then recurse only below the
+  requested directories; mixed requests add the exact-file chains. Automatic
+  config discovery keeps its existing ownership walk. The synthetic Git entry
+  is ordered before authored entries, so a later config `!` may re-include a
+  target
 - when the client supports dynamic file-watch registration, Go watches
   workspace-descendant `.gitignore` files plus exact `.gitignore` paths in
   strict workspace ancestors that may contain an automatically selected config.
@@ -930,9 +997,10 @@ Additional current behaviors:
 - native and third-party plugin rules are gated by their normalized prefixes for JS/TS configs; third-party rules use process-wide Go registry placeholders, but LSP additionally filters those placeholders through the exact rule-name set committed for the current Node generation so metadata retained from an older generation cannot be dispatched to a newer worker
 - CLI/API lint target selection is independent from TypeScript `Program` membership and considers only rslint-supported script extensions. The `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` default baseline is always selected; explicit config `files` contributes candidates only within the supported set. Global ignores and `.gitignore` remove targets, while an entry-level ignore prevents only its own selector/config contribution
 - selected CLI/API targets can still appear as 0-rule lint results when no config entry contributes rules; this applies to default-baseline directory discovery and explicit supported files, and syntax diagnostics remain available in that state
-- under automatic discovery, each selected file is governed by its nearest loadable config; an explicitly selected config is used directly. In either case, a target can bind only to a tsconfig declared by its governing config, and the first declared project containing the file wins
+- under automatic discovery, each selected file is governed by its nearest loadable config; an explicitly selected config is used directly. In either case, a target can bind only to a tsconfig declared by its governing config. The first declared project whose parsed root set contains the file wins. Only when no declared root contains it does the first declaration-order Program containing it through imports win
+- omitting `parserOptions.project` enables the governing config directory's default `tsconfig.json` fallback; an explicit empty project list disables that fallback
 - `files`/`ignores` matching uses the stable target path in the governing config's path space; a ts-go Program source alias is used only to locate the AST and type information, so moving a target into or out of a tsconfig cannot change its rule configuration
-- within each Program-registry build, normalized declared tsconfig paths are deduplicated across config associations; CLI fix passes create a new registry build. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Selected CLI files outside the governing config's ts-go Programs are parsed and bound as independent rslint Programs. Targets whose names collide under a case-insensitive ts-go path key are partitioned across independent Programs so distinct physical files and package scopes remain distinct
+- within each Program-registry build, normalized declared tsconfig paths are deduplicated across config associations; CLI fix passes create a new source/Program generation and rerun focused project selection from the request's metadata view. Import-only fallback membership is therefore recomputed after source edits. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Selected CLI files outside the governing config's ts-go Programs are parsed and bound as independent rslint Programs. Targets whose names collide under a case-insensitive ts-go path key are partitioned across independent Programs so distinct physical files and package scopes remain distinct
 - `--type-check` and `--type-check-only` build every real tsconfig declared by the effective loaded config catalog. Git reachability may change which automatic configs enter that catalog; once it is established, program-wide checking is not filtered by lint targets, config `files`/`ignores`, `.gitignore`, or CLI file/directory arguments. Only those project-backed source generations expose the program-diagnostics capability consumed by Phase 2; `--type-check-only` skips the separate lint-target walk.
 - for LSP, an open supported script is a per-file target independent of Program membership. Global config ignores, `.gitignore`, default-excluded paths, and unavailable config boundaries suppress native rules, plugin rules, and fixes; an available zero-rule config still parses the target and can report syntax diagnostics
 
@@ -968,8 +1036,8 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
    - `--api`: starts the IPC API server
    - default: runs direct CLI linting
 4. **Lint Target Plan**: Go resolves a stable target set from CLI/API scope, the implicit default baseline, explicit config `files`, global ignores, and `.gitignore`
-5. **Project Loading**: one request-scoped `program/loader.Session` builds each normalized tsconfig path declared by an active governing config once; `--type-check` and `--type-check-only` instead retain every project declared by the effective loaded config catalog. Shared declared paths preserve each active config association and declaration order. Planning fixes those identities and stable slots serially, then independent Programs fill the slots through a bounded worker pool.
-6. **Target Binding**: the loader binds each target by exact lexical or canonical filesystem identity to the first containing project declared by its governing config. It creates source-only Programs for supported unbound CLI targets, including projects with no tsconfig, and returns one ordered Program sequence plus parallel target projections. CLI/API never branch on the private construction path
+5. **Project Loading**: one request-scoped `program/loader.Session` resolves normalized tsconfig identities once per load. A focused selection execution retains parsed root metadata while choosing direct winners, then builds the deduplicated winner set in parallel; targets with no direct winner advance an ordered fallback frontier. Full-CWD/no-argument lint and type-check modes retain bounded eager parallel construction. Shared declared paths preserve each active config association and declaration order.
+6. **Target Binding**: the loader binds each target by exact lexical or canonical filesystem identity in two tiers: first declared direct root, then first declaration-order import-containing Program. It creates source-only Programs for supported unbound CLI targets, including projects with no tsconfig, and returns one ordered Program sequence plus parallel target projections. CLI/API never coordinate compiler construction or implement ownership themselves
 7. **Rule Plan Preparation**: `PrepareLintPlan()` receives one ordered sequence of rslint Programs, retains every selected file, and resolves each eligible file's complete rule set once from the stable lint-target path, never the ts-go source alias. The immutable result freezes the shared rule environment and per-file type eligibility alongside syntax-error and zero-rule files for native accounting while exposing the non-empty file/rule projection needed by third-party plugin dispatch. CLI and native API reuse the same plan for plugin and native execution; LSP keeps its single-document `LintSingleFile` adapter.
 8. **Rule Execution**: `RunLinter()` schedules the unified Program sequence over the prepared plan. It asks only the Program facade to acquire checkers, retaining checker-exclusive grouping when available and sharding sufficiently large checker-free generations across at most `GOMAXPROCS` workers. Small checker-free Programs stay in one shard so scheduling and shared-consumer overhead cannot dominate their rule work. Each Program constructor freezes its complete source universe; target/config filters produce a separate execution projection, while cross-file rules always see the full universe. Prepared plans bind the exact Program pointer, so a reparse/fix generation must construct a new Program and plan. Module graphs and other derived structures are cached by Program generation rather than copied into `RuleContext`. The CLI supplies native edit demand independently of rule selection: diagnostics-only for plain lint, autofix-only for writable `--fix` passes, and diagnostics-only for the final verification pass. When `--type-check` is enabled, Phase 2 schedules only Programs that expose complete program diagnostics; source-only generations expose no such capability and require no parallel skip state.
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
@@ -1008,7 +1076,10 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    - Native API roots carry an exact target-ancestor trie from the tinyglobby
      result, so only sibling branches leading to supplied files enter those
      frontiers. CLI/LSP directory roots, including CLI mixed file+directory
-     invocations, remain recursively unbounded within ignore boundaries.
+     invocations, remain recursively unbounded during automatic config
+     discovery. After an explicit JS/TS config loads, its fixed-owner Git
+     projection instead carries the CLI target trie: exact-file branches stop
+     at their parent, and requested directory branches recurse from that root.
    - Directory-root ancestry is loaded outer-to-inner before the root frontier.
      Each successful owner's authored global ignores and Git cursor control
      continuation below that boundary; local Git sources are observed only after
@@ -1023,6 +1094,10 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      planned serially in stable config/project order. Construction then uses at
      most `min(GOMAXPROCS, Program count)` workers and merges results and
      errors by the planned order.
+   - Focused lint parses each governing config's tsconfig frontier in declaration
+     order. Independent config frontiers and confirmed direct winner Programs
+     may run concurrently; import-only fallback remains serial within one
+     governing config so a later completion cannot overtake an earlier project.
    - `--singleThreaded` executes the same state machine with one Go discovery
      worker and serializes module evaluation within each Node frontier batch.
      Coordinator batches and results remain ordered in either mode.
@@ -1157,7 +1232,7 @@ goroutines remain outside that guarantee.
 ### Caching Strategy
 
 - **LSP Session Reuse**: `internal/lsp` builds a shared ts-go `project.Session`, so configured projects, inferred projects, and overlay document state are reused across requests.
-- **LSP Session-External ts-go Program Ownership**: rslint retains an independently built ts-go Program only for a declared custom project that the main Session does not own. The owner is keyed by the exact config path, receives serialized LSP document events, and uses ts-go's incremental Program update only for known source changes. Config, project-shape, and covered filesystem changes discard the affected resident state. Filesystem reads made during Program construction and lazy checker work are mapped to client watchers with ts-go's existing watch utilities; registration failure falls back to fresh construction. Clients without watched-file support also retain the fresh behavior. This project-owner path is independent from the CLI/API request loader; no second LSP Session or rslint ParseCache is introduced.
+- **LSP Configured-Project Selection Cache**: normal diagnostics and speculative fixes share one root-first selector while keeping separate Program owners. Session projects cache exact/canonical root membership by authored `ParsedCommandLine` generation. Session-external projects retain lightweight parsed metadata only after all config and directory reads have watcher coverage, then reuse that same parse when a Program is needed. Only a Program that contains the requested target becomes resident; non-containing import probes are transient. Config, project-shape, and covered filesystem changes discard affected metadata and Programs. Registration failure and conflicting editor aliases use fresh request-local construction. Speculative fix Programs always remain isolated. This path is independent from the CLI/API request loader; no second LSP Session or rslint ParseCache is introduced.
 - **Parse Cache in LSP**: the LSP server passes a shared ts-go `project.ParseCache` into the session to avoid re-parsing from scratch on every change.
 - **SourceFile-Owned Module Syntax Reuse**: any `Program.ModuleGraph()` query may attach the syntax-only module-specifier projection to an immutable ts-go `SourceFile`, independently of project ownership or watcher availability. Programs reusing that exact file object share collection, while resolution and target ASTs remain local to each Program generation. Attached values may contain only scalars and nodes owned by that SourceFile—never a Program, resolved target, checker state, or another SourceFile. Replaced files carry the attached data out with their own AST lifetime; no LSP server map, project-membership sweep, or explicit reset owns this cache. Source-only Programs retain it only for their generation's SourceFile lifetime.
 - **Incremental LSP Document Sync**: editor changes reach the server immediately and are applied in order to both rslint's document mirror and the ts-go Session overlay. rslint selects the mandatory LSP UTF-16 encoding so incoming changes, native diagnostics, plugin diagnostics, and edits share VS Code's coordinate model. Whole-document changes remain a supported protocol fallback.
@@ -1437,7 +1512,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **Diagnostic**: A lint finding reported by a rule or by TypeScript semantic diagnostics
 - **Flat Config**: ESLint-style array-based configuration model used by rslint to merge rule settings per file
 - **Inspector**: Auxiliary backend path that returns node, type, symbol, signature, and flow information for Playground inspection
-- **IPC API**: Length-prefixed JSON message protocol exposed by `cmd/rslint --api` for Node and WASM clients; config path resolution and third-party plugin routing use separate keys when API overrides rebase relative patterns
+- **IPC API**: Length-prefixed JSON message protocol exposed by `cmd/rslint --api` for Node and WASM clients; config path resolution and third-party plugin routing have separate identities
 - **Listener**: Callback registered by a rule for an AST kind or synthetic listener kind
 - **Nearest Config**: In multi-config mode, the governing config selected by lexical-first ownership resolution
 - **Node Kind**: Enumerated AST kind value used by ts-go and by the listener dispatcher to identify node types

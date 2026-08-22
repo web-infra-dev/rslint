@@ -3,6 +3,7 @@ package lang
 import (
 	"strings"
 
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"golang.org/x/text/language"
 )
 
@@ -71,14 +72,14 @@ func isValidBCP47Tag(value string) bool {
 	if strings.ContainsRune(value, '_') {
 		return false
 	}
-	trimmed := strings.TrimSpace(value)
+	trimmed := ecmascript.StringTrim(value)
 	if trimmed == "" {
 		return false
 	}
 	if strings.ContainsAny(trimmed, " \t\n\r\v\f") {
 		return false
 	}
-	if deprecatedGrandfatheredTags[strings.ToLower(trimmed)] {
+	if deprecatedGrandfatheredTags[ecmascript.StringToLowerCase(trimmed)] {
 		return false
 	}
 	if isPrivateUseOnly(trimmed) {
@@ -109,7 +110,7 @@ func isValidBCP47Tag(value string) bool {
 // `posix` subtag up front keeps the acceptance set aligned with upstream.
 func hasLegacyPOSIXVariant(s string) bool {
 	for _, p := range strings.Split(s, "-") {
-		if strings.EqualFold(p, "posix") {
+		if ecmascript.EqualsWhenLowercased(p, "posix") {
 			return true
 		}
 	}
@@ -162,11 +163,11 @@ func hasSuppressScriptViolation(tag language.Tag) bool {
 		return false
 	}
 	base, _ := tag.Base()
-	suppress, ok := suppressScriptByLanguage[strings.ToLower(base.String())]
+	suppress, ok := suppressScriptByLanguage[ecmascript.StringToLowerCase(base.String())]
 	if !ok {
 		return false
 	}
-	return strings.EqualFold(script.String(), suppress)
+	return ecmascript.EqualsWhenLowercased(script.String(), suppress)
 }
 
 // deprecatedGrandfatheredTags is the lowercased set of IANA Subtag Registry

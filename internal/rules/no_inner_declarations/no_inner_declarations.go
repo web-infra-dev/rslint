@@ -2,7 +2,6 @@ package no_inner_declarations
 
 import (
 	_ "embed"
-	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -17,36 +16,77 @@ type ruleOptions struct {
 	blockScopedFunctions string // "allow" or "disallow"
 }
 
+type declarationType uint8
+
+const (
+	functionDeclaration declarationType = iota
+	variableDeclaration
+)
+
+type declarationRoot uint8
+
+const (
+	programRoot declarationRoot = iota
+	functionBodyRoot
+	classStaticBlockBodyRoot
+)
+
+var moveDeclarationMessages = [2][3]rule.RuleMessage{
+	functionDeclaration: {
+		programRoot:              {Id: "moveDeclToRoot", Description: "Move function declaration to program root."},
+		functionBodyRoot:         {Id: "moveDeclToRoot", Description: "Move function declaration to function body root."},
+		classStaticBlockBodyRoot: {Id: "moveDeclToRoot", Description: "Move function declaration to class static block body root."},
+	},
+	variableDeclaration: {
+		programRoot:              {Id: "moveDeclToRoot", Description: "Move variable declaration to program root."},
+		functionBodyRoot:         {Id: "moveDeclToRoot", Description: "Move variable declaration to function body root."},
+		classStaticBlockBodyRoot: {Id: "moveDeclToRoot", Description: "Move variable declaration to class static block body root."},
+	},
+}
+
 // https://eslint.org/docs/latest/rules/no-inner-declarations
 var NoInnerDeclarationsRule = rule.Rule{
 	Name:   "no-inner-declarations",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		allowBlockScopedFunctions := opts.blockScopedFunctions == "allow" &&
+			ctx.LanguageOptions.EffectiveECMAVersion() >= 2015
 
 		listeners := rule.RuleListeners{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
-				if opts.blockScopedFunctions == "allow" && utils.IsInStrictMode(node, ctx.SourceFile) {
+				// @typescript-eslint/parser represents overload and ambient
+				// signatures as TSDeclareFunction, which the upstream
+				// FunctionDeclaration listener never receives. tsgo represents
+				// those signatures as body-less FunctionDeclaration nodes.
+				if node.Body() == nil {
 					return
 				}
-				check(node, "function", &ctx)
+				if allowBlockScopedFunctions && utils.IsInStrictMode(node, ctx.SourceFile) {
+					return
+				}
+				check(node, functionDeclaration, &ctx)
 			},
 		}
 
 		if opts.both {
-			listeners[ast.KindVariableStatement] = func(node *ast.Node) {
-				varStmt := node.AsVariableStatement()
-				if varStmt == nil || varStmt.DeclarationList == nil {
+			listeners[ast.KindVariableDeclarationList] = func(node *ast.Node) {
+				if !utils.IsVarKeyword(node) {
 					return
 				}
 
-				// Only check var declarations, not let/const/using
-				// BlockScoped = Let | Const | Using
-				if varStmt.DeclarationList.Flags&ast.NodeFlagsBlockScoped != 0 {
-					return
+				// ESTree uses VariableDeclaration for both declaration
+				// statements and for-loop initializers. tsgo wraps statement
+				// declarations in VariableStatement but leaves loop initializers
+				// as a bare VariableDeclarationList. Preserve ESLint's report
+				// range by selecting the corresponding outer node only when it
+				// exists.
+				reportNode := node
+				if node.Parent != nil && node.Parent.Kind == ast.KindVariableStatement {
+					reportNode = node.Parent
 				}
 
-				check(node, "variable", &ctx)
+				check(reportNode, variableDeclaration, &ctx)
 			}
 		}
 
@@ -86,8 +126,6 @@ func isValidParent(parent *ast.Node) bool {
 	switch parent.Kind {
 	case ast.KindSourceFile:
 		return true
-	case ast.KindModuleBlock:
-		return true
 	case ast.KindBlock:
 		// A block is valid only if its parent is a function-like node or
 		// a class static block.
@@ -107,33 +145,28 @@ func isValidParent(parent *ast.Node) bool {
 	return false
 }
 
-// nearestFunctionName walks up the tree to find the enclosing function (if any)
-// and returns a description used in the error message.
-func nearestFunctionName(node *ast.Node) string {
+// nearestDeclarationRoot walks up the tree to find the declaration's expected
+// root container for the diagnostic message.
+func nearestDeclarationRoot(node *ast.Node) declarationRoot {
 	current := node.Parent
 	for current != nil {
 		switch current.Kind {
 		case ast.KindClassStaticBlockDeclaration:
-			return "class static block body"
+			return classStaticBlockBodyRoot
 		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
 			ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
-			return "function body"
+			return functionBodyRoot
 		}
 		current = current.Parent
 	}
-	return "program"
+	return programRoot
 }
 
-func check(node *ast.Node, declType string, ctx *rule.RuleContext) {
+func check(node *ast.Node, declaration declarationType, ctx *rule.RuleContext) {
 	parent := node.Parent
 	if isValidParent(parent) {
 		return
 	}
 
-	body := nearestFunctionName(node)
-
-	ctx.ReportNode(node, rule.RuleMessage{
-		Id:          "moveDeclToRoot",
-		Description: fmt.Sprintf("Move %s declaration to %s root.", declType, body),
-	})
+	ctx.ReportNode(node, moveDeclarationMessages[declaration][nearestDeclarationRoot(node)])
 }

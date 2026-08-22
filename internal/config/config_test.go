@@ -110,6 +110,25 @@ func TestParserOptionsUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestParserOptionsProjectEmptyArraySurvivesJSONRoundTrip(t *testing.T) {
+	before := ParserOptions{Project: ProjectPaths{}}
+	encoded, err := json.Marshal(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != `{"project":[]}` {
+		t.Fatalf("MarshalJSON = %s, want explicit empty project", encoded)
+	}
+
+	var after ParserOptions
+	if err := json.Unmarshal(encoded, &after); err != nil {
+		t.Fatal(err)
+	}
+	if after.Project == nil || len(after.Project) != 0 {
+		t.Fatalf("round-trip project = %#v, want non-nil empty slice", after.Project)
+	}
+}
+
 func TestParserOptionsProjectServicePtr(t *testing.T) {
 	tests := []struct {
 		name          string

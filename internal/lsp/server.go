@@ -68,6 +68,7 @@ func NewServer(opts *ServerOptions) *Server {
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
+		lintSessionRoots:       newLintSessionProjectRootCache(),
 	}
 }
 
@@ -157,8 +158,9 @@ type Server struct {
 	watchEnabled     bool
 	watchers         collections.SyncSet[project.WatcherID]
 
-	session      *project.Session
-	lintPrograms *lintProgramStore
+	session          *project.Session
+	lintPrograms     *lintProgramStore
+	lintSessionRoots *lintSessionProjectRootCache
 
 	// enables tests to share a cache of parsed source files
 	parseCache *project.ParseCache
@@ -173,6 +175,9 @@ type Server struct {
 	// The resolver is rebuilt atomically with each config transaction. Its keys
 	// are the same filesystem paths stored in jsConfigs.
 	jsConfigOwnerResolver *config.ConfigOwnerResolver
+	// jsonConfigResolver freezes the invocation-wide JSON config's authored
+	// path space when that config generation is loaded.
+	jsonConfigResolver *config.ConfigOwnerResolver
 	// configDiscoveryActive becomes true after the first structurally valid
 	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
 	// config-scoped .gitignore watchers trigger a fresh transaction without
@@ -245,7 +250,13 @@ type Server struct {
 	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
 	// used, driving an isolated overlay Program); tests inject a mock to exercise the
 	// plugin-fix fold loop without spinning up a language service.
-	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) (lintPassResult, error)
+	fixAllNativeLint func(
+		ctx context.Context,
+		uri lsproto.DocumentUri,
+		pass int,
+		content string,
+		snapshot documentLintSnapshot,
+	) (lintPassResult, error)
 
 	// pluginReverseTimeout bounds each eslint-plugin reverse request to the
 	// client (rslint/pluginLint) on BOTH paths: source.fixAll (summed across

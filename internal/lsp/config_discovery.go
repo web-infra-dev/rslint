@@ -301,6 +301,7 @@ type lspDiscoveredConfigSnapshot struct {
 	ownerResolver       *config.ConfigOwnerResolver
 	unavailableConfigs  map[string]struct{}
 	jsonConfig          config.RslintConfig
+	jsonConfigResolver  *config.ConfigOwnerResolver
 	jsonConfigPath      string
 	jsonTsConfigPaths   []string
 	transactionID       string
@@ -663,6 +664,10 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		nil,
 		jsonBoundaryResolver.ChildConfigDirs(jsonCWD),
 	)
+	snapshot.jsonConfigResolver = config.NewConfigOwnerResolver(
+		map[string]config.RslintConfig{jsonCWD: snapshot.jsonConfig},
+		fsys,
+	)
 	snapshot.jsonConfigPath = jsonPath
 	snapshot.jsonTsConfigPaths = jsonTsConfigs
 	return snapshot, nil
@@ -742,11 +747,13 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	// The serialized dispatch loop makes this map swap atomic to every document
 	// and code-action handler.
 	s.invalidateOpenDocumentDiagnostics()
+	s.invalidateLintProjectCaches()
 	s.jsConfigs = snapshot.configs
 	s.tsConfigPathsByConfig = snapshot.tsConfigPaths
 	s.jsConfigOwnerResolver = snapshot.ownerResolver
 	s.jsUnavailableConfigs = snapshot.unavailableConfigs
 	s.jsonConfig = snapshot.jsonConfig
+	s.jsonConfigResolver = snapshot.jsonConfigResolver
 	s.rslintConfigPath = snapshot.jsonConfigPath
 	s.tsConfigPaths = snapshot.jsonTsConfigPaths
 	s.eslintPluginConfigGeneration = snapshot.transactionID
@@ -786,9 +793,6 @@ func resolveTsConfigPathsWithFS(cfg config.RslintConfig, cwd string, fsys vfs.FS
 		return nil, err
 	}
 	for index, projectPath := range paths {
-		if realPath := fsys.Realpath(projectPath); realPath != "" {
-			projectPath = realPath
-		}
 		paths[index] = tspath.NormalizePath(projectPath)
 	}
 	return paths, nil

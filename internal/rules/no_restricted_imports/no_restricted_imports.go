@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -135,8 +136,8 @@ func (m *ignoreMatcher) ignores(path string) bool {
 		glob := p.glob
 		testPath := path
 		if !m.caseSensitive {
-			glob = strings.ToLower(glob)
-			testPath = strings.ToLower(testPath)
+			glob = ecmascript.StringToLowerCase(glob)
+			testPath = ecmascript.StringToLowerCase(testPath)
 		}
 		if matchIgnore(glob, testPath) {
 			ignored = !p.negated
@@ -454,7 +455,7 @@ var NoRestrictedImportsRule = rule.Rule{
 				if importDecl.ModuleSpecifier == nil {
 					return
 				}
-				importSource := strings.TrimSpace(utils.GetStaticStringValue(importDecl.ModuleSpecifier))
+				importSource := ecmascript.StringTrim(utils.GetStaticStringValue(importDecl.ModuleSpecifier))
 				if importSource == "" {
 					return
 				}
@@ -465,7 +466,7 @@ var NoRestrictedImportsRule = rule.Rule{
 				if exportDecl.ModuleSpecifier == nil {
 					return
 				}
-				importSource := strings.TrimSpace(utils.GetStaticStringValue(exportDecl.ModuleSpecifier))
+				importSource := ecmascript.StringTrim(utils.GetStaticStringValue(exportDecl.ModuleSpecifier))
 				if importSource == "" {
 					return
 				}
@@ -486,7 +487,7 @@ var NoRestrictedImportsRule = rule.Rule{
 				// ESLint base does NOT trim require() source, but in practice nobody
 				// writes whitespace inside require('...') so the divergence is moot
 				// and the consistency is worth more.
-				importSource := strings.TrimSpace(utils.GetStaticStringValue(extRef.Expression))
+				importSource := ecmascript.StringTrim(utils.GetStaticStringValue(extRef.Expression))
 				if importSource == "" {
 					return
 				}
