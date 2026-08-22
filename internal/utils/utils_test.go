@@ -126,7 +126,8 @@ func TestAccessExpressionStaticName(t *testing.T) {
 		"object[\"property\"];\n" +
 		"object[(\"property\")];\n" +
 		"object[\"property\" as const];\n" +
-		"object[dynamic];\n"
+		"object[dynamic];\n" +
+		"class C { #property; m() { this.#property; this[\"#property\"]; } }\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
 		Path:     "/test.ts",
@@ -143,6 +144,12 @@ func TestAccessExpressionStaticName(t *testing.T) {
 		{name: "parenthesized element key", text: `object[("property")]`, want: "property", wantOkay: true},
 		{name: "asserted element key", text: `object["property" as const]`, want: "property", wantOkay: true},
 		{name: "dynamic element key", text: `object[dynamic]`, wantOkay: false},
+		// A private name is its own equivalence class: ESLint's
+		// getStaticPropertyName accepts a dotted key only when it is an
+		// Identifier, so `#property` has no static name and never pairs up with
+		// the string "#property".
+		{name: "private name", text: `this.#property`, wantOkay: false},
+		{name: "private-looking string key", text: `this["#property"]`, want: "#property", wantOkay: true},
 	}
 	for _, tt := range tests {
 		node := findNodeWithText(t, sourceFile, tt.text)

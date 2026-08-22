@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
 	"github.com/web-infra-dev/rslint/internal/rules/id_length"
 	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
+	"github.com/web-infra-dev/rslint/internal/rules/logical_assignment_operators"
 	"github.com/web-infra-dev/rslint/internal/rules/max_classes_per_file"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
@@ -198,6 +199,7 @@ func GetAllRules() []rule.Rule {
 		guard_for_in.GuardForInRule,
 		id_length.IdLengthRule,
 		init_declarations.InitDeclarationsRule,
+		logical_assignment_operators.LogicalAssignmentOperatorsRule,
 		max_classes_per_file.MaxClassesPerFileRule,
 		max_depth.MaxDepthRule,
 		max_lines.MaxLinesRule,
