@@ -37,10 +37,9 @@ func TestNoUnusedVarsUpstream(t *testing.T) {
 			skipped++
 		}
 	}
-	// Six skips use the intentionally unsupported `/* exported */` comment.
 	// The remaining skips require either ESLint's cross-rule markVariableAsUsed
 	// API or parsing invalid strict-mode legacy octal syntax.
-	assert.Equal(t, skipped, 14)
+	assert.Equal(t, skipped, 8)
 
 	var provenance struct {
 		Upstream struct {

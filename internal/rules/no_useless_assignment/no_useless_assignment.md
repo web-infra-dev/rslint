@@ -9,8 +9,10 @@ variable name, a missing `return`, or leftover code from a refactor.
 
 The rule only looks at variables it can follow end to end. It stays silent when
 the variable is never read at all (that is `no-unused-vars`' job), when it is
-read from another function, when it is exported, and when the assignment sits
-inside a `try` block, where the block may be abandoned before the value is used.
+read from another function, when it leaves the file — through an `export`, or
+through an `/* exported name */` comment naming a global — and when the
+assignment sits inside a `try` block, where the block may be abandoned before
+the value is used.
 
 Examples of **incorrect** code for this rule:
 
@@ -69,9 +71,6 @@ function fn() {
 
 ## Differences from ESLint
 
-- The `/* exported foo */` directive comment is not supported. In a script
-  file, ESLint treats a variable named by it as observable from outside and
-  reports no assignments to it; this rule still analyzes the variable.
 - Destructuring follows the run-time evaluation order: the initializer or
   right-hand side produces its value first, then each element evaluates its
   computed key and default. So `let { a = x } = (x = 1, obj)` is clean here —

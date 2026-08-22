@@ -66,6 +66,16 @@ func TestNoUnusedVarsExtras(t *testing.T) {
 
 			// A reference outside a class declaration consumes its outer binding.
 			{Code: `class UsedClass { static make() { return new UsedClass(); } } consume(UsedClass);`},
+
+			// `/* exported */` marks a global-scope binding used, whichever
+			// declaration form binds it. A `var` reaches the global scope from
+			// inside a block; the invalid cases below cover the forms that stay
+			// block-scoped.
+			{Code: `/* exported publicValue */ var publicValue = 1;`},
+			{Code: `/* exported publicFn */ function publicFn() {}`},
+			{Code: `/* exported PublicClass */ class PublicClass {}`},
+			{Code: `/* exported destructured */ var { destructured } = source;`},
+			{Code: `/* exported hoisted */ { var hoisted = 1; }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// A dot-property name is not a reference to the local binding.
@@ -208,11 +218,44 @@ func TestNoUnusedVarsExtras(t *testing.T) {
 				},
 			},
 
-			// ---- Intentional difference: exported comments do not mark globals as used ----
+			// ---- `/* exported */` reaches the global scope and nothing else ----
 			{
-				Code: `/* exported publicValue */ var publicValue = 1;`,
+				Code: `/* exported blockScoped */ { let blockScoped = 1; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					extraUnusedErrorWithSuggestion("publicValue", true, 1, 32, 43, `/* exported publicValue */ `),
+					extraUnusedErrorWithSuggestion("blockScoped", true, 1, 34, 45, `/* exported blockScoped */ {  }`),
+				},
+			},
+			{
+				Code: `/* exported blockFunction */ { function blockFunction() {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("blockFunction", false, 1, 41, 54, `/* exported blockFunction */ {  }`),
+				},
+			},
+			{
+				Code: `/* exported inner */ function outer() { var inner = 1; } outer();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("inner", true, 1, 45, 50, `/* exported inner */ function outer() {  } outer();`),
+				},
+			},
+			{
+				Code: `/* exported caught */ try {} catch (caught) {}`,
+				Options: map[string]interface{}{
+					"caughtErrors": "all",
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedError("caught", false, 1, 37, 43, ""),
+				},
+			},
+			// A directive marks its global used, so reportUsedIgnorePattern sees
+			// an ignored name that is used after all.
+			{
+				Code: `/* exported _publicValue */ var _publicValue = 1;`,
+				Options: map[string]interface{}{
+					"varsIgnorePattern":       "^_",
+					"reportUsedIgnorePattern": true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUsedIgnoredError("_publicValue", ". Used vars must not match /^_/u", 1, 33, 45),
 				},
 			},
 

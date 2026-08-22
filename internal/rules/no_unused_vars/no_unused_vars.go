@@ -2061,6 +2061,13 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		varInfo.Used = true
 		varInfo.OnlyUsedAsType = false
 	}
+	// An `/* exported */` global is consumed by a separately loaded file, so
+	// upstream counts the directive itself as a use. reportUsedIgnorePattern
+	// still sees it as used, which is what turns a directive on an ignored name
+	// into a usedIgnoredVar report.
+	if !varInfo.Used && ctx.IsExportedGlobalBinding(definition, name) {
+		varInfo.Used = true
+	}
 	// A used binding cannot produce a diagnostic unless the caller asks to
 	// report names that match an ignore pattern. Avoid category, export, and
 	// assignment analysis on the common path.

@@ -68,6 +68,26 @@ const x: SomeType = getValue();
 function baz(_unused: string) {}
 ```
 
+## The `/* exported */` comment
+
+A script shares its globals with the other scripts loaded alongside it, where
+this rule cannot see them being read. An `/* exported name */` block comment
+declares that such a global is consumed elsewhere, and the rule counts the
+comment itself as a use. TypeScript's scope manager puts type-only declarations
+in the same global scope as value ones, so the comment reaches an `interface`,
+`type`, `enum`, or `namespace` as well:
+
+```typescript
+/* exported PublicValue, PublicType */
+var PublicValue = 1;
+type PublicType = string;
+```
+
+The comment resolves each name against the global scope, so it applies to a
+file whose top level is that scope — one with no `import`/`export` of its own.
+A module's top-level binding, a block binding, and a function's parameters live
+in their own scopes and are still reported.
+
 ## Original Documentation
 
 - [typescript-eslint: no-unused-vars](https://typescript-eslint.io/rules/no-unused-vars)
