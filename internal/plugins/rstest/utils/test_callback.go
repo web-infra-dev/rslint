@@ -131,9 +131,14 @@ func isModuleTopLevelFunction(function *ast.Node) bool {
 		case ast.KindVariableDeclaration,
 			ast.KindVariableDeclarationList,
 			ast.KindVariableStatement,
-			ast.KindParenthesizedExpression:
+			ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindSatisfiesExpression,
+			ast.KindNonNullExpression,
+			ast.KindTypeAssertionExpression:
 			// The declaration chain a `const cb = () => {}` hangs from, and the
-			// parentheses SkipParentheses already looked through.
+			// parentheses and TS assertions SkipAssertionsAndParens already
+			// looked through.
 		default:
 			return false
 		}

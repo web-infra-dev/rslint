@@ -105,14 +105,21 @@ test('loads a value', () => {
 
 ## Limitations
 
-The rule checks conditionals inside test callbacks reached through supported
-Rstest forms, including global `test` / `it`, imports from `@rstest/core` and
-`@rstest/playwright`, namespace and CommonJS access, `import.meta.rstest`,
-parameterized `.each` / `.for`, and same-file callback aliases such as
-`test('case', callback)` when `callback` is defined in the same file.
+The scope is the test registration call itself, reached through supported
+Rstest forms: global `test` / `it`, imports from `@rstest/core` and
+`@rstest/playwright`, namespace and CommonJS access, `import.meta.rstest`, and
+parameterized `.each` / `.for`. Everything written inside that call is checked,
+including the title, the options and timeout arguments, the `.each` data, and a
+callback passed through a wrapper such as `test('case', wrap(() => {}))`.
 
-Wrapper callbacks are not followed. For example, conditionals inside
-`test('case', wrap(() => {}))` are not reported.
+A function declared outside the call is not checked, even when the call names
+it as its callback: in `test('case', callback); function callback() {}` the
+body of `callback` is outside the test call, so conditionals in it are not
+reported.
+
+Unlike the upstream rule, an inner registration exiting does not clear the
+outer test's scope, so a conditional written after a nested `test(...)` is
+still reported.
 
 ## Original Documentation
 

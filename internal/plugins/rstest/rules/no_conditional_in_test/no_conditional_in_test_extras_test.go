@@ -42,14 +42,42 @@ beforeEach(() => {
 });
     `},
 
-		// ---- Dimension 4: unresolved wrapper is fail-closed ----
+		// ---- Dimension 4: a callback declared outside the test call is out of
+		// scope, whatever argument position names it ----
 		{Code: `
-test('case', wrap(() => {
+test('case', callback);
+function callback() {
   if (flag) {
     act();
   }
-}));
+}
     `},
+		{Code: `
+const callback = () => {
+  if (flag) {
+    act();
+  }
+};
+test('case', callback);
+    `},
+		{Code: `
+const TIMEOUT = 1000;
+test('case', callback, TIMEOUT);
+function callback() {
+  if (flag) {
+    act();
+  }
+}
+    `},
+		{Code: `
+test('case', { timeout: 1000 }, callback);
+function callback() {
+  if (flag) {
+    act();
+  }
+}
+    `},
+		{Code: `test('case', callback); let callback = () => { if (flag) { act(); } }; callback = other;`},
 
 		// ---- Dimension 4: body-absent or non-callback overloads do not crash ----
 		{Code: `test('case');`},
@@ -114,6 +142,56 @@ test('case', () => {
 			}},
 		},
 
+		// ---- Dimension 4: every argument of the test call is inside the test ----
+		{
+			Code: `
+test('case', wrap(() => {
+  if (flag) {
+    act();
+  }
+}));
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
+		},
+		{
+			Code: `test(cond ? 'a' : 'b', () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      1,
+				Column:    6,
+				EndLine:   1,
+				EndColumn: 22,
+			}},
+		},
+		{
+			Code:   `test('case', () => {}, timeout || 5);`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 1, Column: 24}},
+		},
+		{
+			Code:   `test.each([a || b])('case', () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 1, Column: 12}},
+		},
+		{
+			Code:   `test.skip.each([a || b])('case', () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 1, Column: 17}},
+		},
+		{
+			Code:   "test.each`${a || b}`('case', () => {});",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 1, Column: 13}},
+		},
+		{
+			Code:    `test(a?.b, () => {});`,
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 1, Column: 6}},
+		},
+
+		// ---- Divergence from upstream: an inner registration exiting does not
+		// clear the outer test's scope ----
+		{
+			Code:   `test('outer', () => { test('inner', () => {}); if (flag) { act(); } });`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 1, Column: 48}},
+		},
+
 		// ---- Dimension 4: nested function declarations inside test still report ----
 		{
 			Code: `
@@ -161,36 +239,6 @@ test('case', () => {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 4, Column: 5}},
 		},
 
-		// ---- Dimension 4: named callback ownership via analysis.Callbacks().Functions ----
-		{
-			Code: `
-test('case', callback);
-function callback() {
-  if (flag) {
-    act();
-  }
-}
-      `,
-			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "conditionalInTest",
-				Line:      4,
-				Column:    3,
-				EndLine:   6,
-				EndColumn: 4,
-			}},
-		},
-		{
-			Code: `
-const callback = () => {
-  if (flag) {
-    act();
-  }
-};
-test('case', callback);
-      `,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
-		},
-
 		// ---- Dimension 4: overload (name, cb, timeout) keeps second argument as callback ----
 		{
 			Code: `
@@ -202,19 +250,6 @@ test('case', () => {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
 		},
-		{
-			Code: `
-const TIMEOUT = 1000;
-test('case', callback, TIMEOUT);
-function callback() {
-  if (flag) {
-    act();
-  }
-}
-      `,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 5, Column: 3}},
-		},
-
 		// ---- Dimension 4: overload (name, options, callback) resolves third argument ----
 		{
 			Code: `
@@ -226,18 +261,6 @@ test('case', { timeout: 1000 }, () => {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
 		},
-		{
-			Code: `
-test('case', { timeout: 1000 }, callback);
-function callback() {
-  if (flag) {
-    act();
-  }
-}
-      `,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 4, Column: 3}},
-		},
-
 		// ---- Dimension 4: global/named/alias/require/namespace/whole-module/import.meta/playwright sources ----
 		{
 			Code: `

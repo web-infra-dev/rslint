@@ -58,43 +58,27 @@ func isOutermostOptionalChain(node *ast.Node) bool {
 	}
 }
 
-func enterTestCallback(
-	testCallbackDepth *int,
-	testCallbackFunctions map[*ast.Node]bool,
-	node *ast.Node,
-) {
-	if node != nil && testCallbackFunctions[node] {
-		*testCallbackDepth = *testCallbackDepth + 1
-	}
-}
-
-func exitTestCallback(
-	testCallbackDepth *int,
-	testCallbackFunctions map[*ast.Node]bool,
-	node *ast.Node,
-) {
-	if node != nil && testCallbackFunctions[node] {
-		*testCallbackDepth = *testCallbackDepth - 1
-	}
-}
-
 var NoConditionalInTestRule = rule.Rule{
 	Name:   "rstest/no-conditional-in-test",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
-		testCallbackFunctions := analysis.Callbacks().Functions
-		testCallbackDepth := 0
+		// The scope is the test registration call itself, so every argument of
+		// the call is inside a test and a function that merely happens to be
+		// named as the callback is not. The counter, rather than a flag, keeps
+		// an inner registration exiting from clearing the outer test's state.
+		testCallDepth := 0
+		testCalls := map[*ast.Node]bool{}
 
 		reportConditional := func(node *ast.Node) {
-			if testCallbackDepth > 0 {
+			if testCallDepth > 0 {
 				ctx.ReportNode(node, buildConditionalInTestMessage())
 			}
 		}
 
 		reportOptionalChain := func(node *ast.Node) {
-			if testCallbackDepth > 0 &&
+			if testCallDepth > 0 &&
 				!opts.allowOptionalChaining &&
 				isOutermostOptionalChain(node) {
 				reportRange := internalUtils.TrimNodeTextRange(ctx.SourceFile, node)
@@ -109,25 +93,6 @@ var NoConditionalInTestRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{
-			ast.KindFunctionDeclaration: func(node *ast.Node) {
-				enterTestCallback(&testCallbackDepth, testCallbackFunctions, node)
-			},
-			rule.ListenerOnExit(ast.KindFunctionDeclaration): func(node *ast.Node) {
-				exitTestCallback(&testCallbackDepth, testCallbackFunctions, node)
-			},
-			ast.KindFunctionExpression: func(node *ast.Node) {
-				enterTestCallback(&testCallbackDepth, testCallbackFunctions, node)
-			},
-			rule.ListenerOnExit(ast.KindFunctionExpression): func(node *ast.Node) {
-				exitTestCallback(&testCallbackDepth, testCallbackFunctions, node)
-			},
-			ast.KindArrowFunction: func(node *ast.Node) {
-				enterTestCallback(&testCallbackDepth, testCallbackFunctions, node)
-			},
-			rule.ListenerOnExit(ast.KindArrowFunction): func(node *ast.Node) {
-				exitTestCallback(&testCallbackDepth, testCallbackFunctions, node)
-			},
-
 			ast.KindIfStatement:           reportConditional,
 			ast.KindSwitchStatement:       reportConditional,
 			ast.KindConditionalExpression: reportConditional,
@@ -139,8 +104,22 @@ var NoConditionalInTestRule = rule.Rule{
 
 			ast.KindPropertyAccessExpression: reportOptionalChain,
 			ast.KindElementAccessExpression:  reportOptionalChain,
-			ast.KindCallExpression:           reportOptionalChain,
 			ast.KindNonNullExpression:        reportOptionalChain,
+
+			ast.KindCallExpression: func(node *ast.Node) {
+				reportOptionalChain(node)
+				if analysis.ParseTestCall(node) != nil {
+					testCalls[node] = true
+					testCallDepth++
+				}
+			},
+			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
+				if !testCalls[node] {
+					return
+				}
+				delete(testCalls, node)
+				testCallDepth--
+			},
 		}
 	},
 }

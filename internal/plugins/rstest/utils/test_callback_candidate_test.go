@@ -145,88 +145,95 @@ func TestRstestCallAnalysisCallbacksSkipFilesWithoutTests(t *testing.T) {
 	}
 }
 
-	)
-	)
-	)
-		`describe.concurrent("suite", () => {});`,
-		`test("as", (() => {}) as () => void);
-		`test.concurrent("x", () => marker());`,
-	analysis := GetRstestCallAnalysis(ctx)
-	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
-	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
-	analysis.Callbacks()
+func TestRstestCallAnalysisCallbacksRemainTestOnly(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{
-		ast.SourceFileParseOptions{
-		ast.SourceFileParseOptions{
-			break
-	callbacks := analysis.Callbacks()
-			FileName: "/concurrent-context.test.ts",
-			Path:     "/concurrent-context.test.ts",
-	concurrentContext := GetRstestConcurrentContext(ctx, analysis)
-const callback = (() => {}) as () => void;
-		core.ScriptKindTS,
-		core.ScriptKindTS,
-		core.ScriptKindTS,
-	ctx := rule.RuleContext{SourceFile: sourceFile}.WithFileCache(rule.NewFileCache())
 			FileName: "/describe-only.test.ts",
 			Path:     "/describe-only.test.ts",
-			describeCall = call
-	for _, call := range analysis.calls {
-func TestRstestCallAnalysisCallbacksRemainTestOnly(t *testing.T) {
-func TestRstestCallAnalysisCallbacksUnwrapTypeScriptAssertions(t *testing.T) {
-func TestRstestConcurrentContextBuildsOwnershipLazily(t *testing.T) {
-	if !concurrentContext.IsInConcurrentTest(markerCall) {
+		},
+		`describe.concurrent("suite", () => {});`,
+		core.ScriptKindTS,
+	)
+	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
 	if analysis.hasTests {
-		if analysis.isFnCallCandidate(call) {
-	if concurrentContext.ownership != nil {
-	if concurrentContext.ownership == nil {
-	if describeCall == nil {
-	if len(analysis.fnCalls) != 0 {
-	if len(callbacks.Functions) != 4 {
-	if markerCall == nil {
-		if node.Kind == ast.KindCallExpression {
-			if root != nil && root.Kind == ast.KindIdentifier &&
-				markerCall = node
-		return node.ForEachChild(visit)
-				return true
-			root := testFramework.ResolveFirstIdentifier(node.AsCallExpression().Expression)
-				root.AsIdentifier().Text == "marker" {
-	sourceFile := parser.ParseSourceFile(
-	sourceFile := parser.ParseSourceFile(
-	sourceFile := parser.ParseSourceFile(
-	sourceFile.Node.ForEachChild(visit)
-		t.Fatal("concurrent context eagerly built registration ownership")
-		t.Fatal("describe call not found")
 		t.Fatal("describe-only file unexpectedly has a test candidate")
-		t.Fatal("first concurrent query did not build registration ownership")
-		t.Fatal("marker call not found")
-		t.Fatal("marker call was not associated with its concurrent test")
+	}
+
+	analysis.Callbacks()
+	if len(analysis.fnCalls) != 0 {
 		t.Fatalf("callbacks parsed %d calls without a test candidate", len(analysis.fnCalls))
-		t.Fatalf("found %d wrapped callback functions, want 4", len(callbacks.Functions))
-test("named", callback);`,
-test("non-null", (() => {})!);
-test("satisfies", (() => {}) satisfies () => void);
+	}
+
 	var describeCall *ast.Node
-	var markerCall *ast.Node
-	var visit func(*ast.Node) bool
-	visit = func(node *ast.Node) bool {
+	for _, call := range analysis.calls {
+		if analysis.isFnCallCandidate(call) {
+			describeCall = call
+			break
+		}
+	}
+	if describeCall == nil {
+		t.Fatal("describe call not found")
+	}
+}
+
+func TestRstestCallAnalysisCallbacksUnwrapTypeScriptAssertions(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(
+		ast.SourceFileParseOptions{
 			FileName: "/wrapped-callbacks.test.ts",
 			Path:     "/wrapped-callbacks.test.ts",
 		},
-	}
-	}
-		}
-	}
+		`test("as", (() => {}) as () => void);
+test("satisfies", (() => {}) satisfies () => void);
+test("non-null", (() => {})!);
+const callback = (() => {}) as () => void;
+test("named", callback);`,
+		core.ScriptKindTS,
+	)
+	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
+	callbacks := analysis.Callbacks()
+	if len(callbacks.Functions) != 4 {
+		t.Fatalf("found %d wrapped callback functions, want 4", len(callbacks.Functions))
 	}
 }
+
+func TestRstestConcurrentContextBuildsOwnershipLazily(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(
+		ast.SourceFileParseOptions{
+			FileName: "/concurrent-context.test.ts",
+			Path:     "/concurrent-context.test.ts",
 		},
+		`test.concurrent("x", () => marker());`,
+		core.ScriptKindTS,
+	)
+	ctx := rule.RuleContext{SourceFile: sourceFile}.WithFileCache(rule.NewFileCache())
+	analysis := GetRstestCallAnalysis(ctx)
+	concurrentContext := GetRstestConcurrentContext(ctx, analysis)
+	if concurrentContext.ownership != nil {
+		t.Fatal("concurrent context eagerly built registration ownership")
 	}
+
+	var markerCall *ast.Node
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindCallExpression {
+			root := testFramework.ResolveFirstIdentifier(node.AsCallExpression().Expression)
+			if root != nil && root.Kind == ast.KindIdentifier &&
+				root.AsIdentifier().Text == "marker" {
+				markerCall = node
+				return true
 			}
 		}
+		return node.ForEachChild(visit)
 	}
+	sourceFile.Node.ForEachChild(visit)
+	if markerCall == nil {
+		t.Fatal("marker call not found")
 	}
+	if !concurrentContext.IsInConcurrentTest(markerCall) {
+		t.Fatal("marker call was not associated with its concurrent test")
 	}
-		},
+	if concurrentContext.ownership == nil {
+		t.Fatal("first concurrent query did not build registration ownership")
 	}
 }
 
