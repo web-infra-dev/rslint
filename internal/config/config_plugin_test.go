@@ -22,15 +22,15 @@ func TestEslintPluginDeclNameAliases_PinnedForJSGuard(t *testing.T) {
 		"eslint-plugin-unicorn":     {},
 	}
 	got := map[string]struct{}{}
-	for _, p := range KnownPlugins {
-		for _, dn := range p.DeclNames {
-			if strings.HasPrefix(dn, "eslint-plugin-") {
-				got[dn] = struct{}{}
+	for _, plugin := range nativePluginDeclarations {
+		for _, declarationName := range plugin.declarationNames {
+			if strings.HasPrefix(declarationName, "eslint-plugin-") {
+				got[declarationName] = struct{}{}
 			}
 		}
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("eslint-plugin-* DeclNames drifted:\n got  = %v\n want = %v\nMirror them in packages/rslint/src/define-config.ts NATIVE_PLUGIN_DECL_ALIASES.", got, want)
+		t.Errorf("eslint-plugin-* declaration names drifted:\n got  = %v\n want = %v\nMirror them in packages/rslint/src/config/define-config.ts NATIVE_PLUGIN_DECL_ALIASES.", got, want)
 	}
 }
 
@@ -77,67 +77,44 @@ func TestRulePluginPrefix(t *testing.T) {
 	}
 }
 
-func TestGetCoreRules(t *testing.T) {
-	RegisterAllRules()
-
-	coreRules := GetCoreRules()
-	if len(coreRules) == 0 {
-		t.Error("Expected at least one core rule")
+func TestNativePluginDeclarationsCoverCatalogNamespaces(t *testing.T) {
+	namespaces := make(map[string]bool, len(nativePluginDeclarations))
+	for _, plugin := range nativePluginDeclarations {
+		namespaces[plugin.rulePrefix] = false
 	}
-
-	// Core rules are registered with keys that don't contain "/"
-	// The total should be much less than all rules
-	allRules := GlobalRuleRegistry.GetAllRules()
-	if len(coreRules) >= len(allRules) {
-		t.Errorf("Expected fewer core rules than total, got %d vs %d", len(coreRules), len(allRules))
-	}
-}
-
-func TestRules_Disjoint(t *testing.T) {
-	RegisterAllRules()
-
-	// Sum across core + every known plugin's GetAllRules, so this test does not
-	// need to be edited each time a new plugin is added.
-	total := len(GetCoreRules())
-	for _, plugin := range KnownPlugins {
-		total += len(plugin.getAllRules())
-	}
-
-	allRules := GlobalRuleRegistry.GetAllRules()
-	if total != len(allRules) {
-		t.Errorf("Expected total %d to equal all rules %d", total, len(allRules))
-	}
-}
-
-func TestPluginByDeclName_AllDeclNamesRegistered(t *testing.T) {
-	// Every DeclName in KnownPlugins must resolve to the correct RulePrefix
-	for _, plugin := range KnownPlugins {
-		for _, declName := range plugin.DeclNames {
-			info, ok := pluginByDeclName[declName]
-			if !ok {
-				t.Errorf("DeclName %q not found in pluginByDeclName lookup table", declName)
-				continue
-			}
-			if info.RulePrefix != plugin.RulePrefix {
-				t.Errorf("DeclName %q resolved to RulePrefix %q, expected %q", declName, info.RulePrefix, plugin.RulePrefix)
-			}
-		}
-	}
-}
-
-func TestKnownPlugins_GetAllRulesMatchRulePrefix(t *testing.T) {
-	RegisterAllRules()
-
-	for _, plugin := range KnownPlugins {
-		rules := plugin.getAllRules()
-		if len(rules) == 0 {
-			t.Errorf("Plugin %q getAllRules() returned 0 rules", plugin.RulePrefix)
+	hasCoreRule := false
+	for ruleName := range nativeRuleCatalog().AllRules() {
+		namespace := RulePluginPrefix(ruleName)
+		if namespace == "" {
+			hasCoreRule = true
 			continue
 		}
-		prefix := plugin.RulePrefix + "/"
-		for _, r := range rules {
-			if !strings.HasPrefix(r.Name, prefix) {
-				t.Errorf("Plugin %q getAllRules() returned rule %q which does not have prefix %q", plugin.RulePrefix, r.Name, prefix)
+		if _, known := namespaces[namespace]; !known {
+			t.Errorf("native rule %q uses undeclared plugin namespace %q", ruleName, namespace)
+			continue
+		}
+		namespaces[namespace] = true
+	}
+	if !hasCoreRule {
+		t.Error("native catalog contains no core rules")
+	}
+	for namespace, hasRule := range namespaces {
+		if !hasRule {
+			t.Errorf("native plugin namespace %q contains no rules", namespace)
+		}
+	}
+}
+
+func TestNativePluginDeclarationNamesAreIndexed(t *testing.T) {
+	for _, plugin := range nativePluginDeclarations {
+		for _, declarationName := range plugin.declarationNames {
+			indexed, ok := nativePluginByDeclarationName[declarationName]
+			if !ok {
+				t.Errorf("declaration name %q is not indexed", declarationName)
+				continue
+			}
+			if indexed.rulePrefix != plugin.rulePrefix {
+				t.Errorf("declaration name %q resolved to namespace %q, want %q", declarationName, indexed.rulePrefix, plugin.rulePrefix)
 			}
 		}
 	}
@@ -232,7 +209,6 @@ func TestGetConfigForFile_PluginsOnlyFromMatchingEntries(t *testing.T) {
 }
 
 func TestGetConfigForFile_MultiplePluginsInSameEntry(t *testing.T) {
-	RegisterAllRules()
 
 	config := RslintConfig{
 		{

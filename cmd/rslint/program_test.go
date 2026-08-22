@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/catalog"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -43,7 +44,6 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 		t.Fatalf("load source-only Program: programs=%d err=%v", len(loaded.Programs), err)
 	}
 
-	rslintconfig.RegisterAllRules()
 	cfg := rslintconfig.RslintConfig{
 		rslintconfig.ConfigEntry{
 			Files:   []string{"**/*.ts"},
@@ -52,7 +52,7 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 		},
 	}
 	// Deliberately bypass the config resolver's type-info gate.
-	rules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(cfg, targetFile, tmpDir, false)
+	rules, _ := rslintconfig.ResolveEnabledRules(catalog.Native(), cfg, targetFile, tmpDir, false)
 	if len(rules) != 1 || rules[0].Name != "@typescript-eslint/no-unsafe-member-access" || !rules[0].RequiresTypeInfo {
 		t.Fatalf("fixture did not resolve the expected type-aware rule: %+v", rules)
 	}

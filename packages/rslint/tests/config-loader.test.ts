@@ -555,10 +555,10 @@ describe('collectPluginMeta', () => {
     ]);
   });
 
-  test('ruleNames are merged across configs sharing a prefix (per-config-unique rules still register)', () => {
-    // Go registers ONE global placeholder set per prefix but the worker routes
-    // per-config; a rule mounted only by /b's `local` (zzz) must still register,
-    // or Go never dispatches it for files under /b (silent false-green).
+  test('ruleNames are merged across configs sharing a prefix (per-config-unique rules remain resolvable)', () => {
+    // Go derives one request-wide placeholder set per prefix but the worker
+    // routes per-config; a rule mounted only by /b's `local` (zzz) must remain
+    // resolvable, or Go never dispatches it for files under /b (silent false-green).
     const { eslintPluginEntries } = collectPluginMeta([
       {
         configPath: '/a/rslint.config.mjs',

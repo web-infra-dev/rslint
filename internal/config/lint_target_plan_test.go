@@ -100,6 +100,7 @@ func TestLintTargetPlanAppliesExecutionConfigOverFrozenPathSpaces(t *testing.T) 
 		executionConfig,
 		directory,
 		osvfs.FS(),
+		nativeRuleCatalog(),
 		false,
 	).ResolveTarget(plan.Targets[0])
 	if resolved.MergedConfig == nil ||
@@ -211,7 +212,7 @@ func TestResolveLintTargetPlanSeparatesConfigDirectoryFromScanRoot(t *testing.T)
 		t.Fatalf("target config directory = %q, want %q", got, configDirectory)
 	}
 	resolvedTarget := plan.Targets[0]
-	merged := NewFileConfigResolverWithFS(entries, configDirectory, osvfs.FS(), false).
+	merged := NewFileConfigResolverWithFS(entries, configDirectory, osvfs.FS(), nativeRuleCatalog(), false).
 		ConfigForTarget(resolvedTarget.Path, resolvedTarget.CanonicalPath)
 	if merged == nil || merged.Rules["no-debugger"] == nil {
 		t.Fatalf("external target %q did not retain config-relative matching: %#v", resolvedTarget.Path, merged)

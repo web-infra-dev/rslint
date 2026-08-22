@@ -5,10 +5,9 @@
 // the entire rslib build, so by the time it runs the library surface's
 // `dist/index.d.ts` already exists (see rslib.config.ts).
 //
-// Reads every registered native rule's options JSON Schema from
-// `rule-schemas.json` — a `{name, schema}[]` dump produced by
-// `tools/dump_rule_schemas` (which walks internal/config.GlobalRuleRegistry,
-// the single source of truth for rule IDs, prefixes, and declared schemas).
+// Reads every native rule's options JSON Schema from `rule-schemas.json` — a
+// `{name, schema}[]` dump produced by `tools/dump_rule_schemas` from the shared
+// immutable native rule catalog.
 // That dump isn't produced automatically, so a missing one just skips with a
 // warning rather than failing the build. Rules that haven't declared a
 // schema yet (internal/rule.Rule.Schema == nil) are omitted by the Go side

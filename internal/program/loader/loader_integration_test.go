@@ -591,7 +591,6 @@ func TestLoadProgramsUsesPhysicalConfigSpaceForSymlinkedConfigRoot(t *testing.T)
 		t.Fatalf("binding lost canonical target identity: source=%q binding=%+v target=%q", sourcePath, lintTarget, realTarget)
 	}
 
-	rslintconfig.RegisterAllRules()
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
 		Config:                 cfg,
 		CurrentDirectory:       linkDir,
@@ -650,7 +649,6 @@ func TestLoadProgramsConfigMatchingDoesNotDependOnProgramSourcePath(t *testing.T
 		t.Fatalf("binding must retain lexical target %q, got %+v", expectedTargetPath, target)
 	}
 
-	rslintconfig.RegisterAllRules()
 	resolver := newLintConfigResolver(lintConfigResolverOptions{
 		Config:                 cfg,
 		CurrentDirectory:       rootDir,

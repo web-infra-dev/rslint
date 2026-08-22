@@ -81,6 +81,18 @@ linters:
           msg: 'Two strings a rule compares without regard to case are compared the way whatever it is ported from compares them: use ecmascript.EqualsWhenUppercased where upstream writes toUpperCase (jsx-ast-utils looks a prop up that way) and ecmascript.EqualsWhenLowercased where it writes toLowerCase. strings.EqualFold is neither: it folds U+017F ſ onto `s` in both directions, and never folds U+0131 ı onto `i` although uppercasing does.'
     depguard:
       rules:
+        config-rule-boundary:
+          # Configuration evaluates rule descriptors supplied by callers. It
+          # must not assemble or import concrete rule implementations.
+          list-mode: lax
+          files:
+            - '**/internal/config/**'
+            - '!**/internal/config/**_test.go'
+          deny:
+            - pkg: 'github.com/web-infra-dev/rslint/internal/plugins'
+              desc: 'Configuration depends on internal/rule abstractions; assemble concrete implementations in internal/rules/catalog.'
+            - pkg: 'github.com/web-infra-dev/rslint/internal/rules'
+              desc: 'Configuration depends on internal/rule abstractions; assemble concrete implementations in internal/rules/catalog.'
         js-semantics:
           # Lax so that the allow list below reads as an exception to a deny
           # rather than as the only thing a rule may import.

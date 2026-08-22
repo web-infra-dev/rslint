@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -25,6 +26,50 @@ import (
 type canonicalPathBaseFS struct {
 	vfs.FS
 	realpathCalls atomic.Int32
+}
+
+func captureAPIStderr(t *testing.T, run func()) string {
+	t.Helper()
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("create stderr pipe: %v", err)
+	}
+	previous := os.Stderr
+	os.Stderr = writer
+	defer func() {
+		os.Stderr = previous
+		reader.Close()
+	}()
+
+	run()
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close stderr writer: %v", err)
+	}
+	output, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("read stderr: %v", err)
+	}
+	return string(output)
+}
+
+func TestHandleLintInvalidOptionsDoesNotDerivePluginCatalog(t *testing.T) {
+	var lintErr error
+	stderr := captureAPIStderr(t, func() {
+		_, lintErr = (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+			Config:           json.RawMessage(`[{"rules":{"no-console":["error",{"allow":"warn"}]}}]`),
+			WorkingDirectory: t.TempDir(),
+			EslintPlugins: []api.EslintPluginEntry{{
+				Prefix:    "@typescript-eslint",
+				RuleNames: []string{"no-explicit-any"},
+			}},
+		}, nil)
+	})
+	if lintErr == nil || !strings.Contains(lintErr.Error(), "invalid rule options") {
+		t.Fatalf("HandleLintWithContext error = %v, want invalid rule options", lintErr)
+	}
+	if strings.Contains(stderr, "shadowed by a built-in rule") {
+		t.Fatalf("plugin catalog was derived before options validation: %q", stderr)
+	}
 }
 
 func (fs *canonicalPathBaseFS) Realpath(filePath string) string {
