@@ -1,0 +1,447 @@
+// Rstest Snapshot v1
+
+exports[`no-implicit-globals > invalid 1`] = `
+{
+  "code": "var foo = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'var' declaration in the global scope, wrap in an IIFE for a local variable, assign as global property for a global variable.",
+      "messageId": "globalNonLexicalBinding",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 2`] = `
+{
+  "code": "function foo() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected function declaration in the global scope, wrap in an IIFE for a local variable, assign as global property for a global variable.",
+      "messageId": "globalNonLexicalBinding",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 3`] = `
+{
+  "code": "var foo = 1, bar = 2;",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'var' declaration in the global scope, wrap in an IIFE for a local variable, assign as global property for a global variable.",
+      "messageId": "globalNonLexicalBinding",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+    {
+      "message": "Unexpected 'var' declaration in the global scope, wrap in an IIFE for a local variable, assign as global property for a global variable.",
+      "messageId": "globalNonLexicalBinding",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 4`] = `
+{
+  "code": "const a = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'const' declaration in the global scope, wrap in a block or in an IIFE.",
+      "messageId": "globalLexicalBinding",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 5`] = `
+{
+  "code": "let a;",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'let' declaration in the global scope, wrap in a block or in an IIFE.",
+      "messageId": "globalLexicalBinding",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 6`] = `
+{
+  "code": "class A {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected class declaration in the global scope, wrap in a block or in an IIFE.",
+      "messageId": "globalLexicalBinding",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 7`] = `
+{
+  "code": "foo = 1",
+  "diagnostics": [
+    {
+      "message": "Global variable leak, declare the variable if it is intended to be local.",
+      "messageId": "globalVariableLeak",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 8`] = `
+{
+  "code": "for (foo in {});",
+  "diagnostics": [
+    {
+      "message": "Global variable leak, declare the variable if it is intended to be local.",
+      "messageId": "globalVariableLeak",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 9`] = `
+{
+  "code": "foo = 1, bar = 2;",
+  "diagnostics": [
+    {
+      "message": "Global variable leak, declare the variable if it is intended to be local.",
+      "messageId": "globalVariableLeak",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+    {
+      "message": "Global variable leak, declare the variable if it is intended to be local.",
+      "messageId": "globalVariableLeak",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 10`] = `
+{
+  "code": "Array = 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment to read-only global variable.",
+      "messageId": "assignmentToReadonlyGlobal",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 11`] = `
+{
+  "code": "foo = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment to read-only global variable.",
+      "messageId": "assignmentToReadonlyGlobal",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 12`] = `
+{
+  "code": "var Array = 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected redeclaration of read-only global variable.",
+      "messageId": "redeclarationOfReadonlyGlobal",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 13`] = `
+{
+  "code": "/*global foo:readonly*/ var foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected redeclaration of read-only global variable.",
+      "messageId": "redeclarationOfReadonlyGlobal",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 14`] = `
+{
+  "code": "/*global foo:readonly*/ function foo() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected redeclaration of read-only global variable.",
+      "messageId": "redeclarationOfReadonlyGlobal",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 15`] = `
+{
+  "code": "/* exported bar */ var foo = 'text';",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'var' declaration in the global scope, wrap in an IIFE for a local variable, assign as global property for a global variable.",
+      "messageId": "globalNonLexicalBinding",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-globals > invalid 16`] = `
+{
+  "code": "/* exported foo */ foo = 1",
+  "diagnostics": [
+    {
+      "message": "Global variable leak, declare the variable if it is intended to be local.",
+      "messageId": "globalVariableLeak",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-globals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
