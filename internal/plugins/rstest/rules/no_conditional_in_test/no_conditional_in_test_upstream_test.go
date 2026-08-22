@@ -1,20 +1,21 @@
+// TestNoConditionalInTestUpstream migrates the full valid/invalid suite from
+// eslint-plugin-jest v29.16.1 src/rules/__tests__/no-conditional-in-test.test.ts
+// 1:1. rslint-specific lock-ins live in no_conditional_in_test_extras_test.go.
 package no_conditional_in_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/fixtures"
-	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_conditional_in_test"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
+	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_in_test"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoConditionalInTestRule(t *testing.T) {
+func TestNoConditionalInTestUpstream(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{
+		// ---- conditional expressions ----
 		{Code: `const x = y ? 1 : 0`},
-		{Code: `const x = foo && bar`},
-		{Code: `const x = foo || bar`},
-		{Code: `const x = foo ?? bar`},
 		{Code: `
       const foo = function (bar) {
         return foo ? bar : null;
@@ -33,16 +34,16 @@ func TestNoConditionalInTestRule(t *testing.T) {
         foo();
       });
     `},
-		{Code: `
+		{
+			Code: `
       fit.concurrent('foo', () => {
         switch('bar') {}
       })
-    `},
-		{Code: `
-      xit.concurrent('foo', () => {
-        if (x) {}
-      });
-    `},
+    `,
+			Skip: true, // SKIP: rstest does not support Jest's legacy fit alias.
+		},
+
+		// ---- switch statements ----
 		{Code: `it('foo', () => {})`},
 		{Code: `
       switch (true) {
@@ -76,16 +77,22 @@ func TestNoConditionalInTestRule(t *testing.T) {
         switch('bar') {}
       })
     `},
-		{Code: `
+		{
+			Code: `
       xdescribe('foo', () => {
         switch('bar') {}
       })
-    `},
-		{Code: `
+    `,
+			Skip: true, // SKIP: rstest does not support Jest's legacy xdescribe alias.
+		},
+		{
+			Code: `
       fdescribe('foo', () => {
         switch('bar') {}
       })
-    `},
+    `,
+			Skip: true, // SKIP: rstest does not support Jest's legacy fdescribe alias.
+		},
 		{Code: `
       describe('foo', () => {
         switch('bar') {}
@@ -128,6 +135,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
         });
       });
     `},
+
+		// ---- if statements ----
 		{Code: `if (foo) {}`},
 		{Code: `it('foo', () => {})`},
 		{Code: `it("foo", function () {})`},
@@ -147,16 +156,22 @@ func TestNoConditionalInTestRule(t *testing.T) {
         if ('bar') {}
       })
     `},
-		{Code: `
+		{
+			Code: `
       xdescribe('foo', () => {
         if ('bar') {}
       })
-    `},
-		{Code: `
+    `,
+			Skip: true, // SKIP: rstest does not support Jest's legacy xdescribe alias.
+		},
+		{
+			Code: `
       fdescribe('foo', () => {
         if ('bar') {}
       })
-    `},
+    `,
+			Skip: true, // SKIP: rstest does not support Jest's legacy fdescribe alias.
+		},
 		{Code: `
       describe('foo', () => {
         if ('bar') {}
@@ -211,17 +226,16 @@ func TestNoConditionalInTestRule(t *testing.T) {
         });
       });
     `},
-		{Code: `
+		{
+			Code: `
       fit.concurrent('foo', () => {
         if ('bar') {}
       })
-    `},
-		{Code: `
-      import { fit as focusedTest } from '@jest/globals';
-      focusedTest.concurrent('x', () => {
-        if (condition) {}
-      });
-    `},
+    `,
+			Skip: true, // SKIP: rstest does not support Jest's legacy fit alias.
+		},
+
+		// ---- optional chaining ----
 		{Code: `const x = obj?.foo`},
 		{Code: `
       it('foo', () => {
@@ -255,17 +269,11 @@ func TestNoConditionalInTestRule(t *testing.T) {
         expect(values).toStrictEqual(['foo']);
       });
     `},
+
+		// ---- optional chaining with allowOptionalChaining=false ----
 		{
 			Code:    `const x = obj?.foo`,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-		},
-		{
-			Code:    `it?.('foo', () => {});`,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-		},
-		{
-			Code:    `test?.('foo', () => {});`,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Options: map[string]any{"allowOptionalChaining": false},
 		},
 		{
 			Code: `
@@ -275,7 +283,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           expect(foo).toBe(undefined);
         });
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Options: map[string]any{"allowOptionalChaining": false},
 		},
 		{
 			Code: `
@@ -283,7 +291,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           const val = obj?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Options: map[string]any{"allowOptionalChaining": false},
 		},
 		{
 			Code: `
@@ -293,7 +301,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           });
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Options: map[string]any{"allowOptionalChaining": false},
 		},
 		{
 			Code: `
@@ -303,7 +311,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           });
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Options: map[string]any{"allowOptionalChaining": false},
 		},
 		{
 			Code: `
@@ -313,7 +321,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           expect(values).toStrictEqual(['foo']);
         });
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Options: map[string]any{"allowOptionalChaining": false},
 		},
 		{
 			Code: `
@@ -324,49 +332,25 @@ func TestNoConditionalInTestRule(t *testing.T) {
           });
         });
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Options: map[string]any{"allowOptionalChaining": false},
 		},
 	}
+
 	invalid := []rule_tester.InvalidTestCase{
+		// ---- conditional expressions ----
 		{
 			Code: `
         it('foo', () => {
           expect(bar ? foo : baz).toBe(boo);
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 10},
-			},
-		},
-		{
-			Code: `
-        it('foo', () => {
-          foo && expect(foo).toBe(true);
-        })
-      `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
-		},
-		{
-			Code: `
-        it('foo', () => {
-          const value = foo || bar;
-        })
-      `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 17},
-			},
-		},
-		{
-			Code: `
-        it('foo', () => {
-          const value = foo ?? bar;
-        })
-      `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 17},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      2,
+				Column:    10,
+				EndLine:   2,
+				EndColumn: 25,
+			}},
 		},
 		{
 			Code: `
@@ -376,9 +360,13 @@ func TestNoConditionalInTestRule(t *testing.T) {
           };
         });
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 12},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      3,
+				Column:    12,
+				EndLine:   3,
+				EndColumn: 28,
+			}},
 		},
 		{
 			Code: `
@@ -386,9 +374,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           const foo = bar ? foo : baz;
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 15},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 15}},
 		},
 		{
 			Code: `
@@ -397,9 +383,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
         })
         const foo = bar ? foo : baz;
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 15},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 15}},
 		},
 		{
 			Code: `
@@ -413,6 +397,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
 				{MessageId: "conditionalInTest", Line: 3, Column: 22},
 			},
 		},
+
+		// ---- switch statements ----
 		{
 			Code: `
         it('is invalid', () => {
@@ -428,9 +414,13 @@ func TestNoConditionalInTestRule(t *testing.T) {
           expect(values).toStrictEqual(['foo']);
         });
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 5},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      3,
+				Column:    5,
+				EndLine:   8,
+				EndColumn: 6,
+			}},
 		},
 		{
 			Code: `
@@ -440,9 +430,13 @@ func TestNoConditionalInTestRule(t *testing.T) {
           }
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      2,
+				Column:    3,
+				EndLine:   4,
+				EndColumn: 4,
+			}},
 		},
 		{
 			Code: `
@@ -450,9 +444,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -460,9 +452,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -470,9 +460,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -480,9 +468,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:   true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -490,9 +477,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:   true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -500,9 +486,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -510,9 +494,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -520,9 +502,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -530,9 +510,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:   true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -540,9 +519,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:   true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -553,9 +531,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           })
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 4, Column: 5},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 4, Column: 5}},
 		},
 		{
 			Code: `
@@ -582,9 +558,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           switch ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
 		},
 		{
 			Code: `
@@ -613,6 +587,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
 				{MessageId: "conditionalInTest", Line: 13, Column: 7},
 			},
 		},
+
+		// ---- if statements ----
 		{
 			Code: `
         it('foo', () => {
@@ -625,9 +601,13 @@ func TestNoConditionalInTestRule(t *testing.T) {
           };
         });
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 5},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      3,
+				Column:    5,
+				EndLine:   7,
+				EndColumn: 6,
+			}},
 		},
 		{
 			Code: `
@@ -641,9 +621,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           };
         });
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 5},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 5}},
 		},
 		{
 			Code: `
@@ -651,9 +629,13 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      2,
+				Column:    3,
+				EndLine:   2,
+				EndColumn: 16,
+			}},
 		},
 		{
 			Code: `
@@ -661,9 +643,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -671,9 +651,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -681,9 +659,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -691,9 +667,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:   true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -701,9 +676,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:   true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -711,9 +685,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -721,9 +693,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -731,9 +701,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -741,9 +709,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:   true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -753,9 +720,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           })
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 5},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 5}},
 		},
 		{
 			Code: `
@@ -782,15 +747,11 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
 		},
 		{
-			Code: "\n        it.each``('foo', () => {\n          callExpression()\n          if ('bar') {}\n        })\n      ",
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 3},
-			},
+			Code:   "\n        it.each``('foo', () => {\n          callExpression()\n          if ('bar') {}\n        })\n      ",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
 		},
 		{
 			Code: `
@@ -799,15 +760,11 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
 		},
 		{
-			Code: "\n        it.only.each``('foo', () => {\n          callExpression()\n          if ('bar') {}\n        })\n      ",
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 3},
-			},
+			Code:   "\n        it.only.each``('foo', () => {\n          callExpression()\n          if ('bar') {}\n        })\n      ",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
 		},
 		{
 			Code: `
@@ -816,9 +773,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
           if ('bar') {}
         })
       `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 3},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 3}},
 		},
 		{
 			Code: `
@@ -865,16 +820,22 @@ func TestNoConditionalInTestRule(t *testing.T) {
 				{MessageId: "conditionalInTest", Line: 9, Column: 3},
 			},
 		},
+
+		// ---- optional chaining with allowOptionalChaining=false ----
 		{
 			Code: `
         it('foo', () => {
           const value = obj?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 17},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      2,
+				Column:    17,
+				EndLine:   2,
+				EndColumn: 25,
+			}},
 		},
 		{
 			Code: `
@@ -882,10 +843,14 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.foo?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionalInTest",
+				Line:      2,
+				Column:    3,
+				EndLine:   2,
+				EndColumn: 16,
+			}},
 		},
 		{
 			Code: `
@@ -893,22 +858,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.foo();
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
-		},
-		{
-			Code: `
-        it('x', () => {
-          obj?.method(arg?.value);
-        });
-      `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-				{MessageId: "conditionalInTest", Line: 2, Column: 15},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -916,43 +867,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.[key];
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
-		},
-		{
-			Code: `
-        it('foo', () => {
-          obj?.foo!.bar;
-        })
-      `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
-		},
-		{
-			Code: `
-        it('foo', () => {
-          obj?.foo!();
-        })
-      `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
-		},
-		{
-			Code: `
-        it('foo', () => {
-          (obj?.foo)!.bar;
-        })
-      `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 4},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -960,10 +876,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -971,10 +885,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -982,10 +894,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -993,10 +903,9 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:    true,
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -1004,10 +913,9 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:    true,
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -1015,10 +923,9 @@ func TestNoConditionalInTestRule(t *testing.T) {
           obj?.bar;
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-			},
+			Skip:    true,
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 3}},
 		},
 		{
 			Code: `
@@ -1028,10 +935,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           })
         })
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 3, Column: 5},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 3, Column: 5}},
 		},
 		{
 			Code: `
@@ -1041,35 +946,8 @@ func TestNoConditionalInTestRule(t *testing.T) {
           expect(values).toStrictEqual(['foo']);
         });
       `,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 41},
-			},
-		},
-		// The reported range covers the trailing `!`, the way ESLint's
-		// ChainExpression range does.
-		{
-			Code:    `it('is invalid', () => { obj?.bar!; });`,
-			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 1, Column: 26, EndLine: 1, EndColumn: 35},
-			},
-		},
-
-		// Divergence from upstream: the inner registration exiting does not
-		// clear the outer test's scope, so the trailing `if` is reported too.
-		{
-			Code: `
-        it('outer', () => {
-          switch (x) { case 1: break; }
-          it('inner', () => { doThing(); });
-          if (y) {}
-        });
-      `,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "conditionalInTest", Line: 2, Column: 3},
-				{MessageId: "conditionalInTest", Line: 4, Column: 3},
-			},
+			Options: map[string]any{"allowOptionalChaining": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "conditionalInTest", Line: 2, Column: 41}},
 		},
 	}
 
