@@ -183,6 +183,44 @@ func TestValidateConfig_Globals(t *testing.T) {
 	}
 }
 
+func TestValidateConfig_SourceType(t *testing.T) {
+	for _, value := range []string{"module", "script", "commonjs"} {
+		t.Run("valid-"+value, func(t *testing.T) {
+			var cfg RslintConfig
+			input := fmt.Sprintf(`[{"languageOptions":{"sourceType":%q}}]`, value)
+			if err := json.Unmarshal([]byte(input), &cfg); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if err := ValidateConfig(cfg); err != nil {
+				t.Fatalf("valid sourceType %q was rejected: %v", value, err)
+			}
+		})
+	}
+
+	// Absent is fine.
+	if err := ValidateConfig(RslintConfig{{LanguageOptions: &LanguageOptions{Raw: map[string]any{}}}}); err != nil {
+		t.Fatalf("missing sourceType should be allowed: %v", err)
+	}
+
+	for _, input := range []string{
+		`[{"languageOptions":{"sourceType":"esm"}}]`,
+		`[{"languageOptions":{"sourceType":"Module"}}]`,
+		`[{"languageOptions":{"sourceType":""}}]`,
+		`[{"languageOptions":{"sourceType":null}}]`,
+		`[{"languageOptions":{"sourceType":1}}]`,
+	} {
+		t.Run(input, func(t *testing.T) {
+			var cfg RslintConfig
+			if err := json.Unmarshal([]byte(input), &cfg); err != nil {
+				t.Fatalf("unmarshal invalid sourceType fixture: %v", err)
+			}
+			if err := ValidateConfig(cfg); err == nil {
+				t.Fatal("expected invalid sourceType to be rejected")
+			}
+		})
+	}
+}
+
 func TestValidateConfig_RuleSeverities(t *testing.T) {
 	t.Run("JSON ingress", func(t *testing.T) {
 		var cfg RslintConfig

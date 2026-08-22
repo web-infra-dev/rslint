@@ -61,13 +61,10 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 	sf := ctx.SourceFile
 
-	// Top-level `this` validity. typescript-eslint's wrapper defaults to
-	// `parserOptions.sourceType: 'module'`, which makes top-level `this`
-	// always invalid. rslint does not expose `sourceType` /
-	// `parserOptions.ecmaFeatures.globalReturn`, so we adopt the same
-	// default and treat top-level `this` as invalid — a framework-layer
-	// consequence of rslint not surfacing parser options, applied
-	// uniformly across rules.
+	// Top-level `this` validity. This rule always adopts typescript-eslint's
+	// module default and treats top-level `this` as invalid, independently of
+	// ctx.LanguageOptions.SourceType. rslint also does not expose
+	// parserOptions.ecmaFeatures.globalReturn.
 	topLevelValid := false
 
 	// Stack of `this`-validity flags, one per non-arrow function-like /

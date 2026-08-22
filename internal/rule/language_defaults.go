@@ -36,6 +36,7 @@ func (i GlobalsInit) access(name string) utils.GlobalAccess {
 type RefStoreInit struct {
 	implicitWrapperBindings []string
 	nonGlobalTopLevelScope  bool
+	globalTopLevelScope     bool
 }
 
 func (i RefStoreInit) hasImplicitWrapperBinding(name string) bool {
@@ -61,26 +62,59 @@ var commonJSGlobalsInit = GlobalsInit{entries: languageGlobalCatalog}
 
 var moduleRefStoreInit = RefStoreInit{nonGlobalTopLevelScope: true}
 
+var globalProgramRefStoreInit = RefStoreInit{globalTopLevelScope: true}
+
 var commonJSRefStoreInit = RefStoreInit{
 	implicitWrapperBindings: []string{"arguments"},
 	nonGlobalTopLevelScope:  true,
 }
 
+var javascriptSourceExtensions = []string{
+	tspath.ExtensionJs,
+	tspath.ExtensionJsx,
+	tspath.ExtensionMjs,
+	tspath.ExtensionCjs,
+}
+
+func isJavaScriptSourceExtension(fileName string) bool {
+	ext := tspath.GetAnyExtensionFromPath(fileName, nil, false)
+	return tspath.ExtensionIsOneOf(ext, javascriptSourceExtensions)
+}
+
 // ResolveLanguageDefaults resolves the concrete Globals and RefStore
-// initialization supplied by ESLint's default language selection for fileName.
-// It deliberately does not read authored sourceType, package.json, or
-// TypeScript-flavoured extensions.
+// initialization supplied by ESLint's default language selection for fileName,
+// together with effective language options.
 //
-// JavaScript module files contribute only their non-global top-level scope.
-// An exact, case-sensitive .cjs extension contributes CommonJS's four globals,
-// non-global wrapper scope, and implicit wrapper arguments binding. Other
-// extensions return zero values.
-func ResolveLanguageDefaults(fileName string) (GlobalsInit, RefStoreInit) {
-	switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
-	case tspath.ExtensionJs, tspath.ExtensionMjs:
-		return GlobalsInit{}, moduleRefStoreInit
-	case tspath.ExtensionCjs:
-		return commonJSGlobalsInit, commonJSRefStoreInit
+// An omitted source type is filled from the filename: .js/.jsx/.mjs and
+// TypeScript-flavoured extensions (.ts/.tsx/.cts/.mts) select module, matching
+// espree and typescript-eslint; .cjs selects commonjs. Authored sourceType then
+// selects the inits on every extension. module contributes a non-global
+// top-level scope. commonjs contributes writable exports and read-only
+// global/module/require everywhere; on espree-parsed extensions
+// (.js/.jsx/.mjs/.cjs) it adds the non-global wrapper scope and the
+// wrapper-local arguments binding, while TypeScript-flavoured extensions
+// keep a global program scope, matching typescript-eslint's scope manager.
+// script forces a global program scope even when module syntax is present.
+func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (GlobalsInit, RefStoreInit, LanguageOptions) {
+	if languageOptions.SourceType == "" {
+		switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
+		case tspath.ExtensionJs, tspath.ExtensionJsx, tspath.ExtensionMjs,
+			tspath.ExtensionTs, tspath.ExtensionTsx, tspath.ExtensionCts, tspath.ExtensionMts:
+			languageOptions.SourceType = "module"
+		case tspath.ExtensionCjs:
+			languageOptions.SourceType = "commonjs"
+		}
 	}
-	return GlobalsInit{}, RefStoreInit{}
+	switch languageOptions.SourceType {
+	case "commonjs":
+		if isJavaScriptSourceExtension(fileName) {
+			return commonJSGlobalsInit, commonJSRefStoreInit, languageOptions
+		}
+		return commonJSGlobalsInit, globalProgramRefStoreInit, languageOptions
+	case "module":
+		return GlobalsInit{}, moduleRefStoreInit, languageOptions
+	case "script":
+		return GlobalsInit{}, globalProgramRefStoreInit, languageOptions
+	}
+	return GlobalsInit{}, RefStoreInit{}, languageOptions
 }

@@ -94,6 +94,11 @@
             { "type": "integer", "minimum": 2015, "maximum": 2026 }
           ]
         },
+        "sourceType": {
+          "type": "string",
+          "enum": ["module", "script", "commonjs"],
+          "description": "Module kind exposed to rules whose behavior depends on it. This does not change TypeScript parsing; when omitted, rules can infer the module kind from source syntax."
+        },
         "parserOptions": {
           "$ref": "#/definitions/ParserOptions",
           "description": "Parser-specific configuration options"

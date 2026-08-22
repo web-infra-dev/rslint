@@ -15,11 +15,10 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/strict
 //
-// NOTE: Unlike ESLint, rslint does not expose languageOptions.parserOptions
-// (ecmaFeatures.impliedStrict / ecmaFeatures.globalReturn) or
-// sourceType === "commonjs". rslint detects ES modules via
-// ast.IsExternalModule (presence of import/export) and treats every other
-// file as a script. Consequences:
+// NOTE: Unlike ESLint, this rule determines module state from
+// ast.IsExternalModule (the presence of import/export syntax), independently
+// of languageOptions.sourceType. rslint also does not expose parserOptions
+// ecmaFeatures.impliedStrict / ecmaFeatures.globalReturn. Consequences:
 //   - "safe" resolves to "function" on script files and "module" on ES modules
 //     (ESLint's commonjs-aware "global" fallback has no rslint analogue).
 //   - "implied" and "globalReturn" code paths are unreachable.

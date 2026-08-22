@@ -266,6 +266,9 @@ func validateLanguageOptions(languageOptions *LanguageOptions) error {
 	if err := validateConfigGlobals(languageOptions); err != nil {
 		return err
 	}
+	if err := validateConfigSourceType(languageOptions); err != nil {
+		return err
+	}
 	if languageOptions == nil || languageOptions.Raw == nil {
 		return nil
 	}
@@ -323,6 +326,29 @@ func validateConfigGlobals(languageOptions *LanguageOptions) error {
 				access,
 			)
 		}
+	}
+	return nil
+}
+
+// validateConfigSourceType rejects authored `languageOptions.sourceType`
+// values that are not ESLint's "module" / "script" / "commonjs". Absent is
+// fine — ResolveLanguageDefaults fills the filename default afterward.
+// Matches the JS language plugin, which only reads the top-level field (no
+// legacy `parserOptions.sourceType`).
+func validateConfigSourceType(languageOptions *LanguageOptions) error {
+	if languageOptions == nil || languageOptions.Raw == nil {
+		return nil
+	}
+	value, present := languageOptions.Raw["sourceType"]
+	if !present {
+		return nil
+	}
+	s, ok := value.(string)
+	if !ok || !rule.IsValidSourceType(s) {
+		return fmt.Errorf(
+			"key \"languageOptions.sourceType\": invalid value %v; expected \"module\", \"script\", or \"commonjs\"",
+			value,
+		)
 	}
 	return nil
 }
@@ -1101,6 +1127,9 @@ func ExtractLanguageOptions(langOpts *LanguageOptions) rule.LanguageOptions {
 		if version, ok := normalizeConfigECMAVersion(value); ok {
 			result.ECMAVersion = version
 		}
+	}
+	if sourceType, ok := langOpts.Raw["sourceType"].(string); ok && rule.IsValidSourceType(sourceType) {
+		result.SourceType = sourceType
 	}
 	return result
 }

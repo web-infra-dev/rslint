@@ -366,10 +366,16 @@ from the resolved language defaults, while `IsNameDefinedInFile`
 supports scope rules whose query location is not itself an identifier
 reference. `HasNonGlobalTopLevelScope` exposes the corresponding scope fact
 without exposing a language mode or requiring rules to parse paths.
-Config resolution normalizes the per-file `ecmaVersion` into `LanguageOptions`;
-its zero value means the moving `latest` edition. The linter exposes the
-normalized value through `RuleContext.LanguageOptions` and also uses it to
-build one `Globals` value for each native rule context. Rules read
+Config resolution normalizes the per-file `ecmaVersion` and authored top-level
+`languageOptions.sourceType` (`module`, `script`, or `commonjs`) into
+`LanguageOptions`, which is exposed as a whole on each native `RuleContext`.
+`ecmaVersion`'s zero value means the moving `latest` edition. The legacy
+`parserOptions.sourceType` location is not read. The linter resolves
+an omitted source type from the filename (`.cjs` to `commonjs`; `.js`/`.jsx`/
+`.mjs` and TypeScript-flavoured `.ts`/`.tsx`/`.cts`/`.mts` to `module`).
+The remaining zero value has module semantics through `EffectiveSourceType`.
+Source type does not change TypeScript parsing or compiler module resolution. The linter uses the normalized edition to build
+one `Globals` value for each native rule context. Rules read
 `LanguageOptions` when upstream behavior depends on language configuration;
 they use `Globals` for variable-availability decisions. `Globals` owns the
 ESLint-versioned language-global set, resolved language defaults, the authored
@@ -379,20 +385,25 @@ and the effective access after applying their precedence. Rules use
 accessors only when upstream behavior depends on provenance, instead of
 rebuilding the merge. A rule whose upstream semantics add another source, such
 as TypeScript library globals, applies this view last so `ecmaVersion` and
-authored overrides remain authoritative. This keeps the language-global
-composition point extensible for future language options such as `sourceType`;
-non-global wrapper bindings remain a `RefStore` initialization concern.
+authored overrides remain authoritative. Non-global wrapper bindings remain a
+`RefStore` initialization concern.
 
 Before constructing rule contexts, the linter calls `ResolveLanguageDefaults`
-once and passes its concrete `GlobalsInit` and `RefStoreInit` results to their
-respective consumers. Today the resolver selects defaults from the source
-filename: `.js` and `.mjs` contribute a non-global top-level scope; `.cjs`
-additionally contributes writable `exports`, read-only `global`, `module`, and
-`require`, plus the wrapper-local `arguments` binding. Other extensions
-contribute no defaults. The resolver does not inspect `package.json` or authored
-`sourceType`; adding `sourceType` later changes the resolver input and this one
-call site, while `Globals`, `RefStore`, and rules keep consuming the same
-initialization types.
+once and passes its concrete `GlobalsInit`, `RefStoreInit`, and effective
+`LanguageOptions` results to their respective consumers. An omitted source
+type is filled from the filename (`.cjs` → `commonjs`; `.js`/`.jsx`/`.mjs`
+and TypeScript-flavoured extensions `.ts`/`.tsx`/`.cts`/`.mts` → `module`),
+matching espree and typescript-eslint. The resolver then selects inits from
+that effective source type: `commonjs` contributes writable `exports`,
+read-only `global`, `module`, and `require` on every extension, plus — on
+espree-parsed extensions (`.js`/`.jsx`/`.mjs`/`.cjs`) — non-global wrapper
+scope and the wrapper-local `arguments` binding; `module` contributes a
+non-global top-level scope; `script` forces a global program scope even when
+module syntax is present; TypeScript-flavoured `commonjs` keeps that same
+global program scope.
+Authored `sourceType` therefore applies on every extension, including
+`.ts`/`.tsx`. The resolver does not inspect `package.json`. A rule reads
+`RuleContext.LanguageOptions` when its upstream behavior depends on them.
 Every authored alias is normalized to one of ESLint's three access levels —
 `utils.GlobalAccess`, whose zero value means no source mentioned the name.
 Booleans follow the `globals` package: `true` is writable, `false` is read-only.

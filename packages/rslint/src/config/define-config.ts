@@ -135,6 +135,12 @@ export type GlobalsConfig = Record<string, GlobalAccess>;
 export interface LanguageOptions {
   /** ECMAScript edition used for language globals; omitted defaults to `'latest'`. */
   ecmaVersion?: number | 'latest';
+  /**
+   * Module kind for the file. When omitted, `.js`/`.mjs` resolve to `'module'`
+   * and `.cjs` to `'commonjs'`; other extensions keep the value unset. This
+   * does not change TypeScript parsing.
+   */
+  sourceType?: 'module' | 'script' | 'commonjs';
   parserOptions?: ParserOptions;
   /**
    * Global variables available in this file's scope, e.g. from a browser
