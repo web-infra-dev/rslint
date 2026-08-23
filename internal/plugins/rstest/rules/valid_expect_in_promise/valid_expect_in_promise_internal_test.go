@@ -24,6 +24,8 @@ func TestSourceMayContainPromiseChain(t *testing.T) {
 		// answer, because the parser interns only a key that is a literal itself.
 		{source: `promise[("then")](value => expect(value).toBe(1))`, want: true},
 		{source: `promise[ /* c */ ("finally") ](() => expect(cleanup).toHaveBeenCalled())`, want: true},
+		{source: "promise[\uFEFF(\"then\")](value => expect(value).toBe(1))", want: true},
+		{source: "promise[// c\u2028(\"catch\")](error => expect(error).toBeDefined())", want: true},
 		{source: `promise[("\x74hen")](value => expect(value).toBe(1))`, want: true},
 		{source: `const text = "then"`, want: false},
 		{source: `const catchError = () => {}`, want: false},
@@ -83,6 +85,9 @@ func TestBracketOpensOnParenthesis(t *testing.T) {
 		{text: "promise[\n  (\"then\")\n](fn)", want: true},
 		{text: `promise[/* key */ ("then")](fn)`, want: true},
 		{text: "promise[// key\n(\"then\")](fn)", want: true},
+		{text: "promise[\uFEFF(\"then\")](fn)", want: true},
+		{text: "promise[// key\u2028(\"then\")](fn)", want: true},
+		{text: "promise[// key\u2029(\"then\")](fn)", want: true},
 		{text: `promise["then"](fn)`, want: false},
 		{text: `rows[index](fn)`, want: false},
 		{text: `rows[index] && other[(index)]`, want: true},

@@ -98,6 +98,15 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 				}},
 			},
 			{
+				Code: "test(\"case\", () => { promise[\uFEFF(\"then\")](value => expect(value).toBe(1)); });",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Message:   "This promise should either be returned or awaited to ensure the assertions in its chain are called",
+					Line:      1,
+					Column:    22,
+				}},
+			},
+			{
 				Code: `test("case", (context) => { promise.then(value => context.expect(value).toBe(1)); });`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "expectInFloatingPromise",

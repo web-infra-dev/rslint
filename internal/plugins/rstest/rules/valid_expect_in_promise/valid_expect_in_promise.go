@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
@@ -66,7 +67,7 @@ func sourceMayContainPromiseChain(sourceFile *ast.SourceFile) bool {
 // only costs a walk the caller would otherwise skip, and never hides one.
 func bracketOpensOnParenthesis(text string) bool {
 	for index := strings.IndexByte(text, '['); index >= 0; {
-		if next := skipTrivia(text, index+1); next < len(text) && text[next] == '(' {
+		if next := scanner.SkipTrivia(text, index+1); next < len(text) && text[next] == '(' {
 			return true
 		}
 		offset := strings.IndexByte(text[index+1:], '[')
@@ -76,40 +77,6 @@ func bracketOpensOnParenthesis(text string) bool {
 		index += offset + 1
 	}
 	return false
-}
-
-// skipTrivia returns the first index at or after index that starts neither
-// whitespace nor a comment.
-func skipTrivia(text string, index int) int {
-	for index < len(text) {
-		switch text[index] {
-		case ' ', '\t', '\r', '\n', '\v', '\f':
-			index++
-		case '/':
-			if index+1 >= len(text) {
-				return index
-			}
-			switch text[index+1] {
-			case '/':
-				end := strings.IndexByte(text[index:], '\n')
-				if end < 0 {
-					return len(text)
-				}
-				index += end + 1
-			case '*':
-				end := strings.Index(text[index+2:], "*/")
-				if end < 0 {
-					return len(text)
-				}
-				index += end + 4
-			default:
-				return index
-			}
-		default:
-			return index
-		}
-	}
-	return index
 }
 
 var promiseChainMemberNames = [...]string{"then", "catch", "finally"}
