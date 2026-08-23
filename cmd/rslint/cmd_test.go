@@ -31,6 +31,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -1613,10 +1614,10 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		t.Fatalf("target discovery should retain the default baseline despite --rule overlay, got %v", targetFiles)
 	}
 
-	rslintconfig.RegisterAllRules()
 	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
 		Config:                  activeConfig,
 		CurrentDirectory:        dir,
+		RuleCatalog:             rules.All(),
 		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
 		SourceMappingsCanonical: true,
 		TargetPlan:              &targetPlan,

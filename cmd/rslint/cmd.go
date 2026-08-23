@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -417,10 +418,11 @@ func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]r
 func validateResolvedRuleOptions(
 	configMap map[string]rslintconfig.RslintConfig,
 	rslintConfig rslintconfig.RslintConfig,
+	catalog *rule.Catalog,
 ) (map[string]rslintconfig.RslintConfig, rslintconfig.RslintConfig, []string) {
 	var messages []string
 	if configMap == nil {
-		normalized, optionsErrors := rslintconfig.ValidateRuleOptions(rslintConfig, rslintconfig.GlobalRuleRegistry)
+		normalized, optionsErrors := rslintconfig.ValidateRuleOptions(rslintConfig, catalog)
 		for _, optionsError := range optionsErrors {
 			messages = append(messages, optionsError.Error())
 		}
@@ -433,13 +435,27 @@ func validateResolvedRuleOptions(
 	slices.Sort(configDirs)
 	normalizedMap := make(map[string]rslintconfig.RslintConfig, len(configMap))
 	for _, dir := range configDirs {
-		normalized, optionsErrors := rslintconfig.ValidateRuleOptions(configMap[dir], rslintconfig.GlobalRuleRegistry)
+		normalized, optionsErrors := rslintconfig.ValidateRuleOptions(configMap[dir], catalog)
 		normalizedMap[dir] = normalized
 		for _, optionsError := range optionsErrors {
 			messages = append(messages, fmt.Sprintf("%s (config at %s)", optionsError.Error(), dir))
 		}
 	}
 	return normalizedMap, rslintConfig, messages
+}
+
+func deriveRuleCatalog(plugins []rslintconfig.EslintPluginEntry) (*rule.Catalog, []string) {
+	return rules.All().ForESLintPlugins(plugins)
+}
+
+func reportShadowedPluginRules(shadowed []string) {
+	for _, ruleName := range shadowed {
+		fmt.Fprintf(
+			os.Stderr,
+			"rslint: plugin rule %q is shadowed by a built-in rule of the same name; using the built-in.\n",
+			ruleName,
+		)
+	}
 }
 
 // resolveStartTime returns the start time for timing output.
@@ -701,15 +717,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	programSession := loader.NewSession(fs)
 	fs = programSession.FS()
 
-	// Initialize rule registry with all available rules
-	rslintconfig.RegisterAllRules()
-	// Register placeholder rules for mounted ESLint plugins so their rule
-	// names resolve (and route to the Node worker) instead of being dropped.
 	var eslintPlugins []rslintconfig.EslintPluginEntry
 	if usesJSConfig {
 		eslintPlugins = configCatalog.EslintPlugins
 	}
-	rslintconfig.RegisterEslintPluginRules(eslintPlugins)
+	ruleCatalog, shadowedPluginRules := deriveRuleCatalog(eslintPlugins)
+	reportShadowedPluginRules(shadowedPluginRules)
 	var rslintConfig rslintconfig.RslintConfig
 
 	// configMap holds per-directory configs for automatically discovered JS/TS
@@ -761,7 +774,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	} else {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
-		loader := rslintconfig.NewConfigLoader(fs, currentDirectory)
+		loader := rslintconfig.NewConfigLoader(fs, currentDirectory, rules.All())
 		rslintConfig, currentDirectory, err = loader.LoadRslintConfiguration(config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -818,7 +831,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// overrides) and before any linting starts, so a bad config fails fast
 	// with every failure reported at once instead of surfacing mid-lint.
 	var optionsMessages []string
-	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig)
+	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig, ruleCatalog)
 	if len(optionsMessages) > 0 {
 		for _, message := range optionsMessages {
 			fmt.Fprintf(os.Stderr, "error: %s\n", message)
@@ -955,6 +968,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		ConfigMap:               configMap,
 		Config:                  rslintConfig,
 		CurrentDirectory:        currentDirectory,
+		RuleCatalog:             ruleCatalog,
 		EnforcePlugins:          enforcePlugins,
 		LintTargetBySourcePath:  lintTargetBySourcePath,
 		SourceMappingsCanonical: true,
@@ -1105,6 +1119,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				ConfigMap:               configMap,
 				Config:                  rslintConfig,
 				CurrentDirectory:        currentDirectory,
+				RuleCatalog:             ruleCatalog,
 				EnforcePlugins:          enforcePlugins,
 				LintTargetBySourcePath:  newBinding.LintTargetBySourcePath,
 				SourceMappingsCanonical: true,

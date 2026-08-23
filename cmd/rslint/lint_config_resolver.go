@@ -22,6 +22,7 @@ type lintConfigResolverOptions struct {
 	ConfigMap              map[string]rslintconfig.RslintConfig
 	Config                 rslintconfig.RslintConfig
 	CurrentDirectory       string
+	RuleCatalog            *rule.Catalog
 	EnforcePlugins         bool
 	LintTargetBySourcePath map[string]rslintconfig.DiscoveredLintTarget
 	// SourceMappingsCanonical indicates that binding already supplied both
@@ -32,6 +33,9 @@ type lintConfigResolverOptions struct {
 }
 
 func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
+	if opts.RuleCatalog == nil {
+		panic("rule catalog is required")
+	}
 	resolver := &lintConfigResolver{
 		configMap:              opts.ConfigMap,
 		currentDirectory:       opts.CurrentDirectory,
@@ -47,6 +51,7 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
 				entries,
 				configDirectory,
 				opts.FS,
+				opts.RuleCatalog,
 				opts.EnforcePlugins,
 			)
 		}
@@ -54,6 +59,7 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
 			entries,
 			configDirectory,
 			opts.FS,
+			opts.RuleCatalog,
 			opts.EnforcePlugins,
 		)
 	}

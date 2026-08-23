@@ -37,6 +37,7 @@ type configTargetCacheKey struct {
 // lifetime and is safe for concurrent use by native and plugin lint workers.
 type FileConfigResolver struct {
 	config         RslintConfig
+	catalog        *rule.Catalog
 	enforcePlugins bool
 	targetResolver *configTargetResolver
 
@@ -45,8 +46,13 @@ type FileConfigResolver struct {
 }
 
 // NewFileConfigResolver creates a per-run resolver for one config root.
-func NewFileConfigResolver(config RslintConfig, cwd string, enforcePlugins bool) *FileConfigResolver {
-	return NewFileConfigResolverWithFS(config, cwd, nil, enforcePlugins)
+func NewFileConfigResolver(
+	config RslintConfig,
+	cwd string,
+	catalog *rule.Catalog,
+	enforcePlugins bool,
+) *FileConfigResolver {
+	return NewFileConfigResolverWithFS(config, cwd, nil, catalog, enforcePlugins)
 }
 
 // NewFileConfigResolverWithFS creates a resolver that keeps lexical and
@@ -55,12 +61,31 @@ func NewFileConfigResolverWithFS(
 	config RslintConfig,
 	cwd string,
 	fsys vfs.FS,
+	catalog *rule.Catalog,
 	enforcePlugins bool,
 ) *FileConfigResolver {
+	return newFileConfigResolver(
+		config,
+		catalog,
+		enforcePlugins,
+		newConfigTargetResolver(config, cwd, fsys),
+	)
+}
+
+func newFileConfigResolver(
+	config RslintConfig,
+	catalog *rule.Catalog,
+	enforcePlugins bool,
+	targetResolver *configTargetResolver,
+) *FileConfigResolver {
+	if catalog == nil {
+		panic("rule catalog is required")
+	}
 	return &FileConfigResolver{
 		config:         config,
+		catalog:        catalog,
 		enforcePlugins: enforcePlugins,
-		targetResolver: newConfigTargetResolver(config, cwd, fsys),
+		targetResolver: targetResolver,
 	}
 }
 
@@ -156,7 +181,7 @@ func (r *FileConfigResolver) resolutionForTarget(
 			mergedConfig := r.config.mergeConfigEntries(decision.key)
 			return &effectiveConfigPlan{
 				mergedConfig: mergedConfig,
-				enabledRules: GlobalRuleRegistry.GetEnabledRulesForMergedConfig(mergedConfig, r.enforcePlugins),
+				enabledRules: ConfiguredRules(r.catalog, mergedConfig, r.enforcePlugins),
 			}
 		})
 		return resolution

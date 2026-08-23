@@ -12,8 +12,23 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func newBaseLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
+	opts.RuleCatalog = rules.All()
+	return newLintConfigResolver(opts)
+}
+
+func TestLintConfigResolverRequiresRuleCatalog(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected nil rule catalog to panic")
+		}
+	}()
+	newLintConfigResolver(lintConfigResolverOptions{})
+}
 
 // TestPluginConfigResolver_UsesGoOwnedCatalogKey proves the routing identity is
 // the same normalized key Go published in its typed discovery catalog. Node
@@ -25,7 +40,7 @@ func TestPluginConfigResolver_UsesGoOwnedCatalogKey(t *testing.T) {
 	}
 	sourcePath := configDir + "/src/a.ts"
 	r := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
+		lintResolver: newBaseLintConfigResolver(lintConfigResolverOptions{
 			ConfigMap: configMap,
 			LintTargetBySourcePath: map[string]rslintconfig.DiscoveredLintTarget{
 				sourcePath: {
@@ -46,7 +61,7 @@ func TestPluginConfigResolver_UsesGoOwnedCatalogKey(t *testing.T) {
 
 	// With no low-level API routing override, the owner key is used directly.
 	posix := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
+		lintResolver: newBaseLintConfigResolver(lintConfigResolverOptions{
 			ConfigMap: map[string]rslintconfig.RslintConfig{"/posix/proj": configMap[configDir]},
 			LintTargetBySourcePath: map[string]rslintconfig.DiscoveredLintTarget{
 				"/posix/proj/a.ts": {
@@ -126,7 +141,7 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 
 	// Multi-config, file under no config -> ("", nil).
 	r := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
+		lintResolver: newBaseLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
 	}
 	if wk, m := r.resolve("/elsewhere/a.ts"); wk != "" || m != nil {
 		t.Errorf("no-match -> (\"\",nil), got (%q, nil=%v)", wk, m == nil)
@@ -134,7 +149,7 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 
 	// Single-config (configMap==nil): wireKey is currentDirectory; merged from rslintConfig.
 	single := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(lintConfigResolverOptions{
+		lintResolver: newBaseLintConfigResolver(lintConfigResolverOptions{
 			Config:           configMap["/proj"],
 			CurrentDirectory: "/proj",
 		}),
@@ -145,7 +160,6 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 }
 
 func TestLintConfigResolver_UsesOnlyBoundTargetOwnership(t *testing.T) {
-	rslintconfig.RegisterAllRules()
 
 	configMap := map[string]rslintconfig.RslintConfig{
 		"/repo": {{
@@ -160,7 +174,7 @@ func TestLintConfigResolver_UsesOnlyBoundTargetOwnership(t *testing.T) {
 			},
 		}},
 	}
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
+	resolver := newBaseLintConfigResolver(lintConfigResolverOptions{
 		ConfigMap: configMap,
 		LintTargetBySourcePath: map[string]rslintconfig.DiscoveredLintTarget{
 			"/repo/packages/app/src/gap.ts": {
@@ -205,7 +219,6 @@ func TestLintConfigResolver_UsesOnlyBoundTargetOwnership(t *testing.T) {
 }
 
 func TestLintConfigResolver_UsesBoundOwnerForAliasedSource(t *testing.T) {
-	rslintconfig.RegisterAllRules()
 
 	configMap := map[string]rslintconfig.RslintConfig{
 		"/repo": {{
@@ -217,7 +230,7 @@ func TestLintConfigResolver_UsesBoundOwnerForAliasedSource(t *testing.T) {
 		}},
 	}
 	sourcePath := "/repo/packages/app/a.ts"
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
+	resolver := newBaseLintConfigResolver(lintConfigResolverOptions{
 		ConfigMap: configMap,
 		LintTargetBySourcePath: map[string]rslintconfig.DiscoveredLintTarget{
 			sourcePath: {
@@ -235,7 +248,6 @@ func TestLintConfigResolver_UsesBoundOwnerForAliasedSource(t *testing.T) {
 }
 
 func TestLintConfigResolver_UsesBoundTargetForRulesAndGlobals(t *testing.T) {
-	rslintconfig.RegisterAllRules()
 
 	cfg := rslintconfig.RslintConfig{{
 		Files: []string{"src/**/*.ts"},
@@ -246,7 +258,7 @@ func TestLintConfigResolver_UsesBoundTargetForRulesAndGlobals(t *testing.T) {
 		}},
 		Rules: rslintconfig.Rules{"no-console": "error"},
 	}}
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
+	resolver := newBaseLintConfigResolver(lintConfigResolverOptions{
 		Config:           cfg,
 		CurrentDirectory: "/repo",
 		LintTargetBySourcePath: map[string]rslintconfig.DiscoveredLintTarget{
@@ -280,10 +292,9 @@ func (f *caseInsensitiveResolverFS) Realpath(filePath string) string {
 }
 
 func TestLintConfigResolver_SourceMappingsUseCanonicalFilesystemIdentity(t *testing.T) {
-	rslintconfig.RegisterAllRules()
 	fsys := &caseInsensitiveResolverFS{FS: osvfs.FS()}
 	sourcePath := "c:/repo/src/a.ts"
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
+	resolver := newBaseLintConfigResolver(lintConfigResolverOptions{
 		ConfigMap: map[string]rslintconfig.RslintConfig{
 			"C:/Repo": {{
 				Files: []string{"src/**/*.ts"},

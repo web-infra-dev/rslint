@@ -468,7 +468,6 @@ func TestReloadConfig_NoTsConfigsIsAccepted(t *testing.T) {
 	s.cwd = dir
 	s.rslintConfigPath = filepath.Join(dir, "rslint.json")
 
-	config.RegisterAllRules()
 	err := s.reloadConfig()
 	if err != nil {
 		t.Fatalf("reloadConfig should accept config without tsconfigs, got error: %v", err)

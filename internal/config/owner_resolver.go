@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // LintDiscoveryScope records explicit-file provenance supplied by config
@@ -144,6 +145,7 @@ func (resolver *ConfigOwnerResolver) ResolveTarget(target DiscoveredLintTarget) 
 // selection and files/ignores matching.
 func (resolver *ConfigOwnerResolver) ResolveTargetConfig(
 	target DiscoveredLintTarget,
+	catalog *rule.Catalog,
 	enforcePlugins bool,
 ) (string, RslintConfig, ResolvedFileConfig, bool) {
 	configDir, _ := resolver.ResolveTarget(target)
@@ -153,6 +155,7 @@ func (resolver *ConfigOwnerResolver) ResolveTargetConfig(
 	entries, resolved, ok := resolver.ResolveConfigTarget(
 		configDir,
 		target,
+		catalog,
 		enforcePlugins,
 	)
 	return configDir, entries, resolved, ok
@@ -164,6 +167,7 @@ func (resolver *ConfigOwnerResolver) ResolveTargetConfig(
 func (resolver *ConfigOwnerResolver) ResolveConfigTarget(
 	configDir string,
 	target DiscoveredLintTarget,
+	catalog *rule.Catalog,
 	enforcePlugins bool,
 ) (RslintConfig, ResolvedFileConfig, bool) {
 	if resolver == nil {
@@ -177,11 +181,7 @@ func (resolver *ConfigOwnerResolver) ResolveConfigTarget(
 	if targetResolver == nil {
 		return nil, ResolvedFileConfig{}, false
 	}
-	fileResolver := &FileConfigResolver{
-		config:         entries,
-		enforcePlugins: enforcePlugins,
-		targetResolver: targetResolver,
-	}
+	fileResolver := newFileConfigResolver(entries, catalog, enforcePlugins, targetResolver)
 	return entries, fileResolver.ResolveTarget(target), true
 }
 
