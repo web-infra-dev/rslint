@@ -72,6 +72,34 @@ func NewFileConfigResolverWithFS(
 	)
 }
 
+// NewFileConfigResolverWithPathSpaces evaluates config against an existing
+// path-space generation. It rejects an incomplete snapshot instead of silently
+// observing the filesystem again.
+func NewFileConfigResolverWithPathSpaces(
+	config RslintConfig,
+	configDirectory string,
+	fsys vfs.FS,
+	pathSpaces *PathSpaceSnapshot,
+	catalog *rule.Catalog,
+	enforcePlugins bool,
+) (*FileConfigResolver, error) {
+	matcher, err := NewTargetMatcherWithPathSpaces(
+		config,
+		configDirectory,
+		fsys,
+		pathSpaces,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return newFileConfigResolver(
+		config,
+		catalog,
+		enforcePlugins,
+		matcher.resolver,
+	), nil
+}
+
 func newFileConfigResolver(
 	config RslintConfig,
 	catalog *rule.Catalog,
@@ -127,7 +155,7 @@ func (r *FileConfigResolver) EnabledRulesForTarget(filePath string, canonicalPat
 // a CanonicalParentPath avoid every later filesystem lookup needed to
 // distinguish a leaf symlink from an aliased directory tree.
 func (r *FileConfigResolver) ResolveTarget(
-	target DiscoveredLintTarget,
+	target PathIdentity,
 ) ResolvedFileConfig {
 	resolution := r.resolutionForTarget(target)
 	if resolution == nil {
@@ -146,7 +174,7 @@ func (r *FileConfigResolver) planForFile(filePath string) *effectiveConfigPlan {
 }
 
 func (r *FileConfigResolver) planForTarget(filePath string, canonicalPath string) *effectiveConfigPlan {
-	resolution := r.resolutionForTarget(DiscoveredLintTarget{
+	resolution := r.resolutionForTarget(PathIdentity{
 		Path:          filePath,
 		CanonicalPath: canonicalPath,
 	})
@@ -157,7 +185,7 @@ func (r *FileConfigResolver) planForTarget(filePath string, canonicalPath string
 }
 
 func (r *FileConfigResolver) resolutionForTarget(
-	target DiscoveredLintTarget,
+	target PathIdentity,
 ) *configTargetResolution {
 	key := configTargetCacheKey{
 		path:                tspath.NormalizePath(target.Path),
@@ -165,7 +193,7 @@ func (r *FileConfigResolver) resolutionForTarget(
 		canonicalParentPath: tspath.NormalizePath(target.CanonicalParentPath),
 	}
 	return r.filePlans.getOrInit(key, func() *configTargetResolution {
-		decision := r.targetResolver.resolveTarget(DiscoveredLintTarget{
+		decision := r.targetResolver.resolveTarget(PathIdentity{
 			Path:                key.path,
 			CanonicalPath:       key.canonicalPath,
 			CanonicalParentPath: key.canonicalParentPath,

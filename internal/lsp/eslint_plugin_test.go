@@ -17,6 +17,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
@@ -434,8 +435,8 @@ func TestBuildPluginFileInput_RespectsGitignore(t *testing.T) {
 
 func TestBuildPluginFileInput_UsesEffectiveJSConfigSnapshot(t *testing.T) {
 	dir := t.TempDir()
-	target := filepath.Join(dir, "source.ts")
-	if err := os.WriteFile(target, []byte("foo();\n"), 0o644); err != nil {
+	targetPath := filepath.Join(dir, "source.ts")
+	if err := os.WriteFile(targetPath, []byte("foo();\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	s := newTestServer()
@@ -446,9 +447,9 @@ func TestBuildPluginFileInput_UsesEffectiveJSConfigSnapshot(t *testing.T) {
 		Rules:   config.Rules{"tpsnapshot/no-foo": "error"},
 	}}
 	s.jsConfigs = map[string]config.RslintConfig{tspath.NormalizePath(dir): jsConfig}
-	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
 	installRuleCatalogForTest(s, jsConfig)
-	uri := documentURIFromPath(target)
+	uri := documentURIFromPath(targetPath)
 	s.documents[uri] = "foo();\n"
 
 	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
@@ -493,17 +494,27 @@ func TestDocumentLintSnapshotKeepsObjectPluginCatalogInsideJSOwner(t *testing.T)
 		Plugins: []string{"community"},
 		Rules:   config.Rules{"community/check": "error"},
 	}}
-	s.jsonConfig = jsonConfig
-	s.jsonConfigResolver = config.NewConfigOwnerResolver(
-		map[string]config.RslintConfig{jsonOwnerDirectory: jsonConfig},
-		s.fs,
-	)
-	s.jsConfigs = map[string]config.RslintConfig{jsOwnerDirectory: jsConfig}
-	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
 	s.ruleCatalog, _ = rules.All().ForESLintPlugins([]rule.ESLintPluginMetadata{{
 		Prefix:    "community",
 		RuleNames: []string{"check"},
 	}})
+	installJSONConfigForTest(s, jsonOwnerDirectory, jsonConfig)
+	s.jsConfigs = map[string]config.RslintConfig{jsOwnerDirectory: jsConfig}
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
+	jsResolver, err := config.NewFileConfigResolverWithPathSpaces(
+		jsConfig,
+		jsOwnerDirectory,
+		s.fs,
+		s.jsConfigOwnerIndex.PathSpaces(),
+		s.ruleCatalog,
+		true,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.jsFileConfigResolvers = map[string]*config.FileConfigResolver{
+		jsOwnerDirectory: jsResolver,
+	}
 
 	rootURI := documentURIFromPath(rootFile)
 	s.documents[rootURI] = "debugger;\n"
@@ -836,9 +847,9 @@ func TestNativeFixPassUsesFrozenTargetOverlay(t *testing.T) {
 	s.cwd = "/alias"
 	s.fs = fsys
 	s.configSnapshotIncludesGitignore = true
-	s.jsonConfig = config.RslintConfig{{
+	installJSONConfigForTest(s, "/alias", config.RslintConfig{{
 		Rules: config.Rules{"no-debugger": "error"},
-	}}
+	}})
 	const content = "debugger;\n"
 	s.documents[uri] = content
 	snapshot := s.documentLintSnapshot(uri)

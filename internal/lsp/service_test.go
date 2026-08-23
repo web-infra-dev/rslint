@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -64,13 +65,48 @@ func TestNewServerInitializesRuleCatalog(t *testing.T) {
 
 func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) {
 	s.jsConfigs = configs
-	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(configs, s.fs)
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(configs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
 	var entries []config.RslintConfig
 	for _, configEntries := range configs {
 		entries = append(entries, configEntries)
 	}
 	installRuleCatalogForTest(s, entries...)
+	s.jsFileConfigResolvers = make(map[string]*config.FileConfigResolver, len(configs))
+	for configDirectory, configEntries := range configs {
+		resolver, err := config.NewFileConfigResolverWithPathSpaces(
+			configEntries,
+			configDirectory,
+			s.fs,
+			s.jsConfigOwnerIndex.PathSpaces(),
+			s.currentRuleCatalog(),
+			true,
+		)
+		if err != nil {
+			panic(err)
+		}
+		s.jsFileConfigResolvers[configDirectory] = resolver
+	}
+}
+
+func installJSONConfigForTest(s *Server, configDirectory string, entries config.RslintConfig) {
+	s.jsonConfig = entries
+	s.jsonConfigOwnerIndex = target.NewOwnerIndex(
+		map[string]config.RslintConfig{configDirectory: entries},
+		s.fs,
+	)
+	resolver, err := config.NewFileConfigResolverWithPathSpaces(
+		entries,
+		configDirectory,
+		s.fs,
+		s.jsonConfigOwnerIndex.PathSpaces(),
+		rules.All(),
+		false,
+	)
+	if err != nil {
+		panic(err)
+	}
+	s.jsonFileConfigResolver = resolver
 }
 
 func installRuleCatalogForTest(s *Server, configs ...config.RslintConfig) {
@@ -107,7 +143,7 @@ func installRuleCatalogForTest(s *Server, configs ...config.RslintConfig) {
 
 func configuredRulesForLSPTest(
 	entries config.RslintConfig,
-	target config.DiscoveredLintTarget,
+	target target.File,
 	configDirectory string,
 	enforcePlugins bool,
 	hasTypeInfo bool,
@@ -138,9 +174,14 @@ func documentLintSnapshotForTest(
 	if usesJavaScriptConfig {
 		ruleCatalog = s.currentRuleCatalog()
 	}
+	target := lspConfigTarget(uriToPath(uri), configDirectory, s.fs)
 	return documentLintSnapshot{
-		target:                lspConfigTarget(uriToPath(uri), configDirectory, s.fs),
-		config:                entries,
+		target: target,
+		config: entries,
+		pathSpaces: config.NewPathSpaceSnapshot(
+			map[string]config.RslintConfig{target.ConfigDirectory: entries},
+			s.fs,
+		),
 		ruleCatalog:           ruleCatalog,
 		typeScriptConfigPaths: typeScriptConfigPaths,
 		usesJavaScriptConfig:  usesJavaScriptConfig,
@@ -1727,9 +1768,11 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 				targetPath := sourceFile.FileName()
 				return configuredRulesForLSPTest(
 					cfg,
-					config.DiscoveredLintTarget{
-						Path:            targetPath,
-						CanonicalPath:   targetPath,
+					target.File{
+						PathIdentity: config.PathIdentity{
+							Path:          targetPath,
+							CanonicalPath: targetPath,
+						},
 						ConfigDirectory: dir,
 					},
 					dir,
@@ -2668,9 +2711,11 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 		Plugins: []string{"@typescript-eslint"},
 	}}
 
-	target := config.DiscoveredLintTarget{
-		Path:            "/project/index.ts",
-		CanonicalPath:   "/project/index.ts",
+	target := target.File{
+		PathIdentity: config.PathIdentity{
+			Path:          "/project/index.ts",
+			CanonicalPath: "/project/index.ts",
+		},
 		ConfigDirectory: "/project",
 	}
 	withoutTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true, false)

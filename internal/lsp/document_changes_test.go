@@ -365,7 +365,7 @@ func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
 
 			target := lspConfigTarget(file, dir, fs)
 			served := lintSingleFile(
-				program, sourceFile, target, dir, true, resolver.ResolveTarget(target).EnabledRules, rule.EditDemandAll, context.Background(),
+				program, sourceFile, target, dir, true, resolver.ResolveTarget(target.Identity()).EnabledRules, rule.EditDemandAll, context.Background(),
 			).Diagnostics
 
 			if len(served) != 0 {
@@ -411,7 +411,7 @@ func TestOtherRulesStillRunInTheEditor(t *testing.T) {
 
 	target := lspConfigTarget(file, dir, fs)
 	served := lintSingleFile(
-		program, sourceFile, target, dir, true, resolver.ResolveTarget(target).EnabledRules, rule.EditDemandAll, context.Background(),
+		program, sourceFile, target, dir, true, resolver.ResolveTarget(target.Identity()).EnabledRules, rule.EditDemandAll, context.Background(),
 	).Diagnostics
 
 	byRule := make(map[string][]rule.RuleFix, len(served))

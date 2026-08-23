@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"gotest.tools/v3/assert"
 )
 
@@ -413,7 +414,17 @@ func TestConfigWithGitignore_FullWalkHonorsOrderedDirectoryReinclude(t *testing.
 	base := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 	effective := config.ConfigWithGitignore(base, dir, osvfs.FS(), nil)
 
-	files := config.DiscoverLintFiles(effective, dir, osvfs.FS(), nil, nil, true)
+	plan, err := target.Resolve(target.Request{
+		Config:          effective,
+		ConfigDirectory: dir,
+		FS:              osvfs.FS(),
+		SingleThreaded:  true,
+	})
+	assert.NilError(t, err)
+	files := make([]string, 0, len(plan.Files))
+	for _, file := range plan.Files {
+		files = append(files, file.Path)
+	}
 	assert.DeepEqual(t, files, []string{tspath.ResolvePath(dir, "rstest/coverage/keep.ts")})
 }
 
@@ -462,7 +473,7 @@ func TestConfigWithGitignore_GitNegationCannotOverrideConfigIgnore(t *testing.T)
 		".gitignore":           "!ignored-by-config.ts\n",
 		"ignored-by-config.ts": "debugger;\n",
 	})
-	target := tspath.ResolvePath(dir, "ignored-by-config.ts")
+	targetPath := tspath.ResolvePath(dir, "ignored-by-config.ts")
 	base := config.RslintConfig{
 		{Ignores: []string{"ignored-by-config.ts"}},
 		{Rules: config.Rules{"no-debugger": "error"}},
@@ -470,18 +481,18 @@ func TestConfigWithGitignore_GitNegationCannotOverrideConfigIgnore(t *testing.T)
 
 	for _, effective := range []config.RslintConfig{
 		config.ConfigWithGitignore(base, dir, osvfs.FS(), nil),
-		config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{target}),
+		config.ConfigWithGitignore(base, dir, osvfs.FS(), []string{targetPath}),
 	} {
-		assert.Assert(t, effective.IsFileIgnored(target, dir))
-		assert.Assert(t, effective.GetConfigForFile(target, dir) == nil)
-		assert.Equal(t, len(config.DiscoverLintTargets(
-			effective,
-			dir,
-			osvfs.FS(),
-			[]string{target},
-			nil,
-			false,
-		)), 0)
+		assert.Assert(t, effective.IsFileIgnored(targetPath, dir))
+		assert.Assert(t, effective.GetConfigForFile(targetPath, dir) == nil)
+		plan, err := target.Resolve(target.Request{
+			Config:          effective,
+			ConfigDirectory: dir,
+			FS:              osvfs.FS(),
+			Files:           []string{targetPath},
+		})
+		assert.NilError(t, err)
+		assert.Equal(t, len(plan.Files), 0)
 	}
 }
 

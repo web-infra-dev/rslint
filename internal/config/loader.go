@@ -244,11 +244,11 @@ func expandProjectGlob(fsys vfs.FS, configDirectory string, pattern string) ([]s
 	}
 
 	relativePattern := relativeGlobPattern(searchRoot, resolvedPattern)
-	// expandProjectGlob historically follows symlinks (e.g. tsconfig
+	// Project globs follow symlinks (e.g. tsconfig
 	// referenced via packages/*/tsconfig.json where packages may be
 	// symlinks in pnpm workspaces). It runs single-threaded under
 	// doublestar.GlobWalk, so the cycle dedupe is deterministic.
-	globFS := &vfsAdapter{vfs: fsys, root: searchRoot, followSymlinks: true}
+	globFS := &vfsAdapter{vfs: fsys, root: searchRoot}
 
 	matches := []string{}
 	err := doublestar.GlobWalk(globFS, relativePattern, func(path string, d fs.DirEntry) error {

@@ -14,7 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -570,10 +570,10 @@ func TestSessionRejectsNilFilesystemBeforeLoading(t *testing.T) {
 			if _, err := session.BuildProjects(nil, true); err == nil {
 				t.Fatal("BuildProjects accepted an invalid session")
 			}
-			if _, err := session.LoadCLI(ProjectSet{}, rslintconfig.LintTargetPlan{}, "/repo", true); err == nil {
+			if _, err := session.LoadCLI(ProjectSet{}, target.Plan{}, "/repo", true); err == nil {
 				t.Fatal("LoadCLI accepted an invalid session")
 			}
-			if _, err := session.LoadAPI(ProjectSet{}, rslintconfig.LintTargetPlan{}, "/repo", true); err == nil {
+			if _, err := session.LoadAPI(ProjectSet{}, target.Plan{}, "/repo", true); err == nil {
 				t.Fatal("LoadAPI accepted an invalid session")
 			}
 		})

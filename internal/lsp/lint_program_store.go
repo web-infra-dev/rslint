@@ -11,7 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
-	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -42,7 +42,7 @@ type lintProgramRequest struct {
 	ctx               context.Context
 	uri               lsproto.DocumentUri
 	overlayFS         vfs.FS
-	target            config.DiscoveredLintTarget
+	target            target.File
 	freshOnly         bool
 	overlayPrepared   bool
 	usedConfig        string
@@ -68,7 +68,7 @@ func (s *lintProgramStore) Usable() bool {
 func (s *lintProgramStore) Request(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
-	target config.DiscoveredLintTarget,
+	target target.File,
 ) (lintProgramLoader, lintProjectMetadataLoader, func()) {
 	target.Path = tspath.NormalizePath(target.Path)
 	if target.CanonicalPath != "" {
@@ -617,7 +617,7 @@ func (s *lintProgramState) failedLookupPathMatches(path tspath.Path) bool {
 }
 
 func (s *lintProgramState) rememberSelectedTarget(
-	target config.DiscoveredLintTarget,
+	target target.File,
 	fs vfs.FS,
 ) {
 	canonicalPath := target.CanonicalPath

@@ -1,4 +1,4 @@
-package config
+package target
 
 import (
 	"os"
@@ -12,6 +12,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 type retargetingExplicitOwnerFS struct {
@@ -41,45 +43,50 @@ func (fsys *retargetingExplicitOwnerFS) Realpath(filePath string) string {
 	}
 }
 
-func TestLintTargetPlanSelectsActiveConfigsAndCallerPaths(t *testing.T) {
-	configA := RslintConfig{{Rules: Rules{"no-debugger": "error"}}}
-	configB := RslintConfig{{Rules: Rules{"no-console": "error"}}}
-	configs := map[string]RslintConfig{
-		"/repo/a": configA,
-		"/repo/b": configB,
-	}
-	plan := LintTargetPlan{Targets: []DiscoveredLintTarget{
+func TestPlanSelectsActiveOwnersAndCallerPaths(t *testing.T) {
+	plan := Plan{Files: []File{
 		{
-			Path:            "/repo/a/alias.ts",
-			CanonicalPath:   "/physical/a.ts",
+			PathIdentity: rslintconfig.PathIdentity{
+				Path:          "/repo/b/index.ts",
+				CanonicalPath: "/physical/b.ts",
+			},
+			ConfigDirectory: "/repo/b",
+		},
+		{
+			PathIdentity: rslintconfig.PathIdentity{
+				Path:          "/repo/a/alias.ts",
+				CanonicalPath: "/physical/a.ts",
+			},
 			ConfigDirectory: "/repo/a",
 		},
 		{
-			Path:            "/repo/a/second-alias.ts",
-			CanonicalPath:   "/physical/a.ts",
+			PathIdentity: rslintconfig.PathIdentity{
+				Path:          "/repo/a/second-alias.ts",
+				CanonicalPath: "/physical/a.ts",
+			},
 			ConfigDirectory: "/repo/a",
 		},
 	}}
 
-	active := plan.ActiveConfigs(configs)
-	if len(active) != 1 || active["/repo/a"] == nil {
-		t.Fatalf("active configs = %v, want only /repo/a", active)
+	owners := plan.ActiveOwners()
+	if len(owners) != 2 || owners[0] != "/repo/a" || owners[1] != "/repo/b" {
+		t.Fatalf("active owners = %v, want sorted unique owners", owners)
 	}
 	preferred := plan.PreferredCallerPaths()
-	if got := preferred[exactPathID("/physical/a.ts")]; got != "/repo/a/alias.ts" {
+	if got := preferred[rslintconfig.ExactPathID("/physical/a.ts")]; got != "/repo/a/alias.ts" {
 		t.Fatalf("preferred caller path = %q, want first lexical target", got)
 	}
 }
 
-func TestLintTargetPlanAppliesExecutionConfigOverFrozenPathSpaces(t *testing.T) {
+func TestTargetPlanAppliesExecutionConfigOverFrozenPathSpaces(t *testing.T) {
 	directory := tspath.NormalizePath(t.TempDir())
 	filePath := tspath.CombinePaths(directory, "index.ts")
 	if err := os.WriteFile(filePath, []byte("export {};\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	plan, err := ResolveLintTargetPlan(LintTargetPlanRequest{
-		Config: RslintConfig{{
-			Settings: Settings{"generation": "discovery"},
+	plan, err := Resolve(Request{
+		Config: rslintconfig.RslintConfig{{
+			Settings: rslintconfig.Settings{"generation": "discovery"},
 		}},
 		ConfigDirectory: directory,
 		ScanRoot:        directory,
@@ -90,34 +97,39 @@ func TestLintTargetPlanAppliesExecutionConfigOverFrozenPathSpaces(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Targets) != 1 {
-		t.Fatalf("planned targets = %+v", plan.Targets)
+	if len(plan.Files) != 1 {
+		t.Fatalf("planned targets = %+v", plan.Files)
 	}
-	executionConfig := RslintConfig{{
-		Settings: Settings{"generation": "execution"},
+	executionConfig := rslintconfig.RslintConfig{{
+		Settings: rslintconfig.Settings{"generation": "execution"},
 	}}
-	resolved := plan.NewFileConfigResolver(
+	resolver, err := rslintconfig.NewFileConfigResolverWithPathSpaces(
 		executionConfig,
 		directory,
 		osvfs.FS(),
-		baseRuleCatalog(),
+		plan.PathSpaces(),
+		rules.All(),
 		false,
-	).ResolveTarget(plan.Targets[0])
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved := resolver.ResolveTarget(plan.Files[0].Identity())
 	if resolved.MergedConfig == nil ||
 		resolved.MergedConfig.Settings["generation"] != "execution" {
 		t.Fatalf("execution config was replaced by discovery config: %+v", resolved.MergedConfig)
 	}
 }
 
-func TestLintTargetPlanFreezesExplicitOwnerAndWarningOutcome(t *testing.T) {
+func TestTargetPlanFreezesExplicitOwnerAndWarningOutcome(t *testing.T) {
 	targetPath := "/repo/project/link.ts"
 	fsys := &retargetingExplicitOwnerFS{
 		FS:               &configPathSpaceFS{caseSensitive: false},
 		targetPath:       targetPath,
 		targetParentPath: tspath.GetDirectoryPath(targetPath),
 	}
-	plan, err := ResolveLintTargetPlan(LintTargetPlanRequest{
-		ConfigMap: map[string]RslintConfig{
+	plan, err := Resolve(Request{
+		ConfigMap: map[string]rslintconfig.RslintConfig{
 			"/repo/Project": {{}},
 		},
 		ConfigDirectory: "/repo",
@@ -129,24 +141,24 @@ func TestLintTargetPlanFreezesExplicitOwnerAndWarningOutcome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Targets) != 1 || plan.Targets[0].ConfigDirectory != "/repo/Project" {
-		t.Fatalf("explicit target lost its assigned owner: %+v", plan.Targets)
+	if len(plan.Files) != 1 || plan.Files[0].ConfigDirectory != "/repo/Project" {
+		t.Fatalf("explicit target lost its assigned owner: %+v", plan.Files)
 	}
 	if len(plan.ExplicitFileOutcomes) != 1 ||
 		plan.ExplicitFileOutcomes[0].Ignored ||
 		!plan.ExplicitFileOutcomes[0].Exists {
 		t.Fatalf("explicit outcome = %+v", plan.ExplicitFileOutcomes)
 	}
-	if fsys.parentCalls != 3 {
-		t.Fatalf("target parent Realpath calls = %d, want two identity reads plus one owner selection", fsys.parentCalls)
+	if fsys.parentCalls != 2 {
+		t.Fatalf("target parent Realpath calls = %d, want only the two identity reads", fsys.parentCalls)
 	}
 }
 
-func TestLintTargetPlanPreservesIgnoredBeforeMissingWarningPriority(t *testing.T) {
+func TestTargetPlanPreservesIgnoredBeforeMissingWarningPriority(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	target := tspath.CombinePaths(root, "node_modules/pkg/missing.ts")
-	plan, err := ResolveLintTargetPlan(LintTargetPlanRequest{
-		Config:          RslintConfig{{}},
+	plan, err := Resolve(Request{
+		Config:          rslintconfig.RslintConfig{{}},
 		ConfigDirectory: root,
 		ScanRoot:        root,
 		FS:              osvfs.FS(),
@@ -156,7 +168,7 @@ func TestLintTargetPlanPreservesIgnoredBeforeMissingWarningPriority(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Targets) != 0 || len(plan.ExplicitFileOutcomes) != 1 {
+	if len(plan.Files) != 0 || len(plan.ExplicitFileOutcomes) != 1 {
 		t.Fatalf("plan = %+v", plan)
 	}
 	outcome := plan.ExplicitFileOutcomes[0]
@@ -165,7 +177,7 @@ func TestLintTargetPlanPreservesIgnoredBeforeMissingWarningPriority(t *testing.T
 	}
 }
 
-func TestResolveLintTargetPlanSeparatesConfigDirectoryFromScanRoot(t *testing.T) {
+func TestTargetResolveSeparatesConfigDirectoryFromScanRoot(t *testing.T) {
 	root := t.TempDir()
 	configDirectory := filepath.Join(root, "config")
 	scanRoot := filepath.Join(root, "workspace")
@@ -190,11 +202,11 @@ func TestResolveLintTargetPlanSeparatesConfigDirectoryFromScanRoot(t *testing.T)
 	configDirectory = tspath.NormalizePath(configDirectory)
 	scanRoot = tspath.NormalizePath(scanRoot)
 	target = tspath.NormalizePath(target)
-	entries := RslintConfig{{
+	entries := rslintconfig.RslintConfig{{
 		Files: []string{"../workspace/src/*.ts"},
-		Rules: Rules{"no-debugger": "error"},
+		Rules: rslintconfig.Rules{"no-debugger": "error"},
 	}}
-	plan, err := ResolveLintTargetPlan(LintTargetPlanRequest{
+	plan, err := Resolve(Request{
 		Config:          entries,
 		ConfigDirectory: configDirectory,
 		ScanRoot:        scanRoot,
@@ -205,21 +217,21 @@ func TestResolveLintTargetPlanSeparatesConfigDirectoryFromScanRoot(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Targets) != 1 || plan.Targets[0].Path != target {
-		t.Fatalf("targets = %+v, want only %q", plan.Targets, target)
+	if len(plan.Files) != 1 || plan.Files[0].Path != target {
+		t.Fatalf("targets = %+v, want only %q", plan.Files, target)
 	}
-	if got := plan.Targets[0].ConfigDirectory; got != configDirectory {
+	if got := plan.Files[0].ConfigDirectory; got != configDirectory {
 		t.Fatalf("target config directory = %q, want %q", got, configDirectory)
 	}
-	resolvedTarget := plan.Targets[0]
-	merged := NewFileConfigResolverWithFS(entries, configDirectory, osvfs.FS(), baseRuleCatalog(), false).
+	resolvedTarget := plan.Files[0]
+	merged := rslintconfig.NewFileConfigResolverWithFS(entries, configDirectory, osvfs.FS(), rules.All(), false).
 		ConfigForTarget(resolvedTarget.Path, resolvedTarget.CanonicalPath)
 	if merged == nil || merged.Rules["no-debugger"] == nil {
 		t.Fatalf("external target %q did not retain config-relative matching: %#v", resolvedTarget.Path, merged)
 	}
 }
 
-func TestResolveLintTargetPlanRejectsPhysicalAliasesWithDifferentOwners(t *testing.T) {
+func TestTargetResolveRejectsPhysicalAliasesWithDifferentOwners(t *testing.T) {
 	sharedDir := t.TempDir()
 	sharedTarget := filepath.Join(sharedDir, "target.ts")
 	if err := os.WriteFile(sharedTarget, []byte("export const value = 1;\n"), 0o644); err != nil {
@@ -247,13 +259,13 @@ func TestResolveLintTargetPlanRejectsPhysicalAliasesWithDifferentOwners(t *testi
 	ownerB = tspath.NormalizePath(ownerB)
 	targetA = tspath.NormalizePath(targetA)
 	targetB = tspath.NormalizePath(targetB)
-	configs := map[string]RslintConfig{
-		ownerA: {{Rules: Rules{"no-debugger": "error"}}},
-		ownerB: {{Rules: Rules{"no-console": "error"}}},
+	configs := map[string]rslintconfig.RslintConfig{
+		ownerA: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		ownerB: {{Rules: rslintconfig.Rules{"no-console": "error"}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
-	_, err := ResolveLintTargetPlan(LintTargetPlanRequest{
+	_, err := Resolve(Request{
 		ConfigMap:       configs,
 		ConfigDirectory: tspath.NormalizePath(ownersRoot),
 		FS:              fsys,
@@ -265,7 +277,7 @@ func TestResolveLintTargetPlanRejectsPhysicalAliasesWithDifferentOwners(t *testi
 	}
 }
 
-func TestResolveLintTargetPlanRejectsSamePhysicalConfigAliasesAsDifferentOwners(t *testing.T) {
+func TestTargetResolveRejectsSamePhysicalConfigAliasesAsDifferentOwners(t *testing.T) {
 	physicalOwner := t.TempDir()
 	physicalTarget := filepath.Join(physicalOwner, "target.ts")
 	if err := os.WriteFile(physicalTarget, []byte("export const value = 1;\n"), 0o644); err != nil {
@@ -286,13 +298,13 @@ func TestResolveLintTargetPlanRejectsSamePhysicalConfigAliasesAsDifferentOwners(
 	ownerB = tspath.NormalizePath(ownerB)
 	targetA := tspath.CombinePaths(ownerA, "target.ts")
 	targetB := tspath.CombinePaths(ownerB, "target.ts")
-	configs := map[string]RslintConfig{
-		ownerA: {{Rules: Rules{"owner-a": "error"}}},
-		ownerB: {{Rules: Rules{"owner-b": "error"}}},
+	configs := map[string]rslintconfig.RslintConfig{
+		ownerA: {{Rules: rslintconfig.Rules{"owner-a": "error"}}},
+		ownerB: {{Rules: rslintconfig.Rules{"owner-b": "error"}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
-	_, err := ResolveLintTargetPlan(LintTargetPlanRequest{
+	_, err := Resolve(Request{
 		ConfigMap:       configs,
 		ConfigDirectory: tspath.NormalizePath(aliasesRoot),
 		FS:              fsys,
@@ -309,7 +321,7 @@ func TestResolveLintTargetPlanRejectsSamePhysicalConfigAliasesAsDifferentOwners(
 // Production code discovers owned targets first; program/loader decides their
 // membership afterward.
 func discoverFilesOutsideProgramsForTest(
-	config RslintConfig,
+	config rslintconfig.RslintConfig,
 	configDir string,
 	fsys vfs.FS,
 	programFiles map[string]struct{},
@@ -317,7 +329,7 @@ func discoverFilesOutsideProgramsForTest(
 	allowDirs []string,
 	singleThreaded bool,
 ) []string {
-	targets := DiscoverLintFiles(config, configDir, fsys, allowFiles, allowDirs, singleThreaded)
+	targets := discoverLintFiles(config, configDir, fsys, allowFiles, allowDirs, singleThreaded)
 	result := make([]string, 0, len(targets))
 	for _, target := range targets {
 		if _, exists := programFiles[target]; !exists {
@@ -328,7 +340,7 @@ func discoverFilesOutsideProgramsForTest(
 }
 
 func discoverFilesOutsideProgramsMultiConfigForTest(
-	configMap map[string]RslintConfig,
+	configMap map[string]rslintconfig.RslintConfig,
 	fsys vfs.FS,
 	programFiles map[string]struct{},
 	allowFiles []string,
@@ -341,7 +353,7 @@ func discoverFilesOutsideProgramsMultiConfigForTest(
 
 	seen := make(map[string]struct{})
 	var result []string
-	for _, target := range DiscoverLintTargetsMultiConfig(
+	for _, target := range discoverLintTargetsMultiConfig(
 		configMap,
 		nil,
 		fsys,

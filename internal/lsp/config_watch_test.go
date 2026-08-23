@@ -475,6 +475,15 @@ func TestReloadConfig_NoTsConfigsIsAccepted(t *testing.T) {
 	if len(s.jsonConfig) != 1 {
 		t.Errorf("expected 1 config entry, got %d", len(s.jsonConfig))
 	}
+	if s.jsonConfigOwnerIndex == nil || s.jsonFileConfigResolver == nil {
+		t.Fatal("reloadConfig did not publish a complete JSON evaluation generation")
+	}
+	s.configSnapshotIncludesGitignore = true
+	target := lspTargetIdentity(filepath.Join(dir, "index.ts"), s.fs)
+	selection := s.selectDocumentConfig(target)
+	if selection.resolved.MergedConfig == nil {
+		t.Fatal("reloaded JSON resolver did not select a supported target")
+	}
 }
 
 func TestReloadConfigAndRelint_RelintOpenDocuments(t *testing.T) {

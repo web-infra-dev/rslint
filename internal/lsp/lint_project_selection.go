@@ -12,7 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
-	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -127,7 +127,7 @@ type selectedLintProject struct {
 
 func selectConfiguredLintProject(
 	tsConfigPaths []string,
-	target config.DiscoveredLintTarget,
+	target target.File,
 	loaders lintProjectLoaders,
 ) (selectedLintProject, bool, error) {
 	metadataByProject := make([]*lintProjectMetadata, len(tsConfigPaths))
@@ -202,14 +202,14 @@ func selectConfiguredLintProject(
 // project snapshot. Root probing and Program construction share it, so a
 // config cannot be parsed twice or change meaning halfway through selection.
 type standaloneLintProjectRequest struct {
-	target   config.DiscoveredLintTarget
+	target   target.File
 	fs       vfs.FS
 	loadFS   func() vfs.FS
 	projects map[string]*lintProjectMetadata
 }
 
 func newStandaloneLintProjectRequest(
-	target config.DiscoveredLintTarget,
+	target target.File,
 	loadFS func() vfs.FS,
 ) *standaloneLintProjectRequest {
 	target.Path = tspath.NormalizePath(target.Path)
@@ -224,7 +224,7 @@ func newStandaloneLintProjectRequest(
 }
 
 func newStandaloneLintProjectRequestWithFS(
-	target config.DiscoveredLintTarget,
+	target target.File,
 	fs vfs.FS,
 ) *standaloneLintProjectRequest {
 	request := newStandaloneLintProjectRequest(target, nil)

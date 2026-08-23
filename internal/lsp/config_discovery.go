@@ -20,6 +20,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
 )
@@ -299,24 +300,27 @@ func decodeConfigTransactionResult(raw any, target any, method string) error {
 }
 
 type preparedLSPConfigSnapshot struct {
-	configs            map[string]config.RslintConfig
-	tsConfigPaths      map[string][]string
-	ownerResolver      *config.ConfigOwnerResolver
-	unavailableConfigs map[string]struct{}
-	jsonConfig         config.RslintConfig
-	jsonConfigResolver *config.ConfigOwnerResolver
-	jsonConfigPath     string
-	jsonTsConfigPaths  []string
-	transactionID      string
-	usableLastGood     bool
+	configs              map[string]config.RslintConfig
+	tsConfigPaths        map[string][]string
+	ownerIndex           *target.OwnerIndex
+	unavailableConfigs   map[string]struct{}
+	jsonConfig           config.RslintConfig
+	jsonConfigOwnerIndex *target.OwnerIndex
+	jsonConfigDirectory  string
+	jsonConfigPath       string
+	jsonTsConfigPaths    []string
+	transactionID        string
+	usableLastGood       bool
 }
 
 // lspDiscoveredConfigSnapshot is commit-ready: its configuration state and
 // exact rule catalog always belong to the same Node transaction.
 type lspDiscoveredConfigSnapshot struct {
 	preparedLSPConfigSnapshot
-	ruleCatalog         *rule.Catalog
-	shadowedPluginRules []string
+	ruleCatalog            *rule.Catalog
+	fileConfigResolvers    map[string]*config.FileConfigResolver
+	jsonFileConfigResolver *config.FileConfigResolver
+	shadowedPluginRules    []string
 }
 
 func (s *Server) handleConfigRefresh(ctx context.Context, request configRefreshRequest) (configRefreshResponse, error) {
@@ -495,7 +499,19 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 	if err := loader.ensureActivated(ctx, configCatalog); err != nil {
 		return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, configCatalog.TransactionID, err)
 	}
-	snapshot := completeDiscoveredConfigSnapshot(preparedSnapshot, configCatalog.EslintPlugins)
+	snapshot, err := completeDiscoveredConfigSnapshot(
+		preparedSnapshot,
+		configCatalog.EslintPlugins,
+		snapshotFS,
+	)
+	if err != nil {
+		return configRefreshResponse{}, s.abortFailedConfigRefresh(
+			ctx,
+			loader,
+			configCatalog.TransactionID,
+			err,
+		)
+	}
 	// Cancellation is honored throughout discovery and activation. Once commit
 	// begins, finish the local two-phase control exchange under a short bounded
 	// context so cancellation cannot leave Node committed while Go silently
@@ -640,12 +656,13 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		snapshot.tsConfigPaths[configDir] = nil
 		snapshot.unavailableConfigs[configDir] = struct{}{}
 	}
-	// ConfigOwnerResolver snapshots both the path index and config values. Build
-	// it only after all successful and unavailable boundaries are present.
+	// Build the owner index only after all successful and unavailable
+	// boundaries are present. Config values remain owned by this LSP snapshot;
+	// the target package retains only routing and frozen path-space state.
 	// Successful automatic catalog entries already contain the Git sources read
 	// by their discovery generation; unavailable boundaries intentionally remain
 	// empty and only stop JSON fallback ownership.
-	snapshot.ownerResolver = config.NewConfigOwnerResolver(snapshot.configs, fsys)
+	snapshot.ownerIndex = target.NewOwnerIndex(snapshot.configs, fsys)
 	if configCatalog.Explicit {
 		// An explicit JS/TS config is invocation-wide and owns the cwd. JSON is
 		// not part of this mode, so an unrelated JSON file must not make the
@@ -666,18 +683,19 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	}
 	jsonCWD := tspath.NormalizePath(s.cwd)
 	jsonBoundaryConfigs[jsonCWD] = jsonConfig
-	jsonBoundaryResolver := config.NewConfigOwnerResolver(jsonBoundaryConfigs, fsys)
+	jsonBoundaryResolver := target.NewOwnerIndex(jsonBoundaryConfigs, fsys)
 	snapshot.jsonConfig = config.ConfigWithGitignoreWithBoundaries(
 		jsonConfig,
 		jsonCWD,
 		fsys,
 		nil,
-		jsonBoundaryResolver.ChildConfigDirs(jsonCWD),
+		jsonBoundaryResolver.ChildOwnerDirectories(jsonCWD),
 	)
-	snapshot.jsonConfigResolver = config.NewConfigOwnerResolver(
+	snapshot.jsonConfigOwnerIndex = target.NewOwnerIndex(
 		map[string]config.RslintConfig{jsonCWD: snapshot.jsonConfig},
 		fsys,
 	)
+	snapshot.jsonConfigDirectory = jsonCWD
 	snapshot.jsonConfigPath = jsonPath
 	snapshot.jsonTsConfigPaths = jsonTsConfigs
 	return snapshot, nil
@@ -686,16 +704,61 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 func completeDiscoveredConfigSnapshot(
 	prepared *preparedLSPConfigSnapshot,
 	plugins []config.EslintPluginEntry,
-) *lspDiscoveredConfigSnapshot {
+	fsys vfs.FS,
+) (*lspDiscoveredConfigSnapshot, error) {
 	if prepared == nil {
 		panic("prepared LSP config snapshot is required")
 	}
 	ruleCatalog, shadowedPluginRules := deriveLSPRuleCatalog(rules.All(), plugins)
+	fileConfigResolvers := make(map[string]*config.FileConfigResolver, len(prepared.configs))
+	for _, configDirectory := range sortedConfigDirectories(prepared.configs) {
+		resolver, err := config.NewFileConfigResolverWithPathSpaces(
+			prepared.configs[configDirectory],
+			configDirectory,
+			fsys,
+			prepared.ownerIndex.PathSpaces(),
+			ruleCatalog,
+			true,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("prepare file config resolver for %q: %w", configDirectory, err)
+		}
+		fileConfigResolvers[configDirectory] = resolver
+	}
+
+	var jsonFileConfigResolver *config.FileConfigResolver
+	if prepared.jsonConfigOwnerIndex != nil {
+		jsonCWD := prepared.jsonConfigDirectory
+		resolver, err := config.NewFileConfigResolverWithPathSpaces(
+			prepared.jsonConfig,
+			jsonCWD,
+			fsys,
+			prepared.jsonConfigOwnerIndex.PathSpaces(),
+			rules.All(),
+			false,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("prepare JSON file config resolver for %q: %w", jsonCWD, err)
+		}
+		jsonFileConfigResolver = resolver
+	}
+
 	return &lspDiscoveredConfigSnapshot{
 		preparedLSPConfigSnapshot: *prepared,
 		ruleCatalog:               ruleCatalog,
+		fileConfigResolvers:       fileConfigResolvers,
+		jsonFileConfigResolver:    jsonFileConfigResolver,
 		shadowedPluginRules:       shadowedPluginRules,
+	}, nil
+}
+
+func sortedConfigDirectories(configs map[string]config.RslintConfig) []string {
+	directories := make([]string, 0, len(configs))
+	for directory := range configs {
+		directories = append(directories, directory)
 	}
+	sort.Strings(directories)
+	return directories
 }
 
 // unavailableConfigBoundaryDirectories returns the shallowest failed config
@@ -775,10 +838,12 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.invalidateLintProjectCaches()
 	s.jsConfigs = snapshot.configs
 	s.tsConfigPathsByConfig = snapshot.tsConfigPaths
-	s.jsConfigOwnerResolver = snapshot.ownerResolver
+	s.jsConfigOwnerIndex = snapshot.ownerIndex
+	s.jsFileConfigResolvers = snapshot.fileConfigResolvers
 	s.jsUnavailableConfigs = snapshot.unavailableConfigs
 	s.jsonConfig = snapshot.jsonConfig
-	s.jsonConfigResolver = snapshot.jsonConfigResolver
+	s.jsonConfigOwnerIndex = snapshot.jsonConfigOwnerIndex
+	s.jsonFileConfigResolver = snapshot.jsonFileConfigResolver
 	s.rslintConfigPath = snapshot.jsonConfigPath
 	s.tsConfigPaths = snapshot.jsonTsConfigPaths
 	s.eslintPluginConfigGeneration = snapshot.transactionID
