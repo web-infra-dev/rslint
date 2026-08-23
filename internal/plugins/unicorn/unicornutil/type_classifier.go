@@ -28,8 +28,6 @@ type TypeClassifierOptions struct {
 	HeritageSymbolFlags        ast.SymbolFlags
 	UnknownSymbolLessTypeFlags checker.TypeFlags
 	AllowNullishInMixedUnion   bool
-	TreatMixedUnionAsTarget    bool
-	TreatMixedUnionAsNonTarget bool
 }
 
 // ClassifyType mirrors eslint-plugin-unicorn's getTypeScriptType plus the
@@ -106,23 +104,17 @@ func classifyUnion(ctx rule.RuleContext, parts []*checker.Type, options TypeClas
 		return TypeNonTarget
 	}
 
-	anyTarget := false
 	allTarget := true
-	anyNonTarget := false
 	allNonTarget := true
 	for _, class := range classes {
-		anyTarget = anyTarget || class == TypeTarget
 		allTarget = allTarget && class == TypeTarget
-		anyNonTarget = anyNonTarget || class == TypeNonTarget
 		allNonTarget = allNonTarget && class == TypeNonTarget
 	}
 
-	if (options.TreatMixedUnionAsTarget && anyTarget) ||
-		(!options.TreatMixedUnionAsTarget && allTarget) {
+	if allTarget {
 		return TypeTarget
 	}
-	if (options.TreatMixedUnionAsNonTarget && anyNonTarget) ||
-		(!options.TreatMixedUnionAsNonTarget && allNonTarget) {
+	if allNonTarget {
 		return TypeNonTarget
 	}
 	return TypeUnknown
