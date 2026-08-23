@@ -1,6 +1,6 @@
 // TestNoAliasMethodsUpstream migrates the complete
 // eslint-plugin-vitest@v1.6.27 no-alias-methods suite. Rstest-only edge cases,
-// real-user shapes, computed-identifier fallback, and edit-demand coverage
+// real-user shapes, computed-key non-reporting policy, and edit-demand coverage
 // live in no_alias_methods_extras_test.go.
 package no_alias_methods
 

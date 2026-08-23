@@ -1,5 +1,5 @@
 // TestNoAliasMethodsExtras locks in the Rstest-only augmentation required by
-// the port spec: first-matcher contract, strict computed-identifier fallback,
+// the port spec: first-matcher contract, computed-key non-reporting policy,
 // source matrices, trivia-preserving fixes, real-user shapes, and edit-demand
 // parity.
 package no_alias_methods
