@@ -57,7 +57,7 @@ func ConfigWithGitignoreForExactTarget(
 	config RslintConfig,
 	configDir string,
 	fsys vfs.FS,
-	target DiscoveredLintTarget,
+	target PathIdentity,
 ) RslintConfig {
 	collectionFile := resolveGitignoreCollectionTargetPath(target, configDir, fsys)
 	return configWithGitignoreCollectionFiles(
@@ -398,14 +398,14 @@ func parseCollectedGitignorePatterns(collected []gitignore.Pattern, caseInsensit
 // lexical path space. This keeps Git source lookup stable when the config root
 // and target use different symlink, casing, or canonical spellings.
 func ResolveGitignoreCollectionPath(filePath string, canonicalPath string, configDir string, fsys vfs.FS) string {
-	return resolveGitignoreCollectionTargetPath(DiscoveredLintTarget{
+	return resolveGitignoreCollectionTargetPath(PathIdentity{
 		Path:          filePath,
 		CanonicalPath: canonicalPath,
 	}, configDir, fsys)
 }
 
 func resolveGitignoreCollectionTargetPath(
-	target DiscoveredLintTarget,
+	target PathIdentity,
 	configDir string,
 	fsys vfs.FS,
 ) string {

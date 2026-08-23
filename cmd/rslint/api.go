@@ -22,6 +22,7 @@ import (
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
@@ -251,7 +252,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 
 	var (
 		configMap              map[string]rslintconfig.RslintConfig
-		configTargetScopes     map[string]rslintconfig.LintDiscoveryScope
+		configTargetScopes     map[string]target.OwnerScope
 		catalogPlugins         []rslintconfig.EslintPluginEntry
 		pluginConfigDirByOwner map[string]string
 		configGitignoreFrozen  bool
@@ -424,12 +425,12 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// invocation-wide single-config paths.
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	targetPlan, err := rslintconfig.ResolveLintTargetPlan(rslintconfig.LintTargetPlanRequest{
+	targetPlan, err := target.Resolve(target.Request{
 		ConfigMap:       configMap,
 		Config:          rslintConfig,
 		ConfigDirectory: configDirectory,
 		ScanRoot:        currentDirectory,
-		ConfigScopes:    configTargetScopes,
+		OwnerScopes:     configTargetScopes,
 		FS:              fs,
 		Files:           allowedFiles,
 	})
@@ -440,10 +441,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// selected. Resolve the target plan before project paths so an ignored or
 	// empty request cannot fail on an inactive project declaration.
 	var projectSet loader.ProjectSet
-	if len(targetPlan.Targets) > 0 {
+	if len(targetPlan.Files) > 0 {
 		if configMap != nil {
 			projectSet, err = programSession.BuildTargetProjects(
-				targetPlan.ActiveConfigs(configMap),
+				configsForOwners(configMap, targetPlan.ActiveOwners()),
 				targetPlan,
 				false,
 			)
@@ -473,7 +474,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		EnforcePlugins:          true,
 		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
 		SourceMappingsCanonical: true,
-		TargetPlan:              &targetPlan,
+		PathSpaces:              targetPlan.PathSpaces(),
 		FS:                      fs,
 	})
 	targetPathForSourcePath := func(sourcePath string) string {

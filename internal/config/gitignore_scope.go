@@ -62,20 +62,20 @@ func PlanGitignoreCollectionScopes(
 		return scope
 	}
 
-	for _, directory := range coalesceRequestedDirectories(targetDirectories, fsys) {
+	for _, directory := range CoalesceDirectoryIdentities(targetDirectories, fsys) {
 		if directoryWithinGitignoreRoot(
-			directory.lexicalPath,
-			directory.canonicalPath,
+			directory.LexicalPath,
+			directory.CanonicalPath,
 			defaultRoot,
 			fsys,
 			useCaseSensitive,
 		) {
 			scope := ensureDefaultScope()
-			scope.Directories = appendUniquePath(scope.Directories, directory.lexicalPath, pathID)
+			scope.Directories = appendUniquePath(scope.Directories, directory.LexicalPath, pathID)
 			continue
 		}
-		scope := ensureOutsideScope(directory.lexicalPath)
-		scope.Directories = appendUniquePath(scope.Directories, directory.lexicalPath, pathID)
+		scope := ensureOutsideScope(directory.LexicalPath)
+		scope.Directories = appendUniquePath(scope.Directories, directory.LexicalPath, pathID)
 	}
 
 	sort.Slice(outsideScopes, func(i, j int) bool {

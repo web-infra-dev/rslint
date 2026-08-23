@@ -1,4 +1,4 @@
-package config
+package target
 
 import (
 	"os"
@@ -17,6 +17,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"gotest.tools/v3/assert"
 )
 
@@ -90,8 +92,8 @@ func TestDiscoverFilesOutsidePrograms_Basic(t *testing.T) {
 		"scripts/b.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	// src/a.ts is in the program, scripts/b.ts is not
@@ -112,11 +114,11 @@ func TestDiscoverFilesOutsidePrograms_GlobalIgnoresExclude(t *testing.T) {
 		"scripts/b.ts",
 	})
 
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		// Global ignore
 		{Ignores: []string{"scripts/**"}},
-		// Rules entry
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		// rslintconfig.Rules entry
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{
@@ -136,8 +138,8 @@ func TestDiscoverFilesOutsidePrograms_ProgramFilesSkipped(t *testing.T) {
 		"src/b.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	// Both files are in the program
@@ -158,12 +160,12 @@ func TestDiscoverFilesOutsidePrograms_EntryIgnoreDoesNotRemoveTarget(t *testing.
 		"test/b.ts",
 	})
 
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		// Entry with files AND entry-level ignores
 		{
 			Files:   []string{"**/*.ts"},
 			Ignores: []string{"test/**"},
-			Rules:   Rules{"test-rule": "error"},
+			Rules:   rslintconfig.Rules{"test-rule": "error"},
 		},
 	}
 
@@ -184,16 +186,16 @@ func TestDiscoverLintFiles_EntryIgnorePreventsSelectorContribution(t *testing.T)
 		"src/ignored.JS",
 		"src/included.JS",
 	})
-	config := RslintConfig{
-		{Rules: Rules{"no-debugger": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Rules: rslintconfig.Rules{"no-debugger": "error"}},
 		{
 			Files:   []string{"**/*.JS"},
 			Ignores: []string{"**/ignored.JS"},
-			Rules:   Rules{"no-console": "error"},
+			Rules:   rslintconfig.Rules{"no-console": "error"},
 		},
 	}
 
-	targets := DiscoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
+	targets := discoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
 	assert.DeepEqual(t, targets, []string{paths["src/included.JS"]})
 	if merged := config.GetConfigForFile(paths["src/ignored.JS"], configDir); merged != nil {
 		t.Fatalf("locally ignored selector made the non-default extension configurable: %#v", merged)
@@ -219,19 +221,19 @@ func TestDiscoverLintFiles_DefaultBaselineIsIndependentOfConfigEntries(t *testin
 
 	tests := []struct {
 		name   string
-		config RslintConfig
+		config rslintconfig.RslintConfig
 	}{
 		{name: "empty config"},
 		{
 			name: "global ignore only",
-			config: RslintConfig{
+			config: rslintconfig.RslintConfig{
 				{Ignores: []string{"generated/**"}},
 			},
 		},
 		{
 			name: "explicit TS entry does not remove defaults",
-			config: RslintConfig{
-				{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+			config: rslintconfig.RslintConfig{
+				{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 			},
 		},
 	}
@@ -250,7 +252,7 @@ func TestDiscoverLintFiles_DefaultBaselineIsIndependentOfConfigEntries(t *testin
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			targets := DiscoverLintFiles(tt.config, configDir, osvfs.FS(), nil, nil, true)
+			targets := discoverLintFiles(tt.config, configDir, osvfs.FS(), nil, nil, true)
 			assert.DeepEqual(t, targets, expected)
 		})
 	}
@@ -274,7 +276,7 @@ func TestDiscoverLintFiles_PreservesUNCRoot(t *testing.T) {
 		resolvedPaths: map[string]string{},
 	}
 
-	targets := DiscoverLintFiles(nil, configDir, mock, nil, nil, true)
+	targets := discoverLintFiles(nil, configDir, mock, nil, nil, true)
 	assert.DeepEqual(t, targets, []string{"//server/share/repo/src/a.ts"})
 }
 
@@ -328,7 +330,7 @@ func TestDiscoverLintFiles_PreservesDistinctLexicalPathCasing(t *testing.T) {
 			"c:/repo/src/a.ts": true,
 		},
 	}
-	targets := DiscoverLintFiles(
+	targets := discoverLintFiles(
 		nil,
 		"C:/Repo",
 		fsys,
@@ -342,11 +344,11 @@ func TestDiscoverLintFiles_PreservesDistinctLexicalPathCasing(t *testing.T) {
 func TestDiscoverLintFiles_ExplicitPatternCanExtendCaseSensitiveBaseline(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{"src/A.JS", "src/b.js"})
 
-	withoutExplicitPattern := DiscoverLintFiles(nil, configDir, osvfs.FS(), nil, nil, true)
+	withoutExplicitPattern := discoverLintFiles(nil, configDir, osvfs.FS(), nil, nil, true)
 	assert.DeepEqual(t, withoutExplicitPattern, []string{paths["src/b.js"]})
 
-	config := RslintConfig{{Files: []string{"**/*.JS"}}}
-	withExplicitPattern := DiscoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
+	config := rslintconfig.RslintConfig{{Files: []string{"**/*.JS"}}}
+	withExplicitPattern := discoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
 	expected := []string{paths["src/A.JS"], paths["src/b.js"]}
 	sort.Strings(expected)
 	assert.DeepEqual(t, withExplicitPattern, expected)
@@ -359,13 +361,13 @@ func TestDiscoverLintFiles_FilesAndGroupAppliesCandidatePostFilter(t *testing.T)
 		"other/B.JS",
 		"src/default.ts",
 	})
-	config := RslintConfig{{
+	config := rslintconfig.RslintConfig{{
 		FilePatternGroups: [][]string{
 			{"src/**", "**/*.JS", "!**/*.test.JS"},
 		},
 	}}
 
-	targets := DiscoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
+	targets := discoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
 	expected := []string{paths["src/A.JS"], paths["src/default.ts"]}
 	sort.Strings(expected)
 	assert.DeepEqual(t, targets, expected)
@@ -377,12 +379,12 @@ func TestDiscoverLintFiles_EmptyFilesAndGroupMatchesSupportedBaseline(t *testing
 		"src/b.ts",
 		"src/readme.md",
 	})
-	config := RslintConfig{{
+	config := rslintconfig.RslintConfig{{
 		FilePatternGroups: [][]string{{}},
-		Rules:             Rules{"test-rule": "error"},
+		Rules:             rslintconfig.Rules{"test-rule": "error"},
 	}}
 
-	targets := DiscoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
+	targets := discoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
 	expected := []string{paths["src/a.js"], paths["src/b.ts"]}
 	sort.Strings(expected)
 	assert.DeepEqual(t, targets, expected)
@@ -397,8 +399,8 @@ func TestDiscoverFilesOutsidePrograms_NoFilesField_UsesDefaultExtensions(t *test
 		"src/styles.css",
 	})
 
-	config := RslintConfig{
-		{Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
@@ -415,8 +417,8 @@ func TestDiscoverFilesOutsidePrograms_AllowDirsScope(t *testing.T) {
 		"tools/c.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -436,13 +438,13 @@ func TestDiscoverLintFiles_AllowDirsStartsWalkAtScopedRoot(t *testing.T) {
 		"packages/other/src/b.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 	appDir := tspath.NormalizePath(filepath.Join(configDir, "packages/app"))
 	spy := &spyFS{FS: osvfs.FS()}
 
-	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{appDir}, true)
+	targets := discoverLintFiles(config, configDir, spy, nil, []string{appDir}, true)
 
 	assert.DeepEqual(t, targets, []string{paths["packages/app/src/a.ts"]})
 
@@ -464,13 +466,13 @@ func TestDiscoverLintFiles_AllowDirsSkipsDefaultExcludedRoot(t *testing.T) {
 		"src/a.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 	nodeModulesDir := tspath.NormalizePath(filepath.Join(configDir, "node_modules"))
 	spy := &spyFS{FS: osvfs.FS()}
 
-	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{nodeModulesDir}, true)
+	targets := discoverLintFiles(config, configDir, spy, nil, []string{nodeModulesDir}, true)
 
 	assert.DeepEqual(t, targets, []string{})
 	for _, accessed := range spy.snapshotAccessedDirs() {
@@ -486,14 +488,14 @@ func TestDiscoverLintFiles_AllowDirsSkipsGloballyIgnoredRoot(t *testing.T) {
 		"src/a.ts",
 	})
 
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"dist/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 	distDir := tspath.NormalizePath(filepath.Join(configDir, "dist"))
 	spy := &spyFS{FS: osvfs.FS()}
 
-	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{distDir}, true)
+	targets := discoverLintFiles(config, configDir, spy, nil, []string{distDir}, true)
 
 	assert.DeepEqual(t, targets, []string{})
 	for _, accessed := range spy.snapshotAccessedDirs() {
@@ -509,14 +511,14 @@ func TestDiscoverLintFiles_AllowDirsKeepsIgnoredRootWithNegation(t *testing.T) {
 		"dist/keep.ts",
 	})
 
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"dist/**/*", "!dist/keep.ts"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 	distDir := tspath.NormalizePath(filepath.Join(configDir, "dist"))
 	spy := &spyFS{FS: osvfs.FS()}
 
-	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{distDir}, true)
+	targets := discoverLintFiles(config, configDir, spy, nil, []string{distDir}, true)
 
 	assert.DeepEqual(t, targets, []string{paths["dist/keep.ts"]})
 	enteredDist := false
@@ -534,12 +536,12 @@ func TestDiscoverLintFiles_EmptyAllowDirsDoesNotWalk(t *testing.T) {
 		"src/a.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 	spy := &spyFS{FS: osvfs.FS()}
 
-	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{}, true)
+	targets := discoverLintFiles(config, configDir, spy, nil, []string{}, true)
 
 	assert.Equal(t, len(targets), 0)
 	assert.Equal(t, len(spy.snapshotAccessedDirs()), 0)
@@ -551,11 +553,11 @@ func TestDiscoverLintFiles_ExplicitFileSkipsNestedDefaultExcludedDir(t *testing.
 		"src/a.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
-	targets := DiscoverLintFiles(
+	targets := discoverLintFiles(
 		config,
 		configDir,
 		osvfs.FS(),
@@ -587,9 +589,9 @@ func TestDiscoverLintTargetsFromRootExplicitFileUsesScanRootDefaultExcludes(t *t
 	aliasTarget := tspath.CombinePaths(aliasDir, "index.ts")
 
 	targets := discoverLintTargetsFromRoot(
-		RslintConfig{{
+		rslintconfig.RslintConfig{{
 			Files: []string{"**/*.ts"},
-			Rules: Rules{"test-rule": "error"},
+			Rules: rslintconfig.Rules{"test-rule": "error"},
 		}},
 		configDir,
 		scanRoot,
@@ -598,7 +600,7 @@ func TestDiscoverLintTargetsFromRootExplicitFileUsesScanRootDefaultExcludes(t *t
 		nil,
 		true,
 	)
-	assert.DeepEqual(t, targets, []DiscoveredLintTarget{})
+	assert.DeepEqual(t, targets, []File{})
 }
 
 func TestDiscoverLintFiles_OverlappingAllowDirsWalkChildOnce(t *testing.T) {
@@ -608,14 +610,14 @@ func TestDiscoverLintFiles_OverlappingAllowDirsWalkChildOnce(t *testing.T) {
 		"packages/other/src/c.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 	appDir := tspath.NormalizePath(filepath.Join(configDir, "packages/app"))
 	srcDir := tspath.NormalizePath(filepath.Join(configDir, "packages/app/src"))
 	spy := &spyFS{FS: osvfs.FS()}
 
-	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{appDir, srcDir}, true)
+	targets := discoverLintFiles(config, configDir, spy, nil, []string{appDir, srcDir}, true)
 
 	expected := []string{paths["packages/app/src/a.ts"], paths["packages/app/src/nested/b.ts"]}
 	assert.DeepEqual(t, targets, expected)
@@ -649,7 +651,7 @@ func TestDiscoverLintTargetsFromRoot_WalksEveryRequestedDirectory(t *testing.T) 
 	}
 
 	targets := discoverLintTargetsFromRoot(
-		RslintConfig{{Rules: Rules{"test-rule": "error"}}},
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"test-rule": "error"}}},
 		configDir,
 		scanRoot,
 		osvfs.FS(),
@@ -657,9 +659,9 @@ func TestDiscoverLintTargetsFromRoot_WalksEveryRequestedDirectory(t *testing.T) 
 		[]string{firstDir, secondDir},
 		true,
 	)
-	assert.DeepEqual(t, targets, []DiscoveredLintTarget{
-		{Path: firstFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(firstFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(firstDir)), ConfigDirectory: configDir},
-		{Path: secondFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(secondFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(secondDir)), ConfigDirectory: configDir},
+	assert.DeepEqual(t, targets, []File{
+		{PathIdentity: rslintconfig.PathIdentity{Path: firstFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(firstFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(firstDir))}, ConfigDirectory: configDir},
+		{PathIdentity: rslintconfig.PathIdentity{Path: secondFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(secondFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(secondDir))}, ConfigDirectory: configDir},
 	})
 }
 
@@ -683,10 +685,10 @@ func TestDiscoverLintTargetsFromRoot_PreservesDistinctLexicalDirectorySelectors(
 		t.Skipf("second directory symlink unavailable: %v", err)
 	}
 
-	plan, err := ResolveLintTargetPlan(LintTargetPlanRequest{
-		Config: RslintConfig{{
+	plan, err := Resolve(Request{
+		Config: rslintconfig.RslintConfig{{
 			Files: []string{"b/*.TS"},
-			Rules: Rules{"rule": "error"},
+			Rules: rslintconfig.Rules{"rule": "error"},
 		}},
 		ConfigDirectory: configDir,
 		ScanRoot:        configDir,
@@ -698,8 +700,8 @@ func TestDiscoverLintTargetsFromRoot_PreservesDistinctLexicalDirectorySelectors(
 		t.Fatal(err)
 	}
 	wantPath := tspath.CombinePaths(aliasB, "x.TS")
-	if len(plan.Targets) != 1 || plan.Targets[0].Path != wantPath {
-		t.Fatalf("targets = %+v, want only %q", plan.Targets, wantPath)
+	if len(plan.Files) != 1 || plan.Files[0].Path != wantPath {
+		t.Fatalf("targets = %+v, want only %q", plan.Files, wantPath)
 	}
 }
 
@@ -713,15 +715,15 @@ func TestDiscoverLintTargetsFromRoot_DirectoryAliasDoesNotRewriteSiblingScope(t 
 	if err := os.WriteFile(physicalFile, []byte("export {};\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	aliasDir := tspath.CombinePaths(root, "zalias")
+	aliasDir := tspath.CombinePaths(root, "alias-b")
 	if err := os.Symlink(physicalDir, aliasDir); err != nil {
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
 
-	plan, err := ResolveLintTargetPlan(LintTargetPlanRequest{
-		Config: RslintConfig{{
+	plan, err := Resolve(Request{
+		Config: rslintconfig.RslintConfig{{
 			Files: []string{"real/*.TS"},
-			Rules: Rules{"rule": "error"},
+			Rules: rslintconfig.Rules{"rule": "error"},
 		}},
 		ConfigDirectory: root,
 		ScanRoot:        root,
@@ -732,8 +734,8 @@ func TestDiscoverLintTargetsFromRoot_DirectoryAliasDoesNotRewriteSiblingScope(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Targets) != 1 || plan.Targets[0].Path != physicalFile {
-		t.Fatalf("targets = %+v, want only real-directory spelling %q", plan.Targets, physicalFile)
+	if len(plan.Files) != 1 || plan.Files[0].Path != physicalFile {
+		t.Fatalf("targets = %+v, want only real-directory spelling %q", plan.Files, physicalFile)
 	}
 }
 
@@ -757,9 +759,9 @@ func TestDiscoverLintTargetsMultiConfig_PreservesProjectedCanonicalIdentity(t *t
 		t.Skipf("target directory symlink unavailable: %v", err)
 	}
 
-	targets := DiscoverLintTargetsMultiConfig(
-		map[string]RslintConfig{
-			configAlias: {{Rules: Rules{"rule": "error"}}},
+	targets := discoverLintTargetsMultiConfig(
+		map[string]rslintconfig.RslintConfig{
+			configAlias: {{Rules: rslintconfig.Rules{"rule": "error"}}},
 		},
 		nil,
 		osvfs.FS(),
@@ -796,9 +798,9 @@ func TestDiscoverLintTargetsFromRoot_SharedAliasAncestorKeepsRelativeConfigMeani
 		t.Skipf("root symlink unavailable: %v", err)
 	}
 	configDir := tspath.CombinePaths(aliasRoot, "config")
-	entries := RslintConfig{
+	entries := rslintconfig.RslintConfig{
 		{Ignores: []string{"../workspace/ignored.ts"}},
-		{Files: []string{"../workspace/*.ts"}, Rules: Rules{"rule": "error"}},
+		{Files: []string{"../workspace/*.ts"}, Rules: rslintconfig.Rules{"rule": "error"}},
 	}
 	targets := discoverLintTargetsFromRoot(
 		entries,
@@ -812,7 +814,7 @@ func TestDiscoverLintTargetsFromRoot_SharedAliasAncestorKeepsRelativeConfigMeani
 	if len(targets) != 1 || targets[0].Path != visible {
 		t.Fatalf("shared-alias targets = %+v, want only %q", targets, visible)
 	}
-	merged := NewFileConfigResolverWithFS(entries, configDir, osvfs.FS(), baseRuleCatalog(), false).ConfigForFile(visible)
+	merged := rslintconfig.NewFileConfigResolverWithFS(entries, configDir, osvfs.FS(), rules.All(), false).ConfigForFile(visible)
 	if merged == nil || merged.Rules["rule"] == nil {
 		t.Fatalf("shared-alias effective config = %#v", merged)
 	}
@@ -846,9 +848,9 @@ func TestDiscoverLintTargetsFromRoot_UnionsFilesAndDirectories(t *testing.T) {
 		[]string{directoryRoot},
 		true,
 	)
-	assert.DeepEqual(t, targets, []DiscoveredLintTarget{
-		{Path: directoryFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryRoot)), ConfigDirectory: configDir},
-		{Path: exactFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(exactFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(filepath.Dir(exactFile))), ConfigDirectory: configDir},
+	assert.DeepEqual(t, targets, []File{
+		{PathIdentity: rslintconfig.PathIdentity{Path: directoryFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryRoot))}, ConfigDirectory: configDir},
+		{PathIdentity: rslintconfig.PathIdentity{Path: exactFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(exactFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(filepath.Dir(exactFile)))}, ConfigDirectory: configDir},
 	})
 }
 
@@ -896,9 +898,9 @@ func TestDiscoverLintTargetsFromRoot_SkipsIgnoredExternalRootBeforeWalking(t *te
 	}
 	spy := &spyFS{FS: osvfs.FS()}
 	targets := discoverLintTargetsFromRoot(
-		RslintConfig{
+		rslintconfig.RslintConfig{
 			{Ignores: []string{"../external/**"}},
-			{Rules: Rules{"test-rule": "error"}},
+			{Rules: rslintconfig.Rules{"test-rule": "error"}},
 		},
 		configDir,
 		scanRoot,
@@ -907,7 +909,7 @@ func TestDiscoverLintTargetsFromRoot_SkipsIgnoredExternalRootBeforeWalking(t *te
 		[]string{externalDir},
 		true,
 	)
-	assert.DeepEqual(t, targets, []DiscoveredLintTarget{})
+	assert.DeepEqual(t, targets, []File{})
 	for _, accessed := range spy.snapshotAccessedDirs() {
 		if pathsEqual(accessed, externalDir, true) || tspath.StartsWithDirectory(accessed, externalDir, true) {
 			t.Fatalf("ignored external root was entered: %v", spy.snapshotAccessedDirs())
@@ -936,7 +938,7 @@ func TestDiscoverLintTargetsFromRoot_SkipsDefaultExcludedScanRoot(t *testing.T) 
 		t.Run(test.name, func(t *testing.T) {
 			spy := &spyFS{FS: osvfs.FS()}
 			targets := discoverLintTargetsFromRoot(
-				RslintConfig{{Rules: Rules{"test-rule": "error"}}},
+				rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"test-rule": "error"}}},
 				configDir,
 				scanRoot,
 				spy,
@@ -944,7 +946,7 @@ func TestDiscoverLintTargetsFromRoot_SkipsDefaultExcludedScanRoot(t *testing.T) 
 				test.directories,
 				true,
 			)
-			assert.DeepEqual(t, targets, []DiscoveredLintTarget{})
+			assert.DeepEqual(t, targets, []File{})
 			for _, accessed := range spy.snapshotAccessedDirs() {
 				if pathsEqual(accessed, scanRoot, true) || tspath.StartsWithDirectory(accessed, scanRoot, true) {
 					t.Fatalf("default-excluded scan root was entered: %v", spy.snapshotAccessedDirs())
@@ -990,8 +992,8 @@ func TestDiscoverLintTargets_DirectoryWalkAvoidsPerNodeRealpath(t *testing.T) {
 		"src/c.ts",
 	})
 	fsys := &realpathCountingFS{FS: osvfs.FS(), calls: make(map[string]int)}
-	targets := DiscoverLintTargets(
-		RslintConfig{{Rules: Rules{"test-rule": "error"}}},
+	targets := discoverLintTargets(
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"test-rule": "error"}}},
 		configDir,
 		fsys,
 		nil,
@@ -1013,7 +1015,7 @@ func TestDiscoverLintTargets_DirectoryWalkAvoidsPerNodeRealpath(t *testing.T) {
 func TestDiscoverLintTargets_ExplicitFileResolvesPhysicalIdentity(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{"src/a.ts"})
 	fsys := &realpathCountingFS{FS: osvfs.FS(), calls: make(map[string]int)}
-	targets := DiscoverLintTargets(nil, configDir, fsys, []string{paths["src/a.ts"]}, nil, true)
+	targets := discoverLintTargets(nil, configDir, fsys, []string{paths["src/a.ts"]}, nil, true)
 	assert.Equal(t, len(targets), 1)
 	assert.Assert(t, fsys.callCount(paths["src/a.ts"]) > 0)
 }
@@ -1025,7 +1027,7 @@ func TestDiscoverLintTargets_FileSymlinkResolvesPhysicalIdentity(t *testing.T) {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	fsys := &realpathCountingFS{FS: osvfs.FS(), calls: make(map[string]int)}
-	targets := DiscoverLintTargets(nil, configDir, fsys, nil, []string{configDir}, true)
+	targets := discoverLintTargets(nil, configDir, fsys, nil, []string{configDir}, true)
 	assert.Equal(t, len(targets), 2)
 
 	canonicalByPath := make(map[string]string, len(targets))
@@ -1061,32 +1063,15 @@ func TestDiscoverLintTargets_MissingSymlinkMetadataResolvesFileIdentity(t *testi
 		},
 	}
 
-	targets := DiscoverLintTargets(nil, configDir, fsys, nil, nil, true)
-	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
-		Path:                filePath,
-		CanonicalPath:       physicalPath,
-		CanonicalParentPath: "/repo/src",
-		ConfigDirectory:     configDir,
-	}})
-}
-
-func TestIsFileInAllowedDirsHonorsCaseSensitivity(t *testing.T) {
-	assert.Assert(t, isFileInAllowedDirs("/Repo/Src/a.ts", []string{"/repo/src"}, false))
-	assert.Assert(t, !isFileInAllowedDirs("/Repo/Src/a.ts", []string{"/repo/src"}, true))
-}
-
-func TestIsFileInAllowedDirsUsesExactCanonicalIdentity(t *testing.T) {
-	fsys := &configPathSpaceFS{
-		caseSensitive: false,
-		realPaths: map[string]string{
-			"/Alias/Src/a.ts": "/Real/Src/a.ts",
-			"/real/src":       "/Real/Src",
-			"/Repo/Src/b.ts":  "/Repo/Src/b.ts",
-			"/repo/src":       "/repo/src",
+	targets := discoverLintTargets(nil, configDir, fsys, nil, nil, true)
+	assert.DeepEqual(t, targets, []File{{
+		PathIdentity: rslintconfig.PathIdentity{
+			Path:                filePath,
+			CanonicalPath:       physicalPath,
+			CanonicalParentPath: "/repo/src",
 		},
-	}
-	assert.Assert(t, isFileInAllowedDirsWithFS("/Alias/Src/a.ts", []string{"/real/src"}, fsys))
-	assert.Assert(t, !isFileInAllowedDirsWithFS("/Repo/Src/b.ts", []string{"/repo/src"}, fsys))
+		ConfigDirectory: configDir,
+	}})
 }
 
 func TestDiscoverWalkRootsMapsCanonicalDirectoryAlias(t *testing.T) {
@@ -1107,9 +1092,9 @@ func TestDiscoverFilesOutsidePrograms_MultipleFilesPatterns(t *testing.T) {
 		"src/c.js",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"rule-a": "error"}},
-		{Files: []string{"**/*.tsx"}, Rules: Rules{"rule-b": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"rule-a": "error"}},
+		{Files: []string{"**/*.tsx"}, Rules: rslintconfig.Rules{"rule-b": "error"}},
 		// .js remains in the default target baseline with zero matching rules.
 	}
 
@@ -1136,8 +1121,8 @@ func TestDiscoverFilesOutsidePrograms_DefaultJsDiscoveredWithoutExplicitPattern(
 	})
 
 	// An explicit TypeScript selector does not remove the default JS target.
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -1155,8 +1140,8 @@ func TestDiscoverFilesOutsidePrograms_AllowFilesScope(t *testing.T) {
 		"tools/c.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -1178,12 +1163,12 @@ func TestDiscoverLintFiles_ExplicitFileBypassesFilesWithDirScope(t *testing.T) {
 		"src/a.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	srcDir := tspath.NormalizePath(filepath.Join(configDir, "src"))
-	targets := DiscoverLintFiles(
+	targets := discoverLintFiles(
 		config,
 		configDir,
 		osvfs.FS(),
@@ -1208,8 +1193,8 @@ func TestDiscoverFilesOutsidePrograms_AllExtensionsDiscoveredByPattern(t *testin
 
 	// files: ['**/*'] matches the whole tree, but rslint still only lints
 	// extensions it can parse.
-	config := RslintConfig{
-		{Files: []string{"**/*"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -1230,12 +1215,12 @@ func TestDiscoverFilesOutsideProgramsMultiConfig(t *testing.T) {
 		"b.tsx",
 	})
 
-	configMap := map[string]RslintConfig{
+	configMap := map[string]rslintconfig.RslintConfig{
 		configDir1: {
-			{Files: []string{"**/*.ts"}, Rules: Rules{"rule-a": "error"}},
+			{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"rule-a": "error"}},
 		},
 		configDir2: {
-			{Files: []string{"**/*.tsx"}, Rules: Rules{"rule-b": "error"}},
+			{Files: []string{"**/*.tsx"}, Rules: rslintconfig.Rules{"rule-b": "error"}},
 		},
 	}
 
@@ -1263,23 +1248,23 @@ func TestDiscoverLintFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
 	})
 	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
 
-	configMap := map[string]RslintConfig{
+	configMap := map[string]rslintconfig.RslintConfig{
 		rootDir: {
-			{Files: []string{"**/*.ts"}, Rules: Rules{"root-rule": "error"}},
+			{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"root-rule": "error"}},
 		},
 		childDir: {
-			{Files: []string{"**/*.jsx"}, Rules: Rules{"child-rule": "error"}},
+			{Files: []string{"**/*.jsx"}, Rules: rslintconfig.Rules{"child-rule": "error"}},
 		},
 	}
 
-	targets := DiscoverLintFilesMultiConfig(configMap, osvfs.FS(), nil, []string{rootDir}, false)
+	targets := discoverLintFilesMultiConfig(configMap, osvfs.FS(), nil, []string{rootDir}, false)
 
 	expected := []string{rootPaths["root.ts"]}
 	expected = append(expected, rootPaths["pkg/child.ts"])
 	sort.Strings(expected)
 	assert.DeepEqual(t, targets, expected)
 
-	ownedTargets := DiscoverLintTargetsMultiConfig(configMap, nil, osvfs.FS(), nil, []string{rootDir}, false)
+	ownedTargets := discoverLintTargetsMultiConfig(configMap, nil, osvfs.FS(), nil, []string{rootDir}, false)
 	owners := make(map[string]string, len(ownedTargets))
 	for _, target := range ownedTargets {
 		owners[target.Path] = target.ConfigDirectory
@@ -1295,17 +1280,17 @@ func TestDiscoverLintFilesMultiConfig_DoesNotWalkChildConfigFromParent(t *testin
 	})
 	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
 
-	configMap := map[string]RslintConfig{
+	configMap := map[string]rslintconfig.RslintConfig{
 		rootDir: {
-			{Files: []string{"**/*.ts"}, Rules: Rules{"root-rule": "error"}},
+			{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"root-rule": "error"}},
 		},
 		childDir: {
-			{Files: []string{"**/*.ts"}, Rules: Rules{"child-rule": "error"}},
+			{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"child-rule": "error"}},
 		},
 	}
 	spy := &spyFS{FS: osvfs.FS()}
 
-	targets := DiscoverLintFilesMultiConfig(configMap, spy, nil, []string{rootDir}, true)
+	targets := discoverLintFilesMultiConfig(configMap, spy, nil, []string{rootDir}, true)
 
 	expected := []string{rootPaths["pkg/child.ts"], rootPaths["root.ts"]}
 	sort.Strings(expected)
@@ -1321,12 +1306,12 @@ func TestDiscoverLintFilesMultiConfig_DoesNotWalkChildConfigFromParent(t *testin
 			childAccesses++
 		}
 	}
-	assert.Equal(t, rootAccesses, 1, "each child config must not rescan the invocation root")
+	assert.Equal(t, rootAccesses, 1, "each child config must not scan the invocation root again")
 	assert.Equal(t, childAccesses, 1, "child config directory should be entered only by its owning config")
 }
 
 func TestConfigDirectoryIndex_UsesImmediateBoundariesAndNearestOwner(t *testing.T) {
-	configMap := map[string]RslintConfig{
+	configMap := map[string]rslintconfig.RslintConfig{
 		"/repo":          nil,
 		"/repo/pkg":      nil,
 		"/repo/pkg/deep": nil,
@@ -1336,14 +1321,16 @@ func TestConfigDirectoryIndex_UsesImmediateBoundariesAndNearestOwner(t *testing.
 
 	assert.DeepEqual(t, index.childConfigDirs("/repo"), []string{"/repo/pkg"})
 	assert.DeepEqual(t, index.childConfigDirs("/repo/pkg"), []string{"/repo/pkg/deep"})
-	owner, ok := index.nearestConfig("/repo/pkg/deep/src/index.ts")
+	owner, ok := NewOwnerIndex(configMap, nil).Resolve(
+		FreezeFileIdentity("/repo/pkg/deep/src/index.ts", nil),
+	)
 	assert.Assert(t, ok)
 	assert.Equal(t, owner, "/repo/pkg/deep")
 }
 
 func TestConfigDirectoryIndex_UsesVerifiedNativeCaseHierarchy(t *testing.T) {
 	fsys := &caseInsensitiveDiscoveryFS{FS: osvfs.FS()}
-	configMap := map[string]RslintConfig{
+	configMap := map[string]rslintconfig.RslintConfig{
 		"C:/Repo":         nil,
 		"c:/repo/Package": nil,
 	}
@@ -1354,7 +1341,9 @@ func TestConfigDirectoryIndex_UsesVerifiedNativeCaseHierarchy(t *testing.T) {
 		"C:/Repo/Package/src/index.ts",
 		"c:/repo/package/src/index.ts",
 	} {
-		owner, ok := index.nearestConfig(filePath)
+		owner, ok := NewOwnerIndex(configMap, fsys).Resolve(
+			FreezeFileIdentity(filePath, fsys),
+		)
 		assert.Assert(t, ok)
 		assert.Equal(t, owner, "c:/repo/Package")
 	}
@@ -1376,8 +1365,10 @@ func TestConfigDirectoryIndex_UsesPhysicalConfigRootForAliasedTarget(t *testing.
 
 	linkDir = tspath.NormalizePath(linkDir)
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	index := newConfigDirectoryIndex(map[string]RslintConfig{linkDir: nil}, fsys)
-	owner, ok := index.nearestConfig(filepath.Join(realDir, "src/index.ts"))
+	configMap := map[string]rslintconfig.RslintConfig{linkDir: nil}
+	owner, ok := NewOwnerIndex(configMap, fsys).Resolve(
+		FreezeFileIdentity(filepath.Join(realDir, "src/index.ts"), fsys),
+	)
 	assert.Assert(t, ok)
 	assert.Equal(t, owner, linkDir)
 }
@@ -1391,14 +1382,14 @@ func TestDiscoverLintTargetsMultiConfig_MatchesIgnoresInPhysicalConfigSpace(t *t
 	defer os.Remove(linkDir)
 	linkDir = tspath.NormalizePath(linkDir)
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	configMap := map[string]RslintConfig{
+	configMap := map[string]rslintconfig.RslintConfig{
 		linkDir: {
 			{Ignores: []string{"src/ignored.ts"}},
-			{Files: []string{"src/**/*.ts"}, Rules: Rules{"rule": "error"}},
+			{Files: []string{"src/**/*.ts"}, Rules: rslintconfig.Rules{"rule": "error"}},
 		},
 	}
 
-	targets := DiscoverLintTargetsMultiConfig(
+	targets := discoverLintTargetsMultiConfig(
 		configMap,
 		nil,
 		fsys,
@@ -1406,11 +1397,13 @@ func TestDiscoverLintTargetsMultiConfig_MatchesIgnoresInPhysicalConfigSpace(t *t
 		nil,
 		true,
 	)
-	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
-		Path:                paths["src/keep.ts"],
-		CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["src/keep.ts"])),
-		CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["src/keep.ts"]))),
-		ConfigDirectory:     linkDir,
+	assert.DeepEqual(t, targets, []File{{
+		PathIdentity: rslintconfig.PathIdentity{
+			Path:                paths["src/keep.ts"],
+			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["src/keep.ts"])),
+			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["src/keep.ts"]))),
+		},
+		ConfigDirectory: linkDir,
 	}})
 }
 
@@ -1418,12 +1411,12 @@ func TestDiscoverLintTargetsMultiConfig_AssignsExplicitFilesBeforeConfigProcessi
 	rootDir, paths := setupDiscoveryFixture(t, []string{"root.ts", "pkg/child.ts"})
 	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
 	fsys := &fileExistsCountingFS{FS: osvfs.FS()}
-	configMap := map[string]RslintConfig{
-		rootDir:  {{Files: []string{"**/*.jsx"}, Rules: Rules{"root": "error"}}},
-		childDir: {{Files: []string{"**/*.jsx"}, Rules: Rules{"child": "error"}}},
+	configMap := map[string]rslintconfig.RslintConfig{
+		rootDir:  {{Files: []string{"**/*.jsx"}, Rules: rslintconfig.Rules{"root": "error"}}},
+		childDir: {{Files: []string{"**/*.jsx"}, Rules: rslintconfig.Rules{"child": "error"}}},
 	}
 
-	targets := DiscoverLintTargetsMultiConfig(
+	targets := discoverLintTargetsMultiConfig(
 		configMap,
 		nil,
 		fsys,
@@ -1449,15 +1442,15 @@ func TestDiscoverLintTargetsMultiConfig_PreservesHostAssignedExplicitOwner(t *te
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	configMap := map[string]RslintConfig{
-		rootDir:  {{Rules: Rules{"root": "error"}}},
-		childDir: {{Rules: Rules{"child": "error"}}},
+	configMap := map[string]rslintconfig.RslintConfig{
+		rootDir:  {{Rules: rslintconfig.Rules{"root": "error"}}},
+		childDir: {{Rules: rslintconfig.Rules{"child": "error"}}},
 	}
 
-	targets := DiscoverLintTargetsMultiConfig(
+	targets := discoverLintTargetsMultiConfig(
 		configMap,
-		map[string]LintDiscoveryScope{
-			rootDir: {Files: []string{aliasPath}},
+		map[string]OwnerScope{
+			rootDir: {ExplicitFiles: []string{aliasPath}},
 		},
 		fsys,
 		[]string{aliasPath},
@@ -1479,15 +1472,15 @@ func TestDiscoverLintTargetsMultiConfig_MergesAutomaticAndHostAssignedFilesForSa
 	})
 	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
 	fsys := osvfs.FS()
-	configMap := map[string]RslintConfig{
-		rootDir:  {{Rules: Rules{"root": "error"}}},
-		childDir: {{Rules: Rules{"child": "error"}}},
+	configMap := map[string]rslintconfig.RslintConfig{
+		rootDir:  {{Rules: rslintconfig.Rules{"root": "error"}}},
+		childDir: {{Rules: rslintconfig.Rules{"child": "error"}}},
 	}
 
-	targets := DiscoverLintTargetsMultiConfig(
+	targets := discoverLintTargetsMultiConfig(
 		configMap,
-		map[string]LintDiscoveryScope{
-			childDir: {Files: []string{paths["pkg/explicit.ts"]}},
+		map[string]OwnerScope{
+			childDir: {ExplicitFiles: []string{paths["pkg/explicit.ts"]}},
 		},
 		fsys,
 		[]string{paths["pkg/automatic.ts"], paths["pkg/explicit.ts"]},
@@ -1495,18 +1488,22 @@ func TestDiscoverLintTargetsMultiConfig_MergesAutomaticAndHostAssignedFilesForSa
 		true,
 	)
 
-	assert.DeepEqual(t, targets, []DiscoveredLintTarget{
+	assert.DeepEqual(t, targets, []File{
 		{
-			Path:                paths["pkg/automatic.ts"],
-			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["pkg/automatic.ts"])),
-			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["pkg/automatic.ts"]))),
-			ConfigDirectory:     childDir,
+			PathIdentity: rslintconfig.PathIdentity{
+				Path:                paths["pkg/automatic.ts"],
+				CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["pkg/automatic.ts"])),
+				CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["pkg/automatic.ts"]))),
+			},
+			ConfigDirectory: childDir,
 		},
 		{
-			Path:                paths["pkg/explicit.ts"],
-			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["pkg/explicit.ts"])),
-			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["pkg/explicit.ts"]))),
-			ConfigDirectory:     childDir,
+			PathIdentity: rslintconfig.PathIdentity{
+				Path:                paths["pkg/explicit.ts"],
+				CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["pkg/explicit.ts"])),
+				CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["pkg/explicit.ts"]))),
+			},
+			ConfigDirectory: childDir,
 		},
 	})
 }
@@ -1517,21 +1514,21 @@ func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFil
 		"ignored/explicit.ts",
 	})
 	ignoredDir := tspath.NormalizePath(filepath.Join(rootDir, "ignored"))
-	configMap := map[string]RslintConfig{
+	configMap := map[string]rslintconfig.RslintConfig{
 		rootDir: {
 			{Ignores: []string{"ignored/**"}},
-			{Rules: Rules{"root": "error"}},
+			{Rules: rslintconfig.Rules{"root": "error"}},
 		},
-		ignoredDir: {{Rules: Rules{"nested": "error"}}},
+		ignoredDir: {{Rules: rslintconfig.Rules{"nested": "error"}}},
 	}
 	fsys := osvfs.FS()
 
-	targets := DiscoverLintTargetsMultiConfig(
+	targets := discoverLintTargetsMultiConfig(
 		configMap,
-		map[string]LintDiscoveryScope{
+		map[string]OwnerScope{
 			ignoredDir: {
-				Files:        []string{paths["ignored/explicit.ts"]},
-				ExplicitOnly: true,
+				ExplicitFiles: []string{paths["ignored/explicit.ts"]},
+				ExplicitOnly:  true,
 			},
 		},
 		fsys,
@@ -1540,11 +1537,13 @@ func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFil
 		true,
 	)
 
-	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
-		Path:                paths["ignored/explicit.ts"],
-		CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["ignored/explicit.ts"])),
-		CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["ignored/explicit.ts"]))),
-		ConfigDirectory:     ignoredDir,
+	assert.DeepEqual(t, targets, []File{{
+		PathIdentity: rslintconfig.PathIdentity{
+			Path:                paths["ignored/explicit.ts"],
+			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(paths["ignored/explicit.ts"])),
+			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["ignored/explicit.ts"]))),
+		},
+		ConfigDirectory: ignoredDir,
 	}})
 }
 
@@ -1561,16 +1560,16 @@ func TestDiscoverLintTargetsMultiConfig_PrefersLexicalOwnerOverPhysicalConfig(t 
 	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	realConfigDir := tspath.NormalizePath(filepath.Join(rootDir, "real"))
 	nestedConfigDir := tspath.NormalizePath(filepath.Join(linkDir, "nested"))
-	configMap := map[string]RslintConfig{
-		rootDir:         {{Rules: Rules{"root": "error"}}},
-		realConfigDir:   {{Rules: Rules{"physical": "error"}}},
-		nestedConfigDir: {{Rules: Rules{"nested": "error"}}},
+	configMap := map[string]rslintconfig.RslintConfig{
+		rootDir:         {{Rules: rslintconfig.Rules{"root": "error"}}},
+		realConfigDir:   {{Rules: rslintconfig.Rules{"physical": "error"}}},
+		nestedConfigDir: {{Rules: rslintconfig.Rules{"nested": "error"}}},
 	}
 
-	targets := DiscoverLintTargetsMultiConfig(
+	targets := discoverLintTargetsMultiConfig(
 		configMap,
-		map[string]LintDiscoveryScope{
-			realConfigDir: {Files: []string{paths["real/other.ts"]}},
+		map[string]OwnerScope{
+			realConfigDir: {ExplicitFiles: []string{paths["real/other.ts"]}},
 		},
 		fSys,
 		[]string{paths["real/other.ts"]},
@@ -1594,8 +1593,8 @@ func TestDiscoverLintTargets_DirectorySymlinkPreservesCanonicalIdentity(t *testi
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	targets := DiscoverLintTargets(
-		RslintConfig{{Rules: Rules{"rule": "error"}}},
+	targets := discoverLintTargets(
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"rule": "error"}}},
 		rootDir,
 		fsys,
 		nil,
@@ -1617,8 +1616,8 @@ func TestDiscoverLintTargets_PhysicalConfigFallbackPreservesDirectoryAliasPath(t
 	}
 	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	realConfigDir := tspath.NormalizePath(filepath.Join(rootDir, "real"))
-	targets := DiscoverLintTargets(
-		RslintConfig{{Rules: Rules{"rule": "error"}}},
+	targets := discoverLintTargets(
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"rule": "error"}}},
 		realConfigDir,
 		fSys,
 		nil,
@@ -1648,17 +1647,17 @@ func TestDiscoverLintTargetsMultiConfig_AliasAuthoredEntrySelectsNonDefaultExten
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
 
-	inlineOverride := ConfigWithAuthoredPathBase(RslintConfig{{
+	inlineOverride := rslintconfig.ConfigWithAuthoredPathBase(rslintconfig.RslintConfig{{
 		Files: []string{"link/**/*.TS"},
-		Rules: Rules{"inline": "error"},
+		Rules: rslintconfig.Rules{"inline": "error"},
 	}}, rootDir)
-	entries := append(RslintConfig{{
+	entries := append(rslintconfig.RslintConfig{{
 		Files: []string{"sub/**/*.ts"},
-		Rules: Rules{"physical": "error"},
+		Rules: rslintconfig.Rules{"physical": "error"},
 	}}, inlineOverride...)
 	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	targets := DiscoverLintTargetsMultiConfig(
-		map[string]RslintConfig{realConfigDir: entries},
+	targets := discoverLintTargetsMultiConfig(
+		map[string]rslintconfig.RslintConfig{realConfigDir: entries},
 		nil,
 		fSys,
 		nil,
@@ -1690,17 +1689,17 @@ func TestDiscoverLintTargetsMultiConfig_PrunesUsingCallerVisibleDirectoryAlias(t
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
 
-	inlineIgnore := ConfigWithAuthoredPathBase(
-		RslintConfig{{Ignores: []string{"real/**"}}},
+	inlineIgnore := rslintconfig.ConfigWithAuthoredPathBase(
+		rslintconfig.RslintConfig{{Ignores: []string{"real/**"}}},
 		rootDir,
 	)
-	entries := append(RslintConfig{{
+	entries := append(rslintconfig.RslintConfig{{
 		Files: []string{"sub/**/*.TS"},
-		Rules: Rules{"physical": "error"},
+		Rules: rslintconfig.Rules{"physical": "error"},
 	}}, inlineIgnore...)
 	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	targets := DiscoverLintTargetsMultiConfig(
-		map[string]RslintConfig{realConfigDir: entries},
+	targets := discoverLintTargetsMultiConfig(
+		map[string]rslintconfig.RslintConfig{realConfigDir: entries},
 		nil,
 		fSys,
 		nil,
@@ -1731,15 +1730,15 @@ func TestDiscoverLintTargetsMultiConfig_EvaluatesEveryRequestedDirectoryAlias(t 
 			t.Skipf("directory symlink unavailable: %v", err)
 		}
 	}
-	entries := ConfigWithAuthoredPathBase(RslintConfig{{
+	entries := rslintconfig.ConfigWithAuthoredPathBase(rslintconfig.RslintConfig{{
 		Files: []string{"b/**/*.TS"},
-		Rules: Rules{"inline": "error"},
+		Rules: rslintconfig.Rules{"inline": "error"},
 	}}, rootDir)
 	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	wantPath := tspath.CombinePaths(aliasB, "index.TS")
 	for _, directories := range [][]string{{aliasA, aliasB}, {aliasB, aliasA}} {
-		targets := DiscoverLintTargetsMultiConfig(
-			map[string]RslintConfig{realConfigDir: entries},
+		targets := discoverLintTargetsMultiConfig(
+			map[string]rslintconfig.RslintConfig{realConfigDir: entries},
 			nil,
 			fSys,
 			nil,
@@ -1797,17 +1796,17 @@ func TestDiscoverLintTargetsMultiConfig_DefaultExcludesUseRequestedDirectoryAlia
 				t.Skipf("directory symlink unavailable: %v", err)
 			}
 
-			physicalRelative, ok := RelativePathWithinConfigRoot(physicalTargetDir, realConfigDir, true)
+			physicalRelative, ok := rslintconfig.RelativePathWithinConfigRoot(physicalTargetDir, realConfigDir, true)
 			if !ok {
 				t.Fatal("invalid physical fixture")
 			}
-			entries := RslintConfig{{
+			entries := rslintconfig.RslintConfig{{
 				Files: []string{physicalRelative + "/**/*.TS"},
-				Rules: Rules{"physical": "error"},
+				Rules: rslintconfig.Rules{"physical": "error"},
 			}}
 			fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			targets := DiscoverLintTargetsMultiConfig(
-				map[string]RslintConfig{realConfigDir: entries},
+			targets := discoverLintTargetsMultiConfig(
+				map[string]rslintconfig.RslintConfig{realConfigDir: entries},
 				nil,
 				fSys,
 				nil,
@@ -1845,13 +1844,13 @@ func TestDiscoverLintTargetsMultiConfig_DefaultExcludeFiltersEachDirectoryAlias(
 			t.Skipf("directory symlink unavailable: %v", err)
 		}
 	}
-	entries := RslintConfig{{
+	entries := rslintconfig.RslintConfig{{
 		Files: []string{"sub/**/*.TS"},
-		Rules: Rules{"physical": "error"},
+		Rules: rslintconfig.Rules{"physical": "error"},
 	}}
 	fSys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	targets := DiscoverLintTargetsMultiConfig(
-		map[string]RslintConfig{realConfigDir: entries},
+	targets := discoverLintTargetsMultiConfig(
+		map[string]rslintconfig.RslintConfig{realConfigDir: entries},
 		nil,
 		fSys,
 		nil,
@@ -1869,14 +1868,14 @@ func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.
 		"C:/Repo/src/a.TS",
 		"C:/Repo/src/a.TS",
 		[]resolvedAllowedDirectory{{
-			lexicalPath:   "c:/repo/src",
-			canonicalPath: "C:/Repo/src",
+			LexicalPath:   "c:/repo/src",
+			CanonicalPath: "C:/Repo/src",
 		}},
 		false,
 	)
 	if len(projections) != 1 ||
-		projections[0].path != "c:/repo/src/a.TS" ||
-		projections[0].canonicalPath != "C:/Repo/src/a.TS" {
+		projections[0].Path != "c:/repo/src/a.TS" ||
+		projections[0].CanonicalPath != "C:/Repo/src/a.TS" {
 		t.Fatalf("projections = %+v", projections)
 	}
 
@@ -1884,14 +1883,14 @@ func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.
 		"C:/Repo/src/a.TS",
 		"C:/Repo/src/a.TS",
 		[]resolvedAllowedDirectory{
-			{lexicalPath: "C:/Repo/src", canonicalPath: "C:/Repo/src"},
-			{lexicalPath: "c:/repo/src", canonicalPath: "c:/repo/src"},
+			{LexicalPath: "C:/Repo/src", CanonicalPath: "C:/Repo/src"},
+			{LexicalPath: "c:/repo/src", CanonicalPath: "c:/repo/src"},
 		},
 		false,
 	)
 	if len(projections) != 1 ||
-		projections[0].path != "C:/Repo/src/a.TS" ||
-		projections[0].canonicalPath != "" {
+		projections[0].Path != "C:/Repo/src/a.TS" ||
+		projections[0].CanonicalPath != "" {
 		t.Fatalf("distinct case-only roots produced projections %+v", projections)
 	}
 }
@@ -1904,12 +1903,12 @@ func TestDiscoverFilesOutsideProgramsMultiConfig_UsesNearestConfigOwner(t *testi
 	})
 	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
 
-	configMap := map[string]RslintConfig{
+	configMap := map[string]rslintconfig.RslintConfig{
 		rootDir: {
-			{Files: []string{"**/*.ts"}, Rules: Rules{"root-rule": "error"}},
+			{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"root-rule": "error"}},
 		},
 		childDir: {
-			{Files: []string{"**/*.jsx"}, Rules: Rules{"child-rule": "error"}},
+			{Files: []string{"**/*.jsx"}, Rules: rslintconfig.Rules{"child-rule": "error"}},
 		},
 	}
 
@@ -1926,7 +1925,7 @@ func TestDiscoverFilesOutsidePrograms_FilesButNoRules(t *testing.T) {
 	})
 
 	// The selector contributes a target even though the entry has no rules.
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Files: []string{"**/*.ts"}},
 	}
 
@@ -1947,9 +1946,9 @@ func TestDiscoverFilesOutsidePrograms_DirIgnoreBlocksTraversal(t *testing.T) {
 	})
 
 	// build/** is directory-level → blocks traversal → ! cannot re-include
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"build/**", "!build/keep.ts"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -1981,9 +1980,9 @@ func TestDiscoverFilesOutsidePrograms_FileIgnoreAllowsNegation(t *testing.T) {
 	})
 
 	// build/**/* is file-level → does NOT block traversal → ! CAN re-include
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"build/**/*", "!build/keep.ts"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -2017,9 +2016,9 @@ func TestDiscoverFilesOutsidePrograms_WildcardMiddleDirIgnoreBlocks(t *testing.T
 		"packages/app/src/index.ts",
 	})
 
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"packages/*/dist/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -2047,10 +2046,10 @@ func TestDiscoverFilesOutsidePrograms_CrossEntryDirIgnoreAndNegation(t *testing.
 	// Entry 1: dir-level ignore. Entry 2: negation.
 	// dir/** blocks traversal → negation cannot re-include (even across entries,
 	// because global ignores are merged and dir-level patterns block first).
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"build/**"}},
 		{Ignores: []string{"!build/keep.ts"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -2070,9 +2069,9 @@ func TestDiscoverFilesOutsidePrograms_DoubleStarDirIgnoreBlocksNested(t *testing
 	})
 
 	// **/dist/** blocks any dist/ directory
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/dist/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	programFiles := map[string]struct{}{}
@@ -2096,8 +2095,8 @@ func TestDiscoverFilesOutsidePrograms_DefaultExcludesNodeModules(t *testing.T) {
 	})
 
 	// No global ignores at all — defaults should still exclude node_modules
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
@@ -2124,8 +2123,8 @@ func TestDiscoverFilesOutsidePrograms_DefaultExcludesGitDir(t *testing.T) {
 		".git/hooks/pre-commit.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
@@ -2185,8 +2184,8 @@ func TestDiscoverFilesOutsidePrograms_PrunesNodeModulesAtWalkLevel(t *testing.T)
 		"node_modules/pkg/nested/deep.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
@@ -2205,8 +2204,8 @@ func TestDiscoverFilesOutsidePrograms_PrunesDefaultExcludesCaseInsensitive(t *te
 		"Node_Modules/pkg/index.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
@@ -2225,8 +2224,8 @@ func TestDiscoverFilesOutsidePrograms_PrunesGitDirAtWalkLevel(t *testing.T) {
 		".git/objects/ab/file.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
@@ -2246,9 +2245,9 @@ func TestDiscoverFilesOutsidePrograms_PrunesUserIgnoredDirAtWalkLevel(t *testing
 		"vendor/lib/nested/deep.ts",
 	})
 
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"vendor/**"}}, // global ignore
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
@@ -2268,9 +2267,9 @@ func TestDiscoverFilesOutsidePrograms_PrunesNestedIgnoredDirButEntersParent(t *t
 		"build/output/nested/deep.ts",
 	})
 
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"build/output/**"}}, // only output/ ignored, not build/
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
@@ -2307,8 +2306,8 @@ func TestDiscoverFilesOutsidePrograms_EntersNonExcludedDirs(t *testing.T) {
 		"lib/utils.ts",
 	})
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
@@ -2337,7 +2336,7 @@ func TestDiscoverFilesOutsidePrograms_EntersNonExcludedDirs(t *testing.T) {
 // End-to-end cross-matrix tests: config ignores × .gitignore × gap files × linter
 //
 // These tests simulate the full flow:
-//   1. ConfigWithGitignore (with config ignores for pruning)
+//   1. rslintconfig.ConfigWithGitignore (with config ignores for pruning)
 //   2. Inject gitignore globs into config
 //   3. discoverFilesOutsideProgramsForTest
 //   4. Verify GetConfigForFile (linter's per-file decision) is consistent
@@ -2347,13 +2346,13 @@ func TestDiscoverFilesOutsidePrograms_EntersNonExcludedDirs(t *testing.T) {
 // GetConfigForFile also returns nil for any file in that dir.
 // =============================================================================
 
-// e2eSetup creates a fixture, applies ConfigWithGitignore, then runs discoverFilesOutsideProgramsForTest,
+// e2eSetup creates a fixture, applies rslintconfig.ConfigWithGitignore, then runs discoverFilesOutsideProgramsForTest,
 // and returns gap files + the final config (for GetConfigForFile verification).
-func e2eSetup(t *testing.T, files map[string]string, config RslintConfig, programFiles map[string]struct{}) (string, []string, RslintConfig) {
+func e2eSetup(t *testing.T, files map[string]string, config rslintconfig.RslintConfig, programFiles map[string]struct{}) (string, []string, rslintconfig.RslintConfig) {
 	t.Helper()
 	dir := setupDiscoveryContentFixture(t, files)
 
-	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
+	config = rslintconfig.ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	if programFiles == nil {
 		programFiles = map[string]struct{}{}
@@ -2376,9 +2375,9 @@ func TestE2E_StandardMonorepo(t *testing.T) {
 		"target/build/output.ts":   "x",
 		"packages/foo/src/main.ts": "x",
 	}
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/tests/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
@@ -2415,8 +2414,8 @@ func TestE2E_NestedGitignoreAffectsProgramFiles(t *testing.T) {
 		"packages/foo/src/index.ts":         "x",
 		"packages/foo/src/generated/api.ts": "x",
 	}
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	// Build programFiles with both files (simulating tsconfig include: ["src"])
@@ -2424,7 +2423,7 @@ func TestE2E_NestedGitignoreAffectsProgramFiles(t *testing.T) {
 	indexPath := tspath.NormalizePath(dir + "/packages/foo/src/index.ts")
 	genPathFull := tspath.NormalizePath(dir + "/packages/foo/src/generated/api.ts")
 
-	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
+	config = rslintconfig.ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	// generated/api.ts is in programFiles but gitignored.
 	// GetConfigForFile should return nil because gitignore patterns are in config.
@@ -2447,9 +2446,9 @@ func TestE2E_FileLevelIgnoreWithNegation(t *testing.T) {
 		"tests/.gitignore":     "tmp/\n",
 		"tests/e2e/.gitignore": "screenshots/\n",
 	}
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/tests/**/*", "!tests/e2e/**/*"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
@@ -2483,9 +2482,9 @@ func TestE2E_GitignoreAndConfigIgnoreIndependent(t *testing.T) {
 		"dist/bundle.ts":     "x",
 		"vendor/lib/util.ts": "x",
 	}
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/vendor/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
@@ -2513,9 +2512,9 @@ func TestE2E_NoGitignoreOnlyConfigIgnores(t *testing.T) {
 		"src/index.ts":         "x",
 		"tests/unit/a.test.ts": "x",
 	}
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/tests/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir, gapFiles, _ := e2eSetup(t, files, config, nil)
@@ -2533,8 +2532,8 @@ func TestE2E_ProgramFilesExcluded(t *testing.T) {
 		"src/index.ts": "x",
 		"src/utils.ts": "x",
 	}
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	// Create fixture once and use the same dir for programFiles and e2e flow.
@@ -2546,7 +2545,7 @@ func TestE2E_ProgramFilesExcluded(t *testing.T) {
 		indexPath: {},
 	}
 
-	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
+	config = rslintconfig.ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	gapFiles := discoverFilesOutsideProgramsForTest(config, dir, osvfs.FS(), programFiles, nil, nil, false)
 	gapSet := toSet(gapFiles)
@@ -2567,10 +2566,10 @@ func TestE2E_MultipleIgnoreEntries(t *testing.T) {
 		"target/output.ts":      "x",
 		"packages/foo/index.ts": "x",
 	}
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/tests/**"}},
 		{Ignores: []string{"scripts/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
@@ -2597,15 +2596,15 @@ func TestE2E_ConfigIgnoredDirInProgram(t *testing.T) {
 		"src/index.ts":           "x",
 		"tests/helpers/setup.ts": "x",
 	}
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/tests/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir := setupDiscoveryContentFixture(t, files)
 	testFile := tspath.NormalizePath(dir + "/tests/helpers/setup.ts")
 
-	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
+	config = rslintconfig.ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	// Even though setup.ts is in programFiles, GetConfigForFile should return nil
 	// because tests/ is directory-blocked by config ignores.
@@ -2621,9 +2620,9 @@ func TestE2E_OverlappingGitignoreAndConfigIgnore(t *testing.T) {
 		"src/index.ts":   "x",
 		"dist/bundle.ts": "x",
 	}
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/dist/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
@@ -2646,13 +2645,13 @@ func TestE2E_AllowDirsWithConfigIgnores(t *testing.T) {
 		"packages/bar/src/c.ts":  "x",
 		"tests/unit/d.ts":        "x",
 	}
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/tests/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir := setupDiscoveryContentFixture(t, files)
-	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
+	config = rslintconfig.ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	// Only allow packages/foo/
 	fooDir := tspath.NormalizePath(dir + "/packages/foo")
@@ -2673,12 +2672,12 @@ func TestE2E_AllowFilesWithGitignore(t *testing.T) {
 		"src/index.ts":   "x",
 		"dist/bundle.ts": "x",
 	}
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
 	dir := setupDiscoveryContentFixture(t, files)
-	config = ConfigWithGitignore(config, dir, osvfs.FS(), nil)
+	config = rslintconfig.ConfigWithGitignore(config, dir, osvfs.FS(), nil)
 
 	srcFile := tspath.NormalizePath(dir + "/src/index.ts")
 	distFile := tspath.NormalizePath(dir + "/dist/bundle.ts")
@@ -2725,8 +2724,8 @@ func TestDiscoverFilesOutsidePrograms_SkipsSymlinkedDirs(t *testing.T) {
 		t.Fatalf("symlink b: %v", err)
 	}
 
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"r": "error"}},
 	}
 
 	for _, single := range []bool{false, true} {
@@ -2750,9 +2749,9 @@ func TestDiscoverFilesOutsidePrograms_SingleThreadedEquivalence(t *testing.T) {
 		"tools/e.ts",
 		"tools/skip/f.ts",
 	})
-	config := RslintConfig{
+	config := rslintconfig.RslintConfig{
 		{Ignores: []string{"**/skip/**"}},
-		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"r": "error"}},
 	}
 
 	parallelGaps := discoverFilesOutsideProgramsForTest(config, configDir, osvfs.FS(),
@@ -2778,8 +2777,8 @@ func TestDiscoverFilesOutsidePrograms_AllowFilesFastPathSorted(t *testing.T) {
 		"d.ts",
 		"e.ts",
 	})
-	config := RslintConfig{
-		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"r": "error"}},
 	}
 	allow := []string{paths["e.ts"], paths["a.ts"], paths["c.ts"], paths["b.ts"], paths["d.ts"]}
 	expected := []string{paths["a.ts"], paths["b.ts"], paths["c.ts"], paths["d.ts"], paths["e.ts"]}

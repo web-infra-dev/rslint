@@ -27,6 +27,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
@@ -821,6 +822,35 @@ func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
 	}
 }
 
+func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
+	directory := t.TempDir()
+	write := func(name string, content string) string {
+		t.Helper()
+		filePath := filepath.Join(directory, name)
+		if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+		return filePath
+	}
+	write("index.ts", "export const value: number = 1;\n")
+	write("tsconfig.json", `{"files":["index.ts"]}`)
+	configPath := write("rslint.json", `[
+  {"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}}}
+]`)
+
+	code, stdout, stderr := runLintPipelineForTest(t, directory, lintArgs{
+		Config:         configPath,
+		TypeCheck:      true,
+		TypeCheckOnly:  true,
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 0 {
+		t.Fatalf("type-check-only exit = %d, stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
 func TestIsBroadProjectLoadScope(t *testing.T) {
 	const cwd = "/repo"
 	tests := []struct {
@@ -1314,7 +1344,7 @@ func TestCollectAllowFileWarnings_EmptyReturnsNil(t *testing.T) {
 	if got != nil {
 		t.Errorf("nil outcomes should produce nil, got %+v", got)
 	}
-	got = collectAllowFileWarnings([]rslintconfig.ExplicitFileOutcome{})
+	got = collectAllowFileWarnings([]target.ExplicitFileOutcome{})
 	if got != nil {
 		t.Errorf("empty outcomes should still produce nil, got %+v", got)
 	}
@@ -1322,13 +1352,13 @@ func TestCollectAllowFileWarnings_EmptyReturnsNil(t *testing.T) {
 
 func explicitFileWarningsForTest(
 	t *testing.T,
-	request rslintconfig.LintTargetPlanRequest,
+	request target.Request,
 ) []allowFileWarning {
 	t.Helper()
 	request.SingleThreaded = true
-	plan, err := rslintconfig.ResolveLintTargetPlan(request)
+	plan, err := target.Resolve(request)
 	if err != nil {
-		t.Fatalf("ResolveLintTargetPlan: %v", err)
+		t.Fatalf("target.Resolve: %v", err)
 	}
 	return collectAllowFileWarnings(plan.ExplicitFileOutcomes)
 }
@@ -1337,11 +1367,11 @@ func TestCollectAllowFileWarnings_NoWarningForFilesScopeMiss(t *testing.T) {
 	program := createTestProgram(t, map[string]string{
 		"src/app.ts": "const value = 1;",
 	})
-	target := findProgramFileForTest(t, program, "src/app.ts")
-	configDir := tspath.GetDirectoryPath(tspath.GetDirectoryPath(target))
+	targetPath := findProgramFileForTest(t, program, "src/app.ts")
+	configDir := tspath.GetDirectoryPath(tspath.GetDirectoryPath(targetPath))
 
-	warnings := explicitFileWarningsForTest(t, rslintconfig.LintTargetPlanRequest{
-		Files: []string{target},
+	warnings := explicitFileWarningsForTest(t, target.Request{
+		Files: []string{targetPath},
 		Config: rslintconfig.RslintConfig{
 			{Files: []string{"**/*.js"}, Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
@@ -1355,19 +1385,19 @@ func TestCollectAllowFileWarnings_NoWarningForFilesScopeMiss(t *testing.T) {
 }
 
 func TestCollectAllowFileWarnings_NoWarningForExistingFile(t *testing.T) {
-	target := filepath.Join(t.TempDir(), "outside.ts")
-	if err := os.WriteFile(target, []byte("const outside = 1;\n"), 0o644); err != nil {
+	targetPath := filepath.Join(t.TempDir(), "outside.ts")
+	if err := os.WriteFile(targetPath, []byte("const outside = 1;\n"), 0o644); err != nil {
 		t.Fatalf("write outside target: %v", err)
 	}
-	target = tspath.NormalizePath(target)
+	targetPath = tspath.NormalizePath(targetPath)
 
-	warnings := explicitFileWarningsForTest(t, rslintconfig.LintTargetPlanRequest{
-		Files: []string{target},
+	warnings := explicitFileWarningsForTest(t, target.Request{
+		Files: []string{targetPath},
 		Config: rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
-		ConfigDirectory: tspath.GetDirectoryPath(target),
-		ScanRoot:        tspath.GetDirectoryPath(target),
+		ConfigDirectory: tspath.GetDirectoryPath(targetPath),
+		ScanRoot:        tspath.GetDirectoryPath(targetPath),
 		FS:              osvfs.FS(),
 	})
 	if len(warnings) != 0 {
@@ -1376,14 +1406,14 @@ func TestCollectAllowFileWarnings_NoWarningForExistingFile(t *testing.T) {
 }
 
 func TestCollectAllowFileWarnings_MissingFileWarns(t *testing.T) {
-	target := tspath.NormalizePath(filepath.Join(t.TempDir(), "missing.ts"))
-	warnings := explicitFileWarningsForTest(t, rslintconfig.LintTargetPlanRequest{
-		Files: []string{target},
+	targetPath := tspath.NormalizePath(filepath.Join(t.TempDir(), "missing.ts"))
+	warnings := explicitFileWarningsForTest(t, target.Request{
+		Files: []string{targetPath},
 		Config: rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
-		ConfigDirectory: tspath.GetDirectoryPath(target),
-		ScanRoot:        tspath.GetDirectoryPath(target),
+		ConfigDirectory: tspath.GetDirectoryPath(targetPath),
+		ScanRoot:        tspath.GetDirectoryPath(targetPath),
 		FS:              osvfs.FS(),
 	})
 	if len(warnings) != 1 {
@@ -1398,11 +1428,11 @@ func TestCollectAllowFileWarnings_GlobalIgnoreStillWarns(t *testing.T) {
 	program := createTestProgram(t, map[string]string{
 		"src/app.ts": "const value = 1;",
 	})
-	target := findProgramFileForTest(t, program, "src/app.ts")
-	configDir := tspath.GetDirectoryPath(tspath.GetDirectoryPath(target))
+	targetPath := findProgramFileForTest(t, program, "src/app.ts")
+	configDir := tspath.GetDirectoryPath(tspath.GetDirectoryPath(targetPath))
 
-	warnings := explicitFileWarningsForTest(t, rslintconfig.LintTargetPlanRequest{
-		Files: []string{target},
+	warnings := explicitFileWarningsForTest(t, target.Request{
+		Files: []string{targetPath},
 		Config: rslintconfig.RslintConfig{
 			{Ignores: []string{"src/**"}},
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
@@ -1421,16 +1451,16 @@ func TestCollectAllowFileWarnings_GlobalIgnoreStillWarns(t *testing.T) {
 
 func TestCollectAllowFileWarnings_DefaultExcludedFileWarns(t *testing.T) {
 	dir := t.TempDir()
-	target := tspath.NormalizePath(filepath.Join(dir, "node_modules/pkg/a.ts"))
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	targetPath := tspath.NormalizePath(filepath.Join(dir, "node_modules/pkg/a.ts"))
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		t.Fatalf("mkdir target dir: %v", err)
 	}
-	if err := os.WriteFile(target, []byte("const value = 1;\n"), 0o644); err != nil {
+	if err := os.WriteFile(targetPath, []byte("const value = 1;\n"), 0o644); err != nil {
 		t.Fatalf("write target: %v", err)
 	}
 
-	warnings := explicitFileWarningsForTest(t, rslintconfig.LintTargetPlanRequest{
-		Files: []string{target},
+	warnings := explicitFileWarningsForTest(t, target.Request{
+		Files: []string{targetPath},
 		Config: rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
@@ -1465,7 +1495,7 @@ func TestCollectAllowFileWarningsUsesScanRootBeforeConfigProjection(t *testing.T
 	}
 	aliasTarget := tspath.CombinePaths(aliasDir, "index.ts")
 
-	warnings := explicitFileWarningsForTest(t, rslintconfig.LintTargetPlanRequest{
+	warnings := explicitFileWarningsForTest(t, target.Request{
 		Files:           []string{aliasTarget},
 		Config:          rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-console": "error"}}},
 		ConfigDirectory: configDir,
@@ -1511,7 +1541,7 @@ func TestCollectAllowFileWarningsPreservesGitignoreTargetIdentity(t *testing.T) 
 		nil,
 	)
 
-	warnings := explicitFileWarningsForTest(t, rslintconfig.LintTargetPlanRequest{
+	warnings := explicitFileWarningsForTest(t, target.Request{
 		Files:           []string{aliasTarget},
 		Config:          effective,
 		ConfigDirectory: configDir,
@@ -1547,7 +1577,7 @@ func TestCollectAllowFileWarnings_KeepsLexicalConfigOwnersSeparate(t *testing.T)
 	targetA := tspath.ResolvePath(ownerA, "link/index.ts")
 	targetB := tspath.ResolvePath(ownerB, "link/index.ts")
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	warnings := explicitFileWarningsForTest(t, rslintconfig.LintTargetPlanRequest{
+	warnings := explicitFileWarningsForTest(t, target.Request{
 		Files: []string{targetA, targetB},
 		ConfigMap: map[string]rslintconfig.RslintConfig{
 			ownerA: {{Ignores: []string{"link/**"}}},
@@ -1590,7 +1620,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildProject: %v", err)
 	}
-	targetPlan, err := rslintconfig.ResolveLintTargetPlan(rslintconfig.LintTargetPlanRequest{
+	targetPlan, err := target.Resolve(target.Request{
 		Config:          targetConfig,
 		ConfigDirectory: dir,
 		ScanRoot:        dir,
@@ -1599,15 +1629,15 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		SingleThreaded:  true,
 	})
 	if err != nil {
-		t.Fatalf("ResolveLintTargetPlan: %v", err)
+		t.Fatalf("target.Resolve: %v", err)
 	}
 	binding, err := programSession.LoadAPI(programSet, targetPlan, dir, true)
 	if err != nil {
 		t.Fatalf("LoadAPI: %v", err)
 	}
 	targetsByProgram := binding.TargetsByProgram
-	targetFiles := make([]string, 0, len(targetPlan.Targets))
-	for _, target := range targetPlan.Targets {
+	targetFiles := make([]string, 0, len(targetPlan.Files))
+	for _, target := range targetPlan.Files {
 		targetFiles = append(targetFiles, target.Path)
 	}
 	if len(targetFiles) != 2 || !strings.HasSuffix(targetFiles[0], "/a.ts") || !strings.HasSuffix(targetFiles[1], "/b.js") {
@@ -1620,7 +1650,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		RuleCatalog:             rules.All(),
 		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
 		SourceMappingsCanonical: true,
-		TargetPlan:              &targetPlan,
+		PathSpaces:              targetPlan.PathSpaces(),
 		FS:                      fs,
 	})
 	var diagnostics []rule.RuleDiagnostic
@@ -1972,8 +2002,8 @@ func TestRemapDiagnosticTargetPaths(t *testing.T) {
 		{FilePath: "/program/link.ts"},
 		{FilePath: "/program/unchanged.ts"},
 	}
-	remapDiagnosticTargetPaths(diagnostics, map[string]rslintconfig.DiscoveredLintTarget{
-		"/program/link.ts": {Path: "/requested/real.ts"},
+	remapDiagnosticTargetPaths(diagnostics, map[string]target.File{
+		"/program/link.ts": {PathIdentity: rslintconfig.PathIdentity{Path: "/requested/real.ts"}},
 	})
 
 	if diagnostics[0].FilePath != "/requested/real.ts" {

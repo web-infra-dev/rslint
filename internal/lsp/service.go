@@ -30,6 +30,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -51,9 +52,10 @@ type lintPassResult struct {
 // and fixes must all consume this same target/config pair; none may rediscover
 // the target identity from the filesystem mid-operation.
 type documentLintSnapshot struct {
-	target                config.DiscoveredLintTarget
+	target                target.File
 	config                config.RslintConfig
 	resolvedConfig        config.ResolvedFileConfig
+	pathSpaces            *config.PathSpaceSnapshot
 	ruleCatalog           *rule.Catalog
 	configResolved        bool
 	typeScriptConfigPaths []string
@@ -75,14 +77,21 @@ func resolveDocumentLintSnapshotConfig(
 	if snapshot.ruleCatalog == nil {
 		panic("document lint snapshot requires a rule catalog")
 	}
-	resolver := config.NewFileConfigResolverWithFS(
+	if snapshot.pathSpaces == nil {
+		panic("document lint snapshot requires a path-space snapshot")
+	}
+	resolver, err := config.NewFileConfigResolverWithPathSpaces(
 		snapshot.config,
 		snapshot.target.ConfigDirectory,
 		fs,
+		snapshot.pathSpaces,
 		snapshot.ruleCatalog,
 		snapshot.usesJavaScriptConfig,
 	)
-	snapshot.resolvedConfig = resolver.ResolveTarget(snapshot.target)
+	if err != nil {
+		panic(err)
+	}
+	snapshot.resolvedConfig = resolver.ResolveTarget(snapshot.target.Identity())
 	snapshot.configResolved = true
 	return snapshot
 }
@@ -294,16 +303,44 @@ func (s *Server) reloadConfig() error {
 	if err != nil {
 		return fmt.Errorf("could not resolve tsconfig paths for %q: %w", s.rslintConfigPath, err)
 	}
-	s.jsonConfig = rslintConfig
-	s.jsonConfigResolver = config.NewConfigOwnerResolver(
-		map[string]config.RslintConfig{
-			tspath.NormalizePath(s.cwd): rslintConfig,
-		},
+	ownerIndex, fileConfigResolver, err := prepareJSONConfigEvaluation(
+		rslintConfig,
+		s.cwd,
 		s.fs,
 	)
+	if err != nil {
+		return fmt.Errorf("could not prepare JSON config evaluation: %w", err)
+	}
+	s.jsonConfig = rslintConfig
+	s.jsonConfigOwnerIndex = ownerIndex
+	s.jsonFileConfigResolver = fileConfigResolver
 	s.tsConfigPaths = paths
 	s.invalidateLintProjectCaches()
 	return nil
+}
+
+func prepareJSONConfigEvaluation(
+	entries config.RslintConfig,
+	configDirectory string,
+	fsys vfs.FS,
+) (*target.OwnerIndex, *config.FileConfigResolver, error) {
+	configDirectory = tspath.NormalizePath(configDirectory)
+	ownerIndex := target.NewOwnerIndex(
+		map[string]config.RslintConfig{configDirectory: entries},
+		fsys,
+	)
+	resolver, err := config.NewFileConfigResolverWithPathSpaces(
+		entries,
+		configDirectory,
+		fsys,
+		ownerIndex.PathSpaces(),
+		rules.All(),
+		false,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ownerIndex, resolver, nil
 }
 
 func (s *Server) invalidateLintProjectCaches() {
@@ -543,13 +580,19 @@ func (s *Server) reloadConfigAndRelint() {
 	configPath, found := findRslintConfig(s.fs, s.cwd)
 	if !found {
 		log.Printf("rslint config file no longer exists, clearing config")
-		s.jsonConfig = config.RslintConfig{}
-		s.jsonConfigResolver = config.NewConfigOwnerResolver(
-			map[string]config.RslintConfig{
-				tspath.NormalizePath(s.cwd): s.jsonConfig,
-			},
+		emptyConfig := config.RslintConfig{}
+		ownerIndex, fileConfigResolver, err := prepareJSONConfigEvaluation(
+			emptyConfig,
+			s.cwd,
 			s.fs,
 		)
+		if err != nil {
+			log.Printf("Error clearing rslint config: %v", err)
+			return
+		}
+		s.jsonConfig = emptyConfig
+		s.jsonConfigOwnerIndex = ownerIndex
+		s.jsonFileConfigResolver = fileConfigResolver
 		s.rslintConfigPath = ""
 		s.tsConfigPaths = nil
 		s.invalidateLintProjectCaches()
@@ -1036,9 +1079,14 @@ type LintResponse struct {
 }
 
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
+	target := lspConfigTarget(uriToPath(uri), cwd, fs)
 	snapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshot{
-		target:                lspConfigTarget(uriToPath(uri), cwd, fs),
-		config:                rslintConfig,
+		target: target,
+		config: rslintConfig,
+		pathSpaces: config.NewPathSpaceSnapshot(
+			map[string]config.RslintConfig{target.ConfigDirectory: rslintConfig},
+			fs,
+		),
 		ruleCatalog:           rules.All(),
 		typeScriptConfigPaths: tsConfigPaths,
 		usesJavaScriptConfig:  enforcePlugins,
@@ -1144,7 +1192,7 @@ func rulesServedToEditors(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
 func lintSingleFile(
 	program *compiler.Program,
 	sourceFile *ast.SourceFile,
-	target config.DiscoveredLintTarget,
+	target target.File,
 	processCwd string,
 	hasTypeInfo bool,
 	enabledRules []rule.ConfiguredRule,
@@ -1205,7 +1253,7 @@ func lintSingleFile(
 
 func selectLintProgram(
 	uri lsproto.DocumentUri,
-	target config.DiscoveredLintTarget,
+	target target.File,
 	session *project.Session,
 	ctx context.Context,
 	tsConfigPaths []string,
@@ -1290,7 +1338,7 @@ func sourceFileForPath(program *compiler.Program, filename string, fs vfs.FS) *a
 
 func sourceFileForTarget(
 	program *compiler.Program,
-	target config.DiscoveredLintTarget,
+	target target.File,
 	fs vfs.FS,
 ) *ast.SourceFile {
 	return utils.NewProgramSourceLookup(program, fs).
@@ -1299,7 +1347,7 @@ func sourceFileForTarget(
 
 func (s *Server) currentEditorOverlayFSForTarget(
 	uri lsproto.DocumentUri,
-	target config.DiscoveredLintTarget,
+	target target.File,
 ) vfs.FS {
 	content, open := s.documents[uri]
 	files, _ := s.currentEditorOverlayFilesForFrozenTarget(
@@ -1313,7 +1361,7 @@ func (s *Server) currentEditorOverlayFSForTarget(
 
 func (s *Server) currentEditorOverlayFSForTargetWithConflicts(
 	uri lsproto.DocumentUri,
-	target config.DiscoveredLintTarget,
+	target target.File,
 ) (vfs.FS, bool) {
 	content, open := s.documents[uri]
 	files, aliasesConflict := s.currentEditorOverlayFilesForFrozenTarget(
@@ -1327,7 +1375,7 @@ func (s *Server) currentEditorOverlayFSForTargetWithConflicts(
 
 func (s *Server) currentEditorOverlayFilesForTarget(
 	uri lsproto.DocumentUri,
-	target config.DiscoveredLintTarget,
+	target target.File,
 	content string,
 ) map[string]string {
 	files, _ := s.currentEditorOverlayFilesForFrozenTarget(
@@ -1345,7 +1393,7 @@ func (s *Server) currentEditorOverlayFilesForTarget(
 // symlink generations between config/project selection and Program creation.
 func (s *Server) currentEditorOverlayFilesForFrozenTarget(
 	uri lsproto.DocumentUri,
-	target config.DiscoveredLintTarget,
+	target target.File,
 	targetContent string,
 	includeTarget bool,
 ) (map[string]string, bool) {
@@ -1379,7 +1427,7 @@ func (s *Server) currentEditorOverlayFilesForFrozenTarget(
 }
 
 func frozenLintTargetPhysicalPathID(
-	target config.DiscoveredLintTarget,
+	target target.File,
 	fs vfs.FS,
 ) string {
 	filePath := target.CanonicalPath
@@ -1403,7 +1451,7 @@ type frozenLintTargetOverlayFS struct {
 func newFrozenLintTargetOverlayFS(
 	baseFS vfs.FS,
 	files map[string]string,
-	target config.DiscoveredLintTarget,
+	target target.File,
 ) vfs.FS {
 	caseSensitive := true
 	if baseFS != nil {
@@ -1433,7 +1481,7 @@ func (fs *frozenLintTargetOverlayFS) Realpath(filePath string) string {
 
 func addEditorOverlayTarget(
 	files map[string]string,
-	target config.DiscoveredLintTarget,
+	target target.File,
 	content string,
 ) {
 	if target.Path != "" {
@@ -1530,9 +1578,14 @@ func (s *Server) runConfiguredLintForContent(
 	if enforcePlugins {
 		ruleCatalog = s.currentRuleCatalog()
 	}
+	target := lspConfigTarget(uriToPath(uri), cwd, s.fs)
 	snapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshot{
-		target:                lspConfigTarget(uriToPath(uri), cwd, s.fs),
-		config:                rslintConfig,
+		target: target,
+		config: rslintConfig,
+		pathSpaces: config.NewPathSpaceSnapshot(
+			map[string]config.RslintConfig{target.ConfigDirectory: rslintConfig},
+			s.fs,
+		),
 		ruleCatalog:           ruleCatalog,
 		typeScriptConfigPaths: tsConfigPaths,
 		usesJavaScriptConfig:  enforcePlugins,
@@ -1614,11 +1667,13 @@ func lspFilesystemPathID(filePath string, fs vfs.FS) string {
 	return lspLexicalPathID(filePath, caseSensitive)
 }
 
-func lspTargetIdentity(filePath string, fs vfs.FS) config.DiscoveredLintTarget {
-	return config.FreezeLintTargetIdentity(filePath, fs)
+func lspTargetIdentity(filePath string, fs vfs.FS) target.File {
+	return target.File{
+		PathIdentity: target.FreezeFileIdentity(filePath, fs),
+	}
 }
 
-func lspConfigTarget(filePath string, configDirectory string, fs vfs.FS) config.DiscoveredLintTarget {
+func lspConfigTarget(filePath string, configDirectory string, fs vfs.FS) target.File {
 	target := lspTargetIdentity(filePath, fs)
 	target.ConfigDirectory = tspath.NormalizePath(configDirectory)
 	return target
@@ -1799,6 +1854,7 @@ func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 type documentConfigSelection struct {
 	entries       config.RslintConfig
 	resolved      config.ResolvedFileConfig
+	pathSpaces    *config.PathSpaceSnapshot
 	ruleCatalog   *rule.Catalog
 	directory     string
 	configKey     string
@@ -1806,12 +1862,11 @@ type documentConfigSelection struct {
 	configMissing bool
 }
 
-func (s *Server) selectDocumentConfig(
-	target config.DiscoveredLintTarget,
-	jsRuleCatalog *rule.Catalog,
-) documentConfigSelection {
+func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelection {
+	jsRuleCatalog := s.currentRuleCatalog()
 	evaluationFS := s.fs
-	jsOwnerResolver := s.jsConfigOwnerResolver
+	jsOwnerIndex := s.jsConfigOwnerIndex
+	jsFileConfigResolvers := s.jsFileConfigResolvers
 	if !s.configSnapshotIncludesGitignore {
 		// The target identity was frozen before entering this function. Bootstrap
 		// config evaluation now gets its own short-lived filesystem generation so
@@ -1821,39 +1876,55 @@ func (s *Server) selectDocumentConfig(
 			evaluationFS = newConfigSnapshotFS(bundled.WrapFS(cachedvfs.From(s.fs)))
 		}
 		if len(s.jsConfigs) > 0 {
-			jsOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, evaluationFS)
+			jsOwnerIndex = target.NewOwnerIndex(s.jsConfigs, evaluationFS)
 		}
 	}
 	evaluateKnownConfig := func(
 		entries config.RslintConfig,
 		configDirectory string,
-		ownerResolver *config.ConfigOwnerResolver,
+		ownerIndex *target.OwnerIndex,
+		fileConfigResolver *config.FileConfigResolver,
 		catalog *rule.Catalog,
 		enforcePlugins bool,
-	) (config.RslintConfig, config.ResolvedFileConfig, bool) {
+	) (config.RslintConfig, config.ResolvedFileConfig, *config.PathSpaceSnapshot, bool) {
 		configDirectory = tspath.NormalizePath(configDirectory)
 		if !s.configSnapshotIncludesGitignore {
 			entries = config.ConfigWithGitignoreForExactTarget(
 				entries,
 				configDirectory,
 				evaluationFS,
-				target,
+				lintFile.Identity(),
 			)
-			ownerResolver = nil
+			ownerIndex = nil
+			fileConfigResolver = nil
 		}
-		if ownerResolver == nil {
-			ownerResolver = config.NewConfigOwnerResolver(
+		if ownerIndex == nil {
+			ownerIndex = target.NewOwnerIndex(
 				map[string]config.RslintConfig{configDirectory: entries},
 				evaluationFS,
 			)
 		}
-		resolvedEntries, resolved, ok := ownerResolver.ResolveConfigTarget(
-			configDirectory,
-			target,
-			catalog,
-			enforcePlugins,
-		)
-		return resolvedEntries, resolved, ok
+		if _, ok := ownerIndex.PathSpaces().PhysicalDirectory(configDirectory); !ok {
+			return nil, config.ResolvedFileConfig{}, ownerIndex.PathSpaces(), false
+		}
+		if fileConfigResolver == nil {
+			if s.configSnapshotIncludesGitignore {
+				panic("committed config snapshot is missing its file config resolver")
+			}
+			var err error
+			fileConfigResolver, err = config.NewFileConfigResolverWithPathSpaces(
+				entries,
+				configDirectory,
+				evaluationFS,
+				ownerIndex.PathSpaces(),
+				catalog,
+				enforcePlugins,
+			)
+			if err != nil {
+				panic(err)
+			}
+		}
+		return entries, fileConfigResolver.ResolveTarget(lintFile.Identity()), ownerIndex.PathSpaces(), true
 	}
 
 	if len(s.jsConfigs) > 0 {
@@ -1862,16 +1933,18 @@ func (s *Server) selectDocumentConfig(
 				tspath.NormalizePath(s.configRefreshConfigPath),
 			)
 			if entries, active := s.jsConfigs[configKey]; active {
-				entries, resolved, ok := evaluateKnownConfig(
+				entries, resolved, pathSpaces, ok := evaluateKnownConfig(
 					entries,
 					configKey,
-					jsOwnerResolver,
+					jsOwnerIndex,
+					jsFileConfigResolvers[configKey],
 					jsRuleCatalog,
 					true,
 				)
 				return documentConfigSelection{
 					entries:       entries,
 					resolved:      resolved,
+					pathSpaces:    pathSpaces,
 					ruleCatalog:   jsRuleCatalog,
 					directory:     configKey,
 					configKey:     configKey,
@@ -1879,22 +1952,22 @@ func (s *Server) selectDocumentConfig(
 					configMissing: !ok,
 				}
 			}
-		} else if jsOwnerResolver != nil {
-			configKey, entries, resolved, ok :=
-				jsOwnerResolver.ResolveTargetConfig(target, jsRuleCatalog, true)
-			if ok {
-				if !s.configSnapshotIncludesGitignore {
-					entries, resolved, ok = evaluateKnownConfig(
-						entries,
-						configKey,
-						nil,
-						jsRuleCatalog,
-						true,
-					)
-				}
+		} else if jsOwnerIndex != nil {
+			configKey, owned := jsOwnerIndex.Resolve(lintFile.Identity())
+			if owned {
+				entries := s.jsConfigs[configKey]
+				entries, resolved, pathSpaces, ok := evaluateKnownConfig(
+					entries,
+					configKey,
+					jsOwnerIndex,
+					jsFileConfigResolvers[configKey],
+					jsRuleCatalog,
+					true,
+				)
 				return documentConfigSelection{
 					entries:       entries,
 					resolved:      resolved,
+					pathSpaces:    pathSpaces,
 					ruleCatalog:   jsRuleCatalog,
 					directory:     configKey,
 					configKey:     configKey,
@@ -1907,16 +1980,18 @@ func (s *Server) selectDocumentConfig(
 
 	configDirectory := tspath.NormalizePath(s.cwd)
 	goRuleCatalog := rules.All()
-	entries, resolved, ok := evaluateKnownConfig(
+	entries, resolved, pathSpaces, ok := evaluateKnownConfig(
 		s.jsonConfig,
 		configDirectory,
-		s.jsonConfigResolver,
+		s.jsonConfigOwnerIndex,
+		s.jsonFileConfigResolver,
 		goRuleCatalog,
 		false,
 	)
 	return documentConfigSelection{
 		entries:       entries,
 		resolved:      resolved,
+		pathSpaces:    pathSpaces,
 		ruleCatalog:   goRuleCatalog,
 		directory:     configDirectory,
 		configMissing: !ok,
@@ -1928,8 +2003,7 @@ func (s *Server) selectDocumentConfig(
 // the only production entry from an editor URI into lint configuration.
 func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnapshot {
 	target := lspTargetIdentity(uriToPath(uri), s.fs)
-	ruleCatalog := s.currentRuleCatalog()
-	selection := s.selectDocumentConfig(target, ruleCatalog)
+	selection := s.selectDocumentConfig(target)
 	target.ConfigDirectory = selection.directory
 	typeScriptConfigPaths := s.tsConfigPaths
 	if selection.usesJSConfig {
@@ -1940,6 +2014,7 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 		target:                target,
 		config:                selection.entries,
 		resolvedConfig:        selection.resolved,
+		pathSpaces:            selection.pathSpaces,
 		ruleCatalog:           selection.ruleCatalog,
 		configResolved:        !selection.configMissing,
 		typeScriptConfigPaths: typeScriptConfigPaths,
@@ -1953,7 +2028,7 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 // cannot be resolved in separate filesystem observations.
 func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	target := lspTargetIdentity(uriToPath(uri), s.fs)
-	selection := s.selectDocumentConfig(target, s.currentRuleCatalog())
+	selection := s.selectDocumentConfig(target)
 	return selection.entries, selection.directory, selection.usesJSConfig
 }
 
@@ -1979,7 +2054,7 @@ func (s *Server) nearestJSConfigKey(uri lsproto.DocumentUri) (string, bool) {
 	return s.jsConfigKeyForTarget(lspTargetIdentity(uriToPath(uri), s.fs))
 }
 
-func (s *Server) jsConfigKeyForTarget(target config.DiscoveredLintTarget) (string, bool) {
+func (s *Server) jsConfigKeyForTarget(target target.File) (string, bool) {
 	if len(s.jsConfigs) == 0 {
 		return "", false
 	}
@@ -1991,10 +2066,10 @@ func (s *Server) jsConfigKeyForTarget(target config.DiscoveredLintTarget) (strin
 		_, active := s.jsConfigs[configDir]
 		return configDir, active
 	}
-	if s.jsConfigOwnerResolver == nil {
+	if s.jsConfigOwnerIndex == nil {
 		return "", false
 	}
-	configDir, _ := s.jsConfigOwnerResolver.ResolveTarget(target)
+	configDir, _ := s.jsConfigOwnerIndex.Resolve(target.Identity())
 	if configDir == "" {
 		return "", false
 	}

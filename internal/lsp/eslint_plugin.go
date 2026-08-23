@@ -111,12 +111,17 @@ func (s *Server) buildPluginFileInputWithConfig(
 	if isJSConfig {
 		ruleCatalog = s.currentRuleCatalog()
 	}
+	target := lspConfigTarget(uriToPath(uri), configCwd, s.fs)
 	return s.buildPluginFileInputWithSnapshot(
 		uri,
 		textOverride,
 		resolveDocumentLintSnapshotConfig(documentLintSnapshot{
-			target:               lspConfigTarget(uriToPath(uri), configCwd, s.fs),
-			config:               rslintConfig,
+			target: target,
+			config: rslintConfig,
+			pathSpaces: config.NewPathSpaceSnapshot(
+				map[string]config.RslintConfig{target.ConfigDirectory: rslintConfig},
+				s.fs,
+			),
 			ruleCatalog:          ruleCatalog,
 			usesJavaScriptConfig: isJSConfig,
 		}, s.fs),

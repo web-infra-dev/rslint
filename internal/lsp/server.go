@@ -23,6 +23,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
@@ -174,12 +175,17 @@ type Server struct {
 	// jsConfigs is keyed by the catalog's absolute filesystem directory
 	// byte-for-byte so Go ownership and Node plugin routing share one identity.
 	jsConfigs map[string]config.RslintConfig
-	// The resolver is rebuilt atomically with each config transaction. Its keys
+	// The index is rebuilt atomically with each config transaction. Its keys
 	// are the same filesystem paths stored in jsConfigs.
-	jsConfigOwnerResolver *config.ConfigOwnerResolver
-	// jsonConfigResolver freezes the invocation-wide JSON config's authored
+	jsConfigOwnerIndex *target.OwnerIndex
+	// jsFileConfigResolvers are built once from the same path-space and rule
+	// generation. Document requests reuse them instead of repeatedly parsing selectors
+	// and ignore patterns on every edit.
+	jsFileConfigResolvers map[string]*config.FileConfigResolver
+	// jsonConfigOwnerIndex freezes the invocation-wide JSON config's authored
 	// path space when that config generation is loaded.
-	jsonConfigResolver *config.ConfigOwnerResolver
+	jsonConfigOwnerIndex   *target.OwnerIndex
+	jsonFileConfigResolver *config.FileConfigResolver
 	// configDiscoveryActive becomes true after the first structurally valid
 	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
 	// config-scoped .gitignore watchers trigger a fresh transaction without

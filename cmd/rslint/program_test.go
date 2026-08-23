@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -32,10 +33,8 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 	programSession := loader.NewSession(fs)
 	loaded, err := programSession.LoadCLI(
 		loader.ProjectSet{},
-		rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
-			Path:            targetFile,
-			CanonicalPath:   targetFile,
-			ConfigDirectory: tmpDir,
+		target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetFile,
+			CanonicalPath: targetFile}, ConfigDirectory: tmpDir,
 		}}},
 		tmpDir,
 		false,

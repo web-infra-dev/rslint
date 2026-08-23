@@ -8,10 +8,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// GlobalIgnoreMatcher owns the authored path-space and global-ignore policy
-// shared by config-candidate and lint-target discovery. Callers supply lexical
-// paths plus an optional canonical fallback; matcher internals stay private so
-// both discovery flows cannot accidentally diverge on ignore semantics.
+// GlobalIgnoreMatcher is the config-candidate discovery view of authored
+// global-ignore policy. It shares the private config-target resolver and policy
+// with TargetMatcher, while exposing only the operations candidate discovery
+// needs. Callers supply lexical paths plus an optional canonical fallback.
 type GlobalIgnoreMatcher struct {
 	resolver *configTargetResolver
 }
@@ -47,12 +47,6 @@ func (matcher GlobalIgnoreMatcher) IgnoresPath(filePath string, canonicalPath st
 	}
 	target, matches := matcher.resolver.resolvePathSpaces(filePath, canonicalPath, false)
 	return matcher.resolver.globallyIgnores(target, matches)
-}
-
-// IgnoresTarget evaluates a frozen file and parent identity without resolving
-// either target path through the filesystem again.
-func (matcher GlobalIgnoreMatcher) IgnoresTarget(target DiscoveredLintTarget) bool {
-	return matcher.resolver != nil && matcher.resolver.resolveTarget(target).globallyIgnored
 }
 
 // dirKind classifies an ignore pattern by how it bears on DIRECTORY decisions.

@@ -19,6 +19,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 
 type configRefreshTestResult struct {
@@ -294,7 +295,7 @@ func installLastGoodConfig(s *Server, root string) {
 		},
 	}}
 	s.jsConfigs = map[string]config.RslintConfig{root: entries}
-	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
 	s.tsConfigPathsByConfig = map[string][]string{root: nil}
 	s.eslintPluginConfigGeneration = "last-good"
@@ -646,9 +647,12 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	if !snapshot.configs[root].IsFileIgnored(rootTarget, root) {
 		t.Fatal("root config did not collect its own .gitignore")
 	}
-	resolvedDir, resolvedConfig := snapshot.ownerResolver.Resolve(rootTarget)
-	if resolvedDir != root || !resolvedConfig.IsFileIgnored(rootTarget, root) {
-		t.Fatalf("committed owner resolver returned stale config: dir=%q config=%+v", resolvedDir, resolvedConfig)
+	resolvedDir, resolved := snapshot.ownerIndex.Resolve(
+		target.FreezeFileIdentity(rootTarget, fsys),
+	)
+	resolvedConfig := snapshot.configs[resolvedDir]
+	if resolvedDir != root || !resolved || !resolvedConfig.IsFileIgnored(rootTarget, root) {
+		t.Fatalf("committed owner index returned stale config: dir=%q resolved=%v config=%+v", resolvedDir, resolved, resolvedConfig)
 	}
 	if snapshot.configs[root].IsFileIgnored(childTarget, root) {
 		t.Fatal("root config crossed the child config's .gitignore source boundary")
@@ -658,6 +662,43 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	}
 	if snapshot.jsonConfig.IsFileIgnored(childTarget, root) {
 		t.Fatal("JSON fallback crossed the child JS config's .gitignore source boundary")
+	}
+}
+
+func TestCompleteDiscoveredConfigSnapshotBuildsOneResolverPerOwner(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	child := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fsys := bundled.WrapFS(osvfs.FS())
+	catalog := &discovery.ConfigCatalog{
+		TransactionID: "resolver-generation",
+		Configs: map[string]config.RslintConfig{
+			root:  {{Rules: config.Rules{"no-console": "error"}}},
+			child: {{Rules: config.Rules{"no-debugger": "error"}}},
+		},
+	}
+	s := newTestServer()
+	s.cwd = root
+	prepared, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := completeDiscoveredConfigSnapshot(prepared, nil, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(completed.fileConfigResolvers) != len(catalog.Configs) {
+		t.Fatalf("file config resolvers = %d, want %d", len(completed.fileConfigResolvers), len(catalog.Configs))
+	}
+	for _, configDirectory := range []string{root, child} {
+		if completed.fileConfigResolvers[configDirectory] == nil {
+			t.Fatalf("missing resolver for %q", configDirectory)
+		}
+	}
+	if completed.jsonFileConfigResolver == nil {
+		t.Fatal("automatic config generation is missing its JSON fallback resolver")
 	}
 }
 
@@ -963,8 +1004,11 @@ func TestUnavailableConfigBoundaryKeepsLexicalSymlinkFailure(t *testing.T) {
 		},
 		Failures: []discovery.ConfigFailure{{Directory: aliasRoot}},
 	}
-	resolver := config.NewConfigOwnerResolver(catalog.Configs, fsy)
-	if owner, _ := resolver.Resolve(filepath.Join(aliasRoot, "src", "index.ts")); owner != realRoot {
+	resolver := target.NewOwnerIndex(catalog.Configs, fsy)
+	if owner, _ := resolver.Resolve(target.FreezeFileIdentity(
+		filepath.Join(aliasRoot, "src", "index.ts"),
+		fsy,
+	)); owner != realRoot {
 		t.Fatalf("test precondition: canonical resolver owner = %q, want %q", owner, realRoot)
 	}
 	boundaries := unavailableConfigBoundaryDirectories(fsy, catalog)
@@ -1048,7 +1092,7 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 	writeConfigCandidate(t, nested)
 	installLastGoodConfig(s, root)
 	s.jsConfigs[nested] = config.RslintConfig{{Rules: config.Rules{"old-nested": "error"}}}
-	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
 	s.tsConfigPathsByConfig[nested] = nil
 
 	result := startConfigRefreshForTest(s, "config-change")
