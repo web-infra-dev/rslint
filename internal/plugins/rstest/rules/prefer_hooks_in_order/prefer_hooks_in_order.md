@@ -67,11 +67,12 @@ call made while it is set. That conflates two separate scopes, and this rule
 scopes each run to its own nesting level instead. Two consequences, both of
 which this rule reports differently from upstream on hook-inside-hook shapes:
 
-- A nested hook callback no longer ends the surrounding run. Upstream clears the
-  boolean as soon as any nested hook call exits, so a later outer hook is
-  compared as if it started a fresh run and an inversion after that point goes
-  unreported. Here the surrounding run survives the callback, so
-  `afterAll(() => { beforeEach(() => {}); }); beforeAll(() => {});` is reported.
+- A nested hook callback no longer ends the surrounding run. After a nested hook
+  exits, an ordinary call resets upstream's run, so a later outer hook starts
+  fresh and an inversion can go unreported. Here the surrounding run survives
+  the callback, so
+  `afterAll(() => { beforeEach(() => {}); doSomething(); }); beforeAll(() => {});`
+  is reported.
 
 - A nested hook is never compared against a hook from the enclosing run.
   Upstream lets the enclosing run's index leak in, which both reports correctly
