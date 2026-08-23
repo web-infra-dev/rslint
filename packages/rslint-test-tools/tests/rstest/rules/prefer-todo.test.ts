@@ -25,6 +25,24 @@ ruleTester.run('prefer-todo', {} as never, {
   ],
   invalid: [
     {
+      code: 'test?.("optional");',
+      errors: [{ messageId: 'unimplementedTest' }],
+    },
+    {
+      code: 'test("extra", () => {}, 1, 2);',
+      errors: [{ messageId: 'emptyTest' }],
+    },
+    {
+      code: 'test(`dynamic ${name}`);',
+      output: 'test.todo(`dynamic ${name}`);',
+      errors: [{ messageId: 'unimplementedTest' }],
+    },
+    {
+      code: 'wrap(test("nested"));',
+      output: 'wrap(test.todo("nested"));',
+      errors: [{ messageId: 'unimplementedTest' }],
+    },
+    {
       // Reported without a fix: rewriting either accessor leaves the other
       // skip active, so no one-accessor rewrite delivers a todo.
       code: 'test.skip.skip("stub", () => {});',

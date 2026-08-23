@@ -43,7 +43,12 @@ even when no rewrite delivers a todo test:
   `const skipped = test.skip; skipped('case')`, because the call site has no
   accessor to replace;
 - a repeated `.skip` chain, such as `test.skip.skip('case', () => {})`, because
-  replacing one accessor leaves the other skip active.
+  replacing one accessor leaves the other skip active;
+- an optional registration such as `test?.('case')`, because inserting `.todo`
+  would move the optional boundary and may change the call's runtime behavior;
+- a call with unsupported extra arguments whose callback is still provably
+  empty, such as `test('case', () => {}, 1000, extra)`, because dropping or
+  preserving those arguments would guess at behavior outside Rstest's overloads.
 
 ### Not reported at all
 
@@ -71,6 +76,17 @@ The options overload is recognized only when the second argument is written as
 an object literal. Calls such as `test('case', options)` and
 `test('case', options, () => {})` are left unchanged because the identifier may
 still be the callback.
+
+### Rstest-specific behavior
+
+The rule intentionally recognizes two registration shapes that the upstream
+Jest parser leaves alone:
+
+- interpolated template titles such as ``test(`case ${name}`)`` are reported,
+  because the dynamic title does not make a missing or empty callback ambiguous;
+- nested registrations such as `wrap(test('case'))` are reported, because the
+  inner `test(...)` call still executes and registers an Rstest test. Rewriting
+  that inner call to `test.todo(...)` preserves its registration role.
 
 ## Original Documentation
 

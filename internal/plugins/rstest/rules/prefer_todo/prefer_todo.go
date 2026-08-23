@@ -36,6 +36,9 @@ type callbackClassification struct {
 	callbackIndex int
 	optionsIndex  int
 	timeoutIndex  int
+	// reportOnly is true when the callback is certainly empty but the call has
+	// no supported Rstest overload that can be rewritten safely.
+	reportOnly bool
 }
 
 // PreferTodoRule ports eslint-plugin-jest's prefer-todo semantics to Rstest's
@@ -67,11 +70,9 @@ var PreferTodoRule = rule.Rule{
 				if call == nil || call.Arguments == nil {
 					return
 				}
-				if call.QuestionDotToken != nil ||
+				optionalCall := call.QuestionDotToken != nil ||
 					ast.IsOptionalChain(node) ||
-					ast.IsOptionalChain(ast.SkipParentheses(call.Expression)) {
-					return
-				}
+					ast.IsOptionalChain(ast.SkipParentheses(call.Expression))
 				args := call.Arguments.Nodes
 				if len(args) == 0 {
 					return
@@ -91,10 +92,16 @@ var PreferTodoRule = rule.Rule{
 				switch classification.kind {
 				case callbackMissing:
 					ctx.ReportNodeWithDeferredFixes(node, messageUnimplementedTest(), func() []rule.RuleFix {
+						if optionalCall || classification.reportOnly {
+							return nil
+						}
 						return buildFixes(ctx, call, callSite, classification)
 					})
 				case callbackInlineEmpty:
 					ctx.ReportNodeWithDeferredFixes(node, messageEmptyTest(), func() []rule.RuleFix {
+						if optionalCall || classification.reportOnly {
+							return nil
+						}
 						return buildFixes(ctx, call, callSite, classification)
 					})
 				}
@@ -552,13 +559,20 @@ func classifyCallback(args []*ast.Node) callbackClassification {
 			timeoutIndex:  -1,
 		}
 	}
-	if len(args) == 0 || len(args) > 3 {
+	if len(args) == 0 {
 		return callbackClassification{
 			kind:          callbackImplementedOrUnknown,
 			callbackIndex: -1,
 			optionsIndex:  -1,
 			timeoutIndex:  -1,
 		}
+	}
+	if len(args) > 3 {
+		classification := classifyCallback(args[:3])
+		if classification.kind == callbackInlineEmpty {
+			classification.reportOnly = true
+		}
+		return classification
 	}
 
 	second := skipParentheses(args[1])
