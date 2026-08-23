@@ -41,8 +41,29 @@ ruleTester.run('prefer-each', {} as never, {
       });
     `,
     },
+    {
+      code: `for (const row of getRows(it('one', () => {}))) {}`,
+    },
+    {
+      code: `for (const row in getRows(it('one', () => {}))) {}`,
+    },
   ],
   invalid: [
+    {
+      code: `
+        for (const row of getRows(beforeEach(() => {}))) {
+          test(row.name, () => {});
+        }
+      `,
+      errors: [
+        {
+          messageId: 'preferEach',
+          message: 'prefer using `test.each` rather than a manual loop',
+          line: 2,
+          column: 9,
+        },
+      ],
+    },
     {
       code: `
         for (const [input, expected] of data) {

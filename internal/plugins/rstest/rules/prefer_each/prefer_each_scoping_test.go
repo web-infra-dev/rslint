@@ -152,6 +152,16 @@ test('a', cb);`,
 })());`,
 				Errors: []rule_tester.InvalidTestCaseError{preferEachAt("describe", 2, 3, 4, 4)},
 			},
+			{
+				// The inner iterable runs once per outer iteration, so its
+				// registration belongs to the outer loop, not the inner loop.
+				Code: `for (const suite of suites) {
+  for (const row of getRows(test(suite.name, () => {}))) {
+    consume(row);
+  }
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{preferEachAt("test", 1, 1, 5, 2)},
+			},
 		},
 	)
 }

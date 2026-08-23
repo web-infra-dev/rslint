@@ -22,6 +22,27 @@ type pendingRegistration struct {
 	name string
 }
 
+type loopFrame struct {
+	node          *ast.Node
+	registrations []pendingRegistration
+}
+
+func isInsideForInOrOfExpression(node *ast.Node, loop *ast.Node) bool {
+	if loop.Kind != ast.KindForInStatement && loop.Kind != ast.KindForOfStatement {
+		return false
+	}
+	statement := loop.AsForInOrOfStatement()
+	if statement == nil || statement.Expression == nil {
+		return false
+	}
+	for current := node; current != nil && current != loop; current = current.Parent {
+		if current == statement.Expression {
+			return true
+		}
+	}
+	return false
+}
+
 func recommendFn(pending []pendingRegistration) string {
 	if len(pending) == 1 && pending[0].kind == rstestUtils.RstestFnTypeTest {
 		if pending[0].name == "it" {
@@ -51,10 +72,10 @@ var PreferEachRule = rule.Rule{
 		// exactly what the loop registers. A loop that only runs business logic
 		// has an empty frame and is never reported, whether or not it sits inside
 		// a test callback.
-		frames := make([][]pendingRegistration, 0, 4)
+		frames := make([]loopFrame, 0, 4)
 
 		enterLoop := func(node *ast.Node) {
-			frames = append(frames, nil)
+			frames = append(frames, loopFrame{node: node})
 		}
 
 		exitLoop := func(node *ast.Node) {
@@ -63,10 +84,10 @@ var PreferEachRule = rule.Rule{
 			}
 			frame := frames[len(frames)-1]
 			frames = frames[:len(frames)-1]
-			if len(frame) == 0 {
+			if len(frame.registrations) == 0 {
 				return
 			}
-			ctx.ReportNode(node, buildPreferEachMessage(recommendFn(frame)))
+			ctx.ReportNode(node, buildPreferEachMessage(recommendFn(frame.registrations)))
 		}
 
 		return rule.RuleListeners{
@@ -88,11 +109,19 @@ var PreferEachRule = rule.Rule{
 				case testFramework.FnKindTest,
 					testFramework.FnKindDescribe,
 					testFramework.FnKindHook:
-					top := len(frames) - 1
-					frames[top] = append(frames[top], pendingRegistration{
-						kind: parsed.Kind,
-						name: parsed.Name,
-					})
+					for i := len(frames) - 1; i >= 0; i-- {
+						// The right-hand expression of for-in/of runs once before that
+						// loop starts. It belongs to an enclosing loop, if any, rather
+						// than to the loop whose rows it produces.
+						if isInsideForInOrOfExpression(node, frames[i].node) {
+							continue
+						}
+						frames[i].registrations = append(frames[i].registrations, pendingRegistration{
+							kind: parsed.Kind,
+							name: parsed.Name,
+						})
+						break
+					}
 				}
 			},
 		}

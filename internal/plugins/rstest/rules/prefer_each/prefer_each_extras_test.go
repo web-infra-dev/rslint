@@ -19,6 +19,9 @@ func TestPreferEachExtras(t *testing.T) {
 			{Code: `for (const row of rows) { consume(row); }`},
 			{Code: `for (const key in rows) { consume(rows[key]); }`},
 			{Code: `for (let i = 0; i < rows.length; i++) { consume(rows[i]); }`},
+			// The iterable is evaluated once, before for-in/of starts iterating.
+			{Code: `for (const row of getRows(it('one', () => {}))) {}`},
+			{Code: `for (const row in getRows(it('one', () => {}))) {}`},
 
 			// ---- Real-user: #1048 business loop inside a test callback ----
 			{Code: `test('business loop', () => { for (const row of rows) { consume(row); } });`},
@@ -256,6 +259,19 @@ for (const row of rows) {
 			},
 
 			// ---- Dimension 1: alternate loop kinds with registrations ----
+			{
+				// The iterable registration is ignored; only the registration in
+				// the repeatedly executed body contributes to the recommendation.
+				Code: `for (const row of getRows(beforeEach(() => {}))) {
+  test(row.name, () => {});
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferEach",
+					Message:   "prefer using `test.each` rather than a manual loop",
+					Line:      1,
+					Column:    1,
+				}},
+			},
 			{
 				Code: `for (const key in rows) {
   test(key, () => {});
