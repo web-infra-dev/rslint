@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -65,7 +66,16 @@ func parseOptions(options []any) Options {
 // identifier's own name (not its runtime value) — matching upstream's
 // `node.key.name` fallback, which reads the Identifier node's `name` field
 // regardless of whether the key is computed.
-func propertyStaticName(nameNode *ast.Node) (string, bool) {
+func propertyStaticName(sf *ast.SourceFile, nameNode *ast.Node) (string, bool) {
+	literal := nameNode
+	if nameNode.Kind == ast.KindComputedPropertyName {
+		literal = ast.SkipParentheses(nameNode.AsComputedPropertyName().Expression)
+	}
+	if literal.Kind == ast.KindNumericLiteral {
+		if name, ok := eslintRadixLiteralName(sf, literal); ok {
+			return name, true
+		}
+	}
 	if name, ok := utils.GetStaticPropertyName(nameNode); ok {
 		return name, true
 	}
@@ -76,6 +86,57 @@ func propertyStaticName(nameNode *ast.Node) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// eslintRadixLiteralName reproduces the parser behavior behind ESLint's
+// numeric Literal.value. It accumulates an explicit-radix literal into a
+// double one digit at a time. Converting the exact integer only after reading
+// every digit can round to the neighboring double instead when the value is
+// above 2^53. tsgo's normalized NumericLiteral.Text has already lost the raw
+// digits needed to reproduce that behavior, so read them from the source.
+func eslintRadixLiteralName(sf *ast.SourceFile, node *ast.Node) (string, bool) {
+	raw := scanner.GetSourceTextOfNodeFromSourceFile(sf, node, false)
+	if len(raw) < 3 || raw[0] != '0' {
+		return "", false
+	}
+
+	var radix int
+	switch raw[1] {
+	case 'b', 'B':
+		radix = 2
+	case 'o', 'O':
+		radix = 8
+	case 'x', 'X':
+		radix = 16
+	default:
+		return "", false
+	}
+
+	value := 0.0
+	for i := 2; i < len(raw); i++ {
+		if raw[i] == '_' {
+			continue
+		}
+		digit := radixDigit(raw[i])
+		if digit < 0 || digit >= radix {
+			return "", false
+		}
+		value = value*float64(radix) + float64(digit)
+	}
+	return ecmascript.NumberToString(value), true
+}
+
+func radixDigit(ch byte) int {
+	switch {
+	case ch >= '0' && ch <= '9':
+		return int(ch - '0')
+	case ch >= 'a' && ch <= 'f':
+		return int(ch-'a') + 10
+	case ch >= 'A' && ch <= 'F':
+		return int(ch-'A') + 10
+	default:
+		return -1
+	}
 }
 
 // keyReportNode returns the node whose range diagnostics should be reported
@@ -246,7 +307,7 @@ var SortKeysRule = rule.Rule{
 			}
 
 			oldPrevName, oldHasPrevName := st.prevName, st.hasPrevName
-			thisName, thisOk := propertyStaticName(nameNode)
+			thisName, thisOk := propertyStaticName(ctx.SourceFile, nameNode)
 
 			// Nothing below reads a blank line unless the option asking about
 			// one is on, and the scan for one has the whole file's comment
