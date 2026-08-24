@@ -1,3 +1,5 @@
+// cspell:ignore truenull
+
 package utils
 
 import (
