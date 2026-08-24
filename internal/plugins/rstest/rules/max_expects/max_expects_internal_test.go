@@ -53,7 +53,7 @@ func TestCallEventStackIgnoresMarkWithoutEnter(t *testing.T) {
 
 func TestFunctionEventStackPairsOverflow(t *testing.T) {
 	events := functionEventStack{}
-	for index := 0; index < inlineFunctionEventCapacity+3; index++ {
+	for index := range inlineFunctionEventCapacity + 3 {
 		events.push(functionPushKind(index%int(functionActivateRegistrationFallback) + 1))
 	}
 	for index := inlineFunctionEventCapacity + 2; index >= 0; index-- {
