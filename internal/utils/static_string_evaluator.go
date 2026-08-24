@@ -70,6 +70,15 @@ func NewStaticStringEvaluatorWithoutScope() *StaticStringEvaluator {
 type staticNullValue struct{}
 type staticUndefinedValue struct{}
 
+// staticNumberValue is a number this evaluator computed itself. tsgo hands
+// numbers back as jsnum.Number, a type internal/utils cannot import; the IsNaN
+// method both types carry is what tells a folded number from a folded bigint.
+type staticNumberValue float64
+
+func (value staticNumberValue) IsNaN() bool {
+	return math.IsNaN(float64(value))
+}
+
 // staticStringNode keeps literal strings backed by their existing AST node so
 // nested aggregate evaluation doesn't allocate an interface box per literal.
 type staticStringNode ast.Node
@@ -464,6 +473,20 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 			return staticEvaluator.evalValue(binary.Right)
 		}
 		return left
+	case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+		left := staticEvaluator.evalValue(binary.Left)
+		right := staticEvaluator.evalValue(binary.Right)
+		if !left.ok || !right.ok {
+			return staticEvalResult{}
+		}
+		equal, ok := staticValuesStrictEqual(left.value, right.value)
+		if !ok {
+			return staticEvalResult{}
+		}
+		if binary.OperatorToken.Kind == ast.KindExclamationEqualsEqualsToken {
+			equal = !equal
+		}
+		return staticEvalResult{value: equal, ok: true}
 	case ast.KindPlusToken:
 		left := staticEvaluator.evalValue(binary.Left)
 		right := staticEvaluator.evalValue(binary.Right)
@@ -495,19 +518,52 @@ func (staticEvaluator *StaticStringEvaluator) concatStaticValues(left any, right
 
 func (staticEvaluator *StaticStringEvaluator) evalPrefixUnaryExpression(node *ast.Node) staticEvalResult {
 	prefix := node.AsPrefixUnaryExpression()
-	if prefix == nil || prefix.Operator != ast.KindExclamationToken {
+	if prefix == nil {
 		return staticEvaluator.evalWithTsgo(node)
 	}
 
+	switch prefix.Operator {
+	case ast.KindExclamationToken:
+		operand := staticEvaluator.evalValue(prefix.Operand)
+		if !operand.ok {
+			return staticEvalResult{}
+		}
+		truthy, ok := staticValueTruthy(operand.value)
+		if !ok {
+			return staticEvalResult{}
+		}
+		return staticEvalResult{value: !truthy, ok: true}
+	case ast.KindPlusToken, ast.KindMinusToken, ast.KindTildeToken:
+		if result := staticEvaluator.evalNumericPrefix(prefix); result.ok {
+			return result
+		}
+	}
+
+	return staticEvaluator.evalWithTsgo(node)
+}
+
+// evalNumericPrefix folds `+`, `-` and `~` over any static operand. tsgo's
+// evaluator folds these operators only when the operand is already a number,
+// so string, boolean and nullish operands reach here unfolded.
+func (staticEvaluator *StaticStringEvaluator) evalNumericPrefix(prefix *ast.PrefixUnaryExpression) staticEvalResult {
 	operand := staticEvaluator.evalValue(prefix.Operand)
 	if !operand.ok {
 		return staticEvalResult{}
 	}
-	truthy, ok := staticValueTruthy(operand.value)
+	number, ok := staticValueToNumber(operand.value)
 	if !ok {
 		return staticEvalResult{}
 	}
-	return staticEvalResult{value: !truthy, ok: true}
+
+	switch prefix.Operator {
+	case ast.KindPlusToken:
+		return staticEvalResult{value: staticNumberValue(number), ok: true}
+	case ast.KindMinusToken:
+		return staticEvalResult{value: staticNumberValue(-number), ok: true}
+	case ast.KindTildeToken:
+		return staticEvalResult{value: staticNumberValue(^toInt32(number)), ok: true}
+	}
+	return staticEvalResult{}
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalConditionalExpression(node *ast.Node) staticEvalResult {
@@ -1078,6 +1134,12 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 		return staticStringSlice(text, arguments)
 	case "substring":
 		return staticStringSubstring(text, arguments)
+	case "substr":
+		return staticStringSubstr(text, arguments)
+	case "charAt":
+		return staticStringCharAt(text, arguments)
+	case "concat":
+		return staticStringConcat(text, arguments)
 	}
 
 	return staticEvalResult{}
@@ -1167,6 +1229,58 @@ func staticStringSubstring(text string, arguments []any) staticEvalResult {
 	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
 }
 
+// staticStringSubstr implements the Annex B String#substr, whose second
+// argument is a length rather than an end index.
+func staticStringSubstr(text string, arguments []any) staticEvalResult {
+	start, ok := staticArgumentInteger(arguments, 0, 0)
+	if !ok {
+		return staticEvalResult{}
+	}
+	count, ok := staticArgumentInteger(arguments, 1, math.MaxInt)
+	if !ok {
+		return staticEvalResult{}
+	}
+	units := utf16.Encode([]rune(text))
+	length := len(units)
+	from := normalizeSliceIndex(start, length)
+	if count <= 0 {
+		return staticEvalResult{value: "", ok: true}
+	}
+	to := length
+	if count < length-from {
+		to = from + count
+	}
+	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+}
+
+func staticStringCharAt(text string, arguments []any) staticEvalResult {
+	index, ok := staticArgumentInteger(arguments, 0, 0)
+	if !ok {
+		return staticEvalResult{}
+	}
+	units := utf16.Encode([]rune(text))
+	if index < 0 || index >= len(units) {
+		return staticEvalResult{value: "", ok: true}
+	}
+	return staticEvalResult{value: string(utf16.Decode(units[index : index+1])), ok: true}
+}
+
+func staticStringConcat(text string, arguments []any) staticEvalResult {
+	var builder strings.Builder
+	builder.WriteString(text)
+	for _, argument := range arguments {
+		part, ok := staticValueToString(argument)
+		if !ok {
+			return staticEvalResult{}
+		}
+		if len(part) > maxStaticStringLength-builder.Len() {
+			return staticEvalResult{}
+		}
+		builder.WriteString(part)
+	}
+	return staticEvalResult{value: builder.String(), ok: true}
+}
+
 func staticArgumentInteger(arguments []any, index int, defaultValue int) (int, bool) {
 	if index >= len(arguments) || staticValueUndefined(arguments[index]) {
 		return defaultValue, true
@@ -1215,8 +1329,14 @@ func toUint32(number float64) uint32 {
 	return uint32(remainder)
 }
 
+func toInt32(number float64) int32 {
+	return int32(toUint32(number))
+}
+
 func staticValueToNumber(value any) (float64, bool) {
 	switch value := value.(type) {
+	case staticNumberValue:
+		return float64(value), true
 	case bool:
 		if value {
 			return 1, true
@@ -1471,7 +1591,7 @@ func isMutatingArrayMethod(name string) bool {
 
 func staticValueIsTsgoSafe(value any) bool {
 	switch value.(type) {
-	case bool, staticNullValue, staticUndefinedValue, *staticStringNode, *staticObjectValue, *staticArrayValue:
+	case bool, staticNullValue, staticUndefinedValue, staticNumberValue, *staticStringNode, *staticObjectValue, *staticArrayValue:
 		return false
 	default:
 		return value != nil
@@ -1513,6 +1633,75 @@ func staticValueUndefined(value any) bool {
 	return ok
 }
 
+// staticValueKind is the JavaScript typeof-like classification `===` needs.
+// Objects and arrays compare by identity, which folding does not model, and
+// tsgo's bigint representation cannot be inspected from this package; both stay
+// unknown.
+type staticValueKind uint8
+
+const (
+	staticKindUnknown staticValueKind = iota
+	staticKindString
+	staticKindNumber
+	staticKindBoolean
+	staticKindNull
+	staticKindUndefined
+)
+
+func staticValueKindOf(value any) staticValueKind {
+	switch value.(type) {
+	case bool:
+		return staticKindBoolean
+	case staticNullValue:
+		return staticKindNull
+	case staticUndefinedValue:
+		return staticKindUndefined
+	}
+	if staticValueIsString(value) {
+		return staticKindString
+	}
+	if _, isNumber := value.(interface{ IsNaN() bool }); isNumber {
+		return staticKindNumber
+	}
+	return staticKindUnknown
+}
+
+// staticValuesStrictEqual implements the strict equality comparison over folded
+// values. Comparing across kinds is always false, which keeps `1n === 1` right
+// even though bigint values themselves stay unknown.
+func staticValuesStrictEqual(left any, right any) (equal bool, ok bool) {
+	leftKind := staticValueKindOf(left)
+	rightKind := staticValueKindOf(right)
+	if leftKind == staticKindUnknown || rightKind == staticKindUnknown {
+		return false, false
+	}
+	if leftKind != rightKind {
+		return false, true
+	}
+
+	switch leftKind {
+	case staticKindString:
+		leftText, _ := staticValueAsString(left)
+		rightText, _ := staticValueAsString(right)
+		return leftText == rightText, true
+	case staticKindNumber:
+		leftNumber, leftOk := staticValueToNumber(left)
+		rightNumber, rightOk := staticValueToNumber(right)
+		if !leftOk || !rightOk {
+			return false, false
+		}
+		return leftNumber == rightNumber, true
+	case staticKindBoolean:
+		leftFlag, leftOk := left.(bool)
+		rightFlag, rightOk := right.(bool)
+		if !leftOk || !rightOk {
+			return false, false
+		}
+		return leftFlag == rightFlag, true
+	}
+	return true, true
+}
+
 func staticValueIsAggregate(value any) bool {
 	switch value.(type) {
 	case *staticObjectValue, *staticArrayValue:
@@ -1526,6 +1715,8 @@ func staticValueTruthy(value any) (truthy bool, ok bool) {
 	switch value := value.(type) {
 	case string:
 		return value != "", true
+	case staticNumberValue:
+		return value != 0 && !value.IsNaN(), true
 	case *staticStringNode:
 		stringValue, _ := staticValueAsString(value)
 		return stringValue != "", true
@@ -1544,6 +1735,8 @@ func staticValueToString(value any) (string, bool) {
 	switch value := value.(type) {
 	case string:
 		return value, true
+	case staticNumberValue:
+		return ecmascript.NumberToString(float64(value)), true
 	case *staticStringNode:
 		return staticValueAsString(value)
 	case bool:

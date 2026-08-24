@@ -51,6 +51,29 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const stringSliceUtf16 = \"😀GETx\".slice(2, 5);\n" +
 		"const stringSubstring = \"xHEADy\".substring(1, 5);\n" +
 		"const stringSubstringReversed = \"HEAD\".substring(4, 0);\n" +
+		"const stringSubstr = \"xGETy\".substr(1, 3);\n" +
+		"const stringSubstrNegative = \"xxGET\".substr(-3);\n" +
+		"const stringSubstrEmptyLength = \"GET\".substr(0, 0);\n" +
+		"const stringCharAt = \"GETx\".charAt(0);\n" +
+		"const stringCharAtDefault = \"GET\".charAt();\n" +
+		"const stringCharAtOutOfRange = \"GET\".charAt(9);\n" +
+		"const stringConcat = \"G\".concat(\"ET\");\n" +
+		"const stringConcatMany = \"HE\".concat(\"A\", \"D\");\n" +
+		"const stringConcatCoercion = \"n\".concat(1, true, null);\n" +
+		"const stringConcatUnknown = \"G\".concat(unknownValue);\n" +
+		"const unaryPlusString = String(+\"71\");\n" +
+		"const unaryPlusBoolean = String(+true);\n" +
+		"const unaryMinusString = String(-\"1\");\n" +
+		"const unaryTildeString = String(~\"1\");\n" +
+		"const unaryPlusInvalid = String(+\"nope\");\n" +
+		"const unaryPlusUnknown = String(+unknownValue);\n" +
+		"const strictEqualNumbers = +\"71\" === 71 ? \"then\" : \"no\";\n" +
+		"const strictEqualStrings = \"a\" === \"a\" ? \"then\" : \"no\";\n" +
+		"const strictUnequalStrings = \"a\" !== \"b\" ? \"then\" : \"no\";\n" +
+		"const strictEqualAcrossKinds = (1 as any) === \"1\" ? \"no\" : \"then\";\n" +
+		"const strictEqualNullish = (null as any) === undefined ? \"no\" : \"then\";\n" +
+		"const strictEqualObjects = ({} as any) === {} ? \"then\" : \"no\";\n" +
+		"const strictEqualUnknown = unknownValue === \"a\" ? \"then\" : \"no\";\n" +
 		"const StringAlias = String;\n" +
 		"const aliasFromCharCode = StringAlias.fromCharCode(71, 69, 84);\n" +
 		"const ArrayAlias = Array;\n" +
@@ -177,6 +200,29 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "stringSliceUtf16", want: "GET", ok: true},
 		{name: "stringSubstring", want: "HEAD", ok: true},
 		{name: "stringSubstringReversed", want: "HEAD", ok: true},
+		{name: "stringSubstr", want: "GET", ok: true},
+		{name: "stringSubstrNegative", want: "GET", ok: true},
+		{name: "stringSubstrEmptyLength", want: "", ok: true},
+		{name: "stringCharAt", want: "G", ok: true},
+		{name: "stringCharAtDefault", want: "G", ok: true},
+		{name: "stringCharAtOutOfRange", want: "", ok: true},
+		{name: "stringConcat", want: "GET", ok: true},
+		{name: "stringConcatMany", want: "HEAD", ok: true},
+		{name: "stringConcatCoercion", want: "n1truenull", ok: true},
+		{name: "stringConcatUnknown"},
+		{name: "unaryPlusString", want: "71", ok: true},
+		{name: "unaryPlusBoolean", want: "1", ok: true},
+		{name: "unaryMinusString", want: "-1", ok: true},
+		{name: "unaryTildeString", want: "-2", ok: true},
+		{name: "unaryPlusInvalid", want: "NaN", ok: true},
+		{name: "unaryPlusUnknown"},
+		{name: "strictEqualNumbers", want: "then", ok: true},
+		{name: "strictEqualStrings", want: "then", ok: true},
+		{name: "strictUnequalStrings", want: "then", ok: true},
+		{name: "strictEqualAcrossKinds", want: "then", ok: true},
+		{name: "strictEqualNullish", want: "then", ok: true},
+		{name: "strictEqualObjects"},
+		{name: "strictEqualUnknown"},
 		{name: "aliasFromCharCode", want: "GET", ok: true},
 		{name: "aliasArrayOf", want: "GET", ok: true},
 		{name: "shadowedFromCharCode"},

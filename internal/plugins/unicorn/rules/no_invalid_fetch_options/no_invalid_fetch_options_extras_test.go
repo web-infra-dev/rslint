@@ -148,6 +148,10 @@ func TestNoInvalidFetchOptionsExtras(t *testing.T) {
 			invalid(`fetch(url, {method: Array.of("GET")[0], body})`, "body", "GET"),
 			invalid(`fetch(url, {method: "xGETy".slice(1, 4), body})`, "body", "GET"),
 			invalid(`fetch(url, {method: "xHEADy".substring(1, 5), body})`, "body", "HEAD"),
+			invalid(`fetch(url, {method: "xGETy".substr(1, 3), body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "G".concat("ET"), body})`, "body", "GET"),
+			invalid(`fetch(url, {method: "GET".charAt(0) + "ET", body})`, "body", "GET"),
+			invalid(`fetch(url, {method: +"71" === 71 ? "GET" : "POST", body})`, "body", "GET"),
 			invalid(`const S = String; fetch(url, {method: S.fromCharCode(71, 69, 84), body})`, "body", "GET"),
 			invalid(`const A = Array; fetch(url, {method: A.of("HEAD")[0], body})`, "body", "HEAD"),
 
