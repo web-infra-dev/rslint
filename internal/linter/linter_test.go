@@ -38,6 +38,10 @@ func noopRule() []ConfiguredRule {
 // createTestProgramWithFiles creates a TS program in a temp directory with the given files.
 // Returns the program and a map of short filename -> normalized absolute path.
 func createTestProgramWithFiles(t *testing.T, sourceFiles map[string]string) (*compiler.Program, map[string]string) {
+	return createTestProgramWithFilesAndCompilerOptions(t, sourceFiles, "{}")
+}
+
+func createTestProgramWithFilesAndCompilerOptions(t *testing.T, sourceFiles map[string]string, compilerOptions string) (*compiler.Program, map[string]string) {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -58,7 +62,7 @@ func createTestProgramWithFiles(t *testing.T, sourceFiles map[string]string) (*c
 	}
 
 	includeJSON := `"` + strings.Join(includes, `","`) + `"`
-	tsconfig := `{"include":[` + includeJSON + `]}`
+	tsconfig := `{"compilerOptions":` + compilerOptions + `,"include":[` + includeJSON + `]}`
 	if err := os.WriteFile(filepath.Join(tmpDir, "tsconfig.json"), []byte(tsconfig), 0644); err != nil {
 		t.Fatalf("Failed to write tsconfig: %v", err)
 	}
@@ -71,6 +75,51 @@ func createTestProgramWithFiles(t *testing.T, sourceFiles map[string]string) (*c
 	}
 
 	return program, normalizedPaths
+}
+
+func TestRunLinter_PrunesSyntheticJSDocSyntax(t *testing.T) {
+	program, paths := createTestProgramWithFilesAndCompilerOptions(t, map[string]string{
+		"input.mjs": `/** @type {Array<{ value: number | null }>} */
+const annotated = value;
+const runtime = null;`,
+	}, `{"allowJs":true,"checkJs":false}`)
+
+	var typeReferences int
+	var nullEntries int
+	var nullExits int
+	_, err := RunLinter(RunLinterOptions{
+		Programs:       wrapTestPrograms(program),
+		SingleThreaded: true,
+		TargetFiles:    [][]string{{paths["input.mjs"]}},
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			return []ConfiguredRule{{
+				Name:     "jsdoc-traversal-boundary",
+				Severity: rule.SeverityError,
+				Run: func(rule.RuleContext) rule.RuleListeners {
+					return rule.RuleListeners{
+						ast.KindTypeReference: func(*ast.Node) {
+							typeReferences++
+						},
+						ast.KindNullKeyword: func(*ast.Node) {
+							nullEntries++
+						},
+						rule.ListenerOnExit(ast.KindNullKeyword): func(*ast.Node) {
+							nullExits++
+						},
+					}
+				},
+			}}
+		},
+	})
+	if err != nil {
+		t.Fatalf("RunLinter error: %v", err)
+	}
+	if typeReferences != 0 {
+		t.Fatalf("JSDoc TypeReference listener calls = %d, want 0", typeReferences)
+	}
+	if nullEntries != 1 || nullExits != 1 {
+		t.Fatalf("runtime null listener calls = (%d enter, %d exit), want (1, 1)", nullEntries, nullExits)
+	}
 }
 
 // tmpDirPath returns the normalized directory path for a file in normalizedPaths.

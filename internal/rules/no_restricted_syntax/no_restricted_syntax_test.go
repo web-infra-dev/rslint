@@ -271,6 +271,22 @@ const B = withSuspense(React.lazy(() => import('./b')));
 					},
 				},
 			},
+
+			// ============================================================
+			// JSDoc is skipped
+			// ============================================================
+			{
+				Code:     "/** @param {number | null} exitCode */\nfunction finish(exitCode) {}",
+				FileName: "file.mjs",
+				Options:  []interface{}{`Literal[value=null]`},
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code:     "/** @param {(err?: NodeJS.ErrnoException | null) => void} done */\nfunction finish(done) {}",
+				FileName: "file.cjs",
+				Options:  []interface{}{`Literal[value=null]`},
+				TSConfig: "tsconfig.allow-js.json",
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ============================================================
