@@ -41,6 +41,8 @@ func TestCatchErrorNameExtras(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			// Locks in upstream isPromiseCatchParameter() arm 1: catch callback.
 			invalid("promise.catch(function (bad) { return bad })", "promise.catch(function (error) { return error })", "bad", "error"),
+			// ESTree treats parentheses around a rejection handler as transparent.
+			invalid("promise.catch((bad => use(bad)))", "promise.catch((error => use(error)))", "bad", "error"),
 			// Locks in upstream isPromiseCatchParameter() arm 2: then rejection callback.
 			invalid("promise.then(ok => ok, bad => bad)", "promise.then(ok => ok, error => error)", "bad", "error"),
 			// Locks in upstream collision arm: append an underscore.

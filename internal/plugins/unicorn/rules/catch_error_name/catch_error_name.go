@@ -153,25 +153,29 @@ func isPromiseCatchParameter(identifier *ast.Node) bool {
 	if len(parameters) == 0 || unicornutil.PlainParameterIdentifier(parameters[0]) != identifier || function.Parent == nil {
 		return false
 	}
+	callback := utils.OutermostParenthesizedExpression(function)
+	if callback.Parent == nil {
+		return false
+	}
 
 	argumentsLength := 1
 	method := "catch"
-	if match, ok := unicornutil.MatchDotMethodCall(function.Parent, unicornutil.DotMethodCallOptions{
+	if match, ok := unicornutil.MatchDotMethodCall(callback.Parent, unicornutil.DotMethodCallOptions{
 		Method:              method,
 		ArgumentsLength:     &argumentsLength,
 		AllowOptionalMember: true,
-	}); ok && match.Call.Arguments()[0] == function {
+	}); ok && match.Call.Arguments()[0] == callback {
 		return true
 	}
 
 	argumentsLength = 2
 	method = "then"
-	match, ok := unicornutil.MatchDotMethodCall(function.Parent, unicornutil.DotMethodCallOptions{
+	match, ok := unicornutil.MatchDotMethodCall(callback.Parent, unicornutil.DotMethodCallOptions{
 		Method:              method,
 		ArgumentsLength:     &argumentsLength,
 		AllowOptionalMember: true,
 	})
-	return ok && match.Call.Arguments()[1] == function
+	return ok && match.Call.Arguments()[1] == callback
 }
 
 func isValidVariableName(name string) bool {
