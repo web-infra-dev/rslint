@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 // methodPluginLint is the server→client reverse request that asks the
@@ -19,6 +20,29 @@ import (
 // and return the diagnostics. It is the LSP equivalent of the CLI's
 // `pluginLint` IPC request.
 const methodPluginLint = lsproto.Method("rslint/pluginLint")
+
+// deriveLSPRuleCatalog preserves the LSP's established generation gate: an
+// empty object-form plugin rule name is not resolvable in Go, even though the
+// CLI and API historically accepted the same metadata.
+func deriveLSPRuleCatalog(
+	base *rule.Catalog,
+	plugins []config.EslintPluginEntry,
+) (*rule.Catalog, []string) {
+	filtered := make([]config.EslintPluginEntry, 0, len(plugins))
+	for _, plugin := range plugins {
+		ruleNames := make([]string, 0, len(plugin.RuleNames))
+		for _, ruleName := range plugin.RuleNames {
+			if ruleName != "" {
+				ruleNames = append(ruleNames, ruleName)
+			}
+		}
+		filtered = append(filtered, config.EslintPluginEntry{
+			Prefix:    plugin.Prefix,
+			RuleNames: ruleNames,
+		})
+	}
+	return base.ForESLintPlugins(filtered)
+}
 
 // installEslintPluginDispatch lazily builds the dispatcher closure once. It
 // sends one plugin-lint batch over the reverse request and decodes the
@@ -69,11 +93,11 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 // Must be called from the main dispatch loop: it reads s.jsConfigs (lock-free)
 // and the s.documents overlay.
 func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *string) (linter.EslintPluginFileInput, bool) {
-	if s.isUnavailableConfigForURI(uri) {
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.unavailable {
 		return linter.EslintPluginFileInput{}, false
 	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	return s.buildPluginFileInputWithConfig(uri, textOverride, rslintConfig, configCwd, isJSConfig)
+	return s.buildPluginFileInputWithSnapshot(uri, textOverride, snapshot)
 }
 
 func (s *Server) buildPluginFileInputWithConfig(
@@ -83,15 +107,48 @@ func (s *Server) buildPluginFileInputWithConfig(
 	configCwd string,
 	isJSConfig bool,
 ) (linter.EslintPluginFileInput, bool) {
-	configKey := s.pluginConfigKeyForURI(uri)
-	filePath := uriToPath(uri)
-	configFilePath, matchConfigDir := config.ResolveConfigPathSpace(filePath, configCwd, s.fs)
-	if isDefaultExcludedLintPath(configFilePath, matchConfigDir, s.fs) {
+	ruleCatalog := rules.All()
+	if isJSConfig {
+		ruleCatalog = s.currentRuleCatalog()
+	}
+	target := lspConfigTarget(uriToPath(uri), configCwd, s.fs)
+	return s.buildPluginFileInputWithSnapshot(
+		uri,
+		textOverride,
+		resolveDocumentLintSnapshotConfig(documentLintSnapshot{
+			target: target,
+			config: rslintConfig,
+			pathSpaces: config.NewPathSpaceSnapshot(
+				map[string]config.RslintConfig{target.ConfigDirectory: rslintConfig},
+				s.fs,
+			),
+			ruleCatalog:          ruleCatalog,
+			usesJavaScriptConfig: isJSConfig,
+		}, s.fs),
+	)
+}
+
+func (s *Server) buildPluginFileInputWithSnapshot(
+	uri lsproto.DocumentUri,
+	textOverride *string,
+	snapshot documentLintSnapshot,
+) (linter.EslintPluginFileInput, bool) {
+	if !snapshot.configResolved {
+		snapshot = resolveDocumentLintSnapshotConfig(snapshot, s.fs)
+	}
+	target := snapshot.target
+	filePath := target.Path
+	configCwd := target.ConfigDirectory
+	configKey := ""
+	if snapshot.usesJavaScriptConfig {
+		configKey = configCwd
+	}
+	if isDefaultExcludedLintPath(target.Path, s.cwd, s.fs) {
 		return linter.EslintPluginFileInput{}, false
 	}
 
-	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, matchConfigDir, isJSConfig)
-	enabledRules, merged := fileConfigResolver.EnabledRulesForFile(configFilePath)
+	enabledRules := snapshot.resolvedConfig.EnabledRules
+	merged := snapshot.resolvedConfig.MergedConfig
 	if merged == nil {
 		// File is globally ignored — no plugin (or native) diagnostics.
 		return linter.EslintPluginFileInput{}, false
@@ -111,45 +168,8 @@ func (s *Server) buildPluginFileInputWithConfig(
 
 	// sourceFile=nil: the LSP rebuilds against the overlay Text (the worker
 	// linted that same string). Shared filter/assembly with the CLI (F1).
-	enabledRules = s.pluginRulesForCurrentGeneration(enabledRules)
 	languageOptions, settings := config.PluginMergedMaps(merged)
 	return linter.BuildEslintPluginFileInput(filePath, configKey, enabledRules, languageOptions, settings, text, nil)
-}
-
-// eslintPluginRuleSet expands activation metadata into the exact rule names
-// the matching Node generation can execute. It always returns a non-nil map:
-// an activated generation with no community plugins must block placeholders
-// retained in the process-wide registry by older generations.
-func eslintPluginRuleSet(entries []config.EslintPluginEntry) map[string]struct{} {
-	rules := make(map[string]struct{})
-	for _, entry := range entries {
-		if entry.Prefix == "" {
-			continue
-		}
-		for _, ruleName := range entry.RuleNames {
-			if ruleName != "" {
-				rules[entry.Prefix+"/"+ruleName] = struct{}{}
-			}
-		}
-	}
-	return rules
-}
-
-func (s *Server) pluginRulesForCurrentGeneration(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
-	if s.eslintPluginRules == nil {
-		return rules
-	}
-	filtered := make([]rule.ConfiguredRule, 0, len(rules))
-	for _, configuredRule := range rules {
-		if !configuredRule.IsEslintPluginRule {
-			filtered = append(filtered, configuredRule)
-			continue
-		}
-		if _, ok := s.eslintPluginRules[configuredRule.Name]; ok {
-			filtered = append(filtered, configuredRule)
-		}
-	}
-	return filtered
 }
 
 // pluginConfigKeyForURI returns the owning config directory's absolute path.
@@ -181,20 +201,18 @@ func (s *Server) pluginConfigKeyForURI(uri lsproto.DocumentUri) string {
 // Must be called from the main dispatch loop (it reads jsConfigs + documents
 // to build the input and the generation map).
 func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) {
-	if s.isUnavailableConfigForURI(uri) {
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.unavailable {
 		s.cancelInflightPluginDispatch(uri)
 		return
 	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	s.dispatchPluginLintWithConfig(uri, generation, rslintConfig, configCwd, isJSConfig)
+	s.dispatchPluginLintWithSnapshot(uri, generation, snapshot)
 }
 
-func (s *Server) dispatchPluginLintWithConfig(
+func (s *Server) dispatchPluginLintWithSnapshot(
 	uri lsproto.DocumentUri,
 	generation uint64,
-	rslintConfig config.RslintConfig,
-	configCwd string,
-	isJSConfig bool,
+	snapshot documentLintSnapshot,
 ) {
 	// Supersede any prior in-flight dispatch for this URI FIRST — before the
 	// no-plugin-work early return below. Even a relint that yields no plugin
@@ -204,7 +222,7 @@ func (s *Server) dispatchPluginLintWithConfig(
 	// a $/cancelRequest tells the client to stop the worker.
 	s.cancelInflightPluginDispatch(uri)
 
-	input, ok := s.buildPluginFileInputWithConfig(uri, nil, rslintConfig, configCwd, isJSConfig)
+	input, ok := s.buildPluginFileInputWithSnapshot(uri, nil, snapshot)
 	if !ok {
 		return
 	}
@@ -362,24 +380,22 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 //
 // Must be called from the main dispatch loop (it reads jsConfigs + documents).
 func (s *Server) lintPluginRulesSync(ctx context.Context, uri lsproto.DocumentUri, content string, fix bool, suggestionsMode string) []rule.RuleDiagnostic {
-	if s.isUnavailableConfigForURI(uri) {
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.unavailable {
 		return nil
 	}
-	rslintConfig, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	return s.lintPluginRulesSyncWithConfig(ctx, uri, content, fix, suggestionsMode, rslintConfig, configCwd, isJSConfig)
+	return s.lintPluginRulesSyncWithSnapshot(ctx, uri, content, fix, suggestionsMode, snapshot)
 }
 
-func (s *Server) lintPluginRulesSyncWithConfig(
+func (s *Server) lintPluginRulesSyncWithSnapshot(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
 	content string,
 	fix bool,
 	suggestionsMode string,
-	rslintConfig config.RslintConfig,
-	configCwd string,
-	isJSConfig bool,
+	snapshot documentLintSnapshot,
 ) []rule.RuleDiagnostic {
-	input, ok := s.buildPluginFileInputWithConfig(uri, &content, rslintConfig, configCwd, isJSConfig)
+	input, ok := s.buildPluginFileInputWithSnapshot(uri, &content, snapshot)
 	if !ok {
 		return nil
 	}

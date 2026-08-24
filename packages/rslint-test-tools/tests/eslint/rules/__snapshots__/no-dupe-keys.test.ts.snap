@@ -9,7 +9,7 @@ exports[`no-dupe-keys > invalid 1`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 21,
+          "column": 18,
           "line": 1,
         },
         "start": {
@@ -35,7 +35,7 @@ exports[`no-dupe-keys > invalid 2`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 27,
+          "column": 24,
           "line": 1,
         },
         "start": {
@@ -61,7 +61,7 @@ exports[`no-dupe-keys > invalid 3`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 27,
+          "column": 24,
           "line": 1,
         },
         "start": {
@@ -76,7 +76,7 @@ exports[`no-dupe-keys > invalid 3`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 33,
+          "column": 30,
           "line": 1,
         },
         "start": {
@@ -102,7 +102,7 @@ exports[`no-dupe-keys > invalid 4`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 25,
+          "column": 22,
           "line": 1,
         },
         "start": {
@@ -128,11 +128,11 @@ exports[`no-dupe-keys > invalid 5`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 45,
+          "column": 41,
           "line": 1,
         },
         "start": {
-          "column": 29,
+          "column": 30,
           "line": 1,
         },
       },
@@ -154,7 +154,7 @@ exports[`no-dupe-keys > invalid 6`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 27,
+          "column": 22,
           "line": 1,
         },
         "start": {
@@ -180,11 +180,11 @@ exports[`no-dupe-keys > invalid 7`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 33,
+          "column": 27,
           "line": 1,
         },
         "start": {
-          "column": 24,
+          "column": 25,
           "line": 1,
         },
       },
@@ -206,11 +206,11 @@ exports[`no-dupe-keys > invalid 8`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 33,
+          "column": 29,
           "line": 1,
         },
         "start": {
-          "column": 23,
+          "column": 24,
           "line": 1,
         },
       },
@@ -232,11 +232,37 @@ exports[`no-dupe-keys > invalid 9`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 37,
+          "column": 31,
           "line": 1,
         },
         "start": {
-          "column": 25,
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-keys > invalid 10`] = `
+{
+  "code": "var x = { [("a")]: 1, [(("a"))]: 2 };",
+  "diagnostics": [
+    {
+      "message": "Duplicate key 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
           "line": 1,
         },
       },

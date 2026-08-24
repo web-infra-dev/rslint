@@ -68,6 +68,14 @@ func TestPreferArraySomeExtras(t *testing.T) {
 		// upstream suite as invalid).
 		{Code: `class MyArray extends Array {} function foo(items: MyArray) { if (items.find(fn)) {} }`, Tsx: false},
 		{Code: `class MyArray extends Array {} function foo(items: MyArray) { items.filter(fn).length > 0; }`, Tsx: false},
+		// Type-information classification does not walk interface heritage when
+		// deciding whether a stored `.find()` result is definitely from an array.
+		{Code: `interface Items extends Array<object> {} declare function get(): Items; const found = get().find(fn); if (found) {}`, Tsx: false},
+		// Nullish participates in union classification as a non-target, so this
+		// receiver is unknown rather than definitely an array.
+		{Code: `declare const items: object[] | undefined; const found = items.find(fn); if (found) {}`, Tsx: false},
+		// A function's return annotation does not annotate the function binding.
+		{Code: `function items(): object[] { return [] } const found = items.find(fn); if (found) {}`, Tsx: false},
 
 		// ---- Locks in filter().length arm: `$`-prefixed receiver skipped ----
 		{Code: `$foo.filter(fn).length > 0`},
@@ -97,6 +105,13 @@ func TestPreferArraySomeExtras(t *testing.T) {
 		{
 			Code:   `if ((foo).find(fn)) {}`,
 			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`if ((foo).some(fn)) {}`)},
+		},
+		// The type-information path matches the type symbol name without
+		// requiring the declaration to come from the standard library.
+		{
+			Code:   `export {}; interface Array<T> { find(predicate: Function): T | undefined } declare function get(): Array<object>; const found = get().find(fn); if (found) {}`,
+			Tsx:    false,
+			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`export {}; interface Array<T> { find(predicate: Function): T | undefined } declare function get(): Array<object>; const found = get().some(fn); if (found) {}`)},
 		},
 		// A `for…of` const binding has no VariableDeclaration initializer. Its
 		// inferred array type still makes the boolean `.find()` use reportable.
