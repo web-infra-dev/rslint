@@ -6,9 +6,6 @@ Prefer ending a test body with an assertion. A test whose last statement is not
 an `expect` (or another configured assert function) often indicates unfinished
 work that may pass silently.
 
-Skipped [`test.todo` / `it.todo`](https://jestjs.io/docs/api#testtodoname)
-bodies are ignored.
-
 Examples of **incorrect** code for this rule:
 
 ```javascript

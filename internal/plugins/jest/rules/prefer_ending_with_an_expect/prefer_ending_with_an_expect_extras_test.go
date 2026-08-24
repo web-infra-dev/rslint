@@ -18,7 +18,7 @@ func TestPreferEndingWithAnExpectExtras(t *testing.T) {
 		t,
 		&prefer_ending_with_an_expect.PreferEndingWithAnExpectRule,
 		[]rule_tester.ValidTestCase{
-			// ---- Dimension 4: parenthesized callback and assertion expression ----
+			// Parenthesized callback and assertion expression.
 			{Code: `test('works', (((() => (((expect(1).toBe(1))))))));`},
 			// ---- Dimension 4: optional assertion call chain ----
 			{Code: `test('works', () => expect?.(1).toBe(1));`},
@@ -40,6 +40,13 @@ func TestPreferEndingWithAnExpectExtras(t *testing.T) {
 			{Code: `test('http assertion', () => request(app).get('/').expect(200));`, Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.expect"}}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				// An explicitly empty assertion-name list must not restore the default.
+				Code: `import { expect } from 'chai';
+test('x', () => { expect(1).to.equal(1); });`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{}}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "mustEndWithExpect", Line: 2, Column: 1, EndLine: 2, EndColumn: 5}},
+			},
 			{
 				// ---- Dimension 4: empty function body gracefully reports ----
 				Code: `test('empty', () => {});`,

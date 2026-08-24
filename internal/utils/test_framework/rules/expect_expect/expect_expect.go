@@ -23,7 +23,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -81,76 +80,6 @@ func buildErrorNoAssertionsMessage() rule.RuleMessage {
 		Id:          "noAssertions",
 		Description: "Test has no assertions",
 	}
-}
-
-func parseOptions(options []any, defaultAssertNames []string) ([]string, []string) {
-	assertNames := slices.Clone(defaultAssertNames)
-	additional := []string{}
-
-	if len(options) == 0 {
-		return assertNames, additional
-	}
-	optsMap, _ := options[0].(map[string]interface{})
-
-	if arr, ok := optsMap["assertFunctionNames"].([]interface{}); ok {
-		assertNames = stringList(arr)
-	}
-	if arr, ok := optsMap["additionalTestBlockFunctions"].([]interface{}); ok {
-		additional = stringList(arr)
-	}
-
-	return assertNames, additional
-}
-
-func stringList(raw []interface{}) []string {
-	out := make([]string, 0, len(raw))
-	for _, v := range raw {
-		if s, ok := v.(string); ok {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-func compileAssertPatterns(patterns []string) []*esregexp.RegExp {
-	out := make([]*esregexp.RegExp, 0, len(patterns))
-	for _, p := range patterns {
-		out = append(out, compileAssertPattern(p))
-	}
-	return out
-}
-
-func compileAssertPattern(pattern string) *esregexp.RegExp {
-	segs := strings.Split(pattern, ".")
-	parts := make([]string, 0, len(segs))
-	for _, s := range segs {
-		if s == "**" {
-			parts = append(parts, `[a-zA-Z0-9.]*`)
-		} else {
-			parts = append(parts, strings.ReplaceAll(s, "*", `[a-zA-Z0-9]*`))
-		}
-	}
-	joined := strings.Join(parts, `\.`)
-	// Segments follow eslint-plugin-jest: only `*` is expanded; other characters
-	// (e.g. `\$`) are copied into the Regexp source like JavaScript's RegExp
-	// constructor. A malformed pattern compiles to nil and never matches.
-	re, err := esregexp.Compile(`^(?:`+joined+`)(?:\.|$)`, "iu")
-	if err != nil {
-		return nil
-	}
-	return re
-}
-
-func matchesAssertName(name string, compiled []*esregexp.RegExp) bool {
-	if name == "" {
-		return false
-	}
-	for _, re := range compiled {
-		if re != nil && re.TestOrTimeout(name) {
-			return true
-		}
-	}
-	return false
 }
 
 func indexUnchecked(unchecked []*ast.Node, call *ast.Node) int {
@@ -270,8 +199,9 @@ func NewRule(config Config) rule.Rule {
 		Schema: rule.NewSchema(schemaJSON),
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			runtime := config.Prepare(ctx)
-			assertNames, additionalTestBlocks := parseOptions(options, config.DefaultAssertFunctionNames)
-			compiled := compileAssertPatterns(assertNames)
+			parsedOptions := testFramework.ParseAssertionFunctionOptions(options, config.DefaultAssertFunctionNames)
+			compiled := testFramework.CompileAssertPatterns(parsedOptions.AssertFunctionNames)
+			additionalTestBlocks := parsedOptions.AdditionalTestBlockFunctions
 			var unchecked []*ast.Node
 			uncheckedByDecl := map[*ast.Node][]*ast.Node{}
 			uncheckedByName := map[string][]*ast.Node{}
@@ -319,7 +249,7 @@ func NewRule(config Config) rule.Rule {
 					// whatever the framework can resolve; patterns run first because
 					// they answer the overwhelmingly common bare `expect(...)`
 					// without touching the framework analysis.
-					if !matchesAssertName(calleeName, compiled) &&
+					if !testFramework.MatchesAssertName(calleeName, compiled) &&
 						(runtime.IsAssertion == nil || !runtime.IsAssertion(node)) {
 						return
 					}

@@ -57,7 +57,7 @@ func isAssertionCall(node *ast.Node, ctx rule.RuleContext, patterns []*esregexp.
 	if jestUtils.IsTypeOfJestFnCall(node, ctx, jestUtils.JestFnTypeExpect) {
 		return true
 	}
-	return jestUtils.MatchesAssertFunctionName(
+	return testFramework.MatchesAssertName(
 		testFramework.CalleeChainName(node.AsCallExpression().Expression),
 		patterns,
 	)
@@ -77,8 +77,8 @@ var PreferEndingWithAnExpectRule = rule.Rule{
 	Name:   "jest/prefer-ending-with-an-expect",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		parsedOptions := jestUtils.ParseAssertionFunctionOptions(options)
-		patterns := jestUtils.CompileAssertFunctionNamePatterns(parsedOptions.AssertFunctionNames)
+		parsedOptions := testFramework.ParseAssertionFunctionOptions(options, []string{"expect"})
+		patterns := testFramework.CompileAssertPatterns(parsedOptions.AssertFunctionNames)
 		additional := parsedOptions.AdditionalTestBlockFunctions
 
 		return rule.RuleListeners{
