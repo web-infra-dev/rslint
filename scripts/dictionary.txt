@@ -1,5 +1,6 @@
 # Custom Dictionary Words
 aavascript
+abce
 accesskey
 accum
 acdfg
@@ -39,6 +40,7 @@ autofixers
 autofocus
 auvred
 axobject
+Azeri
 backgrounded
 backlink
 backpressure
@@ -79,6 +81,8 @@ cand
 canonicalise
 canonicalised
 canonicalises
+caser
+caseless
 catchable
 categorisation
 Cbar
@@ -134,6 +138,7 @@ destabilising
 destructures
 desugars
 desync
+dialytika
 dirxml
 disqualifier
 disqualifiers
@@ -141,6 +146,7 @@ dlclark
 Dmts
 dobedo
 dont
+dotless
 doublestar
 DPUB
 dropeffect
@@ -150,6 +156,7 @@ embertest
 endline
 englishish
 enochian
+Erfe
 errchkjson
 errgroup
 errrr
@@ -198,6 +205,7 @@ footgun
 Foox
 foox
 fooz
+forbidigo
 forcetypeassert
 forinstatement
 formedness
@@ -209,6 +217,7 @@ fsys
 fullwidth
 funcs
 funcw
+Garay
 gcflags
 GDSFP
 Geor
@@ -273,11 +282,13 @@ kase
 keygen
 keyshortcuts
 keytar
+keyup
 Khmr
 Knda
 koblas
 Kore
 labelledby
+lalala
 Laoo
 ldflags
 ldquo
@@ -321,6 +332,7 @@ middot
 minimatch
 misalign
 miscategorise
+misparsed
 misrefactored
 Mlym
 mmap
@@ -329,6 +341,7 @@ Modns
 modns
 morestack
 mousein
+mouseout
 mousemove
 msvc
 multibyte
@@ -364,6 +377,7 @@ nomatch
 nonconstructor
 noninteractive
 nonoctal
+nonspacing
 noopener
 noopenernoreferrer
 noreferrer
@@ -376,6 +390,7 @@ noscript
 notarole
 notcool
 noteref
+NOTMATCHED
 notunique
 NOTX
 nsec
@@ -397,6 +412,7 @@ optgroup
 optionable
 Orya
 osvfs
+otherthing
 outputfixes
 ovsx
 oxendict
@@ -415,6 +431,7 @@ picomatch
 Pipeable
 pollable
 posinset
+postamble
 Prag
 preact
 prebundle
@@ -634,6 +651,7 @@ Unwatch
 unwinded
 uppercased
 uppercases
+uppercasing
 useeffectevent
 usemap
 USERPROFILE

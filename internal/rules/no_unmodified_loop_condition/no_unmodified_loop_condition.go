@@ -1,17 +1,33 @@
 package no_unmodified_loop_condition
 
 import (
-	"fmt"
+	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_unmodified_loop_condition.schema.json
+var schemaJSON []byte
+
+type ruleOptions struct {
+	checkConditionalExpressions bool
+}
+
+func parseOptions(options []any) ruleOptions {
+	if len(options) == 0 {
+		return ruleOptions{}
+	}
+	value, _ := options[0].(map[string]any)
+	check, _ := value["checkConditionalExpressions"].(bool)
+	return ruleOptions{checkConditionalExpressions: check}
+}
+
 func buildLoopConditionNotModifiedMessage(name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "loopConditionNotModified",
-		Description: fmt.Sprintf("'%s' is not modified in this loop.", name),
+		Description: "'" + name + "' is not modified in this loop.",
 	}
 }
 
@@ -22,21 +38,23 @@ func hasDynamicExpression(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
+	if ast.IsFunctionLike(node) || node.Kind == ast.KindClassExpression {
+		return false
+	}
 
 	switch node.Kind {
-	case ast.KindCallExpression,
-		ast.KindPropertyAccessExpression,
+	case ast.KindCallExpression:
+		// ESTree represents import() as ImportExpression, which is not one of
+		// upstream's dynamic sentinels. tsgo represents it as CallExpression.
+		if !ast.IsImportCall(node) {
+			return true
+		}
+	case ast.KindPropertyAccessExpression,
 		ast.KindElementAccessExpression,
 		ast.KindNewExpression,
 		ast.KindTaggedTemplateExpression,
 		ast.KindYieldExpression:
 		return true
-	// Skip function/class expressions — side effects inside them
-	// don't execute during condition evaluation.
-	case ast.KindArrowFunction,
-		ast.KindFunctionExpression,
-		ast.KindClassExpression:
-		return false
 	}
 
 	found := false
@@ -50,192 +68,257 @@ func hasDynamicExpression(node *ast.Node) bool {
 	return found
 }
 
-// identifierRef holds an identifier's symbol and AST node for reporting.
+// identifierRef holds an identifier's symbol, AST node, and the binary or
+// conditional expression group it belongs to. A nil group means ESLint checks
+// this reference independently.
 type identifierRef struct {
 	symbol *ast.Symbol
 	node   *ast.Node
+	group  *ast.Node
 }
 
-// extractGroups walks a condition expression and returns groups of sub-expressions.
-// Logical operators (||, &&, ??) split operands into independent groups.
-// Comparison/arithmetic BinaryExpressions and ConditionalExpressions form a single group.
-func extractGroups(node *ast.Node) []*ast.Node {
+// isConditionGroup reports whether node corresponds to one of the ESTree node
+// kinds grouped by ESLint: BinaryExpression, plus ConditionalExpression unless
+// checkConditionalExpressions is enabled. tsgo also represents logical,
+// assignment, and sequence expressions as BinaryExpression, so those operator
+// families must be excluded here.
+func isConditionGroup(node *ast.Node, checkConditionalExpressions bool) bool {
 	if node == nil {
-		return nil
+		return false
 	}
-	node = ast.SkipParentheses(node)
-	if node.Kind == ast.KindBinaryExpression {
-		bin := node.AsBinaryExpression()
-		if bin != nil && bin.OperatorToken != nil && ast.IsLogicalOrCoalescingBinaryOperator(bin.OperatorToken.Kind) {
-			// Logical operators split into independent groups
-			left := extractGroups(bin.Left)
-			right := extractGroups(bin.Right)
-			return append(left, right...)
-		}
+	if node.Kind == ast.KindConditionalExpression {
+		return !checkConditionalExpressions
 	}
-	// Everything else (comparison binary, conditional, single identifier, etc.)
-	// is a single group.
-	return []*ast.Node{node}
+	if node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	bin := node.AsBinaryExpression()
+	if bin == nil || bin.OperatorToken == nil {
+		return false
+	}
+	operator := bin.OperatorToken.Kind
+	return operator != ast.KindCommaToken &&
+		!ast.IsLogicalOrCoalescingBinaryOperator(operator) &&
+		!ast.IsAssignmentOperator(operator)
 }
 
-// collectIdentifierSymbols collects unique identifier references (by symbol) from a node.
-// Returns nil if any dynamic expression is found.
-//
+// isConditionBoundary matches the expression/statement/declaration sentinels
+// that stop ESLint's ancestor walk. Tagged templates are intentionally not a
+// boundary: upstream only treats them as dynamic when they occur inside a
+// binary or conditional group.
+func isConditionBoundary(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if ast.IsFunctionLike(node) || node.Kind == ast.KindClassExpression ||
+		node.Kind == ast.KindClassDeclaration || ast.IsStatement(node) {
+		return true
+	}
+	switch node.Kind {
+	case ast.KindCallExpression:
+		return !ast.IsImportCall(node)
+	case ast.KindPropertyAccessExpression,
+		ast.KindElementAccessExpression,
+		ast.KindNewExpression,
+		ast.KindYieldExpression:
+		return true
+	default:
+		return false
+	}
+}
+
+// collectIdentifierSymbols mirrors ESLint's per-reference ancestor walk.
 // Symbols are resolved via RefStore.Resolve, which falls back to the
-// TypeChecker internally for identifiers its per-file binder walk can't place
-// (cross-file, .d.ts, and standard-library globals). RefStore.References
-// indexes identifiers for those fallback symbols the same way, so the later
-// modification checks work for them unchanged.
-func collectIdentifierSymbols(node *ast.Node, refs *rule.RefStore) []identifierRef {
-	if node == nil {
+// TypeChecker internally for identifiers its per-file binder walk can't place.
+func collectIdentifierSymbols(condition *ast.Node, refs *rule.RefStore, checkConditionalExpressions bool) []identifierRef {
+	if condition == nil {
 		return nil
 	}
-	if hasDynamicExpression(node) {
-		return nil
-	}
+
 	var result []identifierRef
-	var walk func(n *ast.Node)
-	walk = func(n *ast.Node) {
+	var walk func(n *ast.Node, group *ast.Node)
+	walk = func(n *ast.Node, group *ast.Node) {
 		if n == nil {
 			return
 		}
-		if n.Kind == ast.KindIdentifier {
-			if sym := refs.Resolve(n); sym != nil {
-				// Deduplicate by symbol
-				dup := false
-				for _, r := range result {
-					if r.symbol == sym {
-						dup = true
-						break
-					}
-				}
-				if !dup {
-					result = append(result, identifierRef{symbol: sym, node: n})
-				}
+		if isConditionBoundary(n) {
+			return
+		}
+		// Walking from the condition root means the first eligible ancestor is
+		// the outermost group that findConditionGroup used to discover by
+		// walking back up from every identifier. Outermost groups have disjoint
+		// subtrees, so their dynamic status can be checked once at entry without
+		// per-loop maps.
+		if group == nil && isConditionGroup(n, checkConditionalExpressions) {
+			group = n
+			if hasDynamicExpression(group) {
+				return
 			}
+		}
+		if n.Kind == ast.KindIdentifier {
+			sym := refs.Resolve(n)
+			if sym == nil {
+				return
+			}
+			result = append(result, identifierRef{symbol: sym, node: n, group: group})
 			return
 		}
 		n.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
+			walk(child, group)
 			return false
 		})
 	}
-	walk(node)
+	walk(condition, nil)
 	return result
 }
 
-// isWrittenInRange reports whether sym has a write reference positioned inside
-// rangeNode. It scans sym's whole-file reference list (built once per symbol
-// and shared across every loop/group that queries it) rather than re-walking
-// rangeNode's subtree per query — the old TypeChecker-based implementation
-// walked the (potentially large) loop body/incrementor once per condition
-// identifier, which dominates cost when loops are large or numerous.
-func isWrittenInRange(refs *rule.RefStore, sym *ast.Symbol, rangeNode *ast.Node) bool {
-	if rangeNode == nil {
+func nodeIsInRange(node *ast.Node, rangeNode *ast.Node) bool {
+	if node == nil || rangeNode == nil {
 		return false
 	}
-	lo, hi := rangeNode.Pos(), rangeNode.End()
-	for _, ref := range refs.References(sym) {
-		if ref.Pos() >= lo && ref.End() <= hi && utils.IsWriteReference(ref) {
+	return node.Pos() >= rangeNode.Pos() && node.End() <= rangeNode.End()
+}
+
+func nodeIsInLoopRange(node *ast.Node, condition *ast.Node, body *ast.Node, incrementor *ast.Node) bool {
+	return nodeIsInRange(node, condition) ||
+		nodeIsInRange(node, body) ||
+		nodeIsInRange(node, incrementor)
+}
+
+// isVarDeclarationWrittenInLoop covers initialization writes that RefStore
+// intentionally omits because declaration names are not references. ESLint
+// counts these only for variables whose first definition is a var declaration.
+func isVarDeclarationWrittenInLoop(sym *ast.Symbol, condition *ast.Node, body *ast.Node, incrementor *ast.Node) bool {
+	if sym == nil || len(sym.Declarations) == 0 {
+		return false
+	}
+
+	first := ast.GetRootDeclaration(sym.Declarations[0])
+	if first == nil || first.Kind != ast.KindVariableDeclaration || first.Parent == nil ||
+		!utils.IsVarKeyword(first.Parent) {
+		return false
+	}
+
+	for _, declaration := range sym.Declarations {
+		root := ast.GetRootDeclaration(declaration)
+		if root == nil || root.Kind != ast.KindVariableDeclaration || root.Parent == nil ||
+			!utils.IsVarKeyword(root.Parent) ||
+			!nodeIsInLoopRange(root, condition, body, incrementor) {
+			continue
+		}
+		if utils.VariableDeclarationIntroducesWrite(root) {
 			return true
 		}
 	}
 	return false
 }
 
-// isReferencedInRange reports whether any symbol in funcSymbols has a
-// reference positioned inside rangeNode, using the same whole-file reference
-// lists as isWrittenInRange instead of walking rangeNode per query.
-func isReferencedInRange(refs *rule.RefStore, funcSymbols []*ast.Symbol, rangeNode *ast.Node) bool {
-	if rangeNode == nil {
-		return false
-	}
-	lo, hi := rangeNode.Pos(), rangeNode.End()
-	for _, funcSym := range funcSymbols {
-		for _, ref := range refs.References(funcSym) {
-			if ref.Pos() >= lo && ref.End() <= hi {
-				return true
-			}
+// isReferencedInLoop reports whether sym has a reference in any part of the
+// loop. The caller always has exactly one function symbol, so accepting it
+// directly avoids constructing a single-element slice for every candidate
+// modifier.
+func isReferencedInLoop(refs *rule.RefStore, sym *ast.Symbol, condition *ast.Node, body *ast.Node, incrementor *ast.Node) bool {
+	for _, ref := range refs.References(sym) {
+		if nodeIsInLoopRange(ref, condition, body, incrementor) {
+			return true
 		}
 	}
 	return false
 }
 
-// isModifiedByCalledFunction checks if the symbol is modified inside a
-// FunctionDeclaration that is called within the loop (body or incrementor).
-// This matches ESLint's secondary check: if a write reference to the variable
-// is inside a FunctionDeclaration, and that function's name is referenced
-// within the loop, the variable counts as modified.
-func isModifiedByCalledFunction(refs *rule.RefStore, loopBody *ast.Node, incrementor *ast.Node, sym *ast.Symbol) bool {
-	scope := utils.FindEnclosingScope(loopBody)
-	if scope == nil {
-		return false
-	}
-
-	// Step 1: find (top-level, non-nested) FunctionDeclarations in scope that
-	// write to sym anywhere in their body.
-	var modifyingFuncSymbols []*ast.Symbol
-	var findFuncs func(n *ast.Node)
-	findFuncs = func(n *ast.Node) {
-		if n == nil {
-			return
-		}
-		if ast.IsFunctionDeclaration(n) && n.Name() != nil {
-			// Only the body executes when the function is called; a write inside
-			// a parameter's default-value initializer only runs when that
-			// argument is omitted, so it must not count as "written" here.
-			if isWrittenInRange(refs, sym, n.Body()) {
-				if funcSym := n.Symbol(); funcSym != nil {
-					modifyingFuncSymbols = append(modifyingFuncSymbols, funcSym)
-				}
+// enclosingFunctionDeclaration returns the nearest FunctionDeclaration that
+// contains a write reference. Function expressions do not stop the walk,
+// matching ESLint's getEncloseFunctionDeclaration helper.
+func enclosingFunctionDeclaration(ref *ast.Node) *ast.Node {
+	for node := ref; node != nil; node = node.Parent {
+		if ast.IsFunctionDeclaration(node) {
+			if node.Name() == nil {
+				return nil
 			}
-			return
+			return node
 		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			findFuncs(child)
-			return false
-		})
 	}
-	findFuncs(scope)
+	return nil
+}
 
-	if len(modifyingFuncSymbols) == 0 {
-		return false
+// isModifiedInLoop scans the symbol's shared whole-file reference list once
+// for direct writes before applying ESLint's secondary called-function check.
+// The previous implementation scanned the same list independently for the
+// condition, body, incrementor, and called-function path.
+func isModifiedInLoop(refs *rule.RefStore, sym *ast.Symbol, condition *ast.Node, body *ast.Node, incrementor *ast.Node) bool {
+	symbolRefs := refs.References(sym)
+	for _, ref := range symbolRefs {
+		if utils.IsWriteReference(ref) && nodeIsInLoopRange(ref, condition, body, incrementor) {
+			return true
+		}
 	}
-
-	// Step 2: check if any of those functions are referenced in the loop
-	// (body or incrementor). ESLint uses range-based checking — any reference
-	// (not just calls) to the function within the loop counts.
-	if isReferencedInRange(refs, modifyingFuncSymbols, loopBody) {
+	if isVarDeclarationWrittenInLoop(sym, condition, body, incrementor) {
 		return true
 	}
-	if incrementor != nil && isReferencedInRange(refs, modifyingFuncSymbols, incrementor) {
-		return true
+
+	// A write outside the loop still counts when it belongs to a named
+	// FunctionDeclaration whose binding is referenced inside the loop.
+	for _, modifier := range symbolRefs {
+		if !utils.IsWriteReference(modifier) {
+			continue
+		}
+		funcNode := enclosingFunctionDeclaration(modifier)
+		if funcNode == nil {
+			continue
+		}
+		funcSym := funcNode.Symbol()
+		if funcSym == nil {
+			continue
+		}
+		if isReferencedInLoop(refs, funcSym, condition, body, incrementor) {
+			return true
+		}
 	}
 	return false
 }
 
 // checkLoopCondition checks identifiers in a loop condition and reports those
-// that are not modified in the loop body (or incrementor for for-statements).
-func checkLoopCondition(ctx rule.RuleContext, condition *ast.Node, body *ast.Node, incrementor *ast.Node) {
+// that are not modified in the condition, body, or incrementor.
+func checkLoopCondition(ctx rule.RuleContext, condition *ast.Node, body *ast.Node, incrementor *ast.Node, options ruleOptions) {
 	if condition == nil || body == nil {
 		return
 	}
 
 	refs := ctx.Refs
-	groups := extractGroups(condition)
-
-	for _, group := range groups {
-		idRefs := collectIdentifierSymbols(group, refs)
-		if idRefs == nil {
-			continue // dynamic expression found, skip this group
+	idRefs := collectIdentifierSymbols(condition, refs, options.checkConditionalExpressions)
+	if len(idRefs) == 0 {
+		return
+	}
+	if len(idRefs) == 1 {
+		ref := idRefs[0]
+		if !isModifiedInLoop(refs, ref.symbol, condition, body, incrementor) {
+			ctx.ReportNode(ref.node, buildLoopConditionNotModifiedMessage(ref.node.Text()))
 		}
+		return
+	}
+
+	modifiedBySymbol := map[*ast.Symbol]bool{}
+
+	for groupStart := 0; groupStart < len(idRefs); {
+		groupEnd := groupStart + 1
+		groupNode := idRefs[groupStart].group
+		if groupNode != nil {
+			// References assigned to an outermost group form one contiguous DFS
+			// run. Nil-group references remain intentionally independent.
+			for groupEnd < len(idRefs) && idRefs[groupEnd].group == groupNode {
+				groupEnd++
+			}
+		}
+		group := idRefs[groupStart:groupEnd]
 
 		// Check if any identifier in this group is modified
 		anyModified := false
-		for _, ref := range idRefs {
-			modified := isWrittenInRange(refs, ref.symbol, body) ||
-				(incrementor != nil && isWrittenInRange(refs, ref.symbol, incrementor)) ||
-				isModifiedByCalledFunction(refs, body, incrementor, ref.symbol)
+		for _, ref := range group {
+			modified, checked := modifiedBySymbol[ref.symbol]
+			if !checked {
+				modified = isModifiedInLoop(refs, ref.symbol, condition, body, incrementor)
+				modifiedBySymbol[ref.symbol] = modified
+			}
 			if modified {
 				anyModified = true
 				break
@@ -243,39 +326,41 @@ func checkLoopCondition(ctx rule.RuleContext, condition *ast.Node, body *ast.Nod
 		}
 
 		if !anyModified {
-			for _, ref := range idRefs {
+			for _, ref := range group {
 				ctx.ReportNode(ref.node, buildLoopConditionNotModifiedMessage(ref.node.Text()))
 			}
 		}
+		groupStart = groupEnd
 	}
 }
 
 // NoUnmodifiedLoopConditionRule disallows variables in loop conditions that are not modified in the loop
 var NoUnmodifiedLoopConditionRule = rule.Rule{
 	Name:   "no-unmodified-loop-condition",
-	Schema: rule.EmptyArraySchema,
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindWhileStatement: func(node *ast.Node) {
 				whileStmt := node.AsWhileStatement()
 				if whileStmt == nil {
 					return
 				}
-				checkLoopCondition(ctx, whileStmt.Expression, whileStmt.Statement, nil)
+				checkLoopCondition(ctx, whileStmt.Expression, whileStmt.Statement, nil, opts)
 			},
 			ast.KindDoStatement: func(node *ast.Node) {
 				doStmt := node.AsDoStatement()
 				if doStmt == nil {
 					return
 				}
-				checkLoopCondition(ctx, doStmt.Expression, doStmt.Statement, nil)
+				checkLoopCondition(ctx, doStmt.Expression, doStmt.Statement, nil, opts)
 			},
 			ast.KindForStatement: func(node *ast.Node) {
 				forStmt := node.AsForStatement()
 				if forStmt == nil {
 					return
 				}
-				checkLoopCondition(ctx, forStmt.Condition, forStmt.Statement, forStmt.Incrementor)
+				checkLoopCondition(ctx, forStmt.Condition, forStmt.Statement, forStmt.Incrementor, opts)
 			},
 		}
 	},

@@ -52,7 +52,7 @@ func isWhitespace(str string) bool {
 	// `;
 
 	for _, r := range str {
-		if !ecmascript.IsWhiteSpace(r) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			return false
 		}
 	}

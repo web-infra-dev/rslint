@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -171,11 +172,11 @@ const DefaultJestVersion = "29.0.0"
 // It returns 29 when the version cannot be parsed, matching the historical default of Jest 29.
 func JestVersionMajor(v string) int {
 	const fallback = 29
-	s := strings.TrimSpace(v)
+	s := ecmascript.StringTrim(v)
 	if s == "" {
 		return fallback
 	}
-	low := strings.ToLower(s)
+	low := ecmascript.StringToLowerCase(s)
 	if strings.HasPrefix(low, "workspace:") || strings.HasPrefix(low, "file:") || strings.HasPrefix(low, "link:") {
 		return fallback
 	}
@@ -184,7 +185,7 @@ func JestVersionMajor(v string) int {
 	}
 	if strings.HasPrefix(low, "npm:") {
 		if at := strings.LastIndexByte(s, '@'); at >= 0 && at+1 < len(s) {
-			s = strings.TrimSpace(s[at+1:])
+			s = ecmascript.StringTrim(s[at+1:])
 		} else {
 			return fallback
 		}
@@ -193,16 +194,16 @@ func JestVersionMajor(v string) int {
 	for {
 		changed := false
 		if strings.HasPrefix(s, ">=") {
-			s = strings.TrimSpace(s[2:])
+			s = ecmascript.StringTrim(s[2:])
 			changed = true
 		} else if strings.HasPrefix(s, "<=") {
-			s = strings.TrimSpace(s[2:])
+			s = ecmascript.StringTrim(s[2:])
 			changed = true
 		} else if strings.HasPrefix(s, ">") || strings.HasPrefix(s, "<") {
-			s = strings.TrimSpace(s[1:])
+			s = ecmascript.StringTrim(s[1:])
 			changed = true
 		} else if strings.HasPrefix(s, "^") || strings.HasPrefix(s, "~") {
-			s = strings.TrimSpace(s[1:])
+			s = ecmascript.StringTrim(s[1:])
 			changed = true
 		}
 		if !changed {
@@ -294,7 +295,7 @@ func jestVersionFromSettings(settings map[string]interface{}) (string, bool) {
 	default:
 		return "", false
 	}
-	ver = strings.TrimSpace(ver)
+	ver = ecmascript.StringTrim(ver)
 	if ver == "" {
 		return "", false
 	}

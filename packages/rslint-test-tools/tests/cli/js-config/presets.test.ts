@@ -8,6 +8,7 @@ import {
   reactPlugin,
   importPlugin,
   rstestPlugin,
+  unicornPlugin,
 } from '@rslint/core';
 
 describe('defineConfig and config presets', () => {
@@ -36,10 +37,19 @@ describe('defineConfig and config presets', () => {
     expect(importPlugin.configs.recommended).toBeDefined();
     expect(rstestPlugin).toBeDefined();
     expect(rstestPlugin.configs.recommended).toBeDefined();
+    expect(unicornPlugin).toBeDefined();
+    expect(unicornPlugin.configs.recommended).toBeDefined();
   });
 
   test('config presets should be valid config entries', () => {
-    for (const plugin of [ts, js, reactPlugin, importPlugin, rstestPlugin]) {
+    for (const plugin of [
+      ts,
+      js,
+      reactPlugin,
+      importPlugin,
+      rstestPlugin,
+      unicornPlugin,
+    ]) {
       const rec = plugin.configs.recommended;
       expect(typeof rec).toBe('object');
       expect(rec).not.toBeNull();
@@ -153,9 +163,20 @@ describe('defineConfig and config presets', () => {
       'rstest/no-interpolation-in-snapshots': 'error',
       'rstest/no-mocks-import': 'error',
       'rstest/no-standalone-expect': 'error',
+      'rstest/prefer-called-exactly-once-with': 'error',
+      'rstest/require-local-test-context-for-concurrent-snapshots': 'error',
       'rstest/valid-expect': 'error',
       'rstest/valid-expect-in-promise': 'error',
       'rstest/valid-title': 'error',
     });
+  });
+
+  test('unicornPlugin.configs.recommended should declare unicorn plugin and the ported rule', () => {
+    const rec = unicornPlugin.configs.recommended;
+    expect(rec.plugins).toBeDefined();
+    expect(rec.plugins).toContain('unicorn');
+    expect(rec.rules?.['unicorn/no-array-fill-with-reference-type']).toBe(
+      'error',
+    );
   });
 });

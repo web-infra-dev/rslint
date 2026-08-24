@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_unknown_property.schema.json
@@ -360,7 +361,7 @@ func buildDOMPropertyLookup(settings map[string]interface{}) map[string]string {
 	// Upper bound: two full lists + optional extras.
 	m := make(map[string]string, len(domPropertyNamesTwoWords)+len(domPropertyNamesOneWord)+len(reactOnProps)+2)
 	add := func(name string) {
-		key := strings.ToLower(name)
+		key := ecmascript.StringToLowerCase(name)
 		if _, ok := m[key]; !ok {
 			m[key] = name
 		}
@@ -393,9 +394,9 @@ func buildDOMPropertyLookup(settings map[string]interface{}) map[string]string {
 // lowercased form matches a known case-insensitive entry, otherwise returns
 // `name` unchanged. This lets `charset` / `charSet` / `CHARSET` compare equal.
 func normalizeAttributeCase(name string) string {
-	lower := strings.ToLower(name)
+	lower := ecmascript.StringToLowerCase(name)
 	for _, canonical := range domPropertiesIgnoreCase {
-		if strings.ToLower(canonical) == lower {
+		if ecmascript.StringToLowerCase(canonical) == lower {
 			return canonical
 		}
 	}
@@ -406,11 +407,12 @@ func normalizeAttributeCase(name string) string {
 // React will accept: starts with `data-`, does not start with `data-xml`
 // (case-insensitive), and does not contain a colon.
 func isValidDataAttribute(name string) bool {
-	if !strings.HasPrefix(strings.ToLower(name), "data-") {
+	lower := ecmascript.StringToLowerCase(name)
+	if !strings.HasPrefix(lower, "data-") {
 		return false
 	}
 	// `data-xml*` is reserved and rejected by React.
-	if len(name) >= 8 && strings.EqualFold(name[:8], "data-xml") {
+	if strings.HasPrefix(lower, "data-xml") {
 		return false
 	}
 	// Colons split the attribute into a namespace; `data-*` must not contain
@@ -421,7 +423,7 @@ func isValidDataAttribute(name string) bool {
 // hasUpperCaseCharacter reports whether `name` contains any letter that
 // differs from its lowercased form.
 func hasUpperCaseCharacter(name string) bool {
-	return strings.ToLower(name) != name
+	return ecmascript.StringToLowerCase(name) != name
 }
 
 // getStandardName looks up `name` (case-insensitively, after the
@@ -435,7 +437,7 @@ func getStandardName(name string, domPropertyLookup map[string]string) string {
 	if v, ok := svgDomAttributeNames[name]; ok {
 		return v
 	}
-	if v, ok := domPropertyLookup[strings.ToLower(name)]; ok {
+	if v, ok := domPropertyLookup[ecmascript.StringToLowerCase(name)]; ok {
 		return v
 	}
 	return ""
@@ -595,7 +597,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id: "dataLowercaseRequired",
 						Description: "React does not recognize data-* props with uppercase characters on a DOM element. Found '" +
-							actualName + "', use '" + strings.ToLower(actualName) + "' instead",
+							actualName + "', use '" + ecmascript.StringToLowerCase(actualName) + "' instead",
 					})
 				}
 				return

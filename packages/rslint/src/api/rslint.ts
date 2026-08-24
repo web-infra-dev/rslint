@@ -44,12 +44,19 @@ import type {
 } from '../types.js';
 
 export interface RslintOptions {
-  /** Base directory for config discovery and relative path resolution. */
+  /**
+   * Working directory for targets and discovery; also the base of inline
+   * `overrideConfig` paths.
+   */
   cwd?: string;
-  /** Extra config appended after the resolved/discovered config (ESLint's overrideConfig). */
+  /**
+   * Extra config appended after the resolved/discovered config. Relative
+   * `files`, `ignores`, and `parserOptions.project` paths resolve from `cwd`.
+   */
   overrideConfig?: RslintConfigEntry | RslintConfig | null;
   /**
-   * `string` — use this JS/TS config module (no discovery).
+   * `string` — use this JS/TS config module (no discovery); its relative
+   *            config paths resolve from the module's directory.
    * `true`   — use only `overrideConfig` (no file, no discovery).
    * `null`/absent — auto-discover the nearest config (ESLint v10 semantics; no `false`).
    */

@@ -4,11 +4,11 @@ import (
 	_ "embed"
 	"regexp"
 	"strings"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_pascal_case.schema.json
@@ -64,19 +64,37 @@ func testDigit(r rune) bool {
 // True iff the rune is a cased letter in its upper form — excludes digits
 // and non-letter symbols (where upper == lower).
 func testUpperCase(r rune) bool {
-	return unicode.ToUpper(r) == r && unicode.ToLower(r) != r
+	// Upstream reads one UTF-16 code unit, and a lone surrogate has no case,
+	// so a character outside the BMP counts as neither upper nor lower case.
+	if r > 0xFFFF {
+		return false
+	}
+	c := string(r)
+	return ecmascript.StringToUpperCase(c) == c && ecmascript.StringToLowerCase(c) != c
 }
 
 // testLowerCase mirrors upstream `char === char.toLowerCase() && lowerCase !== char.toUpperCase()`.
 func testLowerCase(r rune) bool {
-	return unicode.ToLower(r) == r && unicode.ToUpper(r) != r
+	// Upstream reads one UTF-16 code unit, and a lone surrogate has no case,
+	// so a character outside the BMP counts as neither upper nor lower case.
+	if r > 0xFFFF {
+		return false
+	}
+	c := string(r)
+	return ecmascript.StringToLowerCase(c) == c && ecmascript.StringToUpperCase(c) != c
 }
 
 // isNonAlphaNumeric mirrors upstream
 // `char.toLowerCase() === char.toUpperCase() && !testDigit(char)` — true for
 // symbols like `_`, `-`, `$`, where upper and lower coincide, excluding digits.
 func isNonAlphaNumeric(r rune) bool {
-	return unicode.ToLower(r) == unicode.ToUpper(r) && !testDigit(r)
+	// Upstream reads one UTF-16 code unit, and a lone surrogate has no case,
+	// so a character outside the BMP counts as caseless, and no digit is one.
+	if r > 0xFFFF {
+		return true
+	}
+	c := string(r)
+	return ecmascript.StringToLowerCase(c) == ecmascript.StringToUpperCase(c) && !testDigit(r)
 }
 
 // testPascalCase returns true when `name` begins with an upper-case letter,

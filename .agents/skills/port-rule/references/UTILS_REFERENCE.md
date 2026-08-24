@@ -19,12 +19,13 @@ This document provides a comprehensive reference for utility functions available
 
 Values a rule is handed were written for JavaScript, and Go's standard library answers a nearby but different question about each of them. These packages hold the readings that match — see [JavaScript Semantics](#javascript-semantics-ecmascript-minimatch3-isglob).
 
-| Package                   | Description                                                |
-| ------------------------- | ---------------------------------------------------------- |
-| `utils/ecmascript`        | Trim, blank, whitespace, case comparison, number-to-string |
-| `utils/ecmascript/regexp` | Compiles and matches a JavaScript RegExp                   |
-| `utils/minimatch3`        | Glob matching the way minimatch 3 does — what plugins pin  |
-| `utils/isglob`            | "Was this written as a glob, or is it a plain path?"       |
+| Package                   | Description                                                      |
+| ------------------------- | ---------------------------------------------------------------- |
+| `utils/ecmascript`        | Trim, blank, whitespace, upper/lower case, number-to-string      |
+| `utils/ecmascript/regexp` | Compiles and matches a JavaScript RegExp, and `/i` comparison    |
+| `utils/unicode17`         | A general category — `\p{Lu}`, `\p{L}`, `\p{M}` — as Node has it |
+| `utils/minimatch3`        | Glob matching the way minimatch 3 does — what plugins pin        |
+| `utils/isglob`            | "Was this written as a glob, or is it a plain path?"             |
 
 ---
 
@@ -132,7 +133,7 @@ result := utils.NaturalCompare("item2", "item10") // -1
 ```go
 // Whitespace, trimming, and every other question ECMAScript specifies live in
 // utils/ecmascript — see the JavaScript Semantics section below.
-isWhite := ecmascript.IsWhiteSpace(r)
+isWhite := ecmascript.IsWhiteSpaceOrLineTerminator(r)
 ```
 
 ---
@@ -689,7 +690,7 @@ A ported rule is handed values that were written for JavaScript: a string to tri
 import "github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 ```
 
-A helper standing in for something JavaScript exposes carries that name with its receiver in front (`StringTrim`, `NumberToString`). Everything else is named the way ECMAScript names it — a grammar production (`IsWhiteSpace`), an abstract operation (`Canonicalize`), or the question being asked (`IsBlank`).
+A helper standing in for something JavaScript exposes carries that name with its receiver in front (`StringTrim` for `String.prototype.trim`, `StringToUpperCase` for `String.prototype.toUpperCase`, `NumberToString` for `Number::toString`). Everything else is named the way ECMAScript names it — a grammar production (`IsWhiteSpace`, `IsLineTerminator`), the two of them together (`IsWhiteSpaceOrLineTerminator`) — or, where the language spells out no name, the question being asked (`IsBlank`).
 
 ```go
 // String.prototype.trim(). NOT strings.TrimSpace, which disagrees in BOTH
@@ -700,23 +701,33 @@ trimmed := ecmascript.StringTrim(title)
 // `s.trim() === ""`
 blank := ecmascript.IsBlank(line)
 
-// ECMAScript WhiteSpace + LineTerminator. NOT unicode.IsSpace.
-white := ecmascript.IsWhiteSpace(r)
+// Everything `\s` matches and `trim()` strips: ECMAScript WhiteSpace plus
+// LineTerminator. NOT unicode.IsSpace.
+white := ecmascript.IsWhiteSpaceOrLineTerminator(r)
 
-// LineTerminator: \n \r U+2028 U+2029. Go has no notion of the last two.
-ecmascript.IsLineTerminator(r)
-ecmascript.LineTerminators // the four, as a string
+// The two productions on their own, for a rule that reads them apart — JSX
+// text, say, where a line break and a space are not the same thing.
+ecmascript.IsWhiteSpace(r)     // tab, vertical tab, form feed, U+FEFF, Zs
+ecmascript.IsLineTerminator(r) // \n \r U+2028 U+2029; Go knows only the first two
+ecmascript.LineTerminators     // the four, as a string
+
+// String.prototype.toUpperCase / toLowerCase. NOT strings.ToUpper or
+// unicode.ToUpper, which map one character to one character on Go's edition of
+// Unicode: `ß` uppercases to `SS` here as it does in JavaScript, `ﬁ` to `FI`,
+// and a capital sigma lowercases to a final sigma when it ends a word. An
+// all-ASCII string never leaves the ASCII path, so this is the default even
+// for a tag name or an option.
+upper := ecmascript.StringToUpperCase(name)
+lower := ecmascript.StringToLowerCase(name)
+
+// The locale-sensitive pair, which answers the same way: a linter must draw
+// the same diagnostics on a Turkish machine as anywhere else.
+ecmascript.StringToLocaleUpperCase(s)
+ecmascript.StringToLocaleLowerCase(s)
 
 // String(n) / string concatenation. strconv picks the same digits but leaves
 // fixed notation at a different point and spells the infinities differently.
 text := ecmascript.NumberToString(42) // "42", not "4.2e+01"
-
-// The Canonicalize abstract operation — how `/x/i` compares two characters.
-// Neither Go's case folding nor Unicode simple folding: Σ ς σ are one
-// character to it, while U+212A KELVIN SIGN and `k` are two.
-ecmascript.Canonicalize(r)
-ecmascript.CaseEquivalents(r)      // everything `/i` accepts for r, or nil
-ecmascript.CaseEquivalenceGroups() // for widening a whole range
 
 // Is this string a complete, valid regexp literal (slashes and flags included)?
 // Call it before offering a fix that emits `/.../`.
@@ -730,6 +741,8 @@ ecmascript.ContainsLineTerminator(text, low, high)
 ecmascript.IsTriviaWhitespaceByte(b) // ASCII fast path
 ecmascript.IsTriviaWhitespaceRune(r) // call only for r >= U+0080
 ```
+
+> `forbidigo` denies `strings.ToLower`, `strings.ToUpper` and `strings.TrimSpace` under `internal/rules/**` and `internal/plugins/**`. There is no exception to argue about: for a string that holds nothing but ASCII the port returns the same answer, and past ASCII it returns the one JavaScript returns.
 
 ### `internal/utils/ecmascript/regexp` — a JavaScript RegExp
 
@@ -751,11 +764,45 @@ re.Source() // "^\\d+$"
 re.Flags()  // "iu"
 ```
 
+A `/i` comparison is its own reading, and the pattern widening in this package is built on it:
+
+```go
+// The Canonicalize abstract operation — how `/x/i` compares two characters.
+// The second argument says whether the pattern carries `u` or `v`, because the
+// two readings disagree: without one, an uppercase mapping that never crosses
+// into ASCII, so `k` and U+212A KELVIN SIGN are two characters; with one,
+// simple case folding, so they are one. Σ ς σ are one character either way.
+esregexp.Canonicalize(r, unicodeMode)
+esregexp.CaseEquivalents(r, unicodeMode)      // everything `/i` accepts for r, or nil
+esregexp.CaseEquivalenceGroups(unicodeMode)   // for widening a whole range
+```
+
 `Test` bounds how long one match may run (`esregexp.MatchTimeout`, 1s) and answers `false` on overrun — a backtracking engine on a user-written pattern is a way to hang the linter. Use `TestOrError` when a rule needs to distinguish "no match" from "gave up".
 
 Not covered: the `v` flag's set syntax (`Compile` refuses it), and case-insensitive backreference comparison.
 
 > `depguard` denies `github.com/dlclark/regexp2` under `internal/rules/**` and `internal/plugins/**`. Go through this package.
+
+### `internal/utils/unicode17` — the edition of Unicode Node reads
+
+```go
+import "github.com/web-infra-dev/rslint/internal/utils/unicode17"
+```
+
+Go 1.26's `unicode` tables are Unicode 15.0; Node 26 carries ICU 78, which is Unicode 17.0. Two bicameral scripts, eight new case mappings, nine and a half thousand letters and ninety-three combining marks arrived in between, and a rule that asks Go about them gets an answer ESLint would not give. This package holds that difference, and answers the category questions outright:
+
+```go
+unicode17.IsUpper(r)  // \p{Lu}, as unicode.IsUpper would if it were on 17.0
+unicode17.IsLower(r)  // \p{Ll}
+unicode17.IsLetter(r) // \p{L}
+unicode17.IsMark(r)   // \p{M} — the combining marks
+```
+
+Reach for it when the upstream rule reads a **character class**: change-case's `\p{Ll}` behind `unicorn/filename-case`, `\p{Uppercase_Letter}` behind `unicorn/prefer-array-flat`, `\p{M}` behind `no-misleading-character-class`. When upstream instead writes `c === c.toUpperCase()`, that is a case mapping and belongs to `ecmascript`, which reads this package on its own.
+
+The package deletes itself: `TestDeltaStillNeeded` fails the moment the toolchain stops being Unicode 15.0, which on Go 1.27 is the signal to delete the package rather than maintain it.
+
+> `depguard` denies the standard library's `unicode` under `internal/rules/**` and `internal/plugins/**`. A case question goes to `ecmascript`, a category question here, and an identifier question — is this character allowed to start or continue an identifier? — to tsgo's `scanner.IsIdentifierStart` / `scanner.IsIdentifierPart`, which reads TypeScript's own tables so that a rule and the parser never disagree.
 
 ### `internal/utils/minimatch3` — globs the way a plugin reads them
 

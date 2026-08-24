@@ -44,6 +44,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed aria_role.schema.json
@@ -124,7 +125,7 @@ var AriaRoleRule = rule.Rule{
 				// Upstream uses a case-INSENSITIVE compare here even though
 				// JSX is case-sensitive at runtime — `<div ROLE="datepicker">`
 				// still triggers the rule.
-				if !strings.EqualFold(reactutil.GetJsxPropName(attr), "role") {
+				if !ecmascript.EqualsWhenUppercased(reactutil.GetJsxPropName(attr), "role") {
 					return
 				}
 

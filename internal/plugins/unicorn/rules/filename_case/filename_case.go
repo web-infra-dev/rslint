@@ -5,40 +5,37 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 //go:embed filename_case.schema.json
 var schemaJSON []byte
 
-// caseStyle is one of the four supported filename case styles.
+// caseStyle is one of the supported filename case styles.
 type caseStyle struct {
 	key  string
 	name string
 	fn   func(string) string
 }
 
-const caseStyleCount = 4
+const caseStyleCount = 5
 
-// allCases keeps a stable canonical iteration order for the `cases` option.
-//
-// NOTE: Unlike ESLint, where Object.keys() over `options.cases` preserves the
-// user's literal-property insertion order, we always use this canonical order
-// in the diagnostic message. The reason is that rslint receives options as a
-// `map[string]interface{}` after JSON parsing; Go map iteration is not
-// order-preserving, and the original key order is unrecoverable. Locking the
-// order here keeps message text deterministic.
+// allCases follows the upstream case registry order. Go maps do not preserve
+// the authored order of `cases`, so this order also keeps diagnostics and
+// suggestions deterministic when multiple cases are enabled.
 var allCases = [caseStyleCount]caseStyle{
 	{key: "camelCase", name: "camel case", fn: toCamelCase},
-	{key: "snakeCase", name: "snake case", fn: toSnakeCase},
+	{key: "camelCaseWithAcronyms", name: "camel case with acronyms", fn: toCamelCaseWithAcronyms},
 	{key: "kebabCase", name: "kebab case", fn: toKebabCase},
-	{key: "pascalCase", name: "pascal case", fn: toPascalCase},
+	{key: "snakeCase", name: "snake case", fn: toSnakeCase},
+	{key: "pascalCase", name: "pascal case", fn: toPascalCaseWithLeadingAcronym},
 }
 
 func caseForKey(key string) (caseStyle, bool) {
@@ -70,7 +67,7 @@ type invalidIgnore struct {
 }
 
 // options is the parsed shape of the user's rule configuration. Cases use a
-// fixed-size array because the schema permits exactly four known styles; this
+// fixed-size array because the schema permits exactly five known styles; this
 // keeps the option parsing done for every file allocation-free unless ignore
 // patterns are configured.
 type options struct {
@@ -79,10 +76,11 @@ type options struct {
 	ignores                []*esregexp.RegExp
 	invalidIgnores         []invalidIgnore
 	multipleFileExtensions bool
+	checkDirectories       bool
 }
 
 func parseOptions(rawOpts []any) options {
-	opts := options{caseCount: 1, multipleFileExtensions: true}
+	opts := options{caseCount: 1, multipleFileExtensions: true, checkDirectories: true}
 	opts.cases[0] = allCases[2] // kebabCase
 	if len(rawOpts) == 0 {
 		return opts
@@ -125,6 +123,9 @@ func parseOptions(rawOpts []any) options {
 
 	if v, ok := optsMap["multipleFileExtensions"].(bool); ok {
 		opts.multipleFileExtensions = v
+	}
+	if v, ok := optsMap["checkDirectories"].(bool); ok {
+		opts.checkDirectories = v
 	}
 
 	return opts
@@ -231,7 +232,7 @@ func splitWords(s string) []string {
 	wordStart := -1
 	var previous rune
 	for pos, current := range s {
-		if !unicode.IsLetter(current) && !isASCIIDigit(current) {
+		if !unicode17.IsLetter(current) && !isASCIIDigit(current) {
 			if wordStart >= 0 {
 				words = append(words, s[wordStart:pos])
 				wordStart = -1
@@ -242,11 +243,11 @@ func splitWords(s string) []string {
 		if wordStart < 0 {
 			wordStart = pos
 		} else {
-			boundary := (unicode.IsLower(previous) || isASCIIDigit(previous)) && unicode.IsUpper(current)
-			if !boundary && unicode.IsUpper(previous) && unicode.IsUpper(current) {
+			boundary := (unicode17.IsLower(previous) || isASCIIDigit(previous)) && unicode17.IsUpper(current)
+			if !boundary && unicode17.IsUpper(previous) && unicode17.IsUpper(current) {
 				_, size := utf8.DecodeRuneInString(s[pos:])
 				next, _ := utf8.DecodeRuneInString(s[pos+size:])
-				boundary = unicode.IsLower(next)
+				boundary = unicode17.IsLower(next)
 			}
 			if boundary {
 				words = append(words, s[wordStart:pos])
@@ -274,11 +275,11 @@ func pascalLikeTransform(word string, index int) string {
 	}
 	char0, size := utf8.DecodeRuneInString(word)
 	first := word[:size]
-	rest := strings.ToLower(word[size:])
+	rest := ecmascript.StringToLowerCase(word[size:])
 	if index > 0 && isASCIIDigit(char0) {
 		return "_" + first + rest
 	}
-	return strings.ToUpper(first) + rest
+	return ecmascript.StringToUpperCase(first) + rest
 }
 
 func toCamelCase(s string) string {
@@ -288,12 +289,60 @@ func toCamelCase(s string) string {
 	}
 	var sb strings.Builder
 	sb.Grow(len(s) + len(words))
-	sb.WriteString(strings.ToLower(words[0]))
+	sb.WriteString(ecmascript.StringToLowerCase(words[0]))
 	for i := 1; i < len(words); i++ {
 		sb.WriteString(pascalLikeTransform(words[i], i))
 	}
 	return sb.String()
 }
+
+func toCamelCaseWithAcronyms(s string) string {
+	if isCamelCaseWithAcronyms(s) {
+		return s
+	}
+	return toCamelCase(s)
+}
+
+func isCamelCaseWithAcronyms(s string) bool {
+	if len(s) == 0 || !isASCIILower(s[0]) {
+		return false
+	}
+	for index := 1; index < len(s); index++ {
+		char := s[index]
+		if isASCIILower(char) || isASCIIByteDigit(char) {
+			continue
+		}
+		if !isASCIIUpper(char) {
+			return false
+		}
+
+		uppercaseStart := index
+		for index+1 < len(s) && isASCIIUpper(s[index+1]) {
+			index++
+		}
+		if index == uppercaseStart {
+			continue
+		}
+		if index+1 < len(s) && isASCIILower(s[index+1]) {
+			index--
+			continue
+		}
+		for index+1 < len(s) && isASCIIByteDigit(s[index+1]) {
+			index++
+		}
+		if index == len(s)-1 {
+			return true
+		}
+		if !isASCIIUpper(s[index+1]) {
+			return false
+		}
+	}
+	return true
+}
+
+func isASCIILower(char byte) bool     { return char >= 'a' && char <= 'z' }
+func isASCIIUpper(char byte) bool     { return char >= 'A' && char <= 'Z' }
+func isASCIIByteDigit(char byte) bool { return char >= '0' && char <= '9' }
 
 func toPascalCase(s string) string {
 	words := splitWords(s)
@@ -306,6 +355,54 @@ func toPascalCase(s string) string {
 		sb.WriteString(pascalLikeTransform(w, i))
 	}
 	return sb.String()
+}
+
+func toPascalCaseWithLeadingAcronym(s string) string {
+	if acronymEnd := leadingPascalAcronymEnd(s); acronymEnd > 0 {
+		suffix := s[acronymEnd:]
+		if toPascalCase(suffix) == suffix {
+			return s
+		}
+	}
+	return toPascalCase(s)
+}
+
+// leadingPascalAcronymEnd matches upstream's
+// /^[A-Z]{3,}(?=\d*[A-Z](?:[a-z]|\d+[a-z]))/ without routing source text
+// through a regexp engine.
+func leadingPascalAcronymEnd(s string) int {
+	for index := range len(s) {
+		char := s[index]
+		if !isASCIILower(char) && !isASCIIUpper(char) && !isASCIIByteDigit(char) {
+			return 0
+		}
+	}
+
+	uppercaseEnd := 0
+	for uppercaseEnd < len(s) && isASCIIUpper(s[uppercaseEnd]) {
+		uppercaseEnd++
+	}
+	for acronymEnd := uppercaseEnd; acronymEnd >= 3; acronymEnd-- {
+		index := acronymEnd
+		for index < len(s) && isASCIIByteDigit(s[index]) {
+			index++
+		}
+		if index >= len(s) || !isASCIIUpper(s[index]) {
+			continue
+		}
+		index++
+		if index < len(s) && isASCIILower(s[index]) {
+			return acronymEnd
+		}
+		digitStart := index
+		for index < len(s) && isASCIIByteDigit(s[index]) {
+			index++
+		}
+		if index > digitStart && index < len(s) && isASCIILower(s[index]) {
+			return acronymEnd
+		}
+	}
+	return 0
 }
 
 func toKebabCase(s string) string { return joinNoCase(splitWords(s), "-") }
@@ -325,7 +422,7 @@ func joinNoCase(words []string, delim string) string {
 		if i > 0 {
 			sb.WriteString(delim)
 		}
-		sb.WriteString(strings.ToLower(w))
+		sb.WriteString(ecmascript.StringToLowerCase(w))
 	}
 	return sb.String()
 }
@@ -436,9 +533,8 @@ func validateFilename(words []filenameWord, cases []caseStyle) (valid bool, inva
 
 // fixFilename builds the deduplicated, ordered list of suggested filenames by
 // taking the cartesian product of each non-ignored chunk's case-conversion
-// candidates. The order matches change-case's left-to-right output, so all
-// four styles produce `fooBar`, `foo_bar`, `foo-bar`, `FooBar` in canonical
-// camel, snake, kebab, pascal order.
+// candidates. Candidate order follows allCases so output remains stable even
+// though the source configuration was decoded into a Go map.
 type filenameReplacements struct {
 	items [caseStyleCount]string
 	count int
@@ -567,7 +663,107 @@ func englishishBacktickJoin(items []string) string {
 	return sb.String()
 }
 
-const filenameCaseRuleName = "unicorn/filename-case"
+func isInsideCwd(relativePath string) bool {
+	return relativePath != "" &&
+		relativePath != ".." &&
+		!strings.HasPrefix(relativePath, "../") &&
+		!tspath.IsRootedDiskPath(relativePath)
+}
+
+// getCanonicalPOSIXPathSegments handles the hot path produced by the normal
+// lint planner: absolute, normalized POSIX filenames under an absolute,
+// normalized cwd. Less common path forms fall back to tspath below so their
+// Node-compatible normalization stays centralized there.
+func getCanonicalPOSIXPathSegments(fileName string, cwd string) ([]string, bool) {
+	if !isCanonicalAbsolutePOSIXPath(fileName) || !isCanonicalAbsolutePOSIXPath(cwd) {
+		return nil, false
+	}
+
+	basename := fileName[strings.LastIndexByte(fileName, '/')+1:]
+	if fileName == cwd {
+		return []string{basename}, true
+	}
+
+	var relative string
+	if cwd == "/" {
+		relative = fileName[1:]
+	} else {
+		if !strings.HasPrefix(fileName, cwd) || len(fileName) <= len(cwd) || fileName[len(cwd)] != '/' {
+			return []string{basename}, true
+		}
+		relative = fileName[len(cwd)+1:]
+	}
+	if relative == "" {
+		return []string{basename}, true
+	}
+	return strings.Split(relative, "/"), true
+}
+
+func isCanonicalAbsolutePOSIXPath(path string) bool {
+	if path == "/" {
+		return true
+	}
+	if len(path) < 2 || path[0] != '/' || path[len(path)-1] == '/' || strings.IndexByte(path, '\\') >= 0 {
+		return false
+	}
+
+	segmentStart := 1
+	for index := 1; index <= len(path); index++ {
+		if index < len(path) && path[index] != '/' {
+			continue
+		}
+		segment := path[segmentStart:index]
+		if segment == "" || segment == "." || segment == ".." || segment == "^" ||
+			len(segment) == 2 && tspath.IsVolumeCharacter(segment[0]) && segment[1] == ':' {
+			return false
+		}
+		segmentStart = index + 1
+	}
+	return true
+}
+
+func getPathSegments(fileName string, cwd string) []string {
+	if segments, ok := getCanonicalPOSIXPathSegments(fileName, cwd); ok {
+		return segments
+	}
+	return getPathSegmentsWithTspath(fileName, cwd)
+}
+
+func getPathSegmentsWithTspath(fileName string, cwd string) []string {
+	basename := tspath.GetBaseFileName(fileName)
+	if cwd == "" {
+		return []string{basename}
+	}
+	resolved := tspath.ResolvePath(cwd, fileName)
+	if (tspath.GetRootLength(cwd) > 0) != (tspath.GetRootLength(resolved) > 0) {
+		return []string{basename}
+	}
+	relative := tspath.GetRelativePathFromDirectory(cwd, resolved, tspath.ComparePathsOptions{
+		CurrentDirectory:          cwd,
+		UseCaseSensitiveFileNames: true,
+	})
+	if !isInsideCwd(relative) {
+		return []string{basename}
+	}
+	segments := strings.Split(relative, "/")
+	filtered := segments[:0]
+	for _, segment := range segments {
+		if segment != "." && segment != "" {
+			filtered = append(filtered, segment)
+		}
+	}
+	if len(filtered) == 0 {
+		return []string{basename}
+	}
+	return filtered
+}
+
+const (
+	filenameCaseRuleName       = "unicorn/filename-case"
+	messageIDFilenameCase      = "filename-case"
+	messageIDDirectoryCase     = "directory-case"
+	messageIDFilenameExtension = "filename-extension"
+)
 
 var FilenameCaseRule = rule.Rule{
 	Name:   filenameCaseRuleName,
@@ -585,9 +781,8 @@ var FilenameCaseRule = rule.Rule{
 		if fileName == "" {
 			return nil
 		}
-		// `tspath.GetBaseFileName` normalizes `\` → `/` first, so a Windows
-		// path like `src\foo\bar.js` resolves the basename correctly.
-		basename := tspath.GetBaseFileName(fileName)
+		pathSegments := getPathSegments(fileName, ctx.ProcessCurrentDirectory())
+		basename := pathSegments[len(pathSegments)-1]
 		// Skip ESLint's stdin / inline-source virtual filenames.
 		if basename == "<input>" || basename == "<text>" {
 			return nil
@@ -618,13 +813,38 @@ var FilenameCaseRule = rule.Rule{
 			return nil
 		}
 
-		if isIgnoredByDefault(basename) {
-			return nil
+		for _, segment := range pathSegments {
+			for _, re := range opts.ignores {
+				if re.TestOrTimeout(segment) {
+					return nil
+				}
+			}
 		}
-		for _, re := range opts.ignores {
-			if re.TestOrTimeout(basename) {
+		cases := opts.selectedCases()
+		if opts.checkDirectories {
+			for _, directory := range pathSegments[:len(pathSegments)-1] {
+				if strings.HasPrefix(directory, "$") {
+					continue
+				}
+				leading, words := splitFilename(directory)
+				valid, invalidWord, invalidCandidates := validateFilename(words, cases)
+				if valid {
+					continue
+				}
+				if ctx.DisableManager.IsRuleDisabled(filenameCaseRuleName, reportRange.Pos()) {
+					return nil
+				}
+				renamed := fixFilename(words, cases, invalidWord, invalidCandidates, leading, "")
+				ctx.ReportRange(reportRange, rule.RuleMessage{
+					Id: messageIDDirectoryCase,
+					Description: "Directory name `" + directory + "` is not in " +
+						englishishCaseNames(cases) + ". Rename it to " + englishishBacktickJoin(renamed) + ".",
+				})
 				return nil
 			}
+		}
+		if isIgnoredByDefault(basename) {
+			return nil
 		}
 
 		ext := nodeExtname(basename)
@@ -638,16 +858,18 @@ var FilenameCaseRule = rule.Rule{
 		}
 
 		leading, words := splitFilename(filename)
-		cases := opts.selectedCases()
 		valid, invalidWord, invalidCandidates := validateFilename(words, cases)
-		lowerExt := strings.ToLower(ext)
+		if strings.HasPrefix(filename, "$") {
+			valid = true
+		}
+		lowerExt := ecmascript.StringToLowerCase(ext)
 		if valid {
 			if ext != lowerExt {
 				if ctx.DisableManager.IsRuleDisabled(filenameCaseRuleName, reportRange.Pos()) {
 					return nil
 				}
 				ctx.ReportRange(reportRange, rule.RuleMessage{
-					Id: "filenameExtension",
+					Id: messageIDFilenameExtension,
 					Description: "File extension `" + ext + "` is not in lowercase. Rename it to `" +
 						filename + middle + lowerExt + "`.",
 				})
@@ -665,7 +887,7 @@ var FilenameCaseRule = rule.Rule{
 
 		renamed := fixFilename(words, cases, invalidWord, invalidCandidates, leading, middle+lowerExt)
 		ctx.ReportRange(reportRange, rule.RuleMessage{
-			Id: "filenameCase",
+			Id: messageIDFilenameCase,
 			Description: "Filename is not in " + englishishCaseNames(cases) + ". Rename it to " +
 				englishishBacktickJoin(renamed) + ".",
 		})

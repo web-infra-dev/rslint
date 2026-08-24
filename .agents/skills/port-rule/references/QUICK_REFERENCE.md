@@ -53,21 +53,30 @@ message, and report range must remain independent of edit demand.
 
 ---
 
-## Rule Registration
+## Rule Catalog Inclusion
 
-Each rule lives in a per-group `all.go` that exports a `GetAllRules() []rule.Rule` slice. Append your rule there; `config.go` iterates each slice automatically — **do not edit `config.go`**.
+Core rules are listed in `internal/rules/all.go`'s `coreRules()`; each plugin's `all.go` exports `GetAllRules() []rule.Rule`. `rules.All()` combines those sources into the shared catalog — **do not edit `internal/config` for a new rule**.
 
-| Rule Type                                                                    | File to edit                         | Final registered key                                 |
-| ---------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
-| ESLint Core                                                                  | `internal/rules/all.go`              | `"no-debugger"`                                      |
-| `@typescript-eslint`                                                         | `internal/plugins/typescript/all.go` | `"@typescript-eslint/no-explicit-any"`               |
-| Other plugins (react, jest, import, jsx-a11y, promise, react-hooks, unicorn) | `internal/plugins/<plugin>/all.go`   | `"<plugin>/<rule>"` (e.g. `"import/no-self-import"`) |
+| Rule Type                                                                            | File to edit                         | Final catalog key                                    |
+| ------------------------------------------------------------------------------------ | ------------------------------------ | ---------------------------------------------------- |
+| ESLint Core                                                                          | `internal/rules/all.go`              | `"no-debugger"`                                      |
+| `@typescript-eslint`                                                                 | `internal/plugins/typescript/all.go` | `"@typescript-eslint/no-explicit-any"`               |
+| Other plugins (react, jest, import, jsx-a11y, promise, react-hooks, rstest, unicorn) | `internal/plugins/<plugin>/all.go`   | `"<plugin>/<rule>"` (e.g. `"import/no-self-import"`) |
 
-**How to add a rule**: in the relevant `all.go`, add the import path and append the rule var to the `GetAllRules()` return slice:
+**How to add a rule**: add the import path, then append the rule var to `coreRules()` for a core rule or the plugin's `GetAllRules()` for a plugin rule:
 
 ```go
 import "github.com/web-infra-dev/rslint/internal/.../my_rule"
 
+// Core rule: internal/rules/all.go
+func coreRules() []rule.Rule {
+    return []rule.Rule{
+        // …existing entries…
+        my_rule.MyRuleRule,
+    }
+}
+
+// Plugin rule: internal/plugins/<plugin>/all.go
 func GetAllRules() []rule.Rule {
     return []rule.Rule{
         // …existing entries…
@@ -76,7 +85,7 @@ func GetAllRules() []rule.Rule {
 }
 ```
 
-The registration key comes from `rule.Name`. Core rules use `rule.Rule{Name: "…"}` (bare). `@typescript-eslint` rules use `rule.CreateRule(rule.Rule{Name: "…"})` which auto-prefixes `@typescript-eslint/`; **never** use `rule.CreateRule` outside `@typescript-eslint/` — it silently mis-registers the key.
+The catalog key comes from `rule.Name`. Core rules use `rule.Rule{Name: "…"}` (bare). `@typescript-eslint` rules use `rule.CreateRule(rule.Rule{Name: "…"})` which auto-prefixes `@typescript-eslint/`; **never** use `rule.CreateRule` outside `@typescript-eslint/` — it silently produces the wrong key.
 
 ---
 
@@ -114,7 +123,12 @@ import (
     "github.com/web-infra-dev/rslint/internal/utils"
 
     // JavaScript semantics — trim/blank/case/number, never strings.TrimSpace
+    // or strings.ToLower
     "github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+
+    // A general category (\p{Lu}, \p{L}, \p{M}) on the edition of Unicode Node
+    // reads — never the standard library's unicode package
+    "github.com/web-infra-dev/rslint/internal/utils/unicode17"
 
     // A JavaScript RegExp — never the standard library's regexp, which is RE2
     esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -146,7 +160,8 @@ import (
 - [ ] ESLint `variable.references` usage maps to `ctx.Refs` with a binder symbol
 - [ ] Whole-file comment scans use `ctx.Comments.All()`
 - [ ] Cross-file source/module queries use `ctx.Program()` without backend-kind branches
-- [ ] Regexps go through `esregexp`, globs through `minimatch3`/`isglob`, and JS string/number semantics through `ecmascript` — no `strings.TrimSpace`, stdlib `regexp`, or `doublestar` on a value that came from JavaScript
+- [ ] Regexps go through `esregexp`, globs through `minimatch3`/`isglob`, and JS string/number semantics through `ecmascript` — no `strings.TrimSpace`, `strings.ToLower`/`ToUpper`, stdlib `regexp`, or `doublestar` on a value that came from JavaScript
+- [ ] A character question goes to `ecmascript` (case, whitespace), `esregexp` (`/i` comparison), `unicode17` (a general category) or tsgo's `scanner` (identifier) — never to the standard library's `unicode`
 - [ ] Grep the change for `"regexp"` and account for every hit: a stdlib pattern is allowed only when it is written here, RE2 and JavaScript read it the same way, and no user input reaches it — otherwise it takes `esregexp`
 - [ ] If the upstream rule reads globs with anything but minimatch 3 or is-glob — `minimatch@10` included — it was reported to the user rather than silently ported onto `minimatch3`/`doublestar` or hand-rolled
 - [ ] Type check passes (`pnpm typecheck`)
@@ -154,7 +169,7 @@ import (
 - [ ] Spell check passes (`pnpm -w run check-spell`)
 - [ ] Format check passes (`pnpm format:check`)
 - [ ] Changed-package Go lint passes (packages containing changed `.go` files under `cmd/` and `internal/`; see Phase 4 Step 7 in `PORT_RULE.md`)
-- [ ] Rule registered (in the appropriate `all.go`: `internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise)
+- [ ] Rule included in the catalog (in `internal/rules/all.go` for core, or the plugin's `all.go` otherwise)
 - [ ] Test file registered (`packages/rslint-test-tools/rstest.config.mts`)
 - [ ] Documentation created (`<rule_name>.md`)
 

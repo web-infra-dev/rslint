@@ -260,7 +260,7 @@ try {
       ",
   "diagnostics": [
     {
-      "message": "'err' is defined but never used.",
+      "message": "'err' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -349,7 +349,7 @@ try {
       ",
   "diagnostics": [
     {
-      "message": "'err' is defined but never used.",
+      "message": "'err' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -380,7 +380,7 @@ try {
       ",
   "diagnostics": [
     {
-      "message": "'error' is defined but never used.",
+      "message": "'error' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -395,7 +395,7 @@ try {
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'err' is defined but never used.",
+      "message": "'err' is defined but never used. Allowed unused caught errors must match /^ignore/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {

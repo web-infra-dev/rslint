@@ -3894,7 +3894,13 @@ func TestRequiresQuoting(t *testing.T) {
 		{name: "变量1"},
 		{name: "1value", want: true},
 		{name: "foo-bar", want: true},
-		{name: "a·b", want: true},
+		// U+00B7 has the Other_ID_Continue property, so the compiler reads it
+		// as part of an identifier.
+		{name: "a·b"},
+		// A character outside the basic plane is two UTF-16 code units, and
+		// neither half of a surrogate pair is an identifier character.
+		{name: "\U00010400value", want: true},
+		{name: "value\U00010400", want: true},
 	}
 	for _, testCase := range tests {
 		if got := requiresQuoting(testCase.name); got != testCase.want {

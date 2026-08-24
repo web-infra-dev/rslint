@@ -121,6 +121,10 @@ type ParsedRstestExpectCall struct {
 	Matchers []ParsedRstestExpectMatcher
 	// Reason explains why no matcher was resolved.
 	Reason RstestExpectParseReason
+	// FromTestContext reports whether the expect root is the local expect
+	// provided by a test callback parameter, including renamed destructuring
+	// and receiver forms such as ctx.expect.
+	FromTestContext bool
 
 	// rootInvoked and trailingMembers feed IsStaticRstestExpectCall, which
 	// needs the syntactic shape rather than the chain semantics.
@@ -142,13 +146,12 @@ func isRstestExpectCall(
 	if entries.count == 0 || entries.first == nil || entries.first.Kind != ast.KindIdentifier {
 		return false
 	}
-	_, ok := rstestExpectRootIndex(
+	return rstestExpectRootMatch(
 		entries.first,
 		entries.secondName,
 		entries.count > 1,
 		analysis,
-	)
-	return ok
+	).ok
 }
 
 type rstestExpectEntries struct {
@@ -233,11 +236,11 @@ func parseRstestExpectCall(
 	}
 	expression := findTopMostRstestExpectExpression(node)
 	entries := testFramework.GetMemberEntries(expression)
-	expectIndex, ok := rstestExpectMemberIndex(node, entries, analysis)
-	if !ok {
+	match := rstestExpectMemberMatch(node, entries, analysis)
+	if !match.ok {
 		return nil
 	}
-	return classifyRstestExpectCall(expression, entries, expectIndex)
+	return classifyRstestExpectCall(expression, entries, match)
 }
 
 // IsStaticRstestExpectCall reports calls of a single static member on the
@@ -333,32 +336,46 @@ func findTopMostRstestExpectExpression(node *ast.Node) *ast.Node {
 	return top
 }
 
-// rstestExpectMemberIndex resolves whether node is an expect call and where
-// the expect member sits in entries: 0 when the root identifier itself is
-// expect (imports, globals, destructured context), 1 when the root is a
-// receiver (namespace object, import.meta.rstest, test context).
-func rstestExpectMemberIndex(
+// rstestExpectMatch locates the expect member inside an assertion chain.
+// Keeping the three results together stops call sites from having to remember
+// the order of two adjacent booleans that mean different things.
+type rstestExpectMatch struct {
+	// index is where the expect member sits in the chain entries: 0 when the
+	// root identifier itself is expect (imports, globals, destructured
+	// context), 1 when the root is a receiver (namespace object,
+	// import.meta.rstest, test context).
+	index int
+	// ok reports whether the chain is an Rstest expect chain at all.
+	ok bool
+	// fromTestContext reports whether the root is the local expect handed to a
+	// test callback rather than a global or imported one.
+	fromTestContext bool
+}
+
+// rstestExpectMemberMatch resolves whether node is an expect call and where the
+// expect member sits in entries.
+func rstestExpectMemberMatch(
 	node *ast.Node,
 	entries []testFramework.MemberEntry,
 	analysis *RstestCallAnalysis,
-) (int, bool) {
+) rstestExpectMatch {
 	if isImportMetaRstestExpectCall(node) {
 		// GetMemberEntries cannot represent the import.meta prefix and starts
 		// the chain at the rstest property, so expect sits at index 1.
 		if len(entries) > 1 && entries[1].Name == "expect" {
-			return 1, true
+			return rstestExpectMatch{index: 1, ok: true}
 		}
-		return 0, false
+		return rstestExpectMatch{}
 	}
 
 	if len(entries) == 0 || entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
-		return 0, false
+		return rstestExpectMatch{}
 	}
 	secondName := ""
 	if len(entries) > 1 {
 		secondName = entries[1].Name
 	}
-	return rstestExpectRootIndex(
+	return rstestExpectRootMatch(
 		entries[0].Node,
 		secondName,
 		len(entries) > 1,
@@ -366,57 +383,62 @@ func rstestExpectMemberIndex(
 	)
 }
 
-func rstestExpectRootIndex(
+func rstestExpectRootMatch(
 	root *ast.Node,
 	secondName string,
 	hasSecond bool,
 	analysis *RstestCallAnalysis,
-) (int, bool) {
+) rstestExpectMatch {
 	if root == nil || root.Kind != ast.KindIdentifier {
-		return 0, false
+		return rstestExpectMatch{}
 	}
 	localName := root.AsIdentifier().Text
 	ctx := analysis.ctx
 	if ctx.TypeChecker == nil {
-		return 0, localName == "expect"
+		return rstestExpectMatch{ok: localName == "expect"}
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(root)
 	if symbol == nil {
-		return 0, localName == "expect"
+		return rstestExpectMatch{ok: localName == "expect"}
 	}
-	kind, ok := analysis.expectRoots[symbol]
+	rootInfo, ok := analysis.expectRoots[symbol]
 	if !ok {
-		kind = classifyRstestExpectRoot(
+		rootInfo = classifyRstestExpectRoot(
 			localName,
 			root,
 			symbol,
 			analysis,
 		)
-		analysis.expectRoots[symbol] = kind
+		analysis.expectRoots[symbol] = rootInfo
 	}
-	switch kind {
+	switch rootInfo.Kind {
 	case rstestExpectRootDirect:
-		return 0, true
+		return rstestExpectMatch{ok: true, fromTestContext: rootInfo.FromTestContext}
 	case rstestExpectRootReceiver:
-		return 1, hasSecond && secondName == "expect"
+		return rstestExpectMatch{
+			index:           1,
+			ok:              hasSecond && secondName == "expect",
+			fromTestContext: rootInfo.FromTestContext,
+		}
 	default:
-		return 0, false
+		return rstestExpectMatch{}
 	}
 }
 
 func classifyRstestExpectCall(
 	expression *ast.Node,
 	entries []testFramework.MemberEntry,
-	expectIndex int,
+	match rstestExpectMatch,
 ) *ParsedRstestExpectCall {
-	expectEntry := entries[expectIndex]
-	rest := entries[expectIndex+1:]
+	expectEntry := entries[match.index]
+	rest := entries[match.index+1:]
 	parsed := &ParsedRstestExpectCall{
 		Expression:      expression,
 		Entry:           RstestExpectEntryCall,
 		Head:            expectEntry.Call,
 		rootInvoked:     expectEntry.Call != nil,
 		trailingMembers: len(rest),
+		FromTestContext: match.fromTestContext,
 	}
 	if len(rest) > 0 {
 		parsed.Members = make([]string, len(rest))
@@ -696,29 +718,34 @@ const (
 	rstestExpectRootReceiver
 )
 
+type rstestExpectRoot struct {
+	Kind            rstestExpectRootKind
+	FromTestContext bool
+}
+
 func classifyRstestExpectRoot(
 	localName string,
 	root *ast.Node,
 	symbol *ast.Symbol,
 	analysis *RstestCallAnalysis,
-) rstestExpectRootKind {
+) rstestExpectRoot {
 	callbacks := analysis.callbacksRef()
 	ctx := analysis.ctx
 	if callbacks.ContextExpectNames[symbol] {
-		return rstestExpectRootDirect
+		return rstestExpectRoot{Kind: rstestExpectRootDirect, FromTestContext: true}
 	}
 	if callbacks.ContextReceivers[symbol] {
-		return rstestExpectRootReceiver
+		return rstestExpectRoot{Kind: rstestExpectRootReceiver, FromTestContext: true}
 	}
 
 	if name, _, ok := resolveImportMetaRstestBinding(symbol); ok {
 		if name == "expect" {
-			return rstestExpectRootDirect
+			return rstestExpectRoot{Kind: rstestExpectRootDirect}
 		}
-		return rstestExpectRootNone
+		return rstestExpectRoot{Kind: rstestExpectRootNone}
 	}
 	if isImportMetaRstestObjectAlias(symbol) {
-		return rstestExpectRootReceiver
+		return rstestExpectRoot{Kind: rstestExpectRootReceiver}
 	}
 
 	for _, module := range []string{RstestImportModule, RstestPlaywrightImportModule} {
@@ -730,13 +757,13 @@ func classifyRstestExpectRoot(
 			module,
 		)
 		if name == "expect" {
-			return rstestExpectRootDirect
+			return rstestExpectRoot{Kind: rstestExpectRootDirect}
 		}
 		if testFramework.IsModuleNamespaceSymbol(symbol, module) {
-			return rstestExpectRootReceiver
+			return rstestExpectRoot{Kind: rstestExpectRootReceiver}
 		}
 	}
-	return rstestExpectRootNone
+	return rstestExpectRoot{Kind: rstestExpectRootNone}
 }
 
 func isImportMetaRstestExpectCall(node *ast.Node) bool {

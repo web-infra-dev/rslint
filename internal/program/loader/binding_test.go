@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -124,10 +125,8 @@ func TestLoadProgramsPreservesExactAndProjectOrder(t *testing.T) {
 				{configDir: 1},
 			},
 		}
-		plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
-			Path:            targetPath,
-			CanonicalPath:   targetPath,
-			ConfigDirectory: configDir,
+		plan := target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath,
+			CanonicalPath: targetPath}, ConfigDirectory: configDir,
 		}}}
 
 		binding, err := loadAPIForTest(set, plan, configDir, newBuildContext(fsys), true)
@@ -148,10 +147,8 @@ func TestLoadProgramsPreservesExactAndProjectOrder(t *testing.T) {
 			compilerPrograms: []*compiler.Program{program},
 			configOrders:     []configOrders{{configDir: 0}},
 		}
-		plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
-			Path:            targetPath,
-			CanonicalPath:   targetPath,
-			ConfigDirectory: configDir,
+		plan := target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath,
+			CanonicalPath: targetPath}, ConfigDirectory: configDir,
 		}}}
 		fsys.resetCalls()
 
@@ -189,9 +186,8 @@ func TestProgramFileIndex_IsTargetAwareAndLazyPerGoverningGroup(t *testing.T) {
 
 	index := newProgramFileIndex(
 		[]*compiler.Program{targetProgram, aliasProgram},
-		[]rslintconfig.DiscoveredLintTarget{{
-			Path:          targetAlias,
-			CanonicalPath: targetPath,
+		[]target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetAlias,
+			CanonicalPath: targetPath},
 		}},
 		fsys,
 		true,
@@ -231,9 +227,9 @@ func TestProgramFileIndex_BuildsGoverningGroupInOneBatch(t *testing.T) {
 
 	index := newProgramFileIndex(
 		[]*compiler.Program{first, second},
-		[]rslintconfig.DiscoveredLintTarget{
-			{Path: firstTarget, CanonicalPath: firstTarget},
-			{Path: secondTarget, CanonicalPath: secondTarget},
+		[]target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: firstTarget, CanonicalPath: firstTarget}},
+			{PathIdentity: rslintconfig.PathIdentity{Path: secondTarget, CanonicalPath: secondTarget}},
 		},
 		fsys,
 		false,
@@ -279,9 +275,9 @@ func TestProgramFileIndex_CanonicalizesRegularFilesByDirectory(t *testing.T) {
 
 	index := newProgramFileIndex(
 		[]*compiler.Program{program},
-		[]rslintconfig.DiscoveredLintTarget{
-			{Path: firstTarget, CanonicalPath: firstTarget},
-			{Path: secondTarget, CanonicalPath: secondTarget},
+		[]target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: firstTarget, CanonicalPath: firstTarget}},
+			{PathIdentity: rslintconfig.PathIdentity{Path: secondTarget, CanonicalPath: secondTarget}},
 		},
 		fsys,
 		false,
@@ -361,7 +357,7 @@ func TestProgramFileIndex_FallsBackForUncertainFileIdentity(t *testing.T) {
 
 			index := newProgramFileIndex(
 				[]*compiler.Program{program},
-				[]rslintconfig.DiscoveredLintTarget{{Path: targetPath, CanonicalPath: targetPath}},
+				[]target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath, CanonicalPath: targetPath}}},
 				fsys,
 				true,
 			)
@@ -395,7 +391,7 @@ func TestProgramFileIndex_UsesPerFileIdentityForSingletonDirectory(t *testing.T)
 
 	index := newProgramFileIndex(
 		[]*compiler.Program{program},
-		[]rslintconfig.DiscoveredLintTarget{{Path: targetPath, CanonicalPath: targetPath}},
+		[]target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath, CanonicalPath: targetPath}}},
 		fsys,
 		false,
 	)
@@ -432,9 +428,9 @@ func TestProgramFileIndex_UsesFilesystemCasingForDirectoryIdentity(t *testing.T)
 
 	index := newProgramFileIndex(
 		[]*compiler.Program{program},
-		[]rslintconfig.DiscoveredLintTarget{
-			{Path: targetPath, CanonicalPath: targetPath},
-			{Path: otherTarget, CanonicalPath: otherTarget},
+		[]target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: targetPath, CanonicalPath: targetPath}},
+			{PathIdentity: rslintconfig.PathIdentity{Path: otherTarget, CanonicalPath: otherTarget}},
 		},
 		fsys,
 		true,
@@ -465,7 +461,7 @@ func TestProgramFileIndex_ResolvesSharedUnknownSourceOnce(t *testing.T) {
 
 	index := newProgramFileIndex(
 		[]*compiler.Program{first, second},
-		[]rslintconfig.DiscoveredLintTarget{{Path: targetPath, CanonicalPath: targetPath}},
+		[]target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath, CanonicalPath: targetPath}}},
 		fsys,
 		true,
 	)
@@ -495,7 +491,7 @@ func TestProgramFileIndex_PreservesLexicalAliasTieBreak(t *testing.T) {
 
 	index := newProgramFileIndex(
 		[]*compiler.Program{program},
-		[]rslintconfig.DiscoveredLintTarget{{Path: targetPath, CanonicalPath: targetPath}},
+		[]target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath, CanonicalPath: targetPath}}},
 		fsys,
 		false,
 	)
@@ -546,7 +542,7 @@ func TestProgramFileIndex_UsesTspathIdentityAcrossFilesystemRoots(t *testing.T) 
 
 			index := newProgramFileIndex(
 				[]*compiler.Program{program},
-				[]rslintconfig.DiscoveredLintTarget{{Path: test.targetPath, CanonicalPath: test.targetPath}},
+				[]target.File{{PathIdentity: rslintconfig.PathIdentity{Path: test.targetPath, CanonicalPath: test.targetPath}}},
 				fsys,
 				true,
 			)

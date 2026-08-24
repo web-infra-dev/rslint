@@ -1,0 +1,859 @@
+// Rstest Snapshot v1
+
+exports[`prefer-object-has-own > invalid 1`] = `
+{
+  "code": "Object.hasOwnProperty.call(obj, 'foo')",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 2`] = `
+{
+  "code": "Object.hasOwnProperty.call(obj, property)",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 3`] = `
+{
+  "code": "Object.prototype.hasOwnProperty.call(obj, 'foo')",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 4`] = `
+{
+  "code": "({}).hasOwnProperty.call(obj, 'foo')",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 5`] = `
+{
+  "code": "Object/* comment */.prototype.hasOwnProperty.call(a, b);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 6`] = `
+{
+  "code": "const hasProperty = Object.prototype.hasOwnProperty.call(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 7`] = `
+{
+  "code": "const hasProperty = (( Object.prototype.hasOwnProperty.call(object, property) ));",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 8`] = `
+{
+  "code": "const hasProperty = (( Object.prototype.hasOwnProperty.call ))(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 9`] = `
+{
+  "code": "const hasProperty = (( Object.prototype.hasOwnProperty )).call(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 10`] = `
+{
+  "code": "const hasProperty = (( Object.prototype )).hasOwnProperty.call(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 11`] = `
+{
+  "code": "const hasProperty = (( Object )).prototype.hasOwnProperty.call(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 12`] = `
+{
+  "code": "const hasProperty = {}.hasOwnProperty.call(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 13`] = `
+{
+  "code": "const hasProperty={}.hasOwnProperty.call(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 14`] = `
+{
+  "code": "const hasProperty = (( {}.hasOwnProperty.call(object, property) ));",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 15`] = `
+{
+  "code": "const hasProperty = (( {}.hasOwnProperty.call ))(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 16`] = `
+{
+  "code": "const hasProperty = (( {}.hasOwnProperty )).call(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 17`] = `
+{
+  "code": "const hasProperty = (( {} )).hasOwnProperty.call(object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 18`] = `
+{
+  "code": "function foo(){return {}.hasOwnProperty.call(object, property)}",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 19`] = `
+{
+  "code": "function foo(){return{}.hasOwnProperty.call(object, property)}",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 20`] = `
+{
+  "code": "function foo(){return/*comment*/{}.hasOwnProperty.call(object, property)}",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 21`] = `
+{
+  "code": "async function foo(){return await{}.hasOwnProperty.call(object, property)}",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 22`] = `
+{
+  "code": "async function foo(){return await/*comment*/{}.hasOwnProperty.call(object, property)}",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 85,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 23`] = `
+{
+  "code": "for (const x of{}.hasOwnProperty.call(object, property).toString());",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 24`] = `
+{
+  "code": "for (const x of/*comment*/{}.hasOwnProperty.call(object, property).toString());",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 25`] = `
+{
+  "code": "for (const x in{}.hasOwnProperty.call(object, property).toString());",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 26`] = `
+{
+  "code": "for (const x in/*comment*/{}.hasOwnProperty.call(object, property).toString());",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 27`] = `
+{
+  "code": "function foo(){return({}.hasOwnProperty.call)(object, property)}",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 28`] = `
+{
+  "code": "Object['prototype']['hasOwnProperty']['call'](object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 29`] = `
+{
+  "code": "Object[\`prototype\`][\`hasOwnProperty\`][\`call\`](object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 30`] = `
+{
+  "code": "Object['hasOwnProperty']['call'](object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 31`] = `
+{
+  "code": "Object[\`hasOwnProperty\`][\`call\`](object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 32`] = `
+{
+  "code": "({})['hasOwnProperty']['call'](object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-object-has-own > invalid 33`] = `
+{
+  "code": "({})[\`hasOwnProperty\`][\`call\`](object, property);",
+  "diagnostics": [
+    {
+      "message": "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.",
+      "messageId": "useHasOwn",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-object-has-own",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
