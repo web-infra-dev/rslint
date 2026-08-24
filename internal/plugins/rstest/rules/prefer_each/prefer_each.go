@@ -76,7 +76,7 @@ var PreferEachRule = rule.Rule{
 		// runs while the flag happens to be set is skipped entirely.
 		//
 		// This rule gives each loop its own frame instead. A registration is
-		// recorded against the innermost loop that lexically contains it, and a
+		// recorded against the innermost loop whose body contains it, and a
 		// loop is reported from its own frame alone, so what the report says is
 		// exactly what the loop registers. A loop that only runs business logic
 		// has an empty frame and is never reported, whether or not it sits inside

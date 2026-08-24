@@ -82,7 +82,7 @@ Any loop containing `describe`, hooks, or multiple registrations suggests
 file and gates it on an `inTestCaseCall` boolean that every `test(...)` sets and
 every `test(...)` exit clears. Both halves leak across scopes. This port gives
 each loop its own frame instead: a registration belongs to the innermost loop
-that lexically contains it, and a loop is reported from that frame alone. Three
+whose body contains it, and a loop is reported from that frame alone. Four
 observable differences follow.
 
 The message names what the loop itself registers. Upstream's flat list still
@@ -121,6 +121,23 @@ for (const suite of suites) {
   }
 }
 ```
+
+A registration in a nested loop's header belongs to the enclosing loop, because
+the header is evaluated once per iteration of that enclosing loop. Upstream
+clears its shared list when the inner loop is entered, so the registration is
+discarded and nothing is reported:
+
+```ts
+for (const suite of suites) {
+  // outer loop is `test.each` here, unreported upstream
+  for (const row of getRows(test(suite.name, () => {}))) {
+    consume(row);
+  }
+}
+```
+
+The same applies to a nested classic `for` initializer, condition, or update
+expression.
 
 ## Original Documentation
 
