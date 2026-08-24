@@ -78,6 +78,23 @@ func TrimmedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	return sourceFile.Text()[r.Pos():r.End()]
 }
 
+// IsESTreeLiteralKind reports whether kind maps to ESTree's Literal node.
+// Template literals are intentionally excluded: ESTree represents them with
+// TemplateLiteral even when they contain no substitutions.
+func IsESTreeLiteralKind(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindStringLiteral,
+		ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword:
+		return true
+	}
+	return false
+}
+
 // RangeEnclosingDelimiters widens the inner range [start, end) outward to the
 // nearest enclosing `open`/`close` delimiter pair and returns the widened
 // offsets. Given the span of a comma-separated list whose own range excludes
