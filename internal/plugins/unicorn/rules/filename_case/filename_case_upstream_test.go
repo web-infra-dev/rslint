@@ -2,6 +2,7 @@
 package filename_case
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -78,6 +79,78 @@ func TestGetPathSegments(t *testing.T) {
 	}
 }
 
+func TestCanonicalPOSIXPathSegments(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileName string
+		cwd      string
+		want     []string
+		wantFast bool
+	}{
+		{name: "inside cwd", fileName: "/repo/src/file.js", cwd: "/repo", want: []string{"src", "file.js"}, wantFast: true},
+		{name: "root cwd", fileName: "/src/file.js", cwd: "/", want: []string{"src", "file.js"}, wantFast: true},
+		{name: "outside cwd", fileName: "/other/src/file.js", cwd: "/repo", want: []string{"file.js"}, wantFast: true},
+		{name: "cwd prefix collision", fileName: "/repository/file.js", cwd: "/repo", want: []string{"file.js"}, wantFast: true},
+		{name: "same path", fileName: "/repo", cwd: "/repo", want: []string{"repo"}, wantFast: true},
+		{name: "relative filename", fileName: "src/file.js", cwd: "/repo"},
+		{name: "relative cwd", fileName: "/repo/src/file.js", cwd: "repo"},
+		{name: "dot segment", fileName: "/repo/src/../file.js", cwd: "/repo"},
+		{name: "duplicate separator", fileName: "/repo//file.js", cwd: "/repo"},
+		{name: "untitled root segment", fileName: "/^/file.js", cwd: "/"},
+		{name: "DOS volume segment", fileName: "/repo/C:/file.js", cwd: "/repo"},
+		{name: "trailing cwd separator", fileName: "/repo/file.js", cwd: "/repo/"},
+		{name: "backslash", fileName: `/repo/src\file.js`, cwd: "/repo"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := getCanonicalPOSIXPathSegments(test.fileName, test.cwd)
+			if ok != test.wantFast {
+				t.Fatalf("fast path = %v, want %v", ok, test.wantFast)
+			}
+			if len(got) != len(test.want) {
+				t.Fatalf("segments = %v, want %v", got, test.want)
+			}
+			for index := range got {
+				if got[index] != test.want[index] {
+					t.Fatalf("segments = %v, want %v", got, test.want)
+				}
+			}
+			if ok {
+				slow := getPathSegmentsWithTspath(test.fileName, test.cwd)
+				if !slices.Equal(got, slow) {
+					t.Fatalf("fast segments = %v, tspath segments = %v", got, slow)
+				}
+			}
+		})
+	}
+}
+
+func FuzzCanonicalPOSIXPathSegments(f *testing.F) {
+	seeds := [][2]string{
+		{"/repo/src/file.js", "/repo"},
+		{"/repo", "/repo"},
+		{"/repository/file.js", "/repo"},
+		{"/src/file.js", "/"},
+		{"/repo/目录/file.js", "/repo"},
+		{"/$route/a-b_0/file.js", "/$route"},
+	}
+	for _, seed := range seeds {
+		f.Add(seed[0], seed[1])
+	}
+
+	f.Fuzz(func(t *testing.T, fileName string, cwd string) {
+		got, ok := getCanonicalPOSIXPathSegments(fileName, cwd)
+		if !ok {
+			return
+		}
+		want := getPathSegmentsWithTspath(fileName, cwd)
+		if !slices.Equal(got, want) {
+			t.Fatalf("fast segments = %v, tspath segments = %v for file %q cwd %q", got, want, fileName, cwd)
+		}
+	})
+}
+
 func TestLatestUpstreamPathBehavior(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -91,21 +164,21 @@ func TestLatestUpstreamPathBehavior(t *testing.T) {
 			name:   "checks directory",
 			cwd:    "/repo",
 			file:   "/repo/src/FooBar/file.js",
-			wantID: "directoryCase",
+			wantID: "directory-case",
 			want:   "Directory name `FooBar` is not in kebab case. Rename it to `foo-bar`.",
 		},
 		{
 			name:   "checks index parent directory",
 			cwd:    "/repo",
 			file:   "/repo/src/FooBar/index.js",
-			wantID: "directoryCase",
+			wantID: "directory-case",
 			want:   "Directory name `FooBar` is not in kebab case. Rename it to `foo-bar`.",
 		},
 		{
 			name:   "checks complete dotted directory segment",
 			cwd:    "/repo",
 			file:   "/repo/src/foo.JS/bar.js",
-			wantID: "directoryCase",
+			wantID: "directory-case",
 			want:   "Directory name `foo.JS` is not in kebab case. Rename it to `foo.js`.",
 		},
 		{
@@ -115,7 +188,7 @@ func TestLatestUpstreamPathBehavior(t *testing.T) {
 			options: []any{map[string]any{
 				"case": "kebabCase", "checkDirectories": false,
 			}},
-			wantID: "filenameCase",
+			wantID: "filename-case",
 			want:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 		},
 		{
@@ -130,14 +203,14 @@ func TestLatestUpstreamPathBehavior(t *testing.T) {
 			name:   "dollar directory skipped",
 			cwd:    "/repo",
 			file:   "/repo/src/$UserId/fooBar.js",
-			wantID: "filenameCase",
+			wantID: "filename-case",
 			want:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 		},
 		{
 			name:   "dollar filename still checks extension",
 			cwd:    "/repo",
 			file:   "/repo/src/foo/$userId.TSX",
-			wantID: "filenameExtension",
+			wantID: "filename-extension",
 			want:   "File extension `.TSX` is not in lowercase. Rename it to `$userId.tsx`.",
 		},
 		{
@@ -149,14 +222,14 @@ func TestLatestUpstreamPathBehavior(t *testing.T) {
 			name:   "outside cwd checks basename only",
 			cwd:    "/repo",
 			file:   "/other/Src/fooBar.js",
-			wantID: "filenameCase",
+			wantID: "filename-case",
 			want:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 		},
 		{
 			name:   "first invalid directory wins",
 			cwd:    "/repo",
 			file:   "/repo/src/FooBar/BazQux.js",
-			wantID: "directoryCase",
+			wantID: "directory-case",
 			want:   "Directory name `FooBar` is not in kebab case. Rename it to `foo-bar`.",
 		},
 		{
@@ -166,7 +239,7 @@ func TestLatestUpstreamPathBehavior(t *testing.T) {
 			options: []any{map[string]any{"cases": map[string]any{
 				"pascalCase": true, "camelCase": true,
 			}}},
-			wantID: "directoryCase",
+			wantID: "directory-case",
 			want:   "Directory name `foo-bar` is not in camel case or pascal case. Rename it to `fooBar` or `FooBar`.",
 		},
 	}
