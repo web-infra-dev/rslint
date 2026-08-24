@@ -933,12 +933,12 @@ function f() {
       "messageId": "unusedVar",
       "range": {
         "end": {
-          "column": 9,
-          "line": 5,
+          "column": 8,
+          "line": 3,
         },
         "start": {
-          "column": 8,
-          "line": 5,
+          "column": 7,
+          "line": 3,
         },
       },
       "ruleName": "@typescript-eslint/no-unused-vars",
@@ -985,7 +985,7 @@ export function fn2({ x, y }) {
       ",
   "diagnostics": [
     {
-      "message": "'y' is assigned a value but never used.",
+      "message": "'y' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {

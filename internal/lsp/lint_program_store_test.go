@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
@@ -73,9 +74,19 @@ func newLintProgramStoreFixture(t *testing.T, source string) *lintProgramStoreFi
 	return fixture
 }
 
+func (f *lintProgramStoreFixture) request(
+	uri lsproto.DocumentUri,
+) (lintProgramLoader, lintProjectMetadataLoader, func()) {
+	return f.store.Request(
+		context.Background(),
+		uri,
+		lspConfigTarget(uriToPath(uri), f.server.cwd, f.server.fs),
+	)
+}
+
 func (f *lintProgramStoreFixture) load(t *testing.T) *compiler.Program {
 	t.Helper()
-	loader, _, finalize := f.store.Request(context.Background(), f.sourceURI)
+	loader, _, finalize := f.request(f.sourceURI)
 	program, _, err := loader(f.configPath)
 	if err != nil {
 		t.Fatalf("load lint Program: %v", err)
@@ -119,7 +130,7 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 
 func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
-	_, loadMetadata, finalize := fixture.store.Request(context.Background(), fixture.sourceURI)
+	_, loadMetadata, finalize := fixture.request(fixture.sourceURI)
 	metadata, available, err := loadMetadata(fixture.configPath)
 	if err != nil {
 		t.Fatalf("load metadata: %v", err)
@@ -131,7 +142,7 @@ func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 	if metadata == nil || !metadata.Contains(fixture.sourcePath, fixture.sourcePath) {
 		t.Fatalf("project metadata did not contain the configured source: %v", metadata)
 	}
-	_, loadMetadata, finalize = fixture.store.Request(context.Background(), fixture.sourceURI)
+	_, loadMetadata, finalize = fixture.request(fixture.sourceURI)
 	reused, available, err := loadMetadata(fixture.configPath)
 	if err != nil {
 		t.Fatalf("reuse metadata: %v", err)
@@ -153,7 +164,7 @@ func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 	if err := os.WriteFile(fixture.configPath, []byte(`{"files":[]}`), 0o644); err != nil {
 		t.Fatalf("rewrite config: %v", err)
 	}
-	_, loadMetadata, finalize = fixture.store.Request(context.Background(), fixture.sourceURI)
+	_, loadMetadata, finalize = fixture.request(fixture.sourceURI)
 	metadata, available, err = loadMetadata(fixture.configPath)
 	if err != nil {
 		t.Fatalf("reload metadata: %v", err)
@@ -170,10 +181,7 @@ func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 func TestLintProgramStoreOpeningNewIncludedFileInvalidatesProjectMetadata(t *testing.T) {
 	const content = "export const value = 1;\n"
 	fixture := newLintProgramStoreFixture(t, content)
-	_, loadMetadata, finalize := fixture.store.Request(
-		context.Background(),
-		fixture.sourceURI,
-	)
+	_, loadMetadata, finalize := fixture.request(fixture.sourceURI)
 	before, available, err := loadMetadata(fixture.configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +202,7 @@ func TestLintProgramStoreOpeningNewIncludedFileInvalidatesProjectMetadata(t *tes
 		t.Fatal("newly included source retained stale project metadata")
 	}
 
-	_, loadMetadata, finalize = fixture.store.Request(context.Background(), newURI)
+	_, loadMetadata, finalize = fixture.request(newURI)
 	after, available, err := loadMetadata(fixture.configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -218,10 +226,7 @@ func TestLintProgramStoreDoesNotRetainNonContainingFallbackProgram(t *testing.T)
 	outsideURI := documentURIFromPath(outsidePath)
 	fixture.server.documents[outsideURI] = outsideContent
 
-	loadProgram, loadMetadata, finalize := fixture.store.Request(
-		context.Background(),
-		outsideURI,
-	)
+	loadProgram, loadMetadata, finalize := fixture.request(outsideURI)
 	metadata, available, err := loadMetadata(fixture.configPath)
 	if err != nil {
 		t.Fatalf("load metadata: %v", err)
@@ -263,6 +268,11 @@ func TestLintProgramStoreDoesNotRetainProgramWithTransientProjectMetadata(t *tes
 		store: fixture.store,
 		ctx:   context.Background(),
 		uri:   fixture.sourceURI,
+		target: lspConfigTarget(
+			fixture.sourcePath,
+			fixture.server.cwd,
+			fixture.server.fs,
+		),
 		projectMetadata: map[string]*lintProjectMetadata{
 			configPath: metadata,
 		},
@@ -347,7 +357,7 @@ func TestLintProgramStoreUnsavedFileSaveRemainsIncremental(t *testing.T) {
 	fixture.server.documents[newURI] = content
 	fixture.store.DidOpen(newURI, content, false)
 
-	loader, _, finalize := fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize := fixture.request(newURI)
 	first, sourceFile, err := loader(fixture.configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -363,7 +373,7 @@ func TestLintProgramStoreUnsavedFileSaveRemainsIncremental(t *testing.T) {
 	}
 	identityAfterSave := lspFilesystemPathID(newPath, fixture.server.fs)
 	fixture.store.DidSave(newURI, true)
-	loader, _, finalize = fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize = fixture.request(newURI)
 	saved, _, err := loader(fixture.configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -376,7 +386,7 @@ func TestLintProgramStoreUnsavedFileSaveRemainsIncremental(t *testing.T) {
 	const changed = "export const value = 2;\n"
 	fixture.server.documents[newURI] = changed
 	fixture.store.DidChange(newURI, changed)
-	loader, _, finalize = fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize = fixture.request(newURI)
 	updated, updatedSource, err := loader(fixture.configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -395,7 +405,7 @@ func TestLintProgramStoreUnsavedFileCloseInvalidates(t *testing.T) {
 	fixture.server.documents[newURI] = content
 	fixture.store.DidOpen(newURI, content, false)
 
-	loader, _, finalize := fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize := fixture.request(newURI)
 	if _, sourceFile, err := loader(fixture.configPath); err != nil {
 		t.Fatal(err)
 	} else if sourceFile == nil {
@@ -573,7 +583,7 @@ func TestLintProgramStoreOpeningNewIncludedFileRebuilds(t *testing.T) {
 		t.Fatal("newly included source retained a Program built before the file existed")
 	}
 
-	loader, _, finalize := fixture.store.Request(context.Background(), newURI)
+	loader, _, finalize := fixture.request(newURI)
 	defer finalize()
 	rebuilt, sourceFile, err := loader(fixture.configPath)
 	if err != nil {
@@ -621,7 +631,7 @@ func TestLintProgramStoreOpeningNewImportedFileRebuildsBeforeWatchEvent(t *testi
 		t.Fatal("newly resolved import retained a Program built while it was missing")
 	}
 
-	loader, _, finalize := fixture.store.Request(context.Background(), importedURI)
+	loader, _, finalize := fixture.request(importedURI)
 	defer finalize()
 	rebuilt, sourceFile, err := loader(fixture.configPath)
 	if err != nil {
@@ -650,7 +660,7 @@ func TestLintProgramStoreConflictingAliasesUseFreshPrograms(t *testing.T) {
 
 	load := func() *compiler.Program {
 		t.Helper()
-		loader, _, finalize := fixture.store.Request(context.Background(), fixture.sourceURI)
+		loader, _, finalize := fixture.request(fixture.sourceURI)
 		defer finalize()
 		program, _, err := loader(fixture.configPath)
 		if err != nil {
@@ -675,6 +685,69 @@ type realpathCountingFS struct {
 func (fs *realpathCountingFS) Realpath(path string) string {
 	fs.calls++
 	return fs.FS.Realpath(path)
+}
+
+type retargetingLintProgramFS struct {
+	vfs.FS
+	targetPath string
+	firstPath  string
+	laterPath  string
+	targetCall int
+}
+
+func (fs *retargetingLintProgramFS) Realpath(filePath string) string {
+	if tspath.NormalizePath(filePath) != fs.targetPath {
+		return fs.FS.Realpath(filePath)
+	}
+	fs.targetCall++
+	if fs.targetCall == 1 {
+		return fs.firstPath
+	}
+	return fs.laterPath
+}
+
+func TestLintProgramStoreReusesFrozenTargetForResidentAndRebuild(t *testing.T) {
+	const content = "export const value = 1;\n"
+	fixture := newLintProgramStoreFixture(t, content)
+	fixture.load(t)
+	canonicalPath := tspath.NormalizePath(fixture.server.fs.Realpath(fixture.sourcePath))
+	laterPath := tspath.NormalizePath(filepath.Join(filepath.Dir(fixture.sourcePath), "moved.ts"))
+	if err := os.WriteFile(laterPath, []byte("export const moved = 2;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	retargetingFS := &retargetingLintProgramFS{
+		FS:         fixture.server.fs,
+		targetPath: fixture.sourcePath,
+		firstPath:  canonicalPath,
+		laterPath:  laterPath,
+	}
+	fixture.server.fs = retargetingFS
+	target := lspConfigTarget(fixture.sourcePath, fixture.server.cwd, retargetingFS)
+
+	load := func() *ast.SourceFile {
+		t.Helper()
+		loader, _, finalize := fixture.store.Request(
+			context.Background(),
+			fixture.sourceURI,
+			target,
+		)
+		defer finalize()
+		_, sourceFile, err := loader(fixture.configPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sourceFile
+	}
+	if sourceFile := load(); sourceFile == nil || sourceFile.Text() != content {
+		t.Fatalf("resident Program source = %v", sourceFile)
+	}
+	fixture.store.Invalidate()
+	if sourceFile := load(); sourceFile == nil || sourceFile.Text() != content {
+		t.Fatalf("rebuilt Program source = %v", sourceFile)
+	}
+	if retargetingFS.targetCall != 1 {
+		t.Fatalf("target Realpath calls = %d, want one frozen observation", retargetingFS.targetCall)
+	}
 }
 
 func TestLintProgramStoreUnrelatedOpenDoesNotScanProgramSources(t *testing.T) {
@@ -752,7 +825,11 @@ func TestLintProgramStoreWatchesExternalEmptyIncludeDirectory(t *testing.T) {
 		return nil
 	}
 
-	loader, _, finalize := store.Request(context.Background(), sourceURI)
+	loader, _, finalize := store.Request(
+		context.Background(),
+		sourceURI,
+		lspConfigTarget(sourcePath, workspace, server.fs),
+	)
 	if _, _, err := loader(configPath); err != nil {
 		t.Fatal(err)
 	}

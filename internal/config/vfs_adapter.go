@@ -11,46 +11,29 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-// vfsAdapter adapts a vfs.FS to a standard fs.FS rooted at a given directory,
-// used by lint-target discovery and by doublestar.GlobWalk
-// in expandProjectGlob. It is NOT a general-purpose fs.FS implementation —
-// Open() always returns a directory handle (vfsDirFile) because both callers
-// only open directories.
+// vfsAdapter adapts a vfs.FS to the standard fs.FS used by
+// doublestar.GlobWalk in expandProjectGlob. It is not a general-purpose fs.FS
+// implementation: Open always returns a directory handle because the project
+// glob walker opens only directories.
 //
-// followSymlinks controls how directory symlinks are handled in ReadDir:
-//
-//   - false (default, used by lint-target discovery): symlinked subdirectories are
-//     skipped entirely. This matches ESLint v10's flat-config file walker:
-//     it uses @humanfs/node, whose walk() recurses only when
-//     Dirent.isDirectory() is true — and Dirent.isDirectory() returns false
-//     for symbolic links because Node's readdir({withFileTypes: true})
-//     reports the dirent type without following links. The result for the
-//     lint-target walk is the same: symlinked directories are not entered,
-//     output is deterministic regardless of the concurrency model, and
-//     cycles cannot occur.
-//
-//   - true (used by expandProjectGlob): symlinks are followed unless their
-//     resolved target is already in the current path's ancestor chain. This
-//     prevents traversal cycles while preserving distinct aliases that point
-//     to the same directory.
+// Directory symlinks are followed unless their resolved target is already in
+// the current path's ancestor chain. This preserves project-glob aliases while
+// preventing traversal cycles.
 //
 // Realpath results are cached behind a mutex so the adapter remains safe if a
 // caller traverses it concurrently in the future.
 type vfsAdapter struct {
-	vfs            vfs.FS
-	root           string
-	followSymlinks bool
-	realpathMu     sync.Mutex
-	resolvedPaths  map[string]string
+	vfs           vfs.FS
+	root          string
+	realpathMu    sync.Mutex
+	resolvedPaths map[string]string
 }
 
 var _ fs.FS = (*vfsAdapter)(nil)
 
-// Open implements fs.FS. Both callers (fs.WalkDir in lint-target discovery and
-// doublestar.GlobWalk in expandProjectGlob) only call Open() on directories.
-// Therefore we always return a vfsDirFile without calling DirectoryExists —
-// the parent's ReadDir already confirmed the entry is a directory, so the
-// stat would be redundant.
+// Open implements fs.FS. doublestar.GlobWalk only calls it on directories, so
+// it returns a vfsDirFile without a redundant DirectoryExists call; the
+// parent's ReadDir already confirmed the entry type.
 func (a *vfsAdapter) Open(name string) (fs.File, error) {
 	fullPath := a.fullPath(name)
 
@@ -153,11 +136,6 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 			}
 
 			if isSymlink {
-				if !f.adapter.followSymlinks {
-					// Skip symlinks entirely. See the type doc on vfsAdapter
-					// for why this is the default for lint-target discovery.
-					continue
-				}
 				if dirRealPath == "" {
 					dirRealPath = f.adapter.cachedRealpath(dirPath)
 				}
@@ -173,14 +151,12 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 		}
 		for _, file := range accessible.Files {
 			isSymlink := false
-			needsRealpath := accessible.Symlinks == nil
 			if accessible.Symlinks != nil {
 				_, isSymlink = accessible.Symlinks[file]
 			}
 			f.entries = append(f.entries, &vfsDirEntry{
-				name:          file,
-				isSymlink:     isSymlink,
-				needsRealpath: needsRealpath,
+				name:      file,
+				isSymlink: isSymlink,
 			})
 		}
 		sort.Slice(f.entries, func(i, j int) bool {
@@ -215,17 +191,13 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 
 // vfsDirEntry implements fs.DirEntry.
 type vfsDirEntry struct {
-	name          string
-	isDir         bool
-	isSymlink     bool
-	needsRealpath bool
+	name      string
+	isDir     bool
+	isSymlink bool
 }
 
 func (e *vfsDirEntry) Name() string { return e.name }
 func (e *vfsDirEntry) IsDir() bool  { return e.isDir }
-func (e *vfsDirEntry) needsCanonicalRealpath() bool {
-	return e.needsRealpath
-}
 func (e *vfsDirEntry) Type() fs.FileMode {
 	if e.isDir {
 		return fs.ModeDir
