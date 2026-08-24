@@ -79,6 +79,16 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 			{Code: `/*global foo*/ function f(foo) { return foo; } consume(foo); f(1);`},
 			{Code: `/*global foo*/ consume(foo);`},
 			{Code: `/*global Foo*/ type Alias = Foo; consume({} as Alias);`},
+			{
+				Code:     `/*globals module*/ module.exports = 1;`,
+				FileName: "inline-global.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code:     `/*global foo:writable*/ foo = foo + 1;`,
+				FileName: "inline-global.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
 
 			// Every binding introduced by an exported destructuring declaration is exported.
 			{Code: `export const { nested: { value }, list: [item] } = source;`},
@@ -334,6 +344,14 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 				Code: `/*global foo*/ { const foo = 1; consume(foo); }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
+				},
+			},
+			{
+				Code:     `/*global module*/ const module = {}; module.exports = 1;`,
+				FileName: "inline-global.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedError("module", false, 1, 10, 16, ""),
 				},
 			},
 			{

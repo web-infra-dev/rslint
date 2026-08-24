@@ -6,12 +6,14 @@ This document summarizes how to work on rslint effectively and consistently.
 
 - `architecture.md`: Current high-level architecture, major runtime flows, and subsystem relationships.
 - `cmd/rslint/`: CLI entry (default), IPC API (`--api`), LSP (`--lsp`).
-- `internal/config/`: Config types/loader, rule registry and registration.
+- `internal/config/`: Config types/loader, authored path-space matching, merging, and configured-rule resolution.
+- `internal/config/target/`: Lint-target planning, explicit file outcomes, directory walking, and config-owner routing.
 - `internal/program/`: Unified source Program, module resolution/graph, and generation-scoped derived caches.
 - `internal/linter/`: Linter engine, traversal, and fix application.
-- `internal/rule/`: Rule descriptors/environment, context, diagnostics, disable manager, listeners.
+- `internal/rule/`: Rule descriptors/environment, immutable catalogs, context, diagnostics, disable manager, listeners.
+- `internal/rules/`: Core rules and the final `all.go` aggregation of every Go-implemented rule.
 - `internal/plugins/typescript/`: `@typescript-eslint` rules under `rules/<rule>/`.
-- `internal/plugins/import/`: `eslint-plugin-import` registration.
+- `internal/plugins/import/`: `eslint-plugin-import` rule implementations.
 - `internal/testutil/`: Cross-package test infrastructure, including safe txtar fixture materialization.
 - `internal/utils/`: JSONC, overlay VFS, compiler construction, AST/type helpers.
 - `internal/utils/ecmascript/`: JavaScript's own semantics (trim, blank, upper/lower case, number-to-string) plus `ecmascript/regexp` for a JavaScript RegExp and its `/i` comparison. `internal/utils/unicode17/` carries the general categories on the edition of Unicode Node reads. `internal/utils/minimatch3/` and `internal/utils/isglob/` port the glob packages ESLint plugins depend on.

@@ -24,6 +24,12 @@ func TestNoHooksRule(t *testing.T) {
 					map[string]interface{}{"allow": []interface{}{"afterEach", "afterAll"}},
 				},
 			},
+			{
+				Code: `test("foo")`,
+				Options: []interface{}{
+					map[string]interface{}{},
+				},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

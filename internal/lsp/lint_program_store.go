@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -41,7 +42,7 @@ type lintProgramRequest struct {
 	ctx               context.Context
 	uri               lsproto.DocumentUri
 	overlayFS         vfs.FS
-	targetPath        string
+	target            target.File
 	freshOnly         bool
 	overlayPrepared   bool
 	usedConfig        string
@@ -67,11 +68,20 @@ func (s *lintProgramStore) Usable() bool {
 func (s *lintProgramStore) Request(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
+	target target.File,
 ) (lintProgramLoader, lintProjectMetadataLoader, func()) {
+	target.Path = tspath.NormalizePath(target.Path)
+	if target.CanonicalPath != "" {
+		target.CanonicalPath = tspath.NormalizePath(target.CanonicalPath)
+	}
+	if target.CanonicalParentPath != "" {
+		target.CanonicalParentPath = tspath.NormalizePath(target.CanonicalParentPath)
+	}
 	request := &lintProgramRequest{
 		store:             s,
 		ctx:               ctx,
 		uri:               uri,
+		target:            target,
 		projectMetadata:   make(map[string]*lintProjectMetadata),
 		transientMetadata: make(map[string]struct{}),
 	}
@@ -92,8 +102,7 @@ func (r *lintProgramRequest) prepareOverlay() {
 	r.overlayPrepared = true
 	var aliasesConflict bool
 	r.overlayFS, aliasesConflict =
-		r.store.server.currentEditorOverlayFSWithConflicts(r.uri)
-	r.targetPath = uriToPath(r.uri)
+		r.store.server.currentEditorOverlayFSForTargetWithConflicts(r.uri, r.target)
 	if aliasesConflict {
 		r.store.Invalidate()
 		r.freshOnly = true
@@ -194,7 +203,10 @@ func (r *lintProgramRequest) load(
 		return r.rebuild(configFileName, r.projectMetadata[configFileName])
 	}
 
-	targetSource := state.sources.SourceFileForPath(r.targetPath)
+	targetSource := state.sources.SourceFileForTarget(
+		r.target.Path,
+		r.target.CanonicalPath,
+	)
 	if content, open := r.store.server.documents[r.uri]; open {
 		r.store.markStateSourceContent(state, targetSource, content)
 	}
@@ -234,7 +246,10 @@ func (r *lintProgramRequest) load(
 	clear(state.dirtyFiles)
 	added, safe := r.cover(state)
 	if !safe {
-		return program, state.sources.SourceFileForPath(r.targetPath), nil
+		return program, state.sources.SourceFileForTarget(
+			r.target.Path,
+			r.target.CanonicalPath,
+		), nil
 	}
 	if added {
 		return r.rebuild(configFileName, state.metadata)
@@ -253,7 +268,7 @@ func (r *lintProgramRequest) loadFresh(
 	if err != nil {
 		return nil, nil, err
 	}
-	return program, sourceFileForPath(program, r.targetPath, r.overlayFS), nil
+	return program, sourceFileForTarget(program, r.target, r.overlayFS), nil
 }
 
 func (r *lintProgramRequest) rebuild(
@@ -274,7 +289,7 @@ func (r *lintProgramRequest) rebuild(
 		if err != nil {
 			return nil, nil, err
 		}
-		return program, sourceFileForPath(program, r.targetPath, r.overlayFS), nil
+		return program, sourceFileForTarget(program, r.target, r.overlayFS), nil
 	}
 
 	// Register every dependency discovered by the first build, then rebuild
@@ -294,7 +309,10 @@ func (r *lintProgramRequest) rebuild(
 			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
 			metadata:                 metadata,
 		}
-		sourceFile := state.sources.SourceFileForPath(r.targetPath)
+		sourceFile := state.sources.SourceFileForTarget(
+			r.target.Path,
+			r.target.CanonicalPath,
+		)
 		if sourceFile == nil {
 			// A fallback probe that did not contain this target must not make an
 			// unrelated Program resident. Previously selected resident Programs
@@ -324,9 +342,12 @@ func (r *lintProgramRequest) result(
 	configFileName string,
 	state *lintProgramState,
 ) (*compiler.Program, *ast.SourceFile, error) {
-	sourceFile := state.sources.SourceFileForPath(r.targetPath)
+	sourceFile := state.sources.SourceFileForTarget(
+		r.target.Path,
+		r.target.CanonicalPath,
+	)
 	if sourceFile != nil {
-		state.rememberSelectedSource(r.targetPath, r.store.server.fs)
+		state.rememberSelectedTarget(r.target, r.store.server.fs)
 		r.usedConfig = configFileName
 		r.usedState = state
 	}
@@ -595,9 +616,20 @@ func (s *lintProgramState) failedLookupPathMatches(path tspath.Path) bool {
 	return false
 }
 
-func (s *lintProgramState) rememberSelectedSource(fileName string, fs vfs.FS) {
-	s.selectedSourceIdentities[lintProgramLexicalPathID(fileName, fs)] =
-		tspath.Path(lspFilesystemPathID(fileName, fs))
+func (s *lintProgramState) rememberSelectedTarget(
+	target target.File,
+	fs vfs.FS,
+) {
+	canonicalPath := target.CanonicalPath
+	if canonicalPath == "" {
+		canonicalPath = target.Path
+	}
+	caseSensitive := true
+	if fs != nil {
+		caseSensitive = fs.UseCaseSensitiveFileNames()
+	}
+	s.selectedSourceIdentities[lintProgramLexicalPathID(target.Path, fs)] =
+		tspath.Path(lspLexicalPathID(canonicalPath, caseSensitive))
 }
 
 func lintProgramLexicalPathID(fileName string, fs vfs.FS) tspath.Path {

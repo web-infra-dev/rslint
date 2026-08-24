@@ -5,7 +5,7 @@ exports[`no-unused-vars > invalid 1`] = `
   "code": "(function (a, b, c) {});",
   "diagnostics": [
     {
-      "message": "'a' is defined but never used.",
+      "message": "'a' is defined but never used. Allowed unused args must match /c/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -20,7 +20,7 @@ exports[`no-unused-vars > invalid 1`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'b' is defined but never used.",
+      "message": "'b' is defined but never used. Allowed unused args must match /c/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -46,7 +46,7 @@ exports[`no-unused-vars > invalid 2`] = `
   "code": "(function (a, b, { c, d }) {});",
   "diagnostics": [
     {
-      "message": "'a' is defined but never used.",
+      "message": "'a' is defined but never used. Allowed unused args must match /[cd]/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -61,7 +61,7 @@ exports[`no-unused-vars > invalid 2`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'b' is defined but never used.",
+      "message": "'b' is defined but never used. Allowed unused args must match /[cd]/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -87,7 +87,7 @@ exports[`no-unused-vars > invalid 3`] = `
   "code": "(function (a, b, { c, d }) {});",
   "diagnostics": [
     {
-      "message": "'a' is defined but never used.",
+      "message": "'a' is defined but never used. Allowed unused args must match /c/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -102,7 +102,7 @@ exports[`no-unused-vars > invalid 3`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'b' is defined but never used.",
+      "message": "'b' is defined but never used. Allowed unused args must match /c/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -117,7 +117,7 @@ exports[`no-unused-vars > invalid 3`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'d' is assigned a value but never used.",
+      "message": "'d' is defined but never used. Allowed unused args must match /c/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -143,7 +143,7 @@ exports[`no-unused-vars > invalid 4`] = `
   "code": "(function (a, b, { c, d }) {});",
   "diagnostics": [
     {
-      "message": "'a' is defined but never used.",
+      "message": "'a' is defined but never used. Allowed unused args must match /d/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -158,7 +158,7 @@ exports[`no-unused-vars > invalid 4`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'b' is defined but never used.",
+      "message": "'b' is defined but never used. Allowed unused args must match /d/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -173,7 +173,7 @@ exports[`no-unused-vars > invalid 4`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'c' is assigned a value but never used.",
+      "message": "'c' is defined but never used. Allowed unused args must match /d/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -203,7 +203,7 @@ exports[`no-unused-vars > invalid 5`] = `
       ",
   "diagnostics": [
     {
-      "message": "'a' is assigned a value but never used.",
+      "message": "'a' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -233,7 +233,7 @@ exports[`no-unused-vars > invalid 6`] = `
       ",
   "diagnostics": [
     {
-      "message": "'a' is assigned a value but never used.",
+      "message": "'a' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -248,7 +248,7 @@ exports[`no-unused-vars > invalid 6`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'c' is assigned a value but never used.",
+      "message": "'c' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -861,7 +861,7 @@ exports[`no-unused-vars > invalid 27`] = `
       ",
   "diagnostics": [
     {
-      "message": "'a' is assigned a value but never used.",
+      "message": "'a' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -876,7 +876,7 @@ exports[`no-unused-vars > invalid 27`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'c' is assigned a value but never used.",
+      "message": "'c' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -906,7 +906,7 @@ exports[`no-unused-vars > invalid 28`] = `
       ",
   "diagnostics": [
     {
-      "message": "'a' is assigned a value but never used.",
+      "message": "'a' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -936,7 +936,7 @@ exports[`no-unused-vars > invalid 29`] = `
       ",
   "diagnostics": [
     {
-      "message": "'a' is assigned a value but never used.",
+      "message": "'a' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -951,7 +951,7 @@ exports[`no-unused-vars > invalid 29`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'c' is assigned a value but never used.",
+      "message": "'c' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -981,7 +981,7 @@ exports[`no-unused-vars > invalid 30`] = `
       ",
   "diagnostics": [
     {
-      "message": "'a' is assigned a value but never used.",
+      "message": "'a' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -996,7 +996,7 @@ exports[`no-unused-vars > invalid 30`] = `
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'c' is assigned a value but never used.",
+      "message": "'c' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -1292,6 +1292,21 @@ function foo() {
       ",
   "diagnostics": [
     {
+      "message": "'a' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+    {
       "message": "'foo' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
@@ -1302,21 +1317,6 @@ function foo() {
         "start": {
           "column": 10,
           "line": 4,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unused-vars",
-    },
-    {
-      "message": "'a' is assigned a value but never used.",
-      "messageId": "unusedVar",
-      "range": {
-        "end": {
-          "column": 6,
-          "line": 7,
-        },
-        "start": {
-          "column": 5,
-          "line": 7,
         },
       },
       "ruleName": "@typescript-eslint/no-unused-vars",
@@ -1344,12 +1344,12 @@ function init() {
       "messageId": "unusedVar",
       "range": {
         "end": {
-          "column": 6,
-          "line": 6,
+          "column": 4,
+          "line": 4,
         },
         "start": {
-          "column": 3,
-          "line": 6,
+          "column": 1,
+          "line": 4,
         },
       },
       "ruleName": "@typescript-eslint/no-unused-vars",

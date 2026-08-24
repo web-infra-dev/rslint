@@ -62,6 +62,89 @@ func (b *Builder[E]) expr(node *ast.Node) {
 	}
 }
 
+// condition evaluates node while keeping its truthy and falsy continuations
+// separate. A plain expr may merge short-circuit branches because its value is
+// all the consumer needs; a control-flow condition cannot merge them before it
+// decides which statement executes, or impossible paths can appear across the
+// join (for example, the short branch of `a || b` reaching an `else` body).
+func (b *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[E]) {
+	if node == nil {
+		b.link(b.cur, whenTrue)
+		b.link(b.cur, whenFalse)
+		return
+	}
+
+	switch node.Kind {
+	case ast.KindParenthesizedExpression:
+		if b.hooks.Expression != nil {
+			b.hooks.Expression(b, node)
+		}
+		b.condition(node.AsParenthesizedExpression().Expression, whenTrue, whenFalse)
+
+	case ast.KindPrefixUnaryExpression:
+		unary := node.AsPrefixUnaryExpression()
+		if unary.Operator != ast.KindExclamationToken {
+			b.expr(node)
+			b.link(b.cur, whenTrue)
+			b.link(b.cur, whenFalse)
+			return
+		}
+		if b.hooks.Expression != nil {
+			b.hooks.Expression(b, node)
+		}
+		b.condition(unary.Operand, whenFalse, whenTrue)
+
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		operator := binary.OperatorToken.Kind
+		if operator != ast.KindAmpersandAmpersandToken &&
+			operator != ast.KindBarBarToken &&
+			operator != ast.KindQuestionQuestionToken {
+			b.expr(node)
+			b.link(b.cur, whenTrue)
+			b.link(b.cur, whenFalse)
+			return
+		}
+		if b.hooks.Expression != nil {
+			b.hooks.Expression(b, node)
+		}
+		right := b.newBlock()
+		switch operator {
+		case ast.KindAmpersandAmpersandToken:
+			b.condition(binary.Left, right, whenFalse)
+		case ast.KindBarBarToken:
+			b.condition(binary.Left, whenTrue, right)
+		case ast.KindQuestionQuestionToken:
+			// A non-nullish left operand may itself be truthy or falsy; a
+			// nullish one evaluates the right operand.
+			b.expr(binary.Left)
+			b.link(b.cur, whenTrue)
+			b.link(b.cur, whenFalse)
+			b.link(b.cur, right)
+		}
+		b.enter(right)
+		b.condition(binary.Right, whenTrue, whenFalse)
+
+	case ast.KindConditionalExpression:
+		if b.hooks.Expression != nil {
+			b.hooks.Expression(b, node)
+		}
+		conditional := node.AsConditionalExpression()
+		trueEntry := b.newBlock()
+		falseEntry := b.newBlock()
+		b.condition(conditional.Condition, trueEntry, falseEntry)
+		b.enter(trueEntry)
+		b.condition(conditional.WhenTrue, whenTrue, whenFalse)
+		b.enter(falseEntry)
+		b.condition(conditional.WhenFalse, whenTrue, whenFalse)
+
+	default:
+		b.expr(node)
+		b.link(b.cur, whenTrue)
+		b.link(b.cur, whenFalse)
+	}
+}
+
 // visitUnknown routes a child of a node the builder has no dedicated handler
 // for. Statements and expressions are handled by their own walkers so control
 // flow inside them is still modelled.

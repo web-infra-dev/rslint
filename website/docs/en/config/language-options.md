@@ -75,7 +75,9 @@ Files outside all tsconfigs are still linted, but only rules that do not require
 }
 ```
 
-Relative project patterns are resolved from the config file's directory for automatically discovered configs, or from the current working directory when the config is supplied with `--config`.
+Relative project patterns in a config file are resolved from that file's directory. Relative project patterns in the JavaScript API's inline `overrideConfig` are resolved from the API `cwd`.
+
+Omit `project` to use the governing config directory's default `tsconfig.json`. Set `project: []` to disable that fallback explicitly.
 
 ## languageOptions.globals
 
