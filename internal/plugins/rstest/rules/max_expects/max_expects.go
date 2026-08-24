@@ -51,6 +51,9 @@ const (
 )
 
 const (
+	// Listener events follow AST nesting, so ordinary files only use a few
+	// slots. Keep that path allocation-free while retaining a sound overflow
+	// path for generated or adversarially deep expressions.
 	inlineFunctionEventCapacity = 8
 	inlineCallEventCapacity     = 16
 )
