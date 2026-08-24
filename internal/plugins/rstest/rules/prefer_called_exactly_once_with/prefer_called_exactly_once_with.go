@@ -46,16 +46,6 @@ const (
 	mergeMatcherRolePair = mergeMatcherRoleOnce | mergeMatcherRoleWith
 )
 
-var mergeMatcherNames = [...]struct {
-	name string
-	role mergeMatcherRoles
-}{
-	{name: "toHaveBeenCalledOnce", role: mergeMatcherRoleOnce},
-	{name: "calledOnce", role: mergeMatcherRoleOnce},
-	{name: "toHaveBeenCalledWith", role: mergeMatcherRoleWith},
-	{name: "calledWith", role: mergeMatcherRoleWith},
-}
-
 // sourceMayContainMergePair cheaply rejects files that cannot contain both
 // halves of a merge. The parser interns property names and the cooked text of
 // string/template element-access keys, so the identifier table covers normal,
@@ -70,9 +60,16 @@ func sourceMayContainMergePair(sourceFile *ast.SourceFile) bool {
 	}
 
 	roles := mergeMatcherRoles(0)
-	for _, matcher := range mergeMatcherNames {
-		if _, ok := sourceFile.Identifiers[matcher.name]; ok {
-			roles |= matcher.role
+	for name := range onceMatchers {
+		if _, ok := sourceFile.Identifiers[name]; ok {
+			roles |= mergeMatcherRoleOnce
+			break
+		}
+	}
+	for name := range combinedMatchers {
+		if _, ok := sourceFile.Identifiers[name]; ok {
+			roles |= mergeMatcherRoleWith
+			break
 		}
 	}
 	if roles == mergeMatcherRolePair {
@@ -102,12 +99,14 @@ func bracketOpensOnParenthesis(text string) bool {
 }
 
 func matcherRole(name string) mergeMatcherRoles {
-	for _, matcher := range mergeMatcherNames {
-		if matcher.name == name {
-			return matcher.role
-		}
+	roles := mergeMatcherRoles(0)
+	if onceMatchers[name] {
+		roles |= mergeMatcherRoleOnce
 	}
-	return 0
+	if _, ok := combinedMatchers[name]; ok {
+		roles |= mergeMatcherRoleWith
+	}
+	return roles
 }
 
 // parenthesizedElementAccessRoles performs the exact fallback for keys such as

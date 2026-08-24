@@ -9,6 +9,9 @@ import (
 )
 
 func TestSourceMayContainMergePair(t *testing.T) {
+	escapedCalledOnce := `\x63` + "calledOnce"[1:]
+	escapedCalledWith := `\x63` + "calledWith"[1:]
+
 	testCases := []struct {
 		source string
 		want   bool
@@ -21,12 +24,12 @@ func TestSourceMayContainMergePair(t *testing.T) {
 		{source: `test("case", () => expect(spy).calledOnce.toHaveBeenCalledWith("a"))`, want: true},
 		{source: `test("case", () => { expect(spy)["calledOnce"]; expect(spy)["calledWith"]("a") })`, want: true},
 		{source: "test(\"case\", () => { expect(spy)[`calledOnce`]; expect(spy)[`calledWith`](\"a\") })", want: true},
-		{source: `test("case", () => { expect(spy)["\x63alledOnce"]; expect(spy)["\x63alledWith"]("a") })`, want: true},
+		{source: `test("case", () => { expect(spy)["` + escapedCalledOnce + `"]; expect(spy)["` + escapedCalledWith + `"]("a") })`, want: true},
 		{source: `test("case", () => { expect(spy)[("calledOnce")]; expect(spy).calledWith("a") })`, want: true},
 		{source: `test("case", () => { expect(spy)[ /* key */ ("calledOnce") ]; expect(spy)[("calledWith")]("a") })`, want: true},
 		{source: "test(\"case\", () => { expect(spy)[\uFEFF(\"calledOnce\")]; expect(spy).calledWith(\"a\") })", want: true},
 		{source: "test(\"case\", () => { expect(spy)[// key\u2028(\"calledOnce\")]; expect(spy).calledWith(\"a\") })", want: true},
-		{source: `test("case", () => { expect(spy)[("\x63alledOnce")]; expect(spy)[("\x63alledWith")]("a") })`, want: true},
+		{source: `test("case", () => { expect(spy)[("` + escapedCalledOnce + `")]; expect(spy)[("` + escapedCalledWith + `")]("a") })`, want: true},
 		{source: `test("case", () => expect(spy).toHaveBeenCalledExactlyOnceWith("a"))`, want: false},
 		{source: `test("case", () => expect(spy).calledOnceWith("a"))`, want: false},
 		{source: `test("case", () => { expect(spy).calledOnceAgain; expect(spy).calledWithout("a") })`, want: false},
