@@ -50,6 +50,44 @@ const (
 	functionActivateRegistrationFallback
 )
 
+type functionEventStack []functionPushKind
+
+func (events *functionEventStack) push(kind functionPushKind) {
+	*events = append(*events, kind)
+}
+
+func (events *functionEventStack) pop() functionPushKind {
+	if len(*events) == 0 {
+		return functionPushNone
+	}
+	last := len(*events) - 1
+	kind := (*events)[last]
+	*events = (*events)[:last]
+	return kind
+}
+
+type callEventStack []bool
+
+func (events *callEventStack) push(didPushRegistrationFrame bool) {
+	*events = append(*events, didPushRegistrationFrame)
+}
+
+func (events *callEventStack) markRegistrationFrame() {
+	if len(*events) != 0 {
+		(*events)[len(*events)-1] = true
+	}
+}
+
+func (events *callEventStack) pop() bool {
+	if len(*events) == 0 {
+		return false
+	}
+	last := len(*events) - 1
+	didPushRegistrationFrame := (*events)[last]
+	*events = (*events)[:last]
+	return didPushRegistrationFrame
+}
+
 func parseOptions(rawOptions []any) options {
 	opts := options{Max: defaultMax}
 	if len(rawOptions) == 0 {
@@ -278,8 +316,8 @@ var MaxExpectsRule = rule.Rule{
 		callbacks := analysis.Callbacks().Functions
 
 		stack := newFrameStack()
-		pushedFunctions := map[*ast.Node]functionPushKind{}
-		pushedRegistrations := map[*ast.Node]bool{}
+		functionEvents := functionEventStack{}
+		callEvents := callEventStack{}
 
 		enterFunction := func(node *ast.Node) {
 			kind := functionPushForNode(node, callbacks)
@@ -296,30 +334,26 @@ var MaxExpectsRule = rule.Rule{
 				canActivateRegistrationFallback(stack.top(), node) {
 				kind = functionActivateRegistrationFallback
 			}
+			functionEvents.push(kind)
 
 			switch kind {
 			case functionPushTestCallback:
 				stack.push(frameTestCallback, true, nil, nil)
-				pushedFunctions[node] = functionPushTestCallback
 			case functionPushDetached:
 				stack.push(frameDetachedFunction, stack.top().active, nil, nil)
-				pushedFunctions[node] = functionPushDetached
 			case functionActivateRegistrationFallback:
 				stack.top().active = true
-				pushedFunctions[node] = functionActivateRegistrationFallback
 			}
 		}
 
-		exitFunction := func(node *ast.Node) {
-			switch pushedFunctions[node] {
+		exitFunction := func(_ *ast.Node) {
+			switch functionEvents.pop() {
 			case functionPushNone:
 				return
 			case functionActivateRegistrationFallback:
-				delete(pushedFunctions, node)
 				stack.top().active = false
 				return
 			}
-			delete(pushedFunctions, node)
 			stack.pop()
 		}
 
@@ -339,6 +373,7 @@ var MaxExpectsRule = rule.Rule{
 			ast.KindConstructor:                              enterFunction,
 			rule.ListenerOnExit(ast.KindConstructor):         exitFunction,
 			ast.KindCallExpression: func(node *ast.Node) {
+				callEvents.push(false)
 				if analysis.ParseTestCall(node) != nil {
 					stack.push(
 						frameRegistrationFallback,
@@ -346,7 +381,7 @@ var MaxExpectsRule = rule.Rule{
 						node,
 						registrationFallbackCandidateRoots(node.AsCallExpression()),
 					)
-					pushedRegistrations[node] = true
+					callEvents.markRegistrationFrame()
 					return
 				}
 
@@ -361,7 +396,7 @@ var MaxExpectsRule = rule.Rule{
 						node,
 						hookFallbackCandidateRoots(node.AsCallExpression()),
 					)
-					pushedRegistrations[node] = true
+					callEvents.markRegistrationFrame()
 					return
 				}
 
@@ -375,11 +410,10 @@ var MaxExpectsRule = rule.Rule{
 					ctx.ReportNode(node, buildExceededMaxAssertionMessage(count, opts.Max))
 				}
 			},
-			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-				if !pushedRegistrations[node] {
+			rule.ListenerOnExit(ast.KindCallExpression): func(_ *ast.Node) {
+				if !callEvents.pop() {
 					return
 				}
-				delete(pushedRegistrations, node)
 				stack.pop()
 			},
 		}
