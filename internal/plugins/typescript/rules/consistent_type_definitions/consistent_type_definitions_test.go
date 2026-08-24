@@ -2,6 +2,8 @@ package consistent_type_definitions
 
 import (
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -544,4 +546,192 @@ declare global { interface Array<T> { item: T; } }`,
 			}
 		})
 	}
+}
+
+func TestConsistentTypeDefinitionsFixEdits(t *testing.T) {
+	testCases := []struct {
+		name             string
+		code             string
+		options          []any
+		wantMergedSource string
+		wantMergedText   string
+		wantOutput       string
+	}{
+		{
+			name: "reported DoActionV2Resp export",
+			code: `export type DoActionV2Resp = {
+  code?: number;
+  msg?: string;
+  data?: {
+    resp?: string;
+    success?: boolean;
+  };
+};`,
+			wantMergedSource: `type DoActionV2Resp = {
+  code?: number;
+  msg?: string;
+  data?: {
+    resp?: string;
+    success?: boolean;
+  };
+};`,
+			wantMergedText: `interface DoActionV2Resp {
+  code?: number;
+  msg?: string;
+  data?: {
+    resp?: string;
+    success?: boolean;
+  };
+}`,
+			wantOutput: `export interface DoActionV2Resp {
+  code?: number;
+  msg?: string;
+  data?: {
+    resp?: string;
+    success?: boolean;
+  };
+}`,
+		},
+		{
+			name: "reported GetShareDeepResearchPodcastResp export",
+			code: `export type GetShareDeepResearchPodcastResp = {
+  podcast_gen_status?: PodcastGenStatus;
+  audit_status?: AuditStatus;
+  episode?: Episode;
+};`,
+			wantMergedSource: `type GetShareDeepResearchPodcastResp = {
+  podcast_gen_status?: PodcastGenStatus;
+  audit_status?: AuditStatus;
+  episode?: Episode;
+};`,
+			wantMergedText: `interface GetShareDeepResearchPodcastResp {
+  podcast_gen_status?: PodcastGenStatus;
+  audit_status?: AuditStatus;
+  episode?: Episode;
+}`,
+			wantOutput: `export interface GetShareDeepResearchPodcastResp {
+  podcast_gen_status?: PodcastGenStatus;
+  audit_status?: AuditStatus;
+  episode?: Episode;
+}`,
+		},
+		{
+			name:             "type alias parameters preserve trivia before close",
+			code:             `export type T<U /* before close */,> /* before equals */ = ({ x: U });`,
+			wantMergedSource: `type T<U /* before close */,> /* before equals */ = ({ x: U });`,
+			wantMergedText:   `interface T<U /* before close */,> /* before equals */ { x: U }`,
+			wantOutput:       `export interface T<U /* before close */,> /* before equals */ { x: U }`,
+		},
+		{
+			name:             "export interface keeps modifier outside fix",
+			code:             `export interface T { x: number }`,
+			options:          []any{"type"},
+			wantMergedSource: `interface T `,
+			wantMergedText:   `type T = `,
+			wantOutput:       `export type T = { x: number }`,
+		},
+		{
+			name:             "type parameters comments and heritage",
+			code:             `export declare interface T<U /* before close */> extends A, B<U> { x: U }`,
+			options:          []any{"type"},
+			wantMergedSource: `interface T<U /* before close */> extends A, B<U> { x: U }`,
+			wantMergedText:   `type T<U /* before close */> = { x: U } & A & B<U>`,
+			wantOutput:       `export declare type T<U /* before close */> = { x: U } & A & B<U>`,
+		},
+		{
+			name:             "default export spans wrapper",
+			code:             `export default interface T extends A, B { x: number }`,
+			options:          []any{"type"},
+			wantMergedSource: `export default interface T extends A, B { x: number }`,
+			wantMergedText:   "type T = { x: number } & A & B\nexport default T",
+			wantOutput:       "type T = { x: number } & A & B\nexport default T",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			diagnostics := lintConsistentTypeDefinitions(t, testCase.code, testCase.options, rule.EditDemandAutofix)
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+			}
+			if diagnostics[0].FixesPtr == nil {
+				t.Fatal("diagnostic has no fixes")
+			}
+
+			merged := mergeFixesForTest(testCase.code, *diagnostics[0].FixesPtr)
+			if got := testCase.code[merged.Range.Pos():merged.Range.End()]; got != testCase.wantMergedSource {
+				t.Errorf("merged fix source = %q, want %q", got, testCase.wantMergedSource)
+			}
+			if merged.Text != testCase.wantMergedText {
+				t.Errorf("merged fix text = %q, want %q", merged.Text, testCase.wantMergedText)
+			}
+
+			output, unapplied, fixed := linter.ApplyRuleFixes(testCase.code, diagnostics)
+			if !fixed || len(unapplied) != 0 {
+				t.Fatalf("ApplyRuleFixes fixed = %v, unapplied = %d", fixed, len(unapplied))
+			}
+			if output != testCase.wantOutput {
+				t.Errorf("fixed output = %q, want %q", output, testCase.wantOutput)
+			}
+		})
+	}
+}
+
+func lintConsistentTypeDefinitions(
+	t *testing.T,
+	code string,
+	options []any,
+	demand rule.EditDemand,
+) []rule.RuleDiagnostic {
+	t.Helper()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(code, "fix-edits.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:      lintprogram.NewFromCompiler(program),
+		File:         sourceFile.FileName(),
+		ExcludePaths: []string{},
+		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+			return []linter.ConfiguredRule{{
+				Name:     ConsistentTypeDefinitionsRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return ConsistentTypeDefinitionsRule.Run(ctx, options)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	})
+	return diagnostics
+}
+
+func mergeFixesForTest(source string, fixes []rule.RuleFix) rule.RuleFix {
+	fixes = slices.Clone(fixes)
+	slices.SortFunc(fixes, func(a rule.RuleFix, b rule.RuleFix) int {
+		if byStart := a.Range.Pos() - b.Range.Pos(); byStart != 0 {
+			return byStart
+		}
+		return a.Range.End() - b.Range.End()
+	})
+
+	start := fixes[0].Range.Pos()
+	end := fixes[len(fixes)-1].Range.End()
+	lastEnd := start
+	var text strings.Builder
+	for _, fix := range fixes {
+		text.WriteString(source[lastEnd:fix.Range.Pos()])
+		text.WriteString(fix.Text)
+		lastEnd = fix.Range.End()
+	}
+	return rule.RuleFixReplaceRange(fixes[0].Range.WithEnd(end), text.String())
 }

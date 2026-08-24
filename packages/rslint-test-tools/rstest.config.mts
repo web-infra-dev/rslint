@@ -556,6 +556,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-called-with.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-comparison-matcher.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-each.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-ending-with-an-expect.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-equality-matcher.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-expect-resolves.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-hooks-in-order.test.ts',
@@ -616,6 +617,7 @@ export default defineConfig({
     './tests/eslint-plugin-promise/rules/valid-params.test.ts',
 
     // eslint-plugin-unicorn
+    './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
     './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
