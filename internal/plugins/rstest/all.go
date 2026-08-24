@@ -7,6 +7,7 @@ import (
 	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_in_test"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_focused_tests"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_identical_title"
 	no_import_node "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_import_node_test"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_interpolation_in_snapshots"
@@ -28,6 +29,7 @@ func GetAllRules() []rule.Rule {
 		no_conditional_in.NoConditionalInTestRule,
 		no_disabled_tests.NoDisabledTestsRule,
 		no_focused_tests.NoFocusedTestsRule,
+		no_hooks.NoHooksRule,
 		no_identical_title.NoIdenticalTitleRule,
 		no_import_node.NoImportNodeTestRule,
 		no_interpolation_in_snapshots.NoInterpolationInSnapshotsRule,
