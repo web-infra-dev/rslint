@@ -198,8 +198,8 @@ func bodyHasExternalReference(ctx rule.RuleContext, body *ast.Node, originalSymb
 			return
 		}
 		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == candidate &&
-			!(node.Parent != nil && node.Parent.Kind == ast.KindJsxNamespacedName && !ast.IsJsxTagName(node.Parent)) &&
-			!(ast.IsJsxTagName(node) && scanner.IsIntrinsicJsxName(node.Text())) &&
+			(node.Parent == nil || node.Parent.Kind != ast.KindJsxNamespacedName || ast.IsJsxTagName(node.Parent)) &&
+			(!ast.IsJsxTagName(node) || !scanner.IsIntrinsicJsxName(node.Text())) &&
 			!utils.IsNonReferenceIdentifier(node) {
 			symbol := ctx.Refs.Resolve(node)
 			conflict = symbol != originalSymbol && !utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
