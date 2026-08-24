@@ -857,6 +857,19 @@ module or replace its rule/path-space generation. Each document lint snapshot
 samples one committed config generation together with the current project view
 on the serialized server dispatch loop.
 
+Within `internal/lsp`, `server.go` remains the single transport, dispatch-loop,
+and mutable-state owner. `initialization.go` constructs its session;
+`config_discovery.go` owns JS/TS transaction prepare/commit/abort, while
+`config_watch.go` owns watcher registration and event handling together with
+JSON fallback and tsconfig-derived state refresh. `document_sync.go` owns the
+open-buffer mirror and debounce state.
+`document_lint_snapshot.go` then freezes target identity, config ownership, rule
+catalog, and declared projects before `lint_execution.go` selects a session or
+isolated overlay Program. `diagnostics.go` and `code_action.go` consume that same
+snapshot, and `eslint_plugin.go` returns through the server-owned generation
+checks. These are phases of one LSP pipeline, not independently stateful
+services.
+
 An explicit JS/TS `--config` or API `overrideConfigFile` bypasses automatic
 candidate selection and loads the exact module. Its directory remains the
 authored base for relative config content, while the invocation cwd remains the

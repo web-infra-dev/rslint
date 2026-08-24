@@ -1,20 +1,27 @@
 package prefer_hooks_in_order_test
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/fixtures"
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_in_order"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestPreferHooksInOrderRule(t *testing.T) {
+// TestPreferHooksInOrderUpstream migrates the full valid/invalid suite from
+// upstream eslint-plugin-jest's prefer-hooks-in-order coverage as preserved in
+// rslint's Jest port. Position assertions cover line/column for every invalid
+// case. Rstest-specific lock-in cases live in
+// prefer_hooks_in_order_extras_test.go.
+func TestPreferHooksInOrderUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
 		t,
 		&prefer_hooks_in_order.PreferHooksInOrderRule,
 		[]rule_tester.ValidTestCase{
+			// ---- upstream valid ----
 			{Code: `beforeAll(() => {})`},
 			{Code: `beforeEach(() => {})`},
 			{Code: `afterEach(() => {})`},
@@ -276,6 +283,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
     `},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- upstream invalid ----
 			{
 				Code: `
         const withDatabase = () => {
@@ -288,7 +296,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         };
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 6, Column: 11},
+					reorderHooksError("beforeAll", "afterAll", 6, 11),
 				},
 			},
 			{
@@ -301,7 +309,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 5, Column: 9},
+					reorderHooksErrorWithRange("beforeAll", "afterAll", 5, 9, 7, 11),
 				},
 			},
 			{
@@ -310,7 +318,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         beforeAll(() => {});
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 3, Column: 9},
+					reorderHooksErrorWithRange("beforeAll", "afterAll", 3, 9, 3, 28),
 				},
 			},
 			{
@@ -319,7 +327,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         beforeEach(() => {});
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 3, Column: 9},
+					reorderHooksError("beforeEach", "afterEach", 3, 9),
 				},
 			},
 			{
@@ -328,7 +336,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         beforeAll(() => {});
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 3, Column: 9},
+					reorderHooksError("beforeAll", "afterEach", 3, 9),
 				},
 			},
 			{
@@ -337,7 +345,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         beforeAll(() => {});
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 3, Column: 9},
+					reorderHooksError("beforeAll", "beforeEach", 3, 9),
 				},
 			},
 			{
@@ -346,7 +354,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         afterEach(() => {});
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 3, Column: 9},
+					reorderHooksError("afterEach", "afterAll", 3, 9),
 				},
 			},
 			{
@@ -357,7 +365,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         afterEach(() => {});
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 5, Column: 9},
+					reorderHooksError("afterEach", "afterAll", 5, 9),
 				},
 			},
 			{
@@ -367,7 +375,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         afterEach(() => {});
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 4, Column: 9},
+					reorderHooksError("afterEach", "afterAll", 4, 9),
 				},
 			},
 			{
@@ -378,7 +386,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 4, Column: 11},
+					reorderHooksError("afterEach", "afterAll", 4, 11),
 				},
 			},
 			{
@@ -394,8 +402,8 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 4, Column: 11},
-					{MessageId: "reorderHooks", Line: 9, Column: 11},
+					reorderHooksError("afterEach", "afterAll", 4, 11),
+					reorderHooksError("beforeAll", "beforeEach", 9, 11),
 				},
 			},
 			{
@@ -411,8 +419,8 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 4, Column: 11},
-					{MessageId: "reorderHooks", Line: 9, Column: 11},
+					reorderHooksError("afterEach", "afterAll", 4, 11),
+					reorderHooksError("beforeAll", "beforeEach", 9, 11),
 				},
 			},
 			{
@@ -427,7 +435,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 7, Column: 13},
+					reorderHooksError("beforeAll", "beforeEach", 7, 13),
 				},
 			},
 			{
@@ -446,8 +454,8 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 5, Column: 11},
-					{MessageId: "reorderHooks", Line: 10, Column: 13},
+					reorderHooksError("beforeAll", "afterAll", 5, 11),
+					reorderHooksError("beforeEach", "afterEach", 10, 13),
 				},
 			},
 			{
@@ -485,7 +493,7 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 23, Column: 15},
+					reorderHooksError("afterEach", "afterAll", 23, 15),
 				},
 			},
 			{
@@ -516,8 +524,8 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 8, Column: 13},
-					{MessageId: "reorderHooks", Line: 19, Column: 13},
+					reorderHooksError("beforeAll", "beforeEach", 8, 13),
+					reorderHooksError("afterEach", "afterAll", 19, 13),
 				},
 			},
 			{
@@ -573,22 +581,37 @@ func TestPreferHooksInOrderRule(t *testing.T) {
         });
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 7, Column: 11},
-					{MessageId: "reorderHooks", Line: 38, Column: 13},
-				},
-			},
-			{
-				Code: `
-        afterAll(() => {
-          beforeEach(() => {});
-          doSomething();
-        });
-        beforeAll(() => {});
-      `,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "reorderHooks", Line: 6, Column: 9},
+					reorderHooksError("beforeAll", "beforeEach", 7, 11),
+					reorderHooksError("beforeEach", "afterEach", 38, 13),
 				},
 			},
 		},
 	)
+}
+
+func reorderHooksError(currentHook, previousHook string, line, column int) rule_tester.InvalidTestCaseError {
+	return rule_tester.InvalidTestCaseError{
+		MessageId: "reorderHooks",
+		Message: fmt.Sprintf(
+			"`%s` hooks should be before any `%s` hooks",
+			currentHook,
+			previousHook,
+		),
+		Line:   line,
+		Column: column,
+	}
+}
+
+func reorderHooksErrorWithRange(
+	currentHook,
+	previousHook string,
+	line,
+	column,
+	endLine,
+	endColumn int,
+) rule_tester.InvalidTestCaseError {
+	err := reorderHooksError(currentHook, previousHook, line, column)
+	err.EndLine = endLine
+	err.EndColumn = endColumn
+	return err
 }
