@@ -440,6 +440,13 @@ func requiresOuterParenthesis(node *ast.Node) bool {
 	if parent == nil || parent.Kind == ast.KindExpressionStatement {
 		return false
 	}
+	// tsgo represents a destructuring default in an assignment target as a
+	// binary assignment, while ESTree gives the default expression an
+	// AssignmentPattern parent. Preserve the parentheses ESLint adds for that
+	// lower-precedence parent instead of treating it like an ordinary `=`.
+	if utils.IsDefaultValueInDestructuringAssignment(parent) {
+		return true
+	}
 	parentPrecedence := utils.EslintLikePrecedence(parent)
 	return parentPrecedence == -1 || assignmentPrecedence < parentPrecedence
 }

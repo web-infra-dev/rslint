@@ -469,6 +469,13 @@ a ??= b`},
 			},
 			// ---- Locks in the outer-parenthesis arms of the logical fixer ----
 			{
+				Code:   `[x = a || (a = z)] = arr`,
+				Output: []string{`[x = (a ||= z)] = arr`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `logical`, Message: `Logical expression can be replaced with an assignment (||=).`, Line: 1, Column: 6, EndLine: 1, EndColumn: 18},
+				},
+			},
+			{
 				Code:   `[a || (a = 0)]`,
 				Output: []string{`[(a ||= 0)]`},
 				Errors: []rule_tester.InvalidTestCaseError{
