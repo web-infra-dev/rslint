@@ -728,7 +728,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// diagnostics by emission order (parent reported before nested child),
 	// and a file's diagnostics are all emitted by a single worker, so under
 	// a STABLE sort this key is already fully deterministic. Keep this
-	// comparator in sync with the --api one in api.go (same policy over
+	// comparator in sync with the --api one in api_lint.go (same policy over
 	// api.Diagnostic).
 	slices.SortStableFunc(allDiags, func(a, b rule.RuleDiagnostic) int {
 		if c := strings.Compare(a.FilePath, b.FilePath); c != 0 {
