@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -61,10 +62,9 @@ function MyComponent({ theme }: { theme: string }) {
 	diagnosticCount := 0
 	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     program,
 		Settings:    nil,
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
+	}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/rules-of-hooks", rule.SeverityWarning, func(rule.RuleDiagnostic) {
 		diagnosticCount++
 	})
 
@@ -197,5 +197,237 @@ function MyComponent() {
 			Tsx: true,
 		}},
 		nil,
+	)
+}
+
+func TestRulesOfHooksDocumentRegressions(t *testing.T) {
+	const (
+		conditional       = `React Hook "useFirst" is called conditionally. React Hooks must be called in the exact same order in every component render.`
+		conditionalSecond = `React Hook "useSecond" is called conditionally. React Hooks must be called in the exact same order in every component render.`
+		early             = `React Hook "useSecond" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`
+		loop              = `React Hook "useHook" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`
+		named             = `React Hook "useHook" is called in function "lower" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`
+		callback          = `React Hook "useHook" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`
+	)
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&RulesOfHooksRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `
+const handlers = {
+  [key]: () => {
+    useHook();
+  },
+  [otherKey]() {
+    useOtherHook();
+  },
+};
+`,
+				Tsx: true,
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+const _Component: React.FC<Props> = () => {
+  useHook();
+};
+`,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					Message: `React Hook "useHook" is called in function "_Component: React.FC<Props>" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`,
+				}},
+			},
+			{
+				Code: `
+function Component() {
+  const handlers = {
+    [key]: () => {
+      useHook();
+    },
+    [otherKey]() {
+      useOtherHook();
+    },
+  };
+  return handlers;
+}
+`,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: callback},
+					{Message: `React Hook "useOtherHook" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`},
+				},
+			},
+			{
+				Code: `
+function Component(value) {
+  if (!value) return null;
+  useFirst();
+  const resolved = value ?? fallback;
+  useSecond();
+  return resolved;
+}
+`,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: conditional},
+					{Message: early},
+				},
+			},
+			{
+				Code: `
+function Component(value) {
+  switch (value) {
+    case 0:
+      useFirst();
+      if (flag) log();
+      return;
+    default:
+      useSecond();
+  }
+}
+`,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: conditional},
+					{Message: conditionalSecond},
+				},
+			},
+			{
+				Code: `
+function useThing(value) {
+  switch (value) {
+    case 0:
+      if (!value || missing) return;
+      useFirst();
+      break;
+    case 1:
+      if (!value) return;
+      useSecond();
+      break;
+  }
+}
+`,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: conditional + ` Did you accidentally call a React Hook after an early return?`},
+					{Message: early},
+				},
+			},
+			{
+				Code: `
+function useThing(value) {
+  switch (value) {
+    case 0:
+      if (!value) return;
+      useFirst();
+      break;
+    case 1:
+      break;
+  }
+}
+`,
+				Tsx:    true,
+				Errors: []rule_tester.InvalidTestCaseError{{Message: conditional}},
+			},
+			{
+				Code: `
+function Component(value) {
+  switch (value) {
+    case 0:
+      useFirst();
+      return;
+    default:
+      useSecond();
+  }
+}
+`,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: conditional + ` Did you accidentally call a React Hook after an early return?`},
+					{Message: early},
+				},
+			},
+			{
+				Code: `
+function lower(values) {
+  for (const value of values) {
+    switch (value) {
+      case 0:
+        break;
+      case 1:
+        useHook();
+        break;
+    }
+  }
+}
+`,
+				Tsx:    true,
+				Errors: []rule_tester.InvalidTestCaseError{{Message: named}},
+			},
+			{
+				Code: `
+function lower(values) {
+  for (const value of values) {
+    switch (value) {
+      case 0:
+        log(value);
+      case 1:
+        useHook();
+        break;
+    }
+  }
+}
+`,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: loop},
+					{Message: named},
+				},
+			},
+			{
+				Code: `
+function lower(values) {
+  for (const value of values) {
+    switch (value) {
+      case 0:
+        return;
+      case 1:
+        useHook();
+        break;
+    }
+  }
+}
+`,
+				Tsx: true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{Message: loop},
+					{Message: named},
+				},
+			},
+			{
+				Code: `
+function lower(values) {
+  for (const value of values) {
+    switch (value) {
+      case 0:
+        try {
+          break;
+        } catch {}
+      case 1:
+        useHook();
+        break;
+    }
+  }
+}
+`,
+				Tsx:    true,
+				Errors: []rule_tester.InvalidTestCaseError{{Message: named}},
+			},
+		},
 	)
 }

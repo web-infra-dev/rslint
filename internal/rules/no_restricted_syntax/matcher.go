@@ -7,9 +7,10 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // matchContext threads the source file through the matcher so attribute
@@ -850,7 +851,7 @@ func rightRelationalPrimitive(value attrValue) (text string, isString bool, numb
 }
 
 func jsStringToNumber(value string) (float64, bool) {
-	value = strings.TrimSpace(value)
+	value = ecmascript.StringTrim(value)
 	if value == "" {
 		return 0, true
 	}
@@ -942,32 +943,14 @@ func attrStringEquals(left string, right attrValue) bool {
 		re := right.compiledRegex
 		if re == nil {
 			var err error
-			re, err = regexp2.Compile(right.Regex, regexpFlags(right.Flags))
+			re, err = esregexp.Compile(right.Regex, right.Flags)
 			if err != nil {
 				return false
 			}
 		}
-		matched, err := re.MatchString(left)
-		return err == nil && matched
+		return re.Test(left)
 	}
 	return false
-}
-
-func regexpFlags(flags string) regexp2.RegexOptions {
-	opts := regexp2.RegexOptions(regexp2.ECMAScript)
-	for _, c := range flags {
-		switch c {
-		case 'i':
-			opts |= regexp2.IgnoreCase
-		case 's':
-			opts |= regexp2.Singleline
-		case 'm':
-			opts |= regexp2.Multiline
-		case 'u':
-			opts |= regexp2.Unicode
-		}
-	}
-	return opts
 }
 
 func attrAsString(v interface{}) string {

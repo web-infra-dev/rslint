@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -12,12 +13,21 @@ type RstestCallAnalysis struct {
 	fnCalls     map[*ast.Node]*ParsedRstestFnCall
 	expectCalls map[*ast.Node]*ParsedRstestExpectCall
 	isExpect    map[*ast.Node]bool
-	expectRoots map[*ast.Symbol]rstestExpectRootKind
+	expectRoots map[*ast.Symbol]rstestExpectRoot
 	calls       []*ast.Node
-	functions   map[string]*ast.Node
-	callbacks   RstestTestCallbacks
-	callbacksOK bool
-	hasTests    bool
+	// functions indexes named function declarations by name so a callback
+	// passed by an identifier the checker could not resolve still has a
+	// candidate. The index is file-wide and carries no scope information, so
+	// entries record whether the name was declared more than once; see
+	// walkRstestCallbackRegistrations for the guards that keeps it honest.
+	functions map[string]rstestFunctionEntry
+	// callbackInfos memoizes the overload-aware callback resolution, which
+	// costs a symbol lookup per registration and is asked for by both the test
+	// context collector and the callback ownership index.
+	callbackInfos map[*ast.Node]rstestCallbackInfo
+	callbacks     RstestTestCallbacks
+	callbacksOK   bool
+	hasTests      bool
 }
 
 type rstestCallAnalysisFileCacheKey struct{}
@@ -39,13 +49,14 @@ func GetRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 
 func newRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 	analysis := &RstestCallAnalysis{
-		ctx:         ctx,
-		candidates:  cloneRstestCandidateSeeds(),
-		fnCalls:     map[*ast.Node]*ParsedRstestFnCall{},
-		expectCalls: map[*ast.Node]*ParsedRstestExpectCall{},
-		isExpect:    map[*ast.Node]bool{},
-		expectRoots: map[*ast.Symbol]rstestExpectRootKind{},
-		functions:   map[string]*ast.Node{},
+		ctx:           ctx,
+		candidates:    cloneRstestCandidateSeeds(),
+		fnCalls:       map[*ast.Node]*ParsedRstestFnCall{},
+		expectCalls:   map[*ast.Node]*ParsedRstestExpectCall{},
+		isExpect:      map[*ast.Node]bool{},
+		expectRoots:   map[*ast.Symbol]rstestExpectRoot{},
+		functions:     map[string]rstestFunctionEntry{},
+		callbackInfos: map[*ast.Node]rstestCallbackInfo{},
 	}
 	analysis.indexSourceFile()
 	return analysis
@@ -81,6 +92,42 @@ func (analysis *RstestCallAnalysis) ParseTestCall(node *ast.Node) *ParsedRstestF
 	}
 	parsed := analysis.parseFnCallCandidate(node)
 	if parsed == nil || parsed.Kind != RstestFnTypeTest {
+		return nil
+	}
+	return parsed
+}
+
+// TestCallback returns the callback associated with a final Rstest test
+// registration. It reuses the analysis parser and the overload-aware callback
+// resolver without scanning the source file or retaining rule-specific state.
+func (analysis *RstestCallAnalysis) TestCallback(node *ast.Node) (*ast.Node, string) {
+	if analysis.ParseTestCall(node) == nil {
+		return nil, ""
+	}
+	info := analysis.callbackInfo(node)
+	return info.functionNode, info.name
+}
+
+// callbackInfo resolves the callback argument of a registration call once per
+// file. Both callback collectors ask about the same calls, so resolving twice
+// would double the declaration lookups they perform.
+func (analysis *RstestCallAnalysis) callbackInfo(node *ast.Node) rstestCallbackInfo {
+	if info, ok := analysis.callbackInfos[node]; ok {
+		return info
+	}
+	info := resolveRstestTestCallback(analysis.ctx, node.AsCallExpression())
+	analysis.callbackInfos[node] = info
+	return info
+}
+
+// parseRegistrationCall keeps the registrations that own a callback body,
+// which are the only ones an execution mode can be inherited through.
+func (analysis *RstestCallAnalysis) parseRegistrationCall(
+	node *ast.Node,
+) *ParsedRstestFnCall {
+	parsed := analysis.ParseFnCall(node)
+	if parsed == nil ||
+		(parsed.Kind != RstestFnTypeTest && parsed.Kind != RstestFnTypeDescribe) {
 		return nil
 	}
 	return parsed
@@ -369,16 +416,26 @@ func (analysis *RstestCallAnalysis) recordFunction(node *ast.Node) {
 			declaration.Name() != nil &&
 			declaration.Name().Kind == ast.KindIdentifier &&
 			declaration.Initializer != nil {
-			initializer := ast.SkipParentheses(declaration.Initializer)
+			initializer := internalUtils.SkipAssertionsAndParens(declaration.Initializer)
 			if ast.IsFunctionExpressionOrArrowFunction(initializer) {
 				name = declaration.Name().AsIdentifier().Text
 				function = initializer
 			}
 		}
 	}
-	if function != nil && analysis.functions[name] == nil {
-		analysis.functions[name] = function
+	if function == nil {
+		return
 	}
+	entry, seen := analysis.functions[name]
+	if !seen {
+		analysis.functions[name] = rstestFunctionEntry{node: function}
+		return
+	}
+	// A redeclared name has no single answer, and the index cannot tell which
+	// declaration a call site meant. Recording the collision lets the lookup
+	// give up rather than guess the first one.
+	entry.ambiguous = true
+	analysis.functions[name] = entry
 }
 
 func isRstestRequireCall(node *ast.Node) bool {

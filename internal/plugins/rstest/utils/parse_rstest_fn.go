@@ -46,8 +46,10 @@ type rstestResolvedAPI struct {
 	// carries no alias-internal information, so anything that has to hold
 	// across an alias belongs here instead.
 	parameterizedKind RstestParameterizedKind
+	executionMode     RstestExecutionMode
 	skipped           bool
 	todo              bool
+	focusEntries      []ParsedRstestFnMemberEntry
 }
 
 type rstestAPIProfile uint8
@@ -138,7 +140,7 @@ func parseRstestFnCall(
 	if root.Kind == ast.KindIdentifier {
 		localName = root.AsIdentifier().Text
 	}
-	return &ParsedRstestFnCall{
+	parsed := &ParsedRstestFnCall{
 		ParsedCall: testFramework.ParsedCall{
 			Name:          resolved.name,
 			LocalName:     localName,
@@ -158,9 +160,14 @@ func parseRstestFnCall(
 			},
 		},
 		ParameterizedKind: resolved.parameterizedKind,
+		ExecutionMode:     resolved.executionMode,
 		Skipped:           resolved.skipped,
 		Todo:              resolved.todo,
 	}
+	if len(resolved.focusEntries) > 0 {
+		parsed.focus = &rstestFocus{entries: resolved.focusEntries}
+	}
+	return parsed
 }
 
 func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool) {
@@ -598,10 +605,23 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 	// across aliases — which is why the member names themselves are collected
 	// by the caller from parts[consumed:] instead.
 	switch part.name {
+	case "concurrent":
+		// Runtime option merging gives concurrent priority when both modifiers
+		// are present, regardless of their source order.
+		resolved.executionMode = RstestExecutionConcurrent
 	case "each":
 		resolved.parameterizedKind = RstestParameterizedEach
 	case "for":
 		resolved.parameterizedKind = RstestParameterizedFor
+	case "only":
+		resolved.focusEntries = append(resolved.focusEntries, ParsedRstestFnMemberEntry{
+			Name: part.name,
+			Node: part.node,
+		})
+	case "sequential":
+		if resolved.executionMode != RstestExecutionConcurrent {
+			resolved.executionMode = RstestExecutionSequential
+		}
 	case "skip":
 		resolved.skipped = true
 	case "todo":

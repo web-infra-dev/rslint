@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -2457,12 +2458,11 @@ class Disabled extends React.Component {}
 		var diagnostics []rule.RuleDiagnostic
 		ctx := (rule.RuleContext{
 			SourceFile:     sourceFile,
-			Program:        program,
 			Settings:       map[string]interface{}{},
 			TypeChecker:    typeChecker,
 			Comments:       comments,
 			DisableManager: rule.NewDisableManager(sourceFile, comments),
-		}).WithDiagnosticConsumer(RequireOptimizationRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+		}).WithProgram(lintprogram.NewFromCompiler(program)).WithDiagnosticConsumer(RequireOptimizationRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {
 				diagnostics = append(diagnostics, diagnostic)
@@ -2512,8 +2512,8 @@ class Disabled extends React.Component {}
 
 // TestRequireOptimizationRule_NilTypeChecker verifies the rule operates
 // without panicking when the TypeChecker is unavailable. rslint schedules
-// rules without `RequiresTypeInfo: true` against "gap files" (files in the
-// program but not in `typeInfoFiles`) with a nil checker; the rule must
+// rules without `RequiresTypeInfo: true` against Programs without checker
+// capability with a nil checker; the rule must
 // degrade gracefully — the only TC-aware path (SFC classification via
 // `reactutil.IsStatelessReactComponentWithChecker`) falls back to a
 // local-block scan when `tc == nil`.
@@ -2573,10 +2573,9 @@ const ArrowComp = (p) => <div />;
 
 	ctx := (rule.RuleContext{
 		SourceFile:  sourceFile,
-		Program:     program,
 		Settings:    map[string]interface{}{},
 		TypeChecker: nil, // explicitly nil — this is the path under test
-	}).WithReporter("test/require-optimization", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
+	}).WithProgram(lintprogram.NewFromCompiler(program)).WithReporter("test/require-optimization", rule.SeverityWarning, func(rule.RuleDiagnostic) {})
 
 	defer func() {
 		if r := recover(); r != nil {

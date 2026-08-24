@@ -10,8 +10,8 @@ exports[`max-lines-per-function > invalid 1`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 2,
+          "column": 14,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -33,12 +33,12 @@ exports[`max-lines-per-function > invalid 2`] = `
 }",
   "diagnostics": [
     {
-      "message": "Function 'func' has too many lines (2). Maximum allowed is 1.",
+      "message": "Function has too many lines (2). Maximum allowed is 1.",
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 2,
+          "column": 20,
+          "line": 1,
         },
         "start": {
           "column": 12,
@@ -62,15 +62,15 @@ return x;
 }",
   "diagnostics": [
     {
-      "message": "Arrow function 'bar' has too many lines (4). Maximum allowed is 3.",
+      "message": "Arrow function has too many lines (4). Maximum allowed is 3.",
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 4,
+          "column": 18,
+          "line": 1,
         },
         "start": {
-          "column": 13,
+          "column": 16,
           "line": 1,
         },
       },
@@ -89,15 +89,15 @@ exports[`max-lines-per-function > invalid 4`] = `
  2",
   "diagnostics": [
     {
-      "message": "Arrow function 'bar' has too many lines (2). Maximum allowed is 1.",
+      "message": "Arrow function has too many lines (2). Maximum allowed is 1.",
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 3,
-          "line": 2,
+          "column": 18,
+          "line": 1,
         },
         "start": {
-          "column": 13,
+          "column": 16,
           "line": 1,
         },
       },
@@ -179,11 +179,11 @@ foo
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 61,
+          "column": 6,
+          "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 4,
           "line": 1,
         },
       },
@@ -211,8 +211,8 @@ var x = 2;
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 7,
+          "column": 14,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -243,8 +243,8 @@ var x = 2;
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 7,
+          "column": 14,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -275,8 +275,8 @@ var x = 2;
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 7,
+          "column": 14,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -307,8 +307,8 @@ var x = 2;
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 7,
+          "column": 14,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -340,8 +340,8 @@ var x = 2;
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 8,
+          "column": 14,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -373,8 +373,8 @@ var x = 2;
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 8,
+          "column": 14,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -406,8 +406,8 @@ var x = 2;
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 8,
+          "column": 14,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -438,8 +438,8 @@ exports[`max-lines-per-function > invalid 13`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 7,
+          "column": 13,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -470,8 +470,8 @@ function
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 5,
+          "column": 1,
+          "line": 3,
         },
         "start": {
           "column": 1,
@@ -505,8 +505,8 @@ if ( x === y ) {
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 10,
+          "column": 16,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -540,8 +540,8 @@ if ( x === y ) {
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 10,
+          "column": 16,
+          "line": 1,
         },
         "start": {
           "column": 1,
@@ -555,8 +555,8 @@ if ( x === y ) {
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 6,
+          "column": 16,
+          "line": 3,
         },
         "start": {
           "column": 1,
@@ -587,8 +587,8 @@ exports[`max-lines-per-function > invalid 17`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 6,
-          "line": 6,
+          "column": 11,
+          "line": 2,
         },
         "start": {
           "column": 5,
@@ -619,8 +619,8 @@ exports[`max-lines-per-function > invalid 18`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 6,
-          "line": 6,
+          "column": 5,
+          "line": 4,
         },
         "start": {
           "column": 5,
@@ -651,8 +651,8 @@ exports[`max-lines-per-function > invalid 19`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 6,
-          "line": 6,
+          "column": 5,
+          "line": 4,
         },
         "start": {
           "column": 5,
@@ -683,8 +683,8 @@ exports[`max-lines-per-function > invalid 20`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 6,
-          "line": 6,
+          "column": 5,
+          "line": 4,
         },
         "start": {
           "column": 5,
@@ -718,8 +718,8 @@ exports[`max-lines-per-function > invalid 21`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 6,
-          "line": 9,
+          "column": 5,
+          "line": 7,
         },
         "start": {
           "column": 5,
@@ -750,8 +750,8 @@ exports[`max-lines-per-function > invalid 22`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 7,
+          "column": 10,
+          "line": 1,
         },
         "start": {
           "column": 2,
@@ -782,11 +782,11 @@ exports[`max-lines-per-function > invalid 23`] = `
       "messageId": "exceed",
       "range": {
         "end": {
-          "column": 2,
-          "line": 7,
+          "column": 7,
+          "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 5,
           "line": 1,
         },
       },

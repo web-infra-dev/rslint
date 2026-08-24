@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildNoUnnecessaryTemplateExpressionMessage() rule.RuleMessage {
@@ -51,7 +52,7 @@ func isWhitespace(str string) bool {
 	// `;
 
 	for _, r := range str {
-		if !utils.IsStrWhiteSpace(r) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			return false
 		}
 	}

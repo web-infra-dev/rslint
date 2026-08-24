@@ -5,12 +5,12 @@
 package lang
 
 import (
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 const errorMessage = "lang attribute must have a valid value."
@@ -27,7 +27,7 @@ var LangRule = rule.Rule{
 				// JsxNamespacedName for legal source). Mirror exactly so we
 				// don't accidentally skip cases upstream would still process.
 				name := reactutil.GetJsxPropName(attr)
-				if name != "" && !strings.EqualFold(name, "lang") {
+				if name != "" && !ecmascript.EqualsWhenUppercased(name, "lang") {
 					return
 				}
 				parent := reactutil.GetJsxParentElement(attr)

@@ -41,12 +41,12 @@ package no_static_element_interactions
 
 import (
 	_ "embed"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_static_element_interactions.schema.json
@@ -113,7 +113,7 @@ func hasNonNullInteractiveHandler(attrs []*ast.Node, handlers []string) bool {
 			if attr.Kind != ast.KindJsxAttribute {
 				continue
 			}
-			if !strings.EqualFold(reactutil.GetJsxPropName(attr), h) {
+			if !ecmascript.EqualsWhenUppercased(reactutil.GetJsxPropName(attr), h) {
 				continue
 			}
 			// First direct attribute with a matching name — `getProp`'s

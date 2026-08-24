@@ -334,7 +334,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 		tc := ctx.TypeChecker
 
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ctx.Program().Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,

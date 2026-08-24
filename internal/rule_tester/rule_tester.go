@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
@@ -26,8 +26,9 @@ type ValidTestCase struct {
 	Skip     bool                   `json:"skip"`
 	Options  any                    `json:"options"`
 	Settings map[string]interface{} `json:"settings"`
-	// LanguageOptions is the normalized per-file language configuration used
-	// to construct native rule globals. Its zero value means latest.
+	// LanguageOptions is the normalized per-file language configuration exposed
+	// through ctx.LanguageOptions and used to construct native rule globals. Its
+	// zero value means latest.
 	LanguageOptions rule.LanguageOptions `json:"languageOptions"`
 	// Globals simulates a config-declared `languageOptions.globals` for rules
 	// that read ctx.Globals (e.g. no-undef). Values are authored exactly as in
@@ -65,8 +66,9 @@ type InvalidTestCase struct {
 	Output   []string               `json:"output"`
 	Errors   []InvalidTestCaseError `json:"errors"`
 	Settings map[string]interface{} `json:"settings"`
-	// LanguageOptions is the normalized per-file language configuration used
-	// to construct native rule globals. Its zero value means latest.
+	// LanguageOptions is the normalized per-file language configuration exposed
+	// through ctx.LanguageOptions and used to construct native rule globals. Its
+	// zero value means latest.
 	LanguageOptions rule.LanguageOptions `json:"languageOptions"`
 	// Globals simulates a config-declared `languageOptions.globals` for rules
 	// that read ctx.Globals (e.g. no-undef). Values are authored exactly as in
@@ -206,18 +208,20 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		allowedFiles := []string{sourceFile.FileName()}
 
 		_, err = linter.RunLinter(linter.RunLinterOptions{
-			Programs:       []*compiler.Program{program},
+			Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 			SingleThreaded: true,
 			Scope:          linter.FileScope{Files: allowedFiles},
 			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{
 					{
-						Name:            "test",
-						Settings:        settings,
-						LanguageOptions: languageOptions,
-						Globals:         globals,
-						Severity:        rule.SeverityError,
+						Name: "test",
+						Environment: &rule.RuleEnvironment{
+							Settings:        settings,
+							LanguageOptions: languageOptions,
+							Globals:         globals,
+						},
+						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return r.Run(ctx, options)
 						},

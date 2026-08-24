@@ -116,7 +116,7 @@ func TestRunLinter_DoesNotExecutePluginPlaceholderInNativePass(t *testing.T) {
 	pluginRunCalled := false
 
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["a.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
@@ -159,10 +159,12 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 	result, err := runLinterPositional([]*compiler.Program{program}, true, []string{paths["globals.ts"]}, nil, utils.ExcludePaths,
 		func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
-				Name:            "capture-globals",
-				LanguageOptions: languageOptions,
-				Globals:         configGlobals,
-				Severity:        rule.SeverityWarning,
+				Name: "capture-globals",
+				Environment: &rule.RuleEnvironment{
+					LanguageOptions: languageOptions,
+					Globals:         configGlobals,
+				},
+				Severity: rule.SeverityWarning,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
 					captured = &ctx
 					return nil
@@ -177,6 +179,9 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 	if result.LintedFileCount != 1 || captured == nil {
 		t.Fatalf("captured context = %v, linted files = %d; want one", captured != nil, result.LintedFileCount)
 		return
+	}
+	if got := captured.LanguageOptions; got != languageOptions {
+		t.Fatalf("RuleContext.LanguageOptions = %#v, want %#v", got, languageOptions)
 	}
 
 	for name, want := range configGlobals {
@@ -280,7 +285,7 @@ func TestRunLinter_ExecutedRulesAcrossPrograms(t *testing.T) {
 		}
 	}
 	result, err := RunLinter(RunLinterOptions{
-		Programs:    []*compiler.Program{programA, programB},
+		Programs:    wrapTestPrograms(programA, programB),
 		TargetFiles: [][]string{{pathsA["a.ts"]}, {pathsB["b.ts"]}},
 		GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
 			if file.FileName() == pathsA["a.ts"] {
@@ -389,7 +394,7 @@ func TestListenerRegistryIsolationAndRuleOrderAcrossFiles(t *testing.T) {
 
 	var diagnostics []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["a.ts"], paths["b.ts"]}},
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []ConfiguredRule {
@@ -467,7 +472,7 @@ func TestRuleContextReporterPreservesDiagnosticSemantics(t *testing.T) {
 
 	var diagnostics []rule.RuleDiagnostic
 	result, err := RunLinter(RunLinterOptions{
-		Programs:       []*compiler.Program{program},
+		Programs:       wrapTestPrograms(program),
 		SingleThreaded: true,
 		TargetFiles:    [][]string{{paths["reporter.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
@@ -552,5 +557,60 @@ func TestRuleContextReporterPreservesDiagnosticSemantics(t *testing.T) {
 		if got.Origin != rule.DiagnosticOriginLint || got.PreFormatted {
 			t.Errorf("diagnostic %d origin/preformatted = (%v, %v), want lint/false", index, got.Origin, got.PreFormatted)
 		}
+	}
+}
+
+type linterFileCacheTestKey struct{}
+
+func TestRunLinterCachesOncePerFileAcrossRules(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{
+		"first.test.ts":  `test("first", () => {});`,
+		"second.test.ts": `test("second", () => {});`,
+	})
+	values := make(map[string][]*int)
+	builds := make(map[string]int)
+
+	makeRule := func(name string) ConfiguredRule {
+		return ConfiguredRule{
+			Name:     name,
+			Severity: rule.SeverityWarning,
+			Run: func(ctx rule.RuleContext) rule.RuleListeners {
+				fileName := ctx.SourceFile.FileName()
+				value := rule.CachedByFile(ctx, linterFileCacheTestKey{}, func() *int {
+					builds[fileName]++
+					return new(int)
+				})
+				values[fileName] = append(values[fileName], value)
+				return rule.RuleListeners{}
+			},
+		}
+	}
+
+	_, err := RunLinter(RunLinterOptions{
+		Programs:       wrapTestPrograms(program),
+		SingleThreaded: true,
+		TargetFiles: [][]string{{
+			paths["first.test.ts"],
+			paths["second.test.ts"],
+		}},
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			return []ConfiguredRule{makeRule("first-rule"), makeRule("second-rule")}
+		},
+		Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
+	})
+	if err != nil {
+		t.Fatalf("RunLinter error: %v", err)
+	}
+
+	first := values[paths["first.test.ts"]]
+	second := values[paths["second.test.ts"]]
+	if builds[paths["first.test.ts"]] != 1 || len(first) != 2 || first[0] != first[1] {
+		t.Fatalf("first file built %d times with values %#v", builds[paths["first.test.ts"]], first)
+	}
+	if builds[paths["second.test.ts"]] != 1 || len(second) != 2 || second[0] != second[1] {
+		t.Fatalf("second file built %d times with values %#v", builds[paths["second.test.ts"]], second)
+	}
+	if first[0] == second[0] {
+		t.Fatal("different files shared a cached value")
 	}
 }

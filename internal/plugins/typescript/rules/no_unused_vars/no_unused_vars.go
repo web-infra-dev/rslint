@@ -5,11 +5,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_unused_vars.schema.json
@@ -18,6 +18,15 @@ var schemaJSON []byte
 type EnableAutofixRemoval struct {
 	Imports bool `json:"imports"`
 }
+
+type variableType uint8
+
+const (
+	variableTypeVariable variableType = iota
+	variableTypeArrayDestructure
+	variableTypeCatchClause
+	variableTypeParameter
+)
 
 type Config struct {
 	Vars                           string               `json:"vars"`
@@ -33,10 +42,10 @@ type Config struct {
 	ReportUsedIgnorePattern        bool                 `json:"reportUsedIgnorePattern"`
 	EnableAutofixRemoval           EnableAutofixRemoval `json:"enableAutofixRemoval"`
 
-	varsIgnoreRe              *regexp2.Regexp
-	argsIgnoreRe              *regexp2.Regexp
-	caughtErrorsIgnoreRe      *regexp2.Regexp
-	destructuredArrayIgnoreRe *regexp2.Regexp
+	varsIgnoreRe              *esregexp.RegExp
+	argsIgnoreRe              *esregexp.RegExp
+	caughtErrorsIgnoreRe      *esregexp.RegExp
+	destructuredArrayIgnoreRe *esregexp.RegExp
 }
 
 type analysisContext struct {
@@ -90,10 +99,10 @@ const maxCachedPatterns = 64
 
 var patternCache = struct {
 	sync.RWMutex
-	entries map[string]*regexp2.Regexp
+	entries map[string]*esregexp.RegExp
 	order   []string
 }{
-	entries: make(map[string]*regexp2.Regexp),
+	entries: make(map[string]*esregexp.RegExp),
 	order:   make([]string, 0, maxCachedPatterns),
 }
 
@@ -169,7 +178,7 @@ func compilePatterns(config Config) Config {
 	return config
 }
 
-func cachedPattern(pattern string) *regexp2.Regexp {
+func cachedPattern(pattern string) *esregexp.RegExp {
 	if pattern == "" {
 		return nil
 	}
@@ -179,7 +188,7 @@ func cachedPattern(pattern string) *regexp2.Regexp {
 	if ok {
 		return cached
 	}
-	re, _ := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions)
+	re, _ := esregexp.Compile(pattern, "u")
 	patternCache.Lock()
 	if cached, ok := patternCache.entries[pattern]; ok {
 		patternCache.Unlock()
@@ -342,8 +351,30 @@ func hasAssignment(definition *ast.Node, writeRefs []*ast.Node) bool {
 				return true
 			}
 		case ast.KindBindingElement:
-			// Destructured element: `const { a } = obj`
-			return true
+			// Variable destructuring writes every binding. Parameter and catch
+			// bindings are definitions unless their own/containing pattern has a
+			// default initializer (or they are reassigned later).
+			definitionOnly := isParameterNode(definition) || isCaughtErrorNode(definition)
+			for current := definition; current != nil; current = current.Parent {
+				switch current.Kind {
+				case ast.KindBindingElement:
+					if element := current.AsBindingElement(); element != nil && element.Initializer != nil {
+						return true
+					}
+				case ast.KindParameter:
+					if parameter := current.AsParameterDeclaration(); parameter != nil && parameter.Initializer != nil {
+						return true
+					}
+					return len(writeRefs) > 0
+				case ast.KindCatchClause:
+					return len(writeRefs) > 0
+				case ast.KindVariableDeclaration:
+					if definitionOnly {
+						return len(writeRefs) > 0
+					}
+					return true
+				}
+			}
 		case ast.KindParameter:
 			// Parameters with default values: `function f(x = 1)`
 			paramDecl := definition.AsParameterDeclaration()
@@ -751,23 +782,30 @@ func isForInOfDeclaration(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// hasArrayDestructuringWrite checks if the variable has any write reference
-// via array destructuring assignment (e.g., `[_x] = arr`).
-func hasArrayDestructuringWrite(writeRefs []*ast.Node) bool {
+// hasDirectArrayDestructuringWrite checks the same direct ArrayPattern shape
+// that typescript-eslint sees for a write reference. Defaults and rest
+// elements have an intermediate ESTree node and intentionally do not match.
+func hasDirectArrayDestructuringWrite(writeRefs []*ast.Node) bool {
 	for _, ref := range writeRefs {
-		parent := ref.Parent
-		for parent != nil {
-			if parent.Kind == ast.KindArrayLiteralExpression {
-				return true
-			}
-			if parent.Kind != ast.KindSpreadElement &&
-				parent.Kind != ast.KindParenthesizedExpression {
-				break
-			}
-			parent = parent.Parent
+		if ref.Parent != nil && ref.Parent.Kind == ast.KindArrayLiteralExpression &&
+			utils.IsInDestructuringAssignment(ref.Parent) {
+			return true
 		}
 	}
 	return false
+}
+
+// isDirectArrayDestructuredIdentifier recreates ESTree's direct-parent test
+// for declaration bindings. tsgo stores defaults and rest markers on the
+// BindingElement, so exclude those wrappers explicitly.
+func isDirectArrayDestructuredIdentifier(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBindingElement || node.Parent == nil ||
+		node.Parent.Kind != ast.KindArrayBindingPattern {
+		return false
+	}
+	element := node.AsBindingElement()
+	return element != nil && element.DotDotDotToken == nil && element.Initializer == nil &&
+		element.Name() != nil && ast.IsIdentifier(element.Name())
 }
 
 // isParameterInWithoutBodyDeclaration checks if a parameter is in a function-like
@@ -795,6 +833,36 @@ func isParameterInWithoutBodyDeclaration(node *ast.Node) bool {
 		ast.KindConstructSignature,
 		ast.KindIndexSignature:
 		return true
+	}
+	return false
+}
+
+// isUsedInFunctionTypeSignatureParameter mirrors the extra marking performed
+// by typescript-eslint's UnusedVarsVisitor. Identifiers anywhere in a function
+// type signature parameter are marked as used; identifiers in the return type
+// are not. The bodyless function cases correspond to TSDeclareFunction and
+// TSEmptyBodyFunctionExpression in typescript-estree.
+func isUsedInFunctionTypeSignatureParameter(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current.Kind != ast.KindParameter {
+			continue
+		}
+		owner := current.Parent
+		if owner == nil {
+			return false
+		}
+		switch owner.Kind {
+		case ast.KindFunctionType,
+			ast.KindConstructorType,
+			ast.KindCallSignature,
+			ast.KindConstructSignature,
+			ast.KindMethodSignature:
+			return true
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
+			return owner.Body() == nil
+		default:
+			return false
+		}
 	}
 	return false
 }
@@ -984,65 +1052,142 @@ func hasStaticInitBlock(classNode *ast.Node) bool {
 	return found
 }
 
-func isDestructuredArrayElement(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-	parent := node.Parent
-	// Walk up through BindingElements to find the containing pattern.
-	for parent != nil {
-		if parent.Kind == ast.KindArrayBindingPattern {
-			return true
-		}
-		if parent.Kind != ast.KindBindingElement {
-			break
-		}
-		parent = parent.Parent
-	}
-	return false
-}
-
 // matchesIgnorePattern checks if a variable name matches its category's
 // ignore pattern, and whether the match should result in ignoring or
 // reporting (when reportUsedIgnorePattern is true and the variable is used).
-// Returns: (shouldIgnore bool, matchesPattern bool)
-func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, writeRefs []*ast.Node) (bool, bool) {
-	var re *regexp2.Regexp
+// Returns: (shouldIgnore bool, matchesPattern bool, matched variable type)
+func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts *Config, writeRefs []*ast.Node) (bool, bool, variableType) {
+	var re *esregexp.RegExp
+	kind := variableTypeVariable
+	matched := false
 
-	if isParameterNode(varInfo.Definition) {
+	// typescript-eslint evaluates destructuredArrayIgnorePattern before the
+	// binding's ordinary category. This also determines the wording used by
+	// reportUsedIgnorePattern when both patterns match.
+	if opts.destructuredArrayIgnoreRe != nil &&
+		(isDirectArrayDestructuredIdentifier(varInfo.Definition) || hasDirectArrayDestructuringWrite(writeRefs)) &&
+		opts.destructuredArrayIgnoreRe.TestOrTimeout(varName) {
+		kind = variableTypeArrayDestructure
+		matched = true
+	} else if isParameterNode(varInfo.Definition) {
+		kind = variableTypeParameter
 		if opts.Args == "none" {
-			return true, false
+			return true, false, kind
 		}
 		re = opts.argsIgnoreRe
 	} else if isCaughtErrorNode(varInfo.Definition) {
+		kind = variableTypeCatchClause
 		if opts.CaughtErrors == "none" {
-			return true, false
+			return true, false, kind
 		}
 		re = opts.caughtErrorsIgnoreRe
 	} else {
 		re = opts.varsIgnoreRe
 	}
 
-	matched := utils.Regexp2MatchString(re, varName)
-
-	// destructuredArrayIgnorePattern applies to array-destructured elements,
-	// checking both the declaration site AND assignment sites (e.g., `let _x; [_x] = arr`).
-	if !matched && opts.destructuredArrayIgnoreRe != nil {
-		if isDestructuredArrayElement(varInfo.Definition) || hasArrayDestructuringWrite(writeRefs) {
-			matched = utils.Regexp2MatchString(opts.destructuredArrayIgnoreRe, varName)
-		}
+	if !matched {
+		matched = re != nil && re.TestOrTimeout(varName)
 	}
 
 	if !matched {
-		return false, false
+		return false, false, kind
 	}
 
 	// Pattern matches. If used + reportUsedIgnorePattern, don't ignore — report instead.
 	if varInfo.Used && opts.ReportUsedIgnorePattern {
-		return false, true
+		return false, true, kind
 	}
 
-	return true, true
+	return true, true, kind
+}
+
+func ignorePatternAdditional(kind variableType, opts *Config, used bool) string {
+	var description, pattern string
+	switch kind {
+	case variableTypeArrayDestructure:
+		description = "elements of array destructuring"
+		pattern = opts.DestructuredArrayIgnorePattern
+	case variableTypeCatchClause:
+		description = "caught errors"
+		pattern = opts.CaughtErrorsIgnorePattern
+	case variableTypeParameter:
+		description = "args"
+		pattern = opts.ArgsIgnorePattern
+	default:
+		description = "vars"
+		pattern = opts.VarsIgnorePattern
+	}
+	if pattern == "" {
+		return ""
+	}
+	return ignorePatternMessage(description, pattern, used)
+}
+
+// ignorePatternMessage appends the RegExp display form directly to the message
+// so diagnostics allocate one string instead of separately allocating a
+// prefix, `/pattern/u`, and the final additional message. The escaping mirrors
+// RegExp.prototype.toString(): literal slashes and line terminators are escaped
+// even when the original option was passed to the constructor as a string.
+func ignorePatternMessage(description string, source string, used bool) string {
+	if !strings.ContainsAny(source, "/\n\r\u2028\u2029") {
+		if used {
+			return ". Used " + description + " must not match /" + source + "/u"
+		}
+		return ". Allowed unused " + description + " must match /" + source + "/u"
+	}
+
+	var display strings.Builder
+	display.Grow(len(description) + len(source) + 38)
+	if used {
+		display.WriteString(". Used ")
+		display.WriteString(description)
+		display.WriteString(" must not match ")
+	} else {
+		display.WriteString(". Allowed unused ")
+		display.WriteString(description)
+		display.WriteString(" must match ")
+	}
+	display.WriteByte('/')
+	precedingBackslashes := 0
+	for _, char := range source {
+		switch char {
+		case '\\':
+			display.WriteByte('\\')
+			precedingBackslashes++
+			continue
+		case '/':
+			if precedingBackslashes%2 == 0 {
+				display.WriteByte('\\')
+			}
+			display.WriteByte('/')
+		case '\n':
+			display.WriteString(`\n`)
+		case '\r':
+			display.WriteString(`\r`)
+		case '\u2028':
+			display.WriteString(`\u2028`)
+		case '\u2029':
+			display.WriteString(`\u2029`)
+		default:
+			display.WriteRune(char)
+		}
+		precedingBackslashes = 0
+	}
+	display.WriteString("/u")
+	return display.String()
+}
+
+func definitionVariableType(definition *ast.Node, opts *Config) variableType {
+	if opts.DestructuredArrayIgnorePattern != "" && isDirectArrayDestructuredIdentifier(definition) {
+		return variableTypeArrayDestructure
+	}
+	if isCaughtErrorNode(definition) {
+		return variableTypeCatchClause
+	}
+	if isParameterNode(definition) {
+		return variableTypeParameter
+	}
+	return variableTypeVariable
 }
 
 // isBeforeLastUsedParam checks if a parameter appears before a later parameter
@@ -1172,32 +1317,46 @@ doneParentWalk:
 	return false
 }
 
-func buildUnusedVarMessage(varName string, hasAssignment bool) rule.RuleMessage {
-	desc := "'" + varName + "' is defined but never used."
+func buildUnusedVarMessage(varName string, hasAssignment bool, additional string) rule.RuleMessage {
+	action := "defined"
 	if hasAssignment {
-		desc = "'" + varName + "' is assigned a value but never used."
+		action = "assigned a value"
 	}
 	return rule.RuleMessage{
 		Id:          "unusedVar",
-		Description: desc,
+		Description: "'" + varName + "' is " + action + " but never used" + additional + ".",
+		Data: map[string]string{
+			"varName":    varName,
+			"action":     action,
+			"additional": additional,
+		},
 	}
 }
 
-func buildUsedOnlyAsTypeMessage(varName string, hasAssignment bool) rule.RuleMessage {
-	desc := "'" + varName + "' is defined but only used as a type."
+func buildUsedOnlyAsTypeMessage(varName string, hasAssignment bool, additional string) rule.RuleMessage {
+	action := "defined"
 	if hasAssignment {
-		desc = "'" + varName + "' is assigned a value but only used as a type."
+		action = "assigned a value"
 	}
 	return rule.RuleMessage{
 		Id:          "usedOnlyAsType",
-		Description: desc,
+		Description: "'" + varName + "' is " + action + " but only used as a type" + additional + ".",
+		Data: map[string]string{
+			"varName":    varName,
+			"action":     action,
+			"additional": additional,
+		},
 	}
 }
 
-func buildUsedIgnoredVarMessage(varName string) rule.RuleMessage {
+func buildUsedIgnoredVarMessage(varName string, additional string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "usedIgnoredVar",
-		Description: "'" + varName + "' is marked as ignored but is used.",
+		Description: "'" + varName + "' is marked as ignored but is used" + additional + ".",
+		Data: map[string]string{
+			"varName":    varName,
+			"additional": additional,
+		},
 	}
 }
 
@@ -1870,10 +2029,10 @@ func implicitJSXReference(
 	definition *ast.Node,
 	ac *analysisContext,
 ) *ast.Node {
-	if !isImportDefinition(definition) || ctx.Program == nil {
+	if !isImportDefinition(definition) || ctx.Program() == nil {
 		return nil
 	}
-	opts := ctx.Program.Options()
+	opts := ctx.Program().Options()
 	if opts == nil {
 		return nil
 	}
@@ -1899,6 +2058,19 @@ func implicitJSXReference(
 	}
 	if isFragmentFactory {
 		return ac.firstFragment
+	}
+	return nil
+}
+
+func lastWriteInDeclarationScope(definition *ast.Node, refs []*ast.Node) *ast.Node {
+	if len(refs) == 0 {
+		return nil
+	}
+	declarationScope := utils.FindEnclosingScope(definition)
+	for index := len(refs) - 1; index >= 0; index-- {
+		if utils.FindEnclosingScope(refs[index]) == declarationScope {
+			return refs[index]
+		}
 	}
 	return nil
 }
@@ -1970,7 +2142,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 				continue
 			}
 			hasUsage = true
-			if !isTypeOnlyReference(usage) {
+			if !isTypeOnlyReference(usage) || isUsedInFunctionTypeSignatureParameter(usage) {
 				onlyUsedAsType = false
 				break
 			}
@@ -2021,7 +2193,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// Check ignore patterns (varsIgnorePattern / argsIgnorePattern / caughtErrorsIgnorePattern).
 	// If the variable matches its category's pattern and is unused → ignore silently.
 	// If it matches but IS used and reportUsedIgnorePattern is true → report as usedIgnoredVar.
-	shouldIgnore, matchedPattern := matchesIgnorePattern(name, varInfo, opts, info.writeRefs)
+	shouldIgnore, matchedPattern, matchedType := matchesIgnorePattern(name, varInfo, opts, info.writeRefs)
 	if shouldIgnore {
 		return
 	}
@@ -2034,10 +2206,11 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		// and reportUsedIgnorePattern is true (e.g., `export const x = _Foo`).
 		if matchedPattern && varInfo.Used && opts.ReportUsedIgnorePattern {
 			reportNode := varInfo.Variable
-			if len(info.writeRefs) > 0 {
-				reportNode = info.writeRefs[len(info.writeRefs)-1]
+			if lastWrite := lastWriteInDeclarationScope(definition, info.writeRefs); lastWrite != nil {
+				reportNode = lastWrite
 			}
-			ctx.ReportNode(reportNode, buildUsedIgnoredVarMessage(name))
+			additional := ignorePatternAdditional(matchedType, opts, true)
+			ctx.ReportNode(reportNode, buildUsedIgnoredVarMessage(name, additional))
 		}
 		return
 	}
@@ -2053,17 +2226,20 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// ESLint reports at the last write reference position (e.g., `a = a + 1` reports
 	// at the LHS `a`). Fall back to the declaration name node if no write refs found.
 	reportNode := varInfo.Variable
-	if len(info.writeRefs) > 0 {
-		reportNode = info.writeRefs[len(info.writeRefs)-1]
+	if lastWrite := lastWriteInDeclarationScope(definition, info.writeRefs); lastWrite != nil {
+		reportNode = lastWrite
 	}
 
 	assigned := hasAssignment(definition, info.writeRefs)
 
 	if matchedPattern && varInfo.Used && opts.ReportUsedIgnorePattern {
-		ctx.ReportNode(reportNode, buildUsedIgnoredVarMessage(name))
+		additional := ignorePatternAdditional(matchedType, opts, true)
+		ctx.ReportNode(reportNode, buildUsedIgnoredVarMessage(name, additional))
 	} else if varInfo.OnlyUsedAsType && opts.Vars == "all" {
-		ctx.ReportNode(reportNode, buildUsedOnlyAsTypeMessage(name, assigned))
+		unusedAdditional := ignorePatternAdditional(definitionVariableType(definition, opts), opts, false)
+		ctx.ReportNode(reportNode, buildUsedOnlyAsTypeMessage(name, assigned, unusedAdditional))
 	} else if !varInfo.Used {
+		unusedAdditional := ignorePatternAdditional(definitionVariableType(definition, opts), opts, false)
 		isImport := isImportDefinition(definition)
 
 		// Track unused imports for allImportSpecifiersUnused check
@@ -2076,13 +2252,13 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 				ctx,
 				reportNode,
 				definition,
-				buildUnusedVarMessage(name, assigned),
+				buildUnusedVarMessage(name, assigned, unusedAdditional),
 				opts.EnableAutofixRemoval.Imports,
 				ac.reportedUnused,
 			)
 			return
 		}
-		ctx.ReportNode(reportNode, buildUnusedVarMessage(name, assigned))
+		ctx.ReportNode(reportNode, buildUnusedVarMessage(name, assigned, unusedAdditional))
 	}
 }
 

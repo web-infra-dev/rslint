@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -47,7 +48,14 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 			Code:   `type T = { [K: string]: number };`,
 			Output: []string{`interface T { [K: string]: number }`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "interfaceOverType"},
+				{
+					MessageId: "interfaceOverType",
+					Message:   "Use an `interface` instead of a `type`.",
+					Line:      1,
+					Column:    6,
+					EndLine:   1,
+					EndColumn: 7,
+				},
 			},
 		},
 		{
@@ -135,6 +143,41 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 				{MessageId: "interfaceOverType"},
 			},
 		},
+		{
+			Code:   `type /* before-name */ T = { x: number };`,
+			Output: []string{`interface /* before-name */ T { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
+		{
+			Code:   `export /* before-type */ type T = { x: number };`,
+			Output: []string{`export /* before-type */ interface T { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
+		{
+			Code:   `type T /* first */ /* second */ = { x: number };`,
+			Output: []string{`interface T /* first */ /* second */ { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
+		{
+			Code:   `type T = /* after-equals */ { x: number };`,
+			Output: []string{`interface T { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
+		{
+			Code:   `type T</* parameter */ U> /* before-equals */ = (/* after-equals */ { x: U });`,
+			Output: []string{`interface T</* parameter */ U> /* before-equals */ { x: U }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
 		// type → interface with excessive whitespace
 		{
 			Code:   `type T=                         { x: number; };`,
@@ -190,7 +233,14 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 			Options: []interface{}{"type"},
 			Output:  []string{`type T = { x: number; }`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "typeOverInterface"},
+				{
+					MessageId: "typeOverInterface",
+					Message:   "Use a `type` instead of an `interface`.",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 12,
+				},
 			},
 		},
 		{
@@ -257,6 +307,22 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 				{MessageId: "typeOverInterface"},
 			},
 		},
+		{
+			Code:    `interface /* before-name */ T { x: number }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`type /* before-name */ T = { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
+		{
+			Code:    `export /* before-interface */ interface T { x: number }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`export /* before-interface */ type T = { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
 		// interface → type with excessive whitespace
 		{
 			Code:    `interface T                          { x: number; }`,
@@ -293,11 +359,43 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 				{MessageId: "typeOverInterface"},
 			},
 		},
+		{
+			Code:    `declare namespace global { interface A {} }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`declare namespace global { type A = {} }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
+		{
+			Code:    `declare module global { interface A {} }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`declare module global { type A = {} }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
+		{
+			Code:    `declare namespace Outer { global { interface A {} } }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`declare namespace Outer { global { type A = {} } }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
 		// export default interface
 		{
 			Code:    "export default interface Test {\n  bar(): string;\n  foo(): number;\n}",
 			Options: []interface{}{"type"},
 			Output:  []string{"type Test = {\n  bar(): string;\n  foo(): number;\n}\nexport default Test"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
+		{
+			Code:    `export default interface Test extends Base<T>, Extra { x: T };`,
+			Options: []interface{}{"type"},
+			Output:  []string{"type Test = { x: T } & Base<T> & Extra\nexport default Test;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "typeOverInterface"},
 			},
@@ -369,7 +467,7 @@ declare global { interface Array<T> { item: T; } }`,
 
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      program,
+					Program:      lintprogram.NewFromCompiler(program),
 					File:         sourceFile.FileName(),
 					ExcludePaths: []string{},
 					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

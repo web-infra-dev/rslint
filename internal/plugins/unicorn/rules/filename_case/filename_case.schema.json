@@ -2,21 +2,36 @@
   "type": "array",
   "items": [
     {
-      "oneOf": [
+      "description": "The rule options.",
+      "anyOf": [
         {
           "properties": {
             "case": {
-              "enum": ["camelCase", "snakeCase", "kebabCase", "pascalCase"],
-              "description": "The filename case style."
+              "enum": [
+                "camelCase",
+                "camelCaseWithAcronyms",
+                "snakeCase",
+                "kebabCase",
+                "pascalCase"
+              ],
+              "description": "The filename and directory name case style."
             },
             "ignore": {
               "type": "array",
+              "items": {
+                "type": ["string", "object"],
+                "additionalProperties": true
+              },
               "uniqueItems": true,
-              "description": "Patterns to ignore."
+              "description": "Path segment patterns to ignore."
             },
             "multipleFileExtensions": {
               "type": "boolean",
               "description": "Whether to treat additional, dot-separated parts of a filename as file extensions."
+            },
+            "checkDirectories": {
+              "type": "boolean",
+              "description": "Whether to check directory names."
             }
           },
           "additionalProperties": false
@@ -27,32 +42,44 @@
               "properties": {
                 "camelCase": {
                   "type": "boolean",
-                  "description": "Whether to allow camelCase filenames."
+                  "description": "Whether to allow camelCase filenames and directory names."
+                },
+                "camelCaseWithAcronyms": {
+                  "type": "boolean",
+                  "description": "Whether to allow camelCase filenames and directory names with acronym segments."
                 },
                 "snakeCase": {
                   "type": "boolean",
-                  "description": "Whether to allow snake_case filenames."
+                  "description": "Whether to allow snake_case filenames and directory names."
                 },
                 "kebabCase": {
                   "type": "boolean",
-                  "description": "Whether to allow kebab-case filenames."
+                  "description": "Whether to allow kebab-case filenames and directory names."
                 },
                 "pascalCase": {
                   "type": "boolean",
-                  "description": "Whether to allow PascalCase filenames."
+                  "description": "Whether to allow PascalCase filenames and directory names."
                 }
               },
               "additionalProperties": false,
-              "description": "The allowed filename case styles."
+              "description": "The allowed filename and directory name case styles."
             },
             "ignore": {
               "type": "array",
+              "items": {
+                "type": ["string", "object"],
+                "additionalProperties": true
+              },
               "uniqueItems": true,
-              "description": "Patterns to ignore."
+              "description": "Path segment patterns to ignore."
             },
             "multipleFileExtensions": {
               "type": "boolean",
               "description": "Whether to treat additional, dot-separated parts of a filename as file extensions."
+            },
+            "checkDirectories": {
+              "type": "boolean",
+              "description": "Whether to check directory names."
             }
           },
           "additionalProperties": false

@@ -48,3 +48,7 @@ type SourceFileMayBeEmittedHost = compiler.SourceFileMayBeEmittedHost
 type SourceMapEmitResult = compiler.SourceMapEmitResult
 type WriteFile = compiler.WriteFile
 type WriteFileData = compiler.WriteFileData
+//go:linkname GetAdditionalJSSyntacticDiagnostics github.com/microsoft/typescript-go/internal/compiler.getAdditionalJSSyntacticDiagnostics
+func GetAdditionalJSSyntacticDiagnostics(file *ast.SourceFile, options *core.CompilerOptions) []*ast.Diagnostic
+//go:linkname GetModeForUsageLocation github.com/microsoft/typescript-go/internal/compiler.getModeForUsageLocation
+func GetModeForUsageLocation(fileName string, meta ast.SourceFileMetaData, usage *ast.StringLiteralLike, options *core.CompilerOptions) core.ResolutionMode

@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_static_only_class"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -135,9 +136,52 @@ func TestNoStaticOnlyClass(t *testing.T) {
 			// alone are still all-static and reported (covered in invalid)
 			// — here, mixing one non-static numeric key blocks the rule.
 			{Code: `class A { static 0() {} 1() {} }`},
+
+			// A newly detected JSDoc-tagged JavaScript class must still respect
+			// both scoped and line disable directives.
+			{
+				Code:     "/* eslint-disable test */\nclass A { /** @public */ static a() {} }",
+				FileName: "scoped-disable.js",
+			},
+			{
+				Code:     "// eslint-disable-next-line test\nclass A { /** @private */ static a() {} }",
+				FileName: "line-disable.js",
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- JS snapshot block: invalid ----
+
+			// TypeScript-Go synthesizes JSDoc accessibility/readonly tags as
+			// synthetic modifiers in JavaScript. They are comments rather than
+			// ESTree syntax fields, so upstream still reports these classes.
+			{
+				Code:     "class AnnotationFactory {\n\tstatic create() {}\n\t/** @private */\n\tstatic _create() {}\n\t/** @private */\n\tstatic async _getPageIndex() {}\n}",
+				FileName: "annotation.js",
+				Output:   []string{"const AnnotationFactory = {\n\tcreate() {},\n\t/** @private */\n\t_create() {},\n\t/** @private */\n\tasync _getPageIndex() {},\n};"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noStaticOnlyClass",
+					Message:   "Use an object instead of a class with only static members.",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 24,
+				}},
+			},
+			{
+				Code:     "class AnnotationLayer {\n\t/** @public */\n\tstatic render() {}\n\t/** @public */\n\tstatic update() {}\n}",
+				FileName: "annotation_layer.js",
+				Output:   []string{"const AnnotationLayer = {\n\t/** @public */\n\trender() {},\n\t/** @public */\n\tupdate() {},\n};"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noStaticOnlyClass",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 22,
+				}},
+			},
+			{
+				Code:     "class A {\n\t/** @protected */\n\tstatic a() {}\n\t/** @readonly */\n\tstatic b = 1;\n}",
+				FileName: "jsdoc-modifiers.js",
+				Output:   []string{"const A = {\n\t/** @protected */\n\ta() {},\n\t/** @readonly */\n\tb : 1,\n};"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noStaticOnlyClass",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 8,
+				}},
+			},
 
 			// `class A { static a() {}; }` — head is `class A` (length 7).
 			// Autofix: class → const, insert `= ` before `{`, append `;`.
@@ -681,7 +725,7 @@ func TestNoStaticOnlyClassEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			HasTypeInfo:  true,
 			ExcludePaths: []string{},

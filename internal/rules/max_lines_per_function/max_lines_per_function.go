@@ -3,13 +3,13 @@ package max_lines_per_function
 import (
 	_ "embed"
 	"fmt"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed max_lines_per_function.schema.json
@@ -25,6 +25,7 @@ var MaxLinesPerFunctionRule = rule.Rule{
 		sourceFile := ctx.SourceFile
 		text := sourceFile.Text()
 		state := &lineState{}
+		headLocator := utils.NewFunctionHeadRangeLocator(sourceFile)
 
 		process := func(node *ast.Node) {
 			// Overload signatures, abstract / declare members, and TS interface
@@ -40,7 +41,6 @@ var MaxLinesPerFunctionRule = rule.Rule{
 
 			startPos := scanner.GetTokenPosOfNode(node, sourceFile, false)
 			endPos := node.End()
-			textRange := core.NewTextRange(startPos, endPos)
 			lineCount := 0
 			if len(state.lineStarts) == 0 && opts.max >= 1 && isSingleLineRange(text, startPos, endPos) {
 				lineCount = 1
@@ -57,8 +57,8 @@ var MaxLinesPerFunctionRule = rule.Rule{
 			}
 
 			if lineCount > opts.max {
-				name := upperCaseFirst(utils.GetFunctionNameWithKind(node))
-				ctx.ReportRange(textRange, rule.RuleMessage{
+				name := utils.UpperCaseFirstASCII(utils.GetFunctionNameWithKindCore(node))
+				ctx.ReportRange(headLocator.Range(node), rule.RuleMessage{
 					Id: "exceed",
 					Description: fmt.Sprintf(
 						"%s has too many lines (%d). Maximum allowed is %d.",
@@ -87,7 +87,7 @@ var MaxLinesPerFunctionRule = rule.Rule{
 // Synthetic or otherwise unusual ranges retain the established line-map path.
 func isSingleLineRange(text string, startPos, endPos int) bool {
 	return startPos >= 0 && endPos >= startPos && endPos <= len(text) &&
-		!utils.ContainsLineTerminator(text, startPos, endPos)
+		!ecmascript.ContainsLineTerminator(text, startPos, endPos)
 }
 
 type maxLinesPerFunctionOptions struct {
@@ -116,17 +116,6 @@ func parseOptions(options []any) maxLinesPerFunctionOptions {
 		result.iifes = v
 	}
 	return result
-}
-
-// upperCaseFirst mirrors ESLint's shared/string-utils upperCaseFirst — used to
-// capitalize the leading word of `getFunctionNameWithKind`'s output before
-// embedding it into the diagnostic message ("function 'foo'" → "Function
-// 'foo'", "arrow function" → "Arrow function").
-func upperCaseFirst(s string) string {
-	for i, r := range s {
-		return string(unicode.ToUpper(r)) + s[i+len(string(r)):]
-	}
-	return s
 }
 
 // isIIFE reports whether the given function-like node is the callee of a call
@@ -322,7 +311,7 @@ func (s *lineState) lineIsCounted(line int) bool {
 	if len(s.fullLineComment) > 0 && s.fullLineComment[line] {
 		return false
 	}
-	return !s.skipBlankLines || !utils.IsECMABlankLine(s.lineContent(line))
+	return !s.skipBlankLines || !ecmascript.IsBlank(s.lineContent(line))
 }
 
 // lineContent returns the content of the i-th 0-indexed line, without its
@@ -351,7 +340,7 @@ func (s *lineState) commentCoversWholeLine(cmt *ast.CommentRange, startLine, end
 	startOK := startLine < lineIndex
 	if !startOK && startLine == lineIndex {
 		col := cmt.Pos() - int(s.lineStarts[lineIndex])
-		if col >= 0 && col <= len(line) && utils.IsECMABlankLine(line[:col]) {
+		if col >= 0 && col <= len(line) && ecmascript.IsBlank(line[:col]) {
 			startOK = true
 		}
 	}
@@ -364,7 +353,7 @@ func (s *lineState) commentCoversWholeLine(cmt *ast.CommentRange, startLine, end
 	}
 	if endLine == lineIndex {
 		col := cmt.End() - int(s.lineStarts[lineIndex])
-		if col >= 0 && col <= len(line) && utils.IsECMABlankLine(line[col:]) {
+		if col >= 0 && col <= len(line) && ecmascript.IsBlank(line[col:]) {
 			return true
 		}
 	}

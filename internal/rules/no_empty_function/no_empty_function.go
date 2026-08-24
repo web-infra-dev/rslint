@@ -2,10 +2,11 @@ package no_empty_function
 
 import (
 	_ "embed"
-	"fmt"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -17,54 +18,84 @@ var schemaJSON []byte
 var NoEmptyFunctionRule = rule.Rule{
 	Name:   "no-empty-function",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Run:    run,
+}
 
-		check := func(node *ast.Node) {
-			body := node.Body()
-			if body == nil || body.Kind != ast.KindBlock {
-				return
-			}
-			if len(body.Statements()) != 0 {
-				return
-			}
-			if utils.HasCommentInsideNode(ctx.SourceFile, body) {
-				return
-			}
-			if isAllowedEmptyFunction(node, opts) {
-				return
-			}
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	return runWithMessageData(ctx, options, true)
+}
 
-			name := emptyFunctionDisplayName(node)
-			bodyRange := utils.TrimNodeTextRange(ctx.SourceFile, body)
-			message := rule.RuleMessage{
-				Id:          "unexpected",
-				Description: fmt.Sprintf("Unexpected empty %s.", name),
-				Data:        map[string]string{"name": name},
-			}
+// RunTSESLint runs the shared implementation for the typescript-eslint
+// extension. ESLint uses report data only to interpolate the already formatted
+// message and does not expose it in lint results, so the extension avoids a
+// per-diagnostic Go map that its previous implementation also did not provide.
+func RunTSESLint(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	return runWithMessageData(ctx, options, false)
+}
+
+func runWithMessageData(ctx rule.RuleContext, options []any, includeMessageData bool) rule.RuleListeners {
+	opts := parseOptions(options)
+
+	check := func(node *ast.Node) {
+		body := node.Body()
+		if body == nil || body.Kind != ast.KindBlock {
+			return
+		}
+		if len(body.Statements()) != 0 {
+			return
+		}
+		bodyRange := core.NewTextRange(scanner.SkipTrivia(ctx.SourceFile.Text(), body.Pos()), body.End())
+		innerRange := core.NewTextRange(bodyRange.Pos(), bodyRange.Pos())
+		if bodyRange.End() > bodyRange.Pos()+1 {
+			innerRange = core.NewTextRange(bodyRange.Pos()+1, bodyRange.End()-1)
+		}
+		hasComment := false
+		if ctx.Comments != nil {
+			hasComment = utils.HasCommentInSpan(ctx.Comments.All(), innerRange.Pos(), innerRange.End())
+		} else {
+			hasComment = utils.HasCommentInsideNode(ctx.SourceFile, body)
+		}
+		if hasComment {
+			return
+		}
+		if isAllowedEmptyFunction(node, opts) {
+			return
+		}
+
+		name := emptyFunctionDisplayName(node)
+		message := rule.RuleMessage{
+			Id:          "unexpected",
+			Description: "Unexpected empty " + name + ".",
+		}
+		if includeMessageData {
+			message.Data = map[string]string{"name": name}
+		}
+		ctx.ReportRangeWithDeferredSuggestions(bodyRange, message, func() []rule.RuleSuggestion {
 			suggestionMessage := rule.RuleMessage{
 				Id:          "suggestComment",
-				Description: fmt.Sprintf("Add comment inside empty %s.", name),
-				Data:        map[string]string{"name": name},
+				Description: "Add comment inside empty " + name + ".",
 			}
-			ctx.ReportRangeWithSuggestions(bodyRange, message, rule.RuleSuggestion{
+			if includeMessageData {
+				suggestionMessage.Data = map[string]string{"name": name}
+			}
+			return []rule.RuleSuggestion{{
 				Message: suggestionMessage,
 				FixesArr: []rule.RuleFix{
-					rule.RuleFixReplaceRange(utils.BracedNodeInnerRange(ctx.SourceFile, body), " /* empty */ "),
+					rule.RuleFixReplaceRange(innerRange, " /* empty */ "),
 				},
-			})
-		}
+			}}
+		})
+	}
 
-		return rule.RuleListeners{
-			ast.KindArrowFunction:       check,
-			ast.KindConstructor:         check,
-			ast.KindFunctionDeclaration: check,
-			ast.KindFunctionExpression:  check,
-			ast.KindGetAccessor:         check,
-			ast.KindMethodDeclaration:   check,
-			ast.KindSetAccessor:         check,
-		}
-	},
+	return rule.RuleListeners{
+		ast.KindArrowFunction:       check,
+		ast.KindConstructor:         check,
+		ast.KindFunctionDeclaration: check,
+		ast.KindFunctionExpression:  check,
+		ast.KindGetAccessor:         check,
+		ast.KindMethodDeclaration:   check,
+		ast.KindSetAccessor:         check,
+	}
 }
 
 type noEmptyFunctionOptions struct {
@@ -72,12 +103,15 @@ type noEmptyFunctionOptions struct {
 }
 
 func parseOptions(options []any) noEmptyFunctionOptions {
-	opts := noEmptyFunctionOptions{allow: map[string]bool{}}
+	var opts noEmptyFunctionOptions
 	if len(options) == 0 {
 		return opts
 	}
 	m, _ := options[0].(map[string]any)
 	allow, _ := m["allow"].([]any)
+	if len(allow) != 0 {
+		opts.allow = make(map[string]bool, len(allow))
+	}
 	for _, item := range allow {
 		if s, ok := item.(string); ok {
 			opts.allow[s] = true
@@ -122,7 +156,13 @@ func emptyFunctionKind(node *ast.Node) string {
 	case ast.KindArrowFunction:
 		return "arrowFunctions"
 	case ast.KindConstructor:
-		return "constructors"
+		if !ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+			return "constructors"
+		}
+		// ESTree represents `static constructor()` as an ordinary method.
+		// tsgo keeps ConstructorDeclaration as the node kind, so classify the
+		// static spelling explicitly before applying async/generator prefixes.
+		kind = "methods"
 	case ast.KindGetAccessor:
 		kind = "getters"
 	case ast.KindSetAccessor:
@@ -171,10 +211,13 @@ func hasParameterProperty(node *ast.Node) bool {
 // "function" / "arrow function".
 func emptyFunctionDisplayName(node *ast.Node) string {
 	if node.Kind == ast.KindConstructor {
-		return "constructor"
+		if !ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+			return "constructor"
+		}
+		return utils.GetFunctionNameWithKindCore(node)
 	}
 
-	tokens := make([]string, 0, 5)
+	tokens := make([]string, 0, 6)
 	parent := parentSkippingParens(node)
 
 	if isClassMemberFunction(node) {
@@ -184,7 +227,7 @@ func emptyFunctionDisplayName(node *ast.Node) string {
 		if name := node.Name(); name != nil && name.Kind == ast.KindPrivateIdentifier {
 			tokens = append(tokens, "private")
 		}
-	} else if parent != nil && parent.Kind == ast.KindPropertyDeclaration && parent.Parent != nil && ast.IsClassLike(parent.Parent) {
+	} else if isClassFieldFunction(parent) {
 		if ast.HasSyntacticModifier(parent, ast.ModifierFlagsStatic) {
 			tokens = append(tokens, "static")
 		}
@@ -210,7 +253,7 @@ func emptyFunctionDisplayName(node *ast.Node) string {
 		tokens = append(tokens, "method")
 	case parent != nil && parent.Kind == ast.KindPropertyAssignment:
 		tokens = append(tokens, "method")
-	case parent != nil && parent.Kind == ast.KindPropertyDeclaration && parent.Parent != nil && ast.IsClassLike(parent.Parent):
+	case isClassFieldFunction(parent):
 		tokens = append(tokens, "method")
 	default:
 		if node.Kind == ast.KindArrowFunction {
@@ -239,10 +282,24 @@ func isClassMemberFunction(node *ast.Node) bool {
 	return node != nil && node.Parent != nil && ast.IsClassLike(node.Parent) && ast.IsMethodOrAccessor(node)
 }
 
+func isClassFieldFunction(parent *ast.Node) bool {
+	return parent != nil &&
+		parent.Kind == ast.KindPropertyDeclaration &&
+		parent.Parent != nil &&
+		ast.IsClassLike(parent.Parent) &&
+		!ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor)
+}
+
 func functionDisplayName(node *ast.Node) string {
 	if parent := parentSkippingParens(node); parent != nil {
 		switch parent.Kind {
 		case ast.KindPropertyAssignment, ast.KindPropertyDeclaration:
+			if parent.Kind == ast.KindPropertyDeclaration && ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
+				if node.Kind == ast.KindFunctionExpression {
+					return ownFunctionDisplayName(node)
+				}
+				return ""
+			}
 			if name := memberDisplayName(parent.Name()); name != "" {
 				return name
 			}
@@ -276,7 +333,7 @@ func memberDisplayName(name *ast.Node) string {
 		return utils.GetPropertyDisplayName(name)
 	}
 	if displayName := utils.GetPropertyDisplayName(name); displayName != "" {
-		return fmt.Sprintf("'%s'", displayName)
+		return "'" + displayName + "'"
 	}
 	return ""
 }
@@ -286,5 +343,5 @@ func ownFunctionDisplayName(node *ast.Node) string {
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return ""
 	}
-	return fmt.Sprintf("'%s'", name.AsIdentifier().Text)
+	return "'" + name.AsIdentifier().Text + "'"
 }

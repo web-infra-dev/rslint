@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -78,6 +79,16 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 			{Code: `/*global foo*/ function f(foo) { return foo; } consume(foo); f(1);`},
 			{Code: `/*global foo*/ consume(foo);`},
 			{Code: `/*global Foo*/ type Alias = Foo; consume({} as Alias);`},
+			{
+				Code:     `/*globals module*/ module.exports = 1;`,
+				FileName: "inline-global.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code:     `/*global foo:writable*/ foo = foo + 1;`,
+				FileName: "inline-global.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
 
 			// Every binding introduced by an exported destructuring declaration is exported.
 			{Code: `export const { nested: { value }, list: [item] } = source;`},
@@ -336,6 +347,14 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 				},
 			},
 			{
+				Code:     `/*global module*/ const module = {}; module.exports = 1;`,
+				FileName: "inline-global.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedError("module", false, 1, 10, 16, ""),
+				},
+			},
+			{
 				// A local type declaration shadows the inline global just as a
 				// value declaration does, so the type reference consumes the
 				// local alias and leaves the inline global unused.
@@ -433,11 +452,15 @@ consume(outer);
 	if err != nil {
 		t.Fatalf("create JavaScript program: %v", err)
 	}
+	sourceProgram, err := lintprogram.NewFromBoundSources(program, program.SourceFiles())
+	if err != nil {
+		t.Fatalf("create source-only Program: %v", err)
+	}
 
 	ruleRan := false
 	var diagnostics []rule.RuleDiagnostic
 	linter.RunLinterInProgram(
-		program,
+		sourceProgram,
 		nil,
 		nil,
 		utils.ExcludePaths,
@@ -461,7 +484,6 @@ consume(outer);
 		func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		map[string]struct{}{filepath.Join(tmpDir, "project-only.ts"): {}},
 		nil,
 	)
 
@@ -716,14 +738,17 @@ consume(data);`,
 				if err != nil {
 					t.Fatalf("create program: %v", err)
 				}
-				typeInfoFiles := map[string]struct{}{filePath: {}}
+				sourceProgram := lintprogram.NewFromCompiler(program)
 				if !expectChecker {
-					typeInfoFiles = map[string]struct{}{filepath.Join(tmpDir, "project-only.ts"): {}}
+					sourceProgram, err = lintprogram.NewFromBoundSources(program, program.SourceFiles())
+					if err != nil {
+						t.Fatalf("create source-only Program: %v", err)
+					}
 				}
 				var diagnostics []rule.RuleDiagnostic
 				ruleRan := false
 				linter.RunLinterInProgram(
-					program,
+					sourceProgram,
 					nil,
 					nil,
 					utils.ExcludePaths,
@@ -747,7 +772,6 @@ consume(data);`,
 					func(diagnostic rule.RuleDiagnostic) {
 						diagnostics = append(diagnostics, diagnostic)
 					},
-					typeInfoFiles,
 					nil,
 				)
 				if !ruleRan {
@@ -815,7 +839,7 @@ assigned = 2;
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:     program,
+			Program:     lintprogram.NewFromCompiler(program),
 			File:        filePath,
 			HasTypeInfo: true,
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

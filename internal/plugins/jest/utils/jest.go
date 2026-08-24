@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -172,11 +172,11 @@ const DefaultJestVersion = "29.0.0"
 // It returns 29 when the version cannot be parsed, matching the historical default of Jest 29.
 func JestVersionMajor(v string) int {
 	const fallback = 29
-	s := strings.TrimSpace(v)
+	s := ecmascript.StringTrim(v)
 	if s == "" {
 		return fallback
 	}
-	low := strings.ToLower(s)
+	low := ecmascript.StringToLowerCase(s)
 	if strings.HasPrefix(low, "workspace:") || strings.HasPrefix(low, "file:") || strings.HasPrefix(low, "link:") {
 		return fallback
 	}
@@ -185,7 +185,7 @@ func JestVersionMajor(v string) int {
 	}
 	if strings.HasPrefix(low, "npm:") {
 		if at := strings.LastIndexByte(s, '@'); at >= 0 && at+1 < len(s) {
-			s = strings.TrimSpace(s[at+1:])
+			s = ecmascript.StringTrim(s[at+1:])
 		} else {
 			return fallback
 		}
@@ -194,16 +194,16 @@ func JestVersionMajor(v string) int {
 	for {
 		changed := false
 		if strings.HasPrefix(s, ">=") {
-			s = strings.TrimSpace(s[2:])
+			s = ecmascript.StringTrim(s[2:])
 			changed = true
 		} else if strings.HasPrefix(s, "<=") {
-			s = strings.TrimSpace(s[2:])
+			s = ecmascript.StringTrim(s[2:])
 			changed = true
 		} else if strings.HasPrefix(s, ">") || strings.HasPrefix(s, "<") {
-			s = strings.TrimSpace(s[1:])
+			s = ecmascript.StringTrim(s[1:])
 			changed = true
 		} else if strings.HasPrefix(s, "^") || strings.HasPrefix(s, "~") {
-			s = strings.TrimSpace(s[1:])
+			s = ecmascript.StringTrim(s[1:])
 			changed = true
 		}
 		if !changed {
@@ -295,7 +295,7 @@ func jestVersionFromSettings(settings map[string]interface{}) (string, bool) {
 	default:
 		return "", false
 	}
-	ver = strings.TrimSpace(ver)
+	ver = ecmascript.StringTrim(ver)
 	if ver == "" {
 		return "", false
 	}
@@ -338,21 +338,29 @@ func jestVersionFromPackageJSONText(data string) string {
 }
 
 // readJestVersionFromPackageJson resolves the jest version from the nearest package.json (same package
-// as the current source file) using the TypeScript program's host filesystem.
-func readJestVersionFromPackageJson(program *compiler.Program, sourceFile *ast.SourceFile) string {
-	if program == nil || sourceFile == nil {
+// as the current source file) using the effective Program's filesystem.
+func readJestVersionFromPackageJson(ctx rule.RuleContext) string {
+	if ctx.SourceFile == nil {
 		return ""
 	}
-	dir := tspath.GetDirectoryPath(sourceFile.FileName())
-	pkgDir := program.GetNearestAncestorDirectoryWithPackageJson(dir)
+	if !ctx.Program().IsValid() {
+		return ""
+	}
+	sourceProgram := ctx.Program()
+	dir := tspath.GetDirectoryPath(ctx.SourceFile.FileName())
+	pkgDir := sourceProgram.NearestPackageJSONDirectory(dir)
 	if pkgDir == "" {
 		return ""
 	}
 	pkgPath := tspath.CombinePaths(pkgDir, "package.json")
-	if !program.FileExists(pkgPath) {
+	if !sourceProgram.FileExists(pkgPath) {
 		return ""
 	}
-	text, ok := program.Host().FS().ReadFile(pkgPath)
+	fileSystem := sourceProgram.FS()
+	if fileSystem == nil {
+		return ""
+	}
+	text, ok := fileSystem.ReadFile(pkgPath)
 	if !ok {
 		return ""
 	}
@@ -365,7 +373,7 @@ func GetJestVersion(ctx rule.RuleContext) string {
 	if s, ok := jestVersionFromSettings(ctx.Settings); ok {
 		return s
 	}
-	if v := readJestVersionFromPackageJson(ctx.Program, ctx.SourceFile); v != "" {
+	if v := readJestVersionFromPackageJson(ctx); v != "" {
 		return v
 	}
 

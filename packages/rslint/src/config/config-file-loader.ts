@@ -401,7 +401,7 @@ export interface PluginConfigDescriptor {
  * transaction's effective IDs, so discarded candidates cannot leak plugin
  * placeholders or worker routes into the activated catalog.
  * ruleNames for a shared prefix are merged (set union) across configs: Go's
- * placeholder registry is a per-prefix superset, while the worker routes the
+ * generation catalog is a per-prefix superset, while the worker routes the
  * actual rules per config. This is not the validation boundary: worker config
  * loading rejects conflicting plugin definitions, including duplicate routing
  * descriptors that mount different instances under the same prefix.
@@ -440,9 +440,9 @@ export function collectPluginMeta(
       for (const [prefix, meta] of Object.entries(ep)) {
         hasPlugins = true;
         // Union ruleNames across every config that mounts this prefix. Go
-        // registers ONE global placeholder set per prefix, but the worker
-        // routes per-config (each config's own LoadedPlugins), so a rule unique
-        // to a second config's same-prefix plugin must still be registered —
+        // derives one generation-wide placeholder set per prefix, but the
+        // worker routes per-config (each config's own LoadedPlugins), so a rule
+        // unique to a second config's same-prefix plugin must still be included —
         // otherwise Go never resolves/dispatches it and it silently never runs
         // (false green). First-wins would drop it.
         const existing = byPrefix.get(prefix);

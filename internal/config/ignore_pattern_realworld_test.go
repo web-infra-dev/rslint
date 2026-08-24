@@ -1,11 +1,9 @@
 package config
 
 import (
-	"sort"
 	"strings"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"gotest.tools/v3/assert"
 )
 
@@ -215,77 +213,4 @@ func TestRealConfig_RspackNpmArtifacts(t *testing.T) {
 		"re-included triple .js must not be ignored")
 	// Direct child of npm (npm/*) ignored; nested deeper not (unless re-included).
 	assert.Assert(t, isFileIgnored(cwd+"/npm/index.js", pats, cwd), "npm/* direct child ignored")
-}
-
-// --- End-to-end on a real-shaped layout: a multi-source ignore set (rspack
-// config `**/tests/**` + gitignore-converted dir covers + the wildcard-mid-path
-// `!` re-include) must produce a gap-file set IDENTICAL to the linter's own
-// per-file decision (GetConfigForFile != nil), regardless of directory pruning.
-// Oracle = { f : f matches a files pattern ∧ GetConfigForFile(f) != nil }, the
-// same contract as TestDiscoverGapFiles_PruningPreservesGapFiles but on a
-// realistic merged ignore set rather than synthetic patterns. ---
-func TestRealWorld_DiscoverGapFiles_MatchesLinterOracle(t *testing.T) {
-	layout := []string{
-		"packages/core/src/index.ts",                          // lintable
-		"packages/core/dist/bundle.ts",                        // dist cover → ignored
-		"packages/core/node_modules/dep/i.ts",                 // node_modules cover → ignored
-		"target/build/a.ts",                                   // target cover → ignored
-		"tests/rspack-test/configCases/pkg/node_modules/d.ts", // node_modules re-included, BUT under **/tests/** → still ignored
-		"tests/rspack-test/configCases/c.ts",                  // under **/tests/** → ignored
-		"scripts/build.ts",                                    // lintable
-		"npm/darwin-arm64/index.ts",                           // re-included triple → lintable
-		"npm/win32-x64-msvc/index.ts",                         // npm/* direct? no, nested → lintable (not covered)
-		"npm/util.ts",                                         // npm/* direct child → ignored
-		"src/app/main.ts",                                     // lintable
-		"src/util.tsx",                                        // lintable (.tsx)
-	}
-	configDir, paths := setupDiscoveryFixture(t, layout)
-
-	// Realistic merged ignore set: config global ignores + gitignore-converted forms.
-	ignores := []string{
-		"**/tests/**",                          // rspack rslint.config.ts (absolute dir block)
-		"**/dist/**/*",                         // gitignore dist/
-		"**/node_modules/**/*",                 // gitignore node_modules/
-		"!tests/rspack-test/*/**/node_modules", // rspack gitignore re-include (wildcard mid-path)
-		"**/target/**/*",                       // gitignore target/
-		"npm/**/*.node",                        // gitignore npm/**/*.node
-		"npm/*",                                // gitignore /npm/*
-		"!npm/darwin-arm64/**/*",               // gitignore !npm/darwin-arm64/
-	}
-	filesPatterns := []string{"**/*.ts", "**/*.tsx"}
-	config := RslintConfig{
-		{Ignores: ignores},
-		{Files: filesPatterns, Rules: Rules{"test-rule": "error"}},
-	}
-
-	// Oracle = the linter's own per-file decision over the fixture's files.
-	var oracle []string
-	for _, abs := range paths {
-		if !isFileMatched(abs, filesPatterns, configDir) {
-			continue
-		}
-		if config.GetConfigForFile(abs, configDir) != nil {
-			oracle = append(oracle, abs)
-		}
-	}
-	sort.Strings(oracle)
-
-	got := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
-	sort.Strings(got)
-
-	// Walker must equal the linter oracle exactly (no over-prune, no over-include).
-	assert.DeepEqual(t, got, oracle)
-
-	// Pin the expected lintable set explicitly so a silent oracle shift can't
-	// make this pass vacuously.
-	want := []string{
-		paths["npm/darwin-arm64/index.ts"],
-		paths["npm/win32-x64-msvc/index.ts"],
-		paths["packages/core/src/index.ts"],
-		paths["scripts/build.ts"],
-		paths["src/app/main.ts"],
-		paths["src/util.tsx"],
-	}
-	sort.Strings(want)
-	assert.DeepEqual(t, got, want)
 }

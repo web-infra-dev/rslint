@@ -87,9 +87,9 @@ function withRuleAndLanguageOptions(
   };
   // Declare the rule-under-test's plugin so the `--api` plugin gate
   // (enforcePlugins) keeps the rule enabled. The prefix is everything before
-  // the rule name's last "/" — matching Go's RulePluginPrefix; core rules have
+  // the rule name's last "/" — matching Go's rule.Namespace; core rules have
   // no "/" and need no declaration. A bare prefix (e.g. "@typescript-eslint",
-  // "unicorn") is a valid native-plugin declaration name.
+  // "unicorn") is a valid bundled-plugin declaration name.
   const slash = ruleName.lastIndexOf('/');
   if (slash > 0) entry.plugins = [ruleName.slice(0, slash)];
   if (languageOptions) entry.languageOptions = languageOptions;

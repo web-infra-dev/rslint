@@ -1,0 +1,17 @@
+[
+  {
+    "type": "file",
+    "name": "define-config",
+    "label": "defineConfig"
+  },
+  {
+    "type": "file",
+    "name": "global-ignores",
+    "label": "globalIgnores"
+  },
+  {
+    "type": "file",
+    "name": "globals",
+    "label": "globals"
+  }
+]

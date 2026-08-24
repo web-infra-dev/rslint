@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // AriaPropertyDefinition describes the type and permitted values of a single
@@ -408,11 +409,11 @@ var AriaPropertySet = func() map[string]struct{} {
 // AriaPropertyNamesUpper holds `AriaPropertyNames` pre-converted to upper
 // case, 1:1 indexed. Suggestion ranking compares against an upper-cased
 // candidate name, and computing the upper form once at init time avoids
-// `strings.ToUpper` allocations on every suggestion query.
+// an upper-casing pass on every suggestion query.
 var AriaPropertyNamesUpper = func() []string {
 	out := make([]string, len(AriaPropertyNames))
 	for i, name := range AriaPropertyNames {
-		out[i] = strings.ToUpper(name)
+		out[i] = ecmascript.StringToUpperCase(name)
 	}
 	return out
 }()

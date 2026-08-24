@@ -85,32 +85,3 @@ func TestSourceHasBOMFromOverlay(t *testing.T) {
 		t.Errorf("overlay Stat size = %d, want the size without the mark", size)
 	}
 }
-
-// TestSourceHasBOMThroughWrappers is the guard for the fragile part of
-// [BOMSource]: the wrapping VFS layers embed the vfs.FS interface, which
-// promotes only that interface's own methods. A layer that forgets to forward
-// makes every overlay beneath it invisible, and the answer silently falls back
-// to the file on disk.
-func TestSourceHasBOMThroughWrappers(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	markedOnDisk := writeTestFile(t, dir, "marked.ts", []byte("\uFEFFlet a = 1;\n"))
-
-	overlay := NewOverlayVFS(osvfs.FS(), map[string]string{
-		markedOnDisk: "let a = 1;\n",
-	})
-	metadata := newProgramMetadataFS(overlay)
-	parallel := newParallelProgramFS(metadata)
-
-	for name, fs := range map[string]interface {
-		SourceHasBOM(path string) bool
-	}{
-		"programMetadataFS": metadata,
-		"parallelProgramFS": parallel,
-	} {
-		if fs.SourceHasBOM(markedOnDisk) {
-			t.Errorf("%s does not forward to the overlay beneath it", name)
-		}
-	}
-}

@@ -5,12 +5,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed object_shorthand.schema.json
@@ -33,7 +34,7 @@ var jsdocStarRegex = regexp.MustCompile(`^\s*\*`)
 type options struct {
 	apply                     string
 	ignoreConstructors        bool
-	methodsIgnorePattern      *regexp2.Regexp
+	methodsIgnorePattern      *esregexp.RegExp
 	avoidQuotes               bool
 	avoidExplicitReturnArrows bool
 }
@@ -73,7 +74,7 @@ func applyObjectOptions(o *options, m map[string]interface{}) {
 		// equivalent fail-fast surface is config validation, where the schema's
 		// `format: "regex"` on methodsIgnorePattern rejects the config before
 		// linting starts - so the compile-error branch here is only defensive.
-		if re, err := utils.CompileRegexp2(v, utils.JSUnicodeRegexOptions); err == nil {
+		if re, err := esregexp.Compile(v, "u"); err == nil {
 			o.methodsIgnorePattern = re
 		}
 	}
@@ -254,7 +255,7 @@ func shouldIgnoreMethodName(o *options, nameNode *ast.Node) bool {
 	if !ok {
 		return false
 	}
-	return utils.Regexp2MatchString(o.methodsIgnorePattern, name)
+	return o.methodsIgnorePattern.TestOrTimeout(name)
 }
 
 // isArgumentsIdentifier reports whether the node is an Identifier whose
@@ -596,7 +597,7 @@ var ObjectShorthandRule = rule.Rule{
 			arrowTokenPos := arrow.EqualsGreaterThanToken.Pos()
 			arrowTokenEnd := arrow.EqualsGreaterThanToken.End()
 
-			paramsText := strings.TrimSpace(sourceText[paramsStart:arrowTokenPos])
+			paramsText := ecmascript.StringTrim(sourceText[paramsStart:arrowTokenPos])
 			bodyText := strings.TrimLeft(sourceText[arrowTokenEnd:fnRange.End()], " \t")
 
 			// Wrap a single identifier parameter in parentheses: `x => …`.

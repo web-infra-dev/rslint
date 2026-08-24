@@ -121,7 +121,7 @@ type EslintPluginFileInput struct {
 	Settings        map[string]any
 	// Rules are the plugin rules (IsEslintPluginRule) configured for this
 	// file, carrying Name / Options / Severity.
-	Rules []ConfiguredRule
+	Rules []rule.ConfiguredRule
 }
 
 // BuildEslintPluginFileInput assembles one file's plugin-lint input from its
@@ -130,8 +130,8 @@ type EslintPluginFileInput struct {
 // it returns ok=false when the file has no plugin rules (caller skips dispatch).
 // The caller supplies the frame: sourceFile (CLI — the native ts-go SourceFile)
 // or text (LSP — the overlay the worker lints); see EslintPluginFileInput.
-func BuildEslintPluginFileInput(filePath, configKey string, rules []ConfiguredRule, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) (EslintPluginFileInput, bool) {
-	var pluginRules []ConfiguredRule
+func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.ConfiguredRule, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) (EslintPluginFileInput, bool) {
+	var pluginRules []rule.ConfiguredRule
 	for _, r := range rules {
 		if r.IsEslintPluginRule {
 			pluginRules = append(pluginRules, r)

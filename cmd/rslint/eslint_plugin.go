@@ -28,8 +28,7 @@ func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *
 	if r.lintResolver == nil {
 		return "", nil
 	}
-	configPath := r.lintResolver.configPathFor(filePath)
-	cfgDir, resolver, ok := r.lintResolver.resolverForFile(filePath, configPath)
+	cfgDir, resolved, ok := r.lintResolver.resolveFile(filePath)
 	if !ok {
 		return "", nil
 	}
@@ -37,7 +36,7 @@ func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *
 	if pluginConfigDir, ok := r.pluginConfigDirByOwner[cfgDir]; ok {
 		wireKey = pluginConfigDir
 	}
-	return wireKey, resolver.ConfigForFile(configPath)
+	return wireKey, resolved.MergedConfig
 }
 
 // buildPluginFileInputs projects third-party plugin inputs from the same
@@ -73,7 +72,7 @@ func buildPluginFileInputs(plan *linter.LintPlan, resolver pluginConfigResolver)
 
 // hasEslintPluginRule reports whether any configured rule is dispatched to the
 // Node plugin host (rather than run natively in Go).
-func hasEslintPluginRule(rules []linter.ConfiguredRule) bool {
+func hasEslintPluginRule(rules []rule.ConfiguredRule) bool {
 	for _, r := range rules {
 		if r.IsEslintPluginRule {
 			return true

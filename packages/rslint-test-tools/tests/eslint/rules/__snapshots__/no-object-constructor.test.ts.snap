@@ -1,0 +1,815 @@
+// Rstest Snapshot v1
+
+exports[`no-object-constructor > invalid 1`] = `
+{
+  "code": "new Object",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 2`] = `
+{
+  "code": "Object()",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 3`] = `
+{
+  "code": "const fn = () => Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 4`] = `
+{
+  "code": "Object() instanceof Object;",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 5`] = `
+{
+  "code": "const obj = Object?.();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 6`] = `
+{
+  "code": "(new Object() instanceof Object);",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 7`] = `
+{
+  "code": "
+foo
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 8`] = `
+{
+  "code": "
+foo()
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 9`] = `
+{
+  "code": "
+new foo
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 10`] = `
+{
+  "code": "
+(a++)
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 11`] = `
+{
+  "code": "
+++a
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 12`] = `
+{
+  "code": "
+const foo = function() {}
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 13`] = `
+{
+  "code": "
+const foo = class {}
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 14`] = `
+{
+  "code": "
+var foo = { bar: baz }
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 15`] = `
+{
+  "code": "
+{}
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 16`] = `
+{
+  "code": "
+function foo() {}
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 17`] = `
+{
+  "code": "
+class Foo {}
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 18`] = `
+{
+  "code": "foo: Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 19`] = `
+{
+  "code": "while (a) Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 20`] = `
+{
+  "code": "
+do Object();
+while (a);
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 2,
+        },
+        "start": {
+          "column": 4,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 21`] = `
+{
+  "code": "for (const prop in obj) Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 22`] = `
+{
+  "code": "with (obj) Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 23`] = `
+{
+  "code": "
+a++
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 24`] = `
+{
+  "code": "
+function foo() {
+    return
+    Object();
+}
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 25`] = `
+{
+  "code": "
+do {}
+while (a)
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 26`] = `
+{
+  "code": "
+debugger
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 27`] = `
+{
+  "code": "
+foo: break foo
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 28`] = `
+{
+  "code": "
+export { foo } from 'bar'
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-object-constructor > invalid 29`] = `
+{
+  "code": "
+var foo
+Object()
+",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-object-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

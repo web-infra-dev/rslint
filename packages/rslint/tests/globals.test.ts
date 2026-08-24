@@ -48,7 +48,7 @@ describe('built-in globals catalog', () => {
       expect(globals[name]).toEqual(upstreamGlobals[name]);
     }
     for (const [name, globalSet] of Object.entries(RSLINT_GLOBAL_SETS)) {
-      expect(Reflect.get(globals, name)).toBe(globalSet);
+      expect(Reflect.get(globals, name)).toEqual(globalSet);
     }
   });
 
@@ -59,6 +59,8 @@ describe('built-in globals catalog', () => {
     expect(globals.node.require).toBe(false);
     expect(globals.nodeBuiltin.process).toBe(false);
     expect(Object.hasOwn(globals.nodeBuiltin, 'require')).toBe(false);
+    expect(globals.greasemonkey.GM_cookie).toBe(false);
+    expect(globals['react-native'].__DEV__).toBe(false);
   });
 
   test('includes language catalogs for parity with the upstream API', () => {

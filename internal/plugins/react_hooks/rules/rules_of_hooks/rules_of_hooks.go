@@ -12,6 +12,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/cfg"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // The schema declares `additionalHooks` exactly as upstream does. Since
@@ -37,14 +39,13 @@ var (
 )
 
 // All AST predicates above (stripReactNamespace, isFunctionLikeContainer,
-// findEnclosingFunction, getFunctionBody, hasAsyncModifier, ...) live in
+// findEnclosingFunction, hasAsyncModifier, ...) live in
 // `react_hooksutil`. The aliases below keep the call sites unchanged
 // while removing the second copy.
 var (
 	stripReactNamespace     = react_hooksutil.StripReactNamespace
 	isFunctionLikeContainer = react_hooksutil.IsFunctionLikeContainer
 	findEnclosingFunction   = react_hooksutil.FindEnclosingFunction
-	getFunctionBody         = react_hooksutil.GetFunctionBody
 	hasAsyncModifier        = react_hooksutil.HasAsyncModifier
 )
 
@@ -53,7 +54,7 @@ var (
 // `useInsertionEffect`) or matches the user-configured `additionalEffectHooks`
 // regex from settings. Specific to rules-of-hooks (the additional-effect-hooks
 // gate is exclusive to this rule), so it's not promoted to the shared util.
-func isEffectCalleeName(node *ast.Node, additional *regexp.Regexp) bool {
+func isEffectCalleeName(node *ast.Node, additional *esregexp.RegExp) bool {
 	n := stripReactNamespace(node)
 	if n == nil || n.Kind != ast.KindIdentifier {
 		return false
@@ -64,7 +65,7 @@ func isEffectCalleeName(node *ast.Node, additional *regexp.Regexp) bool {
 		return true
 	}
 	if additional != nil {
-		return additional.MatchString(name)
+		return additional.Test(name)
 	}
 	return false
 }
@@ -95,49 +96,6 @@ func isInsideTryCatchOfFunction(node *ast.Node, fn *ast.Node) bool {
 	return false
 }
 
-// isInsideLoopOfFunction reports whether `node` is inside any loop construct
-// (while / for / for-in / for-of / do/while) within `fn`. Approximates
-// upstream's CFG `cycled` set: any segment reachable through a back-edge.
-//
-// Position-aware for the C-style and for-in/of variants:
-//   - `for (init; cond; incr) body`: `init` runs once BEFORE the loop and
-//     is NOT cycled; the condition / incrementor / body all are.
-//   - `for (var of expr) body`: `expr` is evaluated once before iteration
-//     starts (per ECMA-262) and is NOT cycled; `var`'s binding pattern
-//     re-binds per iteration and the body is cycled.
-//
-// Without the position split, hooks placed in `for (let x = useFoo(); ...; )`
-// or `for (const x of useArr()) {}` would be misclassified as cycled and
-// emit a spurious loopError.
-func isInsideLoopOfFunction(node *ast.Node, fn *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	cur := node
-	for cur != nil && cur.Parent != nil && cur.Parent != fn {
-		parent := cur.Parent
-		switch parent.Kind {
-		case ast.KindDoStatement, ast.KindWhileStatement:
-			return true
-		case ast.KindForStatement:
-			fs := parent.AsForStatement()
-			if cur != fs.Initializer {
-				return true
-			}
-		case ast.KindForInStatement, ast.KindForOfStatement:
-			fos := parent.AsForInOrOfStatement()
-			if cur != fos.Expression {
-				return true
-			}
-		}
-		if isFunctionLikeContainer(parent) {
-			return false
-		}
-		cur = parent
-	}
-	return false
-}
-
 // All function-name / forwardRef / classifier predicates live in the
 // shared `react_hooksutil` package. The aliases below preserve the
 // existing call sites unchanged.
@@ -148,326 +106,6 @@ var (
 	isClassMember           = react_hooksutil.IsClassMember
 )
 
-// isConditionalAncestor reports whether the position of `child` within `parent`
-// places it on a conditional execution path (only entered on certain
-// runtime branches). Used by `isConditional` during the parent-walk.
-//
-// NOTE: TryStatement is handled by `isInsideTryBlockWithPriorStmt` instead
-// — being inside a try block is only conditional if a prior sibling could
-// throw before the hook is reached.
-func isConditionalAncestor(parent *ast.Node, child *ast.Node) bool {
-	switch parent.Kind {
-	case ast.KindIfStatement:
-		is := parent.AsIfStatement()
-		// `if (cond) then else` — `then` and `else` are conditional; the
-		// condition expression itself is unconditional and is intentionally
-		// not flagged.
-		return child == is.ThenStatement || child == is.ElseStatement
-	case ast.KindConditionalExpression:
-		ce := parent.AsConditionalExpression()
-		return child == ce.WhenTrue || child == ce.WhenFalse
-	case ast.KindBinaryExpression:
-		be := parent.AsBinaryExpression()
-		if be.OperatorToken == nil {
-			return false
-		}
-		switch be.OperatorToken.Kind {
-		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			// Right operand of `&&` / `||` / `??` is conditional; the left
-			// is always evaluated.
-			return child == be.Right
-		}
-		return false
-	case ast.KindWhileStatement:
-		// The condition is always evaluated at least once, so we don't flag
-		// `while (useFoo()) {}` here — but the body is conditional. The
-		// "in-loop" detection separately reports it as a loop violation,
-		// which takes precedence.
-		return child == parent.AsWhileStatement().Statement
-	case ast.KindForStatement:
-		fs := parent.AsForStatement()
-		// init runs once before the loop and is unconditional. The body
-		// is conditional (and the in-loop detection takes precedence).
-		// Condition / incrementor: also conditional in the sense that they
-		// re-execute per iteration — but the in-loop detection covers them.
-		return child == fs.Statement
-	case ast.KindForInStatement, ast.KindForOfStatement:
-		fos := parent.AsForInOrOfStatement()
-		// `for (const x of expr) body` — `expr` is evaluated once before
-		// iteration starts (ECMA-262 step 1 of ForIn/OfBodyEvaluation),
-		// so it's NOT conditional. The body / binding pattern run per
-		// iteration and are loop-conditional (handled by in-loop detection).
-		return child != fos.Expression
-	case ast.KindCaseClause, ast.KindDefaultClause:
-		// Any descendant of a switch case body is conditional.
-		return true
-	case ast.KindCatchClause:
-		// Catch body only executes on an exception.
-		return true
-	}
-	return false
-}
-
-// isInsideTryBlockWithPriorStmt reports whether `node` sits inside a try
-// block AND has at least one preceding sibling statement in that block.
-// Mirrors upstream's CFG behavior: every statement in a try block has a
-// "could throw" exit, so a hook reached only after a prior throwable
-// statement is conditionally executed. A hook that is the very first
-// statement in a try block (no prior statement) is unconditional in
-// upstream's path counting and is NOT flagged here.
-func isInsideTryBlockWithPriorStmt(node *ast.Node, fn *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	cur := node
-	for cur != nil && cur.Parent != nil && cur.Parent != fn {
-		parent := cur.Parent
-		if parent.Kind == ast.KindBlock {
-			grand := parent.Parent
-			if grand != nil && grand.Kind == ast.KindTryStatement {
-				ts := grand.AsTryStatement()
-				if ts.TryBlock != nil && ts.TryBlock.AsNode() == parent {
-					block := parent.AsBlock()
-					if block.Statements != nil {
-						for _, stmt := range block.Statements.Nodes {
-							if stmt == cur {
-								return false
-							}
-							if stmt.Pos() >= cur.Pos() {
-								return false
-							}
-							return true
-						}
-					}
-					return false
-				}
-			}
-		}
-		if isFunctionLikeContainer(parent) {
-			return false
-		}
-		cur = parent
-	}
-	return false
-}
-
-// isConditional walks the parent chain from `node` up to (but not crossing)
-// `fn`. Returns true once any conditional placement is observed.
-// Approximation of upstream's `pathsFromStartToEnd !== allPathsFromStartToEnd`
-// signal for the structural cases; sibling-based early return / labeled break
-// detection lives in `hasEarlyReturnBefore` and `hasLabeledBreakBefore`.
-func isConditional(node *ast.Node, fn *ast.Node) bool {
-	cur := node
-	for cur != nil && cur.Parent != nil && cur != fn {
-		if isConditionalAncestor(cur.Parent, cur) {
-			return true
-		}
-		cur = cur.Parent
-	}
-	return false
-}
-
-// containsEarlyReturn reports whether `node` (recursively, but never crossing
-// a nested function-like) contains a ReturnStatement. ThrowStatement is
-// intentionally excluded: upstream's CFG models thrown segments as
-// `thrownSegments`, which are excluded from path counting — so a hook
-// reached only when an exception did NOT throw is treated as unconditional.
-// Mirroring that, throw-inside-if does not trigger the "early return" suffix
-// here.
-func containsEarlyReturn(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	found := false
-	var visit func(n *ast.Node) bool
-	visit = func(n *ast.Node) bool {
-		if found {
-			return true
-		}
-		if n.Kind == ast.KindReturnStatement {
-			found = true
-			return true
-		}
-		if isFunctionLikeContainer(n) {
-			return false
-		}
-		n.ForEachChild(visit)
-		return false
-	}
-	visit(node)
-	return found
-}
-
-// isPrecededByDirectTerminator reports whether `hookNode` lies after an
-// unconditional `return` or `throw` statement in the same enclosing block
-// (recursively walking up to the function body). Such a hook is unreachable
-// in upstream's CFG (`!segment.reachable`) and the rule loop `continue`s
-// without checking — we model that by short-circuiting all reports here.
-func isPrecededByDirectTerminator(hookNode *ast.Node, fn *ast.Node) bool {
-	if hookNode == nil {
-		return false
-	}
-	cur := hookNode
-	for cur != nil && cur.Parent != nil && cur.Parent != fn {
-		parent := cur.Parent
-		if parent.Kind == ast.KindBlock {
-			block := parent.AsBlock()
-			if block.Statements != nil {
-				for _, stmt := range block.Statements.Nodes {
-					if stmt == cur {
-						break
-					}
-					if stmt.Pos() >= cur.Pos() {
-						break
-					}
-					switch stmt.Kind {
-					case ast.KindReturnStatement, ast.KindThrowStatement:
-						return true
-					}
-				}
-			}
-		}
-		if isFunctionLikeContainer(parent) {
-			break
-		}
-		cur = parent
-	}
-	return false
-}
-
-// hasEarlyReturnBefore walks up from `hookNode` through enclosing Block
-// ancestors (stopping at the function body) and, at each level, checks
-// preceding siblings for early-return markers (return inside any
-// non-function-like child). Triggers the "early return" suffix on
-// `conditionalError`.
-func hasEarlyReturnBefore(hookNode *ast.Node, fn *ast.Node) bool {
-	if hookNode == nil || fn == nil {
-		return false
-	}
-	body := getFunctionBody(fn)
-	cur := hookNode
-	for cur != nil && cur.Parent != nil && cur.Parent != fn {
-		parent := cur.Parent
-		if parent.Kind == ast.KindBlock {
-			block := parent.AsBlock()
-			if block.Statements != nil {
-				for _, stmt := range block.Statements.Nodes {
-					if stmt == cur {
-						break
-					}
-					if stmt.Pos() >= cur.Pos() {
-						break
-					}
-					if containsEarlyReturn(stmt) {
-						return true
-					}
-				}
-			}
-		}
-		if parent == body {
-			break
-		}
-		cur = parent
-	}
-	return false
-}
-
-// collectEnclosingLabels walks up from `node` and returns a set of
-// LabeledStatement labels enclosing `node` within `fn`. Used by
-// `hasLabeledBreakBefore` to recognize `break <label>` references.
-func collectEnclosingLabels(node *ast.Node, fn *ast.Node) map[string]bool {
-	var labels map[string]bool
-	p := node.Parent
-	for p != nil && p != fn {
-		if p.Kind == ast.KindLabeledStatement {
-			ls := p.AsLabeledStatement()
-			if ls.Label != nil && ls.Label.Kind == ast.KindIdentifier {
-				if labels == nil {
-					labels = make(map[string]bool)
-				}
-				labels[ls.Label.AsIdentifier().Text] = true
-			}
-		}
-		if isFunctionLikeContainer(p) {
-			break
-		}
-		p = p.Parent
-	}
-	return labels
-}
-
-// containsLabeledBreak recursively looks for a BreakStatement whose label
-// matches one of `labels`, without descending into nested function-likes
-// (where the break would refer to its own enclosing label scope).
-func containsLabeledBreak(node *ast.Node, labels map[string]bool) bool {
-	if node == nil || len(labels) == 0 {
-		return false
-	}
-	found := false
-	var visit func(n *ast.Node) bool
-	visit = func(n *ast.Node) bool {
-		if found {
-			return true
-		}
-		if n.Kind == ast.KindBreakStatement {
-			bs := n.AsBreakStatement()
-			if bs.Label != nil && bs.Label.Kind == ast.KindIdentifier {
-				if labels[bs.Label.AsIdentifier().Text] {
-					found = true
-					return true
-				}
-			}
-		}
-		if isFunctionLikeContainer(n) {
-			return false
-		}
-		n.ForEachChild(visit)
-		return false
-	}
-	visit(node)
-	return found
-}
-
-// hasLabeledBreakBefore reports whether `hookNode` lies after a `break <label>`
-// targeting an enclosing LabeledStatement. Used to catch the
-// `label: { if (cond) break label; useFoo(); }` family of conditional patterns
-// that upstream detects via CFG cycle / segment analysis but are otherwise
-// invisible to the parent-walk version of `isConditional`.
-func hasLabeledBreakBefore(hookNode *ast.Node, fn *ast.Node) bool {
-	if hookNode == nil || fn == nil {
-		return false
-	}
-	labels := collectEnclosingLabels(hookNode, fn)
-	if len(labels) == 0 {
-		return false
-	}
-	cur := hookNode
-	for cur != nil && cur.Parent != nil && cur.Parent != fn {
-		parent := cur.Parent
-		if parent.Kind == ast.KindBlock {
-			block := parent.AsBlock()
-			if block.Statements != nil {
-				for _, stmt := range block.Statements.Nodes {
-					if stmt == cur {
-						break
-					}
-					if stmt.Pos() >= cur.Pos() {
-						break
-					}
-					if containsLabeledBreak(stmt, labels) {
-						return true
-					}
-				}
-			}
-		}
-		if isFunctionLikeContainer(parent) {
-			break
-		}
-		cur = parent
-	}
-	return false
-}
-
 // nameText returns the source text for a function-name node, or "" when nil.
 // Used to format `functionError` messages with the enclosing function's name.
 func nameText(node *ast.Node, sf *ast.SourceFile) string {
@@ -475,7 +113,8 @@ func nameText(node *ast.Node, sf *ast.SourceFile) string {
 		return ""
 	}
 	if node.Kind == ast.KindIdentifier {
-		return node.AsIdentifier().Text
+		textRange := utils.GetESTreeBindingIdentifierRange(sf, node)
+		return sf.Text()[textRange.Pos():textRange.End()]
 	}
 	return utils.TrimmedNodeText(sf, node)
 }
@@ -536,7 +175,7 @@ func isReferenceIdentifier(id *ast.Node) bool {
 // `useEffectEvent` binding is allowed inside `useEffect(...)` /
 // `useLayoutEffect(...)` / `useInsertionEffect(...)` / configured effect
 // hooks / nested `useEffectEvent(...)` callbacks.
-func isInsideEffectArgument(idNode *ast.Node, additional *regexp.Regexp) bool {
+func isInsideEffectArgument(idNode *ast.Node, additional *esregexp.RegExp) bool {
 	cur := idNode
 	for cur != nil && cur.Parent != nil {
 		p := cur.Parent
@@ -555,7 +194,7 @@ func isInsideEffectArgument(idNode *ast.Node, additional *regexp.Regexp) bool {
 }
 
 // getAdditionalEffectHooks delegates to the shared settings reader.
-func getAdditionalEffectHooks(settings map[string]interface{}) *regexp.Regexp {
+func getAdditionalEffectHooks(settings map[string]interface{}) *esregexp.RegExp {
 	return react_hooksutil.AdditionalHooksFromSettings(settings, "additionalEffectHooks")
 }
 
@@ -563,7 +202,7 @@ func getAdditionalEffectHooks(settings map[string]interface{}) *regexp.Regexp {
 // rule-level `additionalHooks` option takes precedence, with
 // `settings['react-hooks'].additionalEffectHooks` as the fallback —
 // mirroring upstream's create() since facebook/react#37085.
-func parseAdditionalHooks(options []any, settings map[string]interface{}) *regexp.Regexp {
+func parseAdditionalHooks(options []any, settings map[string]interface{}) *esregexp.RegExp {
 	re := getAdditionalEffectHooks(settings)
 	if len(options) == 0 {
 		return re
@@ -574,7 +213,7 @@ func parseAdditionalHooks(options []any, settings map[string]interface{}) *regex
 	// it fails to compile; absent or empty keeps the settings-derived value.
 	if raw, _ := optsMap["additionalHooks"].(string); raw != "" {
 		re = nil
-		if compiled, err := regexp.Compile(raw); err == nil {
+		if compiled, err := esregexp.Compile(raw, ""); err == nil {
 			re = compiled
 		}
 	}
@@ -925,12 +564,10 @@ func reportRange(sourceText string, node *ast.Node) core.TextRange {
 
 // RulesOfHooksRule is the rslint port of upstream `react-hooks/rules-of-hooks`.
 //
-// Departure from upstream: rslint has no CodePathAnalyzer, so the conditional /
-// loop / early-return / cycled-segment detections are AST-shape based rather
-// than CFG-based. The implementation matches upstream observably for every
-// test in upstream's `valid` and `invalid` suites that doesn't rely on
-// BigInt-precise path counting (and we add a `hasLabeledBreakBefore` walk
-// for the `label: { if (cond) break label; useFoo(); }` case).
+// Conditional, loop, early-return, and cycled-segment decisions are derived
+// from internal/utils/cfg. Its path analysis exposes the same observable
+// questions this rule asks of ESLint's CodePathAnalyzer while remaining shared
+// with the other rules that need control flow.
 //
 // Identifier resolution for `useEffectEvent` references uses the shared Refs
 // index first (correct under shadowing), then the TypeChecker compatibility
@@ -954,6 +591,19 @@ var RulesOfHooksRule = rule.Rule{
 		sourceText := sf.Text()
 		flowSuppressionChecked := false
 		mayHaveFlowSuppression := false
+		codePaths := make(map[*ast.Node]*hookCodePath)
+		pathStateFor := func(node *ast.Node) (hookPathState, *ast.Node) {
+			root := cfg.RootOf(node)
+			if root == nil {
+				return hookPathState{}, nil
+			}
+			codePath := codePaths[root]
+			if codePath == nil {
+				codePath = buildHookCodePath(root)
+				codePaths[root] = codePath
+			}
+			return codePath.state(node), root
+		}
 		isFlowSuppressed := func(node *ast.Node) bool {
 			if !flowSuppressionChecked {
 				flowSuppressionChecked = true
@@ -991,12 +641,11 @@ var RulesOfHooksRule = rule.Rule{
 
 				fn := findEnclosingFunction(node)
 				isUse := isUseIdentifier(callee)
+				pathState, codePathRoot := pathStateFor(node)
 
-				// Skip unreachable hooks (preceded by a direct `return` or
-				// `throw` in the same block). Upstream's CFG marks the
-				// segment as `!reachable` and the rule loop `continue`s,
-				// emitting no diagnostic of any kind.
-				if fn != nil && isPrecededByDirectTerminator(node, fn) {
+				// Upstream skips every rule-of-hooks diagnostic for an
+				// unreachable code path segment.
+				if !pathState.reachable {
 					return
 				}
 
@@ -1005,11 +654,11 @@ var RulesOfHooksRule = rule.Rule{
 					report(callee, fmt.Sprintf(`React Hook "%s" cannot be called in a try/catch block.`, makeHookText(callee, sf)))
 				}
 
-				// Loop check (cycled || do-while). Skipped for use(), which
-				// upstream allows in loops.
-				inAnyLoop := false
+				// ESLint checks both cyclic code path segments and a syntactic
+				// do/while ancestor. The latter is an explicit upstream special
+				// case, while cycle membership comes from the shared CFG.
+				inAnyLoop := pathState.cyclic || isInsideDoWhileLoop(node, codePathRoot)
 				if !isUse {
-					inAnyLoop = isInsideLoopOfFunction(node, fn)
 					if inAnyLoop {
 						report(callee, fmt.Sprintf(
 							`React Hook "%s" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`,
@@ -1035,13 +684,9 @@ var RulesOfHooksRule = rule.Rule{
 					if isUse || inAnyLoop {
 						return
 					}
-					cond := isConditional(node, fn)
-					early := hasEarlyReturnBefore(node, fn)
-					labeled := hasLabeledBreakBefore(node, fn)
-					tryWithPrior := isInsideTryBlockWithPriorStmt(node, fn)
-					if cond || early || labeled || tryWithPrior {
+					if !pathState.onEveryFinalPath {
 						suffix := ""
-						if early {
+						if pathState.possiblyEarlyReturn {
 							suffix = " Did you accidentally call a React Hook after an early return?"
 						}
 						report(callee, fmt.Sprintf(

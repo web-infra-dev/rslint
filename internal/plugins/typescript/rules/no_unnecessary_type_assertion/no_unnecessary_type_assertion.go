@@ -3,7 +3,6 @@ package no_unnecessary_type_assertion
 import (
 	_ "embed"
 	"slices"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -11,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_unnecessary_type_assertion.schema.json
@@ -90,7 +90,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			return fixScanner.TokenRange()
 		}
 
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ctx.Program().Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,
@@ -279,7 +279,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 		checkTypeAssertion := func(node *ast.Node) {
 			typeNode := node.Type()
-			if slices.Contains(opts.TypesToIgnore, strings.TrimSpace(sourceText[typeNode.Pos():typeNode.End()])) {
+			if slices.Contains(opts.TypesToIgnore, ecmascript.StringTrim(sourceText[typeNode.Pos():typeNode.End()])) {
 				return
 			}
 

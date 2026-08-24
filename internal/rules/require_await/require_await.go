@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildMissingAwaitMessage(node *ast.Node) rule.RuleMessage {
@@ -43,7 +44,7 @@ func findAsyncKeyword(sourceFile *ast.SourceFile, node *ast.Node) (asyncKeywordI
 			continue
 		}
 		tokenRange := utils.TrimNodeTextRange(sourceFile, mod)
-		removeEnd := utils.SkipLeadingWhitespace(sourceFile.Text(), tokenRange.End(), len(sourceFile.Text()))
+		removeEnd := ecmascript.SkipLeadingWhitespace(sourceFile.Text(), tokenRange.End(), len(sourceFile.Text()))
 		return asyncKeywordInfo{
 			tokenRange:  tokenRange,
 			removeRange: core.NewTextRange(tokenRange.Pos(), removeEnd),

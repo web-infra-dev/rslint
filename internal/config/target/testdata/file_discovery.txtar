@@ -1,0 +1,123 @@
+Filesystem layouts for directory-pruning tests. Each top-level directory is
+materialized independently so cases cannot leak state into one another.
+
+-- prunes-gitignore/src/index.ts --
+// src/index.ts
+-- prunes-gitignore/target/build/a.ts --
+// target/build/a.ts
+-- prunes-gitignore/target/build/deep/b.ts --
+// target/build/deep/b.ts
+
+-- negation-full-path/src/a.ts --
+// src/a.ts
+-- negation-full-path/target/x.ts --
+// target/x.ts
+-- negation-full-path/sub/path/target/y.ts --
+// sub/path/target/y.ts
+
+-- negation-child/src/a.ts --
+// src/a.ts
+-- negation-child/target/keep/x.ts --
+// target/keep/x.ts
+-- negation-child/target/other/y.ts --
+// target/other/y.ts
+
+-- unrooted-negation/src/a.ts --
+// src/a.ts
+-- unrooted-negation/build/keep/x.ts --
+// build/keep/x.ts
+-- unrooted-negation/build/other/y.ts --
+// build/other/y.ts
+
+-- case-insensitive/src/a.ts --
+// src/a.ts
+-- case-insensitive/target/deep/x.ts --
+// target/deep/x.ts
+-- case-insensitive/scripts/debug/keep.ts --
+// scripts/debug/keep.ts
+-- case-insensitive/scripts/other/drop.ts --
+// scripts/other/drop.ts
+
+-- dir-level/src/a.ts --
+// src/a.ts
+-- dir-level/dist/keep.ts --
+// dist/keep.ts
+-- dir-level/dist/other.ts --
+// dist/other.ts
+
+-- gitignore-target/.gitignore --
+target/
+-- gitignore-target/src/index.ts --
+// src/index.ts
+-- gitignore-target/target/a.ts --
+// target/a.ts
+-- gitignore-target/target/deep/b.ts --
+// target/deep/b.ts
+
+-- nested-gitignore/.gitignore --
+build/
+-- nested-gitignore/sub/.gitignore --
+!build/
+-- nested-gitignore/src/a.ts --
+// src/a.ts
+-- nested-gitignore/build/top.ts --
+// build/top.ts
+-- nested-gitignore/sub/build/keep.ts --
+// sub/build/keep.ts
+
+-- pruning-oracle/src/a.ts --
+// src/a.ts
+-- pruning-oracle/src/comp.tsx --
+// src/comp.tsx
+-- pruning-oracle/target/shallow.ts --
+// target/shallow.ts
+-- pruning-oracle/target/x.ts --
+// target/x.ts
+-- pruning-oracle/target/keep/k.ts --
+// target/keep/k.ts
+-- pruning-oracle/target/other/o.ts --
+// target/other/o.ts
+-- pruning-oracle/target/log/skip.log --
+// target/log/skip.log
+-- pruning-oracle/sub/path/target/y.ts --
+// sub/path/target/y.ts
+-- pruning-oracle/build/shallow.ts --
+// build/shallow.ts
+-- pruning-oracle/build/keep/bk.ts --
+// build/keep/bk.ts
+-- pruning-oracle/build/other/bo.ts --
+// build/other/bo.ts
+-- pruning-oracle/dist/keep.ts --
+// dist/keep.ts
+-- pruning-oracle/dist/other.ts --
+// dist/other.ts
+-- pruning-oracle/dist/sub/deep.ts --
+// dist/sub/deep.ts
+-- pruning-oracle/tests/unit/u.ts --
+// tests/unit/u.ts
+-- pruning-oracle/tests/e2e/e.ts --
+// tests/e2e/e.ts
+-- pruning-oracle/a/b/target/deep/d.ts --
+// a/b/target/deep/d.ts
+-- pruning-oracle/a/b/other/o.ts --
+// a/b/other/o.ts
+-- pruning-oracle/target/save/s.ts --
+// target/save/s.ts
+-- pruning-oracle/target/keep/sub/deep.ts --
+// target/keep/sub/deep.ts
+
+-- per-entry-negation/src/a.ts --
+// src/a.ts
+-- per-entry-negation/target/x.ts --
+// target/x.ts
+-- per-entry-negation/target/keep/k.ts --
+// target/keep/k.ts
+
+-- single-threaded/src/a.ts --
+// src/a.ts
+-- single-threaded/target/x.ts --
+// target/x.ts
+-- single-threaded/target/keep/k.ts --
+// target/keep/k.ts
+-- single-threaded/sub/path/target/y.ts --
+// sub/path/target/y.ts

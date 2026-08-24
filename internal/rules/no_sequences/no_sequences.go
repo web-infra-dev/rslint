@@ -27,16 +27,6 @@ func parseOptions(raw []any) options {
 	return opts
 }
 
-// isCommaBinary reports whether node is a BinaryExpression whose operator is
-// the comma token — tsgo's collapsed form of ESLint's SequenceExpression.
-func isCommaBinary(node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindBinaryExpression {
-		return false
-	}
-	bin := node.AsBinaryExpression()
-	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindCommaToken
-}
-
 // walkUpSkippingParens returns the first ancestor of node that is not a
 // ParenthesizedExpression, along with the count of ParenthesizedExpression
 // wrappers traversed. The returned child is the direct descendant of that
@@ -91,7 +81,7 @@ func firstCommaToken(node *ast.Node) *ast.Node {
 	for {
 		bin := current.AsBinaryExpression()
 		left := ast.SkipParentheses(bin.Left)
-		if !isCommaBinary(left) {
+		if !utils.IsCommaOperator(left) {
 			return bin.OperatorToken
 		}
 		current = left
@@ -107,7 +97,7 @@ var NoSequencesRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if !isCommaBinary(node) {
+				if !utils.IsCommaOperator(node) {
 					return
 				}
 				// Single walk-up; all downstream checks read from these.
@@ -115,7 +105,7 @@ var NoSequencesRule = rule.Rule{
 
 				// Only report once per comma chain — skip inner nodes of
 				// `(a, b), c` / `a, b, c`.
-				if isCommaBinary(parent) {
+				if utils.IsCommaOperator(parent) {
 					return
 				}
 				// `for (init; cond; update)` — ESLint unconditionally allows

@@ -5,13 +5,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/rivo/uniseg"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed ban_ts_comment.schema.json
@@ -21,7 +21,7 @@ type DirectiveConfig struct {
 	Enabled              bool   // Whether the directive is enabled (true means banned)
 	AllowWithDescription bool   // Whether to allow with description
 	DescriptionFormat    string // Regex pattern for description format
-	descriptionRegex     *regexp2.Regexp
+	descriptionRegex     *esregexp.RegExp
 }
 
 type BanTsCommentOptions struct {
@@ -149,7 +149,7 @@ func parseDirectiveConfig(value interface{}) DirectiveConfig {
 		}
 	}
 	if config.DescriptionFormat != "" {
-		config.descriptionRegex, _ = utils.CompileRegexp2(config.DescriptionFormat, utils.JSRegexOptions)
+		config.descriptionRegex, _ = esregexp.Compile(config.DescriptionFormat, "")
 	}
 
 	return config
@@ -357,10 +357,10 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 	fullDirectiveName := directiveName(directive)
 
 	// Trimmed description for length check; raw description for format check
-	trimmedDescription := strings.TrimSpace(rawDescription)
+	trimmedDescription := ecmascript.StringTrim(rawDescription)
 
 	// Check minimum length using grapheme cluster count on the trimmed description
-	descLength := graphemeLength(trimmedDescription)
+	descLength := utils.GraphemeCount(trimmedDescription)
 	if descLength < minDescLength {
 		ctx.ReportRange(
 			commentRange,
@@ -373,7 +373,7 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 	}
 
 	// Check description format against raw (untrimmed) description
-	if config.descriptionRegex != nil && !utils.Regexp2MatchString(config.descriptionRegex, rawDescription) {
+	if config.descriptionRegex != nil && !config.descriptionRegex.TestOrTimeout(rawDescription) {
 		ctx.ReportRange(
 			commentRange,
 			rule.RuleMessage{
@@ -412,10 +412,4 @@ func directiveCommentMessage(directive directiveKind) rule.RuleMessage {
 	default:
 		return rule.RuleMessage{Id: "tsDirectiveComment"}
 	}
-}
-
-// graphemeLength returns the number of grapheme clusters in a string.
-// Uses proper Unicode grapheme cluster segmentation (UAX#29) via rivo/uniseg.
-func graphemeLength(s string) int {
-	return uniseg.GraphemeClusterCount(s)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // isCreateElementCallee reports whether a CallExpression callee is
@@ -52,8 +53,8 @@ var NoDangerWithChildrenRule = rule.Rule{
 			if ident == nil || ident.Kind != ast.KindIdentifier {
 				return nil
 			}
-			// TypeChecker is nil for gap files (files in the program but not
-			// in typeInfoFiles). Without it we cannot resolve an identifier to
+			// TypeChecker is nil when this Program cannot provide semantic
+			// services. Without it we cannot resolve an identifier to
 			// its declaration — skip spread/identifier lookups and fall back to
 			// structural checks only, rather than panic in GetDeclaration.
 			if ctx.TypeChecker == nil {
@@ -198,7 +199,7 @@ var NoDangerWithChildrenRule = rule.Rule{
 				return false
 			}
 			text := child.AsJsxText().Text
-			if strings.TrimSpace(text) != "" {
+			if ecmascript.StringTrim(text) != "" {
 				return false
 			}
 			return strings.Contains(text, "\n")
