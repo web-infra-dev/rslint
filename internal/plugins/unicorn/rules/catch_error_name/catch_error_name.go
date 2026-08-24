@@ -7,14 +7,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 const messageID = "catch-error-name"
@@ -37,11 +36,9 @@ var reservedWords = map[string]bool{
 //go:embed catch_error_name.schema.json
 var schemaJSON []byte
 
-var upperCaser = cases.Upper(language.Und)
-
 type options struct {
 	name   string
-	ignore []*regexp2.Regexp
+	ignore []*esregexp.RegExp
 }
 
 func parseOptions(raw []any) options {
@@ -59,7 +56,7 @@ func parseOptions(raw []any) options {
 			if !ok {
 				continue
 			}
-			if re, err := utils.CompileRegexp2(pattern, utils.JSUnicodeRegexOptions); err == nil {
+			if re, err := esregexp.Compile(pattern, "u"); err == nil {
 				result.ignore = append(result.ignore, re)
 			}
 		}
@@ -107,7 +104,7 @@ func upperFirst(value string) string {
 	if first > 0xffff {
 		return value
 	}
-	return upperCaser.String(string(first)) + value[size:]
+	return ecmascript.StringToUpperCase(string(first)) + value[size:]
 }
 
 func (o options) allows(name string) bool {
@@ -115,7 +112,7 @@ func (o options) allows(name string) bool {
 		return true
 	}
 	for _, re := range o.ignore {
-		if utils.Regexp2MatchString(re, name) {
+		if re.TestOrTimeout(name) {
 			return true
 		}
 	}
