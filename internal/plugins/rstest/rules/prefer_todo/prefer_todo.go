@@ -585,10 +585,16 @@ func classifyCallback(args []*ast.Node) callbackClassification {
 	thirdInlineFn, thirdEmpty := inlineFunctionState(third)
 
 	if secondInlineFn {
-		if thirdInlineFn {
-			return callbackClassification{kind: callbackImplementedOrUnknown, callbackIndex: -1, optionsIndex: -1, timeoutIndex: -1}
-		}
 		if secondEmpty {
+			if thirdInlineFn {
+				return callbackClassification{
+					kind:          callbackInlineEmpty,
+					callbackIndex: 1,
+					optionsIndex:  -1,
+					timeoutIndex:  -1,
+					reportOnly:    true,
+				}
+			}
 			timeoutIndex := -1
 			if len(args) == 3 {
 				timeoutIndex = 2

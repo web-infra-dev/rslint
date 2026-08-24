@@ -84,8 +84,6 @@ func TestPreferTodoExtras(t *testing.T) {
 			{Code: `import * as rstest from "@rstest/core";
 const { test } = rstest;
 test("case");`},
-			// ---- Malformed / graceful degradation.
-			{Code: `test("case", () => {}, () => {});`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Rstest-specific title/call-position behavior. A dynamic title and
@@ -130,6 +128,10 @@ test("case");`},
 			},
 			{
 				Code:   `test("case", {}, () => {}, 1);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", () => {}, () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
 			},
 			// ---- A registration the parser has proved is reported even when no
