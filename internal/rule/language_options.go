@@ -47,11 +47,10 @@ func (o LanguageOptions) EffectiveECMAVersion() int {
 
 // EffectiveSourceType returns the source goal selected for this file. The
 // zero value follows ESLint flat config's module default.
-// ResolveLanguageDefaults fills .js/.jsx/.mjs and TypeScript-flavoured
-// extensions (.ts/.tsx/.cts/.mts) to module, and .cjs to commonjs, before
-// rules receive these options. Authored commonjs or script on a TypeScript
-// extension keeps a global program scope; consult ctx.Refs when scope facts
-// matter.
+// ResolveLanguageDefaults fills an exact, case-sensitive .cjs extension to
+// commonjs and every other filename to module before rules receive these
+// options. Authored commonjs or script on a TypeScript extension keeps a global
+// program scope; consult ctx.Refs when scope facts matter.
 func (o LanguageOptions) EffectiveSourceType() string {
 	if o.SourceType == "" {
 		return "module"

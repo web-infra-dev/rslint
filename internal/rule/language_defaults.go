@@ -85,24 +85,22 @@ func isJavaScriptSourceExtension(fileName string) bool {
 // initialization supplied by ESLint's default language selection for fileName,
 // together with effective language options.
 //
-// An omitted source type is filled from the filename: .js/.jsx/.mjs and
-// TypeScript-flavoured extensions (.ts/.tsx/.cts/.mts) select module, matching
-// espree and typescript-eslint; .cjs selects commonjs. Authored sourceType then
-// selects the inits on every extension. module contributes a non-global
-// top-level scope. commonjs contributes writable exports and read-only
-// global/module/require everywhere; on espree-parsed extensions
-// (.js/.jsx/.mjs/.cjs) it adds the non-global wrapper scope and the
-// wrapper-local arguments binding, while TypeScript-flavoured extensions
-// keep a global program scope, matching typescript-eslint's scope manager.
-// script forces a global program scope even when module syntax is present.
+// An omitted source type is filled from the filename: an exact, case-sensitive
+// .cjs extension selects commonjs and every other filename selects module,
+// matching ESLint. Authored sourceType then selects the inits on every
+// extension. module contributes a non-global top-level scope. commonjs
+// contributes writable exports and read-only global/module/require everywhere;
+// on espree-parsed extensions (.js/.jsx/.mjs/.cjs) it adds the non-global
+// wrapper scope and the wrapper-local arguments binding, while
+// TypeScript-flavoured extensions keep a global program scope, matching
+// typescript-eslint's scope manager. script forces a global program scope even
+// when module syntax is present.
 func ResolveLanguageDefaults(fileName string, languageOptions LanguageOptions) (GlobalsInit, RefStoreInit, LanguageOptions) {
 	if languageOptions.SourceType == "" {
-		switch tspath.GetAnyExtensionFromPath(fileName, nil, false) {
-		case tspath.ExtensionJs, tspath.ExtensionJsx, tspath.ExtensionMjs,
-			tspath.ExtensionTs, tspath.ExtensionTsx, tspath.ExtensionCts, tspath.ExtensionMts:
-			languageOptions.SourceType = "module"
-		case tspath.ExtensionCjs:
+		if tspath.GetAnyExtensionFromPath(fileName, nil, false) == tspath.ExtensionCjs {
 			languageOptions.SourceType = "commonjs"
+		} else {
+			languageOptions.SourceType = "module"
 		}
 	}
 	switch languageOptions.SourceType {
