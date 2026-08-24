@@ -75,6 +75,7 @@ func TestGetterReturnRule(t *testing.T) {
 			{Code: `class foo { get bar(){ try { return 1; } catch(e) { throw e; } } }`},
 			{Code: `class foo { get bar(){ try { throw new Error(); } catch(e) { return 1; } } }`},
 			{Code: `class foo { get bar(){ try { return 1; } finally { } } }`},
+			{Code: `class foo { get bar(){ try { return 1; } catch(e) { } } }`},
 
 			// Switch with return
 			{Code: `class foo { get bar(){ switch(x) { case 1: return 1; default: return 2; } } }`},
@@ -117,7 +118,7 @@ func TestGetterReturnRule(t *testing.T) {
 					{
 						MessageId: "expected",
 						Line:      1,
-						Column:    13,
+						Column:    25,
 					},
 				},
 			},
@@ -192,7 +193,7 @@ func TestGetterReturnRule(t *testing.T) {
 
 			// Try/catch where not all paths return
 			{
-				Code: `class foo { get bar(){ try { return 1; } catch(e) { } } }`,
+				Code: `class foo { get bar(){ try { return value; } catch(e) { } } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "expectedAlways",
@@ -207,9 +208,9 @@ func TestGetterReturnRule(t *testing.T) {
 				Code: `class foo { get bar(){ try { return 1; } finally { return; } } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "expectedAlways",
+						MessageId: "expected",
 						Line:      1,
-						Column:    13,
+						Column:    52,
 					},
 				},
 			},

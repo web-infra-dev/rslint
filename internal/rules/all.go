@@ -1,6 +1,17 @@
 package rules
 
 import (
+	"sync"
+
+	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
+	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
+	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
+	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
+	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
+	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
+	rstestPlugin "github.com/web-infra-dev/rslint/internal/plugins/rstest"
+	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
+	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
@@ -72,6 +83,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_implicit_coercion"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_inline_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
 	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
@@ -79,6 +91,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_lone_blocks"
+	"github.com/web-infra-dev/rslint/internal/rules/no_lonely_if"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_magic_numbers"
@@ -126,6 +139,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undefined"
+	"github.com/web-infra-dev/rslint/internal/rules/no_underscore_dangle"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
@@ -161,6 +175,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_destructuring"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_exponentiation_operator"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_numeric_literals"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_has_own"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_regex_literals"
@@ -172,6 +187,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_await"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
+	"github.com/web-infra-dev/rslint/internal/rules/sort_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
 	"github.com/web-infra-dev/rslint/internal/rules/symbol_description"
 	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
@@ -179,7 +195,32 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
 
-func GetAllRules() []rule.Rule {
+var allRuleCatalog = sync.OnceValue(func() *rule.Catalog {
+	return rule.NewCatalog(allRules()...)
+})
+
+func allRules() []rule.Rule {
+	var implementedRules []rule.Rule
+	implementedRules = append(implementedRules, typescriptPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, importPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, reactPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, reactHooksPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, jestPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, rstestPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, jsxA11yPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, promisePlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, unicornPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, coreRules()...)
+	return implementedRules
+}
+
+// All returns the shared immutable catalog containing every rule implemented
+// in Go. It is safe to share across concurrent lint runs.
+func All() *rule.Catalog {
+	return allRuleCatalog()
+}
+
+func coreRules() []rule.Rule {
 	return []rule.Rule{
 		accessor_pairs.AccessorPairsRule,
 		array_callback_return.ArrayCallbackReturnRule,
@@ -248,9 +289,11 @@ func GetAllRules() []rule.Rule {
 		no_implicit_coercion.NoImplicitCoercionRule,
 		no_implied_eval.NoImpliedEvalRule,
 		no_import_assign.NoImportAssignRule,
+		no_inline_comments.NoInlineCommentsRule,
 		no_inner_declarations.NoInnerDeclarationsRule,
 		no_irregular_whitespace.NoIrregularWhitespaceRule,
 		no_lone_blocks.NoLoneBlocksRule,
+		no_lonely_if.NoLonelyIfRule,
 		no_loop_func.NoLoopFuncRule,
 		no_loss_of_precision.NoLossOfPrecisionRule,
 		no_magic_numbers.NoMagicNumbersRule,
@@ -296,11 +339,13 @@ func GetAllRules() []rule.Rule {
 		no_undef.NoUndefRule,
 		no_undef_init.NoUndefInitRule,
 		no_undefined.NoUndefinedRule,
+		no_underscore_dangle.NoUnderscoreDangleRule,
 		no_unassigned_vars.NoUnassignedVarsRule,
 		prefer_const.PreferConstRule,
 		prefer_destructuring.PreferDestructuringRule,
 		prefer_exponentiation_operator.PreferExponentiationOperatorRule,
 		prefer_numeric_literals.PreferNumericLiteralsRule,
+		prefer_object_has_own.PreferObjectHasOwnRule,
 		prefer_object_spread.PreferObjectSpreadRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
 		preserve_caught_error.PreserveCaughtErrorRule,
@@ -356,5 +401,6 @@ func GetAllRules() []rule.Rule {
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
 		unicode_bom.UnicodeBomRule,
 		operator_assignment.OperatorAssignmentRule,
+		sort_keys.SortKeysRule,
 	}
 }

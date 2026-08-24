@@ -1,112 +1,20 @@
 package no_conditional_in
 
 import (
-	_ "embed"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_conditional_in_test"
 )
 
-//go:embed no_conditional_in_test.schema.json
-var schemaJSON []byte
-
-type options struct {
-	allowOptionalChaining bool
-}
-
-func parseOptions(rawOptions []any) options {
-	opts := options{allowOptionalChaining: true}
-	if len(rawOptions) == 0 {
-		return opts
-	}
-
-	optionMap, _ := rawOptions[0].(map[string]interface{})
-	if allow, ok := optionMap["allowOptionalChaining"].(bool); ok {
-		opts.allowOptionalChaining = allow
-	}
-	return opts
-}
-
-func buildConditionalInTestMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "conditionalInTest",
-		Description: "Avoid having conditionals in tests",
-	}
-}
-
-func isOutermostOptionalChain(node *ast.Node) bool {
-	if !ast.IsOptionalChain(node) || !ast.IsOutermostOptionalChain(node) {
-		return false
-	}
-
-	parent := node.Parent
-	if parent == nil || !ast.IsOptionalChain(parent) {
-		return true
-	}
-
-	switch parent.Kind {
-	case ast.KindPropertyAccessExpression:
-		return parent.AsPropertyAccessExpression().Expression != node
-	case ast.KindElementAccessExpression:
-		return parent.AsElementAccessExpression().Expression != node
-	case ast.KindCallExpression:
-		return parent.AsCallExpression().Expression != node
-	default:
-		return true
-	}
-}
-
-var NoConditionalInTestRule = rule.Rule{
-	Name:   "jest/no-conditional-in-test",
-	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
-		opts := parseOptions(rawOptions)
-		inTestCase := false
-		testCalls := map[*ast.Node]bool{}
-
-		reportConditional := func(node *ast.Node) {
-			if inTestCase {
-				ctx.ReportNode(node, buildConditionalInTestMessage())
-			}
-		}
-
-		reportOptionalChain := func(node *ast.Node) {
-			if inTestCase &&
-				!opts.allowOptionalChaining &&
-				isOutermostOptionalChain(node) {
-				ctx.ReportNode(node, buildConditionalInTestMessage())
-			}
-		}
-
-		return rule.RuleListeners{
-			ast.KindIfStatement:           reportConditional,
-			ast.KindSwitchStatement:       reportConditional,
-			ast.KindConditionalExpression: reportConditional,
-			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ast.IsLogicalExpression(node) {
-					reportConditional(node)
-				}
-			},
-
-			ast.KindPropertyAccessExpression: reportOptionalChain,
-			ast.KindElementAccessExpression:  reportOptionalChain,
-
-			ast.KindCallExpression: func(node *ast.Node) {
-				reportOptionalChain(node)
+var NoConditionalInTestRule = shared.NewRule(shared.Config{
+	Name: "jest/no-conditional-in-test",
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		return shared.Runtime{
+			IsTestCall: func(node *ast.Node) bool {
 				parsed := jestUtils.ParseJestFnCall(node, ctx)
-				if parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest {
-					testCalls[node] = true
-					inTestCase = true
-				}
-			},
-			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-				if !testCalls[node] {
-					return
-				}
-				delete(testCalls, node)
-				inTestCase = false
+				return parsed != nil && parsed.Kind == jestUtils.JestFnTypeTest
 			},
 		}
 	},
-}
+})

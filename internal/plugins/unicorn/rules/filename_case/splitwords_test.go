@@ -104,7 +104,7 @@ func TestFixFilenameDecoratedCartesianProduct(t *testing.T) {
 
 	t.Run("deduplicate each chunk", func(t *testing.T) {
 		leading, words := splitFilename("1_[1_]")
-		cases := []caseStyle{allCases[0], allCases[2], allCases[3]} // camel, kebab, pascal
+		cases := []caseStyle{allCases[0], allCases[2], allCases[4]} // camel, kebab, pascal
 		valid, invalidWord, candidates := validateFilename(words, cases)
 		if valid {
 			t.Fatal("expected filename to be invalid")
@@ -165,8 +165,8 @@ func TestPascalLikeTransformDigitBranch(t *testing.T) {
 }
 
 // TestEnglishishJoinOxford locks in oxford-comma + `or` formatting for 0/1/2/3/4
-// items. The 4-item case is reachable only when all four `cases` are enabled
-// and the filename violates all four (rare in practice but covered here so
+// items. The 4-item case is reachable when four `cases` are enabled and the
+// filename violates all four (rare in practice but covered here so
 // future ListFormat-style refactors can't silently change wording).
 func TestEnglishishJoinOxford(t *testing.T) {
 	cases := []struct {

@@ -1669,6 +1669,8 @@ func isInAmbientAugmentation(node *ast.Node) bool {
 // GetStaticPropertyName extracts the static name from a property name node.
 // It handles Identifier, StringLiteral, NumericLiteral, and ComputedPropertyName
 // (with static string, numeric, BigInt, or template literal expressions).
+// Explicit-radix numeric literals use their source token when available because
+// tsgo's normalized NumericLiteral.Text no longer retains the digit sequence.
 // Returns the name and whether it's a static (non-computed or statically-computable) name.
 func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 	switch nameNode.Kind {
@@ -1677,7 +1679,9 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 	case ast.KindStringLiteral:
 		return nameNode.AsStringLiteral().Text, true
 	case ast.KindNumericLiteral:
-		return NormalizeNumericLiteral(nameNode.AsNumericLiteral().Text), true
+		return numericLiteralPropertyName(nameNode), true
+	case ast.KindBigIntLiteral:
+		return NormalizeBigIntLiteral(nameNode.AsBigIntLiteral().Text), true
 	case ast.KindComputedPropertyName:
 		// ESLint's AST has no parenthesized-expression node, so `[('a')]`
 		// names the same static property as `['a']`.
@@ -1686,7 +1690,7 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 		case ast.KindStringLiteral:
 			return expr.AsStringLiteral().Text, true
 		case ast.KindNumericLiteral:
-			return NormalizeNumericLiteral(expr.AsNumericLiteral().Text), true
+			return numericLiteralPropertyName(expr), true
 		case ast.KindBigIntLiteral:
 			return NormalizeBigIntLiteral(expr.AsBigIntLiteral().Text), true
 		case ast.KindNoSubstitutionTemplateLiteral:
@@ -1706,9 +1710,88 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 	}
 }
 
+// numericLiteralPropertyName returns the static property name represented by a
+// tsgo NumericLiteral. NumericLiteral.Text is already normalized, so explicit
+// radix literals have lost the source digit sequence needed to reproduce the
+// property-name rounding above 2^53. TokenFlags let us recover the raw token
+// only for those literals; detached or synthesized nodes retain the existing
+// Text-based fallback.
+func numericLiteralPropertyName(node *ast.Node) string {
+	literal := node.AsNumericLiteral()
+	explicitRadix := literal.TokenFlags & (ast.TokenFlagsBinarySpecifier |
+		ast.TokenFlagsOctalSpecifier |
+		ast.TokenFlagsHexSpecifier)
+	if explicitRadix != 0 {
+		sourceFile := ast.GetSourceFileOfNode(node)
+		if sourceFile != nil && node.Pos() >= 0 && node.Pos() < node.End() && node.End() <= len(sourceFile.Text()) {
+			raw := scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false)
+			if value, ok := radixLiteralValue(raw); ok {
+				return ecmascript.NumberToString(value)
+			}
+		}
+	}
+	return NormalizeNumericLiteral(literal.Text)
+}
+
+// radixLiteralValue accumulates an explicit binary, octal, or hexadecimal
+// literal into a float64 one source digit at a time. Numeric separators do not
+// contribute to the value.
+func radixLiteralValue(raw string) (float64, bool) {
+	if len(raw) < 3 || raw[0] != '0' {
+		return 0, false
+	}
+
+	var radix int
+	switch raw[1] {
+	case 'b', 'B':
+		radix = 2
+	case 'o', 'O':
+		radix = 8
+	case 'x', 'X':
+		radix = 16
+	default:
+		return 0, false
+	}
+
+	value := 0.0
+	digits := 0
+	previousSeparator := false
+	for i := 2; i < len(raw); i++ {
+		if raw[i] == '_' {
+			if digits == 0 || previousSeparator {
+				return 0, false
+			}
+			previousSeparator = true
+			continue
+		}
+		digit := radixDigitValue(raw[i])
+		if digit < 0 || digit >= radix {
+			return 0, false
+		}
+		value = value*float64(radix) + float64(digit)
+		digits++
+		previousSeparator = false
+	}
+	return value, digits > 0 && !previousSeparator
+}
+
+func radixDigitValue(ch byte) int {
+	switch {
+	case ch >= '0' && ch <= '9':
+		return int(ch - '0')
+	case ch >= 'a' && ch <= 'f':
+		return int(ch-'a') + 10
+	case ch >= 'A' && ch <= 'F':
+		return int(ch-'A') + 10
+	default:
+		return -1
+	}
+}
+
 // NormalizeNumericLiteral parses a numeric literal text and returns its
-// normalized string representation, matching ESLint's String(node.value) behavior.
-// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100", "1e21" -> "1e+21"
+// ECMAScript Number string representation, matching ESLint's String(node.value)
+// behavior. For example, "0x1" -> "1", "1.0" -> "1", "1e2" -> "100",
+// "1e-7" -> "1e-7", and "1e21" -> "1e+21".
 func NormalizeNumericLiteral(text string) string {
 	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
 	// Use big.Int to handle arbitrary precision, then convert to float64

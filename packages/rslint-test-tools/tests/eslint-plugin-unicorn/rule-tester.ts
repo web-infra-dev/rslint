@@ -225,6 +225,9 @@ export class RuleTester {
                 if (typeof error.message === 'string') {
                   assertMessageMatches(message.message, error.message);
                 }
+                if (error.messageId !== undefined) {
+                  assert.strictEqual(message.messageId, error.messageId);
+                }
               }
             }
           }
