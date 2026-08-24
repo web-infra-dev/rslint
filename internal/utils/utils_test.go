@@ -423,6 +423,10 @@ func TestDefaultExcludeDirNames_ContainsExpected(t *testing.T) {
 // Every expectation here is what natural-compare@1.4.0 answers, which is the
 // package the rules that sort naturally hand the pair to.
 func TestNaturalCompare(t *testing.T) {
+	// A lone surrogate has no UTF-8 encoding of its own, so the compiler
+	// carries one as the three bytes UTF-8 would spell the code point with.
+	loneD800 := string([]byte{0xED, 0xA0, 0x80})
+	loneD801 := string([]byte{0xED, 0xA0, 0x81})
 	tests := []struct {
 		a, b string
 		want int
@@ -476,6 +480,11 @@ func TestNaturalCompare(t *testing.T) {
 		// code units, so it compares as the first of them.
 		{"\U0001F600", "\uFFFF", -1},
 		{"\uFFFF", "\U0001F600", 1},
+		// A lone surrogate is the code unit it stands for, so a pair of them
+		// still tells apart.
+		{loneD800, loneD801, -1},
+		{loneD801, loneD800, 1},
+		{loneD800, loneD800, 0},
 		// A NUL reads as the end of the string does, so a pair that differs
 		// only past one of them sorts alike.
 		{"a\x001", "a\x002", 0},

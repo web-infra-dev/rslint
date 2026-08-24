@@ -1298,7 +1298,7 @@ export const x: _Foo = 1;
       ",
   "diagnostics": [
     {
-      "message": "'_Foo' is marked as ignored but is used.",
+      "message": "'_Foo' is marked as ignored but is used. Used vars must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -1327,7 +1327,7 @@ export const x: _Foo = 1;
       ",
   "diagnostics": [
     {
-      "message": "'_Foo' is marked as ignored but is used.",
+      "message": "'_Foo' is marked as ignored but is used. Used vars must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -1358,7 +1358,7 @@ export const x = _Foo.A;
       ",
   "diagnostics": [
     {
-      "message": "'_Foo' is marked as ignored but is used.",
+      "message": "'_Foo' is marked as ignored but is used. Used vars must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -1387,7 +1387,7 @@ export const x = _Foo;
       ",
   "diagnostics": [
     {
-      "message": "'_Foo' is marked as ignored but is used.",
+      "message": "'_Foo' is marked as ignored but is used. Used vars must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {

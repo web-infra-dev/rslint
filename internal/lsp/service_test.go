@@ -21,9 +21,11 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -38,16 +40,152 @@ func newTestServer() *Server {
 		refreshCh:              make(chan struct{}, 1),
 		debounceCh:             make(chan struct{}, 1),
 		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
+		ruleCatalog:            rules.All(),
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
 	}
 }
 
+func TestCurrentRuleCatalogRequiresInitialization(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected uninitialized rule catalog to panic")
+		}
+	}()
+	(&Server{}).currentRuleCatalog()
+}
+
+func TestNewServerInitializesRuleCatalog(t *testing.T) {
+	server := NewServer(&ServerOptions{Cwd: t.TempDir()})
+	if server.currentRuleCatalog() != rules.All() {
+		t.Fatal("NewServer did not install the shared Go rule catalog")
+	}
+}
+
 func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) {
 	s.jsConfigs = configs
-	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(configs, s.fs)
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(configs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
+	var entries []config.RslintConfig
+	for _, configEntries := range configs {
+		entries = append(entries, configEntries)
+	}
+	installRuleCatalogForTest(s, entries...)
+	s.jsFileConfigResolvers = make(map[string]*config.FileConfigResolver, len(configs))
+	for configDirectory, configEntries := range configs {
+		resolver, err := config.NewFileConfigResolverWithPathSpaces(
+			configEntries,
+			configDirectory,
+			s.fs,
+			s.jsConfigOwnerIndex.PathSpaces(),
+			s.currentRuleCatalog(),
+			true,
+		)
+		if err != nil {
+			panic(err)
+		}
+		s.jsFileConfigResolvers[configDirectory] = resolver
+	}
+}
+
+func installJSONConfigForTest(s *Server, configDirectory string, entries config.RslintConfig) {
+	s.jsonConfig = entries
+	s.jsonConfigOwnerIndex = target.NewOwnerIndex(
+		map[string]config.RslintConfig{configDirectory: entries},
+		s.fs,
+	)
+	resolver, err := config.NewFileConfigResolverWithPathSpaces(
+		entries,
+		configDirectory,
+		s.fs,
+		s.jsonConfigOwnerIndex.PathSpaces(),
+		rules.All(),
+		false,
+	)
+	if err != nil {
+		panic(err)
+	}
+	s.jsonFileConfigResolver = resolver
+}
+
+func installRuleCatalogForTest(s *Server, configs ...config.RslintConfig) {
+	base := rules.All()
+	pluginsByPrefix := make(map[string]map[string]struct{})
+	for _, entries := range configs {
+		for _, entry := range entries {
+			for ruleName := range entry.Rules {
+				if _, builtIn := base.Lookup(ruleName); builtIn {
+					continue
+				}
+				prefix := rule.Namespace(ruleName)
+				if prefix == "" {
+					continue
+				}
+				ruleName = strings.TrimPrefix(ruleName, prefix+"/")
+				if pluginsByPrefix[prefix] == nil {
+					pluginsByPrefix[prefix] = make(map[string]struct{})
+				}
+				pluginsByPrefix[prefix][ruleName] = struct{}{}
+			}
+		}
+	}
+	plugins := make([]rule.ESLintPluginMetadata, 0, len(pluginsByPrefix))
+	for prefix, names := range pluginsByPrefix {
+		plugin := rule.ESLintPluginMetadata{Prefix: prefix, RuleNames: make([]string, 0, len(names))}
+		for name := range names {
+			plugin.RuleNames = append(plugin.RuleNames, name)
+		}
+		plugins = append(plugins, plugin)
+	}
+	s.ruleCatalog, _ = base.ForESLintPlugins(plugins)
+}
+
+func configuredRulesForLSPTest(
+	entries config.RslintConfig,
+	target target.File,
+	configDirectory string,
+	enforcePlugins bool,
+	hasTypeInfo bool,
+) []rule.ConfiguredRule {
+	ruleCatalog := rules.All()
+	if enforcePlugins {
+		testServer := newTestServer()
+		installRuleCatalogForTest(testServer, entries)
+		ruleCatalog = testServer.ruleCatalog
+	}
+	rules, _ := config.NewFileConfigResolver(entries, configDirectory, ruleCatalog, enforcePlugins).
+		EnabledRulesForTarget(target.Path, target.CanonicalPath)
+	if !hasTypeInfo {
+		return rule.FilterNonTypeAwareRules(rules)
+	}
+	return rules
+}
+
+func documentLintSnapshotForTest(
+	s *Server,
+	uri lsproto.DocumentUri,
+	entries config.RslintConfig,
+	configDirectory string,
+	usesJavaScriptConfig bool,
+	typeScriptConfigPaths []string,
+) documentLintSnapshot {
+	ruleCatalog := rules.All()
+	if usesJavaScriptConfig {
+		ruleCatalog = s.currentRuleCatalog()
+	}
+	target := lspConfigTarget(uriToPath(uri), configDirectory, s.fs)
+	return documentLintSnapshot{
+		target: target,
+		config: entries,
+		pathSpaces: config.NewPathSpaceSnapshot(
+			map[string]config.RslintConfig{target.ConfigDirectory: entries},
+			s.fs,
+		),
+		ruleCatalog:           ruleCatalog,
+		typeScriptConfigPaths: typeScriptConfigPaths,
+		usesJavaScriptConfig:  usesJavaScriptConfig,
+	}
 }
 
 func documentURIFromPath(filePath string) lsproto.DocumentUri {
@@ -665,6 +803,7 @@ func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 	queue := make(chan *lsproto.Message, 10)
 	return &Server{
 		jsConfigs:              make(map[string]config.RslintConfig),
+		ruleCatalog:            rules.All(),
 		documents:              make(map[lsproto.DocumentUri]string),
 		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		outgoingQueue:          queue,
@@ -1587,7 +1726,6 @@ func TestIsLintableScriptFile_UsesDefaultLintExtensions(t *testing.T) {
 }
 
 func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
-	config.RegisterAllRules()
 
 	dir := t.TempDir()
 	srcDir := filepath.Join(dir, "src")
@@ -1627,7 +1765,20 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 			Program: lintprogram.NewFromCompiler(program),
 			File:    file,
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-				return lspActiveRulesForFile(cfg, sourceFile.FileName(), dir, false, true)
+				targetPath := sourceFile.FileName()
+				return configuredRulesForLSPTest(
+					cfg,
+					target.File{
+						PathIdentity: config.PathIdentity{
+							Path:          targetPath,
+							CanonicalPath: targetPath,
+						},
+						ConfigDirectory: dir,
+					},
+					dir,
+					false,
+					true,
+				)
 			},
 			Consumer: rule.DiagnosticConsumer{
 				Demand: rule.EditDemandAll,
@@ -1805,13 +1956,16 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 
 	sourceURI := toURI(sourcePath)
 	standaloneLoaders := func(uri lsproto.DocumentUri) lintProjectLoaders {
+		target := lspConfigTarget(uriToPath(uri), dir, fsys)
 		return newStandaloneLintProjectRequest(
-			uriToPath(uri),
-			func() vfs.FS { return s.currentEditorOverlayFS(uri) },
+			target,
+			func() vfs.FS { return s.currentEditorOverlayFSForTarget(uri, target) },
 		).loaders()
 	}
+	sourceTarget := lspConfigTarget(sourcePath, dir, fsys)
 	program, _, hasTypeInfo, err := selectLintProgram(
 		sourceURI,
+		sourceTarget,
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
@@ -1831,6 +1985,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 
 	directProgram, _, directHasTypeInfo, err := selectLintProgram(
 		sourceURI,
+		sourceTarget,
 		s.session,
 		ctx,
 		[]string{importConfig, firstConfig},
@@ -1856,10 +2011,14 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		toURI(sourcePath),
 		1,
 		"export const value = 2;\n",
-		config.RslintConfig{{}},
-		dir,
-		false,
-		[]string{secondConfig},
+		documentLintSnapshotForTest(
+			s,
+			toURI(sourcePath),
+			config.RslintConfig{{}},
+			dir,
+			false,
+			[]string{secondConfig},
+		),
 	); err != nil {
 		t.Fatalf("isolated fix pass: %v", err)
 	}
@@ -1872,8 +2031,10 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	}
 
 	gapURI := toURI(gapPath)
+	gapTarget := lspConfigTarget(gapPath, dir, fsys)
 	gapProgram, _, gapHasTypeInfo, err := selectLintProgram(
 		gapURI,
+		gapTarget,
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
@@ -1941,6 +2102,7 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 	rootLoaderCalls := 0
 	program, sourceFile, hasTypeInfo, err := selectLintProgram(
 		uri,
+		lspConfigTarget(sourcePath, dir, fsys),
 		s.session,
 		ctx,
 		[]string{configPath},
@@ -2116,7 +2278,6 @@ func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config.RegisterAllRules()
 	s := newTestServer()
 	s.cwd = aliasRoot
 	s.fs = &realpathAliasLSPTestFS{
@@ -2131,7 +2292,10 @@ func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 	s.documents[realURI] = "const competingAliasValue = 3;\n"
 	s.documents[uri] = openContent
 
-	editorOverlay := s.currentEditorOverlayFS(uri)
+	editorOverlay := s.currentEditorOverlayFSForTarget(
+		uri,
+		lspConfigTarget(aliasFile, aliasRoot, s.fs),
+	)
 	for _, filePath := range []string{aliasFile, realFile} {
 		if got, ok := editorOverlay.ReadFile(tspath.NormalizePath(filePath)); !ok || got != openContent {
 			t.Fatalf("editor overlay read %q = %q, %v; want open content", filePath, got, ok)
@@ -2178,7 +2342,6 @@ func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *te
 		t.Skipf("symlink unavailable: %v", err)
 	}
 
-	config.RegisterAllRules()
 	s := newTestServer()
 	s.cwd = aliasRoot
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -2221,7 +2384,6 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 
-	config.RegisterAllRules()
 	s := newTestServer()
 	s.cwd = realRoot
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -2290,7 +2452,6 @@ func TestConfigCatalog_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 
-	config.RegisterAllRules()
 	s := newTestServer()
 	s.cwd = root
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -2332,6 +2493,132 @@ func TestConfigCatalog_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 	}
 }
 
+func TestConfiguredLintPreservesTargetIdentityAcrossAuthoredConfigBases(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "workspace")
+	configDir := filepath.Join(root, "physical", "package")
+	physicalSourceDir := filepath.Join(configDir, "src")
+	aliasSourceDir := filepath.Join(workspace, "linked-src")
+	if err := os.MkdirAll(physicalSourceDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(physicalSourceDir, aliasSourceDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	const source = "export function f() {\n  debugger;\n  var value = 1;\n  return value;\n}\n"
+	aliasFile := filepath.Join(aliasSourceDir, "index.ts")
+	if err := os.WriteFile(aliasFile, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	effective := config.RslintConfig{{
+		Files: []string{"src/**/*.ts"},
+		Rules: config.Rules{"no-debugger": "error"},
+	}}
+	effective = append(effective, config.ConfigWithAuthoredPathBase(
+		config.RslintConfig{{
+			Files: []string{"linked-src/**/*.ts"},
+			Rules: config.Rules{"no-var": "error"},
+		}},
+		workspace,
+	)...)
+
+	s := newTestServer()
+	s.cwd = workspace
+	s.fs = osvfs.FS()
+	uri := documentURIFromPath(aliasFile)
+	s.documents[uri] = source
+	result, err := s.runConfiguredLintForContent(
+		uri,
+		context.Background(),
+		source,
+		effective,
+		configDir,
+		false,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("runConfiguredLintForContent failed: %v", err)
+	}
+	diagnosticsByRule := make(map[string]rule.RuleDiagnostic, len(result.Diagnostics))
+	for _, diagnostic := range result.Diagnostics {
+		diagnosticsByRule[diagnostic.RuleName] = diagnostic
+	}
+	if _, ok := diagnosticsByRule["no-debugger"]; !ok {
+		t.Fatalf("config-directory rule did not match the shared target: %+v", result.Diagnostics)
+	}
+	noVar, ok := diagnosticsByRule["no-var"]
+	if !ok {
+		t.Fatalf("workspace-authored rule lost the lexical symlink target: %+v", result.Diagnostics)
+	}
+	if len(noVar.Fixes()) == 0 {
+		t.Fatalf("workspace-authored fix was not preserved: %+v", noVar)
+	}
+}
+
+func TestConfiguredLintExternalConfigPreservesGitignoreTargetIdentity(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "workspace")
+	configDir := filepath.Join(root, "physical", "package")
+	physicalSourceDir := filepath.Join(configDir, "src")
+	aliasSourceDir := filepath.Join(workspace, "linked-src")
+	for _, directory := range []string{workspace, physicalSourceDir} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(physicalSourceDir, aliasSourceDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	const source = "debugger;\n"
+	aliasFile := filepath.Join(aliasSourceDir, "ignored.ts")
+	if err := os.WriteFile(aliasFile, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(workspace, ".gitignore"),
+		[]byte("linked-src/ignored.ts\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	effective := config.ConfigWithGitignoreForTargetsFromRoot(
+		config.RslintConfig{{
+			Files: []string{"src/**/*.ts"},
+			Rules: config.Rules{"no-debugger": "error"},
+		}},
+		configDir,
+		workspace,
+		osvfs.FS(),
+		[]string{aliasFile},
+		nil,
+	)
+
+	s := newTestServer()
+	s.cwd = workspace
+	s.fs = osvfs.FS()
+	uri := documentURIFromPath(aliasFile)
+	s.documents[uri] = source
+	result, err := s.runConfiguredLintForContent(
+		uri,
+		context.Background(),
+		source,
+		effective,
+		configDir,
+		false,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("runConfiguredLintForContent failed: %v", err)
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("external-config Git ignore lost the lexical symlink target: %+v", result.Diagnostics)
+	}
+}
+
 func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 	root := t.TempDir()
 	filePath := filepath.Join(root, ".git", "hooks", "check.ts")
@@ -2343,7 +2630,6 @@ func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config.RegisterAllRules()
 	s := newTestServer()
 	s.cwd = root
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -2353,10 +2639,14 @@ func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 		context.Background(),
 		uri,
 		source,
-		config.RslintConfig{{Rules: config.Rules{"no-var": "error"}}},
-		root,
-		false,
-		nil,
+		documentLintSnapshotForTest(
+			s,
+			uri,
+			config.RslintConfig{{Rules: config.Rules{"no-var": "error"}}},
+			root,
+			false,
+			nil,
+		),
 	)
 	if got != source {
 		t.Fatalf("fixAll modified a default-excluded file: %q", got)
@@ -2375,7 +2665,6 @@ func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config.RegisterAllRules()
 	s := newTestServer()
 	s.cwd = root
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -2396,10 +2685,7 @@ func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
 		context.Background(),
 		uri,
 		source,
-		cfg,
-		configDir,
-		true,
-		nil,
+		documentLintSnapshotForTest(s, uri, cfg, configDir, true, nil),
 	)
 	const want = "export const orphan = (() => { let output = 1; return output; })();\n"
 	if got != want {
@@ -2417,7 +2703,6 @@ func (f *caseInsensitiveLSPTestFS) Realpath(filePath string) string {
 }
 
 func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.T) {
-	config.RegisterAllRules()
 	cfg := config.RslintConfig{{
 		Rules: config.Rules{
 			"no-debugger": "error",
@@ -2426,12 +2711,19 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 		Plugins: []string{"@typescript-eslint"},
 	}}
 
-	withoutTypeInfo := lspActiveRulesForFile(cfg, "/project/index.ts", "/project", true, false)
+	target := target.File{
+		PathIdentity: config.PathIdentity{
+			Path:          "/project/index.ts",
+			CanonicalPath: "/project/index.ts",
+		},
+		ConfigDirectory: "/project",
+	}
+	withoutTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true, false)
 	if len(withoutTypeInfo) != 1 || withoutTypeInfo[0].Name != "no-debugger" {
 		t.Fatalf("expected only non-type-aware native rule without tsconfig, got %+v", withoutTypeInfo)
 	}
 
-	withTypeInfo := lspActiveRulesForFile(cfg, "/project/index.ts", "/project", true, true)
+	withTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true, true)
 	if len(withTypeInfo) != 2 {
 		t.Fatalf("expected both native rules with type info, got %+v", withTypeInfo)
 	}

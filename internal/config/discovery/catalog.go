@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 
 // AutoJSConfigFileNames is the automatic-discovery priority. Explicit config
@@ -105,7 +106,7 @@ type ConfigCatalog struct {
 	Configs            map[string]rslintconfig.RslintConfig
 	EffectiveConfigIDs []string
 	EslintPlugins      []rslintconfig.EslintPluginEntry
-	Scopes             map[string]rslintconfig.LintDiscoveryScope
+	Scopes             map[string]target.OwnerScope
 	Failures           []ConfigFailure
 	Stats              ConfigDiscoveryStats
 	// Explicit reports that the catalog came from one explicitly selected
@@ -219,7 +220,7 @@ func buildConfigCatalog(
 		loadStateByIdentity: make(map[tspath.Path]*configLoadState),
 		configs:             make(map[string]rslintconfig.RslintConfig),
 		sources:             make(map[string]configSource),
-		scopes:              make(map[string]rslintconfig.LintDiscoveryScope),
+		scopes:              make(map[string]target.OwnerScope),
 		failureByPath:       make(map[string]ConfigFailure),
 	}
 	return builder.build()

@@ -2,7 +2,6 @@ package prefer_array_some
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
@@ -99,7 +98,7 @@ func checkFindCall(ctx rule.RuleContext, node *ast.Node) {
 	}
 
 	if isBooleanUse {
-		if isKnownNonIndexedCollection(ctx, call.Object) {
+		if unicornutil.IsKnownNonIndexedCollection(ctx, call.Object) {
 			return
 		}
 	} else if !isFindResultVariableUsedOnlyAsBoolean(ctx, node, call) {
@@ -240,7 +239,7 @@ func isFindResultVariableUsedOnlyAsBoolean(ctx rule.RuleContext, callExpression 
 	if statement.ModifierFlags()&ast.ModifierFlagsExport != 0 {
 		return false
 	}
-	if !isArray(ctx, call.Object) {
+	if !unicornutil.IsArray(ctx, call.Object) {
 		return false
 	}
 
@@ -292,7 +291,7 @@ func checkFindIndexComparison(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 
-	if isKnownNonIndexedCollection(ctx, call.Object) {
+	if unicornutil.IsKnownNonIndexedCollection(ctx, call.Object) {
 		return false
 	}
 
@@ -400,7 +399,7 @@ func checkFilterLength(ctx rule.RuleContext, node *ast.Node) {
 		len(skippedObject.AsIdentifier().Text) > 0 && skippedObject.AsIdentifier().Text[0] == '$' {
 		return
 	}
-	if isKnownNonIndexedCollection(ctx, filterObject) {
+	if unicornutil.IsKnownNonIndexedCollection(ctx, filterObject) {
 		return
 	}
 
@@ -644,353 +643,4 @@ func parenthesizedEnd(ctx rule.RuleContext, node *ast.Node) int {
 // the given range.
 func insertBeforeRange(textRange core.TextRange, text string) rule.RuleFix {
 	return rule.RuleFixReplaceRange(textRange.WithEnd(textRange.Pos()), text)
-}
-
-// ---- type classification (upstream utils/is-array.js) ----
-
-// isKnownNonIndexedCollection reports whether the receiver is definitely a
-// keyed collection (`Map`/`Set`/`WeakMap`/`WeakSet`/`ReadonlyMap`/`ReadonlySet`)
-// — types that carry a `.find` / `.filter` / `.findIndex` surface but are not
-// arrays, so the rewrite would be wrong. Returns false when the type is unknown
-// (including when no TypeChecker is available), matching upstream.
-func isKnownNonIndexedCollection(ctx rule.RuleContext, node *ast.Node) bool {
-	return classifyReceiver(ctx, node, indexedCollectionTargets, keyedCollectionNames) == classNonTarget
-}
-
-// isArray reports whether the receiver is definitely an Array / ReadonlyArray /
-// tuple, using syntactic shape first and the type checker as a fallback.
-func isArray(ctx rule.RuleContext, node *ast.Node) bool {
-	return classifyReceiver(ctx, node, arrayTargets, knownNonArrayNames) == classTarget
-}
-
-type typeClass int
-
-const (
-	classUnknown typeClass = iota
-	classTarget
-	classNonTarget
-)
-
-var arrayTargets = utils.NewSetFromItems("Array", "ReadonlyArray")
-
-var indexedCollectionTargets = func() *utils.Set[string] {
-	s := utils.NewSetFromItems("Array", "ReadonlyArray")
-	for _, name := range typedArrayNames {
-		s.Add(name)
-	}
-	return s
-}()
-
-var keyedCollectionNames = utils.NewSetFromItems(
-	"Map", "ReadonlyMap", "WeakMap", "Set", "ReadonlySet", "WeakSet",
-)
-
-var knownNonArrayNames = func() *utils.Set[string] {
-	s := utils.NewSetFromItems(
-		"Map", "ReadonlyMap", "WeakMap", "Set", "ReadonlySet", "WeakSet",
-	)
-	for _, name := range typedArrayNames {
-		s.Add(name)
-	}
-	return s
-}()
-
-var typedArrayNames = []string{
-	"Int8Array", "Uint8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array",
-	"Int32Array", "Uint32Array", "Float16Array", "Float32Array", "Float64Array",
-	"BigInt64Array", "BigUint64Array",
-}
-
-// classifyReceiver mirrors the syntactic short-circuits of unicorn's `getType`
-// (array literals, `Array()` / `new Array()` / `Array.from` / `Array.of`
-// constructors) and then falls back to a type-checker classification analogous
-// to `getTypeScriptType`. `targetNames` and `nonTargetNames` are the type-name
-// sets that resolve to target / non-target respectively.
-func classifyReceiver(ctx rule.RuleContext, node *ast.Node, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	if node == nil {
-		return classUnknown
-	}
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return classUnknown
-	}
-
-	// Syntactic target shapes shared by both classifications: an array literal
-	// or an `Array` constructor / factory call is always an array (target for
-	// arrays; not a keyed collection either, so also non-target there).
-	if isSyntacticArrayNode(node) {
-		if targetNames.Has("Array") {
-			return classTarget
-		}
-		return classNonTarget
-	}
-
-	// Syntactic non-array shapes (upstream isNonArrayNode): `new X()` and
-	// object / function / arrow / class / template literals are never arrays,
-	// so they resolve to non-target for both classifications without needing
-	// the type system.
-	if isSyntacticNonArrayNode(node) {
-		return classNonTarget
-	}
-
-	// A plain `const x = <initializer>` reference resolves to the syntactic
-	// class of its initializer (upstream getTypeFromVariable). This catches
-	// shapes the checker alone can miss on error types, e.g.
-	// `const store = new Store()` where `Store` is undeclared.
-	if ast.IsIdentifier(node) {
-		if init := constInitializer(ctx, node); init != nil {
-			switch {
-			case isSyntacticArrayNode(init):
-				if targetNames.Has("Array") {
-					return classTarget
-				}
-				return classNonTarget
-			case isSyntacticNonArrayNode(init):
-				return classNonTarget
-			}
-		}
-	}
-
-	if ctx.TypeChecker == nil {
-		return classUnknown
-	}
-	t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
-	return classifyType(ctx, t, targetNames, nonTargetNames)
-}
-
-// constInitializer returns the initializer expression of a `const` variable
-// that idNode references, or nil. Only single-declaration `const` bindings with
-// a plain identifier name are resolved (matching upstream's getTypeFromVariable
-// preconditions).
-func constInitializer(ctx rule.RuleContext, idNode *ast.Node) *ast.Node {
-	if ctx.Refs == nil || idNode == nil {
-		return nil
-	}
-	sym := ctx.Refs.Resolve(idNode)
-	if sym == nil || len(sym.Declarations) != 1 {
-		return nil
-	}
-	decl := sym.Declarations[0]
-	if decl == nil || !ast.IsVariableDeclaration(decl) {
-		return nil
-	}
-	parent := decl.Parent
-	if parent == nil || !ast.IsVariableDeclarationList(parent) || parent.Flags&ast.NodeFlagsConst == 0 {
-		return nil
-	}
-	varDecl := decl.AsVariableDeclaration()
-	if varDecl.Name() == nil || !ast.IsIdentifier(varDecl.Name()) ||
-		varDecl.Type != nil || varDecl.Initializer == nil {
-		return nil
-	}
-	return ast.SkipParentheses(varDecl.Initializer)
-}
-
-// isSyntacticArrayNode matches `[]`, `Array(...)`, `new Array(...)`,
-// `Array.from(...)`, and `Array.of(...)` — the shapes upstream's isArrayNode
-// treats as a definite array without consulting the type system.
-func isSyntacticArrayNode(node *ast.Node) bool {
-	if node.Kind == ast.KindArrayLiteralExpression {
-		return true
-	}
-	if ast.IsCallExpression(node) {
-		callee := ast.SkipParentheses(node.AsCallExpression().Expression)
-		if callee == nil {
-			return false
-		}
-		// `Array.from(...)` / `Array.of(...)`
-		if ast.IsPropertyAccessExpression(callee) && !ast.IsOptionalChain(callee) {
-			pae := callee.AsPropertyAccessExpression()
-			obj := ast.SkipParentheses(pae.Expression)
-			name := pae.Name()
-			if obj != nil && ast.IsIdentifier(obj) && obj.AsIdentifier().Text == "Array" &&
-				name != nil && ast.IsIdentifier(name) {
-				m := name.AsIdentifier().Text
-				return m == "from" || m == "of"
-			}
-			return false
-		}
-		// `Array(...)`
-		if ast.IsIdentifier(callee) {
-			return callee.AsIdentifier().Text == "Array"
-		}
-		return false
-	}
-	// `new Array(...)`
-	if ast.IsNewExpression(node) {
-		callee := ast.SkipParentheses(node.AsNewExpression().Expression)
-		return callee != nil && ast.IsIdentifier(callee) && callee.AsIdentifier().Text == "Array"
-	}
-	return false
-}
-
-// isSyntacticNonArrayNode mirrors upstream's isNonArrayNode: `new X()` and
-// object / function / arrow / class / template literals are definitely not
-// arrays. (An `Array` constructor / factory is handled by isSyntacticArrayNode
-// before this is consulted, so `new Array()` never reaches here as non-array.)
-func isSyntacticNonArrayNode(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindNewExpression,
-		ast.KindObjectLiteralExpression,
-		ast.KindFunctionExpression,
-		ast.KindArrowFunction,
-		ast.KindClassExpression,
-		ast.KindTemplateExpression,
-		ast.KindNoSubstitutionTemplateLiteral:
-		return true
-	}
-	return false
-}
-
-// classifyType mirrors unicorn's getTypeScriptType: recurse through
-// unions/intersections/type-parameter constraints, then decide by the resolved
-// symbol name.
-func classifyType(ctx rule.RuleContext, t *checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	if t == nil {
-		return classUnknown
-	}
-	if utils.IsTypeAnyType(t) || utils.IsTypeUnknownType(t) || utils.IsIntrinsicErrorType(t) {
-		return classUnknown
-	}
-	// null / undefined are nullish → treated as non-target by both callers.
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-		return classNonTarget
-	}
-
-	if utils.IsTypeParameter(t) {
-		constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
-		if constraint == nil {
-			return classUnknown
-		}
-		return classifyType(ctx, constraint, targetNames, nonTargetNames)
-	}
-
-	if utils.IsUnionType(t) {
-		return combineUnion(ctx, utils.UnionTypeParts(t), targetNames, nonTargetNames)
-	}
-	if utils.IsIntersectionType(t) {
-		return combineIntersection(ctx, utils.IntersectionTypeParts(t), targetNames, nonTargetNames)
-	}
-
-	// Array / tuple structural check (mirrors upstream isTargetType).
-	if targetNames.Has("Array") && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
-		return classTarget
-	}
-
-	// Base constraint fallback (e.g. `T extends string[]` reached via apparent
-	// constraint rather than the type-parameter branch above).
-	constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
-	if constraint != nil && constraint != t {
-		return classifyType(ctx, constraint, targetNames, nonTargetNames)
-	}
-
-	name, ok := typeSymbolName(t)
-	if !ok {
-		// A primitive (string / number / boolean / bigint / symbol, literal or
-		// not) or any other intrinsic is never an Array or keyed collection →
-		// non-target. Mirrors upstream, where such a value resolves to
-		// non-target via its intrinsicName or static value.
-		if utils.IsTypeFlagSet(t, checker.TypeFlagsPrimitive|checker.TypeFlagsIntrinsic) {
-			return classNonTarget
-		}
-		return classUnknown
-	}
-	if targetNames.Has(name) {
-		return classTarget
-	}
-	// Interface heritage: `interface Items extends Array<string>` resolves to
-	// the array target through its base types. Upstream reaches the same
-	// conclusion via its interface-heritage walk, which runs with
-	// `checkClassHeritage: false` — `class MyArray extends Array {}` therefore
-	// stays a non-target. Only consult heritage when the receiver could be an
-	// array target; keyed-collection classification does not widen through it.
-	if targetNames.Has("Array") && classifyHeritage(ctx, t, targetNames, nonTargetNames) == classTarget {
-		return classTarget
-	}
-	return classNonTarget
-}
-
-// classifyHeritage inspects the base types of an interface symbol, returning
-// classTarget when any base resolves to the target classification. Classes are
-// excluded to match upstream's `checkClassHeritage: false`.
-func classifyHeritage(ctx rule.RuleContext, t *checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	symbol := checker.Type_symbol(t)
-	if symbol == nil || symbol.Flags&ast.SymbolFlagsInterface == 0 {
-		return classUnknown
-	}
-	declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)
-	if declared == nil {
-		return classUnknown
-	}
-	for _, base := range checker.Checker_getBaseTypes(ctx.TypeChecker, declared) {
-		if classifyType(ctx, base, targetNames, nonTargetNames) == classTarget {
-			return classTarget
-		}
-	}
-	return classUnknown
-}
-
-func combineUnion(ctx rule.RuleContext, parts []*checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	// Filter nullish parts (normalizeType folds nullish → nonTarget, and a
-	// union is target only when every non-nullish part is target).
-	filtered := make([]typeClass, 0, len(parts))
-	for _, part := range parts {
-		if utils.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-			continue
-		}
-		filtered = append(filtered, classifyType(ctx, part, targetNames, nonTargetNames))
-	}
-	if len(filtered) == 0 {
-		return classNonTarget
-	}
-	allTarget := true
-	allNonTarget := true
-	for _, c := range filtered {
-		if c != classTarget {
-			allTarget = false
-		}
-		if c != classNonTarget {
-			allNonTarget = false
-		}
-	}
-	if allTarget {
-		return classTarget
-	}
-	if allNonTarget {
-		return classNonTarget
-	}
-	return classUnknown
-}
-
-func combineIntersection(ctx rule.RuleContext, parts []*checker.Type, targetNames, nonTargetNames *utils.Set[string]) typeClass {
-	classes := make([]typeClass, 0, len(parts))
-	for _, part := range parts {
-		classes = append(classes, classifyType(ctx, part, targetNames, nonTargetNames))
-	}
-	for _, c := range classes {
-		if c == classTarget {
-			return classTarget
-		}
-	}
-	for _, c := range classes {
-		if c != classNonTarget {
-			return classUnknown
-		}
-	}
-	return classNonTarget
-}
-
-// typeSymbolName returns the symbol name of a type (its own symbol, falling
-// back to the alias symbol), mirroring upstream's `type.getSymbol() ??
-// type.aliasSymbol` + `symbol.getName()`.
-func typeSymbolName(t *checker.Type) (string, bool) {
-	if sym := checker.Type_symbol(t); sym != nil && sym.Name != "" {
-		return sym.Name, true
-	}
-	if alias := checker.Type_alias(t); alias != nil {
-		if sym := alias.Symbol(); sym != nil && sym.Name != "" {
-			return sym.Name, true
-		}
-	}
-	return "", false
 }

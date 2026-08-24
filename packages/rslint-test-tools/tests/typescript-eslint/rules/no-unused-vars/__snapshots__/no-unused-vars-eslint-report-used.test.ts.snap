@@ -8,7 +8,7 @@ const _b = _a + 5;
       ",
   "diagnostics": [
     {
-      "message": "'_a' is marked as ignored but is used.",
+      "message": "'_a' is marked as ignored but is used. Used vars must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -37,7 +37,7 @@ foo(() => _a);
       ",
   "diagnostics": [
     {
-      "message": "'_a' is marked as ignored but is used.",
+      "message": "'_a' is marked as ignored but is used. Used vars must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -67,7 +67,7 @@ exports[`no-unused-vars > invalid 3`] = `
       ",
   "diagnostics": [
     {
-      "message": "'_a' is marked as ignored but is used.",
+      "message": "'_a' is marked as ignored but is used. Used args must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -96,7 +96,7 @@ console.log(a + _b);
       ",
   "diagnostics": [
     {
-      "message": "'_b' is marked as ignored but is used.",
+      "message": "'_b' is marked as ignored but is used. Used elements of array destructuring must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -128,7 +128,7 @@ foo(_x);
       ",
   "diagnostics": [
     {
-      "message": "'_x' is marked as ignored but is used.",
+      "message": "'_x' is marked as ignored but is used. Used elements of array destructuring must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -157,7 +157,7 @@ foo(ignored);
       ",
   "diagnostics": [
     {
-      "message": "'ignored' is marked as ignored but is used.",
+      "message": "'ignored' is marked as ignored but is used. Used vars must not match /[iI]gnored/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -188,7 +188,7 @@ try {
       ",
   "diagnostics": [
     {
-      "message": "'_err' is marked as ignored but is used.",
+      "message": "'_err' is marked as ignored but is used. Used caught errors must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -219,7 +219,7 @@ try {
       ",
   "diagnostics": [
     {
-      "message": "'_' is assigned a value but never used.",
+      "message": "'_' is assigned a value but never used. Allowed unused caught errors must match /foo/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -250,7 +250,7 @@ try {
       ",
   "diagnostics": [
     {
-      "message": "'_' is assigned a value but never used.",
+      "message": "'_' is assigned a value but never used. Allowed unused caught errors must match /ignored/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -279,7 +279,7 @@ try {
       ",
   "diagnostics": [
     {
-      "message": "'message' is assigned a value but never used.",
+      "message": "'message' is defined but never used. Allowed unused caught errors must match /foo/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -294,7 +294,7 @@ try {
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'firstError' is assigned a value but never used.",
+      "message": "'firstError' is defined but never used. Allowed unused caught errors must match /foo/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -325,7 +325,7 @@ try {
       ",
   "diagnostics": [
     {
-      "message": "'$' is assigned a value but never used.",
+      "message": "'$' is assigned a value but never used. Allowed unused caught errors must match /\\w/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -355,7 +355,7 @@ _ => {
       ",
   "diagnostics": [
     {
-      "message": "'_' is assigned a value but never used.",
+      "message": "'_' is assigned a value but never used. Allowed unused args must match /ignored/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {

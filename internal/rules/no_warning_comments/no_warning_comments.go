@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
@@ -143,52 +144,10 @@ func convertToRegExp(term, location, escapedDecoration string) *esregexp.RegExp 
 // doesn't accidentally trip its own configured terms.
 var selfConfigRegex = esregexp.MustCompile(`\bno-warning-comments\b`, "u")
 
-// eslintDirectivePattern ports astUtils.ESLINT_DIRECTIVE_PATTERN, used to
-// recognize block-comment directives (`/*eslint ...*/`, `/*global ...*/`,
-// `/*exported ...*/`) by their leading text.
-var eslintDirectivePattern = esregexp.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`, "u")
-
-// isDirectiveComment ports astUtils.isDirectiveComment: a Line comment is a
-// directive if its trimmed text starts with "eslint-"; a Block comment is a
-// directive if its trimmed text matches eslintDirectivePattern. Both forms
-// also accept the "rslint-" prefix this linter recognizes alongside "eslint-".
-func isDirectiveComment(kind ast.Kind, trimmedValue string) bool {
-	isLintDirective := strings.HasPrefix(trimmedValue, "eslint-") ||
-		strings.HasPrefix(trimmedValue, "rslint-")
-
-	switch kind {
-	case ast.KindSingleLineCommentTrivia:
-		return isLintDirective
-	case ast.KindMultiLineCommentTrivia:
-		return isLintDirective || eslintDirectivePattern.Test(trimmedValue)
-	default:
-		return false
-	}
-}
-
-// commentValue extracts the text between a comment's delimiters — the same
-// substring ESLint exposes as `comment.value` — without any trimming.
-func commentValue(text string, comment *ast.CommentRange) string {
-	switch comment.Kind {
-	case ast.KindSingleLineCommentTrivia:
-		return text[comment.Pos()+2 : comment.End()]
-	case ast.KindMultiLineCommentTrivia:
-		// A block comment left unterminated at end of file still parses, and
-		// then has no closing delimiter to strip.
-		end := comment.End()
-		if end-comment.Pos() >= 4 && text[end-2:end] == "*/" {
-			end -= 2
-		}
-		return text[comment.Pos()+2 : end]
-	default:
-		return ""
-	}
-}
-
 func checkComment(ctx rule.RuleContext, text string, comment *ast.CommentRange, terms []string, warningRegExps []*esregexp.RegExp) {
-	value := commentValue(text, comment)
+	value := utils.CommentValue(text, comment)
 
-	if isDirectiveComment(comment.Kind, ecmascript.StringTrim(value)) && selfConfigRegex.Test(value) {
+	if utils.IsDirectiveComment(comment.Kind, ecmascript.StringTrim(value)) && selfConfigRegex.Test(value) {
 		return
 	}
 
