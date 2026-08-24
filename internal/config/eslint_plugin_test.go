@@ -7,74 +7,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func preserveGlobalRuleRegistryEntries(t *testing.T, names ...string) {
-	t.Helper()
-
-	type savedRule struct {
-		value  rule.Rule
-		exists bool
-	}
-	saved := make(map[string]savedRule, len(names))
-	for _, name := range names {
-		value, exists := GlobalRuleRegistry.GetRule(name)
-		saved[name] = savedRule{value: value, exists: exists}
-	}
-
-	t.Cleanup(func() {
-		for name, entry := range saved {
-			if entry.exists {
-				GlobalRuleRegistry.rules[name] = entry.value
-			} else {
-				delete(GlobalRuleRegistry.rules, name)
-			}
-		}
-	})
-}
-
-func TestRegisterEslintPluginRules_RegistersPlaceholders(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "testplugA/no-foo", "testplugA/no-bar")
-
-	RegisterEslintPluginRules([]EslintPluginEntry{
-		{Prefix: "testplugA", RuleNames: []string{"no-foo", "no-bar"}},
-	})
-
-	r, ok := GlobalRuleRegistry.GetRule("testplugA/no-foo")
-	if !ok {
-		t.Fatal("expected testplugA/no-foo to be registered as a placeholder")
-	}
-	if !r.IsEslintPluginRule {
-		t.Error("expected IsEslintPluginRule=true for a plugin placeholder")
-	}
-	if r.RequiresTypeInfo {
-		t.Error("expected RequiresTypeInfo=false for a plugin placeholder")
-	}
-	if _, ok := GlobalRuleRegistry.GetRule("testplugA/no-bar"); !ok {
-		t.Error("expected testplugA/no-bar to be registered")
-	}
-}
-
-func TestRegisterEslintPluginRules_NativeWins(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "testplugB/native-rule")
-
-	// Pre-register a native rule (IsEslintPluginRule=false), then try to
-	// mount a plugin rule of the same fully-qualified name.
-	GlobalRuleRegistry.Register("testplugB/native-rule", rule.Rule{
-		Name:               "testplugB/native-rule",
-		IsEslintPluginRule: false,
-	})
-	RegisterEslintPluginRules([]EslintPluginEntry{
-		{Prefix: "testplugB", RuleNames: []string{"native-rule"}},
-	})
-
-	r, ok := GlobalRuleRegistry.GetRule("testplugB/native-rule")
-	if !ok {
-		t.Fatal("expected testplugB/native-rule present")
-	}
-	if r.IsEslintPluginRule {
-		t.Error("native rule must win: IsEslintPluginRule should stay false")
-	}
-}
-
 func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 	// UnmarshalJSON must capture the FULL raw object (sourceType / globals /
 	// ecmaFeatures the Go core doesn't model) so Go can forward them to the
@@ -142,10 +74,8 @@ func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 	}
 }
 
-func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "testplugC/no-null")
-
-	RegisterEslintPluginRules([]EslintPluginEntry{
+func TestResolveEnabledRules_PluginGateAndResolution(t *testing.T) {
+	derivedCatalog, _ := baseRuleCatalog().ForESLintPlugins([]EslintPluginEntry{
 		{Prefix: "testplugC", RuleNames: []string{"no-null"}},
 	})
 	cwd := "/proj"
@@ -158,7 +88,7 @@ func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
 			Rules:   Rules{"testplugC/no-null": "error"},
 		},
 	}
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/a.ts", cwd, true)
+	rules, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/a.ts", cwd, true)
 	if len(rules) != 1 {
 		t.Fatalf("expected exactly 1 enabled rule, got %d", len(rules))
 	}
@@ -179,22 +109,19 @@ func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
 			Rules: Rules{"testplugC/no-null": "error"},
 		},
 	}
-	rulesNoGate, _ := GlobalRuleRegistry.GetEnabledRules(cfgNoGate, "/proj/a.ts", cwd, true)
+	rulesNoGate, _ := ResolveEnabledRules(derivedCatalog, cfgNoGate, "/proj/a.ts", cwd, true)
 	if len(rulesNoGate) != 0 {
 		t.Errorf("expected the gate to drop the rule when its prefix is not declared, got %d", len(rulesNoGate))
 	}
 }
 
-// TestGetEnabledRules_SplitEntryNativeAndCommunity pins the documented combine
-// workflow: native plugins in one (array-form) entry and community plugins in a
-// separate entry. For a file matching both, GetEnabledRules must return BOTH
-// rules, each carrying the correct IsEslintPluginRule routing flag (native runs
+// TestResolveEnabledRules_SplitEntryGoAndCommunity pins the documented combine
+// workflow: bundled plugins in one (array-form) entry and community plugins in a
+// separate entry. For a file matching both, ResolveEnabledRules must return BOTH
+// rules, each carrying the correct IsEslintPluginRule routing flag (Go runs
 // in Go, community routes to the worker).
-func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "testplugSplit/no-foo")
-
-	RegisterAllRules()
-	RegisterEslintPluginRules([]EslintPluginEntry{
+func TestResolveEnabledRules_SplitEntryGoAndCommunity(t *testing.T) {
+	derivedCatalog, _ := baseRuleCatalog().ForESLintPlugins([]EslintPluginEntry{
 		{Prefix: "testplugSplit", RuleNames: []string{"no-foo"}},
 	})
 	cfg := RslintConfig{
@@ -207,19 +134,19 @@ func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
 			Rules:   Rules{"testplugSplit/no-foo": "error"},
 		},
 	}
-	rules, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/a.ts", "/proj", true)
+	rules, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/a.ts", "/proj", true)
 
 	routing := map[string]bool{} // rule name -> IsEslintPluginRule
 	for _, r := range rules {
 		routing[r.Name] = r.IsEslintPluginRule
 	}
 
-	native, hasNative := routing["@typescript-eslint/no-explicit-any"]
-	if !hasNative {
-		t.Fatalf("native rule @typescript-eslint/no-explicit-any missing from %v", routing)
+	goRule, hasGoRule := routing["@typescript-eslint/no-explicit-any"]
+	if !hasGoRule {
+		t.Fatalf("Go rule @typescript-eslint/no-explicit-any missing from %v", routing)
 	}
-	if native {
-		t.Error("native rule must have IsEslintPluginRule=false (runs in Go)")
+	if goRule {
+		t.Error("Go rule must have IsEslintPluginRule=false")
 	}
 
 	community, hasCommunity := routing["testplugSplit/no-foo"]
@@ -231,13 +158,10 @@ func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
 	}
 }
 
-// Config resolution retains native and community rules independently of source
+// Config resolution retains Go and community rules independently of source
 // capabilities. The linter plan owns type-aware eligibility.
-func TestGetEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
-	preserveGlobalRuleRegistryEntries(t, "unicornGap/no-null")
-
-	RegisterAllRules()
-	RegisterEslintPluginRules([]EslintPluginEntry{
+func TestResolveEnabledRulesKeepsGoAndCommunityRules(t *testing.T) {
+	derivedCatalog, _ := baseRuleCatalog().ForESLintPlugins([]EslintPluginEntry{
 		{Prefix: "unicornGap", RuleNames: []string{"no-null"}},
 	})
 	cfg := RslintConfig{
@@ -251,13 +175,13 @@ func TestGetEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
 			Rules:   Rules{"unicornGap/no-null": "error"},
 		},
 	}
-	gap, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/gap.ts", "/proj", true)
+	gap, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/gap.ts", "/proj", true)
 	gapRouting := map[string]bool{}
 	for _, r := range gap {
 		gapRouting[r.Name] = r.IsEslintPluginRule
 	}
-	if _, hasNative := gapRouting["@typescript-eslint/require-await"]; !hasNative {
-		t.Error("config resolution must retain the type-aware native rule")
+	if _, hasGoRule := gapRouting["@typescript-eslint/require-await"]; !hasGoRule {
+		t.Error("config resolution must retain the type-aware Go rule")
 	}
 	community, hasCommunity := gapRouting["unicornGap/no-null"]
 	if !hasCommunity {
@@ -267,13 +191,13 @@ func TestGetEnabledRulesKeepsNativeAndCommunityRules(t *testing.T) {
 		t.Error("the surviving community rule must keep IsEslintPluginRule=true (routes to the worker)")
 	}
 
-	covered, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/covered.ts", "/proj", true)
+	covered, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/covered.ts", "/proj", true)
 	coveredNames := map[string]bool{}
 	for _, r := range covered {
 		coveredNames[r.Name] = true
 	}
 	if !coveredNames["@typescript-eslint/require-await"] {
-		t.Error("type-aware native rule must be kept on a covered file")
+		t.Error("type-aware Go rule must be kept on a covered file")
 	}
 	if !coveredNames["unicornGap/no-null"] {
 		t.Error("community rule must be present on a covered file too")

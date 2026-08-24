@@ -105,6 +105,26 @@ func TestNoUnreachableRule(t *testing.T) {
 			{Code: `function foo() { if (false) { return; } bar(); }`},
 			{Code: `function foo() { if (true) { return; } else { bar(); } }`},
 
+			// --- ESLint does not prune boolean-literal if branches ---
+			{Code: `while (true) { if (true) break; var x = 1; }`},
+			{Code: `function foo() { if (true) return; first(); second(); }`},
+			{Code: `function foo() { if (true) return; function bar() {} after(); }`},
+			{Code: `while (condition) { if (true) break; else first(); second(); }`},
+			{Code: `function foo() { if (true) return; label: { break label; } after(); }`},
+			{Code: `function foo() { if (true) return; label: { process.exit(); } after(); }`},
+			{Code: `function foo() { if (true) return; process.exit(); after(); }`},
+			{Code: `function foo() { if (true) return; { process.exit(); } after(); }`},
+			{Code: `function foo() { if (true) return; try { throw error; } catch (error) { recover(); } after(); }`},
+			{Code: `function foo() { if (true) return; try { process.exit(); } finally {} after(); }`},
+			{Code: `function foo() { if (true) return; do { process.exit(); } while (false); after(); }`},
+			{Code: `function foo() { if (true) return; do { process.exit(); } while (0); after(); }`},
+			{Code: `function foo() { if (true) return; switch (value) { case 1: break; default: return; } after(); }`},
+			{Code: `function foo() { if (true) return; switch (value) { default: process.exit(); } after(); }`},
+			{Code: `function foo() { if (false) first(); else return; after(); }`},
+			{Code: `if (true) throw new Error(); after();`},
+			{Code: `class C { static { if (true) throw new Error(); after(); } }`},
+			{Code: `function outer() { function inner() { if (true) return; process.exit(); after(); } }`},
+
 			// --- Generator try/yield: catch IS reachable (yield can throw) ---
 			{Code: `function* foo() { try { yield 1; return; } catch (err) { return err; } }`},
 
@@ -349,13 +369,67 @@ func TestNoUnreachableRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unreachableCode", Line: 3, Column: 3}},
 			},
 
-			// --- Binder constant condition: if(true) break inside while ---
-			// Binder evaluates if(true) → break always executes → var x = 1 unreachable
+			// --- ESLint boolean-literal if reachability ---
 			{
-				Code:   `while (true) { if (true) break; var x = 1; }`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unreachableCode"}},
+				Code: "function foo() {\n  var i = 0;\n  if (true) {\n    return;\n  }\n  throw \"test\";\n  var j = 0;\n}",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unreachableCode",
+					Line:      7,
+					Column:    3,
+					EndLine:   7,
+					EndColumn: 13,
+				}},
 			},
-
+			{
+				Code: "function foo() {\n  if (true) return;\n  else throw new Error();\n  after();\n}",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unreachableCode",
+					Line:      4,
+					Column:    3,
+					EndLine:   4,
+					EndColumn: 11,
+				}},
+			},
+			{
+				Code: "function foo() {\n  if (true) return;\n  if (condition) return;\n  else throw new Error();\n  after();\n}",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unreachableCode",
+					Line:      5,
+					Column:    3,
+					EndLine:   5,
+					EndColumn: 11,
+				}},
+			},
+			{
+				Code: "function foo(object) {\n  if (true) return;\n  with (object) {\n    return;\n  }\n  after();\n}",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unreachableCode",
+					Line:      6,
+					Column:    3,
+					EndLine:   6,
+					EndColumn: 11,
+				}},
+			},
+			{
+				Code: "function foo() {\n  if (true) return;\n  else {\n    throw new Error();\n    after();\n  }\n}",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unreachableCode",
+					Line:      5,
+					Column:    5,
+					EndLine:   5,
+					EndColumn: 13,
+				}},
+			},
+			{
+				Code: "function foo() {\n  if (false) {\n    return;\n    after();\n  }\n}",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unreachableCode",
+					Line:      4,
+					Column:    5,
+					EndLine:   4,
+					EndColumn: 13,
+				}},
+			},
 			// --- Class method/getter unreachable ---
 			{
 				Code:   `class C { foo() { return; bar(); } }`,

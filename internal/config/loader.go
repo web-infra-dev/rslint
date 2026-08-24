@@ -11,6 +11,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -18,13 +19,19 @@ import (
 type ConfigLoader struct {
 	fs               vfs.FS
 	currentDirectory string
+	ruleCatalog      *rule.Catalog
 }
 
-// NewConfigLoader creates a new configuration loader
-func NewConfigLoader(fs vfs.FS, currentDirectory string) *ConfigLoader {
+// NewConfigLoader creates a configuration loader whose JSON normalization
+// reads available rules only from ruleCatalog.
+func NewConfigLoader(fs vfs.FS, currentDirectory string, ruleCatalog *rule.Catalog) *ConfigLoader {
+	if ruleCatalog == nil {
+		panic("rule catalog is required")
+	}
 	return &ConfigLoader{
 		fs:               fs,
 		currentDirectory: currentDirectory,
+		ruleCatalog:      ruleCatalog,
 	}
 }
 
@@ -60,7 +67,7 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 
 	// Normalize JSON config: inject core rules and plugin rules into each entry's Rules map.
 	// User-specified rules take precedence (they are applied after the defaults).
-	config = normalizeJSONConfig(config)
+	config = normalizeJSONConfig(config, loader.ruleCatalog)
 
 	// Update current directory to the config file's directory
 	configDirectory := tspath.GetDirectoryPath(configFileName)
@@ -71,7 +78,12 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 // This ensures JSON config and JS config are processed identically in GetConfigForFile.
 // User-specified rules always take precedence over auto-enabled defaults.
 // NOTE: This function mutates the input slice in-place (modifies entry Rules maps directly).
-func normalizeJSONConfig(config RslintConfig) RslintConfig {
+func normalizeJSONConfig(config RslintConfig, catalog *rule.Catalog) RslintConfig {
+	if catalog == nil {
+		panic("rule catalog is required")
+	}
+	coreRuleNames := catalog.RuleNamesForNamespace("")
+	pluginRuleNames := make(map[string][]string)
 	for i := range config {
 		entry := &config[i]
 
@@ -85,21 +97,26 @@ func normalizeJSONConfig(config RslintConfig) RslintConfig {
 		}
 
 		// Auto-enable core rules as defaults
-		for _, r := range GetCoreRules() {
-			if _, exists := entry.Rules[r.Name]; !exists {
-				entry.Rules[r.Name] = "error"
+		for _, ruleName := range coreRuleNames {
+			if _, exists := entry.Rules[ruleName]; !exists {
+				entry.Rules[ruleName] = "error"
 			}
 		}
 
 		// Auto-enable plugin rules as defaults
-		for _, plugin := range entry.Plugins {
-			info, ok := pluginByDeclName[plugin]
+		for _, declarationName := range entry.Plugins {
+			plugin, ok := bundledPluginByDeclarationName[declarationName]
 			if !ok {
 				continue
 			}
-			for _, r := range info.getAllRules() {
-				if _, exists := entry.Rules[r.Name]; !exists {
-					entry.Rules[r.Name] = "error"
+			ruleNames, loaded := pluginRuleNames[plugin.ruleNamespace]
+			if !loaded {
+				ruleNames = catalog.RuleNamesForNamespace(plugin.ruleNamespace)
+				pluginRuleNames[plugin.ruleNamespace] = ruleNames
+			}
+			for _, ruleName := range ruleNames {
+				if _, exists := entry.Rules[ruleName]; !exists {
+					entry.Rules[ruleName] = "error"
 				}
 			}
 		}
@@ -123,9 +140,16 @@ func (loader *ConfigLoader) LoadDefaultRslintConfig() (RslintConfig, string, err
 }
 
 // LoadTsConfigsFromRslintConfig extracts and validates TypeScript configuration paths from rslint config.
-// Returns an empty slice (no error) when no parserOptions.project is specified — this is valid
-// for pure JS projects that don't need explicit TypeScript configuration.
+// Each explicit project path is resolved from the authored base of the entry
+// that declares it. Most entries use configDirectory; composed entries such as
+// API overrideConfig may retain a different origin.
+// Returns an empty slice (no error) when no project path is declared. Callers
+// separately distinguish an omitted project field from an explicit empty list.
 func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintConfig, configDirectory string) ([]string, error) {
+	return loadTsConfigsFromRslintConfig(loader.fs, rslintConfig, configDirectory)
+}
+
+func loadTsConfigsFromRslintConfig(fsys vfs.FS, rslintConfig RslintConfig, configDirectory string) ([]string, error) {
 	tsConfigs := []string{}
 	seenPaths := make(map[string]struct{})
 
@@ -133,10 +157,11 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
 			continue
 		}
+		entryBaseDirectory := configEntryBaseDirectory(entry, configDirectory)
 
 		for _, config := range entry.LanguageOptions.ParserOptions.Project {
 			if containsGlobPattern(config) {
-				matches, err := loader.expandProjectGlob(configDirectory, config)
+				matches, err := expandProjectGlob(fsys, entryBaseDirectory, config)
 				if err != nil {
 					return nil, err
 				}
@@ -149,9 +174,9 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 				continue
 			}
 
-			tsconfigPath := tspath.ResolvePath(configDirectory, config)
+			tsconfigPath := tspath.ResolvePath(entryBaseDirectory, config)
 
-			if !loader.fs.FileExists(tsconfigPath) {
+			if !fsys.FileExists(tsconfigPath) {
 				return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
 			}
 
@@ -170,12 +195,17 @@ func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]s
 	if fs == nil {
 		return nil, nil
 	}
-	loader := NewConfigLoader(fs, cwd)
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, cwd)
+	tsConfigs, err := loadTsConfigsFromRslintConfig(fs, rslintConfig, cwd)
 	if err != nil {
 		return nil, err
 	}
 	if len(tsConfigs) == 0 {
+		// An explicit empty list means "use no TypeScript project". It must not
+		// silently turn into the default tsconfig.json; callers that want the
+		// default discovery behavior omit parserOptions.project.
+		if hasExplicitProjectSetting(rslintConfig) {
+			return nil, nil
+		}
 		defaultTsConfig := tspath.ResolvePath(cwd, "tsconfig.json")
 		if fs.FileExists(defaultTsConfig) {
 			return []string{defaultTsConfig}, nil
@@ -183,6 +213,17 @@ func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]s
 		return nil, nil
 	}
 	return tsConfigs, nil
+}
+
+func hasExplicitProjectSetting(config RslintConfig) bool {
+	for _, entry := range config {
+		if entry.LanguageOptions != nil &&
+			entry.LanguageOptions.ParserOptions != nil &&
+			entry.LanguageOptions.ParserOptions.Project != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, configPath string) []string {
@@ -194,23 +235,23 @@ func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, confi
 	return append(paths, normalizedPath)
 }
 
-func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern string) ([]string, error) {
+func expandProjectGlob(fsys vfs.FS, configDirectory string, pattern string) ([]string, error) {
 	resolvedPattern := normalizeGlobPath(tspath.ResolvePath(configDirectory, pattern))
 	searchRoot := globSearchRoot(resolvedPattern, normalizeGlobPath(configDirectory))
 
-	if !loader.fs.DirectoryExists(searchRoot) {
+	if !fsys.DirectoryExists(searchRoot) {
 		return nil, nil
 	}
 
 	relativePattern := relativeGlobPattern(searchRoot, resolvedPattern)
-	// expandProjectGlob historically follows symlinks (e.g. tsconfig
+	// Project globs follow symlinks (e.g. tsconfig
 	// referenced via packages/*/tsconfig.json where packages may be
 	// symlinks in pnpm workspaces). It runs single-threaded under
 	// doublestar.GlobWalk, so the cycle dedupe is deterministic.
-	fsys := &vfsAdapter{vfs: loader.fs, root: searchRoot, followSymlinks: true}
+	globFS := &vfsAdapter{vfs: fsys, root: searchRoot}
 
 	matches := []string{}
-	err := doublestar.GlobWalk(fsys, relativePattern, func(path string, d fs.DirEntry) error {
+	err := doublestar.GlobWalk(globFS, relativePattern, func(path string, d fs.DirEntry) error {
 		fullPath := tspath.ResolvePath(searchRoot, path)
 		matches = append(matches, tspath.NormalizePath(fullPath))
 		return nil

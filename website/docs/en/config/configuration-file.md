@@ -62,9 +62,7 @@ You can specify a config file explicitly, which overrides automatic discovery:
 rslint --config path/to/rslint.config.ts .
 ```
 
-For automatically discovered configs, relative `files`, `ignores`, and `languageOptions.parserOptions.project` patterns are resolved from the config file's directory.
-
-For a config supplied with `--config`, those patterns are resolved from the current working directory.
+Relative `files`, `ignores`, and `languageOptions.parserOptions.project` patterns are resolved from the config file's directory, whether the config is discovered automatically or supplied with `--config`.
 
 To generate a default config, run:
 

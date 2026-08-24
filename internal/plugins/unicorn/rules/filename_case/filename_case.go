@@ -670,7 +670,66 @@ func isInsideCwd(relativePath string) bool {
 		!tspath.IsRootedDiskPath(relativePath)
 }
 
+// getCanonicalPOSIXPathSegments handles the hot path produced by the normal
+// lint planner: absolute, normalized POSIX filenames under an absolute,
+// normalized cwd. Less common path forms fall back to tspath below so their
+// Node-compatible normalization stays centralized there.
+func getCanonicalPOSIXPathSegments(fileName string, cwd string) ([]string, bool) {
+	if !isCanonicalAbsolutePOSIXPath(fileName) || !isCanonicalAbsolutePOSIXPath(cwd) {
+		return nil, false
+	}
+
+	basename := fileName[strings.LastIndexByte(fileName, '/')+1:]
+	if fileName == cwd {
+		return []string{basename}, true
+	}
+
+	var relative string
+	if cwd == "/" {
+		relative = fileName[1:]
+	} else {
+		if !strings.HasPrefix(fileName, cwd) || len(fileName) <= len(cwd) || fileName[len(cwd)] != '/' {
+			return []string{basename}, true
+		}
+		relative = fileName[len(cwd)+1:]
+	}
+	if relative == "" {
+		return []string{basename}, true
+	}
+	return strings.Split(relative, "/"), true
+}
+
+func isCanonicalAbsolutePOSIXPath(path string) bool {
+	if path == "/" {
+		return true
+	}
+	if len(path) < 2 || path[0] != '/' || path[len(path)-1] == '/' || strings.IndexByte(path, '\\') >= 0 {
+		return false
+	}
+
+	segmentStart := 1
+	for index := 1; index <= len(path); index++ {
+		if index < len(path) && path[index] != '/' {
+			continue
+		}
+		segment := path[segmentStart:index]
+		if segment == "" || segment == "." || segment == ".." || segment == "^" ||
+			len(segment) == 2 && tspath.IsVolumeCharacter(segment[0]) && segment[1] == ':' {
+			return false
+		}
+		segmentStart = index + 1
+	}
+	return true
+}
+
 func getPathSegments(fileName string, cwd string) []string {
+	if segments, ok := getCanonicalPOSIXPathSegments(fileName, cwd); ok {
+		return segments
+	}
+	return getPathSegmentsWithTspath(fileName, cwd)
+}
+
+func getPathSegmentsWithTspath(fileName string, cwd string) []string {
 	basename := tspath.GetBaseFileName(fileName)
 	if cwd == "" {
 		return []string{basename}
@@ -699,7 +758,12 @@ func getPathSegments(fileName string, cwd string) []string {
 	return filtered
 }
 
-const filenameCaseRuleName = "unicorn/filename-case"
+const (
+	filenameCaseRuleName       = "unicorn/filename-case"
+	messageIDFilenameCase      = "filename-case"
+	messageIDDirectoryCase     = "directory-case"
+	messageIDFilenameExtension = "filename-extension"
+)
 
 var FilenameCaseRule = rule.Rule{
 	Name:   filenameCaseRuleName,
@@ -772,7 +836,7 @@ var FilenameCaseRule = rule.Rule{
 				}
 				renamed := fixFilename(words, cases, invalidWord, invalidCandidates, leading, "")
 				ctx.ReportRange(reportRange, rule.RuleMessage{
-					Id: "directoryCase",
+					Id: messageIDDirectoryCase,
 					Description: "Directory name `" + directory + "` is not in " +
 						englishishCaseNames(cases) + ". Rename it to " + englishishBacktickJoin(renamed) + ".",
 				})
@@ -805,7 +869,7 @@ var FilenameCaseRule = rule.Rule{
 					return nil
 				}
 				ctx.ReportRange(reportRange, rule.RuleMessage{
-					Id: "filenameExtension",
+					Id: messageIDFilenameExtension,
 					Description: "File extension `" + ext + "` is not in lowercase. Rename it to `" +
 						filename + middle + lowerExt + "`.",
 				})
@@ -823,7 +887,7 @@ var FilenameCaseRule = rule.Rule{
 
 		renamed := fixFilename(words, cases, invalidWord, invalidCandidates, leading, middle+lowerExt)
 		ctx.ReportRange(reportRange, rule.RuleMessage{
-			Id: "filenameCase",
+			Id: messageIDFilenameCase,
 			Description: "Filename is not in " + englishishCaseNames(cases) + ". Rename it to " +
 				englishishBacktickJoin(renamed) + ".",
 		})

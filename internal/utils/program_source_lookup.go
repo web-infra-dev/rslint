@@ -66,6 +66,13 @@ func (lookup *ProgramSourceLookup) CanonicalSourceFile(canonicalPath string) *as
 	if lookup == nil || lookup.program == nil || lookup.fs == nil || canonicalPath == "" {
 		return nil
 	}
+	return lookup.canonicalSourceFileByID(lookup.canonicalPathID(canonicalPath))
+}
+
+func (lookup *ProgramSourceLookup) canonicalSourceFileByID(canonicalID string) *ast.SourceFile {
+	if lookup == nil || lookup.program == nil || lookup.fs == nil || canonicalID == "" {
+		return nil
+	}
 	if !lookup.canonicalIndexBuilt {
 		lookup.canonicalIndexBuilt = true
 		lookup.canonicalSources = make(map[string]*ast.SourceFile)
@@ -77,7 +84,37 @@ func (lookup *ProgramSourceLookup) CanonicalSourceFile(canonicalPath string) *as
 			}
 		}
 	}
-	return lookup.canonicalSources[lookup.canonicalPathID(canonicalPath)]
+	return lookup.canonicalSources[canonicalID]
+}
+
+// SourceFileForTarget resolves a caller-visible path using a canonical target
+// identity that was frozen by an earlier discovery/snapshot boundary. It never
+// performs another filesystem identity lookup for either spelling, so source
+// selection cannot observe a different generation from config selection.
+func (lookup *ProgramSourceLookup) SourceFileForTarget(filePath string, canonicalPath string) *ast.SourceFile {
+	if lookup == nil || lookup.program == nil || filePath == "" {
+		return nil
+	}
+	filePath = tspath.NormalizePath(filePath)
+	if sourceFile := lookup.SourceFileForCandidate(filePath, ""); sourceFile != nil {
+		return sourceFile
+	}
+	if canonicalPath == "" {
+		return nil
+	}
+	canonicalPath = tspath.NormalizePath(canonicalPath)
+	canonicalID := exactProgramSourcePathID(canonicalPath)
+	if sourceFile := lookup.program.GetSourceFile(filePath); sourceFile != nil &&
+		lookup.canonicalPathID(sourceFile.FileName()) == canonicalID {
+		return sourceFile
+	}
+	if exactProgramSourcePathID(canonicalPath) != exactProgramSourcePathID(filePath) {
+		if sourceFile := lookup.program.GetSourceFile(canonicalPath); sourceFile != nil &&
+			lookup.canonicalPathID(sourceFile.FileName()) == canonicalID {
+			return sourceFile
+		}
+	}
+	return lookup.canonicalSourceFileByID(canonicalID)
 }
 
 // SourceFileForPath resolves a lexical filesystem path through exact and

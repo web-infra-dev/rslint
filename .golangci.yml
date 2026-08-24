@@ -69,6 +69,18 @@ linters:
           msg: 'Use ecmascript.IsWhiteSpaceOrLineTerminator instead.'
     depguard:
       rules:
+        config-rule-boundary:
+          # Configuration evaluates rule descriptors supplied by callers. It
+          # must not assemble or import concrete rule implementations.
+          list-mode: lax
+          files:
+            - '**/internal/config/**'
+            - '!**/internal/config/**_test.go'
+          deny:
+            - pkg: 'github.com/web-infra-dev/rslint/internal/plugins'
+              desc: 'Configuration depends on internal/rule abstractions; concrete Go rule aggregation belongs to internal/rules.'
+            - pkg: 'github.com/web-infra-dev/rslint/internal/rules'
+              desc: 'Configuration depends on internal/rule abstractions; concrete Go rule aggregation belongs to internal/rules.'
         js-semantics:
           list-mode: lax
           files:

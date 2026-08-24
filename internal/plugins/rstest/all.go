@@ -2,10 +2,13 @@ package rstest
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/expect_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/max_expects"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_expect"
+	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_in_test"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_focused_tests"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_identical_title"
 	no_import_node "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_import_node_test"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_interpolation_in_snapshots"
@@ -22,10 +25,13 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		expect_expect.ExpectExpectRule,
+		max_expects.MaxExpectsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_conditional_expect.NoConditionalExpectRule,
+		no_conditional_in.NoConditionalInTestRule,
 		no_disabled_tests.NoDisabledTestsRule,
 		no_focused_tests.NoFocusedTestsRule,
+		no_hooks.NoHooksRule,
 		no_identical_title.NoIdenticalTitleRule,
 		no_import_node.NoImportNodeTestRule,
 		no_interpolation_in_snapshots.NoInterpolationInSnapshotsRule,
