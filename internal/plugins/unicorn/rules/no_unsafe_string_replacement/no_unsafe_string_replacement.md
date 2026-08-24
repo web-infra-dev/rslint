@@ -30,10 +30,22 @@ is skipped on files where type information is unavailable.
 
 ## Differences from the original rule
 
-The original rule classifies the receiver syntactically before it consults type
-information. This rule always uses type information, so it reports receivers
-typed as a no-substitution template literal type (`` `x` ``), which are strings,
-and it stays quiet on receivers whose type reduces to `never`.
+The original rule classifies the receiver syntactically, from its type
+annotation, before it consults type information. This rule always uses type
+information, and reports unless the type shows the receiver is not a string.
+Where the two classifiers disagree, this rule follows the type:
+
+- A receiver typed as a no-substitution template literal type (`` `x` ``) is
+  reported. The original rule treats every literal type whose literal is not a
+  plain string literal as a non-string, but such a type is a string.
+- A receiver whose type reduces to `never`, such as `string & number`, is not
+  reported. The receiver is uninhabited, so there is nothing to report on.
+- A receiver whose numeric or bigint literal type is inferred rather than
+  annotated, such as `const value = 1`, `(1)`, or `1 | 2` after narrowing, is
+  not reported. The original rule reports these because it has no annotation to
+  classify and leaves such types unknown; the inferred type is the same type as
+  the annotated one, which is provably not a string. Calling `replace` on those
+  receivers is a TypeScript error in the first place.
 
 ## Original Documentation
 

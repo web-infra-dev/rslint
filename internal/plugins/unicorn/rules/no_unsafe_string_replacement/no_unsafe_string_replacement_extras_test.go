@@ -86,6 +86,37 @@ router.replace("/about", options);`),
 			// Locks in upstream class-heritage recursion: String wrapper subclasses are non-string receivers.
 			tsValid(`class Text extends String {} declare const value: Text; value.replace("x", replacement)`),
 
+			// ---- Provably non-string receivers stay silent, whatever route reaches the type ----
+			// The rule reports on undecided types, so numeric, bigint and tuple
+			// types must be decided rather than left unknown. Upstream reaches
+			// the same verdict for annotated receivers through its syntax
+			// classifier; see the deliberate divergences in the invalid list for
+			// the receivers where it cannot.
+			tsValid(`declare const value: 1; value.replace("x", replacement)`),
+			tsValid(`declare const value: 1n; value.replace("x", replacement)`),
+			tsValid(`type N = 1; declare const value: N; value.replace("x", replacement)`),
+			tsValid(`function run<T extends 1>(value: T) { value.replace("x", replacement); }`),
+			tsValid(`declare const value: 1 | 2; value.replace("x", replacement)`),
+			tsValid(`declare const value: 1 & {brand: true}; value.replace("x", replacement)`),
+			tsValid(`declare const value: [string]; value.replace("x", replacement)`),
+			tsValid(`declare const value: readonly [string]; value.replace("x", replacement)`),
+			tsValid(`declare const value: [a: string]; value.replace("x", replacement)`),
+			tsValid(`declare const value: [string?]; value.replace("x", replacement)`),
+			tsValid(`type Pair = [string, number]; declare const value: Pair; value.replace("x", replacement)`),
+			tsValid(`function run<T extends [string]>(value: T) { value.replace("x", replacement); }`),
+			tsValid(`declare const value: [string] | 1; value.replace("x", replacement)`),
+			// Deliberate divergence from upstream: an inferred literal type is the
+			// same type as an annotated one, so a type-information-only classifier
+			// cannot report the first while skipping the second. Upstream reports
+			// these because its syntax classifier sees no annotation and its type
+			// classifier leaves symbol-less literal types unknown.
+			tsValid(`const value = 1; value.replace("x", replacement)`),
+			tsValid(`(1).replace("x", replacement)`),
+			tsValid(`(1n).replace("x", replacement)`),
+			jsValid(`(1).replace("x", replacement)`),
+			// Same divergence after control-flow narrowing: the narrowed type is 1 | 2.
+			tsValid(`function run(value: 1 | 2 | string) { if (typeof value === "number") { value.replace("x", replacement) } }`),
+
 			// N/A: private object-literal keys are invalid JavaScript syntax.
 			// N/A: autofix boundaries do not apply; this rule has no fix or suggestion.
 			// N/A: class/function nesting state does not apply; the listener is stateless.
@@ -155,13 +186,8 @@ router.replace("/about", options);`),
 			tsInvalid(`declare const value: string | null; value.replace("x", replacement)`, `replacement`, "replace"),
 			// Locks in upstream unknown type arm.
 			tsInvalid(`declare const value: unknown; value.replace("x", replacement)`, `replacement`, "replace"),
-			// Locks in upstream JavaScript fallback: a literal number receiver is still reported without parser services.
-			invalid(`(1).replace("x", replacement)`, `replacement`, "replace"),
-			// TypeScript literal types have no intrinsicName upstream and remain unknown.
-			tsInvalid(`(1).replace("x", replacement)`, `replacement`, "replace"),
-			tsInvalid(`(1n).replace("x", replacement)`, `replacement`, "replace"),
-			// The literal-type rule also applies recursively after control-flow narrowing.
-			tsInvalid(`function run(value: 1 | 2 | string) { if (typeof value === "number") { value.replace("x", replacement) } }`, `replacement`, "replace"),
+			// A union that mixes a string with a non-string is still undecided.
+			tsInvalid(`declare const value: 1 | string; value.replace("x", replacement)`, `replacement`, "replace"),
 			// Template literal types with substitutions are not TSLiteralType and
 			// remain string targets.
 			tsInvalid("declare const value: `a${string}`; value.replace(\"x\", replacement)", `replacement`, "replace"),

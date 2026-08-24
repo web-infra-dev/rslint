@@ -162,11 +162,18 @@ func isPlainObjectProperty(property *ast.Node) bool {
 // isKnownNonStringReceiver mirrors the type-information half of Unicorn's
 // createTypeCheckers. Unlike upstream there is no syntax-level fallback: the
 // rule declares RequiresTypeInfo, so a TypeChecker is always present.
+//
+// The rule reports unless the receiver is known not to be a string, so an
+// undecided type is a report. Every type the classifier cannot decide is
+// therefore a potential false positive, and types that are provably not
+// strings — numeric and bigint literals, tuples — must reach TypeNonTarget
+// even where Unicorn leaves them unknown and lets its syntax classifier
+// answer instead.
 func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
 	t := ctx.TypeChecker.GetTypeAtLocation(node)
 	return unicornutil.ClassifyType(ctx, t, unicornutil.TypeClassifierOptions{
-		HeritageSymbolFlags:        ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
-		UnknownSymbolLessTypeFlags: checker.TypeFlagsNumberLiteral | checker.TypeFlagsBigIntLiteral,
+		HeritageSymbolFlags:          ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
+		NonTargetSymbolLessTypeFlags: checker.TypeFlagsObject,
 		IsTargetType: func(t *checker.Type) bool {
 			return utils.IsTypeFlagSet(t, checker.TypeFlagsStringLike)
 		},

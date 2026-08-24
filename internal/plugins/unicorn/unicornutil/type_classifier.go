@@ -22,12 +22,12 @@ const (
 // createTypeCheckers helper. Syntactic target/non-target recognition remains
 // with each rule because those shapes are domain-specific.
 type TypeClassifierOptions struct {
-	TargetTypeNames            *utils.Set[string]
-	NonTargetTypeNames         *utils.Set[string]
-	IsTargetType               func(*checker.Type) bool
-	HeritageSymbolFlags        ast.SymbolFlags
-	UnknownSymbolLessTypeFlags checker.TypeFlags
-	AllowNullishInMixedUnion   bool
+	TargetTypeNames              *utils.Set[string]
+	NonTargetTypeNames           *utils.Set[string]
+	IsTargetType                 func(*checker.Type) bool
+	HeritageSymbolFlags          ast.SymbolFlags
+	NonTargetSymbolLessTypeFlags checker.TypeFlags
+	AllowNullishInMixedUnion     bool
 }
 
 // ClassifyType mirrors eslint-plugin-unicorn's getTypeScriptType plus the
@@ -69,11 +69,15 @@ func ClassifyType(ctx rule.RuleContext, t *checker.Type, options TypeClassifierO
 
 	name, ok := TypeSymbolName(t)
 	if !ok {
-		if options.UnknownSymbolLessTypeFlags != 0 &&
-			utils.IsTypeFlagSet(t, options.UnknownSymbolLessTypeFlags) {
-			return TypeUnknown
-		}
 		if utils.IsTypeFlagSet(t, checker.TypeFlagsPrimitive|checker.TypeFlagsIntrinsic) {
+			return TypeNonTarget
+		}
+		// A symbol-less type that isn't primitive is one the classifier cannot
+		// name, such as a tuple. Unicorn leaves those unknown, which suits a
+		// rule that reports on its target type; a rule that reports on
+		// everything but its target type needs them decided, and opts in here.
+		if options.NonTargetSymbolLessTypeFlags != 0 &&
+			utils.IsTypeFlagSet(t, options.NonTargetSymbolLessTypeFlags) {
 			return TypeNonTarget
 		}
 		return TypeUnknown
