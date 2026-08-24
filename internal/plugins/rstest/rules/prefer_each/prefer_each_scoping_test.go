@@ -30,6 +30,11 @@ func TestPreferEachLoopScoping(t *testing.T) {
 		t,
 		&prefer_each.PreferEachRule,
 		[]rule_tester.ValidTestCase{
+			// Registrations in classic for control clauses do not belong to the
+			// loop body and cannot be replaced with `.each`.
+			{Code: `for (let i = register(it('once', () => {})); i < 2; i++) {}`},
+			{Code: `for (let i = 0; check(it('condition', () => {}), i < 2); i++) {}`},
+			{Code: `for (let i = 0; i < 2; step(it('update', () => {}), i++)) {}`},
 			// A loop that registers nothing is business logic wherever it sits,
 			// including after a nested registration in the same callback.
 			{Code: `test('outer', () => {
@@ -158,6 +163,16 @@ test('a', cb);`,
 				Code: `for (const suite of suites) {
   for (const row of getRows(test(suite.name, () => {}))) {
     consume(row);
+  }
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{preferEachAt("test", 1, 1, 5, 2)},
+			},
+			{
+				// An inner classic for initializer likewise runs once per outer
+				// iteration and therefore belongs to the outer loop.
+				Code: `for (const suite of suites) {
+  for (let i = register(test(suite.name, () => {})); i < 1; i++) {
+    consume(i);
   }
 }`,
 				Errors: []rule_tester.InvalidTestCaseError{preferEachAt("test", 1, 1, 5, 2)},

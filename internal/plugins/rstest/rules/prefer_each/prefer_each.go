@@ -27,16 +27,25 @@ type loopFrame struct {
 	registrations []pendingRegistration
 }
 
-func isInsideForInOrOfExpression(node *ast.Node, loop *ast.Node) bool {
-	if loop.Kind != ast.KindForInStatement && loop.Kind != ast.KindForOfStatement {
-		return false
+func isInsideLoopBody(node *ast.Node, loop *ast.Node) bool {
+	var body *ast.Node
+	switch loop.Kind {
+	case ast.KindForStatement:
+		statement := loop.AsForStatement()
+		if statement != nil {
+			body = statement.Statement
+		}
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		statement := loop.AsForInOrOfStatement()
+		if statement != nil {
+			body = statement.Statement
+		}
 	}
-	statement := loop.AsForInOrOfStatement()
-	if statement == nil || statement.Expression == nil {
+	if body == nil {
 		return false
 	}
 	for current := node; current != nil && current != loop; current = current.Parent {
-		if current == statement.Expression {
+		if current == body {
 			return true
 		}
 	}
@@ -110,10 +119,10 @@ var PreferEachRule = rule.Rule{
 					testFramework.FnKindDescribe,
 					testFramework.FnKindHook:
 					for i := len(frames) - 1; i >= 0; i-- {
-						// The right-hand expression of for-in/of runs once before that
-						// loop starts. It belongs to an enclosing loop, if any, rather
-						// than to the loop whose rows it produces.
-						if isInsideForInOrOfExpression(node, frames[i].node) {
+						// Only registrations in a loop's body repeat as part of that
+						// loop. Calls in for-in/of iterables and classic for control
+						// clauses belong to an enclosing loop, if any.
+						if !isInsideLoopBody(node, frames[i].node) {
 							continue
 						}
 						frames[i].registrations = append(frames[i].registrations, pendingRegistration{

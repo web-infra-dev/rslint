@@ -47,6 +47,15 @@ ruleTester.run('prefer-each', {} as never, {
     {
       code: `for (const row in getRows(it('one', () => {}))) {}`,
     },
+    {
+      code: `for (let i = register(it('once', () => {})); i < 2; i++) {}`,
+    },
+    {
+      code: `for (let i = 0; check(it('condition', () => {}), i < 2); i++) {}`,
+    },
+    {
+      code: `for (let i = 0; i < 2; step(it('update', () => {}), i++)) {}`,
+    },
   ],
   invalid: [
     {
