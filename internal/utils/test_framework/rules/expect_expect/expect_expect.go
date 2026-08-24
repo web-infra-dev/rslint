@@ -94,35 +94,6 @@ func buildErrorNoAssertionsMessage() rule.RuleMessage {
 	}
 }
 
-func parseOptions(options []any, defaultAssertNames []string) ([]string, []string) {
-	assertNames := slices.Clone(defaultAssertNames)
-	additional := []string{}
-
-	if len(options) == 0 {
-		return assertNames, additional
-	}
-	optsMap, _ := options[0].(map[string]interface{})
-
-	if arr, ok := optsMap["assertFunctionNames"].([]interface{}); ok {
-		assertNames = stringList(arr)
-	}
-	if arr, ok := optsMap["additionalTestBlockFunctions"].([]interface{}); ok {
-		additional = stringList(arr)
-	}
-
-	return assertNames, additional
-}
-
-func stringList(raw []interface{}) []string {
-	out := make([]string, 0, len(raw))
-	for _, v := range raw {
-		if s, ok := v.(string); ok {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
 func compileAssertPatterns(patterns []string) assertMatcher {
 	matcher := assertMatcher{patterns: make([]assertPattern, 0, len(patterns))}
 	for _, p := range patterns {
@@ -386,13 +357,13 @@ func NewRule(config Config) rule.Rule {
 		Schema: rule.NewSchema(schemaJSON),
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			runtime := config.Prepare(ctx)
-			assertNames, additionalTestBlocks := parseOptions(options, config.DefaultAssertFunctionNames)
+			parsedOptions := testFramework.ParseAssertionFunctionOptions(options, config.DefaultAssertFunctionNames)
 			matcher := defaultMatcher
-			if !slices.Equal(assertNames, config.DefaultAssertFunctionNames) {
-				matcher = compileAssertPatterns(assertNames)
+			if !slices.Equal(parsedOptions.AssertFunctionNames, config.DefaultAssertFunctionNames) {
+				matcher = compileAssertPatterns(parsedOptions.AssertFunctionNames)
 			}
-			additionalTestBlockSet := make(map[string]struct{}, len(additionalTestBlocks))
-			for _, name := range additionalTestBlocks {
+			additionalTestBlockSet := make(map[string]struct{}, len(parsedOptions.AdditionalTestBlockFunctions))
+			for _, name := range parsedOptions.AdditionalTestBlockFunctions {
 				additionalTestBlockSet[name] = struct{}{}
 			}
 			var unchecked []*ast.Node
