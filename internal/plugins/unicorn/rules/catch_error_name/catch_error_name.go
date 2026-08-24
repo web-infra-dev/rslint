@@ -3,11 +3,11 @@ package catch_error_name
 import (
 	_ "embed"
 	"fmt"
-	"sort"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -163,6 +163,7 @@ func isPromiseCatchParameter(identifier *ast.Node) bool {
 	if match, ok := unicornutil.MatchDotMethodCall(callback.Parent, unicornutil.DotMethodCallOptions{
 		Method:              method,
 		ArgumentsLength:     &argumentsLength,
+		RejectSpreadElement: true,
 		AllowOptionalMember: true,
 	}); ok && match.Call.Arguments()[0] == callback {
 		return true
@@ -173,6 +174,7 @@ func isPromiseCatchParameter(identifier *ast.Node) bool {
 	match, ok := unicornutil.MatchDotMethodCall(callback.Parent, unicornutil.DotMethodCallOptions{
 		Method:              method,
 		ArgumentsLength:     &argumentsLength,
+		RejectSpreadElement: true,
 		AllowOptionalMember: true,
 	})
 	return ok && match.Call.Arguments()[1] == callback
@@ -194,6 +196,17 @@ func handlerBody(identifier *ast.Node) *ast.Node {
 	return parent.Body()
 }
 
+func handlerScope(identifier *ast.Node) *ast.Node {
+	declaration := bindingDeclaration(identifier)
+	if declaration == nil || declaration.Parent == nil {
+		return nil
+	}
+	if declaration.Parent.Kind == ast.KindCatchClause {
+		return declaration.Parent.AsCatchClause().Block
+	}
+	return declaration.Parent
+}
+
 func bodyHasExternalReference(ctx rule.RuleContext, body *ast.Node, originalSymbol *ast.Symbol, candidate string) bool {
 	conflict := false
 	var walk func(*ast.Node)
@@ -206,7 +219,7 @@ func bodyHasExternalReference(ctx rule.RuleContext, body *ast.Node, originalSymb
 			(!ast.IsJsxTagName(node) || !scanner.IsIntrinsicJsxName(node.Text())) &&
 			!utils.IsNonReferenceIdentifier(node) {
 			symbol := ctx.Refs.Resolve(node)
-			conflict = symbol != originalSymbol && !utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+			conflict = symbol != originalSymbol
 			if conflict {
 				return
 			}
@@ -317,10 +330,21 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 	}
 	originalSymbol := bindingDeclaration(identifier).Symbol()
 	body := handlerBody(identifier)
+	scope := handlerScope(identifier)
 	for {
 		available := !ctx.Globals.Access(candidate).IsDeclared() &&
 			!utils.IsShadowed(identifier, candidate) &&
 			!hasTypeDeclarationInScope(identifier, candidate)
+		if available && ctx.Refs.IsNameDefinedInFileWithMeaning(
+			identifier,
+			candidate,
+			ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
+		) {
+			available = false
+		}
+		if available && !ast.IsInJSFile(identifier) && rule.IsDefaultTypeScriptTypeGlobal(candidate) {
+			available = false
+		}
 		if available && candidate == "arguments" {
 			available = false
 		}
@@ -332,7 +356,7 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 				}
 			}
 		}
-		if available && bodyHasExternalReference(ctx, body, originalSymbol, candidate) {
+		if available && bodyHasExternalReference(ctx, scope, originalSymbol, candidate) {
 			available = false
 		}
 		// NOTE: Unlike ESLint, avoid a known unsafe fix when an unused handler
@@ -352,6 +376,27 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 		}
 		candidate += "_"
 	}
+}
+
+func mergeReferences(left, right []*ast.Node) []*ast.Node {
+	if len(left) == 0 {
+		return right
+	}
+	if len(right) == 0 {
+		return left
+	}
+	merged := make([]*ast.Node, 0, len(left)+len(right))
+	for len(left) > 0 && len(right) > 0 {
+		if left[0].Pos() < right[0].Pos() {
+			merged = append(merged, left[0])
+			left = left[1:]
+		} else {
+			merged = append(merged, right[0])
+			right = right[1:]
+		}
+	}
+	merged = append(merged, left...)
+	return append(merged, right...)
 }
 
 func renameFixes(ctx rule.RuleContext, identifier *ast.Node, references []*ast.Node, name string) []rule.RuleFix {
@@ -386,9 +431,10 @@ var CatchErrorNameRule = rule.Rule{
 				if declaration == nil || ctx.Refs == nil || declaration.Symbol() == nil {
 					return
 				}
-				references := append([]*ast.Node(nil), ctx.Refs.References(declaration.Symbol())...)
-				references = append(references, jsxNamespaceReferences(identifier, handlerBody(identifier), originalName)...)
-				sort.Slice(references, func(i, j int) bool { return references[i].Pos() < references[j].Pos() })
+				references := ctx.Refs.References(declaration.Symbol())
+				if ctx.SourceFile.LanguageVariant == core.LanguageVariantJSX {
+					references = mergeReferences(references, jsxNamespaceReferences(identifier, handlerScope(identifier), originalName))
+				}
 				if originalName == "_" && len(references) == 0 {
 					return
 				}

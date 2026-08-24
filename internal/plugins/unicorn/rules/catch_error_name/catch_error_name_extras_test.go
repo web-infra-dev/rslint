@@ -4,6 +4,7 @@
 package catch_error_name_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
@@ -37,6 +38,9 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			{Code: "try {} catch (xSSad) {}", Options: map[string]any{"name": "ßad"}},
 			{Code: "try {} catch (_) { const x = <div _:attr=\"1\" /> }", Tsx: true},
 			{Code: "try {} catch (_) { function g(_) { return <_:foo /> } }", Tsx: true},
+			// Spread arguments make the apparent callback position indeterminate.
+			{Code: "promise.catch(...xs, bad => bad)"},
+			{Code: "promise.then(...xs, bad => bad)"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Locks in upstream isPromiseCatchParameter() arm 1: catch callback.
@@ -45,6 +49,11 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("promise.catch((bad => use(bad)))", "promise.catch((error => use(error)))", "bad", "error"),
 			// Locks in upstream isPromiseCatchParameter() arm 2: then rejection callback.
 			invalid("promise.then(ok => ok, bad => bad)", "promise.then(ok => ok, error => error)", "bad", "error"),
+			// Parameter initializers share the handler's function scope.
+			invalid("promise.catch((bad, x = error) => use(bad, x))", "promise.catch((error_, x = error) => use(error_, x))", "bad", "error_"),
+			invalid("promise.catch((bad, error = 1) => use(bad, error))", "promise.catch((error_, error = 1) => use(error_, error))", "bad", "error_"),
+			invalid("promise.catch(<error,>(bad: error) => use(bad))", "promise.catch(<error,>(error_: error) => use(error_))", "bad", "error_"),
+			invalidTSX("promise.catch((bad, x = <bad:foo />) => use(bad, x))", "promise.catch((error, x = <error:foo />) => use(error, x))", "bad", "error"),
 			// Locks in upstream collision arm: append an underscore.
 			invalid("const error = 1; try {} catch (bad) { use(bad, error) }", "const error = 1; try {} catch (error_) { use(error_, error) }", "bad", "error_"),
 			// Locks in renameVariable() shorthand expansion.
@@ -82,6 +91,8 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("try {} catch (bad) { enum error {} }", "try {} catch (error) { enum error {} }", "bad", "error"),
 			// Namespace bodies expose their complete value-space bindings.
 			invalid("namespace N { const error = 1; try {} catch (bad) { use(bad) } }", "namespace N { const error = 1; try {} catch (error_) { use(error_) } }", "bad", "error_"),
+			invalid("namespace N { export const error = 1 } namespace N { try {} catch (bad) { use(bad, error) } }", "namespace N { export const error = 1 } namespace N { try {} catch (error_) { use(error_, error) } }", "bad", "error_"),
+			invalid("namespace N { export const error = 1 } namespace N { try {} catch (bad) { use(bad) } }", "namespace N { export const error = 1 } namespace N { try {} catch (error_) { use(error_) } }", "bad", "error_"),
 			invalid("namespace N { function error() {}; try {} catch (bad) { use(bad) } }", "namespace N { function error() {}; try {} catch (error_) { use(error_) } }", "bad", "error_"),
 			invalid("namespace N { { var error = 1 }; try {} catch (bad) { use(bad) } }", "namespace N { { var error = 1 }; try {} catch (error_) { use(error_) } }", "bad", "error_"),
 			invalid("namespace N { for (var error of xs) {}; try {} catch (bad) { use(bad) } }", "namespace N { for (var error of xs) {}; try {} catch (error_) { use(error_) } }", "bad", "error_"),
@@ -91,6 +102,12 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			// Reserved and implicit names are suffixed when necessary.
 			invalid("try {} catch (bad) { use(bad) }", "try {} catch (await_) { use(await_) }", "bad", "await_", map[string]any{"name": "await"}),
 			invalid("try {} catch (bad) { use(bad) }", "try {} catch (undefined_) { use(undefined_) }", "bad", "undefined_", map[string]any{"name": "undefined"}),
+			invalid("try {} catch (bad) { use(bad) }", "try {} catch (Readonly_) { use(Readonly_) }", "bad", "Readonly_", map[string]any{"name": "Readonly"}),
+			func() rule_tester.InvalidTestCase {
+				result := invalid("try {} catch (bad) { use(bad) }", "try {} catch (Readonly) { use(Readonly) }", "bad", "Readonly", map[string]any{"name": "Readonly"})
+				result.FileName = "file.js"
+				return result
+			}(),
 			invalid("promise.catch(function (bad) { use(bad) })", "promise.catch(function (arguments_) { use(arguments_) })", "bad", "arguments_", map[string]any{"name": "arguments"}),
 			invalid("try {} catch (bad) { use(bad) }", "try {} catch (arguments_) { use(arguments_) }", "bad", "arguments_", map[string]any{"name": "arguments"}),
 			// `var` declarations nested in a rejection handler still hoist to its scope.
@@ -120,4 +137,12 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalid("try {} catch (bad) { const error = 1 }", "try {} catch (error_) { const error = 1 }", "bad", "error_"),
 		},
 	)
+}
+
+func TestCatchErrorNameRejectsInvalidIgnorePattern(t *testing.T) {
+	options := []any{map[string]any{"ignore": []any{"["}}}
+	err := catch_error_name.CatchErrorNameRule.Schema.Validate(options)
+	if err == nil || !strings.Contains(err.Error(), "ignore") {
+		t.Fatalf("expected invalid ignore regexp to be rejected, got %v", err)
+	}
 }
