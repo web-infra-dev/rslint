@@ -107,6 +107,14 @@ func TestSortKeysExtras(t *testing.T) {
 				Code:    "var obj = { '\\uD800': 1, '\\uD801': 2 };",
 				Options: []any{"asc", map[string]any{"natural": true}},
 			},
+			// ---- Radix-literal property names: hexadecimal keys above 2^53 ----
+			{Code: "var obj = { 0x1000000000000281: 0, '1152921504606847600': 0 };"},
+			// ---- Radix-literal property names: binary keys above 2^53 ----
+			{Code: "var obj = { 0b1000000000000000000000000000000000000000000000000001010000001: 0, '1152921504606847600': 0 };"},
+			// ---- Radix-literal property names: octal keys above 2^53 ----
+			{Code: "var obj = { 0o100000000000000001201: 0, '1152921504606847600': 0 };"},
+			// ---- Radix-literal property names: parenthesized computed keys use the same name ----
+			{Code: "var obj = { [(0x1000000000000281)]: 0, '1152921504606847600': 0 };"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 1: async method ----
@@ -283,6 +291,34 @@ func TestSortKeysExtras(t *testing.T) {
 				Code: "var obj = { 1e21: 1, '1a': 2 };",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '1a' should be before '1e+21'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
+				},
+			},
+			// ---- Radix-literal property names: hexadecimal diagnostics retain the source-derived name ----
+			{
+				Code: "var obj = { '1152921504606847600': 0, 0x1000000000000281: 0 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '1152921504606847500' should be before '1152921504606847600'.", Line: 1, Column: 39, EndLine: 1, EndColumn: 57},
+				},
+			},
+			// ---- Radix-literal property names: binary diagnostics retain the source-derived name ----
+			{
+				Code: "var obj = { '1152921504606847600': 0, 0b1000000000000000000000000000000000000000000000000001010000001: 0 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '1152921504606847500' should be before '1152921504606847600'.", Line: 1, Column: 39, EndLine: 1, EndColumn: 102},
+				},
+			},
+			// ---- Radix-literal property names: octal diagnostics retain the source-derived name ----
+			{
+				Code: "var obj = { '1152921504606847600': 0, 0o100000000000000001201: 0 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '1152921504606847500' should be before '1152921504606847600'.", Line: 1, Column: 39, EndLine: 1, EndColumn: 62},
+				},
+			},
+			// ---- Radix-literal property names: computed-key diagnostics retain the inner literal range ----
+			{
+				Code: "var obj = { '1152921504606847600': 0, [(0x1000000000000281)]: 0 };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "sortKeys", Message: "Expected object keys to be in ascending order. '1152921504606847500' should be before '1152921504606847600'.", Line: 1, Column: 41, EndLine: 1, EndColumn: 59},
 				},
 			},
 			// ---- A BigInt key is named by its decimal digits, the same as the equivalent number ----
