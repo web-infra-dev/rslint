@@ -1066,6 +1066,8 @@ rslint [options] [files...]
 
 The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli/cli.ts`) and the Go binary (`cmd/rslint/`).
 
+The default Go CLI mode keeps one lint orchestration path in `lint_pipeline.go`. Supporting files own bounded command-layer concerns: `lint_options.go` parses invocation arguments and validates flag combinations; `lint_configuration.go` contains configuration and rule-catalog preparation shared by CLI and API; `lint_config_resolver.go` resolves the effective configuration for each selected file; `lint_diagnostics.go` normalizes diagnostics and explicit-file warnings; `lint_fix.go` owns one fix application and disk-write pass, while the pipeline retains multi-pass rebuild orchestration; `eslint_plugin.go` adapts prepared lint plans to third-party plugin dispatch; and `syntax_diagnostics.go` collects target syntax diagnostics. Target selection remains in `internal/config/target`, Program construction remains in `internal/program/loader`, and report rendering remains in `internal/output`.
+
 1. **Node.js Wrapper**: parses args, starts the Go engine, and hosts JS/TS module evaluation plus live third-party plugin objects
 2. **Config Catalog**: for automatic JS/TS discovery or an explicitly selected JS/TS config, Go builds the staged catalog and batches exact module-evaluation requests to Node. If automatic discovery finds no candidate, or a non-JS config was explicitly selected, the existing Go JSON loader path remains in control
 3. **Mode Selection**:

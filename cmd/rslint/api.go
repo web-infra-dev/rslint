@@ -718,8 +718,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// same-start diagnostics by emission order (parent reported before
 	// nested child), and a file's diagnostics are all emitted by a single
 	// worker, so under a STABLE sort this key is already fully
-	// deterministic. Keep this comparator in sync with the CLI one in
-	// cmd.go (same policy over rule.RuleDiagnostic).
+	// deterministic. Keep this comparator in sync with the CLI comparator
+	// over rule.RuleDiagnostic.
 	sort.SliceStable(diagnostics, func(i, j int) bool {
 		a, b := diagnostics[i], diagnostics[j]
 		if a.FilePath != b.FilePath {
@@ -732,7 +732,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	})
 
 	// Apply fixes in-band when requested. ApplyRuleFixes is the same pure fixer
-	// the CLI uses (cmd.go applyFixPass), but here the result stays in-memory in
+	// the CLI uses through applyFixPass, but here the result stays in-memory in
 	// Output — the JS side persists it via Rslint.outputFixes. Single pass over
 	// each file's fixes (non-overlapping applied, overlapping left for a later
 	// lint); no cross-pass re-lint cascade (P1, see design §8).
