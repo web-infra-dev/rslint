@@ -1839,7 +1839,9 @@ func NormalizeBigIntLiteral(text string) string {
 //
 // Supported node kinds:
 //   - StringLiteral: returns the string value
-//   - NumericLiteral: returns the normalized numeric string (e.g. "0x1" → "1")
+//   - NumericLiteral: returns the normalized numeric string (e.g. "0x1" → "1"),
+//     recovering explicit-radix source tokens when needed for exact JavaScript
+//     rounding above 2^53
 //   - NoSubstitutionTemplateLiteral: returns the template text
 //   - RegularExpressionLiteral: returns the source text (e.g. /foo/g),
 //     matching JavaScript's implicit toString coercion when used as a property key
@@ -1858,7 +1860,7 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 	case ast.KindStringLiteral:
 		return node.AsStringLiteral().Text, true
 	case ast.KindNumericLiteral:
-		return NormalizeNumericLiteral(node.AsNumericLiteral().Text), true
+		return numericLiteralPropertyName(node), true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text, true
 	case ast.KindRegularExpressionLiteral:

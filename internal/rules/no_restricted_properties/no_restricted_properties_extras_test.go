@@ -70,6 +70,13 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 			{Code: `foo[1e-7]`, Options: []any{map[string]any{"property": "0.0000001"}}},
 			{Code: `let {[1e21]: x} = foo;`, Options: []any{map[string]any{"property": "1000000000000000000000"}}},
 
+			// ---- Review regression: Espree parses large radix literals from the
+			// raw token before applying JavaScript Number-to-string semantics. The
+			// differently rounded value produced from tsgo's literal text must not
+			// match an element-access restriction. ----
+			{Code: `foo[0x1000000000000281]`, Options: []any{map[string]any{"property": "1152921504606847700"}}},
+			{Code: `foo[0x1000000000000281n]`, Options: []any{map[string]any{"property": "1152921504606847500"}}},
+
 			// ---- Graceful degradation: empty object patterns ----
 			{Code: `let {} = foo;`, Options: []any{map[string]any{"object": "foo"}}},
 			{Code: `({} = foo);`, Options: []any{map[string]any{"object": "foo"}}},
@@ -207,6 +214,63 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 					MessageId: "restrictedProperty",
 					Message:   "'1e+21' is restricted from being used.",
 					Line:      1, Column: 5, EndLine: 1, EndColumn: 16,
+				}},
+			},
+			{
+				Code:    `foo[0x1000000000000281]`,
+				Options: []any{map[string]any{"property": "1152921504606847500"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1152921504606847500' is restricted from being used.",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 24,
+				}},
+			},
+			{
+				Code:    `foo[0b1000000000000000000000000000000000000000000000000001010000001]`,
+				Options: []any{map[string]any{"property": "1152921504606847500"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1152921504606847500' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `foo[0o100000000000000001201]`,
+				Options: []any{map[string]any{"property": "1152921504606847500"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1152921504606847500' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `foo[0X1_0000_0000_0000_281]`,
+				Options: []any{map[string]any{"property": "1152921504606847500"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1152921504606847500' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `foo[(0x1000000000000281)]`,
+				Options: []any{map[string]any{"object": "foo", "property": "1152921504606847500"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedObjectProperty",
+					Message:   "'foo.1152921504606847500' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `foo?.[0x1000000000000281]`,
+				Options: []any{map[string]any{"property": "1152921504606847500"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1152921504606847500' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `foo[0x1000000000000281n]`,
+				Options: []any{map[string]any{"property": "1152921504606847617"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'1152921504606847617' is restricted from being used.",
 				}},
 			},
 
