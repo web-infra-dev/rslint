@@ -97,7 +97,7 @@
         "sourceType": {
           "type": "string",
           "enum": ["module", "script", "commonjs"],
-          "description": "Module kind exposed to rules whose behavior depends on it. This does not change TypeScript parsing; when omitted, rules can infer the module kind from source syntax."
+          "description": "Module kind exposed to rules whose behavior depends on it. This does not change TypeScript parsing; when omitted, an exact lowercase .cjs extension resolves to commonjs and every other filename resolves to module."
         },
         "parserOptions": {
           "$ref": "#/definitions/ParserOptions",

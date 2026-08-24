@@ -140,9 +140,9 @@ export interface LanguageOptions {
   /** ECMAScript edition used for language globals; omitted defaults to `'latest'`. */
   ecmaVersion?: number | 'latest';
   /**
-   * Module kind for the file. When omitted, `.js`/`.mjs` resolve to `'module'`
-   * and `.cjs` to `'commonjs'`; other extensions keep the value unset. This
-   * does not change TypeScript parsing.
+   * Module kind for the file. When omitted, an exact lowercase `.cjs`
+   * extension resolves to `'commonjs'`; every other filename resolves to
+   * `'module'`. This does not change TypeScript parsing.
    */
   sourceType?: 'module' | 'script' | 'commonjs';
   parserOptions?: ParserOptions;
