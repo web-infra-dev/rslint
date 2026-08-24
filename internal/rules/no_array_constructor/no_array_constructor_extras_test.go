@@ -33,6 +33,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+func jsdocDirectFixCase(code, marker, output, fileName string) rule_tester.InvalidTestCase {
+	testCase := directFixCase(code, marker, output)
+	testCase.FileName = fileName
+	testCase.TSConfig = "tsconfig.allow-js.json"
+	return testCase
+}
+
 func TestNoArrayConstructorExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -75,6 +82,13 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			{Code: `import type { Array } from "my-array"; Array();`},
 			{Code: `function f<Array>() { Array(); }`},
 			{Code: `class C<Array> { m() { Array(); } }`},
+			// A real outer binding still shadows the call when a JSDoc template
+			// with the same name is attached to the intervening class.
+			{
+				Code:     `function outer(Array) { /** @template Array */ class C { m(){ Array() } } }`,
+				FileName: "no-array-constructor-jsdoc-authored-outer.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
 			// ---- Dimension 2: scoping — class type parameter inside a static
 			// member, which scope-manager keeps in the lexical scope chain while
 			// TypeScript's resolver hides it ----
@@ -160,6 +174,28 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			{Code: `new (0, Array)();`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Dimension 2: scoping — JSDoc @template tags remain comments
+			// to ESTree and scope-manager even though tsgo creates synthetic type
+			// parameters from them and attaches those to the host declaration. ----
+			jsdocDirectFixCase(
+				`/** @template Array */ function f(){ Array() }`,
+				`Array()`,
+				`/** @template Array */ function f(){ [] }`,
+				"no-array-constructor-jsdoc-function.js",
+			),
+			jsdocDirectFixCase(
+				`/** @template Array */ const f = () => Array();`,
+				`Array()`,
+				`/** @template Array */ const f = () => [];`,
+				"no-array-constructor-jsdoc-arrow.js",
+			),
+			jsdocDirectFixCase(
+				`/** @template Array */ class C { m(){ Array() } }`,
+				`Array()`,
+				`/** @template Array */ class C { m(){ [] } }`,
+				"no-array-constructor-jsdoc-class.js",
+			),
+
 			// ---- Dimension 4: parenthesized callee, multi-level ----
 			// Upstream's own test only covers single-level `(Array)()`.
 			directFixCase(`((Array))();`, `((Array))()`, `[];`),

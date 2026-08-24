@@ -202,7 +202,11 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 		if (isFunctionLike && !escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)) ||
 			(isClassLike && !escapesClassScope(prevChild, crossedScope)) {
 			for _, typeParameter := range current.TypeParameters() {
-				if typeParameter != nil && typeParameter.Name() != nil && typeParameter.Name().Text() == name {
+				// TypeScript creates synthetic type parameters from JSDoc @template
+				// tags and attaches them to the host declaration. They remain comments
+				// rather than scope variables in ESTree and scope-manager.
+				if typeParameter != nil && typeParameter.Flags&ast.NodeFlagsReparsed == 0 &&
+					typeParameter.Name() != nil && typeParameter.Name().Text() == name {
 					return true
 				}
 			}
