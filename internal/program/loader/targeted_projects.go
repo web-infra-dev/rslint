@@ -11,12 +11,13 @@ import (
 	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type projectTargetBinding struct {
-	targets []rslintconfig.DiscoveredLintTarget
+	targets []target.File
 	owners  []int
 }
 
@@ -174,7 +175,7 @@ func (execution *targetedProjectExecution) build(index int) error {
 
 func (execution *targetedProjectExecution) containsTarget(
 	index int,
-	target rslintconfig.DiscoveredLintTarget,
+	target target.File,
 ) bool {
 	slot := &execution.slots[index]
 	if slot.program == nil {
@@ -185,12 +186,12 @@ func (execution *targetedProjectExecution) containsTarget(
 	})
 	slot.lookupMu.Lock()
 	defer slot.lookupMu.Unlock()
-	return slot.lookup.SourceFileForPath(target.Path) != nil
+	return slot.lookup.SourceFileForTarget(target.Path, target.CanonicalPath) != nil
 }
 
 func (execution *targetedProjectExecution) supportsTarget(
 	index int,
-	target rslintconfig.DiscoveredLintTarget,
+	target target.File,
 ) (bool, error) {
 	parsed, err := execution.parse(index)
 	if err != nil {
@@ -238,7 +239,7 @@ func (execution *targetedProjectExecution) parseConcurrent(indexes []int) {
 
 func (execution *targetedProjectExecution) predictedProjectPosition(
 	orderedProjectIndexes []int,
-	target rslintconfig.DiscoveredLintTarget,
+	target target.File,
 ) int {
 	useCaseSensitive := true
 	if fsys := execution.session.FS(); fsys != nil {
@@ -306,10 +307,10 @@ func runTargetConfigTasks(
 func (execution *targetedProjectExecution) projectSet(
 	keep []bool,
 	directProjectByTarget []int,
-	targets []rslintconfig.DiscoveredLintTarget,
+	targets []target.File,
 ) ProjectSet {
 	binding := &projectTargetBinding{
-		targets: append([]rslintconfig.DiscoveredLintTarget(nil), targets...),
+		targets: append([]target.File(nil), targets...),
 		owners:  make([]int, len(targets)),
 	}
 	set := ProjectSet{
@@ -373,13 +374,13 @@ func orderedProjectIndexesForConfig(plan projectPlan, configDir string) []int {
 // fallback to projects that contain them through module resolution.
 func (s *Session) BuildTargetProjects(
 	configs map[string]rslintconfig.RslintConfig,
-	targetPlan rslintconfig.LintTargetPlan,
+	targetPlan target.Plan,
 	singleThreaded bool,
 ) (ProjectSet, error) {
 	if err := s.validate(); err != nil {
 		return ProjectSet{}, err
 	}
-	if len(configs) == 0 || len(targetPlan.Targets) == 0 {
+	if len(configs) == 0 || len(targetPlan.Files) == 0 {
 		return ProjectSet{}, nil
 	}
 	plan := buildProjectPlan(configs, s.FS())
@@ -392,12 +393,12 @@ func (s *Session) BuildTargetProjects(
 
 	execution := newTargetedProjectExecution(s, plan, singleThreaded)
 	directBuilds := newTargetedProjectBuildQueue(execution)
-	directProjectByTarget := make([]int, len(targetPlan.Targets))
+	directProjectByTarget := make([]int, len(targetPlan.Files))
 	for index := range directProjectByTarget {
 		directProjectByTarget[index] = -1
 	}
 	targetIndexesByConfig := make(map[string][]int)
-	for targetIndex, target := range targetPlan.Targets {
+	for targetIndex, target := range targetPlan.Files {
 		targetIndexesByConfig[target.ConfigDirectory] = append(
 			targetIndexesByConfig[target.ConfigDirectory],
 			targetIndex,
@@ -423,7 +424,7 @@ func (s *Session) BuildTargetProjects(
 				if directProjectByTarget[targetIndex] >= 0 {
 					continue
 				}
-				target := targetPlan.Targets[targetIndex]
+				target := targetPlan.Files[targetIndex]
 				if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
 					directProjectByTarget[targetIndex] = projectIndex
 					unresolved--
@@ -445,7 +446,7 @@ func (s *Session) BuildTargetProjects(
 			for _, targetIndex := range targetIndexes {
 				position := execution.predictedProjectPosition(
 					orderedProjectIndexes,
-					targetPlan.Targets[targetIndex],
+					targetPlan.Files[targetIndex],
 				)
 				if position < 0 {
 					continue
@@ -472,7 +473,7 @@ func (s *Session) BuildTargetProjects(
 						continue
 					}
 					for _, targetIndex := range predictedTargetsByProject[projectIndex] {
-						target := targetPlan.Targets[targetIndex]
+						target := targetPlan.Files[targetIndex]
 						if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
 							if err := directBuilds.enqueue(projectIndex); err != nil {
 								return err
@@ -529,10 +530,10 @@ func (s *Session) BuildTargetProjects(
 		}
 	}
 	for targetIndex, projectIndex := range directProjectByTarget {
-		if projectIndex >= 0 && !execution.containsTarget(projectIndex, targetPlan.Targets[targetIndex]) {
+		if projectIndex >= 0 && !execution.containsTarget(projectIndex, targetPlan.Files[targetIndex]) {
 			return ProjectSet{}, fmt.Errorf(
 				"project root %q from %q was absent from its TypeScript Program",
-				targetPlan.Targets[targetIndex].Path,
+				targetPlan.Files[targetIndex].Path,
 				plan.specs[projectIndex].tsconfigPath,
 			)
 		}
@@ -558,7 +559,7 @@ func (s *Session) BuildTargetProjects(
 			for targetIndex := range pending {
 				supported, supportErr := execution.supportsTarget(
 					projectIndex,
-					targetPlan.Targets[targetIndex],
+					targetPlan.Files[targetIndex],
 				)
 				if supportErr != nil {
 					return supportErr
@@ -578,7 +579,7 @@ func (s *Session) BuildTargetProjects(
 			}
 			selected := false
 			for targetIndex := range pending {
-				if execution.containsTarget(projectIndex, targetPlan.Targets[targetIndex]) {
+				if execution.containsTarget(projectIndex, targetPlan.Files[targetIndex]) {
 					delete(pending, targetIndex)
 					selected = true
 				}
@@ -595,13 +596,13 @@ func (s *Session) BuildTargetProjects(
 		return ProjectSet{}, err
 	}
 
-	return execution.projectSet(keep, directProjectByTarget, targetPlan.Targets), nil
+	return execution.projectSet(keep, directProjectByTarget, targetPlan.Files), nil
 }
 
 func (s *Session) BuildTargetProject(
 	configDirectory string,
 	config rslintconfig.RslintConfig,
-	targetPlan rslintconfig.LintTargetPlan,
+	targetPlan target.Plan,
 	singleThreaded bool,
 ) (ProjectSet, error) {
 	return s.BuildTargetProjects(

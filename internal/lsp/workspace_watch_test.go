@@ -120,7 +120,6 @@ func TestWorkspaceConfigEventsDoNotDuplicateTransactionalRefresh(t *testing.T) {
 }
 
 func TestAncestorJSConfigWatcherRefreshesChangedAndDeletedActiveConfig(t *testing.T) {
-	config.RegisterAllRules()
 	root := tspath.NormalizePath(t.TempDir())
 	workspace := tspath.NormalizePath(filepath.Join(root, "repo", "packages", "app"))
 	ancestor := tspath.NormalizePath(filepath.Join(root, "repo"))
@@ -180,7 +179,6 @@ func TestAncestorJSConfigWatcherRefreshesChangedAndDeletedActiveConfig(t *testin
 }
 
 func TestAncestorJSConfigWatcherDiscoversNewNearerConfig(t *testing.T) {
-	config.RegisterAllRules()
 	root := tspath.NormalizePath(t.TempDir())
 	outer := tspath.NormalizePath(filepath.Join(root, "repo"))
 	nearer := tspath.NormalizePath(filepath.Join(outer, "packages"))
@@ -232,7 +230,6 @@ func TestAncestorJSConfigWatcherDiscoversNewNearerConfig(t *testing.T) {
 }
 
 func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
-	config.RegisterAllRules()
 	root := tspath.NormalizePath(t.TempDir())
 	ancestor := tspath.NormalizePath(filepath.Join(root, "repo"))
 	intermediate := tspath.NormalizePath(filepath.Join(ancestor, "packages"))
@@ -283,7 +280,6 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 }
 
 func TestConfigRefreshPreservesAtomicJSONLastGoodOnJSFailure(t *testing.T) {
-	config.RegisterAllRules()
 	workspace := tspath.NormalizePath(t.TempDir())
 	writeConfigCandidate(t, workspace)
 	jsonPath := filepath.Join(workspace, "rslint.json")

@@ -500,13 +500,20 @@ func lastWriteInDeclarationScope(definition *ast.Node, refs []*ast.Node) *ast.No
 // used to modify the same variable, with the result not used elsewhere.
 // Examples: `a = a + 1;`, `a++;`, `a += 1;` (as statements, not sub-expressions).
 //
-// declNode anchors the variable's own declaration site. A self-referencing
-// assignment (`x = f(x)`) does NOT count as self-modification — i.e. it IS a
-// real use — when the assignment happens in a different function scope than
-// the declaration, or inside a loop: the written value can be observed later
-// (a closure capturing it, or the next loop iteration), so it's a genuine
-// read-modify-write accumulator rather than a discarded self-reference.
-func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, name string, declNode *ast.Node, sourceFile *ast.SourceFile) bool {
+// declarationScope is the variable scope that owns the binding. A
+// self-referencing assignment (`x = f(x)`) does NOT count as self-modification
+// — i.e. it IS a real use — when the assignment happens in a different
+// function scope than the declaration, or inside a loop: the written value can
+// be observed later (a closure capturing it, or the next loop iteration), so
+// it's a genuine read-modify-write accumulator rather than a discarded
+// self-reference.
+func isSelfModifyingReference(
+	node *ast.Node,
+	sym *ast.Symbol,
+	name string,
+	declarationScope *ast.Node,
+	sourceFile *ast.SourceFile,
+) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
@@ -531,7 +538,9 @@ func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, name string, decl
 	// calls/new, templates, conditionals, containers, and TypeScript wrappers.
 	// The assignment must discard its result and execute in the declaration's
 	// variable scope; loop-carried and cross-scope updates can be observed later.
-	declarationScope := variableScope(declNode, sourceFile)
+	if declarationScope == nil {
+		return false
+	}
 	for current := node.Parent; current != nil; current = current.Parent {
 		if current.Kind != ast.KindBinaryExpression {
 			continue
@@ -551,16 +560,6 @@ func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, name string, decl
 	}
 
 	return false
-}
-
-func variableScope(declaration *ast.Node, sourceFile *ast.SourceFile) *ast.Node {
-	if declaration != nil {
-		return utils.FindEnclosingScope(declaration)
-	}
-	if sourceFile != nil {
-		return sourceFile.AsNode()
-	}
-	return nil
 }
 
 // referenceMatchesVariable compares a direct assignment target with either a
@@ -1828,7 +1827,8 @@ func collectLocalExportTargets(refs *rule.RefStore, node *ast.Node, targets map[
 //   - usages: maps each symbol to its usage reference nodes (read references)
 //   - writeRefs: maps each symbol to its write-only reference nodes (assignments)
 //   - localExportTargets: local symbols consumed by named export declarations
-//   - globalRefsByName: references that are not shadowed by a local declaration
+//   - globalRefsByName: references to tracked inline-global names that are not
+//     shadowed by a local declaration
 func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, localExportTargets map[*ast.Symbol]bool, globalRefsByName map[string][]*ast.Node) {
 	sf := sourceFile.AsSourceFile()
 	addUsage := func(sym *ast.Symbol, node *ast.Node) {
@@ -1847,8 +1847,20 @@ func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*
 
 		if ast.IsIdentifier(node) && !isNonReferenceIdentifier(node) {
 			sym := binderReferenceSymbol(node)
-			if sym == nil || !utils.IsSymbolDeclaredInFile(sym, sf) {
-				globalRefsByName[node.Text()] = append(globalRefsByName[node.Text()], node)
+			if globalRefsByName != nil {
+				name := node.Text()
+				if _, tracked := globalRefsByName[name]; tracked {
+					// For `module.exports = value`, tsgo synthesizes a file-local
+					// ModuleExports symbol whose only declaration is the SourceFile. ESLint's
+					// scope manager still resolves `module` to an authored global, so this
+					// synthetic symbol must not make an inline `/* global module */` look
+					// shadowed.
+					if sym == nil ||
+						sym.Flags&ast.SymbolFlagsModuleExports != 0 ||
+						!utils.IsSymbolDeclaredInFile(sym, sf) {
+						globalRefsByName[name] = append(globalRefsByName[name], node)
+					}
+				}
 			}
 
 			// Track write-only references separately for report position.
@@ -1885,12 +1897,21 @@ func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*
 // hasInlineGlobalUse applies the same read semantics as declared variables to
 // `/* global name */` entries, which have no declaration node or binder symbol.
 // Local shadows were removed while collecting globalRefsByName.
-func hasInlineGlobalUse(sourceFile *ast.SourceFile, name string, references []*ast.Node) bool {
+func hasInlineGlobalUse(sourceFile *ast.SourceFile, refs *rule.RefStore, name string, references []*ast.Node) bool {
+	// An explicit global belongs to ESLint's outer global scope. JavaScript
+	// modules and CommonJS files execute in a distinct top-level scope, so an
+	// `x = x + 1` there can be observed outside the file and its RHS is a real
+	// use. A plain script shares the SourceFile scope with the global instead.
+	var declarationScope *ast.Node
+	if sourceFile != nil && !ast.IsExternalModule(sourceFile) &&
+		(refs == nil || !refs.HasNonGlobalTopLevelScope()) {
+		declarationScope = sourceFile.AsNode()
+	}
 	for _, reference := range references {
 		if isPartOfAssignment(reference) {
 			continue
 		}
-		if isSelfModifyingReference(reference, nil, name, nil, sourceFile) {
+		if isSelfModifyingReference(reference, nil, name, declarationScope, sourceFile) {
 			continue
 		}
 		return true
@@ -2008,12 +2029,13 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		if exists {
 			varInfo.References = usageNodes
 
+			declarationScope := utils.FindEnclosingScope(nameNode)
 			filteredUsages := []*ast.Node{}
 			for _, usage := range usageNodes {
 				if (coreModuleBoundary == nil || ast.IsNodeDescendantOf(usage, coreModuleBoundary)) &&
 					(coreTypeOnlyBoundary == nil || ast.IsNodeDescendantOf(usage, coreTypeOnlyBoundary)) &&
 					usage.Pos() != varInfo.Variable.Pos() &&
-					!isSelfModifyingReference(usage, sym, name, nameNode, ctx.SourceFile) &&
+					!isSelfModifyingReference(usage, sym, name, declarationScope, ctx.SourceFile) &&
 					(coreTypeSelfReference || !isInsideAnyOwnDeclaration(usage, allDecls)) {
 					filteredUsages = append(filteredUsages, usage)
 				}
@@ -2156,12 +2178,25 @@ func newRule() rule.Rule {
 			parsedOptions := parseOptions(options)
 			opts := &parsedOptions
 			reporter := &diagnosticReporter{ctx: ctx}
+			inlineGlobals := ctx.Globals.InlineDeclarations()
+			var globalRefsByName map[string][]*ast.Node
+			if opts.Vars != "local" {
+				for _, inlineGlobal := range inlineGlobals {
+					if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
+						continue
+					}
+					if globalRefsByName == nil {
+						globalRefsByName = make(map[string][]*ast.Node, len(inlineGlobals))
+					}
+					globalRefsByName[inlineGlobal.Name] = nil
+				}
+			}
 
 			ac := &analysisContext{
 				allUsages:          make(map[*ast.Symbol][]*ast.Node),
 				writeRefs:          make(map[*ast.Symbol][]*ast.Node),
 				localExportTargets: make(map[*ast.Symbol]bool),
-				globalRefsByName:   make(map[string][]*ast.Node),
+				globalRefsByName:   globalRefsByName,
 				// ESLint core uses lexical scopes, so the binder-backed name index
 				// deliberately has no checker dependency. Project and gap files follow
 				// the same path.
@@ -2495,11 +2530,11 @@ func newRule() rule.Rule {
 
 			ensureCollected(ctx.SourceFile.AsNode())
 			if opts.Vars != "local" {
-				for _, inlineGlobal := range ctx.Globals.InlineDeclarations() {
+				for _, inlineGlobal := range inlineGlobals {
 					if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
 						continue
 					}
-					if hasInlineGlobalUse(ctx.SourceFile, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {
+					if hasInlineGlobalUse(ctx.SourceFile, ctx.Refs, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {
 						continue
 					}
 					reporter.reportRange(

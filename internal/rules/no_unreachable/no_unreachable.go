@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/cfg"
 )
 
 // https://eslint.org/docs/latest/rules/no-unreachable
@@ -87,6 +88,165 @@ func isVarWithoutInitializer(node *ast.Node) bool {
 	return true
 }
 
+// isBooleanLiteralIf reports whether node is an if statement whose condition is
+// folded by the TypeScript binder but not by ESLint's code-path analyzer.
+func isBooleanLiteralIf(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindIfStatement {
+		return false
+	}
+	stmt := node.AsIfStatement()
+	return stmt != nil && stmt.Expression != nil &&
+		(stmt.Expression.Kind == ast.KindTrueKeyword || stmt.Expression.Kind == ast.KindFalseKeyword)
+}
+
+func isCodePathRoot(node *ast.Node) bool {
+	return node != nil && (node.Kind == ast.KindSourceFile ||
+		node.Kind == ast.KindClassStaticBlockDeclaration ||
+		utils.IsFunctionLikeContainer(node))
+}
+
+// flatStatementCompletion reports normal completion for statement shapes that
+// do not need a CFG. The second result is false for compound control flow or a
+// class evaluation, whose static blocks require full code-path analysis.
+func flatStatementCompletion(node *ast.Node, allowBlock bool) (bool, bool) {
+	if node == nil {
+		return true, true
+	}
+	if utils.IsFunctionLikeContainer(node) {
+		return true, true
+	}
+	if node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression || node.Kind == ast.KindModuleBlock {
+		return false, false
+	}
+	if node.Kind == ast.KindBlock {
+		if !allowBlock {
+			return false, false
+		}
+		normal := true
+		for _, statement := range node.Statements() {
+			if !normal {
+				// A branch with its own unreachable tail needs CFG reachability
+				// so that tail is still checked when the binder pruned the branch.
+				return false, false
+			}
+			statementNormal, flat := flatStatementCompletion(statement, true)
+			if !flat {
+				return false, false
+			}
+			normal = statementNormal
+		}
+		return normal, true
+	}
+	if ast.IsStatement(node) {
+		switch node.Kind {
+		case ast.KindReturnStatement, ast.KindThrowStatement,
+			ast.KindBreakStatement, ast.KindContinueStatement:
+			return false, true
+		case ast.KindEmptyStatement, ast.KindVariableStatement,
+			ast.KindExpressionStatement, ast.KindDebuggerStatement:
+		default:
+			return false, false
+		}
+	}
+	flat := true
+	node.ForEachChild(func(child *ast.Node) bool {
+		_, childFlat := flatStatementCompletion(child, false)
+		if !childFlat {
+			flat = false
+			return true
+		}
+		return false
+	})
+	return true, flat
+}
+
+func flatBooleanIfCompletion(node *ast.Node) (normal bool, needsCompensation bool, flat bool) {
+	if !isBooleanLiteralIf(node) {
+		return false, false, false
+	}
+	statement := node.AsIfStatement()
+	thenNormal, thenFlat := flatStatementCompletion(statement.ThenStatement, true)
+	elseNormal, elseFlat := flatStatementCompletion(statement.ElseStatement, true)
+	if !thenFlat || !elseFlat {
+		return false, false, false
+	}
+	normal = statement.ElseStatement == nil || thenNormal || elseNormal
+	selectedNormal := thenNormal
+	if statement.Expression.Kind == ast.KindFalseKeyword {
+		selectedNormal = elseNormal
+	}
+	return normal, !selectedNormal && normal, true
+}
+
+func enclosingCodePathRoot(node *ast.Node) *ast.Node {
+	for current := node; current != nil; current = current.Parent {
+		if isCodePathRoot(current) {
+			return current
+		}
+	}
+	return nil
+}
+
+func compoundStatementContainsBooleanIf(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindBlock, ast.KindIfStatement, ast.KindDoStatement,
+		ast.KindWhileStatement, ast.KindForStatement, ast.KindForInStatement,
+		ast.KindForOfStatement, ast.KindWithStatement, ast.KindSwitchStatement,
+		ast.KindLabeledStatement, ast.KindTryStatement, ast.KindModuleDeclaration,
+		ast.KindModuleBlock:
+	default:
+		return false
+	}
+	found := false
+	var visit func(*ast.Node) bool
+	visit = func(current *ast.Node) bool {
+		if current == nil || found || current != node && isCodePathRoot(current) {
+			return false
+		}
+		if isBooleanLiteralIf(current) {
+			found = true
+			return true
+		}
+		current.ForEachChild(visit)
+		return found
+	}
+	visit(node)
+	return found
+}
+
+type reachabilityState struct {
+	eslintReachable map[*ast.Node]bool
+	cfgRoots        map[*ast.Node]bool
+}
+
+func (s *reachabilityState) ensureCFG(root *ast.Node) {
+	if root == nil || s.cfgRoots[root] {
+		return
+	}
+	if s.cfgRoots == nil {
+		s.cfgRoots = make(map[*ast.Node]bool)
+	}
+	s.cfgRoots[root] = true
+	cfg.Build(root, cfg.Hooks[struct{}]{
+		Statement: func(builder *cfg.Builder[struct{}], statement *ast.Node) {
+			if !builder.Current().Reachable {
+				return
+			}
+			if s.eslintReachable == nil {
+				s.eslintReachable = make(map[*ast.Node]bool)
+			}
+			s.eslintReachable[statement] = true
+		},
+	})
+}
+
+func (s *reachabilityState) isUnreachable(node *ast.Node) bool {
+	return isUnreachable(node) && !s.eslintReachable[node]
+}
+
 // NoUnreachableRule disallows unreachable code after return, throw, break, and continue statements.
 var NoUnreachableRule = rule.Rule{
 	Name:   "no-unreachable",
@@ -96,22 +256,29 @@ var NoUnreachableRule = rule.Rule{
 			Id:          "unreachableCode",
 			Description: "Unreachable code.",
 		}
+		state := reachabilityState{}
 
 		checkStatements := func(statements []*ast.Node) {
 			if len(statements) == 0 {
 				return
 			}
+			var root *ast.Node
+			rootUsesCFG := false
+			if state.cfgRoots != nil {
+				root = enclosingCodePathRoot(statements[0])
+				rootUsesCFG = state.cfgRoots[root]
+			}
 
-			// If the first statement is already unreachable, this container is
-			// either inside unreachable code reported by a parent, or a dead
-			// branch from a constant condition (e.g. else of if(true)). In both
-			// cases, skip to avoid noise and double-reporting.
-			if isUnreachable(statements[0]) {
+			// Unreachable containers are either covered by a parent range or are
+			// dead branches that this rule intentionally does not report wholesale.
+			if state.isUnreachable(statements[0]) {
 				return
 			}
 
 			var rangeStart *ast.Node // first unreachable stmt in current consecutive group
 			var rangeEnd *ast.Node   // last unreachable stmt in current consecutive group
+			synthetic := false
+			syntheticReachable := false
 
 			flush := func() {
 				if rangeStart != nil {
@@ -130,7 +297,37 @@ var NoUnreachableRule = rule.Rule{
 				if stmt == nil {
 					continue
 				}
-				if isUnreachable(stmt) {
+				normalCompletion := true
+				candidateNeedsCompensation := false
+				if !rootUsesCFG && (!synthetic || syntheticReachable) {
+					needsCFG := false
+					if isBooleanLiteralIf(stmt) {
+						var flat bool
+						normalCompletion, candidateNeedsCompensation, flat = flatBooleanIfCompletion(stmt)
+						needsCFG = !flat
+					} else if synthetic {
+						var flat bool
+						normalCompletion, flat = flatStatementCompletion(stmt, false)
+						needsCFG = !flat
+					} else if compoundStatementContainsBooleanIf(stmt) {
+						needsCFG = true
+					}
+					if needsCFG {
+						if root == nil {
+							root = enclosingCodePathRoot(stmt)
+						}
+						state.ensureCFG(root)
+						rootUsesCFG = root != nil && state.cfgRoots[root]
+						synthetic = false
+					}
+				}
+
+				reachable := !state.isUnreachable(stmt)
+				if synthetic {
+					reachable = syntheticReachable
+				}
+
+				if !reachable {
 					if isHoistedOrEmpty(stmt) {
 						// Hoisted/empty statements break the consecutive chain
 						// but are not reported themselves
@@ -144,6 +341,14 @@ var NoUnreachableRule = rule.Rule{
 				} else {
 					flush()
 				}
+
+				if !rootUsesCFG && reachable && candidateNeedsCompensation {
+					synthetic = true
+					syntheticReachable = true
+				} else if synthetic && reachable {
+					syntheticReachable = normalCompletion
+				}
+
 			}
 			flush()
 		}
@@ -184,7 +389,7 @@ var NoUnreachableRule = rule.Rule{
 				}
 				// If the try block is itself unreachable, skip — the parent
 				// already reported it.
-				if isUnreachable(node) {
+				if state.isUnreachable(node) {
 					return
 				}
 				// If the try block cannot throw before reaching a terminal,
