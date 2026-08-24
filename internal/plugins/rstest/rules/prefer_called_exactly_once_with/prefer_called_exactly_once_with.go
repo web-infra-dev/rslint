@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
@@ -35,6 +36,110 @@ var combinedMatchers = map[string]string{
 var onceMatchers = map[string]bool{
 	"toHaveBeenCalledOnce": true,
 	"calledOnce":           true,
+}
+
+type mergeMatcherRoles uint8
+
+const (
+	mergeMatcherRoleOnce mergeMatcherRoles = 1 << iota
+	mergeMatcherRoleWith
+	mergeMatcherRolePair = mergeMatcherRoleOnce | mergeMatcherRoleWith
+)
+
+var mergeMatcherNames = [...]struct {
+	name string
+	role mergeMatcherRoles
+}{
+	{name: "toHaveBeenCalledOnce", role: mergeMatcherRoleOnce},
+	{name: "calledOnce", role: mergeMatcherRoleOnce},
+	{name: "toHaveBeenCalledWith", role: mergeMatcherRoleWith},
+	{name: "calledWith", role: mergeMatcherRoleWith},
+}
+
+// sourceMayContainMergePair cheaply rejects files that cannot contain both
+// halves of a merge. The parser interns property names and the cooked text of
+// string/template element-access keys, so the identifier table covers normal,
+// bracket and escaped spellings without scanning the AST.
+//
+// A key hidden behind parentheses is the one accepted form the table does not
+// intern, because GetMemberEntries reaches through them with SkipParentheses.
+// Only files containing such a bracket need the exact fallback walk.
+func sourceMayContainMergePair(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+
+	roles := mergeMatcherRoles(0)
+	for _, matcher := range mergeMatcherNames {
+		if _, ok := sourceFile.Identifiers[matcher.name]; ok {
+			roles |= matcher.role
+		}
+	}
+	if roles == mergeMatcherRolePair {
+		return true
+	}
+	if !bracketOpensOnParenthesis(sourceFile.Text()) {
+		return false
+	}
+	return roles|parenthesizedElementAccessRoles(sourceFile.AsNode()) == mergeMatcherRolePair
+}
+
+// bracketOpensOnParenthesis reports whether a bracket access starts with a
+// parenthesized key after trivia. False positives in strings or regular
+// expressions only trigger the rare fallback walk; they cannot hide a match.
+func bracketOpensOnParenthesis(text string) bool {
+	for index := strings.IndexByte(text, '['); index >= 0; {
+		if next := scanner.SkipTrivia(text, index+1); next < len(text) && text[next] == '(' {
+			return true
+		}
+		offset := strings.IndexByte(text[index+1:], '[')
+		if offset < 0 {
+			return false
+		}
+		index += offset + 1
+	}
+	return false
+}
+
+func matcherRole(name string) mergeMatcherRoles {
+	for _, matcher := range mergeMatcherNames {
+		if matcher.name == name {
+			return matcher.role
+		}
+	}
+	return 0
+}
+
+// parenthesizedElementAccessRoles performs the exact fallback for keys such as
+// expect(spy)[("calledOnce")]. It mirrors GetMemberEntries' accepted static
+// key forms and stops as soon as both matcher roles have been found.
+func parenthesizedElementAccessRoles(node *ast.Node) mergeMatcherRoles {
+	if node == nil {
+		return 0
+	}
+	roles := mergeMatcherRoles(0)
+	if node.Kind == ast.KindElementAccessExpression {
+		argument := node.AsElementAccessExpression().ArgumentExpression
+		unwrapped := ast.SkipParentheses(argument)
+		if argument != unwrapped && unwrapped != nil {
+			switch unwrapped.Kind {
+			case ast.KindIdentifier:
+				roles |= matcherRole(unwrapped.AsIdentifier().Text)
+			case ast.KindStringLiteral:
+				roles |= matcherRole(unwrapped.AsStringLiteral().Text)
+			case ast.KindNoSubstitutionTemplateLiteral:
+				roles |= matcherRole(unwrapped.AsNoSubstitutionTemplateLiteral().Text)
+			}
+		}
+	}
+	if roles == mergeMatcherRolePair {
+		return roles
+	}
+	node.ForEachChild(func(child *ast.Node) bool {
+		roles |= parenthesizedElementAccessRoles(child)
+		return roles == mergeMatcherRolePair
+	})
+	return roles
 }
 
 type assertionRole uint8
@@ -901,6 +1006,9 @@ var PreferCalledExactlyOnceWithRule = rule.Rule{
 	Name:   "rstest/prefer-called-exactly-once-with",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		if !sourceMayContainMergePair(ctx.SourceFile) {
+			return rule.RuleListeners{}
+		}
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		// The linter traverses SourceFile children but does not dispatch a
 		// SourceFile listener, so inspect the top-level statement list eagerly.
