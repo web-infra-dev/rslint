@@ -131,9 +131,14 @@ func isModuleTopLevelFunction(function *ast.Node) bool {
 		case ast.KindVariableDeclaration,
 			ast.KindVariableDeclarationList,
 			ast.KindVariableStatement,
-			ast.KindParenthesizedExpression:
+			ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindSatisfiesExpression,
+			ast.KindNonNullExpression,
+			ast.KindTypeAssertionExpression:
 			// The declaration chain a `const cb = () => {}` hangs from, and the
-			// parentheses SkipParentheses already looked through.
+			// parentheses and TS assertions SkipAssertionsAndParens already
+			// looked through.
 		default:
 			return false
 		}
@@ -174,7 +179,7 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 	if argument == nil {
 		return rstestCallbackInfo{}
 	}
-	argument = ast.SkipParentheses(argument)
+	argument = internalUtils.SkipAssertionsAndParens(argument)
 	if argument == nil {
 		return rstestCallbackInfo{}
 	}
@@ -198,7 +203,7 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 		if initializer == nil {
 			return rstestCallbackInfo{}
 		}
-		initializer = ast.SkipParentheses(initializer)
+		initializer = internalUtils.SkipAssertionsAndParens(initializer)
 		if ast.IsFunctionExpressionOrArrowFunction(initializer) {
 			return rstestCallbackInfo{functionNode: initializer, name: name}
 		}

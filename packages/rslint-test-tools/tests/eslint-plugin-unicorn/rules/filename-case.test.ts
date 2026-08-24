@@ -36,7 +36,7 @@ function invalid(filename: string, c: string | undefined, message: string) {
     code: `/* Filename: ${filename} */`,
     filename,
     options: c ? [{ case: c, checkDirectories: false }] : [],
-    errors: [{ message }],
+    errors: [{ message, messageId: 'filename-case' }],
   };
 }
 
@@ -49,7 +49,7 @@ function invalidCases(
     code: `/* Filename: ${filename} */`,
     filename,
     options: cases ? [{ cases, checkDirectories: false }] : [],
-    errors: [{ message }],
+    errors: [{ message, messageId: 'filename-case' }],
   };
 }
 
@@ -58,7 +58,7 @@ function invalidWithOptions(filename: string, options: any[], message: string) {
     code: `/* Filename: ${filename} */`,
     filename,
     options: [{ checkDirectories: false, ...options[0] }, ...options.slice(1)],
-    errors: [{ message }],
+    errors: [{ message, messageId: 'filename-case' }],
   };
 }
 
@@ -544,6 +544,7 @@ ruleTester.run('filename-case', {} as never, {
       filename: 'src/FooBar/file.js',
       errors: [
         {
+          messageId: 'directory-case',
           message:
             'Directory name `FooBar` is not in kebab case. Rename it to `foo-bar`.',
         },
@@ -554,6 +555,7 @@ ruleTester.run('filename-case', {} as never, {
       filename: 'src/FooBar/index.js',
       errors: [
         {
+          messageId: 'directory-case',
           message:
             'Directory name `FooBar` is not in kebab case. Rename it to `foo-bar`.',
         },
@@ -569,6 +571,7 @@ ruleTester.run('filename-case', {} as never, {
       filename: 'src/$UserId/fooBar.js',
       errors: [
         {
+          messageId: 'filename-case',
           message: 'Filename is not in kebab case. Rename it to `foo-bar.js`.',
         },
       ],
