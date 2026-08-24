@@ -6,13 +6,14 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type lintConfigResolver struct {
 	configMap              map[string]rslintconfig.RslintConfig
 	currentDirectory       string
-	lintTargetBySourcePath map[string]rslintconfig.DiscoveredLintTarget
+	lintTargetBySourcePath map[string]target.File
 	fsys                   vfs.FS
 	singleResolver         *rslintconfig.FileConfigResolver
 	configResolvers        map[string]*rslintconfig.FileConfigResolver
@@ -22,16 +23,23 @@ type lintConfigResolverOptions struct {
 	ConfigMap              map[string]rslintconfig.RslintConfig
 	Config                 rslintconfig.RslintConfig
 	CurrentDirectory       string
+	RuleCatalog            *rule.Catalog
 	EnforcePlugins         bool
-	LintTargetBySourcePath map[string]rslintconfig.DiscoveredLintTarget
+	LintTargetBySourcePath map[string]target.File
 	// SourceMappingsCanonical indicates that binding already supplied both
 	// lexical and canonical source keys, so normalization needs no filesystem IO.
 	SourceMappingsCanonical bool
-	TargetPlan              *rslintconfig.LintTargetPlan
+	PathSpaces              *rslintconfig.PathSpaceSnapshot
 	FS                      vfs.FS
 }
 
 func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
+	if opts.RuleCatalog == nil {
+		panic("rule catalog is required")
+	}
+	if opts.PathSpaces == nil {
+		panic("path-space snapshot is required")
+	}
 	resolver := &lintConfigResolver{
 		configMap:              opts.ConfigMap,
 		currentDirectory:       opts.CurrentDirectory,
@@ -42,20 +50,18 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
 		entries rslintconfig.RslintConfig,
 		configDirectory string,
 	) *rslintconfig.FileConfigResolver {
-		if opts.TargetPlan != nil {
-			return opts.TargetPlan.NewFileConfigResolver(
-				entries,
-				configDirectory,
-				opts.FS,
-				opts.EnforcePlugins,
-			)
-		}
-		return rslintconfig.NewFileConfigResolverWithFS(
+		fileResolver, err := rslintconfig.NewFileConfigResolverWithPathSpaces(
 			entries,
 			configDirectory,
 			opts.FS,
+			opts.PathSpaces,
+			opts.RuleCatalog,
 			opts.EnforcePlugins,
 		)
+		if err != nil {
+			panic(err)
+		}
+		return fileResolver
 	}
 	if opts.ConfigMap == nil {
 		resolver.singleResolver = newFileResolver(
@@ -83,14 +89,14 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
 }
 
 func normalizeSourceTargetMappings(
-	mapping map[string]rslintconfig.DiscoveredLintTarget,
+	mapping map[string]target.File,
 	fsys vfs.FS,
 	canonicalKeysPresent bool,
-) map[string]rslintconfig.DiscoveredLintTarget {
+) map[string]target.File {
 	if len(mapping) == 0 {
 		return mapping
 	}
-	normalized := make(map[string]rslintconfig.DiscoveredLintTarget, len(mapping)*2)
+	normalized := make(map[string]target.File, len(mapping)*2)
 	for sourcePath, target := range mapping {
 		target.Path = tspath.NormalizePath(target.Path)
 		target.CanonicalPath = tspath.NormalizePath(target.CanonicalPath)
@@ -106,12 +112,12 @@ func normalizeSourceTargetMappings(
 }
 
 func lookupLintTarget(
-	mapping map[string]rslintconfig.DiscoveredLintTarget,
+	mapping map[string]target.File,
 	filePath string,
 	fsys vfs.FS,
-) (rslintconfig.DiscoveredLintTarget, bool) {
+) (target.File, bool) {
 	if len(mapping) == 0 {
-		return rslintconfig.DiscoveredLintTarget{}, false
+		return target.File{}, false
 	}
 	if target, ok := mapping[exactFilesystemPathID(filePath)]; ok {
 		return target, true
@@ -127,13 +133,13 @@ func (r *lintConfigResolver) configResolver(configDir string) *rslintconfig.File
 	return r.configResolvers[canonicalFilesystemPathID(configDir, r.fsys)]
 }
 
-func (r *lintConfigResolver) targetForFile(filePath string) (rslintconfig.DiscoveredLintTarget, bool) {
+func (r *lintConfigResolver) targetForFile(filePath string) (target.File, bool) {
 	if r != nil {
 		if target, ok := lookupLintTarget(r.lintTargetBySourcePath, filePath, r.fsys); ok {
 			return target, true
 		}
 	}
-	return rslintconfig.DiscoveredLintTarget{Path: tspath.NormalizePath(filePath)}, false
+	return target.File{PathIdentity: rslintconfig.PathIdentity{Path: tspath.NormalizePath(filePath)}}, false
 }
 
 func (r *lintConfigResolver) resolveFile(
@@ -146,11 +152,11 @@ func (r *lintConfigResolver) resolveFile(
 			if resolver == nil {
 				return "", rslintconfig.ResolvedFileConfig{}, false
 			}
-			return target.ConfigDirectory, resolver.ResolveTarget(target), true
+			return target.ConfigDirectory, resolver.ResolveTarget(target.Identity()), true
 		}
 		return "", rslintconfig.ResolvedFileConfig{}, false
 	}
-	return r.currentDirectory, r.singleResolver.ResolveTarget(target), true
+	return r.currentDirectory, r.singleResolver.ResolveTarget(target.Identity()), true
 }
 
 func (r *lintConfigResolver) ConfigForFile(filePath string) *rslintconfig.MergedConfig {

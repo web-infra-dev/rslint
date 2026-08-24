@@ -23,8 +23,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -60,6 +62,7 @@ func NewServer(opts *ServerOptions) *Server {
 		parseCache:             opts.ParseCache,
 		jsConfigs:              make(map[string]config.RslintConfig),
 		jsUnavailableConfigs:   make(map[string]struct{}),
+		ruleCatalog:            rules.All(),
 		documents:              make(map[lsproto.DocumentUri]string),
 		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		refreshCh:              make(chan struct{}, 1),
@@ -172,12 +175,17 @@ type Server struct {
 	// jsConfigs is keyed by the catalog's absolute filesystem directory
 	// byte-for-byte so Go ownership and Node plugin routing share one identity.
 	jsConfigs map[string]config.RslintConfig
-	// The resolver is rebuilt atomically with each config transaction. Its keys
+	// The index is rebuilt atomically with each config transaction. Its keys
 	// are the same filesystem paths stored in jsConfigs.
-	jsConfigOwnerResolver *config.ConfigOwnerResolver
-	// jsonConfigResolver freezes the invocation-wide JSON config's authored
+	jsConfigOwnerIndex *target.OwnerIndex
+	// jsFileConfigResolvers are built once from the same path-space and rule
+	// generation. Document requests reuse them instead of repeatedly parsing selectors
+	// and ignore patterns on every edit.
+	jsFileConfigResolvers map[string]*config.FileConfigResolver
+	// jsonConfigOwnerIndex freezes the invocation-wide JSON config's authored
 	// path space when that config generation is loaded.
-	jsonConfigResolver *config.ConfigOwnerResolver
+	jsonConfigOwnerIndex   *target.OwnerIndex
+	jsonFileConfigResolver *config.FileConfigResolver
 	// configDiscoveryActive becomes true after the first structurally valid
 	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
 	// config-scoped .gitignore watchers trigger a fresh transaction without
@@ -215,6 +223,9 @@ type Server struct {
 	tsConfigPathsByConfig map[string][]string
 	documents             map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics           map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
+	// ruleCatalog is the immutable Go-plus-object-plugin catalog committed with
+	// the current configuration generation.
+	ruleCatalog *rule.Catalog
 
 	// refreshCh receives signals from RefreshDiagnostics (called by Session's
 	// background goroutine) and is consumed by the main dispatch loop so that
@@ -237,15 +248,6 @@ type Server struct {
 	// on a serialized config transaction and is captured before dispatching work
 	// to a goroutine.
 	eslintPluginConfigGeneration string
-	// eslintPluginRules contains exactly the object-form plugin rule names
-	// activated for eslintPluginConfigGeneration. GlobalRuleRegistry keeps
-	// placeholders process-wide, so this generation-local gate prevents a
-	// placeholder left by an older config from being dispatched to the current
-	// Node host. nil preserves the unscoped behavior used by isolated tests and
-	// before the first config transaction; every committed generation installs
-	// a non-nil set, including an empty one.
-	eslintPluginRules map[string]struct{}
-
 	// fixAllNativeLint, when non-nil, overrides the per-pass native lint used by
 	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
 	// used, driving an isolated overlay Program); tests inject a mock to exercise the

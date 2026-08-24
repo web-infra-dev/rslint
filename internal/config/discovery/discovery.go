@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 
 type configCandidate struct {
@@ -116,7 +117,7 @@ type configCatalogBuilder struct {
 	loadStateByIdentity  map[tspath.Path]*configLoadState
 	configs              map[string]rslintconfig.RslintConfig
 	sources              map[string]configSource
-	scopes               map[string]rslintconfig.LintDiscoveryScope
+	scopes               map[string]target.OwnerScope
 	failureByPath        map[string]ConfigFailure
 	gitignoreSources     map[string]map[tspath.Path]gitignoreObservation
 	gitignoreScopes      map[string][]string
@@ -264,7 +265,7 @@ func (builder *configCatalogBuilder) build() (*ConfigCatalog, error) {
 			continue
 		}
 		scope := builder.scopes[seed.ownerDir]
-		scope.Files = appendUniqueSortedPath(scope.Files, seed.path)
+		scope.ExplicitFiles = appendUniqueSortedPath(scope.ExplicitFiles, seed.path)
 		builder.scopes[seed.ownerDir] = scope
 	}
 	builder.collectExactTargetGitignore(explicitSeeds)

@@ -22,6 +22,7 @@ import (
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
@@ -219,12 +220,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		return nil, errors.New("config and configDiscovery are mutually exclusive")
 	}
 
-	// Schema validation below resolves native rule implementations through the
-	// global registry. Populate it before validating even the first request in a
-	// long-lived API process; otherwise unknown-rule skipping would make the
-	// first request behave differently from every later request.
-	rslintconfig.RegisterAllRules()
-
 	// Config is the current low-level already-resolved config. High-level native
 	// API callers instead send ConfigDiscovery: Go discovers ownership and asks
 	// the host to evaluate only the staged candidate frontier.
@@ -257,7 +252,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 
 	var (
 		configMap              map[string]rslintconfig.RslintConfig
-		configTargetScopes     map[string]rslintconfig.LintDiscoveryScope
+		configTargetScopes     map[string]target.OwnerScope
 		catalogPlugins         []rslintconfig.EslintPluginEntry
 		pluginConfigDirByOwner map[string]string
 		configGitignoreFrozen  bool
@@ -309,7 +304,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			requester:      requester,
 			overrideConfig: overrideConfig,
 		}
-		var catalog *discovery.ConfigCatalog
+		var configCatalog *discovery.ConfigCatalog
 		var err error
 		if configDiscovery.ExplicitConfigPath != "" {
 			var targetFiles []discovery.DiscoveryFile
@@ -322,7 +317,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 					})
 				}
 			}
-			catalog, err = discovery.LoadExplicitConfig(
+			configCatalog, err = discovery.LoadExplicitConfig(
 				ctx,
 				fs,
 				loader,
@@ -335,37 +330,37 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				},
 			)
 		} else {
-			catalog, err = discovery.DiscoverAutomatic(ctx, fs, loader, discoveryRequest)
+			configCatalog, err = discovery.DiscoverAutomatic(ctx, fs, loader, discoveryRequest)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("discover config catalog: %w", err)
 		}
-		if len(catalog.Failures) > 0 {
-			printConfigDiscoveryFailures(catalog.Failures)
+		if len(configCatalog.Failures) > 0 {
+			printConfigDiscoveryFailures(configCatalog.Failures)
 		}
-		if len(catalog.EslintPlugins) > 0 {
+		if len(configCatalog.EslintPlugins) > 0 {
 			if capabilityRequester, ok := requester.(api.PeerCapabilityRequester); ok &&
 				!capabilityRequester.PeerSupportsCapability(api.CapabilityReversePluginLint) {
 				return nil, errors.New("API peer does not advertise reversePluginLint capability required by discovered ESLint plugins")
 			}
 		}
 
-		if len(catalog.Configs) > 0 {
-			configDirectories := catalog.ConfigDirectories()
-			if len(configDirectories) == 1 && catalog.Explicit {
+		if len(configCatalog.Configs) > 0 {
+			configDirectories := configCatalog.ConfigDirectories()
+			if len(configDirectories) == 1 && configCatalog.Explicit {
 				// overrideConfigFile is invocation-wide. A hierarchical config map
 				// would have no owner for a requested file outside cwd and would
 				// incorrectly drop it, even though explicit flat-config semantics say
 				// the selected module governs the complete supplied target set.
 				configDirectory = configDirectories[0]
-				rslintConfig = append(rslintconfig.RslintConfig(nil), catalog.Configs[configDirectory]...)
+				rslintConfig = append(rslintconfig.RslintConfig(nil), configCatalog.Configs[configDirectory]...)
 				pluginConfigDirByOwner = map[string]string{configDirectory: configDirectory}
 				configGitignoreFrozen = true
 			} else {
-				configMap = make(map[string]rslintconfig.RslintConfig, len(catalog.Configs))
-				pluginConfigDirByOwner = make(map[string]string, len(catalog.Configs))
+				configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
+				pluginConfigDirByOwner = make(map[string]string, len(configCatalog.Configs))
 			}
-			for ownerDirectory, entries := range catalog.Configs {
+			for ownerDirectory, entries := range configCatalog.Configs {
 				if configMap == nil {
 					continue
 				}
@@ -373,7 +368,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				pluginConfigDirByOwner[ownerDirectory] = ownerDirectory
 			}
 			if configMap != nil {
-				configTargetScopes = catalog.Scopes
+				configTargetScopes = configCatalog.Scopes
 			}
 		} else {
 			// No JS candidate is a valid API state: lint with override entries (or
@@ -382,7 +377,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			rslintConfig = overrideConfig
 			configDirectory = currentDirectory
 		}
-		catalogPlugins = catalog.EslintPlugins
+		catalogPlugins = configCatalog.EslintPlugins
 	}
 
 	if configMap == nil && !configGitignoreFrozen {
@@ -395,15 +390,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			nil,
 		)
 	}
-	var optionsMessages []string
-	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig)
-	if len(optionsMessages) > 0 {
-		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(optionsMessages, "\n"))
-	}
-
-	// The plugin registry is process-global, but execution is request-gated by
-	// requestPluginRules below so metadata from an earlier API request cannot
-	// make a later request dispatch stale plugin rules.
 	pluginEntries := append([]rslintconfig.EslintPluginEntry(nil), catalogPlugins...)
 	for _, plugin := range req.EslintPlugins {
 		pluginEntries = append(pluginEntries, rslintconfig.EslintPluginEntry{
@@ -411,16 +397,13 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			RuleNames: append([]string(nil), plugin.RuleNames...),
 		})
 	}
-	var requestPluginRules map[string]struct{}
-	if len(pluginEntries) > 0 {
-		requestPluginRules = make(map[string]struct{})
-		for _, plugin := range pluginEntries {
-			for _, ruleName := range plugin.RuleNames {
-				requestPluginRules[plugin.Prefix+"/"+ruleName] = struct{}{}
-			}
-		}
-		rslintconfig.RegisterEslintPluginRules(pluginEntries)
+	ruleCatalog, shadowedPluginRules := deriveRuleCatalog(pluginEntries)
+	var optionsMessages []string
+	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig, ruleCatalog)
+	if len(optionsMessages) > 0 {
+		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(optionsMessages, "\n"))
 	}
+	reportShadowedPluginRules(shadowedPluginRules)
 
 	responsePathBase := configDirectory
 	if req.ConfigDiscovery != nil {
@@ -442,12 +425,12 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// invocation-wide single-config paths.
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	targetPlan, err := rslintconfig.ResolveLintTargetPlan(rslintconfig.LintTargetPlanRequest{
+	targetPlan, err := target.Resolve(target.Request{
 		ConfigMap:       configMap,
 		Config:          rslintConfig,
 		ConfigDirectory: configDirectory,
 		ScanRoot:        currentDirectory,
-		ConfigScopes:    configTargetScopes,
+		OwnerScopes:     configTargetScopes,
 		FS:              fs,
 		Files:           allowedFiles,
 	})
@@ -458,10 +441,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// selected. Resolve the target plan before project paths so an ignored or
 	// empty request cannot fail on an inactive project declaration.
 	var projectSet loader.ProjectSet
-	if len(targetPlan.Targets) > 0 {
+	if len(targetPlan.Files) > 0 {
 		if configMap != nil {
 			projectSet, err = programSession.BuildTargetProjects(
-				targetPlan.ActiveConfigs(configMap),
+				configsForOwners(configMap, targetPlan.ActiveOwners()),
 				targetPlan,
 				false,
 			)
@@ -487,10 +470,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		ConfigMap:               configMap,
 		Config:                  rslintConfig,
 		CurrentDirectory:        configDirectory,
+		RuleCatalog:             ruleCatalog,
 		EnforcePlugins:          true,
 		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
 		SourceMappingsCanonical: true,
-		TargetPlan:              &targetPlan,
+		PathSpaces:              targetPlan.PathSpaces(),
 		FS:                      fs,
 	})
 	targetPathForSourcePath := func(sourcePath string) string {
@@ -657,31 +641,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			// so a rule carrying a plugin prefix runs only when its plugin is
 			// declared in the config's `plugins` — matching CLI and ESLint
 			// semantics (a rule whose plugin is not declared is skipped).
-			enabledRules := fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
-			// Plugin placeholders live in the process-global registry. Restrict
-			// them to this request's metadata so a long-lived API process cannot
-			// leak a plugin registered by an earlier lint into a later request.
-			for i, configuredRule := range enabledRules {
-				if !configuredRule.IsEslintPluginRule {
-					continue
-				}
-				if _, ok := requestPluginRules[configuredRule.Name]; ok {
-					continue
-				}
-				filtered := make([]rule.ConfiguredRule, 0, len(enabledRules)-1)
-				filtered = append(filtered, enabledRules[:i]...)
-				for _, remainingRule := range enabledRules[i+1:] {
-					if !remainingRule.IsEslintPluginRule {
-						filtered = append(filtered, remainingRule)
-						continue
-					}
-					if _, ok := requestPluginRules[remainingRule.Name]; ok {
-						filtered = append(filtered, remainingRule)
-					}
-				}
-				return filtered
-			}
-			return enabledRules
+			return fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
 		},
 		// The API returns concrete fixes, suggestions, and fixable counts
 		// independently of whether req.Fix later applies autofixes.

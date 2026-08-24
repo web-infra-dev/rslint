@@ -141,6 +141,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-destructuring.test.ts',
     './tests/eslint/rules/prefer-exponentiation-operator.test.ts',
     './tests/eslint/rules/prefer-numeric-literals.test.ts',
+    './tests/eslint/rules/prefer-object-has-own.test.ts',
     './tests/eslint/rules/prefer-object-spread.test.ts',
     './tests/eslint/rules/no-this-before-super.test.ts',
     './tests/eslint/rules/prefer-rest-params.test.ts',
@@ -524,6 +525,7 @@ export default defineConfig({
     './tests/eslint/rules/require-yield.test.ts',
     './tests/eslint/rules/symbol-description.test.ts',
     './tests/eslint/rules/unicode-bom.test.ts',
+    './tests/eslint/rules/sort-keys.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
@@ -577,10 +579,13 @@ export default defineConfig({
 
     // rstest
     './tests/rstest/rules/expect-expect.test.ts',
+    './tests/rstest/rules/max-expects.test.ts',
     './tests/rstest/rules/no-commented-out-tests.test.ts',
     './tests/rstest/rules/no-conditional-expect.test.ts',
+    './tests/rstest/rules/no-conditional-in-test.test.ts',
     './tests/rstest/rules/no-disabled-tests.test.ts',
     './tests/rstest/rules/no-focused-tests.test.ts',
+    './tests/rstest/rules/no-hooks.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
     './tests/rstest/rules/no-import-node-test.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
@@ -612,6 +617,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-array-fill-with-reference-type.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-await-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-instanceof-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-remove-event-listener.test.ts',

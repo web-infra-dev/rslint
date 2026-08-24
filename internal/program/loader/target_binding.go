@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 )
 
@@ -18,7 +18,7 @@ type projectRootMembership struct {
 // an eager build derives it in batches after all Programs are ready.
 func directRootProgramOwners(
 	set ProjectSet,
-	targets []rslintconfig.DiscoveredLintTarget,
+	targets []target.File,
 	fsys vfs.FS,
 	singleThreaded bool,
 ) []int {
@@ -198,7 +198,7 @@ func bindTargetToProgram(
 	programFiles *programFileIndex,
 	programIndexes []int,
 	programIndex int,
-	target rslintconfig.DiscoveredLintTarget,
+	target target.File,
 ) bool {
 	if programIndex < 0 || programIndex >= len(set.compilerPrograms) {
 		return false
@@ -218,22 +218,22 @@ func bindTargetToProgram(
 
 func (s *Session) bindTargetsToProjects(
 	set ProjectSet,
-	plan rslintconfig.LintTargetPlan,
+	plan target.Plan,
 	singleThreaded bool,
-) (LoadResult, []rslintconfig.DiscoveredLintTarget) {
+) (LoadResult, []target.File) {
 	fsys := s.FS()
 	binding := LoadResult{
 		compilerPrograms:       append([]*compiler.Program(nil), set.compilerPrograms...),
 		Programs:               append([]*lintprogram.Program(nil), set.programs...),
 		TargetsByProgram:       make([][]string, len(set.compilerPrograms)),
-		LintTargetBySourcePath: make(map[string]rslintconfig.DiscoveredLintTarget),
+		LintTargetBySourcePath: make(map[string]target.File),
 	}
 
-	var unbound []rslintconfig.DiscoveredLintTarget
+	var unbound []target.File
 	programIndexesByConfig := make(map[string][]int)
-	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Targets, fsys, singleThreaded)
-	directOwners := directRootProgramOwners(set, plan.Targets, fsys, singleThreaded)
-	for targetIndex, target := range plan.Targets {
+	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Files, fsys, singleThreaded)
+	directOwners := directRootProgramOwners(set, plan.Files, fsys, singleThreaded)
+	for targetIndex, target := range plan.Files {
 		programIndexes, cached := programIndexesByConfig[target.ConfigDirectory]
 		if !cached {
 			programIndexes = orderedProgramIndexesForConfig(set, target.ConfigDirectory)

@@ -10,7 +10,8 @@ export type RuleSeverity = 'off' | 'warn' | 'error' | 0 | 1 | 2;
  * `NATIVE_PLUGIN_RESERVED_NAMES` unions these prefixes with the alternate
  * `eslint-plugin-*` declaration names (`NATIVE_PLUGIN_DECL_ALIASES`), so a
  * ported plugin that also has such an alias must be added to BOTH lists here —
- * kept in sync with config.go's PluginInfo.DeclNames (a Go test guards the drift).
+ * kept in sync with `internal/config/plugin_declarations.go` (a Go test guards
+ * the drift).
  */
 const NATIVE_PLUGINS = [
   '@typescript-eslint',
@@ -25,9 +26,10 @@ const NATIVE_PLUGINS = [
 ] as const;
 
 // Alternate `eslint-plugin-*` declaration names that Go normalizes onto a
-// native prefix (mirrors config.go's PluginInfo.DeclNames). A community plugin
-// must not be mounted under one of these either: Go would normalize the key
-// onto the native prefix, and the gate — which keys off the un-normalized
+// bundled prefix (mirrors `bundledPluginDeclarations` in
+// `internal/config/plugin_declarations.go`). A community plugin must not be
+// mounted under one of these either: Go would normalize the key
+// onto the bundled prefix, and the gate — which keys off the un-normalized
 // `<prefix>/<rule>` — would then silently drop the community rules.
 const NATIVE_PLUGIN_DECL_ALIASES = [
   'eslint-plugin-import',

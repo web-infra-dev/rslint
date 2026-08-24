@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -42,17 +43,17 @@ func TestSelectConfiguredLintProjectDirectRootOutranksEarlierImport(t *testing.T
 	const (
 		firstConfig  = "/repo/tsconfig.import.json"
 		secondConfig = "/repo/tsconfig.direct.json"
-		target       = "/repo/src/target.ts"
+		targetPath   = "/repo/src/target.ts"
 	)
 	metadata := map[string]*lintProjectMetadata{
 		firstConfig:  lintProjectMetadataForTest(firstConfig, []string{"/repo/importer.ts"}, nil, nil),
-		secondConfig: lintProjectMetadataForTest(secondConfig, []string{target}, nil, nil),
+		secondConfig: lintProjectMetadataForTest(secondConfig, []string{targetPath}, nil, nil),
 	}
 	sourceFile := &ast.SourceFile{}
 	var programCalls []string
 	selected, found, err := selectConfiguredLintProject(
 		[]string{firstConfig, secondConfig},
-		config.DiscoveredLintTarget{Path: target, CanonicalPath: target},
+		target.File{PathIdentity: config.PathIdentity{Path: targetPath, CanonicalPath: targetPath}},
 		lintProjectLoaders{
 			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 				return metadata[configPath], true, nil
@@ -78,7 +79,7 @@ func TestSelectConfiguredLintProjectFallbackOrderAndExtensionFilter(t *testing.T
 	const (
 		firstConfig  = "/repo/tsconfig.ts.json"
 		secondConfig = "/repo/tsconfig.js.json"
-		target       = "/repo/src/target.js"
+		targetPath   = "/repo/src/target.js"
 	)
 	metadata := map[string]*lintProjectMetadata{
 		firstConfig: lintProjectMetadataForTest(
@@ -98,7 +99,7 @@ func TestSelectConfiguredLintProjectFallbackOrderAndExtensionFilter(t *testing.T
 	var programCalls []string
 	selected, found, err := selectConfiguredLintProject(
 		[]string{firstConfig, secondConfig},
-		config.DiscoveredLintTarget{Path: target, CanonicalPath: target},
+		target.File{PathIdentity: config.PathIdentity{Path: targetPath, CanonicalPath: targetPath}},
 		lintProjectLoaders{
 			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 				return metadata[configPath], true, nil
@@ -151,9 +152,11 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 		target: tspath.NormalizePath(configPath),
 	}
 	request := newStandaloneLintProjectRequestWithFS(
-		config.DiscoveredLintTarget{
-			Path:          firstSource,
-			CanonicalPath: firstSource,
+		target.File{
+			PathIdentity: config.PathIdentity{
+				Path:          firstSource,
+				CanonicalPath: firstSource,
+			},
 		},
 		fs,
 	)

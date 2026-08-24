@@ -1094,7 +1094,7 @@ func TestConfigDiscoveryAutomaticCandidateWinsSameDirectoryLiteralConflict(t *te
 					t.Fatalf("iteration %d selected config = %q, want automatic .mjs", iteration, got)
 				}
 				scope := catalog.Scopes[appDir]
-				if scope.ExplicitOnly || !reflect.DeepEqual(scope.Files, []string{literal}) {
+				if scope.ExplicitOnly || !reflect.DeepEqual(scope.ExplicitFiles, []string{literal}) {
 					t.Fatalf("iteration %d mixed scope = %+v", iteration, scope)
 				}
 				wantPlugins := []string{"automatic-mjs-plugin"}
@@ -2231,7 +2231,7 @@ func TestConfigDiscoveryExplicitFileFindsConfigInsideGitignoredDirectory(t *test
 	if !exists || !scope.ExplicitOnly {
 		t.Fatalf("explicit-only source was not propagated to target scope: %+v", scope)
 	}
-	if !reflect.DeepEqual(scope.Files, []string{filePath}) {
+	if !reflect.DeepEqual(scope.ExplicitFiles, []string{filePath}) {
 		t.Fatalf("explicit file scope = %+v, want %q", scope, filePath)
 	}
 }
@@ -2310,7 +2310,7 @@ func TestConfigDiscoveryExplicitFileDoesNotReadGitignoreThroughDescendantSymlink
 	if got := catalog.ConfigDirectories(); !reflect.DeepEqual(got, []string{root}) {
 		t.Fatalf("lexical symlink target owner = %v, want root", got)
 	}
-	if got := catalog.Scopes[root].Files; !reflect.DeepEqual(got, []string{filePath}) {
+	if got := catalog.Scopes[root].ExplicitFiles; !reflect.DeepEqual(got, []string{filePath}) {
 		t.Fatalf("explicit target scope = %v, want %q", got, filePath)
 	}
 }
@@ -2366,7 +2366,7 @@ func TestConfigDiscoveryBrokenNearestFallsBackToAncestor(t *testing.T) {
 	if got := requestedConfigPathsByBatch(loader); !reflect.DeepEqual(got, [][]string{{brokenConfig}, {rootConfig}}) {
 		t.Fatalf("fallback load order = %v", got)
 	}
-	if scope := catalog.Scopes[root]; !reflect.DeepEqual(scope.Files, []string{filePath}) {
+	if scope := catalog.Scopes[root]; !reflect.DeepEqual(scope.ExplicitFiles, []string{filePath}) {
 		t.Fatalf("explicit file was not reassigned to ancestor: %+v", scope)
 	}
 	if !catalog.Scopes[root].ExplicitOnly {
@@ -2399,7 +2399,7 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 		if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{configPath}) {
 			t.Fatalf("canonical fallback candidates = %v", got)
 		}
-		if scope := catalog.Scopes[physicalRoot]; !reflect.DeepEqual(scope.Files, []string{lexicalFile}) {
+		if scope := catalog.Scopes[physicalRoot]; !reflect.DeepEqual(scope.ExplicitFiles, []string{lexicalFile}) {
 			t.Fatalf("canonical fallback discarded lexical target: %+v", scope)
 		}
 	})

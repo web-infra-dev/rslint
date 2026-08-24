@@ -176,6 +176,26 @@ func TestRstestCallAnalysisCallbacksRemainTestOnly(t *testing.T) {
 	}
 }
 
+func TestRstestCallAnalysisCallbacksUnwrapTypeScriptAssertions(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(
+		ast.SourceFileParseOptions{
+			FileName: "/wrapped-callbacks.test.ts",
+			Path:     "/wrapped-callbacks.test.ts",
+		},
+		`test("as", (() => {}) as () => void);
+test("satisfies", (() => {}) satisfies () => void);
+test("non-null", (() => {})!);
+const callback = (() => {}) as () => void;
+test("named", callback);`,
+		core.ScriptKindTS,
+	)
+	analysis := newRstestCallAnalysis(rule.RuleContext{SourceFile: sourceFile})
+	callbacks := analysis.Callbacks()
+	if len(callbacks.Functions) != 4 {
+		t.Fatalf("found %d wrapped callback functions, want 4", len(callbacks.Functions))
+	}
+}
+
 func TestRstestConcurrentContextBuildsOwnershipLazily(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(
 		ast.SourceFileParseOptions{

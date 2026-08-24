@@ -83,8 +83,8 @@ func newConfigTargetResolverWithBases(
 	}
 	baseIndexByDirectory := make(map[string]int)
 	for index, entry := range config {
-		directory := tspath.NormalizePath(configEntryBaseDirectory(entry, defaultDirectory))
-		baseID := exactPathID(directory)
+		directory := normalizeAuthoredBase(configEntryBaseDirectory(entry, defaultDirectory))
+		baseID := authoredBaseID(directory)
 		baseIndex, exists := baseIndexByDirectory[baseID]
 		if !exists {
 			base, frozen := frozenBases[baseID]
@@ -112,7 +112,7 @@ func newConfigTargetResolverWithBases(
 }
 
 func freezeConfigTargetBase(directory string, fsys vfs.FS) configTargetBase {
-	directory = tspath.NormalizePath(directory)
+	directory = normalizeAuthoredBase(directory)
 	physicalDirectory := directory
 	if fsys != nil {
 		if realPath := fsys.Realpath(directory); realPath != "" {
@@ -169,14 +169,14 @@ func patternsShareTargetCoordinate(left IgnorePattern, right IgnorePattern) bool
 }
 
 func (resolver *configTargetResolver) resolve(path string, canonicalPath string) configTargetDecision {
-	return resolver.resolveTarget(DiscoveredLintTarget{
+	return resolver.resolveTarget(PathIdentity{
 		Path:          path,
 		CanonicalPath: canonicalPath,
 	})
 }
 
 func (resolver *configTargetResolver) resolveTarget(
-	discovered DiscoveredLintTarget,
+	discovered PathIdentity,
 ) configTargetDecision {
 	target, matches := resolver.resolvePathSpacesWithCanonicalParent(
 		discovered.Path,

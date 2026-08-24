@@ -48,6 +48,15 @@ func TestRelativeGlobPatternPreservesFilesystemRoots(t *testing.T) {
 	}
 }
 
+func TestNewConfigLoaderRequiresRuleCatalog(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected nil rule catalog to panic")
+		}
+	}()
+	NewConfigLoader(osvfs.FS(), t.TempDir(), nil)
+}
+
 func TestLoadRslintConfig_RejectsEmptyFilesArray(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "rslint.jsonc")
@@ -60,7 +69,7 @@ func TestLoadRslintConfig_RejectsEmptyFilesArray(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	_, _, err := loader.LoadRslintConfig("rslint.jsonc")
 	assert.ErrorContains(t, err, `key "files": expected value to be a non-empty array`)
 }
@@ -76,7 +85,7 @@ func TestLoadRslintConfig_AllowsMissingFiles(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	cfg, _, err := loader.LoadRslintConfig("rslint.jsonc")
 	assert.NilError(t, err)
 	assert.Equal(t, len(cfg), 1)
@@ -89,7 +98,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
 	createTestFile(t, filepath.Join(tmpDir, "packages/utils/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "apps/web/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -114,7 +123,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
 
 func TestLoadTsConfigsFromRslintConfig_NoMatches(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -134,7 +143,7 @@ func TestLoadTsConfigsFromRslintConfig_MixedGlobAndNonGlob(t *testing.T) {
 	createTestFile(t, filepath.Join(tmpDir, "tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -160,7 +169,7 @@ func TestLoadTsConfigsFromRslintConfig_DeduplicatesMatches(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -189,7 +198,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansionWithOverlayVFS(t *testing.T)
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/utils/tsconfig.json")): `{}`,
 	}
 
-	loader := NewConfigLoader(utils.NewOverlayVFS(osvfs.FS(), virtualFiles), tmpDir)
+	loader := NewConfigLoader(utils.NewOverlayVFS(osvfs.FS(), virtualFiles), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -210,7 +219,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansionWithOverlayVFS(t *testing.T)
 
 func TestLoadTsConfigsFromRslintConfig_NonExistentNonGlobFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -231,7 +240,7 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarPattern(t *testing.T) {
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/subpackage/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/stores/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -259,7 +268,7 @@ func TestLoadTsConfigsFromRslintConfig_SingleStarDoesNotMatchNested(t *testing.T
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/node_modules/foo/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/src/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -279,7 +288,7 @@ func TestLoadTsConfigsFromRslintConfig_SingleStarDoesNotMatchNested(t *testing.T
 
 func TestLoadTsConfigsFromRslintConfig_NonExistentSearchRoot(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -303,7 +312,7 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarWithSymlinkCycle(t *testing.T) 
 		filepath.Join(tmpDir, "packages/ui/loop"),
 	))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -335,7 +344,7 @@ func TestLoadTsConfigsFromRslintConfig_QuestionMarkPattern(t *testing.T) {
 	// "ab" is two chars — should NOT match single ?
 	createTestFile(t, filepath.Join(tmpDir, "packages/ab/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -361,7 +370,7 @@ func TestLoadTsConfigsFromRslintConfig_CharacterClassPattern(t *testing.T) {
 	// "a" is not in [0-9] — should NOT match
 	createTestFile(t, filepath.Join(tmpDir, "tsconfiga.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -386,7 +395,7 @@ func TestLoadTsConfigsFromRslintConfig_NegatedCharacterClass(t *testing.T) {
 	createTestFile(t, filepath.Join(tmpDir, "packages/b/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/c/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -551,7 +560,7 @@ func TestAuthoredPathBaseAppliesToFilesIgnoresAndProjects(t *testing.T) {
 	if override[0].authoredPathBase != nil || override[1].authoredPathBase != nil {
 		t.Fatal("ConfigWithAuthoredPathBase mutated its input")
 	}
-	composed, optionErrors := ValidateRuleOptions(composed, NewRuleRegistry())
+	composed, optionErrors := ValidateRuleOptions(composed, baseRuleCatalog())
 	if len(optionErrors) != 0 {
 		t.Fatalf("ValidateRuleOptions returned errors: %v", optionErrors)
 	}

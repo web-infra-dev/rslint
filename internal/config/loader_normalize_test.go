@@ -2,12 +2,17 @@ package config
 
 import (
 	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func TestNormalizeJSONConfig_CoreRulesDefault(t *testing.T) {
-	RegisterAllRules()
+func normalizeJSONConfigWithBaseCatalog(config RslintConfig) RslintConfig {
+	return normalizeJSONConfig(config, baseRuleCatalog())
+}
 
-	config := normalizeJSONConfig(RslintConfig{
+func TestNormalizeJSONConfig_CoreRulesDefault(t *testing.T) {
+
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Rules: Rules{},
 		},
@@ -20,27 +25,29 @@ func TestNormalizeJSONConfig_CoreRulesDefault(t *testing.T) {
 	}
 
 	// After normalization, core rules should be present
-	coreRules := GetCoreRules()
-	if len(coreRules) == 0 {
-		t.Fatal("Expected at least one core rule to be registered")
-	}
-
-	for _, r := range coreRules {
-		rc, ok := merged.Rules[r.Name]
+	coreRuleCount := 0
+	for ruleName := range baseRuleCatalog().AllRules() {
+		if rule.Namespace(ruleName) != "" {
+			continue
+		}
+		coreRuleCount++
+		rc, ok := merged.Rules[ruleName]
 		if !ok {
-			t.Errorf("Expected core rule %q to be in merged config", r.Name)
+			t.Errorf("Expected core rule %q to be in merged config", ruleName)
 			continue
 		}
 		if rc.Level != "error" {
-			t.Errorf("Expected core rule %q level to be 'error', got %q", r.Name, rc.Level)
+			t.Errorf("Expected core rule %q level to be 'error', got %q", ruleName, rc.Level)
 		}
+	}
+	if coreRuleCount == 0 {
+		t.Fatal("Expected at least one core rule in the catalog")
 	}
 }
 
 func TestNormalizeJSONConfig_PluginAutoEnablesRules(t *testing.T) {
-	RegisterAllRules()
 
-	config := normalizeJSONConfig(RslintConfig{
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Plugins: []string{"@typescript-eslint"},
 		},
@@ -66,9 +73,8 @@ func TestNormalizeJSONConfig_PluginAutoEnablesRules(t *testing.T) {
 }
 
 func TestNormalizeJSONConfig_UserRulesTakePrecedence(t *testing.T) {
-	RegisterAllRules()
 
-	config := normalizeJSONConfig(RslintConfig{
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Rules: Rules{
 				"no-debugger": "off",
@@ -94,9 +100,8 @@ func TestNormalizeJSONConfig_UserRulesTakePrecedence(t *testing.T) {
 }
 
 func TestNormalizeJSONConfig_IgnoredFilesNotLinted(t *testing.T) {
-	RegisterAllRules()
 
-	config := normalizeJSONConfig(RslintConfig{
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Ignores: []string{"**/*.test.ts"},
 			Rules: Rules{
@@ -129,9 +134,8 @@ func TestNormalizeJSONConfig_IgnoredFilesNotLinted(t *testing.T) {
 }
 
 func TestNormalizeJSONConfig_SkipsGlobalIgnoreEntries(t *testing.T) {
-	RegisterAllRules()
 
-	config := normalizeJSONConfig(RslintConfig{
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Ignores: []string{"dist/**"},
 		},
@@ -152,9 +156,8 @@ func TestNormalizeJSONConfig_SkipsGlobalIgnoreEntries(t *testing.T) {
 }
 
 func TestNormalizeJSONConfig_ArrayUserRuleTakesPrecedence(t *testing.T) {
-	RegisterAllRules()
 
-	config := normalizeJSONConfig(RslintConfig{
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Rules: Rules{
 				"no-console": []interface{}{"warn", map[string]interface{}{"allow": []interface{}{"error"}}},
@@ -183,9 +186,8 @@ func TestNormalizeJSONConfig_ArrayUserRuleTakesPrecedence(t *testing.T) {
 }
 
 func TestNormalizeJSONConfig_MultipleEntries_DifferentPlugins(t *testing.T) {
-	RegisterAllRules()
 
-	config := normalizeJSONConfig(RslintConfig{
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Files:   []string{"**/*.ts"},
 			Plugins: []string{"@typescript-eslint"},
@@ -234,10 +236,9 @@ func TestNormalizeJSONConfig_MultipleEntries_DifferentPlugins(t *testing.T) {
 }
 
 func TestNormalizeJSONConfig_IgnoresWithRulesOff(t *testing.T) {
-	RegisterAllRules()
 
 	// Simulates the real rslint.json: single entry with ignores + rules (including "off")
-	config := normalizeJSONConfig(RslintConfig{
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Ignores: []string{
 				"packages/rslint-test-tools/tests/**/*.test.ts",
@@ -277,12 +278,12 @@ func TestNormalizeJSONConfig_IgnoresWithRulesOff(t *testing.T) {
 }
 
 func TestNormalizeJSONConfig_EslintPluginImport(t *testing.T) {
-	RegisterAllRules()
 
 	// JSON config using "eslint-plugin-import" declaration name.
-	// normalizeJSONConfig must resolve plugin declaration names via pluginByDeclName,
+	// normalizeJSONConfig must resolve plugin declaration names via the bundled
+	// plugin declaration index,
 	// so that "import/" prefixed rules are correctly injected.
-	config := normalizeJSONConfig(RslintConfig{
+	config := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{
 			Plugins: []string{"eslint-plugin-import"},
 			Rules:   Rules{},
@@ -309,14 +310,13 @@ func TestNormalizeJSONConfig_EslintPluginImport(t *testing.T) {
 }
 
 func TestNormalizeJSONConfig_PluginNameAlias(t *testing.T) {
-	RegisterAllRules()
 
-	// "import" is an alias for "eslint-plugin-import" in KnownPlugins.
+	// "import" is an alias for "eslint-plugin-import".
 	// Both should produce the same result.
-	config1 := normalizeJSONConfig(RslintConfig{
+	config1 := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{Plugins: []string{"eslint-plugin-import"}, Rules: Rules{}},
 	})
-	config2 := normalizeJSONConfig(RslintConfig{
+	config2 := normalizeJSONConfigWithBaseCatalog(RslintConfig{
 		{Plugins: []string{"import"}, Rules: Rules{}},
 	})
 

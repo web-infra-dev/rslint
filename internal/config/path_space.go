@@ -5,196 +5,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-// LintDiscoveryScope records explicit-file provenance supplied by config
-// discovery. ExplicitOnly keeps a config loaded solely for an explicit file out
-// of automatic ownership, handoff, and directory-discovery decisions. Files in
-// the scope remain owned by that config.
-type LintDiscoveryScope struct {
-	Files        []string
-	ExplicitOnly bool
-}
-
-func configMapForAutomaticTargets(
-	configMap map[string]RslintConfig,
-	scopes map[string]LintDiscoveryScope,
-) map[string]RslintConfig {
-	for configDir := range configMap {
-		if !scopes[configDir].ExplicitOnly {
-			continue
-		}
-		automaticConfigMap := make(map[string]RslintConfig, len(configMap)-1)
-		for candidateDir, candidateConfig := range configMap {
-			if !scopes[candidateDir].ExplicitOnly {
-				automaticConfigMap[candidateDir] = candidateConfig
-			}
-		}
-		return automaticConfigMap
-	}
-	return configMap
-}
-
-// ConfigOwnerResolver snapshots an already-loaded config catalog and resolves
-// which config object governs a runtime file path. It never discovers, reads,
-// or parses config files. Construction is linear in config count. Each lookup
-// tries lexical ancestors, including verified native case aliases, and consults
-// realpath ancestry only when no lexical owner exists.
-type ConfigOwnerResolver struct {
-	configMap       map[string]RslintConfig
-	index           *configDirectoryIndex
-	targetResolvers map[string]*configTargetResolver
-	frozenBases     map[string]configTargetBase
-}
-
-func NewConfigOwnerResolver(configMap map[string]RslintConfig, fsys vfs.FS) *ConfigOwnerResolver {
-	frozenBases := freezeConfigTargetBases(configMap, fsys)
-	return newConfigOwnerResolverWithBases(configMap, fsys, frozenBases)
-}
-
-func freezeConfigTargetBases(
-	configMap map[string]RslintConfig,
-	fsys vfs.FS,
-) map[string]configTargetBase {
-	frozenBases := make(map[string]configTargetBase, len(configMap))
-	freezeBase := func(directory string) {
-		directory = tspath.NormalizePath(directory)
-		baseID := exactPathID(directory)
-		if _, exists := frozenBases[baseID]; !exists {
-			frozenBases[baseID] = freezeConfigTargetBase(directory, fsys)
-		}
-	}
-	for configDir, entries := range configMap {
-		freezeBase(configDir)
-		for _, entry := range entries {
-			freezeBase(configEntryBaseDirectory(entry, configDir))
-		}
-	}
-	return frozenBases
-}
-
-func newConfigOwnerResolverWithBases(
-	configMap map[string]RslintConfig,
-	fsys vfs.FS,
-	frozenBases map[string]configTargetBase,
-) *ConfigOwnerResolver {
-	configSnapshot := make(map[string]RslintConfig, len(configMap))
-	for configDir, entries := range configMap {
-		configSnapshot[configDir] = entries
-	}
-	resolver := &ConfigOwnerResolver{
-		configMap:       configSnapshot,
-		index:           newConfigDirectoryIndexWithBases(configSnapshot, fsys, frozenBases),
-		targetResolvers: make(map[string]*configTargetResolver, len(configSnapshot)),
-		frozenBases:     frozenBases,
-	}
-	for configDir, entries := range configSnapshot {
-		resolver.targetResolvers[configDir] = newConfigTargetResolverWithBases(
-			entries,
-			configDir,
-			fsys,
-			frozenBases,
-		)
-	}
-	return resolver
-}
-
-// NewConfigOwnerResolverForAutomaticTargets excludes configs that were loaded
-// only for catalog-scoped literal files. Those configs own their literal scope,
-// but they are not ownership handoff or .gitignore source boundaries for files
-// reached through an automatic directory/glob walk.
-func NewConfigOwnerResolverForAutomaticTargets(
-	configMap map[string]RslintConfig,
-	scopes map[string]LintDiscoveryScope,
-	fsys vfs.FS,
-) *ConfigOwnerResolver {
-	return NewConfigOwnerResolver(configMapForAutomaticTargets(configMap, scopes), fsys)
-}
-
-func (resolver *ConfigOwnerResolver) Resolve(filePath string) (string, RslintConfig) {
-	if resolver == nil || resolver.index == nil {
-		return "", nil
-	}
-	configDir, ok := resolver.index.nearestConfig(filePath)
-	if !ok {
-		return "", nil
-	}
-	return configDir, resolver.configMap[configDir]
-}
-
-// ResolveTarget resolves ownership from an already-frozen target identity.
-// It does not re-resolve the file itself. Native-case lexical ancestry may be
-// verified once while this lookup selects the owner; the selected owner and
-// effective config can then be frozen with the target for every later stage.
-func (resolver *ConfigOwnerResolver) ResolveTarget(target DiscoveredLintTarget) (string, RslintConfig) {
-	if resolver == nil || resolver.index == nil {
-		return "", nil
-	}
-	configDir, ok := resolver.index.nearestConfigWithCanonicalPath(
-		target.Path,
-		target.CanonicalPath,
-	)
-	if !ok {
-		return "", nil
-	}
-	return configDir, resolver.configMap[configDir]
-}
-
-// ResolveTargetConfig resolves ownership and evaluates the target against the
-// exact authored path-space snapshot captured with the owner catalog. This
-// prevents an aliased config directory from changing meaning between owner
-// selection and files/ignores matching.
-func (resolver *ConfigOwnerResolver) ResolveTargetConfig(
-	target DiscoveredLintTarget,
-	enforcePlugins bool,
-) (string, RslintConfig, ResolvedFileConfig, bool) {
-	configDir, _ := resolver.ResolveTarget(target)
-	if configDir == "" {
-		return "", nil, ResolvedFileConfig{}, false
-	}
-	entries, resolved, ok := resolver.ResolveConfigTarget(
-		configDir,
-		target,
-		enforcePlugins,
-	)
-	return configDir, entries, resolved, ok
-}
-
-// ResolveConfigTarget evaluates target against a known config key while still
-// reusing the key's frozen authored path spaces. It is the explicit-config and
-// invocation-wide counterpart to ResolveTargetConfig's ancestry lookup.
-func (resolver *ConfigOwnerResolver) ResolveConfigTarget(
-	configDir string,
-	target DiscoveredLintTarget,
-	enforcePlugins bool,
-) (RslintConfig, ResolvedFileConfig, bool) {
-	if resolver == nil {
-		return nil, ResolvedFileConfig{}, false
-	}
-	entries, exists := resolver.configMap[configDir]
-	if !exists {
-		return nil, ResolvedFileConfig{}, false
-	}
-	targetResolver := resolver.targetResolvers[configDir]
-	if targetResolver == nil {
-		return nil, ResolvedFileConfig{}, false
-	}
-	fileResolver := &FileConfigResolver{
-		config:         entries,
-		enforcePlugins: enforcePlugins,
-		targetResolver: targetResolver,
-	}
-	return entries, fileResolver.ResolveTarget(target), true
-}
-
-// ChildConfigDirs returns the direct lexical child config directories that
-// form ownership handoff boundaries for configDir. The returned slice is a
-// copy and may be used concurrently with resolver lookups.
-func (resolver *ConfigOwnerResolver) ChildConfigDirs(configDir string) []string {
-	if resolver == nil || resolver.index == nil {
-		return nil
-	}
-	return append([]string(nil), resolver.index.childConfigDirs(configDir)...)
-}
-
 // ResolveConfigFilePathSpace returns the path pair used for files and ignores
 // matching. User-authored paths keep their lexical relationship to the config
 // directory; when both paths are aliases of one physical config tree, the pair
@@ -208,7 +18,7 @@ func ResolveConfigFilePathSpace(filePath string, configDir string, fsys vfs.FS) 
 // ResolveConfigFilePathSpaceWithCanonical is ResolveConfigFilePathSpace with an
 // optional physical file identity already established by target discovery.
 func ResolveConfigFilePathSpaceWithCanonical(filePath string, canonicalPath string, configDir string, fsys vfs.FS) (string, string) {
-	return ResolveConfigFilePathSpaceForTarget(DiscoveredLintTarget{
+	return ResolveConfigFilePathSpaceForTarget(PathIdentity{
 		Path:          filePath,
 		CanonicalPath: canonicalPath,
 	}, configDir, fsys)
@@ -217,7 +27,7 @@ func ResolveConfigFilePathSpaceWithCanonical(filePath string, canonicalPath stri
 // ResolveConfigFilePathSpaceForTarget projects a frozen file and parent
 // identity into one authored config base without resolving the target again.
 func ResolveConfigFilePathSpaceForTarget(
-	target DiscoveredLintTarget,
+	target PathIdentity,
 	configDir string,
 	fsys vfs.FS,
 ) (string, string) {

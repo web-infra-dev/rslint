@@ -16,21 +16,21 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	default_rule "github.com/web-infra-dev/rslint/internal/plugins/import/rules/default"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
-func rootProgramTestPlan(dir string, names ...string) rslintconfig.LintTargetPlan {
-	plan := rslintconfig.LintTargetPlan{Targets: make([]rslintconfig.DiscoveredLintTarget, 0, len(names))}
+func rootProgramTestPlan(dir string, names ...string) target.Plan {
+	plan := target.Plan{Files: make([]target.File, 0, len(names))}
 	for _, name := range names {
 		fileName := tspath.NormalizePath(filepath.Join(dir, name))
-		plan.Targets = append(plan.Targets, rslintconfig.DiscoveredLintTarget{
-			Path:            fileName,
-			CanonicalPath:   fileName,
-			ConfigDirectory: dir,
+		plan.Files = append(plan.Files, target.File{PathIdentity: rslintconfig.PathIdentity{Path: fileName,
+			CanonicalPath: fileName}, ConfigDirectory: dir,
 		})
 	}
 	return plan
@@ -65,8 +65,8 @@ func TestRootProgramsMatchCompatibilityProgram(t *testing.T) {
 		"view.tsx":      "export const view = <div>;\n",
 	})
 	plan := rootProgramTestPlan(dir, "a.js", "b.js", "bad.ts", "view.tsx")
-	rootFiles := make([]string, 0, len(plan.Targets))
-	for _, target := range plan.Targets {
+	rootFiles := make([]string, 0, len(plan.Files))
+	for _, target := range plan.Files {
 		rootFiles = append(rootFiles, target.Path)
 	}
 
@@ -88,7 +88,7 @@ func TestRootProgramsMatchCompatibilityProgram(t *testing.T) {
 
 	directContext := rootProgramTestBuildContext()
 	programs, directDiagnostics, err := buildRootProgramsForTest(
-		[][]rslintconfig.DiscoveredLintTarget{plan.Targets},
+		[][]target.File{plan.Files},
 		dir,
 		directContext,
 		false, // Exercise the production parallel parse/bind path.
@@ -97,12 +97,12 @@ func TestRootProgramsMatchCompatibilityProgram(t *testing.T) {
 		t.Fatalf("buildRootProgramsForTest: %v", err)
 	}
 	compareProgramSyntaxDiagnostics(t, legacyDiagnostics, directDiagnostics)
-	if len(programs) != 1 || len(programs[0].SourceFiles()) != len(plan.Targets) {
+	if len(programs) != 1 || len(programs[0].SourceFiles()) != len(plan.Files) {
 		t.Fatalf("source-only Program source count differs: programs=%d files=%d", len(programs), len(programs[0].SourceFiles()))
 	}
 	sourceProgram := programs[0]
 
-	for i, target := range plan.Targets {
+	for i, target := range plan.Files {
 		programFile := exactProgramSourceFile(compatibility, target.Path)
 		directFile := sourceProgram.SourceFiles()[i]
 		if programFile == nil || directFile == nil {
@@ -154,18 +154,16 @@ func TestRootProgramsMatchCompatibilityProgram(t *testing.T) {
 
 func TestRootProgramsReportUnreadableTarget(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
-	target := tspath.ResolvePath(dir, "missing.ts")
+	targetPath := tspath.ResolvePath(dir, "missing.ts")
 	_, _, err := buildRootProgramsForTest(
-		[][]rslintconfig.DiscoveredLintTarget{{{
-			Path:            target,
-			CanonicalPath:   target,
-			ConfigDirectory: dir,
+		[][]target.File{{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath,
+			CanonicalPath: targetPath}, ConfigDirectory: dir,
 		}}},
 		dir,
 		rootProgramTestBuildContext(),
 		true,
 	)
-	want := fmt.Sprintf("program: could not read root %q", target)
+	want := fmt.Sprintf("program: could not read root %q", targetPath)
 	if err == nil || err.Error() != want {
 		t.Fatalf("unreadable root target error = %v, want %q", err, want)
 	}
@@ -179,7 +177,7 @@ func TestRootProgramSupportsCrossFileImportRules(t *testing.T) {
 	})
 	plan := rootProgramTestPlan(dir, "a.ts", "b.ts")
 	programs, diagnostics, err := buildRootProgramsForTest(
-		[][]rslintconfig.DiscoveredLintTarget{plan.Targets},
+		[][]target.File{plan.Files},
 		dir,
 		rootProgramTestBuildContext(),
 		true,
@@ -284,10 +282,8 @@ func TestLoadCLIMatchesCompatibilityRootAdmission(t *testing.T) {
 				fsys.files[targetPath] = "const value = ;\n"
 				return newBuildContext(fsys)
 			}
-			plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{{
-				Path:            targetPath,
-				CanonicalPath:   targetPath,
-				ConfigDirectory: configDir,
+			plan := target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath,
+				CanonicalPath: targetPath}, ConfigDirectory: configDir,
 			}}}
 
 			legacyContext := newContext()
@@ -368,9 +364,9 @@ func TestRootProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 			directories:        directories,
 		}
 	}
-	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{
-		{Path: upper, CanonicalPath: upper, ConfigDirectory: configDir},
-		{Path: lower, CanonicalPath: lower, ConfigDirectory: configDir},
+	plan := target.Plan{Files: []target.File{
+		{PathIdentity: rslintconfig.PathIdentity{Path: upper, CanonicalPath: upper}, ConfigDirectory: configDir},
+		{PathIdentity: rslintconfig.PathIdentity{Path: lower, CanonicalPath: lower}, ConfigDirectory: configDir},
 	}}
 
 	legacyContext := newBuildContext(newFS())
@@ -438,7 +434,7 @@ func TestSourceOnlyProgramSyntaxDeduplicatesAgainstNonGoverningTypeCheckProgram(
 		t.Fatalf("buildProjectsForConfigs: %v", err)
 	}
 	targetPath := tspath.ResolvePath(childDir, "target.ts")
-	plan := rslintconfig.LintTargetPlan{Targets: []rslintconfig.DiscoveredLintTarget{testLintTarget(fsys, childDir, targetPath)}}
+	plan := target.Plan{Files: []target.File{testLintTarget(fsys, childDir, targetPath)}}
 	binding, err := sessionForTest(buildContext).LoadCLI(set, plan, rootDir, true)
 	if err != nil {
 		t.Fatalf("prepareCLIForTest: %v", err)
@@ -499,18 +495,18 @@ func resolveTargetPlanForTest(
 	configMap map[string]rslintconfig.RslintConfig,
 	config rslintconfig.RslintConfig,
 	currentDirectory string,
-	scopes map[string]rslintconfig.LintDiscoveryScope,
+	scopes map[string]target.OwnerScope,
 	fsys vfs.FS,
 	allowFiles []string,
 	allowDirs []string,
 	singleThreaded bool,
-) (rslintconfig.LintTargetPlan, error) {
-	return rslintconfig.ResolveLintTargetPlan(rslintconfig.LintTargetPlanRequest{
+) (target.Plan, error) {
+	return target.Resolve(target.Request{
 		ConfigMap:       configMap,
 		Config:          config,
 		ConfigDirectory: currentDirectory,
 		ScanRoot:        currentDirectory,
-		ConfigScopes:    scopes,
+		OwnerScopes:     scopes,
 		FS:              fsys,
 		Files:           allowFiles,
 		Directories:     allowDirs,
@@ -520,18 +516,24 @@ func resolveTargetPlanForTest(
 
 func activeConfigsForTest(
 	configs map[string]rslintconfig.RslintConfig,
-	plan rslintconfig.LintTargetPlan,
+	plan target.Plan,
 ) map[string]rslintconfig.RslintConfig {
-	return plan.ActiveConfigs(configs)
+	active := make(map[string]rslintconfig.RslintConfig)
+	for _, owner := range plan.ActiveOwners() {
+		if entries, ok := configs[owner]; ok {
+			active[owner] = entries
+		}
+	}
+	return active
 }
 
-func preferredCallerPathsForTest(plan rslintconfig.LintTargetPlan) map[string]string {
+func preferredCallerPathsForTest(plan target.Plan) map[string]string {
 	return plan.PreferredCallerPaths()
 }
 
 func loadAPIForTest(
 	projects ProjectSet,
-	plan rslintconfig.LintTargetPlan,
+	plan target.Plan,
 	currentDirectory string,
 	context *buildContext,
 	singleThreaded bool,
@@ -558,7 +560,7 @@ func createCompatibilityProgramForTest(
 }
 
 func buildRootProgramsForTest(
-	groups [][]rslintconfig.DiscoveredLintTarget,
+	groups [][]target.File,
 	currentDirectory string,
 	context *buildContext,
 	singleThreaded bool,
@@ -623,7 +625,7 @@ func collectTargetSyntacticDiagnostics(
 
 func remapDiagnosticTargetPaths(
 	diagnostics []rule.RuleDiagnostic,
-	mapping map[string]rslintconfig.DiscoveredLintTarget,
+	mapping map[string]target.File,
 ) {
 	for index := range diagnostics {
 		if target, ok := mapping[diagnostics[index].FilePath]; ok {
@@ -679,13 +681,13 @@ func deduplicateTypeScriptDiagnostics(
 type lintConfigResolverOptions struct {
 	Config                 rslintconfig.RslintConfig
 	CurrentDirectory       string
-	LintTargetBySourcePath map[string]rslintconfig.DiscoveredLintTarget
+	LintTargetBySourcePath map[string]target.File
 	FS                     vfs.FS
 }
 
 type testLintConfigResolver struct {
 	resolver           *rslintconfig.FileConfigResolver
-	lintTargetBySource map[string]rslintconfig.DiscoveredLintTarget
+	lintTargetBySource map[string]target.File
 }
 
 func newLintConfigResolver(opts lintConfigResolverOptions) *testLintConfigResolver {
@@ -694,6 +696,7 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *testLintConfigResolv
 			opts.Config,
 			opts.CurrentDirectory,
 			opts.FS,
+			rules.All(),
 			false,
 		),
 		lintTargetBySource: opts.LintTargetBySourcePath,

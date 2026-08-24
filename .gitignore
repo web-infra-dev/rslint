@@ -180,6 +180,8 @@ packages/rslint/pkg/
 
 # rust
 target/
+!/internal/config/target/
+!/internal/config/target/**
 
 # generated rule manifest
 website/generated/
