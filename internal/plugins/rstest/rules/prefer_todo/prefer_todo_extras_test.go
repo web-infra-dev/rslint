@@ -49,6 +49,7 @@ func TestPreferTodoExtras(t *testing.T) {
 			{Code: `const extended = test.extend(fixtures); extended("case");`},
 			{Code: `const focused = test.only; focused.skip("case", () => {});`},
 			{Code: `const failing = test.fails; failing.skip("case", () => {});`},
+			{Code: `const failing = test.fails.skip; failing("case", () => {});`},
 			{Code: `const ext = test.extend(fixtures); ext.skip("case", () => {});`},
 			// ---- API sources and reverse sources.
 			{Code: `import { test } from "node:test"; test("case");`},
@@ -134,12 +135,32 @@ test("case");`},
 				Code:   `test("case", () => {}, () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
 			},
+			{
+				Code:   `test("case", () => {}, "not a timeout");`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", () => {}, {});`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", () => {}, null);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", () => {}, ("not a timeout" as any));`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
 			// ---- A registration the parser has proved is reported even when no
 			// rewrite delivers a todo. `rstest/no-disabled-tests` already tells the
 			// user these tests have no body; staying silent here would be the only
 			// rule in the plugin that does not.
 			{
 				Code:   `const skipped = test.skip; skipped("case", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 28}},
+			},
+			{
+				Code:   `const skipped = test.skip; skipped.skip("case", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 28}},
 			},
 			{
@@ -201,6 +222,16 @@ test.todo("case");`},
 			// ---- overload matrix: empty callback in function-first overload deletes callback+timeout.
 			{
 				Code:   `test("case", () => {}, 1_000);`,
+				Output: []string{`test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", () => {}, timeout);`,
+				Output: []string{`test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", () => {}, void 0);`,
 				Output: []string{`test.todo("case");`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
 			},

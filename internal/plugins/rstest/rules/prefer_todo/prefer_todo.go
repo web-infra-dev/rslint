@@ -131,7 +131,7 @@ func classifyCallSite(
 		if isSafeBareCallSiteReference(ctx, call.Expression) {
 			return callSiteClassification{bareRoot: true, fixable: true}, true
 		}
-		if parsed.Skipped {
+		if parsed.Skipped && isSafeHiddenSkipCallSiteReference(ctx, call.Expression) {
 			// `const skipped = test.skip; skipped('case')`. The parser resolved
 			// the alias, so this is a skipped Rstest test with no body, but the
 			// `.skip` lives in the alias initializer and there is no accessor at
@@ -158,6 +158,13 @@ func classifyCallSite(
 	}
 	receiver, _ := testFramework.AccessorReceiverAndParent(skipEntry)
 	if !isSafeBareCallSiteReference(ctx, receiver) {
+		if parsed.Skipped && isSafeHiddenSkipCallSiteReference(ctx, receiver) {
+			// The receiver already contributes a proven `.skip`, for example in
+			// `const skipped = test.skip; skipped.skip('case')`. Replacing the
+			// call-site accessor would leave the hidden skip active, so report
+			// without offering a fix.
+			return callSiteClassification{}, true
+		}
 		return callSiteClassification{}, false
 	}
 	if repeatedSkip {
@@ -169,21 +176,122 @@ func classifyCallSite(
 }
 
 func isSafeBareCallSiteReference(ctx rule.RuleContext, node *ast.Node) bool {
+	return isSafeBareReference(ctx, node, nil, 0)
+}
+
+func isSafeBareReference(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	visited map[*ast.Symbol]bool,
+	depth int,
+) bool {
 	if node == nil {
 		return false
 	}
 	node = ast.SkipParentheses(node)
-	if node == nil {
+	if node == nil || depth > 16 {
 		return false
 	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return isSafeBareIdentifierReference(ctx, node, nil, 0)
+		return isSafeBareIdentifierReference(ctx, node, visited, depth)
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		return isSafeBarePropertyReference(ctx, node, nil, 0)
+		return isSafeBarePropertyReference(ctx, node, visited, depth)
 	default:
 		return false
+	}
+}
+
+// isSafeHiddenSkipCallSiteReference proves that an expression reaches a bare
+// Rstest test API through one or more `.skip` accessors and no other modifier
+// or factory. The shared parser exposes the semantic Skipped bit across aliases,
+// but that bit alone cannot distinguish `test.skip` from `test.fails.skip`.
+func isSafeHiddenSkipCallSiteReference(ctx rule.RuleContext, node *ast.Node) bool {
+	return isSafeHiddenSkipReference(ctx, node, nil, 0)
+}
+
+func isSafeHiddenSkipReference(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	visited map[*ast.Symbol]bool,
+	depth int,
+) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	if node == nil || depth > 16 {
+		return false
+	}
+
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if testFramework.AccessorQuestionDotToken(node) != nil {
+			return false
+		}
+		receiver, name, ok := staticAccessor(node)
+		if !ok || name != "skip" {
+			return false
+		}
+		return isSafeBareReference(ctx, receiver, visited, depth+1) ||
+			isSafeHiddenSkipReference(ctx, receiver, visited, depth+1)
+	case ast.KindIdentifier:
+		if ctx.Refs == nil {
+			return false
+		}
+		symbol := ctx.Refs.Resolve(node)
+		if symbol == nil || (visited != nil && visited[symbol]) {
+			return false
+		}
+		if visited == nil {
+			visited = map[*ast.Symbol]bool{}
+		}
+		visited[symbol] = true
+		defer delete(visited, symbol)
+
+		sameFileDecls := 0
+		for _, declaration := range symbol.Declarations {
+			if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
+				continue
+			}
+			sameFileDecls++
+			if declaration.Kind != ast.KindVariableDeclaration ||
+				declaration.Parent == nil ||
+				declaration.Parent.Kind != ast.KindVariableDeclarationList ||
+				declaration.Parent.Flags&ast.NodeFlagsConst == 0 {
+				return false
+			}
+			initializer := declaration.AsVariableDeclaration().Initializer
+			if !isSafeHiddenSkipReference(ctx, initializer, visited, depth+1) {
+				return false
+			}
+		}
+		return sameFileDecls > 0
+	default:
+		return false
+	}
+}
+
+func staticAccessor(node *ast.Node) (*ast.Node, string, bool) {
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		property := node.AsPropertyAccessExpression()
+		if property == nil || property.Name() == nil {
+			return nil, "", false
+		}
+		return property.Expression, property.Name().Text(), true
+	case ast.KindElementAccessExpression:
+		element := node.AsElementAccessExpression()
+		if element == nil {
+			return nil, "", false
+		}
+		name, ok := internalUtils.GetStaticStringLiteralValue(
+			ast.SkipParentheses(element.ArgumentExpression),
+		)
+		return element.Expression, name, ok
+	default:
+		return nil, "", false
 	}
 }
 
@@ -604,6 +712,7 @@ func classifyCallback(args []*ast.Node) callbackClassification {
 				callbackIndex: 1,
 				optionsIndex:  -1,
 				timeoutIndex:  timeoutIndex,
+				reportOnly:    timeoutIndex >= 0 && isDefinitelyUnsupportedTimeout(third),
 			}
 		}
 		return callbackClassification{kind: callbackImplementedOrUnknown, callbackIndex: -1, optionsIndex: -1, timeoutIndex: -1}
@@ -665,6 +774,38 @@ func inlineFunctionState(node *ast.Node) (bool, bool) {
 
 func isObjectLiteral(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindObjectLiteralExpression
+}
+
+// isDefinitelyUnsupportedTimeout identifies expressions whose JavaScript value
+// cannot satisfy Rstest's numeric-or-undefined third-argument contract. Other
+// expressions remain potentially numeric without requiring type information.
+func isDefinitelyUnsupportedTimeout(node *ast.Node) bool {
+	node = internalUtils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindStringLiteral,
+		ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTemplateExpression,
+		ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword,
+		ast.KindObjectLiteralExpression,
+		ast.KindArrayLiteralExpression,
+		ast.KindArrowFunction,
+		ast.KindFunctionExpression,
+		ast.KindClassExpression,
+		ast.KindDeleteExpression,
+		ast.KindTypeOfExpression:
+		return true
+	case ast.KindPrefixUnaryExpression:
+		return node.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
+	default:
+		return false
+	}
 }
 
 func isStringNode(node *ast.Node) bool {

@@ -16,6 +16,9 @@ ruleTester.run('prefer-todo', {} as never, {
     { code: 'test("stub", () => expect(1).toBe(1));' },
     { code: 'test.concurrent("stub", () => expect(1).toBe(1));' },
     {
+      code: 'const failing = test.fails.skip; failing("stub", () => {});',
+    },
+    {
       code: [
         'const core = require("@rstest/core");',
         'core.test = custom;',
@@ -33,6 +36,22 @@ ruleTester.run('prefer-todo', {} as never, {
       errors: [{ messageId: 'emptyTest' }],
     },
     {
+      code: 'test("invalid timeout", () => {}, "not a timeout");',
+      errors: [{ messageId: 'emptyTest' }],
+    },
+    {
+      code: 'test("invalid timeout", () => {}, {});',
+      errors: [{ messageId: 'emptyTest' }],
+    },
+    {
+      code: 'test("invalid timeout", () => {}, null);',
+      errors: [{ messageId: 'emptyTest' }],
+    },
+    {
+      code: 'test("invalid timeout", () => {}, ("bad" as any));',
+      errors: [{ messageId: 'emptyTest' }],
+    },
+    {
       code: 'test(`dynamic ${name}`);',
       output: 'test.todo(`dynamic ${name}`);',
       errors: [{ messageId: 'unimplementedTest' }],
@@ -46,6 +65,10 @@ ruleTester.run('prefer-todo', {} as never, {
       // Reported without a fix: rewriting either accessor leaves the other
       // skip active, so no one-accessor rewrite delivers a todo.
       code: 'test.skip.skip("stub", () => {});',
+      errors: [{ messageId: 'emptyTest' }],
+    },
+    {
+      code: 'const skipped = test.skip; skipped.skip("stub", () => {});',
       errors: [{ messageId: 'emptyTest' }],
     },
     {

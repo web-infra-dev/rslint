@@ -46,9 +46,10 @@ even when no rewrite delivers a todo test:
   replacing one accessor leaves the other skip active;
 - an optional registration such as `test?.('case')`, because inserting `.todo`
   would move the optional boundary and may change the call's runtime behavior;
-- a call with unsupported extra arguments whose callback is still provably
-  empty, such as `test('case', () => {}, 1000, extra)`, because dropping or
-  preserving those arguments would guess at behavior outside Rstest's overloads.
+- a call with unsupported arguments whose callback is still provably empty,
+  such as `test('case', () => {}, 'not a timeout')` or
+  `test('case', () => {}, 1000, extra)`, because dropping or preserving those
+  arguments would guess at behavior outside Rstest's overloads.
 
 ### Not reported at all
 
