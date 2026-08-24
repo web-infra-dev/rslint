@@ -30,6 +30,7 @@ type fakeConfigModuleLoader struct {
 	activations []ConfigActivationRequest
 	pluginsByID map[string][]rslintconfig.EslintPluginEntry
 	mutate      func(ConfigLoadBatchRequest, ConfigLoadBatchResponse) ConfigLoadBatchResponse
+	activate    func(ConfigActivationRequest) (ConfigActivationResponse, error)
 }
 
 type configDiscoveryRealpathFS struct {
@@ -204,6 +205,9 @@ func (loader *fakeConfigModuleLoader) LoadConfigs(_ context.Context, request Con
 
 func (loader *fakeConfigModuleLoader) ActivateConfigs(_ context.Context, request ConfigActivationRequest) (ConfigActivationResponse, error) {
 	loader.activations = append(loader.activations, request)
+	if loader.activate != nil {
+		return loader.activate(request)
+	}
 	return ConfigActivationResponse{
 		TransactionID:       request.TransactionID,
 		EslintPluginEntries: fixtureActivationPlugins(loader.pluginsByID, request.EffectiveConfigIDs),
@@ -2554,14 +2558,14 @@ func TestConfigDiscoveryCaseInsensitiveRootsChooseStableRepresentative(t *testin
 		caseSensitive: false,
 	}
 	build := func(directories []string) []string {
-		builder := configCatalogBuilder{
+		coordinator := discoveryCoordinator{
 			fs: fsys,
 			request: ConfigDiscoveryRequest{
 				CWD:         "C:/repo",
 				Directories: directories,
 			},
 		}
-		return builder.normalizedDirectoryRoots()
+		return coordinator.normalizedDirectoryRoots()
 	}
 	first := build([]string{"c:/repo", "C:/Repo"})
 	second := build([]string{"C:/Repo", "c:/repo"})
@@ -2603,12 +2607,12 @@ func TestConfigDiscoveryCandidateSearchStopsAtUNCShareRoot(t *testing.T) {
 				serverConfig: {},
 			},
 		}
-		builder := configCatalogBuilder{
+		coordinator := discoveryCoordinator{
 			fs:      fsys,
 			request: ConfigDiscoveryRequest{CWD: "//server/share/repo"},
 		}
 
-		candidates := builder.findCandidateChain("//server/share/repo")
+		candidates := coordinator.findCandidateChain("//server/share/repo")
 		if len(candidates) != 1 || candidates[0].path != shareConfig {
 			t.Fatalf("UNC ancestor candidates = %+v, want share root only", candidates)
 		}
@@ -2621,12 +2625,12 @@ func TestConfigDiscoveryCandidateSearchStopsAtUNCShareRoot(t *testing.T) {
 				serverConfig: {},
 			},
 		}
-		builder := configCatalogBuilder{
+		coordinator := discoveryCoordinator{
 			fs:      fsys,
 			request: ConfigDiscoveryRequest{CWD: "//server/share/repo"},
 		}
 
-		if candidate, found := builder.findCandidateUp("//server/share/repo"); found {
+		if candidate, found := coordinator.findCandidateUp("//server/share/repo"); found {
 			t.Fatalf("UNC nearest search escaped its share: %+v", candidate)
 		}
 	})
@@ -2793,29 +2797,30 @@ func TestConfigDiscoveryReusesNativeCaseAliasAcrossLoadFrontiers(t *testing.T) {
 		},
 	}
 	fsys := &configDiscoveryCaseSensitivityFS{FS: realpathFS, caseSensitive: false}
-	builder := configCatalogBuilder{
-		ctx:                 context.Background(),
-		fs:                  fsys,
-		loader:              loader,
-		transactionID:       "case-alias-frontiers",
-		loadStates:          make(map[string]*configLoadState),
-		loadStateByIdentity: make(map[tspath.Path]*configLoadState),
-		failureByPath:       make(map[string]ConfigFailure),
-	}
-	if err := builder.ensureCandidates([]configCandidate{{path: upperConfig, directory: upperRoot}}); err != nil {
+	coordinator := newDiscoveryCoordinator(
+		context.Background(),
+		fsys,
+		loader,
+		ConfigDiscoveryRequest{CWD: upperRoot},
+		"",
+		"case-alias-frontiers",
+	)
+	if err := coordinator.modules.loadCandidates([]configCandidate{{path: upperConfig, directory: upperRoot}}); err != nil {
 		t.Fatalf("first frontier: %v", err)
 	}
-	if err := builder.ensureCandidates([]configCandidate{{path: lowerConfig, directory: lowerRoot}}); err != nil {
+	if err := coordinator.modules.loadCandidates([]configCandidate{{path: lowerConfig, directory: lowerRoot}}); err != nil {
 		t.Fatalf("second frontier: %v", err)
 	}
 	if len(loader.batches) != 1 || len(loader.batches[0].Candidates) != 1 {
 		t.Fatalf("load batches = %+v, want one request across frontiers", loader.batches)
 	}
-	if builder.loadStates[upperConfig] == nil || builder.loadStates[upperConfig] != builder.loadStates[lowerConfig] {
+	upperState := coordinator.modules.state(upperConfig)
+	lowerState := coordinator.modules.state(lowerConfig)
+	if upperState == nil || upperState != lowerState {
 		t.Fatal("case aliases did not resolve to the same representative load state")
 		return
 	}
-	if got := builder.loadStates[lowerConfig].candidate.path; got != upperConfig {
+	if got := lowerState.candidate.path; got != upperConfig {
 		t.Fatalf("representative config path = %q, want %q", got, upperConfig)
 	}
 }
@@ -2898,6 +2903,65 @@ func TestConfigDiscoveryEmptyCatalogDoesNotActivateUnknownTransaction(t *testing
 	if len(loader.activations) != 0 {
 		t.Fatalf("empty discovery activated an unknown host transaction: %+v", loader.activations)
 	}
+}
+
+func TestConfigDiscoveryForwardsFreshModuleLoadMode(t *testing.T) {
+	root := t.TempDir()
+	loader := newFixtureConfigLoader()
+	configPath := writeConfigCandidate(t, root, "rslint.config.js")
+	loader.configs[configPath] = namedConfig("root")
+
+	buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
+		CWD:         root,
+		ImplicitCWD: true,
+		Fresh:       true,
+	})
+	if len(loader.batches) != 1 {
+		t.Fatalf("load batch count = %d, want 1", len(loader.batches))
+	}
+	if got := loader.batches[0].LoadMode; got != ConfigModuleLoadFresh {
+		t.Fatalf("load mode = %q, want %q", got, ConfigModuleLoadFresh)
+	}
+}
+
+func TestConfigDiscoveryPropagatesActivationFailures(t *testing.T) {
+	t.Run("transport", func(t *testing.T) {
+		root := t.TempDir()
+		loader := newFixtureConfigLoader()
+		configPath := writeConfigCandidate(t, root, "rslint.config.js")
+		loader.configs[configPath] = namedConfig("root")
+		activationErr := errors.New("activation transport failed")
+		loader.activate = func(ConfigActivationRequest) (ConfigActivationResponse, error) {
+			return ConfigActivationResponse{}, activationErr
+		}
+
+		_, err := DiscoverAutomatic(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
+			CWD:         root,
+			ImplicitCWD: true,
+		})
+		if !errors.Is(err, activationErr) {
+			t.Fatalf("error = %v, want %v", err, activationErr)
+		}
+	})
+
+	t.Run("transaction mismatch", func(t *testing.T) {
+		root := t.TempDir()
+		loader := newFixtureConfigLoader()
+		configPath := writeConfigCandidate(t, root, "rslint.config.js")
+		loader.configs[configPath] = namedConfig("root")
+		loader.activate = func(ConfigActivationRequest) (ConfigActivationResponse, error) {
+			return ConfigActivationResponse{TransactionID: "other"}, nil
+		}
+
+		_, err := DiscoverAutomatic(context.Background(), discoveryTestFS(), loader, ConfigDiscoveryRequest{
+			CWD:         root,
+			ImplicitCWD: true,
+		})
+		var protocolErr *ConfigDiscoveryProtocolError
+		if !errors.As(err, &protocolErr) {
+			t.Fatalf("error = %v, want ConfigDiscoveryProtocolError", err)
+		}
+	})
 }
 
 func TestConfigDiscoveryTransactionIDsAreUniqueAcrossBuilds(t *testing.T) {

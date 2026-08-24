@@ -74,12 +74,6 @@ type ExplicitConfigRequest struct {
 	SingleThreaded    bool
 }
 
-type configSource struct {
-	CandidateID   string
-	CandidatePath string
-	ExplicitOnly  bool
-}
-
 type ConfigFailure struct {
 	Path      string
 	Directory string
@@ -209,21 +203,15 @@ func buildConfigCatalog(
 	}
 	transactionID := nextConfigDiscoveryTransactionID()
 
-	builder := configCatalogBuilder{
-		ctx:                 ctx,
-		fs:                  fsys,
-		loader:              loader,
-		request:             request,
-		explicitConfigPath:  explicitConfigPath,
-		transactionID:       transactionID,
-		loadStates:          make(map[string]*configLoadState),
-		loadStateByIdentity: make(map[tspath.Path]*configLoadState),
-		configs:             make(map[string]rslintconfig.RslintConfig),
-		sources:             make(map[string]configSource),
-		scopes:              make(map[string]target.OwnerScope),
-		failureByPath:       make(map[string]ConfigFailure),
-	}
-	return builder.build()
+	coordinator := newDiscoveryCoordinator(
+		ctx,
+		fsys,
+		loader,
+		request,
+		explicitConfigPath,
+		transactionID,
+	)
+	return coordinator.build()
 }
 
 func normalizeDiscoveryPath(path string, cwd string) string {

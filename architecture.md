@@ -647,7 +647,17 @@ with a stale host session after a native-process restart. The returned catalog
 publishes final configs, scopes, failures, effective IDs, plugin metadata, and
 whether the invocation used an explicit config. Candidate fingerprints and
 plugin-aggregation scratch remain private to the Node transaction session;
-source-selection scratch remains private to the Go builder.
+source-selection scratch remains private to the Go discovery transaction.
+
+Within `internal/config/discovery`, one request-scoped coordinator owns only
+phase order and final statistics. Ownership resolution and directory walking
+find candidate boundaries; the module-load coordinator owns candidate identity,
+Node batches, failures, and final activation; the Git projection owns frozen
+`.gitignore` reads and materialization; and the catalog draft is the sole writer
+of selected configs and owner scopes. Filesystem workers return frontier results
+without mutating those shared transaction results. The coordinator merges each
+sorted frontier, loads its candidate batch, and adopts the result before the next
+frontier starts; Node activation happens only after catalog finalization.
 
 Automatic discovery uses these rules:
 
