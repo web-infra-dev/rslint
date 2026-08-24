@@ -22,7 +22,7 @@ func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	// but it is still CommonJS — sloppy mode by default — not a real ES module.
 	// Such a file is strict only once it uses module syntax itself.
 	if ast.IsExternalModule(sourceFile) &&
-		(HasModuleSyntax(sourceFile) || !IsCommonJSFileExtension(sourceFile.FileName())) {
+		!(!HasModuleSyntax(sourceFile) && IsCommonJSFileExtension(sourceFile.FileName())) {
 		return true
 	}
 

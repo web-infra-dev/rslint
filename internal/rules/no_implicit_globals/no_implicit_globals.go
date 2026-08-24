@@ -330,6 +330,9 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 // however deeply it is nested, `satisfies` included: `[foo satisfies any] = arr`
 // is a write.
 func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
+	if ast.IsPartOfTypeNode(node) {
+		return nil, 0
+	}
 	current := node
 	writes := 1
 	// wrappers counts the TS expression wrappers the walk has climbed since the
@@ -351,8 +354,17 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 		switch parent.Kind {
 		case ast.KindBinaryExpression:
 			binary := parent.AsBinaryExpression()
-			if binary == nil || binary.OperatorToken == nil ||
-				binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Left != current {
+			if binary == nil || binary.OperatorToken == nil {
+				return nil, 0
+			}
+			if binary.OperatorToken.Kind != ast.KindEqualsToken {
+				if utils.IsInDestructuringAssignment(parent) {
+					current = parent
+					continue
+				}
+				return nil, 0
+			}
+			if binary.Left != current {
 				return nil, 0
 			}
 			if utils.IsDefaultValueInDestructuringAssignment(parent) {
@@ -412,8 +424,31 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 		case ast.KindParenthesizedExpression:
 			current = parent
 
-		default:
+		case ast.KindCallExpression:
+			// PatternVisitor treats call arguments as right-hand reads, but
+			// continues through the callee. This makes `[fn(arg)] = value`
+			// a write to `fn` only, despite the unusual parser-accepted target.
+			call := parent.AsCallExpression()
+			if call == nil || call.Expression != current || !utils.IsInDestructuringAssignment(parent) {
+				return nil, 0
+			}
+			current = parent
+
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+			// A member expression writes its property, not either identifier
+			// inside the expression. PatternVisitor records both as reads.
 			return nil, 0
+
+		default:
+			// @typescript-eslint's PatternVisitor falls back to ordinary child
+			// traversal for parser-accepted expression-shaped pattern elements.
+			// Keep climbing while this expression remains inside the assignment
+			// pattern; IsInDestructuringAssignment excludes default RHS values
+			// and computed property keys.
+			if !utils.IsInDestructuringAssignment(parent) {
+				return nil, 0
+			}
+			current = parent
 		}
 	}
 	return nil, 0

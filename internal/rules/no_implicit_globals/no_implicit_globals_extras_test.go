@@ -145,6 +145,10 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{Code: `class C extends (foo = 1) {}`},
 			{Code: `class C { @dec(foo = 1) m() {} }`},
 
+			// A member expression names the property being assigned; neither
+			// identifier inside it is itself a write target.
+			{Code: `[foo.bar] = arr;`},
+
 			// ---- Block scopes exist from ES2015 on ----
 			{Code: `{ function foo() {} }`},
 			{Code: `if (true) { function foo() {} }`},
@@ -205,6 +209,39 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{
 				Code:   `for (foo! in obj) {}`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+
+			// PatternVisitor traverses parser-accepted expression-shaped pattern
+			// elements. It visits ordinary expression children, but treats call
+			// arguments as reads and continues only through the callee.
+			{
+				Code: `[foo + bar] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 18},
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 18},
+				},
+			},
+			{
+				Code:   `[fn(arg)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code: `[foo ? bar : baz] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak"},
+					{MessageId: "globalVariableLeak"},
+					{MessageId: "globalVariableLeak"},
+				},
+			},
+
+			// A default under object rest still contributes an extra write, and
+			// both diagnostics use the range of the outer assignment.
+			{
+				Code: `[{...foo = bar}] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 23},
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 23},
+				},
 			},
 			{
 				Code: `[foo! = 1] = arr;`,

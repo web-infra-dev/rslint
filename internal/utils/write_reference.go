@@ -263,7 +263,7 @@ func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 		return assignment != nil &&
 			assignment.Initializer == node &&
 			isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
-	case ast.KindSpreadElement:
+	case ast.KindSpreadElement, ast.KindSpreadAssignment:
 		return isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
 	}
 	return false
