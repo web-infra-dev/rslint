@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -38,6 +39,10 @@ func TestNoInvalidThisUpstream(t *testing.T) {
 		t,
 		&NoInvalidThisRule,
 		[]rule_tester.ValidTestCase{
+			{
+				Code:            `function foo() { 'use strict'; this.eval(); }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3},
+			},
 
 			// ---- Global ----
 			// script
@@ -1142,15 +1147,6 @@ function foo() { console.log(this); z(x => console.log(x, this)); }`},
 				Code:   `return function() { console.log(this); z(x => console.log(x, this)); };`,
 				Skip:   true,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedThis"}, {MessageId: "unexpectedThis"}},
-			},
-
-			// ---- Framework gap: ecmaVersion (ES3 "use strict" is inert) ----
-			// rslint has no ecmaVersion setting; every "use strict" directive is
-			// honored regardless of language-version target.
-			{
-				Code:   `function foo() { 'use strict'; this.eval(); }`,
-				Skip:   true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedThis"}},
 			},
 		},
 	)

@@ -20,17 +20,12 @@ var schemaJSON []byte
 // under strict mode.
 //
 // NOTE: Unlike ESLint, rslint does not expose `languageOptions.parserOptions`
-// (`ecmaFeatures.globalReturn`, `ecmaFeatures.impliedStrict`) or an
-// `ecmaVersion` setting. Consequences:
+// (`ecmaFeatures.globalReturn`, `ecmaFeatures.impliedStrict`). Consequently:
 //   - Top-level `this` validity is derived solely from
 //     `ast.IsExternalModule` (presence of import/export): scripts are always
 //     valid, ES modules are always invalid. ESLint's `ecmaFeatures.globalReturn`
 //     escape hatch (Node.js CommonJS-style top-level `return`) has no rslint
 //     equivalent and is therefore unreachable.
-//   - Every "use strict" directive is honored regardless of ECMAScript
-//     version. ESLint only applies directive-based strict mode from ES5
-//     onward (`ecmaVersion: 3` code with a body-level "use strict" stays
-//     non-strict); rslint has no such version gate.
 //
 // https://eslint.org/docs/latest/rules/no-invalid-this
 var NoInvalidThisRule = rule.Rule{
@@ -254,13 +249,16 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := ParseOptions(options)
+	ecmaVersion := ctx.Globals.EffectiveECMAVersion()
 	return BuildListeners(ctx, EngineOptions{
 		CapIsConstructor: opts.CapIsConstructor,
 		// Top-level `this` refers to the global object in scripts (always
 		// valid) and is `undefined` in ES modules (always invalid) —
 		// independent of strict mode.
-		TopLevelValid:           !ast.IsExternalModule(ctx.SourceFile),
-		IsStrict:                isStrictFunction,
+		TopLevelValid: !ast.IsExternalModule(ctx.SourceFile),
+		IsStrict: func(fn *ast.Node, sf *ast.SourceFile) bool {
+			return isStrictFunction(fn, sf, ecmaVersion)
+		},
 		FieldFrameScopedToValue: true,
 	})
 }
@@ -301,7 +299,12 @@ func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, comments []*ast.Co
 // True when an enclosing scope is already strict (ES module, ancestor
 // "use strict", or a class body — see utils.IsInStrictMode), OR the function
 // declares its own "use strict" directive.
-func isStrictFunction(fn *ast.Node, sf *ast.SourceFile) bool {
+func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int) bool {
+	// Strict mode was introduced in ES5; in ES3 even directive-looking string
+	// literals are semantically inert.
+	if ecmaVersion == 3 {
+		return false
+	}
 	if utils.IsInStrictMode(fn, sf) {
 		return true
 	}
@@ -339,7 +342,7 @@ func hasOwnFunctionName(node *ast.Node) bool {
 
 // thisTagPattern is ESLint's exact pattern: `^[\s*]*@this` applied to a
 // comment's *value*, i.e. with `/*` / `*/` / `//` markers stripped.
-var thisTagPattern = regexp.MustCompile(`(?m)^[\s*]*@this\b`)
+var thisTagPattern = regexp.MustCompile(`(?m)^[\s*]*@this`)
 
 // hasJSDocThisTag mirrors `astUtils.hasJSDocThisTag`. Two sources are checked
 // per ESLint:
@@ -698,7 +701,7 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 				}
 				return utils.IsNullOrUndefined(args[1])
 			}
-			if utils.IsSpecificMemberAccess(callee, "Array", "from") ||
+			if isArrayFromMethod(callee) ||
 				utils.IsSpecificMemberAccess(callee, "Array", "fromAsync") {
 				if len(args) != 3 || args[1] != current {
 					return true
@@ -721,6 +724,40 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 
 func isCallApplyBind(name string) bool {
 	return name == "call" || name == "apply" || name == "bind"
+}
+
+// isArrayFromMethod mirrors ESLint's `isArrayFromMethod`: the receiver must
+// be an identifier whose name ends in "Array", which includes Array and all
+// TypedArray constructors, and the statically-known property must be "from".
+func isArrayFromMethod(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+
+	var receiver *ast.Node
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		access := node.AsPropertyAccessExpression()
+		name := access.Name()
+		if name == nil || !ast.IsIdentifier(name) || name.AsIdentifier().Text != "from" {
+			return false
+		}
+		receiver = access.Expression
+	case ast.KindElementAccessExpression:
+		access := node.AsElementAccessExpression()
+		name, ok := utils.GetStaticExpressionValue(ast.SkipParentheses(access.ArgumentExpression))
+		if !ok || name != "from" {
+			return false
+		}
+		receiver = access.Expression
+	default:
+		return false
+	}
+
+	receiver = ast.SkipParentheses(receiver)
+	return receiver != nil && ast.IsIdentifier(receiver) &&
+		strings.HasSuffix(receiver.AsIdentifier().Text, "Array")
 }
 
 // decoratorFrameSkip reports how many frames the `this` at `thisNode` must

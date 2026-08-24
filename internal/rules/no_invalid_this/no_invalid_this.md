@@ -223,7 +223,6 @@ obj.Foo = function Foo() {
 ## Differences from ESLint
 
 - rslint determines whether code is an ES module purely from the presence of `import` / `export` syntax in the file. ESLint additionally lets `languageOptions.sourceType` and `parserOptions.ecmaFeatures.globalReturn` override this independently of file content; rslint does not expose either setting, so top-level `this` validity always follows the file's actual module-ness.
-- rslint honors every `"use strict"` directive regardless of language version. ESLint only applies directive-based strict mode from ECMAScript 5 onward; rslint has no `ecmaVersion` setting to gate this behavior against.
 
 ## When Not To Use It
 
