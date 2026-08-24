@@ -281,7 +281,9 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 		return
 	}
 	name := node.Text()
-	if ctx.Refs != nil && !ctx.Refs.IsGlobalNameReference(node, name, ast.SymbolFlagsValue) {
+	syntheticPatternName := isSyntheticPatternName(node)
+	if ctx.Refs != nil && !syntheticPatternName &&
+		!ctx.Refs.IsGlobalNameReference(node, name, ast.SymbolFlagsValue) {
 		return
 	}
 	switch ctx.Globals.Access(name) {
@@ -295,12 +297,34 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 	case utils.GlobalAccessWritable:
 		// Writable globals may be freely assigned.
 	default:
-		if !strictTopLevel && !utils.IsInStrictMode(node, ctx.SourceFile) {
+		strictnessNode := node
+		if syntheticPatternName {
+			// PatternVisitor's synthetic write belongs to the containing
+			// assignment, outside a function/class expression's own scope.
+			strictnessNode = root
+		}
+		if !strictTopLevel && !utils.IsInStrictMode(strictnessNode, ctx.SourceFile) {
 			for range writes {
 				ctx.ReportNode(root, globalVariableLeakMessage)
 			}
 		}
 	}
+}
+
+// isSyntheticPatternName reports a function/class expression name that
+// PatternVisitor reaches as an assignment target while traversing a
+// parser-accepted expression-shaped pattern. The ordinary reference index
+// correctly resolves such a name to its expression-local self-binding, but
+// scope-manager's synthetic pattern traversal records a separate global write.
+func isSyntheticPatternName(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	parent := node.Parent
+	if parent.Kind != ast.KindFunctionExpression && parent.Kind != ast.KindClassExpression {
+		return false
+	}
+	return parent.Name() == node && utils.IsInDestructuringAssignment(parent)
 }
 
 // findPureAssignmentRoot walks from a candidate write-target identifier up
@@ -314,8 +338,10 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 // one for the assignment. `[[foo = 1] = []] = arr` therefore reports three
 // times over the whole assignment. It returns nil for anything that isn't a pure
 // write target: compound/logical assignment operators and update expressions
-// read as well as write, so ESLint's scope analysis (and this walk) does not
-// treat them as leak/readonly-assignment candidates.
+// read as well as write, so ESLint's ordinary reference analysis does not treat
+// them as leak/readonly-assignment candidates. PatternVisitor is the exception:
+// a compound assignment inside an expression-shaped pattern contributes one
+// write for its left side before the containing pattern contributes another.
 //
 // TypeScript expression wrappers are where the walk stops mirroring the AST and
 // starts mirroring the scope manager. An AssignmentExpression's Left is
@@ -358,16 +384,22 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 				return nil, 0
 			}
 			if binary.OperatorToken.Kind != ast.KindEqualsToken {
-				if utils.IsInDestructuringAssignment(parent) {
-					current = parent
-					continue
+				if !utils.IsInDestructuringAssignment(parent) {
+					return nil, 0
 				}
-				return nil, 0
+				if ast.IsCompoundAssignmentOperator(binary.OperatorToken.Kind) {
+					if binary.Left != current {
+						return nil, 0
+					}
+					writes++
+				}
+				current = parent
+				continue
 			}
 			if binary.Left != current {
 				return nil, 0
 			}
-			if utils.IsDefaultValueInDestructuringAssignment(parent) {
+			if utils.IsInDestructuringAssignment(parent) {
 				writes++
 				enterPattern(parent)
 				continue

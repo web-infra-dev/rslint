@@ -133,6 +133,7 @@ Examples of **correct** code for this rule with `{ "lexicalBindings": true }`:
 - ESLint's `sourceType` config (`"script"` / `"module"` / `"commonjs"`) and `parserOptions.ecmaFeatures.globalReturn` are not configurable. Instead, whether a declaration counts as "global scope" is derived from the file itself: a file with real `import`/`export` syntax, or a `.mjs`/`.cjs` file, is never treated as the global scope, matching what those `sourceType` settings would force. There is no way to opt a script-like file with no module syntax out of being checked, the way `sourceType: "module"` can in ESLint.
 - ESLint's `env` config (which supplies environment globals such as `browser`'s `window`) is not supported. Declare the same names through `languageOptions.globals` or a `/*global */` comment instead.
 - TypeScript declaration forms that bind no runtime variable of their own are not reported: ambient declarations (`declare var foo: number;`, `declare function foo(): void;`, `declare class Foo {}`) and overload signatures. ESLint reports the ambient forms, and counts one declaration per overload signature, so it reports an overload pair twice where this rule reports only the implementation.
+- `/* exported __proto__ */` treats `__proto__` like any other exported name. ESLint 10.8.1 accidentally loses that entry because its directive parser stores names in an ordinary JavaScript object, where assigning `__proto__` invokes the inherited prototype setter instead of creating an own property.
 
 ## Original Documentation
 

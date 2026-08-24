@@ -149,6 +149,16 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// identifier inside it is itself a write target.
 			{Code: `[foo.bar] = arr;`},
 
+			// Within an expression-shaped pattern element, the right side of a
+			// compound assignment stays a read. A writable left side therefore
+			// leaves no implicit write to report for `bar`.
+			{Code: `[foo += bar] = arr;`, Globals: map[string]any{"foo": "writable"}},
+
+			// Unlike plugin-kit's ordinary JavaScript object, the shared exported
+			// directive view has no inherited __proto__ setter: the name is kept
+			// and exempts its declaration like every other exported name.
+			{Code: `/* exported __proto__ */ var __proto__;`},
+
 			// ---- Block scopes exist from ES2015 on ----
 			{Code: `{ function foo() {} }`},
 			{Code: `if (true) { function foo() {} }`},
@@ -232,6 +242,39 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 					{MessageId: "globalVariableLeak"},
 					{MessageId: "globalVariableLeak"},
 				},
+			},
+			// PatternVisitor treats a compound assignment's left side as an
+			// assignment pattern and records both the compound write and the
+			// containing destructuring write. Its right side remains a read.
+			{
+				Code:    `[foo += bar] = arr;`,
+				Globals: map[string]any{"bar": "writable"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 19},
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 19},
+				},
+			},
+			// An equals expression nested in another expression-shaped pattern
+			// element is another assignment-pattern write; both reports use the
+			// containing destructuring assignment's range.
+			{
+				Code:    `[(foo = bar) + baz] = arr;`,
+				Globals: map[string]any{"baz": "writable"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
+					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
+				},
+			},
+			// Function and class names reached through PatternVisitor's synthetic
+			// expression traversal are assignment targets, not ordinary lexical
+			// references to their expression-local bindings.
+			{
+				Code:   `[function foo(){}] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `[class C {}] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 
 			// A default under object rest still contributes an extra write, and

@@ -22,7 +22,7 @@ func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	// but it is still CommonJS — sloppy mode by default — not a real ES module.
 	// Such a file is strict only once it uses module syntax itself.
 	if ast.IsExternalModule(sourceFile) &&
-		!(!HasModuleSyntax(sourceFile) && IsCommonJSFileExtension(sourceFile.FileName())) {
+		(HasModuleSyntax(sourceFile) || !IsCommonJSFileExtension(sourceFile.FileName())) {
 		return true
 	}
 
@@ -45,7 +45,7 @@ func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 		// Class bodies are always strict in ES2015+. A decorator applied to the
 		// class itself is evaluated before the class scope exists, so it is not
 		// part of that body; a decorator on a member is.
-		if ast.IsClassLike(current) && !(child.Kind == ast.KindDecorator && child.Parent == current) {
+		if ast.IsClassLike(current) && (child.Kind != ast.KindDecorator || child.Parent != current) {
 			return true
 		}
 
