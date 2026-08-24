@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -415,7 +416,7 @@ func (analysis *RstestCallAnalysis) recordFunction(node *ast.Node) {
 			declaration.Name() != nil &&
 			declaration.Name().Kind == ast.KindIdentifier &&
 			declaration.Initializer != nil {
-			initializer := ast.SkipParentheses(declaration.Initializer)
+			initializer := internalUtils.SkipAssertionsAndParens(declaration.Initializer)
 			if ast.IsFunctionExpressionOrArrowFunction(initializer) {
 				name = declaration.Name().AsIdentifier().Text
 				function = initializer

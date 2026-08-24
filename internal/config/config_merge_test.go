@@ -33,7 +33,6 @@ func TestGetConfigForFile_ExplicitRulesOnly(t *testing.T) {
 }
 
 func TestGetConfigForFile_WithoutNormalize_PluginDoesNotAutoEnable(t *testing.T) {
-	RegisterAllRules()
 
 	// Without normalizeJSONConfig, plugins should not auto-enable rules
 	config := RslintConfig{

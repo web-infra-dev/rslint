@@ -264,6 +264,14 @@ func classifyLastChainOperand(bin *ast.BinaryExpression) (Operand, bool) {
 // isMemberBasedExpression reports whether the node is a property access or a
 // call on one, i.e. `a.b`, `a[b]`, `a.b()`.
 func isMemberBasedExpression(node *ast.Node) bool {
+	// ESTree wraps the complete optional expression in a ChainExpression,
+	// which is not a MemberExpression or CallExpression. Match that boundary
+	// explicitly because tsgo represents the same expression as its outermost
+	// optional-chain node without a wrapper.
+	if ast.IsOptionalChain(node) && ast.IsOutermostOptionalChain(node) {
+		return false
+	}
+
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 		return true

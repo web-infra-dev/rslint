@@ -76,6 +76,17 @@ type Config struct {
 	Prepare func(ctx rule.RuleContext) Runtime
 }
 
+type assertPattern struct {
+	re           *esregexp.RegExp
+	asciiLiteral string
+	asciiRoot    string
+}
+
+type assertMatcher struct {
+	patterns    []assertPattern
+	hasFallback bool
+}
+
 func buildErrorNoAssertionsMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "noAssertions",
@@ -112,12 +123,50 @@ func stringList(raw []interface{}) []string {
 	return out
 }
 
-func compileAssertPatterns(patterns []string) []*esregexp.RegExp {
-	out := make([]*esregexp.RegExp, 0, len(patterns))
+func compileAssertPatterns(patterns []string) assertMatcher {
+	matcher := assertMatcher{patterns: make([]assertPattern, 0, len(patterns))}
 	for _, p := range patterns {
-		out = append(out, compileAssertPattern(p))
+		compiled := assertPattern{re: compileAssertPattern(p)}
+		if isASCIILiteralAssertPattern(p) {
+			compiled.asciiLiteral = p
+			compiled.asciiRoot = p
+			if dot := strings.IndexByte(p, '.'); dot >= 0 {
+				compiled.asciiRoot = p[:dot]
+			}
+		} else {
+			matcher.hasFallback = true
+		}
+		matcher.patterns = append(matcher.patterns, compiled)
 	}
-	return out
+	return matcher
+}
+
+// isASCIILiteralAssertPattern recognizes the overwhelmingly common option
+// shape (`expect`, `assert`, `expectSaga`, or a dotted identifier chain). Its
+// regexp is an anchored, case-insensitive literal prefix followed by a dot or
+// the end of the callee name, so ASCII callees can be answered without entering
+// the backtracking regexp engine. Patterns with wildcards, regexp syntax, `$`,
+// or non-ASCII text keep the JavaScript regexp path unchanged.
+func isASCIILiteralAssertPattern(pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+	segmentLength := 0
+	for i := range len(pattern) {
+		c := pattern[i]
+		switch {
+		case c >= 'a' && c <= 'z',
+			c >= 'A' && c <= 'Z',
+			c >= '0' && c <= '9',
+			c == '_':
+			segmentLength++
+		case c == '.' && segmentLength > 0:
+			segmentLength = 0
+		default:
+			return false
+		}
+	}
+	return segmentLength > 0
 }
 
 func compileAssertPattern(pattern string) *esregexp.RegExp {
@@ -141,16 +190,82 @@ func compileAssertPattern(pattern string) *esregexp.RegExp {
 	return re
 }
 
-func matchesAssertName(name string, compiled []*esregexp.RegExp) bool {
+func (matcher assertMatcher) matches(name string) bool {
 	if name == "" {
 		return false
 	}
-	for _, re := range compiled {
-		if re != nil && re.TestOrTimeout(name) {
+	ascii := isASCII(name)
+	for _, pattern := range matcher.patterns {
+		if ascii && pattern.asciiLiteral != "" {
+			if hasASCIIFoldedPrefix(name, pattern.asciiLiteral) {
+				return true
+			}
+			continue
+		}
+		if pattern.re != nil && pattern.re.TestOrTimeout(name) {
 			return true
 		}
 	}
 	return false
+}
+
+// mayMatchCallee rejects an ordinary call from the configured-pattern path by
+// looking only at its first identifier. It is deliberately conservative: a
+// dynamic root, non-ASCII root, or any non-literal pattern falls back to the
+// full callee-name construction and regexp match.
+func (matcher assertMatcher) mayMatchCallee(expr *ast.Node) bool {
+	if matcher.hasFallback {
+		return true
+	}
+	root := testFramework.ResolveFirstIdentifier(expr)
+	if root == nil || root.Kind != ast.KindIdentifier {
+		return true
+	}
+	name := root.AsIdentifier().Text
+	if !isASCII(name) {
+		return true
+	}
+	for _, pattern := range matcher.patterns {
+		if asciiEqualFold(name, pattern.asciiRoot) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasASCIIFoldedPrefix(name string, prefix string) bool {
+	if len(name) < len(prefix) || !asciiEqualFold(name[:len(prefix)], prefix) {
+		return false
+	}
+	return len(name) == len(prefix) || name[len(prefix)] == '.'
+}
+
+func asciiEqualFold(left string, right string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range len(left) {
+		a, b := left[i], right[i]
+		if a >= 'A' && a <= 'Z' {
+			a += 'a' - 'A'
+		}
+		if b >= 'A' && b <= 'Z' {
+			b += 'a' - 'A'
+		}
+		if a != b {
+			return false
+		}
+	}
+	return true
+}
+
+func isASCII(value string) bool {
+	for i := range len(value) {
+		if value[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 func indexUnchecked(unchecked []*ast.Node, call *ast.Node) int {
@@ -265,13 +380,21 @@ func checkCallExpressionUsed(
 }
 
 func NewRule(config Config) rule.Rule {
+	defaultMatcher := compileAssertPatterns(config.DefaultAssertFunctionNames)
 	return rule.Rule{
 		Name:   config.Name,
 		Schema: rule.NewSchema(schemaJSON),
 		Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			runtime := config.Prepare(ctx)
 			assertNames, additionalTestBlocks := parseOptions(options, config.DefaultAssertFunctionNames)
-			compiled := compileAssertPatterns(assertNames)
+			matcher := defaultMatcher
+			if !slices.Equal(assertNames, config.DefaultAssertFunctionNames) {
+				matcher = compileAssertPatterns(assertNames)
+			}
+			additionalTestBlockSet := make(map[string]struct{}, len(additionalTestBlocks))
+			for _, name := range additionalTestBlocks {
+				additionalTestBlockSet[name] = struct{}{}
+			}
 			var unchecked []*ast.Node
 			uncheckedByDecl := map[*ast.Node][]*ast.Node{}
 			uncheckedByName := map[string][]*ast.Node{}
@@ -285,20 +408,15 @@ func NewRule(config Config) rule.Rule {
 						return
 					}
 
-					calleeName := testFramework.CalleeChainName(callExpr.Expression)
-
 					classification := TestClassification{}
 					if runtime.ClassifyTest != nil {
 						classification = runtime.ClassifyTest(node)
 					}
-					isTest := classification.IsTest
-					isExtraBlock := calleeName != "" && slices.Contains(additionalTestBlocks, calleeName)
-
-					if isTest || isExtraBlock {
-						if classification.IsTodo || strings.HasSuffix(calleeName, ".todo") {
+					if classification.IsTest {
+						if classification.IsTodo {
 							return
 						}
-						if isTest && runtime.ResolveNamedCallback != nil {
+						if runtime.ResolveNamedCallback != nil {
 							named := runtime.ResolveNamedCallback(node)
 							if named.DeclarationNode != nil && assertedByDecl[named.DeclarationNode] ||
 								named.DeclarationNode == nil && named.Name != "" && assertedByName[named.Name] {
@@ -315,11 +433,30 @@ func NewRule(config Config) rule.Rule {
 						return
 					}
 
+					calleeName := ""
+					if len(additionalTestBlockSet) > 0 {
+						calleeName = testFramework.CalleeChainName(callExpr.Expression)
+						// CalleeChainName returns "" for every callee it cannot name
+						// (`arr[i]()`, `obj[key]()`, `(a ?? b)()`). The option's items
+						// carry no minLength, so a configured "" would otherwise turn
+						// each of those ordinary calls into a reported test block.
+						if _, ok := additionalTestBlockSet[calleeName]; ok && calleeName != "" {
+							if strings.HasSuffix(calleeName, ".todo") {
+								return
+							}
+							unchecked = append(unchecked, node)
+							return
+						}
+					}
+
 					// Assertions are the union of the configured name patterns and
 					// whatever the framework can resolve; patterns run first because
 					// they answer the overwhelmingly common bare `expect(...)`
 					// without touching the framework analysis.
-					if !matchesAssertName(calleeName, compiled) &&
+					if calleeName == "" && matcher.mayMatchCallee(callExpr.Expression) {
+						calleeName = testFramework.CalleeChainName(callExpr.Expression)
+					}
+					if !matcher.matches(calleeName) &&
 						(runtime.IsAssertion == nil || !runtime.IsAssertion(node)) {
 						return
 					}

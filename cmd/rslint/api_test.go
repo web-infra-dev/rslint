@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
@@ -24,6 +26,50 @@ import (
 type canonicalPathBaseFS struct {
 	vfs.FS
 	realpathCalls atomic.Int32
+}
+
+func captureAPIStderr(t *testing.T, run func()) string {
+	t.Helper()
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("create stderr pipe: %v", err)
+	}
+	previous := os.Stderr
+	os.Stderr = writer
+	defer func() {
+		os.Stderr = previous
+		reader.Close()
+	}()
+
+	run()
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close stderr writer: %v", err)
+	}
+	output, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("read stderr: %v", err)
+	}
+	return string(output)
+}
+
+func TestHandleLintInvalidOptionsDoesNotReportPluginShadowWarning(t *testing.T) {
+	var lintErr error
+	stderr := captureAPIStderr(t, func() {
+		_, lintErr = (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+			Config:           json.RawMessage(`[{"rules":{"no-console":["error",{"allow":"warn"}]}}]`),
+			WorkingDirectory: t.TempDir(),
+			EslintPlugins: []api.EslintPluginEntry{{
+				Prefix:    "@typescript-eslint",
+				RuleNames: []string{"no-explicit-any"},
+			}},
+		}, nil)
+	})
+	if lintErr == nil || !strings.Contains(lintErr.Error(), "invalid rule options") {
+		t.Fatalf("HandleLintWithContext error = %v, want invalid rule options", lintErr)
+	}
+	if strings.Contains(stderr, "shadowed by a built-in rule") {
+		t.Fatalf("plugin shadow warning was reported before options validation: %q", stderr)
+	}
 }
 
 func (fs *canonicalPathBaseFS) Realpath(filePath string) string {
@@ -659,6 +705,49 @@ func TestHandleLint_LowLevelResponsePathsRemainRelativeToConfigDirectory(t *test
 	}
 	if !reflect.DeepEqual(response.LintedFiles, []string{"src/source.js"}) {
 		t.Fatalf("linted files = %v, want config-relative source", response.LintedFiles)
+	}
+}
+
+func TestHandleLint_LowLevelExternalConfigSeparatesAuthoredAndScanRoots(t *testing.T) {
+	root := t.TempDir()
+	configDirectory := filepath.Join(root, "config")
+	physicalWorkingDirectory := filepath.Join(root, "physical-workspace")
+	workingDirectory := filepath.Join(root, "workspace-alias")
+	for _, directory := range []string{configDirectory, physicalWorkingDirectory} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(physicalWorkingDirectory, workingDirectory); err != nil {
+		t.Skipf("working-directory symlink unavailable: %v", err)
+	}
+	target := filepath.Join(physicalWorkingDirectory, "target.js")
+	ignored := filepath.Join(physicalWorkingDirectory, "ignored.js")
+	for path, content := range map[string]string{
+		filepath.Join(configDirectory, ".gitignore"):  "target.js\n",
+		filepath.Join(workingDirectory, ".gitignore"): "ignored.js\n",
+		target:  "debugger;\n",
+		ignored: "debugger;\n",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	target = tspath.NormalizePath(osvfs.FS().Realpath(target))
+	ignored = tspath.NormalizePath(osvfs.FS().Realpath(ignored))
+
+	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config:           json.RawMessage(`[{"files":["../physical-workspace/*.js"],"rules":{"no-debugger":"error"}}]`),
+		ConfigDirectory:  configDirectory,
+		WorkingDirectory: workingDirectory,
+		Files:            []string{target, ignored},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.FileCount != 1 || len(response.Diagnostics) != 1 ||
+		filepath.Base(response.Diagnostics[0].FilePath) != "target.js" {
+		t.Fatalf("external config roots were conflated: %+v", response)
 	}
 }
 
@@ -1993,6 +2082,60 @@ func TestHandleLint_ExplicitConfigUsesOnlyWorkingDirectoryGitignore(t *testing.T
 	}
 }
 
+func TestHandleLint_ExplicitExternalConfigUsesWorkingDirectoryResponsePaths(t *testing.T) {
+	root := t.TempDir()
+	configDirectory := filepath.Join(root, "configuration")
+	workingDirectory := filepath.Join(root, "workspace", "deep")
+	configPath := filepath.Join(configDirectory, "custom.config.mjs")
+	targetPath := filepath.Join(workingDirectory, "src", "index.js")
+	writeProgramTestFiles(t, root, map[string]string{
+		"configuration/custom.config.mjs": "export default [];\n",
+		"workspace/deep/src/index.js":     "debugger;\n",
+	})
+
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		switch kind {
+		case api.KindLoadConfigs:
+			request := payload.(discovery.ConfigLoadBatchRequest)
+			if len(request.Candidates) != 1 || filepath.Clean(request.Candidates[0].ConfigDirectory) != filepath.Clean(configDirectory) {
+				return nil, fmt.Errorf("unexpected explicit candidate: %+v", request.Candidates)
+			}
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigLoadBatchResponse{
+				TransactionID: request.TransactionID,
+				Results: []discovery.ConfigLoadResult{{
+					ID:      request.Candidates[0].ID,
+					Status:  "loaded",
+					Entries: mustAPIConfig(t, `[{"files":["../workspace/deep/src/*.js"],"rules":{"no-debugger":"error"}}]`),
+				}},
+			})
+		case api.KindActivateConfigs:
+			request := payload.(discovery.ConfigActivationRequest)
+			return ipc.NewMessage(ipc.KindResponse, 1, discovery.ConfigActivationResponse{TransactionID: request.TransactionID})
+		default:
+			return nil, fmt.Errorf("unexpected reverse request kind %q", kind)
+		}
+	})
+
+	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Files:            []string{targetPath},
+		WorkingDirectory: workingDirectory,
+		ConfigDiscovery: &api.ConfigDiscoveryRequest{
+			ExplicitConfigPath: configPath,
+			ExplicitFiles:      []bool{true},
+		},
+	}, requester)
+	if err != nil {
+		t.Fatalf("HandleLintWithContext: %v", err)
+	}
+	wantPath := tspath.NormalizePath(filepath.Join("src", "index.js"))
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != wantPath {
+		t.Fatalf("diagnostic paths = %+v, want working-directory-relative %q", response.Diagnostics, wantPath)
+	}
+	if !reflect.DeepEqual(response.LintedFiles, []string{wantPath}) {
+		t.Fatalf("linted files = %v, want working-directory-relative %q", response.LintedFiles, wantPath)
+	}
+}
+
 func TestHandleLint_ConfigAndConfigDiscoveryAreMutuallyExclusive(t *testing.T) {
 	var reverseCalls atomic.Int32
 	requester := apiRequesterFunc(func(context.Context, ipc.MessageKind, any) (*ipc.Message, error) {
@@ -2289,7 +2432,7 @@ func TestHandleLint_NoEslintPluginMetadataDoesNotDispatchStalePlaceholder(t *tes
 	withMetadata := baseRequest
 	withMetadata.EslintPlugins = []api.EslintPluginEntry{{Prefix: "request-plugin", RuleNames: []string{"rule"}}}
 	if _, err := handler.HandleLintWithContext(context.Background(), withMetadata, requester); err != nil {
-		t.Fatalf("register plugin placeholder: %v", err)
+		t.Fatalf("lint with plugin metadata: %v", err)
 	}
 	if calls.Load() != 1 {
 		t.Fatalf("expected initial plugin dispatch, got %d", calls.Load())
