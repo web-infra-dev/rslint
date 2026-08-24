@@ -581,6 +581,7 @@ export default defineConfig({
     // rstest
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
+    './tests/rstest/rules/no-alias-methods.test.ts',
     './tests/rstest/rules/no-commented-out-tests.test.ts',
     './tests/rstest/rules/no-conditional-expect.test.ts',
     './tests/rstest/rules/no-conditional-in-test.test.ts',

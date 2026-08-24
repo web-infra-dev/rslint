@@ -3,6 +3,7 @@ package rstest
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/max_expects"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_alias_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_expect"
 	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_in_test"
@@ -27,6 +28,7 @@ func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		expect_expect.ExpectExpectRule,
 		max_expects.MaxExpectsRule,
+		no_alias_methods.NoAliasMethodsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_conditional_expect.NoConditionalExpectRule,
 		no_conditional_in.NoConditionalInTestRule,
