@@ -50,41 +50,78 @@ const (
 	functionActivateRegistrationFallback
 )
 
-type functionEventStack []functionPushKind
+const (
+	inlineFunctionEventCapacity = 8
+	inlineCallEventCapacity     = 16
+)
+
+type functionEventStack struct {
+	inline   [inlineFunctionEventCapacity]functionPushKind
+	overflow []functionPushKind
+	depth    int
+}
 
 func (events *functionEventStack) push(kind functionPushKind) {
-	*events = append(*events, kind)
+	if events.depth < len(events.inline) {
+		events.inline[events.depth] = kind
+	} else {
+		events.overflow = append(events.overflow, kind)
+	}
+	events.depth++
 }
 
 func (events *functionEventStack) pop() functionPushKind {
-	if len(*events) == 0 {
+	if events.depth == 0 {
 		return functionPushNone
 	}
-	last := len(*events) - 1
-	kind := (*events)[last]
-	*events = (*events)[:last]
+	events.depth--
+	if events.depth < len(events.inline) {
+		return events.inline[events.depth]
+	}
+	last := len(events.overflow) - 1
+	kind := events.overflow[last]
+	events.overflow = events.overflow[:last]
 	return kind
 }
 
-type callEventStack []bool
+type callEventStack struct {
+	inline   [inlineCallEventCapacity]bool
+	overflow []bool
+	depth    int
+}
 
 func (events *callEventStack) push(didPushRegistrationFrame bool) {
-	*events = append(*events, didPushRegistrationFrame)
+	if events.depth < len(events.inline) {
+		events.inline[events.depth] = didPushRegistrationFrame
+	} else {
+		events.overflow = append(events.overflow, didPushRegistrationFrame)
+	}
+	events.depth++
 }
 
 func (events *callEventStack) markRegistrationFrame() {
-	if len(*events) != 0 {
-		(*events)[len(*events)-1] = true
+	if events.depth == 0 {
+		return
+	}
+	index := events.depth - 1
+	if index < len(events.inline) {
+		events.inline[index] = true
+	} else {
+		events.overflow[index-len(events.inline)] = true
 	}
 }
 
 func (events *callEventStack) pop() bool {
-	if len(*events) == 0 {
+	if events.depth == 0 {
 		return false
 	}
-	last := len(*events) - 1
-	didPushRegistrationFrame := (*events)[last]
-	*events = (*events)[:last]
+	events.depth--
+	if events.depth < len(events.inline) {
+		return events.inline[events.depth]
+	}
+	last := len(events.overflow) - 1
+	didPushRegistrationFrame := events.overflow[last]
+	events.overflow = events.overflow[:last]
 	return didPushRegistrationFrame
 }
 
