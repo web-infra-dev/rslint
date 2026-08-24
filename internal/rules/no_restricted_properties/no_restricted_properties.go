@@ -323,6 +323,10 @@ var NoRestrictedPropertiesRule = rule.Rule{
 		r := parseOptions(options)
 
 		checkMemberAccess := func(node *ast.Node) {
+			if utils.IsInJsxTagName(node) {
+				return
+			}
+
 			var objectExpr *ast.Node
 			switch node.Kind {
 			case ast.KindPropertyAccessExpression:
