@@ -239,6 +239,7 @@ func parseNamed(raw any, n *namedOptions) {
 }
 
 func parsePathGroups(raw []any) []pathGroup {
+	// cspell:ignore nonegate nocomment noext nobrace nonull
 	out := make([]pathGroup, 0, len(raw))
 	for _, e := range raw {
 		m, ok := e.(map[string]any)
@@ -1057,28 +1058,48 @@ func isSupportedRequireVarStatement(node *ast.Node) bool {
 	if name == nil || (name.Kind != ast.KindIdentifier && name.Kind != ast.KindObjectBindingPattern) {
 		return false
 	}
-	if requireCallWithLiteralArgument(d.Initializer) != nil {
+	if requireCallWithLiteralArgument(skipRequireTransparentExpressions(d.Initializer)) != nil {
 		return true
 	}
-	initializer := ast.SkipParentheses(d.Initializer)
+	initializer := skipRequireTransparentExpressions(d.Initializer)
 	if initializer == nil || initializer.Kind != ast.KindCallExpression || ast.IsOptionalChain(initializer) {
 		return false
 	}
-	callee := ast.SkipParentheses(initializer.AsCallExpression().Expression)
+	callee := skipRequireTransparentExpressions(initializer.AsCallExpression().Expression)
 	if callee == nil || ast.IsOptionalChain(callee) {
 		return false
 	}
 	if !ast.IsAccessExpression(callee) {
 		return false
 	}
-	return requireCallWithLiteralArgument(utils.AccessExpressionObject(callee)) != nil
+	return requireCallWithLiteralArgument(skipRequireTransparentExpressions(utils.AccessExpressionObject(callee))) != nil
+}
+
+// skipRequireTransparentExpressions removes parentheses and the JSDoc type
+// assertion wrapper tsgo retains in JavaScript files. ESTree represents the
+// same JSDoc-authored expression without an assertion node. Explicit
+// TypeScript `as`, `satisfies`, and non-null wrappers remain opaque, matching
+// eslint-plugin-import's traversal.
+func skipRequireTransparentExpressions(node *ast.Node) *ast.Node {
+	for node != nil && node.Kind == ast.KindParenthesizedExpression {
+		isJSDocAssertion := ast.IsJSDocTypeAssertion(node)
+		parenthesized := node.AsParenthesizedExpression()
+		if parenthesized == nil {
+			return node
+		}
+		node = parenthesized.Expression
+		if isJSDocAssertion && node != nil && node.Kind == ast.KindAsExpression {
+			node = node.AsAsExpression().Expression
+		}
+	}
+	return node
 }
 
 // requireCall starts with tsgo's own predicate and only adds the two AST-shape
 // adjustments this rule needs: parentheses are transparent and optional calls
 // are not sortable because moving them can change short-circuiting behavior.
 func requireCall(node *ast.Node) *ast.CallExpression {
-	node = ast.SkipParentheses(node)
+	node = skipRequireTransparentExpressions(node)
 	if node == nil || !ast.IsCallExpression(node) || ast.IsOptionalChain(node) {
 		return nil
 	}
@@ -1089,7 +1110,7 @@ func requireCall(node *ast.Node) *ast.CallExpression {
 	if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
 		return nil
 	}
-	callee := ast.SkipParentheses(call.Expression)
+	callee := skipRequireTransparentExpressions(call.Expression)
 	if !ast.IsIdentifier(callee) || callee.Text() != "require" || ast.IsOptionalChain(callee) {
 		return nil
 	}
@@ -1101,7 +1122,7 @@ func requireCallWithStringLiteralArgument(node *ast.Node) *ast.CallExpression {
 	if call == nil {
 		return nil
 	}
-	argument := ast.SkipParentheses(call.Arguments.Nodes[0])
+	argument := skipRequireTransparentExpressions(call.Arguments.Nodes[0])
 	if argument == nil || argument.Kind != ast.KindStringLiteral {
 		return nil
 	}
@@ -1113,7 +1134,7 @@ func requireCallWithLiteralArgument(node *ast.Node) *ast.CallExpression {
 	if call == nil {
 		return nil
 	}
-	argument := ast.SkipParentheses(call.Arguments.Nodes[0])
+	argument := skipRequireTransparentExpressions(call.Arguments.Nodes[0])
 	if argument == nil {
 		return nil
 	}
@@ -1132,15 +1153,15 @@ func requireCallWithLiteralArgument(node *ast.Node) *ast.CallExpression {
 }
 
 func findStaticRequireCall(node *ast.Node) *ast.CallExpression {
-	for current := ast.SkipParentheses(node); current != nil && !ast.IsOptionalChain(current); {
+	for current := skipRequireTransparentExpressions(node); current != nil && !ast.IsOptionalChain(current); {
 		if call := requireCallWithStringLiteralArgument(current); call != nil {
 			return call
 		}
 		switch current.Kind {
 		case ast.KindCallExpression:
-			current = ast.SkipParentheses(current.AsCallExpression().Expression)
+			current = skipRequireTransparentExpressions(current.AsCallExpression().Expression)
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-			current = ast.SkipParentheses(utils.AccessExpressionObject(current))
+			current = skipRequireTransparentExpressions(utils.AccessExpressionObject(current))
 		default:
 			return nil
 		}
@@ -1378,17 +1399,6 @@ func fixRemoveBlankLineBetween(source *sourceInfo, prev, cur *ast.Node) *rule.Ru
 // mutateRanksToAlphabetize assigns stable ranks within each configured group.
 // Paths compare segment by segment, followed by the optional import-kind key.
 func mutateRanksToAlphabetize(imported []*importEntry, opts alphabetizeOptions) {
-	groups := map[float64][]*importEntry{}
-	for _, e := range imported {
-		groups[e.rank] = append(groups[e.rank], e)
-	}
-
-	keys := make([]float64, 0, len(groups))
-	for k := range groups {
-		keys = append(keys, k)
-	}
-	sort.Float64s(keys)
-
 	multiplier := 1
 	if opts.order == "desc" {
 		multiplier = -1
@@ -1401,87 +1411,138 @@ func mutateRanksToAlphabetize(imported []*importEntry, opts alphabetizeOptions) 
 		multiplierKind = -1
 	}
 
-	cmp := makeAlphaComparator(opts.caseInsensitive, multiplier, multiplierKind)
-	for _, k := range keys {
-		sort.SliceStable(groups[k], func(i, j int) bool {
-			return cmp(groups[k][i].value, groups[k][i].importKind,
-				groups[k][j].value, groups[k][j].importKind) < 0
+	groupSizes := make(map[float64]int)
+	for _, entry := range imported {
+		groupSizes[entry.rank]++
+	}
+	groups := make(map[float64][]alphabetizeEntry, len(groupSizes))
+	for rank, size := range groupSizes {
+		groups[rank] = make([]alphabetizeEntry, 0, size)
+	}
+	for _, entry := range imported {
+		value := entry.value
+		if opts.caseInsensitive {
+			value = ecmascript.StringToLowerCase(value)
+		}
+		kind := entry.importKind
+		if kind == "" {
+			kind = "value"
+		}
+		groups[entry.rank] = append(groups[entry.rank], alphabetizeEntry{
+			entry:        entry,
+			value:        value,
+			segmentCount: strings.Count(value, "/") + 1,
+			kind:         kind,
 		})
 	}
 
-	newRanks := map[string]float64{}
+	keys := make([]float64, 0, len(groups))
+	for rank := range groups {
+		keys = append(keys, rank)
+	}
+	sort.Float64s(keys)
+
+	cmp := makeAlphaComparator(multiplier, multiplierKind)
+	for _, k := range keys {
+		v8StableSortAlphabetized(groups[k], cmp)
+	}
+
+	newRanks := make(map[alphabetizedRankKey]float64, len(imported))
 	var newRank float64
 	for _, k := range keys {
-		for _, e := range groups[k] {
-			newRanks[alphabetizedRankKey(e)] = k + newRank
+		for _, prepared := range groups[k] {
+			newRanks[makeAlphabetizedRankKey(prepared.entry)] = k + newRank
 			newRank++
 		}
 	}
-	for _, e := range imported {
-		if r, ok := newRanks[alphabetizedRankKey(e)]; ok {
-			e.rank = r
+	for _, entry := range imported {
+		if rank, ok := newRanks[makeAlphabetizedRankKey(entry)]; ok {
+			entry.rank = rank
 		}
 	}
 }
 
-func alphabetizedRankKey(entry *importEntry) string {
-	return entry.value + "|" + entry.importKind
+type alphabetizedRankKey struct {
+	value      string
+	importKind string
 }
 
-// makeAlphaComparator compares module names segment by segment and then import
-// kinds, returning a negative, zero, or positive result.
-func makeAlphaComparator(caseInsensitive bool, multiplier, multiplierKind int) func(av, ak, bv, bk string) int {
-	return func(av, ak, bv, bk string) int {
-		va, vb := av, bv
-		if caseInsensitive {
-			va = ecmascript.StringToLowerCase(va)
-			vb = ecmascript.StringToLowerCase(vb)
-		}
-		var result int
-		if !strings.Contains(va, "/") && !strings.Contains(vb, "/") {
-			result = ecmascript.CompareStrings(va, vb)
-		} else {
-			A := strings.Split(va, "/")
-			B := strings.Split(vb, "/")
-			minLen := len(A)
-			if len(B) < minLen {
-				minLen = len(B)
-			}
-			for i := range minLen {
-				if i == 0 && (A[i] == "." || A[i] == "..") && (B[i] == "." || B[i] == "..") {
-					if A[i] != B[i] {
-						// Parent and sibling imports normally occupy distinct groups.
-						// If configuration merges them, keep their source order.
-						break
-					}
-					continue
-				}
-				if c := ecmascript.CompareStrings(A[i], B[i]); c != 0 {
-					result = c
-					break
-				}
-			}
-			if result == 0 && len(A) != len(B) {
-				if len(A) < len(B) {
-					result = -1
-				} else {
-					result = 1
-				}
-			}
-		}
+func makeAlphabetizedRankKey(entry *importEntry) alphabetizedRankKey {
+	return alphabetizedRankKey{value: entry.value, importKind: entry.importKind}
+}
+
+type alphabetizeEntry struct {
+	entry        *importEntry
+	value        string
+	segmentCount int
+	kind         string
+}
+
+// makeAlphaComparator compares the precomputed module names segment by segment
+// and then import kinds, returning a negative, zero, or positive result.
+func makeAlphaComparator(multiplier, multiplierKind int) func(a, b alphabetizeEntry) int {
+	return func(a, b alphabetizeEntry) int {
+		result := compareAlphaValues(a, b)
 		result *= multiplier
 		if result == 0 && multiplierKind != 0 {
-			ka := ak
-			if ka == "" {
-				ka = "value"
-			}
-			kb := bk
-			if kb == "" {
-				kb = "value"
-			}
-			result = multiplierKind * ecmascript.CompareStrings(ka, kb)
+			result = multiplierKind * ecmascript.CompareStrings(a.kind, b.kind)
 		}
 		return result
+	}
+}
+
+func compareAlphaValues(a, b alphabetizeEntry) int {
+	if a.segmentCount == 1 && b.segmentCount == 1 {
+		return ecmascript.CompareStrings(a.value, b.value)
+	}
+
+	aStart, bStart := 0, 0
+	for segment := 0; ; segment++ {
+		aEnd, bEnd := len(a.value), len(b.value)
+		if offset := strings.IndexByte(a.value[aStart:], '/'); offset >= 0 {
+			aEnd = aStart + offset
+		}
+		if offset := strings.IndexByte(b.value[bStart:], '/'); offset >= 0 {
+			bEnd = bStart + offset
+		}
+		aPart, bPart := a.value[aStart:aEnd], b.value[bStart:bEnd]
+
+		if segment == 0 && isRelativeRoot(aPart) && isRelativeRoot(bPart) && aPart != bPart {
+			// The upstream comparator stops at different relative roots, then
+			// still uses segment count as its fallback.
+			return compareInts(a.segmentCount, b.segmentCount)
+		}
+		if result := ecmascript.CompareStrings(aPart, bPart); result != 0 {
+			return result
+		}
+
+		aDone, bDone := aEnd == len(a.value), bEnd == len(b.value)
+		if aDone || bDone {
+			switch {
+			case aDone && bDone:
+				return 0
+			case aDone:
+				return -1
+			default:
+				return 1
+			}
+		}
+		aStart, bStart = aEnd+1, bEnd+1
+	}
+}
+
+func isRelativeRoot(part string) bool {
+	return part == "." || part == ".."
+}
+
+func compareInts(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
 	}
 }
 
@@ -1654,6 +1715,36 @@ func namedSpecifierBounds(sourceFile *ast.SourceFile, node *ast.Node) (int, int,
 		return 0, 0, false
 	}
 	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
+	// Prefer tokens from the parsed list that owns this member. A standalone
+	// scanner starting at the beginning of a TSX file can lose JSX context and
+	// mistake an earlier attribute's object braces for this list's delimiters.
+	// Parser-backed parent tokens retain the correct context for named imports,
+	// exports, binding patterns, and object literals.
+	if node.Parent != nil {
+		start, end := -1, -1
+		for _, token := range utils.TokensOfNode(sourceFile, node.Parent) {
+			isDelimiter := token.Kind == ast.KindCommaToken ||
+				token.Kind == ast.KindOpenBraceToken ||
+				token.Kind == ast.KindCloseBraceToken
+			if !isDelimiter {
+				continue
+			}
+			if token.End <= nodeRange.Pos() {
+				start = token.End
+				continue
+			}
+			if token.Start >= nodeRange.End() {
+				end = token.Start
+				break
+			}
+		}
+		if start >= 0 && end >= start {
+			return start, end, true
+		}
+	}
+
+	// Separate CommonJS assignment statements are not members of a parsed
+	// comma-delimited parent. Retain the source-scanner fallback for those.
 	search := nodeRange.Pos()
 	start := -1
 	for search > 0 {
@@ -1930,7 +2021,7 @@ func handleVariableStatement(ctx rule.RuleContext, stmt *ast.Node, opts options,
 		if ce == nil || ce.Arguments == nil || len(ce.Arguments.Nodes) != 1 {
 			continue
 		}
-		arg := ast.SkipParentheses(ce.Arguments.Nodes[0])
+		arg := skipRequireTransparentExpressions(ce.Arguments.Nodes[0])
 		if arg == nil || arg.Kind != ast.KindStringLiteral {
 			continue
 		}

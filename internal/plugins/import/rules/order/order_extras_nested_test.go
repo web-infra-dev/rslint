@@ -33,14 +33,17 @@ func TestOrderNestedAndSyntaxEdges(t *testing.T) {
 		t,
 		&order.OrderRule,
 		[]rule_tester.ValidTestCase{
-			// eslint-plugin-import v2.32.0 assumes parent and sibling paths occupy
-			// separate groups. If configuration merges them, alphabetizing preserves
-			// their source order rather than comparing the two relative roots.
+			// Different relative roots compare equal at the same depth. This
+			// real-world interleaving is valid in eslint-plugin-import even though
+			// the two sibling paths would sort differently without the parent.
 			{
-				Code: "import sibling from './z';\nimport parent from '../a';",
+				Code: "import { registerHostAuthHeaders } from './host-auth';\n" +
+					"import { registerHostAccountRpcHandlers } from './host-account';\n" +
+					"import { OverlayAsideHostEnv, Scene, TrackEventData } from '../types';\n" +
+					"import { registerHostChat } from './host-chat';",
 				Options: map[string]any{
 					"groups":      []any{[]any{"parent", "sibling"}},
-					"alphabetize": map[string]any{"order": "asc"},
+					"alphabetize": map[string]any{"order": "desc", "caseInsensitive": true},
 				},
 			},
 			// Case-insensitive alphabetizing uses JavaScript's full default case
@@ -99,6 +102,54 @@ func TestOrderNestedAndSyntaxEdges(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Parent-backed tokens keep named-export fixes local even when an
+			// earlier TSX attribute contains object and template-literal braces.
+			{
+				Code: "const view = <Plugin options={{ value: `lang:${lang}` }} />;\n" +
+					"export { DocLayout, Layout, HomeLayout, Search };",
+				Tsx: true,
+				Options: map[string]any{
+					"named":       true,
+					"alphabetize": map[string]any{"order": "desc", "caseInsensitive": true},
+				},
+				Output: []string{
+					"const view = <Plugin options={{ value: `lang:${lang}` }} />;\n" +
+						"export { Layout, DocLayout, HomeLayout, Search };",
+					"const view = <Plugin options={{ value: `lang:${lang}` }} />;\n" +
+						"export { Search, Layout, DocLayout, HomeLayout };",
+					"const view = <Plugin options={{ value: `lang:${lang}` }} />;\n" +
+						"export { Search, Layout, HomeLayout, DocLayout };",
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "order", Line: 2},
+					{MessageId: "order", Line: 2},
+					{MessageId: "order", Line: 2},
+				},
+			},
+			// With four interleaved relative imports, the upstream V8 sort extends
+			// its initial run before inserting the final sibling. This locks in the
+			// observable diagnostic and fixer order for the non-transitive path
+			// comparator rather than substituting Go's stable-sort call sequence.
+			{
+				Code: "import c from './c';\n" +
+					"import a from './a';\n" +
+					"import parent from '../a';\n" +
+					"import b from './b';",
+				Options: map[string]any{
+					"groups":      []any{[]any{"parent", "sibling"}},
+					"alphabetize": map[string]any{"order": "asc"},
+				},
+				Output: []string{
+					"import a from './a';\n" +
+						"import c from './c';\n" +
+						"import parent from '../a';\n" +
+						"import b from './b';",
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "order", Line: 2},
+					{MessageId: "order", Line: 4},
+				},
+			},
 			// The line-range fixer stops only at LF. ECMAScript still counts U+2028
 			// as whitespace, so removing a blank Unicode-separated line
 			// consumes both separators and leaves the semicolons adjacent.
@@ -425,6 +476,19 @@ func TestOrderDimension4(t *testing.T) {
 			{Code: "// only trivia\n/* still only trivia */"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// tsgo retains a JSDoc assertion around this JavaScript expression;
+			// ESTree does not, so it remains transparent to require ordering.
+			{
+				Code: "const constants = require('../basic/constants');\n\n" +
+					"const generated = /** @type {string} */ (require('fs').readFileSync(__filename, 'utf-8'));",
+				FileName: "default-export-from-ignored.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Output: []string{
+					"const generated = /** @type {string} */ (require('fs').readFileSync(__filename, 'utf-8'));\n" +
+						"const constants = require('../basic/constants');\n\n",
+				},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order", Line: 3}},
+			},
 			// Type arguments are call metadata and do not hide a direct require
 			// from module or named-specifier ordering.
 			{

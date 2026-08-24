@@ -248,6 +248,24 @@ func TestOrderBranchCoverage(t *testing.T) {
 				Code:   "const sibling = require('./z');\nimport './side-effect';\nconst fs = require('fs');",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order"}},
 			},
+			// Upstream 2.32.0 sorts the numeric body indexes as strings. For indexes
+			// 2 and 10 that produces an empty safety-check range and offers a fix
+			// across side-effect imports; numeric source order must suppress it.
+			{
+				Code: "import a from './a';\n" +
+					"import './side-0';\n" +
+					"import z from './z';\n" +
+					"import './side-1';\n" +
+					"import './side-2';\n" +
+					"import './side-3';\n" +
+					"import './side-4';\n" +
+					"import './side-5';\n" +
+					"import './side-6';\n" +
+					"import './side-7';\n" +
+					"import b from './b';",
+				Options: map[string]any{"alphabetize": map[string]any{"order": "asc"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "order", Line: 11, Column: 1}},
+			},
 			// Although an exported require is ignored for ordering, it remains an
 			// unrelated statement and blocks a fix between surrounding imports.
 			{
@@ -520,16 +538,16 @@ func TestOrderMinimatchCompatibility(t *testing.T) {
 				Code:    "import react from 'react';\nimport scope from 'scope';",
 				Options: minimatchPathGroupOptions("scope/package", map[string]any{}),
 			},
-			// An explicitly supplied empty patternOptions object leaves minimatch's
-			// nocomment default false, so a leading-# pattern matches nothing.
+			// An explicitly supplied empty patternOptions object keeps minimatch's
+			// leading-comment behavior, so a leading-# pattern matches nothing.
 			{
 				Code:    "import react from 'react';\nimport alias from '#alias';",
 				Options: minimatchPathGroupOptions("#alias", map[string]any{}),
 			},
 		},
 		[]rule_tester.InvalidTestCase{
-			// With patternOptions omitted, import/order supplies nocomment: true and
-			// therefore treats a leading # as an ordinary package-import pattern.
+			// With patternOptions omitted, import/order disables leading comments
+			// and treats a leading # as an ordinary package-import pattern.
 			{
 				Code:    "import react from 'react';\nimport alias from '#alias';",
 				Options: minimatchPathGroupOptions("#alias", nil),

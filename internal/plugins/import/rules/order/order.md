@@ -58,9 +58,9 @@ Refines the group ordering by matching specifiers against minimatch patterns.
 Each entry has a `pattern`, a target `group`, and an optional `position`
 (`"before"` or `"after"`).
 
-`patternOptions` accepts the matching controls supported by minimatch 3.1.5,
-including `dot`, `matchBase`, `nobrace`, `nocase`, `nocomment`, `noext`,
-`noglobstar`, `nonegate`, `nonull`, `partial`, and `flipNegate`.
+`patternOptions` accepts the minimatch 3.1.5 controls for dot files,
+case-insensitive and basename matching, partial prefixes, and
+glob/brace/negation behavior.
 
 ```json
 {
@@ -220,6 +220,15 @@ notes live in the source, not here.
   `import type Default, { Named }` form, Babel's parser omits the inline
   `type` specifier metadata while the TypeScript parser and tsgo retain it.
   Rslint therefore describes that specifier as a `type import`.
+- **Unsafe upstream fixes are suppressed.** Version 2.32.0 sorts numeric
+  statement indexes as strings while checking whether an import can move.
+  After the tenth top-level statement, that can offer a fix which crosses an
+  unassigned side-effect import. Rslint keeps the matching diagnostic but
+  does not attach that unsafe fix.
+- **Unsupported named CommonJS shapes are skipped safely.** With named
+  `require` sorting enabled, version 2.32.0 can throw on a rest binding such
+  as `const { name, ...rest } = require('pkg')`. Rslint leaves unsupported
+  destructuring members unchanged instead.
 
 ## Original Documentation
 

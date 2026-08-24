@@ -752,8 +752,7 @@ type partialGlobStarSection struct {
 // globstar algorithm. Its cutoffs are deliberately not the same as an exact
 // recursive globstar match: once too little of the current file remains to
 // place a later section, it accepts the file as a prefix without inspecting
-// every remaining part. That counter-intuitive cutoff is observable for
-// patterns with more than one `**`, including a dot-name near the cutoff.
+// every remaining part.
 func (m *Matcher) matchPartialGlobStar(file []string, row []patternPart, firstGlobStar int) bool {
 	if !matchPartialPartsAt(file, row[:firstGlobStar], 0) {
 		return false
@@ -790,7 +789,12 @@ func (m *Matcher) matchPartialGlobStar(file []string, row []patternPart, firstGl
 	return m.matchPartialGlobStarSections(file, sections, fileIndex, 0, failed)
 }
 
-func (m *Matcher) matchPartialGlobStarSections(file []string, sections []partialGlobStarSection, fileIndex int, sectionIndex int, failed map[[2]int]struct{}) bool {
+func (m *Matcher) matchPartialGlobStarSections(
+	file []string,
+	sections []partialGlobStarSection,
+	fileIndex, sectionIndex int,
+	failed map[[2]int]struct{},
+) bool {
 	state := [2]int{fileIndex, sectionIndex}
 	if _, found := failed[state]; found {
 		return false
@@ -816,11 +820,10 @@ func (m *Matcher) matchPartialGlobStarSections(file []string, sections []partial
 			m.matchPartialGlobStarSections(file, sections, fileIndex+len(section.parts), sectionIndex+1, failed) {
 			return true
 		}
-		// minimatch 3.1.5 throws if its section cursor has already run past
-		// the file. A malformed option must not crash the linter, so this port
-		// treats that otherwise unreachable branch as a failed match. With
-		// Dot enabled upstream skips the unsafe dot-name check and advances.
 		if fileIndex >= len(file) {
+			// minimatch 3.1.5 throws in this branch without dot matching. A
+			// user option must not crash the linter, so treat that failure as
+			// no match. With dot matching enabled, upstream advances safely.
 			if m.options.Dot {
 				fileIndex++
 				continue
@@ -839,7 +842,7 @@ func (m *Matcher) matchPartialGlobStarSections(file []string, sections []partial
 
 // matchPartialPartsAt mirrors the bounded slice minimatch hands its ordinary
 // matcher while placing one section. Running out of file is success in partial
-// mode; a cursor beyond the file is the unsafe upstream branch handled above.
+// mode.
 func matchPartialPartsAt(file []string, parts []patternPart, fileIndex int) bool {
 	if fileIndex > len(file) {
 		return false
@@ -901,11 +904,9 @@ func (m *Matcher) matchOneFrom(file []string, row []patternPart, fi int, pi int,
 					return false
 				}
 			}
-			// In partial mode, consuming every remaining safe path part means
-			// the file can still grow into the rest of the pattern. minimatch 3
-			// uses this while walking a filesystem (for example, `a/x` is a
-			// partial match for `a/**/b`). A dot part returns above because `**`
-			// is not allowed to consume it under the current options.
+			// This path handles exact matching and partial patterns without a
+			// globstar. Partial globstar patterns take the 3.1.5-specific path
+			// above.
 			return m.options.Partial
 		}
 

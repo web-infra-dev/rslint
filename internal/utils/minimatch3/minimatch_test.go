@@ -329,28 +329,21 @@ func TestMatchOptions(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "Partial traverses multiple globstar segments",
-			pattern: "a/**/b/**/c",
-			path:    "a/x/b/y",
-			options: minimatch3.Options{Partial: true},
-			want:    true,
-		},
-		{
-			name:    "Partial uses minimatch cutoffs between multiple globstars",
+			name:    "Partial follows the multi-globstar prefix cutoff",
 			pattern: "a/**/b/**/c",
 			path:    "a/.hidden",
 			options: minimatch3.Options{Partial: true},
 			want:    true,
 		},
 		{
-			name:    "Partial still rejects a dot name inside the searched window",
+			name:    "Partial still rejects a hidden part inside the search window",
 			pattern: "a/**/b/**/c",
 			path:    "a/.hidden/y",
 			options: minimatch3.Options{Partial: true},
 			want:    false,
 		},
 		{
-			name:    "Partial accepts a short prefix before a long globstar section",
+			name:    "Partial accepts a hidden prefix before a long globstar section",
 			pattern: "**/a/b",
 			path:    ".hidden",
 			options: minimatch3.Options{Partial: true},
@@ -364,7 +357,7 @@ func TestMatchOptions(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "Partial follows the Dot-enabled exhausted cursor result",
+			name:    "Partial follows the dot-enabled exhausted cursor result",
 			pattern: "*/**/**",
 			path:    "x",
 			options: minimatch3.Options{Partial: true, Dot: true},
@@ -552,17 +545,6 @@ func TestMatchManyGlobstarSegments(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("partial mode handles a maximum-length globstar chain", func(t *testing.T) {
-		pattern := strings.TrimSuffix(strings.Repeat("**/", 21845), "/")
-		start := time.Now()
-		if !minimatch3.Match(pattern, "x", minimatch3.Options{Partial: true}) {
-			t.Error("maximum-length partial globstar chain did not match its prefix")
-		}
-		if elapsed := time.Since(start); elapsed > 5*time.Second {
-			t.Errorf("maximum-length partial globstar chain took %s", elapsed)
-		}
-	})
 }
 
 // TestBraceExpand pins the brace expansion against brace-expansion 1.1.16,

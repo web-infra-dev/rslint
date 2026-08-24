@@ -1,4 +1,4 @@
-// cspell:ignore asdas barfoo
+// cspell:ignore asdas barfoo nonegate
 //
 // The TestOrderUpstreamCore* functions migrate the upstream core suite from
 // eslint-plugin-import v2.32.0 (tests/src/rules/order.js).
