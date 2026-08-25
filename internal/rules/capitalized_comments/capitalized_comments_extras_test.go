@@ -27,8 +27,8 @@
 package capitalized_comments
 
 import (
-	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -250,7 +250,7 @@ func TestCapitalizedCommentsExtras(t *testing.T) {
 }
 
 // TestFollowingTokenStarts locks in the single-pass real-token boundary used
-// by ignoreInlineComments. Computing this boundary per comment would rescan
+// by ignoreInlineComments. Computing this boundary per comment would scan
 // all following trivia and make comment-only files quadratic.
 func TestFollowingTokenStarts(t *testing.T) {
 	t.Parallel()
@@ -271,7 +271,7 @@ func TestFollowingTokenStarts(t *testing.T) {
 
 func BenchmarkTokenBoundaries(b *testing.B) {
 	for _, commentCount := range []int{1_000, 2_000, 4_000} {
-		b.Run(fmt.Sprint(commentCount), func(b *testing.B) {
+		b.Run(strconv.Itoa(commentCount), func(b *testing.B) {
 			source := strings.Repeat("// Uppercase\n", commentCount) + "value;"
 			helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 			_, sourceFile, err := helper.CreateTestProgram(source, "token-boundaries.ts", "tsconfig.json")
