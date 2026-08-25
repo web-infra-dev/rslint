@@ -46,6 +46,7 @@ For directory or no-argument lint runs, global ignores in a parent config preven
 export default defineConfig([
   // Global ignore — blocks directory target discovery in these directories
   { ignores: ['**/fixtures/**', 'e2e/**'] },
+  js.configs.recommended,
   ts.configs.recommended,
   // ...
 ]);
@@ -78,12 +79,13 @@ rslint --init
 A typical TypeScript project configuration:
 
 ```ts
-import { defineConfig, globalIgnores, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, js, ts } from '@rslint/core';
 
 export default defineConfig([
   // Global ignores — files excluded from all rules
   globalIgnores(['**/dist/**', '**/fixtures/**']),
-  // Preset with recommended rules
+  // Presets with recommended rules
+  js.configs.recommended,
   ts.configs.recommended,
   // Custom rule overrides
   {
@@ -94,6 +96,10 @@ export default defineConfig([
   },
 ]);
 ```
+
+:::tip
+When using both JavaScript and TypeScript recommended presets, place `js.configs.recommended` before `ts.configs.recommended`. The TypeScript preset disables ESLint core rules that are handled by TypeScript-aware rules, and later config entries override earlier ones.
+:::
 
 For available presets, rule severity, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 

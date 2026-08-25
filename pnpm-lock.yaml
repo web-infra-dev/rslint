@@ -281,6 +281,9 @@ importers:
       ajv:
         specifier: 'catalog:'
         version: 6.15.0
+      globals:
+        specifier: 'catalog:'
+        version: 17.7.0
       husky:
         specifier: 'catalog:'
         version: 9.1.7
