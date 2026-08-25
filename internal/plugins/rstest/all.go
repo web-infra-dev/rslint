@@ -16,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_exactly_once_with"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_times"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_each"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
@@ -42,6 +43,7 @@ func GetAllRules() []rule.Rule {
 		no_mocks_import.NoMocksImportRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		prefer_called_exactly_once_with.PreferCalledExactlyOnceWithRule,
+		prefer_called_times.PreferCalledTimesRule,
 		prefer_each.PreferEachRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,
