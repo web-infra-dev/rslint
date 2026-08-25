@@ -1,0 +1,563 @@
+// Rstest Snapshot v1
+
+exports[`no-restricted-exports > invalid 1`] = `
+{
+  "code": "export function someFunction() {}",
+  "diagnostics": [
+    {
+      "message": "'someFunction' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 2`] = `
+{
+  "code": "export var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 3`] = `
+{
+  "code": "export function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 4`] = `
+{
+  "code": "export class A {}",
+  "diagnostics": [
+    {
+      "message": "'A' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 5`] = `
+{
+  "code": "let a; export { a };",
+  "diagnostics": [
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 6`] = `
+{
+  "code": "export { a } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 7`] = `
+{
+  "code": "let a; export { a as 'a' };",
+  "diagnostics": [
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 8`] = `
+{
+  "code": "export { '' } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "'' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 9`] = `
+{
+  "code": "export var [a] = [];",
+  "diagnostics": [
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 10`] = `
+{
+  "code": "export let { b: { c: a = d } = e } = {};",
+  "diagnostics": [
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 11`] = `
+{
+  "code": "var a; export var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 12`] = `
+{
+  "code": "export const b = 1, a = 2;",
+  "diagnostics": [
+    {
+      "message": "'b' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+    {
+      "message": "'a' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 13`] = `
+{
+  "code": "var getSomething; export { getSomething };",
+  "diagnostics": [
+    {
+      "message": "'getSomething' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 14`] = `
+{
+  "code": "var a; export { a as default };",
+  "diagnostics": [
+    {
+      "message": "'default' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 15`] = `
+{
+  "code": "export { default } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "'default' is restricted from being used as an exported name.",
+      "messageId": "restrictedNamed",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 16`] = `
+{
+  "code": "export default foo;",
+  "diagnostics": [
+    {
+      "message": "Exporting 'default' is restricted.",
+      "messageId": "restrictedDefault",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 17`] = `
+{
+  "code": "export default function foo() {}",
+  "diagnostics": [
+    {
+      "message": "Exporting 'default' is restricted.",
+      "messageId": "restrictedDefault",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 18`] = `
+{
+  "code": "const foo = 123;
+export { foo as default };",
+  "diagnostics": [
+    {
+      "message": "Exporting 'default' is restricted.",
+      "messageId": "restrictedDefault",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 19`] = `
+{
+  "code": "export { default } from 'mod';",
+  "diagnostics": [
+    {
+      "message": "Exporting 'default' is restricted.",
+      "messageId": "restrictedDefault",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 20`] = `
+{
+  "code": "export { foo as default } from 'mod';",
+  "diagnostics": [
+    {
+      "message": "Exporting 'default' is restricted.",
+      "messageId": "restrictedDefault",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-exports > invalid 21`] = `
+{
+  "code": "export * as default from 'mod';",
+  "diagnostics": [
+    {
+      "message": "Exporting 'default' is restricted.",
+      "messageId": "restrictedDefault",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
