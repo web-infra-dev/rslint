@@ -1,0 +1,50 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
+	"github.com/web-infra-dev/rslint/internal/linter"
+)
+
+// eslintPluginConfigResolver projects the API-selected config into the plugin
+// host's opaque routing identity and serializable config maps.
+type eslintPluginConfigResolver struct {
+	lintResolver           *configLint.Resolver
+	pluginConfigKeyByOwner map[string]string
+}
+
+func (resolver eslintPluginConfigResolver) resolve(filePath string) linter.EslintPluginFileConfig {
+	if resolver.lintResolver == nil {
+		return linter.EslintPluginFileConfig{}
+	}
+	ownerDirectory, resolved, ok := resolver.lintResolver.ResolveSourcePath(filePath)
+	if !ok {
+		return linter.EslintPluginFileConfig{}
+	}
+	configKey := ownerDirectory
+	if pluginConfigKey, ok := resolver.pluginConfigKeyByOwner[ownerDirectory]; ok {
+		configKey = pluginConfigKey
+	}
+	languageOptions, settings := rslintconfig.PluginMergedMaps(resolved.MergedConfig)
+	return linter.EslintPluginFileConfig{
+		ConfigKey:       configKey,
+		LanguageOptions: languageOptions,
+		Settings:        settings,
+	}
+}
+
+func reportEslintPluginDispatchOutcome(outcome linter.EslintPluginDispatchOutcome) {
+	writeEslintPluginDispatchOutcome(os.Stderr, outcome)
+}
+
+func writeEslintPluginDispatchOutcome(w io.Writer, outcome linter.EslintPluginDispatchOutcome) {
+	if outcome.DispatchError != nil && !errors.Is(outcome.DispatchError, context.Canceled) {
+		fmt.Fprintf(w, "rslint: eslint-plugin lint error: %v\n", outcome.DispatchError)
+	}
+}
