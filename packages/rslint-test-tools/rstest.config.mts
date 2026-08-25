@@ -601,6 +601,7 @@ export default defineConfig({
     './tests/rstest/rules/valid-expect-in-promise.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
     './tests/rstest/rules/valid-title.test.ts',
+    './tests/rstest/rules/warn-todo.test.ts',
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/always-return.test.ts',
