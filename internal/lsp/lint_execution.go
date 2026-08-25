@@ -162,20 +162,7 @@ func lintSingleFile(
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}}
 	}
 	sourceProgram := lintprogram.NewFromCompiler(program)
-	if syntacticDiagnostics := sourceProgram.SyntacticDiagnostics(ctx, sourceFile); len(syntacticDiagnostics) > 0 {
-		diagnostics := make([]rule.RuleDiagnostic, 0, len(syntacticDiagnostics))
-		for _, diagnostic := range syntacticDiagnostics {
-			diagnostics = append(diagnostics, rule.RuleDiagnostic{
-				RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
-				SourceFile:   sourceFile,
-				FilePath:     sourceFile.FileName(),
-				Range:        diagnostic.Loc(),
-				Message:      rule.RuleMessage{Description: diagnostic.String()},
-				Severity:     rule.SeverityError,
-				Origin:       rule.DiagnosticOriginTypeScript,
-				PreFormatted: true,
-			})
-		}
+	if diagnostics := linter.CollectFileSyntacticDiagnostics(ctx, sourceProgram, sourceFile); len(diagnostics) > 0 {
 		return lintPassResult{Diagnostics: diagnostics, HasSyntaxErrors: true}
 	}
 

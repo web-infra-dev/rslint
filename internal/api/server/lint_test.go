@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -28,6 +28,19 @@ type canonicalPathBaseFS struct {
 	realpathCalls atomic.Int32
 }
 
+func writeProgramTestFiles(t *testing.T, directory string, files map[string]string) {
+	t.Helper()
+	for relativePath, content := range files {
+		fileName := filepath.Join(directory, relativePath)
+		if err := os.MkdirAll(filepath.Dir(fileName), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", filepath.Dir(fileName), err)
+		}
+		if err := os.WriteFile(fileName, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", fileName, err)
+		}
+	}
+}
+
 func captureAPIStderr(t *testing.T, run func()) string {
 	t.Helper()
 	reader, writer, err := os.Pipe()
@@ -55,7 +68,7 @@ func captureAPIStderr(t *testing.T, run func()) string {
 func TestHandleLintInvalidOptionsDoesNotReportPluginShadowWarning(t *testing.T) {
 	var lintErr error
 	stderr := captureAPIStderr(t, func() {
-		_, lintErr = (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		_, lintErr = (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 			Config:           json.RawMessage(`[{"rules":{"no-console":["error",{"allow":"warn"}]}}]`),
 			WorkingDirectory: t.TempDir(),
 			EslintPlugins: []api.EslintPluginEntry{{
@@ -81,7 +94,7 @@ func TestCanonicalPathVFS_UsesRequestHintBeforeBaseFilesystem(t *testing.T) {
 	base := &canonicalPathBaseFS{FS: osvfs.FS()}
 	fsys := &canonicalPathVFS{
 		FS:             base,
-		canonicalPaths: map[string]string{exactFilesystemPathID("/lexical/a.ts"): "/physical/a.ts"},
+		canonicalPaths: map[string]string{rslintconfig.ExactPathID("/lexical/a.ts"): "/physical/a.ts"},
 	}
 	if got := fsys.Realpath("/lexical/a.ts"); got != "/physical/a.ts" {
 		t.Fatalf("Realpath returned %q, want request hint", got)
@@ -92,7 +105,7 @@ func TestCanonicalPathVFS_UsesRequestHintBeforeBaseFilesystem(t *testing.T) {
 }
 
 func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
-	_, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+	_, err := (&Handler{}).HandleLint(api.LintRequest{
 		Files:          []string{"a.ts"},
 		CanonicalFiles: []string{"a.ts", "b.ts"},
 	})
@@ -102,7 +115,7 @@ func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
 }
 
 func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -115,7 +128,7 @@ func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
 		"plugins": ["@typescript-eslint"]
 	}]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -141,7 +154,7 @@ func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
 // diagnostics — and LintedFiles must share Diagnostic.FilePath's path space so
 // the JS side seeds one result per actually-linted file.
 func TestHandleLint_LintedFilesExcludesIgnored(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -155,7 +168,7 @@ func TestHandleLint_LintedFilesExcludesIgnored(t *testing.T) {
 		}
 	]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -198,7 +211,7 @@ func TestHandleLint_LintedFilesExcludesIgnored(t *testing.T) {
 // (non-nil) slice — it serializes as `[]` so the JS side yields zero results
 // rather than falling back to the glob matches (the phantom-empty-result bug).
 func TestHandleLint_AllIgnored_EmptyLintedFiles(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -212,7 +225,7 @@ func TestHandleLint_AllIgnored_EmptyLintedFiles(t *testing.T) {
 		}
 	]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -259,7 +272,7 @@ func TestHandleLint_AllIgnoredDoesNotResolveInactiveProject(t *testing.T) {
 		}
 	]`)
 
-	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
 		WorkingDirectory: dir,
@@ -284,7 +297,7 @@ func TestHandleLint_SelectedTargetResolvesGoverningProject(t *testing.T) {
 		"rules": { "no-debugger": "error" }
 	}]`)
 
-	_, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+	_, err := (&Handler{}).HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
 		WorkingDirectory: dir,
@@ -316,7 +329,7 @@ func TestHandleLint_FirstContainingProgramReportsFileOnce(t *testing.T) {
 		"plugins": ["@typescript-eslint"]
 	}]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
@@ -338,7 +351,7 @@ func TestHandleLint_FirstContainingProgramReportsFileOnce(t *testing.T) {
 }
 
 func TestHandleLint_ExplicitFilesRestrictsScope(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -350,7 +363,7 @@ func TestHandleLint_ExplicitFilesRestrictsScope(t *testing.T) {
 	}]`)
 	targetFile := filepath.Join(fixturesDir, "src", "index.ts")
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -386,7 +399,7 @@ func TestHandleLint_ExplicitFileOutsideFilesIsCountedWithNoRules(t *testing.T) {
 		"rules": { "no-debugger": "error" }
 	}]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
@@ -422,7 +435,7 @@ func TestHandleLint_ExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *
 		"rules": { "no-debugger": "error" }
 	}]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
@@ -450,7 +463,7 @@ func TestHandleLint_MalformedFileDoesNotRunRules(t *testing.T) {
 		t.Fatalf("write target: %v", err)
 	}
 
-	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
 		Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
 		ConfigDirectory:  dir,
 		WorkingDirectory: dir,
@@ -484,7 +497,7 @@ func TestHandleLint_FileContentsDependenciesDoNotWidenExplicitTargets(t *testing
 		"rules": { "no-debugger": "error" }
 	}]`)
 
-	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
 		WorkingDirectory: dir,
@@ -531,7 +544,7 @@ func TestHandleLint_FilesPresenceControlsWhetherFileContentsAreTargets(t *testin
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
 				Config:           config,
 				ConfigDirectory:  dir,
 				WorkingDirectory: dir,
@@ -552,7 +565,7 @@ func TestHandleLint_SourceSnapshotsAreRequestScoped(t *testing.T) {
 	dir := t.TempDir()
 	virtualFile := filepath.Join(dir, "virtual.ts")
 	config := json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)
-	handler := &IPCHandler{}
+	handler := &Handler{}
 
 	request := func(content string) *api.LintResponse {
 		t.Helper()
@@ -592,7 +605,7 @@ func TestHandleLint_ExplicitFileEntryIgnoredIsCountedWithNoRules(t *testing.T) {
 		"rules": { "no-debugger": "error" }
 	}]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
@@ -628,7 +641,7 @@ func TestHandleLint_ExplicitFileGloballyIgnoredIsSkipped(t *testing.T) {
 		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
 	]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
@@ -662,7 +675,7 @@ func TestHandleLint_ExplicitFileGitignoredIsSkipped(t *testing.T) {
 		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
 	]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
@@ -691,7 +704,7 @@ func TestHandleLint_LowLevelResponsePathsRemainRelativeToConfigDirectory(t *test
 		"src/source.js": "debugger;\n",
 	})
 
-	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
 		Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
 		ConfigDirectory:  configDirectory,
 		WorkingDirectory: workingDirectory,
@@ -736,7 +749,7 @@ func TestHandleLint_LowLevelExternalConfigSeparatesAuthoredAndScanRoots(t *testi
 	target = tspath.NormalizePath(osvfs.FS().Realpath(target))
 	ignored = tspath.NormalizePath(osvfs.FS().Realpath(ignored))
 
-	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
 		Config:           json.RawMessage(`[{"files":["../physical-workspace/*.js"],"rules":{"no-debugger":"error"}}]`),
 		ConfigDirectory:  configDirectory,
 		WorkingDirectory: workingDirectory,
@@ -758,7 +771,7 @@ func TestHandleLint_OverlayGitignoreIsApplied(t *testing.T) {
 		t.Fatalf("write target: %v", err)
 	}
 
-	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
 		Config: json.RawMessage(`[
 			{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
 		]`),
@@ -796,7 +809,7 @@ func TestHandleLint_GitignoredParentBlocksNestedNegation(t *testing.T) {
 		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
 	]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
@@ -837,7 +850,7 @@ func TestHandleLint_ParentGitignoreDoesNotSuppressConfigRoot(t *testing.T) {
 		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
 	]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  appDir,
@@ -878,7 +891,7 @@ func TestHandleLint_IntermediateParentGitignoreIsNotRead(t *testing.T) {
 		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
 	]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  appDir,
@@ -919,7 +932,7 @@ func TestHandleLint_ParentWildcardDoesNotReadIntermediateGitignore(t *testing.T)
 		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
 	]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  appDir,
@@ -958,7 +971,7 @@ func TestHandleLint_NoFilesEntryScansDefaultExtensions(t *testing.T) {
 		"rules": { "no-debugger": "error" }
 	}]`)
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,
@@ -986,12 +999,12 @@ func TestHandleLint_NoFilesEntryScansDefaultExtensions(t *testing.T) {
 }
 
 func TestHandleLint_NoConfigEnablesNoRules(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	// No Config: the JS side resolves config; an absent config means "no rules"
 	// (clean 0-diagnostic return, NOT a crash and NOT auto-discovery). Mirrors
 	// ESLint flat-config (a file matched by no config runs no rules).
@@ -1034,7 +1047,7 @@ func TestHandleLint_FileContentsKeepTypeInfoWhenProgramUsesSymlinkSource(t *test
 	}]`)
 	realTarget := filepath.Join(realDir, "src", "a.ts")
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:                    config,
 		ConfigDirectory:           linkDir,
@@ -1071,7 +1084,7 @@ func TestHandleLint_FileContentsKeepTypeInfoWhenProgramUsesSymlinkSource(t *test
 // An in-memory target outside every tsconfig Program must still run
 // non-type-aware rules through the fallback Program.
 func TestHandleLint_GapFile_NonTypeAwareRuleRuns(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -1086,7 +1099,7 @@ func TestHandleLint_GapFile_NonTypeAwareRuleRuns(t *testing.T) {
 	}]`)
 	gapFile := filepath.Join(fixturesDir, "gap-scenario-b.ts")
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -1114,7 +1127,7 @@ func TestHandleLint_GapFile_NonTypeAwareRuleRuns(t *testing.T) {
 // A type-aware rule on a gap file must be filtered before execution. Running
 // it with a nil TypeChecker would crash the process.
 func TestHandleLint_GapFile_TypeAwareRuleGatedOff(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -1134,7 +1147,7 @@ func TestHandleLint_GapFile_TypeAwareRuleGatedOff(t *testing.T) {
 	}]`)
 	gapFile := filepath.Join(fixturesDir, "gap-scenario-a.ts")
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	response, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -1162,12 +1175,12 @@ func TestHandleLint_GapFile_TypeAwareRuleGatedOff(t *testing.T) {
 }
 
 func TestHandleLint_MalformedConfigReturnsError(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	// A config that is not a RslintConfigEntry[] must surface as an IPC error,
 	// not panic / kill the long-lived --api process.
 	_, err = handler.HandleLint(api.LintRequest{
@@ -1181,12 +1194,12 @@ func TestHandleLint_MalformedConfigReturnsError(t *testing.T) {
 }
 
 func TestHandleLint_RejectsEmptyFilesArrayConfig(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	_, err = handler.HandleLint(api.LintRequest{
 		Config:           json.RawMessage(`[{"files":[],"rules":{"no-console":"error"}}]`),
 		ConfigDirectory:  fixturesDir,
@@ -1204,7 +1217,7 @@ func TestHandleLint_RejectsEmptyFilesArrayConfig(t *testing.T) {
 // ④: severity is emitted as a string ("error"/"warning") and counts are split
 // by level — errorCount counts only errors, not the total (ESLint semantics).
 func TestHandleLint_SeverityStringAndCountBuckets(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -1218,7 +1231,7 @@ func TestHandleLint_SeverityStringAndCountBuckets(t *testing.T) {
 			"rules": { "@typescript-eslint/array-type": "` + level + `" },
 			"plugins": ["@typescript-eslint"]
 		}]`)
-		handler := &IPCHandler{}
+		handler := &Handler{}
 		resp, runErr := handler.HandleLint(api.LintRequest{
 			Config:           config,
 			ConfigDirectory:  fixturesDir,
@@ -1261,7 +1274,7 @@ func TestHandleLint_SeverityStringAndCountBuckets(t *testing.T) {
 // ④: suggestions (optional, user-selected fixes) are converted from the rule
 // diagnostic with messageId / message / fixes preserved.
 func TestHandleLint_SuggestionsConverted(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -1275,7 +1288,7 @@ func TestHandleLint_SuggestionsConverted(t *testing.T) {
 	}]`)
 	gapFile := filepath.Join(fixturesDir, "gap-suggestions.ts")
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	resp, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -1318,11 +1331,11 @@ func TestHandleLint_SuggestionsConverted(t *testing.T) {
 	}
 }
 
-// F2: pins the suggestion `data` conversion (api_lint.go: Data: sug.Message.Data).
+// F2: pins the suggestion `data` conversion in lint.go.
 // no-explicit-any's suggestions carry no data, so use no-restricted-types whose
 // suggestion carries {name, replacement}.
 func TestHandleLint_SuggestionDataConverted(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -1334,7 +1347,7 @@ func TestHandleLint_SuggestionDataConverted(t *testing.T) {
 	}]`)
 	gapFile := filepath.Join(fixturesDir, "gap-restricted.ts")
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	resp, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -1374,7 +1387,7 @@ func TestHandleLint_SuggestionDataConverted(t *testing.T) {
 // ⑥: fix:true applies fixes in-band and returns the fixed source per file in
 // Output (not written to disk), plus fixable*Count split by severity.
 func TestHandleLint_FixProducesInBandOutput(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -1386,7 +1399,7 @@ func TestHandleLint_FixProducesInBandOutput(t *testing.T) {
 	}]`)
 	gapFile := filepath.Join(fixturesDir, "gap-fix.ts")
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	resp, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -1416,7 +1429,7 @@ func TestHandleLint_FixProducesInBandOutput(t *testing.T) {
 // ⑥: fix/suggestion ranges are flat UTF-16 offsets, not byte offsets. A CJK
 // char before the fix (1 UTF-16 unit but 3 UTF-8 bytes) makes the two diverge.
 func TestHandleLint_FixRangeIsUTF16(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
@@ -1430,7 +1443,7 @@ func TestHandleLint_FixRangeIsUTF16(t *testing.T) {
 
 	// "type 名 = Array<string>;" — `Array<string>` begins at UTF-16 offset 9
 	// ("type 名 = " is 9 UTF-16 units) but byte offset 11 (名 is 3 bytes).
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	resp, err := handler.HandleLint(api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  fixturesDir,
@@ -1598,7 +1611,7 @@ func TestHandleLint_ConfigDiscoveryLoadsActivatesAndRoutesNestedOwners(t *testin
 		}
 	})
 
-	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{rootTarget, nestedTarget},
 		WorkingDirectory: root,
 		ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
@@ -1699,7 +1712,7 @@ func TestHandleLint_ConfigDiscoveryRequiresPluginCapabilityOnlyWhenDiscovered(t 
 				}
 			}
 
-			response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+			response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 				Files:            []string{target},
 				WorkingDirectory: root,
 				ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
@@ -1772,7 +1785,7 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 		}
 	})
 
-	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{target},
 		WorkingDirectory: root,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
@@ -1831,7 +1844,7 @@ func TestHandleLint_ConfigDiscoveryConfigNegationOverridesGitignore(t *testing.T
 
 	run := func(files []string) *api.LintResponse {
 		t.Helper()
-		response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 			Files:            files,
 			WorkingDirectory: root,
 			ConfigDiscovery: &api.ConfigDiscoveryRequest{
@@ -1904,7 +1917,7 @@ func TestHandleLint_ConfigDiscoveryOverrideNegationReopensGitHiddenConfig(t *tes
 		}
 	})
 
-	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{target},
 		WorkingDirectory: root,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
@@ -1991,7 +2004,7 @@ func TestHandleLint_ConfigDiscoveryExplicitOnlyOwnerDoesNotBlockParentGitignore(
 
 	run := func(files []string, explicitFiles []bool) *api.LintResponse {
 		t.Helper()
-		response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 			Files:            files,
 			WorkingDirectory: root,
 			ConfigDiscovery: &api.ConfigDiscoveryRequest{
@@ -2063,7 +2076,7 @@ func TestHandleLint_ExplicitConfigUsesOnlyWorkingDirectoryGitignore(t *testing.T
 		}
 	})
 
-	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{targetPath, insideIgnoredPath},
 		WorkingDirectory: workingDirectory,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
@@ -2116,7 +2129,7 @@ func TestHandleLint_ExplicitExternalConfigUsesWorkingDirectoryResponsePaths(t *t
 		}
 	})
 
-	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{targetPath},
 		WorkingDirectory: workingDirectory,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
@@ -2143,7 +2156,7 @@ func TestHandleLint_ConfigAndConfigDiscoveryAreMutuallyExclusive(t *testing.T) {
 		return nil, errors.New("reverse request must not run")
 	})
 
-	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	_, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Config:           json.RawMessage(`[]`),
 		ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
 		WorkingDirectory: t.TempDir(),
@@ -2164,7 +2177,7 @@ func TestHandleLint_ConfigDiscoveryExplicitFilesMustMatchFiles(t *testing.T) {
 	})
 	dir := t.TempDir()
 
-	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	_, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{filepath.Join(dir, "a.js"), filepath.Join(dir, "b.js")},
 		WorkingDirectory: dir,
 		ConfigDiscovery: &api.ConfigDiscoveryRequest{
@@ -2212,7 +2225,7 @@ func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *t
 				return nil, errors.New("an empty catalog must not activate Node state")
 			})
 
-			response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+			response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 				Files:            []string{target},
 				WorkingDirectory: dir,
 				ConfigDiscovery: &api.ConfigDiscoveryRequest{
@@ -2265,7 +2278,7 @@ func TestHandleLint_ConfigDiscoveryAllCandidatesFail(t *testing.T) {
 		}
 	})
 
-	_, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	_, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Files:            []string{filepath.Join(dir, "input.js")},
 		WorkingDirectory: dir,
 		ConfigDiscovery:  &api.ConfigDiscoveryRequest{},
@@ -2332,7 +2345,7 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 		return ipc.NewMessage(ipc.KindResponse, 1, result)
 	})
 
-	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Config:                config,
 		ConfigDirectory:       dir,
 		PluginConfigDirectory: pluginConfigDirectory,
@@ -2382,7 +2395,7 @@ func TestHandleLint_EslintPluginSyntaxErrorSkipsDispatch(t *testing.T) {
 		return nil, errors.New("plugin dispatcher must not be called for a syntax error")
 	})
 
-	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
 		Config:           json.RawMessage(`[{"plugins":["syntax-plugin"],"rules":{"syntax-plugin/rule":"error"}}]`),
 		ConfigDirectory:  dir,
 		WorkingDirectory: dir,
@@ -2420,7 +2433,7 @@ func TestHandleLint_NoEslintPluginMetadataDoesNotDispatchStalePlaceholder(t *tes
 			FilePath: req.Files[0].Path,
 		}}})
 	})
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	baseRequest := api.LintRequest{
 		Config:           config,
 		ConfigDirectory:  dir,

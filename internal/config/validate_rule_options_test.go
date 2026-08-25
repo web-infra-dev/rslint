@@ -145,6 +145,96 @@ func configWithRules(rules Rules) RslintConfig {
 	return RslintConfig{ConfigEntry{Rules: rules}}
 }
 
+func TestValidateResolvedRuleOptionsPreservesSingleConfigMode(t *testing.T) {
+	inputOptions := map[string]any{"values": []any{"original"}}
+	input := configWithRules(Rules{
+		"unknown-rule": []any{"error", inputOptions},
+	})
+
+	normalizedMap, normalized, errs := ValidateResolvedRuleOptions(
+		nil,
+		input,
+		newOptionsTestCatalog(),
+	)
+	if normalizedMap != nil {
+		t.Fatalf("single-config mode returned a non-nil config map: %#v", normalizedMap)
+	}
+	if len(errs) != 0 {
+		t.Fatalf("unexpected validation errors: %v", errs)
+	}
+
+	normalizedOptions := normalized[0].Rules["unknown-rule"].([]any)[1].(map[string]any)
+	normalizedOptions["values"].([]any)[0] = "changed"
+	if got := inputOptions["values"].([]any)[0]; got != "original" {
+		t.Fatalf("normalized config aliases its input: %#v", got)
+	}
+}
+
+func TestValidateResolvedRuleOptionsPreservesMultiConfigMode(t *testing.T) {
+	singleConfig := configWithRules(Rules{"unused": "error"})
+	normalizedMap, normalizedSingle, errs := ValidateResolvedRuleOptions(
+		map[string]RslintConfig{},
+		singleConfig,
+		newOptionsTestCatalog(),
+	)
+	if normalizedMap == nil || len(normalizedMap) != 0 {
+		t.Fatalf("non-nil empty config map changed mode: %#v", normalizedMap)
+	}
+	if !reflect.DeepEqual(normalizedSingle, singleConfig) {
+		t.Fatalf("inactive single config changed in multi-config mode: %#v", normalizedSingle)
+	}
+	if len(errs) != 0 {
+		t.Fatalf("unexpected validation errors: %v", errs)
+	}
+
+	inputOptions := map[string]any{"values": []any{"original"}}
+	inputMap := map[string]RslintConfig{
+		"/workspace/a": configWithRules(Rules{
+			"unknown-rule": []any{"error", inputOptions},
+		}),
+	}
+	normalizedMap, _, errs = ValidateResolvedRuleOptions(
+		inputMap,
+		nil,
+		newOptionsTestCatalog(),
+	)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected validation errors: %v", errs)
+	}
+	normalizedOptions := normalizedMap["/workspace/a"][0].Rules["unknown-rule"].([]any)[1].(map[string]any)
+	normalizedOptions["values"].([]any)[0] = "changed"
+	if got := inputOptions["values"].([]any)[0]; got != "original" {
+		t.Fatalf("normalized config map aliases its input: %#v", got)
+	}
+}
+
+func TestValidateResolvedRuleOptionsReportsOwnersInOrder(t *testing.T) {
+	invalid := func(value any) RslintConfig {
+		return configWithRules(Rules{
+			"with-schema": []any{"error", map[string]any{"allow": value}},
+		})
+	}
+	_, _, errs := ValidateResolvedRuleOptions(
+		map[string]RslintConfig{
+			"/workspace/z": invalid("not-an-array"),
+			"/workspace/a": invalid(42),
+		},
+		nil,
+		newOptionsTestCatalog(),
+	)
+	if len(errs) != 2 {
+		t.Fatalf("validation errors = %d, want 2: %v", len(errs), errs)
+	}
+	if errs[0].ConfigDirectory != "/workspace/a" || errs[1].ConfigDirectory != "/workspace/z" {
+		t.Fatalf("owner order = %q, %q", errs[0].ConfigDirectory, errs[1].ConfigDirectory)
+	}
+	for _, err := range errs {
+		if !strings.Contains(err.Error(), "(config at "+err.ConfigDirectory+")") {
+			t.Errorf("error does not identify owner: %q", err.Error())
+		}
+	}
+}
+
 func TestValidateRuleOptionsAcceptsValidConfig(t *testing.T) {
 	catalog := newOptionsTestCatalog()
 	config := configWithRules(Rules{
