@@ -220,25 +220,6 @@ func HasCommentInSpan(sourceComments []*ast.CommentRange, start int, end int) bo
 	return idx < len(sourceComments) && sourceComments[idx].Pos() < end
 }
 
-// CommentValue extracts the text between a comment's delimiters — the same
-// substring ESLint exposes as `comment.value` — without any trimming.
-func CommentValue(text string, comment *ast.CommentRange) string {
-	switch comment.Kind {
-	case ast.KindSingleLineCommentTrivia:
-		return text[comment.Pos()+2 : comment.End()]
-	case ast.KindMultiLineCommentTrivia:
-		// A block comment left unterminated at end of file still parses, and
-		// then has no closing delimiter to strip.
-		end := comment.End()
-		if end-comment.Pos() >= 4 && text[end-2:end] == "*/" {
-			end -= 2
-		}
-		return text[comment.Pos()+2 : end]
-	default:
-		return ""
-	}
-}
-
 func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
 	if IsTypeFlagSet(t, checker.TypeFlagsUnionOrIntersection) {
 		for _, subtype := range t.Types() {

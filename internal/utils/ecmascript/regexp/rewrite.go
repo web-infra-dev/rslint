@@ -286,6 +286,24 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			i += size
 			continue
 
+		case ']', '{', '}':
+			// Annex B lets these stand for themselves when no `u` flag is
+			// present. Unicode mode instead treats an unmatched `]` or `}` and
+			// a `{` that does not open a valid quantifier as syntax errors.
+			if current.unicode {
+				if r == '{' {
+					if width := boundedQuantifierWidth(source[i:]); width > 0 {
+						out.WriteString(source[i : i+width])
+						i += width
+						continue
+					}
+				}
+				return "", false, fmt.Errorf("%w: lone %c", ErrUnsupportedSyntax, r)
+			}
+			out.WriteRune(r)
+			i += size
+			continue
+
 		default:
 			if current.ignoreCase {
 				if class, widened := CaseClass(r, current.unicode); widened {

@@ -264,6 +264,9 @@ func TestCompileRejects(t *testing.T) {
 		{name: "u control escape naming nothing", source: `\c`, flags: "u", is: ErrUnsupportedSyntax},
 		{name: "u identity escape", source: `\a`, flags: "u", is: ErrUnsupportedSyntax},
 		{name: "u set at the end of a range", source: `[\d-A]`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u lone closing bracket", source: `lower]`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u lone opening brace", source: `lower{`, flags: "u", is: ErrUnsupportedSyntax},
+		{name: "u lone closing brace", source: `lower}`, flags: "u", is: ErrUnsupportedSyntax},
 
 		{name: "range running backwards", source: "[b-a]", is: ErrUnsupportedSyntax},
 		{name: "class that no bracket closes", source: "[abc", is: ErrUnsupportedSyntax},

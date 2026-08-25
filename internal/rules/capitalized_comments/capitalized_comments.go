@@ -42,16 +42,23 @@ var CapitalizedCommentsRule = rule.Rule{
 		// Only the inline and consecutive checks need the token stream, and
 		// only for a comment that gets as far as them, so the walk that
 		// answers it happens at most once per file and only on demand.
-		var precedingEnds []int
-		precedingEnd := func(index int) int {
+		var precedingEnds, followingStarts []int
+		boundaries := func() {
 			if precedingEnds == nil {
-				precedingEnds = precedingTokenEnds(ctx.SourceFile, comments)
+				precedingEnds, followingStarts = tokenBoundaries(ctx.SourceFile, comments)
 			}
+		}
+		precedingEnd := func(index int) int {
+			boundaries()
 			return precedingEnds[index]
+		}
+		followingStart := func(index int) int {
+			boundaries()
+			return followingStarts[index]
 		}
 
 		for i := range comments {
-			checkComment(ctx, text, comments, i, opts, precedingEnd)
+			checkComment(ctx, text, comments, i, opts, precedingEnd, followingStart)
 		}
 
 		return rule.RuleListeners{}
@@ -115,7 +122,7 @@ func normalizeCommentOptions(raw map[string]any, which string) commentOptions {
 	return result
 }
 
-func checkComment(ctx rule.RuleContext, text string, comments []*ast.CommentRange, index int, opts ruleOptions, precedingEnd func(int) int) {
+func checkComment(ctx rule.RuleContext, text string, comments []*ast.CommentRange, index int, opts ruleOptions, precedingEnd, followingStart func(int) int) {
 	comment := comments[index]
 	value := utils.CommentValue(text, comment)
 
@@ -124,7 +131,9 @@ func checkComment(ctx rule.RuleContext, text string, comments []*ast.CommentRang
 		commentOpts = opts.Block
 	}
 
-	isInline := func() bool { return isInlineComment(ctx.SourceFile, comments, index, precedingEnd(index)) }
+	isInline := func() bool {
+		return isInlineComment(ctx.SourceFile, comments, index, precedingEnd(index), followingStart(index))
+	}
 	isConsecutive := func() bool { return isConsecutiveComment(comments, index, precedingEnd(index)) }
 
 	if isCommentValid(value, opts.Capitalize, commentOpts, isInline, isConsecutive) {
@@ -158,7 +167,7 @@ func isCommentValid(value string, capitalize string, opts commentOptions, isInli
 	withoutAsterisks := strings.ReplaceAll(value, "*", "")
 
 	// 2. Custom ignore pattern.
-	if opts.IgnorePattern != nil && opts.IgnorePattern.Test(withoutAsterisks) {
+	if opts.IgnorePattern != nil && opts.IgnorePattern.TestOrTimeout(withoutAsterisks) {
 		return true
 	}
 
@@ -242,44 +251,52 @@ func buildFix(comment *ast.CommentRange, value string, capitalize string) []rule
 	return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(charStart, charEnd), replacement)}
 }
 
-// precedingTokenEnds returns, for each comment, the end of the last real token
-// that ends before the comment starts, or -1 when no token precedes it.
+// tokenBoundaries returns, for each comment, the end of the last real token
+// before it and the start of the first real token after it, or -1 when absent.
 // Tokens and comments both arrive in source order, so one walk of the token
-// tree answers it for every comment at once, where asking per comment would
-// read the file again for each one. Walking parser tokens rather than scanning
-// keeps a regular-expression literal whole, which a standalone scanner splits
-// into division punctuators.
-func precedingTokenEnds(sourceFile *ast.SourceFile, comments []*ast.CommentRange) []int {
-	ends := make([]int, len(comments))
-	cursor := 0
+// tree answers both sides for every comment at once. Walking parser tokens
+// rather than scanning keeps a regular-expression literal whole, which a
+// standalone scanner splits into division punctuators.
+func tokenBoundaries(sourceFile *ast.SourceFile, comments []*ast.CommentRange) (precedingEnds, followingStarts []int) {
+	precedingEnds = make([]int, len(comments))
+	followingStarts = make([]int, len(comments))
+	for i := range followingStarts {
+		followingStarts[i] = -1
+	}
+	precedingCursor := 0
+	followingCursor := 0
 	last := -1
 	utils.ForEachToken(sourceFile.AsNode(), func(token *ast.Node) {
 		tokenRange := utils.TrimNodeTextRange(sourceFile, token)
 		if tokenRange.Pos() >= tokenRange.End() {
 			return
 		}
-		for cursor < len(comments) && comments[cursor].Pos() < tokenRange.End() {
-			ends[cursor] = last
-			cursor++
+		for precedingCursor < len(comments) && comments[precedingCursor].Pos() < tokenRange.End() {
+			precedingEnds[precedingCursor] = last
+			precedingCursor++
+		}
+		for followingCursor < len(comments) && comments[followingCursor].End() <= tokenRange.Pos() {
+			followingStarts[followingCursor] = tokenRange.Pos()
+			followingCursor++
 		}
 		last = tokenRange.End()
 	}, sourceFile)
-	for ; cursor < len(comments); cursor++ {
-		ends[cursor] = last
+	for ; precedingCursor < len(comments); precedingCursor++ {
+		precedingEnds[precedingCursor] = last
 	}
-	return ends
+	return precedingEnds, followingStarts
 }
 
 // isInlineComment ports isInlineComment: a comment is inline when both the
 // nearest preceding and following token-or-comment share its start/end line.
 // Only block comments can ever be inline — a line comment always consumes
 // the rest of its own line, so there can be no "next token on the same line".
-func isInlineComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int, precedingEnd int) bool {
+func isInlineComment(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int, precedingEnd, followingStart int) bool {
 	prevEnd, ok := nearestBeforeEnd(comments, index, precedingEnd)
 	if !ok {
 		return false
 	}
-	nextStart, ok := nearestAfterStart(sourceFile, comments, index, comments[index].End())
+	nextStart, ok := nearestAfterStart(comments, index, comments[index].End(), followingStart)
 	if !ok {
 		return false
 	}
@@ -315,11 +332,8 @@ func nearestBeforeEnd(comments []*ast.CommentRange, index int, precedingEnd int)
 
 // nearestAfterStart is the mirror of nearestBeforeEnd for the position
 // immediately following pos.
-func nearestAfterStart(sourceFile *ast.SourceFile, comments []*ast.CommentRange, index int, pos int) (int, bool) {
-	best := -1
-	if tok, ok := utils.TokenAtOrAfter(sourceFile, pos); ok {
-		best = tok.Start
-	}
+func nearestAfterStart(comments []*ast.CommentRange, index int, pos int, followingStart int) (int, bool) {
+	best := followingStart
 	if index+1 < len(comments) {
 		if nextStart := comments[index+1].Pos(); nextStart >= pos && (best < 0 || nextStart < best) {
 			best = nextStart

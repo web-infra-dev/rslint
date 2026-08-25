@@ -27,7 +27,9 @@
 package capitalized_comments
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -45,6 +47,14 @@ func TestCapitalizedCommentsExtras(t *testing.T) {
 		t,
 		&CapitalizedCommentsRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Ignore-pattern timeout: an allow/ignore matcher fails open so
+			// a pathological first alternative cannot create a false positive
+			// while JavaScript continues to the matching second alternative. ----
+			{
+				Code:    "// aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+				Options: []any{"always", map[string]any{"ignorePattern": "(?:(a|aa)+$|a+!)"}},
+			},
+
 			// ---- Dimension 1: inline-comment detection across a TS-specific
 			// token shape (generic type parameter list) ----
 			{
@@ -109,6 +119,16 @@ func TestCapitalizedCommentsExtras(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- JavaScript /u syntax validation: regexp2 accepts a lone
+			// closing bracket literally, but JavaScript rejects it. Such a
+			// pattern must not become an active ignore matcher. ----
+			{
+				Code:    "// lower] text",
+				Output:  []string{"// Lower] text"},
+				Options: []any{"always", map[string]any{"ignorePattern": "lower]"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedLowercaseComment", Line: 1, Column: 1}},
+			},
+
 			// ---- Dimension 4: graceful degradation — a comment alone in
 			// the file has no real token on either side, so it is never
 			// "inline" even when ignoreInlineComments is true ----
@@ -227,6 +247,48 @@ func TestCapitalizedCommentsExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+// TestFollowingTokenStarts locks in the single-pass real-token boundary used
+// by ignoreInlineComments. Computing this boundary per comment would rescan
+// all following trivia and make comment-only files quadratic.
+func TestFollowingTokenStarts(t *testing.T) {
+	t.Parallel()
+
+	source := "first(/* Alpha */ 1); // Bravo\n/* Charlie */ last();"
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	_, sourceFile, err := helper.CreateTestProgram(source, "following-token-starts.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	comments := rule.NewCommentStore(sourceFile).All()
+	_, got := tokenBoundaries(sourceFile, comments)
+	want := []int{strings.Index(source, "1"), strings.Index(source, "last"), strings.Index(source, "last")}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("following token starts = %v, want %v", got, want)
+	}
+}
+
+func BenchmarkTokenBoundaries(b *testing.B) {
+	for _, commentCount := range []int{1_000, 2_000, 4_000} {
+		b.Run(fmt.Sprint(commentCount), func(b *testing.B) {
+			source := strings.Repeat("// Uppercase\n", commentCount) + "value;"
+			helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+			_, sourceFile, err := helper.CreateTestProgram(source, "token-boundaries.ts", "tsconfig.json")
+			if err != nil {
+				b.Fatal(err)
+			}
+			comments := rule.NewCommentStore(sourceFile).All()
+
+			b.ResetTimer()
+			for range b.N {
+				preceding, following := tokenBoundaries(sourceFile, comments)
+				if len(preceding) != commentCount || len(following) != commentCount {
+					b.Fatalf("boundary lengths = %d/%d, want %d/%d", len(preceding), len(following), commentCount, commentCount)
+				}
+			}
+		})
+	}
 }
 
 // TestCapitalizedCommentsEditDemand exercises Dimension 3 (autofix
