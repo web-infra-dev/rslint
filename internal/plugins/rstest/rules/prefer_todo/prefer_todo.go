@@ -461,7 +461,7 @@ func isSafeBareIdentifierReference(
 	symbol := ctx.Refs.Resolve(identifier)
 	if symbol == nil {
 		text := identifier.AsIdentifier().Text
-		return text == "test" || text == "it"
+		return (text == "test" || text == "it") && !isShadowedByLocalBinding(ctx, identifier)
 	}
 	if visited != nil && visited[symbol] {
 		return false
@@ -479,7 +479,8 @@ func isSafeBareIdentifierReference(
 	}
 	if mode == rstestUtils.RSTEST_GLOBAL_MODE &&
 		(name == "test" || name == "it") &&
-		!internalUtils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile) {
+		!internalUtils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile) &&
+		!isShadowedByLocalBinding(ctx, identifier) {
 		return true
 	}
 	name, _, mode = testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
@@ -510,6 +511,30 @@ func isSafeBareIdentifierReference(
 		}
 	}
 	return sameFileDecls > 0
+}
+
+// isShadowedByLocalBinding reports whether the identifier's name is bound by a
+// declaration in this file's lexical scope, in any declaration space.
+//
+// The injected Rstest globals are only reachable when nothing in the file
+// declares the name. Resolving the value space alone is not enough: the pinned
+// upstream rule runs on typescript-eslint's scope manager, which creates a
+// scope variable for type-space declarations too — type aliases, interfaces,
+// namespaces, and type parameters — and a reference then binds to that
+// variable rather than to the injected global. So upstream reports nothing for
+// `type test = string; test('case')` and for the interface, namespace, and
+// type-parameter forms, at the top level and in nested scopes alike. Following
+// TypeScript's declaration-space split here instead would turn each of those
+// into a false positive with a `.todo` fix attached.
+func isShadowedByLocalBinding(ctx rule.RuleContext, identifier *ast.Node) bool {
+	if ctx.Refs == nil || identifier == nil || identifier.Kind != ast.KindIdentifier {
+		return false
+	}
+	return ctx.Refs.IsNameDefinedInFileWithMeaning(
+		identifier,
+		identifier.AsIdentifier().Text,
+		ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
+	)
 }
 
 func isSafeBareAliasDeclaration(

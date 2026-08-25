@@ -85,6 +85,27 @@ func TestPreferTodoExtras(t *testing.T) {
 			{Code: `import * as rstest from "@rstest/core";
 const { test } = rstest;
 test("case");`},
+			// ---- Type-space bindings shadow the injected global too. The upstream
+			// rule runs on typescript-eslint's scope manager, where a type alias,
+			// an interface, a namespace, or a type parameter all declare a scope
+			// variable that the call site binds to instead of the global.
+			{Code: `type test = string; test("case");`},
+			{Code: `interface test {} test("case");`},
+			{Code: `namespace test {} test("case");`},
+			{Code: `function f<test>() { test("case"); }`},
+			{Code: `type it = string; it("case");`},
+			{Code: `interface it {} it("case");`},
+			{Code: `namespace it {} it("case");`},
+			{Code: `function f<it>() { it("case"); }`},
+			{Code: `type test = string; test("case", () => {});`},
+			{Code: `interface test {} test.skip("case", () => {});`},
+			// ---- The same bindings in a nested scope.
+			{Code: `function f() { type test = string; test("case"); }`},
+			{Code: `function f() { interface test {} test("case"); }`},
+			{Code: `function f() { namespace test {} test("case"); }`},
+			{Code: `describe("suite", () => { type test = string; test("case"); });`},
+			{Code: `namespace outer { type test = string; test("case"); }`},
+			{Code: `function f<test>() { function g() { test("case", () => {}); } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Rstest-specific title/call-position behavior. A dynamic title and
