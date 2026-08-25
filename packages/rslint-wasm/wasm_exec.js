@@ -6,7 +6,6 @@
 
 (() => {
   const enosys = () => {
-    debugger;
     const err = new Error('not implemented');
     err.code = 'ENOSYS';
     return err;
