@@ -101,7 +101,7 @@ var NoArrayConstructorRule = rule.Rule{
 			}
 			// `Array<Foo>()` — explicit type arguments mean this isn't the
 			// bare-constructor call the rule targets.
-			if typeArgs != nil && len(typeArgs.Nodes) > 0 {
+			if typeArgs != nil {
 				return
 			}
 			// A single non-spread argument (`Array(9)`, `Array(x)`) may be
@@ -112,8 +112,19 @@ var NoArrayConstructorRule = rule.Rule{
 				return
 			}
 
-			// A local declaration shadows the global constructor.
-			if utils.IsShadowed(callee, "Array") {
+			// A local declaration shadows the global constructor. The binder
+			// lookup resolves the declaration once without rescanning every
+			// enclosing body for each matching call. Keep the AST fallback for
+			// manually assembled rule contexts that do not provide a RefStore.
+			if ctx.Refs == nil {
+				if utils.IsShadowed(callee, "Array") {
+					return
+				}
+			} else if ctx.Refs.IsNameDefinedInFileWithMeaning(
+				callee,
+				"Array",
+				ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
+			) {
 				return
 			}
 			// scope-manager keeps class type parameters visible inside static
@@ -122,26 +133,15 @@ var NoArrayConstructorRule = rule.Rule{
 			// declarations, where both TypeScript's resolver and IsShadowed
 			// follow runtime lexical semantics instead.
 			if utils.HasEnclosingTypeParameter(callee, "Array") ||
+				utils.HasEnclosingClassExpressionName(callee, "Array") ||
 				utils.IsShadowedFromParameterInitializer(callee, "Array") {
 				return
 			}
-			// scope-manager also creates an `Array` variable for TypeScript
-			// type-space declarations — type aliases, interfaces, type
-			// parameters, type-only imports — which utils.IsShadowed doesn't
-			// model. Resolving the name in every declaration space at the call
-			// site covers them.
-			if ctx.Refs != nil && ctx.Refs.IsNameDefinedInFileWithMeaning(
-				callee,
-				"Array",
-				ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
-			) {
-				return
-			}
 			// A config `/* global Array: off */` / `languageOptions.globals`
-			// entry un-declares the builtin, so `Array` no longer resolves to
-			// a known global — ESLint's `getVariableByName` would return
-			// undefined and the rule stays silent.
-			if !ctx.Globals.Access("Array").IsDeclared() {
+			// entry un-declares Espree's builtin. typescript-eslint/parser also
+			// installs its library `Array` variable, which remains visible after
+			// the override, so TypeScript-flavoured files still report.
+			if ast.IsInJSFile(callee) && !ctx.Globals.Access("Array").IsDeclared() {
 				return
 			}
 

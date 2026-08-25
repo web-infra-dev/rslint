@@ -219,6 +219,27 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 	return false
 }
 
+// HasEnclosingClassExpressionName reports whether scope-manager exposes an
+// enclosing class expression's own name at node. A reference sitting directly
+// in the class's decorator acquires the class scope, while a scope created
+// inside that decorator is parented outside the class and cannot see the name.
+func HasEnclosingClassExpressionName(node *ast.Node, name string) bool {
+	prevChild := node
+	crossedScope := false
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindClassExpression && !escapesClassScope(prevChild, crossedScope) {
+			if className := current.Name(); className != nil && className.Kind == ast.KindIdentifier && className.Text() == name {
+				return true
+			}
+		}
+		if ast.IsFunctionLikeDeclaration(current) || ast.IsClassLike(current) {
+			crossedScope = true
+		}
+		prevChild = current
+	}
+	return false
+}
+
 // escapesFunctionScope reports whether a reference that reached fn through
 // prevChild is out of fn's own scope, so none of fn's bindings — parameters,
 // type parameters, function name, body declarations — reach it.

@@ -20,6 +20,8 @@ package no_array_constructor
 
 import (
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -47,6 +49,11 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 		t,
 		&NoArrayConstructorRule,
 		[]rule_tester.ValidTestCase{
+			// A recoverable empty TypeScript type-argument list still means the
+			// call carried explicit type arguments. typescript-eslint stops at its
+			// parser diagnostic and never runs this rule or offers an autofix.
+			{Code: `Array<>(1, 2);`},
+
 			// ---- Dimension 4: TS non-null assertion callee ----
 			// `Array!` is a TSNonNullExpression, never collapsed back to a
 			// bare Identifier by ESTree either, so upstream's
@@ -174,6 +181,22 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			{Code: `new (0, Array)();`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// TypeScript's parser installs its library `Array` variable even when
+			// an authored global override is `off`, so getVariableByName still
+			// finds the constructor. Espree's corresponding behavior remains in
+			// the upstream suite under file.js.
+			{
+				Code:    `Array();`,
+				Globals: map[string]any{"Array": "off"},
+				Output:  []string{`[];`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "preferLiteral", Line: 1, Column: 1, EndLine: 1, EndColumn: 8}},
+			},
+			directFixCase(
+				`/* global Array:off */ Array();`,
+				`Array()`,
+				`/* global Array:off */ [];`,
+			),
+
 			// ---- Dimension 2: scoping — JSDoc @template tags remain comments
 			// to ESTree and scope-manager even though tsgo creates synthetic type
 			// parameters from them and attaches those to the host declaration. ----
@@ -579,4 +602,30 @@ func createNoArrayConstructorProgram(t testing.TB, fileName string, code string)
 		t.Fatalf("source file %q not found", fileName)
 	}
 	return program, sourceFile
+}
+
+// BenchmarkNoArrayConstructorRepeatedCalls protects the scope-scan hot path
+// called out in PR #1753. Program construction is excluded so the result
+// measures repeated rule checks in one unshadowed function scope.
+func BenchmarkNoArrayConstructorRepeatedCalls(b *testing.B) {
+	for _, count := range []int{1_000, 2_000, 4_000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			var source strings.Builder
+			source.WriteString("function f() {")
+			for range count {
+				source.WriteString("void Array(1, 2);")
+			}
+			source.WriteByte('}')
+
+			program, sourceFile := createNoArrayConstructorProgram(b, "repeated-calls.ts", source.String())
+			var options []any
+			b.ResetTimer()
+			for range b.N {
+				diagnostics := lintNoArrayConstructorWithDemand(program, sourceFile, options, rule.EditDemandNone)
+				if len(diagnostics) != count {
+					b.Fatalf("diagnostics = %d, want %d", len(diagnostics), count)
+				}
+			}
+		})
+	}
 }

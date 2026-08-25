@@ -130,7 +130,10 @@ func TestNoArrayConstructorUpstream(t *testing.T) {
 			{Code: `new globalThis.Array`},
 			{Code: `const createArray = Array => new Array()`},
 			{Code: `var Array; new Array;`},
-			{Code: `new Array()`, Globals: map[string]any{"Array": "off"}},
+			{
+				Code: `new Array()`, FileName: "no-array-constructor-espree.js", TSConfig: "tsconfig.allow-js.json",
+				Globals: map[string]any{"Array": "off"},
+			},
 
 			// ---- ruleTesterTypeScript valid ----
 			{Code: `new Array(x);`},
