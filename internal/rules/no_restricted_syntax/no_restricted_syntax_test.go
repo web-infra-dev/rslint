@@ -287,8 +287,29 @@ const B = withSuspense(React.lazy(() => import('./b')));
 				Options:  []interface{}{`Literal[value=null]`},
 				TSConfig: "tsconfig.allow-js.json",
 			},
+			{
+				Code:     "/** @param {Foo} x */\nfunction f(x) {}",
+				FileName: "file.mjs",
+				Options:  []interface{}{`FunctionDeclaration:has(Identifier[name='Foo'])`},
+				TSConfig: "tsconfig.allow-js.json",
+			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Control for the JSDoc :has() case above: the same recursive walk
+			// still sees authored runtime children of the function.
+			{
+				Code:     "/** @param {Foo} x */\nfunction f(x) {}",
+				FileName: "file.mjs",
+				Options:  []interface{}{`FunctionDeclaration:has(Identifier[name='x'])`},
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "restrictedSyntax",
+						Message:   "Using 'FunctionDeclaration:has(Identifier[name='x'])' is not allowed.",
+					},
+				},
+			},
+
 			// ============================================================
 			// Upstream ESLint suite — string format
 			// ============================================================

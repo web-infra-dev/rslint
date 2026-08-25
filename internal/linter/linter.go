@@ -164,17 +164,6 @@ func (r *listenerRegistry) reset() {
 	r.activeKinds = r.activeKinds[:0]
 }
 
-// isJSDocSyntaxNode identifies syntax that TypeScript-Go synthesized from a
-// JSDoc comment. Reparsed roots such as JSTypeAliasDeclaration and
-// their JSDoc-flagged descendants are both absent from ESLint-compatible rule
-// AST traversal; comment and TypeScript compiler APIs expose the authored
-// metadata separately. The DFS prunes at the first such node, so checking the
-// current node is sufficient and avoids walking its ancestors for every
-// ordinary source node.
-func isJSDocSyntaxNode(node *ast.Node) bool {
-	return node != nil && (node.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0 || ast.IsJSDocNode(node))
-}
-
 // runLintRulesInProgram lints files in a single Program. Files are filtered
 // through ExcludePaths, Scope (Files+Dirs), and FileFilter before rule
 // execution. Pass FileFilter=nil to disable that layer.
@@ -321,7 +310,11 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		var childVisitor ast.Visitor
 		var patternVisitor func(node *ast.Node)
 		patternVisitor = func(node *ast.Node) {
-			if isJSDocSyntaxNode(node) {
+			if expression := utils.JSDocTypeAssertionExpression(node); expression != nil {
+				patternVisitor(expression)
+				return
+			}
+			if utils.IsJSDocSyntaxNode(node) {
 				return
 			}
 			runListeners(node.Kind, node)
@@ -357,7 +350,11 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			runListeners(rule.ListenerOnExit(node.Kind), node)
 		}
 		childVisitor = func(node *ast.Node) bool {
-			if isJSDocSyntaxNode(node) {
+			if expression := utils.JSDocTypeAssertionExpression(node); expression != nil {
+				childVisitor(expression)
+				return false
+			}
+			if utils.IsJSDocSyntaxNode(node) {
 				return false
 			}
 			runListeners(node.Kind, node)

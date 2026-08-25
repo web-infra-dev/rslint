@@ -82,6 +82,8 @@ func TestRunLinter_PrunesSyntheticJSDocSyntax(t *testing.T) {
 		"input.mjs": `/** @type {Array<{ value: number | null }>} */
 const annotated = value;
 
+const asserted = /** @type {Foo} */ (bar);
+
 /** @template {string} T */
 function generic(value) { return value; }
 
@@ -95,6 +97,9 @@ const runtime = null;`,
 	}, `{"allowJs":true,"checkJs":false}`)
 
 	var typeReferences int
+	var asExpressions int
+	var fooIdentifiers int
+	var barIdentifiers int
 	var typeParameters int
 	var jsTypeAliases int
 	var jsImports int
@@ -110,6 +115,17 @@ const runtime = null;`,
 				Severity: rule.SeverityError,
 				Run: func(rule.RuleContext) rule.RuleListeners {
 					return rule.RuleListeners{
+						ast.KindAsExpression: func(*ast.Node) {
+							asExpressions++
+						},
+						ast.KindIdentifier: func(node *ast.Node) {
+							switch node.Text() {
+							case "Foo":
+								fooIdentifiers++
+							case "bar":
+								barIdentifiers++
+							}
+						},
 						ast.KindTypeReference: func(*ast.Node) {
 							typeReferences++
 						},
@@ -138,6 +154,14 @@ const runtime = null;`,
 	}
 	if typeReferences != 0 {
 		t.Fatalf("JSDoc TypeReference listener calls = %d, want 0", typeReferences)
+	}
+	if asExpressions != 0 || fooIdentifiers != 0 || barIdentifiers != 1 {
+		t.Fatalf(
+			"JSDoc assertion listener calls = (%d as expressions, %d Foo identifiers, %d bar identifiers), want (0, 0, 1)",
+			asExpressions,
+			fooIdentifiers,
+			barIdentifiers,
+		)
 	}
 	if typeParameters != 0 || jsTypeAliases != 0 || jsImports != 0 {
 		t.Fatalf(

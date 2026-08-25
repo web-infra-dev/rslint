@@ -343,6 +343,43 @@ func VisitDescendants(node *ast.Node, visit func(*ast.Node) bool) {
 	})
 }
 
+// IsJSDocSyntaxNode reports whether node is the root of syntax that tsgo
+// synthesized from a JSDoc comment. Callers performing a depth-first walk can
+// prune the whole subtree as soon as this returns true; ordinary source nodes
+// do not require an ancestor walk.
+func IsJSDocSyntaxNode(node *ast.Node) bool {
+	return node != nil && (node.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0 || ast.IsJSDocNode(node))
+}
+
+// JSDocTypeAssertionExpression returns the authored runtime expression inside
+// a JavaScript JSDoc type assertion. tsgo represents
+// `/** @type {T} */ (value)` as a ParenthesizedExpression containing a
+// synthetic AsExpression, while ESTree exposes only value. Walkers should
+// visit the returned expression instead of either synthetic wrapper or type.
+func JSDocTypeAssertionExpression(node *ast.Node) *ast.Node {
+	if !ast.IsJSDocTypeAssertion(node) {
+		return nil
+	}
+	assertion := node.AsParenthesizedExpression().Expression
+	if assertion == nil || assertion.Kind != ast.KindAsExpression {
+		return nil
+	}
+	return assertion.AsAsExpression().Expression
+}
+
+// IsJSDocTypeAssertionWrapper reports whether node is either wrapper that
+// tsgo inserts around a JavaScript JSDoc type assertion.
+func IsJSDocTypeAssertionWrapper(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if ast.IsJSDocTypeAssertion(node) {
+		return true
+	}
+	return node.Kind == ast.KindAsExpression && node.Parent != nil &&
+		ast.IsJSDocTypeAssertion(node.Parent)
+}
+
 // IsInJSDocSyntax reports whether node came from syntax parsed inside a JSDoc
 // comment. TypeScript-Go deep-clones some of these nodes into the executable
 // tree, preserving NodeFlagsJSDoc on the cloned subtree. Espree and
