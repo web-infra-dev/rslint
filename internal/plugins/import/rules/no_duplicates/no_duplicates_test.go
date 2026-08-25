@@ -859,6 +859,7 @@ import type { RequireType } from "conditional-package" with { "resolution-mode":
 	sourceFile := program.GetSourceFile(filePath)
 	if sourceFile == nil {
 		t.Fatalf("source file %q not found", filePath)
+		return
 	}
 
 	var resolvedPaths []string
@@ -867,6 +868,7 @@ import type { RequireType } from "conditional-package" with { "resolution-mode":
 		resolved := program.GetResolvedModuleFromModuleSpecifier(sourceFile, moduleSpecifier)
 		if resolved == nil {
 			t.Fatalf("import on line %d did not resolve", len(resolvedPaths)+1)
+			continue
 		}
 		resolvedPaths = append(resolvedPaths, resolved.ResolvedFileName)
 	}

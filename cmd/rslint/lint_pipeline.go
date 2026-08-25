@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"runtime/pprof"
 	"runtime/trace"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -537,14 +535,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	pluginResolver := eslintPluginConfigResolver{
 		lintResolver: fileConfigResolver,
 	}
-	var pluginCh <-chan []rule.RuleDiagnostic
+	var pluginCh <-chan linter.EslintPluginDispatchOutcome
 	if hasEslintPlugins {
 		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, pluginResolver.resolve)
 		suggestionsMode := linter.SuggestionsModeOff
 		if fix {
 			suggestionsMode = linter.SuggestionsModeEager
 		}
-		pluginCh = dispatchEslintPluginRulesAsync(ctx, dispatch, pluginInputs, fix, suggestionsMode, timingCollector)
+		pluginCh = linter.DispatchEslintPluginRulesAsync(ctx, dispatch, pluginInputs, fix, suggestionsMode, timingCollector, reportEslintPluginDispatchOutcome)
 	}
 
 	lintResult, err := linter.RunLinter(runOpts)
@@ -561,7 +559,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Merge eslint-plugin diagnostics (dispatched in parallel) now that the
 	// native diagnostics goroutine has drained.
 	if pluginCh != nil {
-		allDiags = append(allDiags, (<-pluginCh)...)
+		allDiags = append(allDiags, (<-pluginCh).Diagnostics...)
 	}
 	remapDiagnosticTargetPaths(allDiags, lintTargetBySourcePath, fs)
 
@@ -675,7 +673,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// worker re-reads the post-fix file content, and merging here keeps
 			// plugin diagnostics from being lost when allDiags is replaced.
 			// Each pass prepares a fresh plan for the rebuilt target binding.
-			var fixPluginCh <-chan []rule.RuleDiagnostic
+			var fixPluginCh <-chan linter.EslintPluginDispatchOutcome
 			if hasEslintPlugins {
 				fixPluginInputs := linter.BuildEslintPluginFileInputs(fixRunOpts.PreparedPlan, eslintPluginConfigResolver{
 					lintResolver: fixConfigResolver,
@@ -684,12 +682,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				if fix {
 					suggestionsMode = linter.SuggestionsModeEager
 				}
-				fixPluginCh = dispatchEslintPluginRulesAsync(ctx, dispatch, fixPluginInputs, fix, suggestionsMode, timingCollector)
+				fixPluginCh = linter.DispatchEslintPluginRulesAsync(ctx, dispatch, fixPluginInputs, fix, suggestionsMode, timingCollector, reportEslintPluginDispatchOutcome)
 			}
 			passResult, passErr := linter.RunLinter(fixRunOpts)
 			var fixPluginDiags []rule.RuleDiagnostic
 			if fixPluginCh != nil {
-				fixPluginDiags = <-fixPluginCh
+				fixPluginDiags = (<-fixPluginCh).Diagnostics
 			}
 			if passErr != nil {
 				fmt.Fprintf(os.Stderr, "error running linter after fixes: %v\n", passErr)
@@ -731,21 +729,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	allDiags = deduplicateTypeScriptDiagnostics(allDiags, fs, targetPlan.PreferredCallerPaths())
 
-	// Diagnostics arrive in completion order — programs and, within a
-	// program, file shards run in parallel — so impose a deterministic
-	// order before printing. The key is (file, start position) only,
-	// deliberately with NO end/rule tie-break: ESLint orders same-start
-	// diagnostics by emission order (parent reported before nested child),
-	// and a file's diagnostics are all emitted by a single worker, so under
-	// a STABLE sort this key is already fully deterministic. Keep this
-	// comparator in sync with the --api one in api_lint.go (same policy over
-	// api.Diagnostic).
-	slices.SortStableFunc(allDiags, func(a, b rule.RuleDiagnostic) int {
-		if c := strings.Compare(a.FilePath, b.FilePath); c != 0 {
-			return c
-		}
-		return cmp.Compare(a.Range.Pos(), b.Range.Pos())
-	})
+	// Paths have already been remapped into the caller-visible target space.
+	// Sort the completed set before rendering; same-start diagnostics retain
+	// emission order.
+	linter.StableSortDiagnosticsByFileAndStart(allDiags)
 
 	// Phase 3: Build one report from the final post-fix diagnostics, then let
 	// the CLI output subsystem own format dispatch, colors, and summary text.

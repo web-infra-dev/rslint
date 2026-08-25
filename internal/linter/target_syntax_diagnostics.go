@@ -2,17 +2,16 @@ package linter
 
 import (
 	"context"
-	"fmt"
 
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type targetSyntacticDiagnosticKey struct {
-	path string
-	code int32
-	pos  int
-	end  int
+	path     string
+	ruleName string
+	pos      int
+	end      int
 }
 
 // CollectTargetSyntacticDiagnostics returns syntax diagnostics for the exact
@@ -32,7 +31,7 @@ func CollectTargetSyntacticDiagnostics(
 	var diagnostics []rule.RuleDiagnostic
 	for i, program := range programs {
 		coveredByProgramDiagnostics := programDiagnosticsIncluded && program.CanProvideProgramDiagnostics()
-		if i >= len(targetsByProgram) || len(targetsByProgram[i]) == 0 {
+		if coveredByProgramDiagnostics || i >= len(targetsByProgram) || len(targetsByProgram[i]) == 0 {
 			continue
 		}
 		ctx := context.Background()
@@ -41,31 +40,18 @@ func CollectTargetSyntacticDiagnostics(
 			if file == nil {
 				continue
 			}
-			for _, diagnostic := range program.SyntacticDiagnostics(ctx, file) {
-				if coveredByProgramDiagnostics {
-					continue
-				}
-				loc := diagnostic.Loc()
+			for _, diagnostic := range CollectFileSyntacticDiagnostics(ctx, program, file) {
 				key := targetSyntacticDiagnosticKey{
-					path: file.FileName(),
-					code: diagnostic.Code(),
-					pos:  loc.Pos(),
-					end:  loc.End(),
+					path:     diagnostic.FilePath,
+					ruleName: diagnostic.RuleName,
+					pos:      diagnostic.Range.Pos(),
+					end:      diagnostic.Range.End(),
 				}
 				if _, ok := seen[key]; ok {
 					continue
 				}
 				seen[key] = struct{}{}
-				diagnostics = append(diagnostics, rule.RuleDiagnostic{
-					RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
-					SourceFile:   file,
-					FilePath:     file.FileName(),
-					Range:        loc,
-					Message:      rule.RuleMessage{Description: diagnostic.String()},
-					Severity:     rule.SeverityError,
-					Origin:       rule.DiagnosticOriginTypeScript,
-					PreFormatted: true,
-				})
+				diagnostics = append(diagnostics, diagnostic)
 			}
 		}
 	}
