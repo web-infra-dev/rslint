@@ -1,0 +1,302 @@
+// Rstest Snapshot v1
+
+exports[`consistent-this > invalid 1`] = `
+{
+  "code": "var context = this",
+  "diagnostics": [
+    {
+      "message": "Unexpected alias 'context' for 'this'.",
+      "messageId": "unexpectedAlias",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 2`] = `
+{
+  "code": "var that = this",
+  "diagnostics": [
+    {
+      "message": "Unexpected alias 'that' for 'this'.",
+      "messageId": "unexpectedAlias",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 3`] = `
+{
+  "code": "var foo = 42, self = this",
+  "diagnostics": [
+    {
+      "message": "Unexpected alias 'self' for 'this'.",
+      "messageId": "unexpectedAlias",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 4`] = `
+{
+  "code": "var self = 42",
+  "diagnostics": [
+    {
+      "message": "Designated alias 'self' is not assigned to 'this'.",
+      "messageId": "aliasNotAssignedToThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 5`] = `
+{
+  "code": "var self",
+  "diagnostics": [
+    {
+      "message": "Designated alias 'self' is not assigned to 'this'.",
+      "messageId": "aliasNotAssignedToThis",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 6`] = `
+{
+  "code": "var self; self = 42",
+  "diagnostics": [
+    {
+      "message": "Designated alias 'self' is not assigned to 'this'.",
+      "messageId": "aliasNotAssignedToThis",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+    {
+      "message": "Designated alias 'self' is not assigned to 'this'.",
+      "messageId": "aliasNotAssignedToThis",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 7`] = `
+{
+  "code": "context = this",
+  "diagnostics": [
+    {
+      "message": "Unexpected alias 'context' for 'this'.",
+      "messageId": "unexpectedAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 8`] = `
+{
+  "code": "that = this",
+  "diagnostics": [
+    {
+      "message": "Unexpected alias 'that' for 'this'.",
+      "messageId": "unexpectedAlias",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 9`] = `
+{
+  "code": "self = this",
+  "diagnostics": [
+    {
+      "message": "Unexpected alias 'self' for 'this'.",
+      "messageId": "unexpectedAlias",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 10`] = `
+{
+  "code": "self += this",
+  "diagnostics": [
+    {
+      "message": "Designated alias 'self' is not assigned to 'this'.",
+      "messageId": "aliasNotAssignedToThis",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-this > invalid 11`] = `
+{
+  "code": "var self; (function() { self = this; }())",
+  "diagnostics": [
+    {
+      "message": "Designated alias 'self' is not assigned to 'this'.",
+      "messageId": "aliasNotAssignedToThis",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

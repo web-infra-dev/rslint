@@ -256,7 +256,7 @@ func (c *curlyChecker) prepareCheck(node, body *ast.Node, name string, condition
 	expected := expectDontCare
 
 	switch {
-	case hasBlock && (len(c.blockStatements(body)) != 1 || c.areBracesNecessary(body)):
+	case hasBlock && (len(c.blockStatements(body)) != 1 || utils.AreBracesNecessary(c.sf, body)):
 		expected = expectBraces
 	case c.opts.multiOnly:
 		expected = expectNoBraces
@@ -445,23 +445,6 @@ func (c *curlyChecker) lastTokenBefore(fromPos, beforePos int) (start, end int, 
 	return
 }
 
-// areBracesNecessary mirrors astUtils.areBracesNecessary: a single-statement
-// block still needs its braces when the statement is a lexical declaration, or
-// when it ends with an `if` that would capture a trailing `else`.
-func (c *curlyChecker) areBracesNecessary(block *ast.Node) bool {
-	statement := c.blockStatements(block)[0]
-	return isLexicalDeclaration(statement) ||
-		(hasUnsafeIf(statement) && c.isFollowedByElseKeyword(block))
-}
-
-func (c *curlyChecker) isFollowedByElseKeyword(block *ast.Node) bool {
-	nextStart := scanner.SkipTrivia(c.text, block.End())
-	if nextStart >= len(c.text) {
-		return false
-	}
-	return scanner.ScanTokenAtPosition(c.sf, nextStart) == ast.KindElseKeyword
-}
-
 // isCollapsedOneLiner reports whether the body sits on the same line as the
 // token that precedes it (its closing `)` / `do` / `else`).
 func (c *curlyChecker) isCollapsedOneLiner(node *ast.Node) bool {
@@ -511,53 +494,4 @@ func (c *curlyChecker) hasLeadingComments(block, statement *ast.Node) bool {
 
 func (c *curlyChecker) blockStatements(block *ast.Node) []*ast.Node {
 	return block.AsBlock().Statements.Nodes
-}
-
-// isLexicalDeclaration mirrors astUtils.isLexicalDeclaration: let/const/using/
-// await using variable declarations and function/class declarations.
-//
-// NOTE: Unlike ESLint (which only sees JavaScript), tsgo also parses TypeScript
-// declarations that are equally illegal as an unbraced control-statement body
-// (`if (a) enum E {}` is a syntax error). They are treated the same as lexical
-// declarations so the autofix never strips a required block.
-func isLexicalDeclaration(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindVariableStatement:
-		declList := node.AsVariableStatement().DeclarationList
-		return declList.Flags&ast.NodeFlagsBlockScoped != 0
-	case ast.KindFunctionDeclaration,
-		ast.KindClassDeclaration,
-		ast.KindEnumDeclaration,
-		ast.KindModuleDeclaration,
-		ast.KindInterfaceDeclaration,
-		ast.KindTypeAliasDeclaration,
-		ast.KindImportEqualsDeclaration:
-		return true
-	}
-	return false
-}
-
-// hasUnsafeIf reports whether the code contains an `if` that would become
-// associated with an `else` appended directly after it.
-func hasUnsafeIf(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindIfStatement:
-		ifStmt := node.AsIfStatement()
-		if ifStmt.ElseStatement == nil {
-			return true
-		}
-		return hasUnsafeIf(ifStmt.ElseStatement)
-	case ast.KindForStatement:
-		return hasUnsafeIf(node.AsForStatement().Statement)
-	case ast.KindForInStatement, ast.KindForOfStatement:
-		return hasUnsafeIf(node.AsForInOrOfStatement().Statement)
-	case ast.KindLabeledStatement:
-		return hasUnsafeIf(node.AsLabeledStatement().Statement)
-	case ast.KindWithStatement:
-		return hasUnsafeIf(node.AsWithStatement().Statement)
-	case ast.KindWhileStatement:
-		return hasUnsafeIf(node.AsWhileStatement().Statement)
-	default:
-		return false
-	}
 }

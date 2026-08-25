@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { convertPathToPattern } from 'tinyglobby';
 import {
   writeFile,
   rm,
@@ -580,7 +581,7 @@ describe('Rslint class', () => {
     }
   });
 
-  test('overrideConfigFile outside cwd still resolves files from cwd', async () => {
+  test('overrideConfigFile outside cwd resolves files from its config directory', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-override-cwd-'));
     const projectDir = path.join(tmp, 'project');
     const configDir = path.join(tmp, 'configs');
@@ -590,7 +591,7 @@ describe('Rslint class', () => {
       const configFile = path.join(configDir, 'custom.config.mjs');
       await writeFile(
         configFile,
-        "export default [{ files: ['src/**/*.ts'], rules: { 'no-console': 'error' } }];\n",
+        "export default [{ files: ['../project/src/**/*.ts'], rules: { 'no-console': 'error' } }];\n",
       );
       await writeFile(
         path.join(projectDir, 'src', 'index.ts'),
@@ -607,6 +608,58 @@ describe('Rslint class', () => {
         expect(results[0].messages.map((m) => m.ruleId)).toContain(
           'no-console',
         );
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('overrideConfigFile keeps multiple directory Git scopes independent', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-multi-root-'));
+    const invocationDir = path.join(tmp, 'invocation');
+    const configDir = path.join(tmp, 'config');
+    const firstDir = path.join(tmp, 'first');
+    const secondDir = path.join(tmp, 'second');
+    try {
+      await Promise.all(
+        [invocationDir, configDir, firstDir, secondDir].map((directory) =>
+          mkdir(directory, { recursive: true }),
+        ),
+      );
+      const configFile = path.join(configDir, 'custom.config.mjs');
+      await writeFile(
+        configFile,
+        "export default [{ rules: { 'no-debugger': 'error' } }];\n",
+      );
+      await Promise.all([
+        writeFile(path.join(firstDir, '.gitignore'), 'ignored.ts\n'),
+        writeFile(path.join(firstDir, 'ignored.ts'), 'debugger;\n'),
+        writeFile(path.join(firstDir, 'visible.ts'), 'debugger;\n'),
+        writeFile(path.join(secondDir, '.gitignore'), 'hidden.ts\n'),
+        writeFile(path.join(secondDir, 'ignored.ts'), 'debugger;\n'),
+        writeFile(path.join(secondDir, 'hidden.ts'), 'debugger;\n'),
+      ]);
+
+      const rslint = new Rslint({
+        cwd: invocationDir,
+        overrideConfigFile: configFile,
+      });
+      try {
+        const results = await rslint.lintFiles([
+          `${convertPathToPattern(firstDir)}/**/*.ts`,
+          `${convertPathToPattern(secondDir)}/**/*.ts`,
+        ]);
+        expect(results.map((result) => result.filePath)).toEqual([
+          path.join(firstDir, 'visible.ts'),
+          path.join(secondDir, 'ignored.ts'),
+        ]);
+        for (const result of results) {
+          expect(result.messages.map((message) => message.ruleId)).toContain(
+            'no-debugger',
+          );
+        }
       } finally {
         await rslint.close();
       }
@@ -1126,7 +1179,7 @@ module.exports = config;`
     }
   });
 
-  test('nested configs resolve overrideConfig paths from each discovered config', async () => {
+  test('nested configs preserve the cwd base of inline overrideConfig paths', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-nested-override-'),
     );
@@ -1162,12 +1215,12 @@ module.exports = config;`
       const rslint = new Rslint({
         cwd: tmp,
         overrideConfig: [
-          { ignores: ['src/ignored.ts'] },
+          { ignores: ['packages/app/src/ignored.ts'] },
           {
-            files: ['src/**/*.ts'],
+            files: ['packages/*/src/**/*.ts'],
             plugins: ['@typescript-eslint'],
             languageOptions: {
-              parserOptions: { project: ['./tsconfig.json'] },
+              parserOptions: { project: ['./packages/*/tsconfig.json'] },
             },
             rules: {
               '@typescript-eslint/array-type': [
@@ -1849,7 +1902,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles scans an explicit directory symlink with its physical ancestor config', async () => {
+  test('lintFiles preserves inline cwd matching through a physical ancestor config', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-explicit-directory-symlink-'),
     );
@@ -1862,7 +1915,10 @@ module.exports = config;`
         path.join(realRoot, 'rslint.config.mjs'),
         "export default [{ files: ['sub/**/*.ts'], rules: { 'no-debugger': 'error' } }];\n",
       );
-      await writeFile(path.join(realSubdir, 'index.ts'), 'debugger;\n');
+      await writeFile(
+        path.join(realSubdir, 'index.ts'),
+        "debugger;\nconsole.log('value');\n",
+      );
       try {
         await symlink(
           realSubdir,
@@ -1873,7 +1929,15 @@ module.exports = config;`
         return;
       }
 
-      const rslint = new Rslint({ cwd: tmp });
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfig: [
+          {
+            files: ['link/**/*.ts'],
+            rules: { 'no-console': 'error' },
+          },
+        ],
+      });
       try {
         for (const pattern of ['link', 'link/**/*.ts']) {
           const results = await rslint.lintFiles(pattern);
@@ -1881,6 +1945,7 @@ module.exports = config;`
           expect(results[0].filePath).toBe(path.join(linkDir, 'index.ts'));
           expect(results[0].messages.map((message) => message.ruleId)).toEqual([
             'no-debugger',
+            'no-console',
           ]);
         }
       } finally {

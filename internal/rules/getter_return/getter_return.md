@@ -83,4 +83,4 @@ var obj = {
 ## Original Documentation
 
 - [ESLint: getter-return](https://eslint.org/docs/latest/rules/getter-return)
-- [Source code](https://github.com/eslint/eslint/blob/v9.39.1/lib/rules/getter-return.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/getter-return.js)

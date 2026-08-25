@@ -129,23 +129,6 @@ interface Foo extends Deep<Map<string, void>> {}
       code: 'type voidPromiseNeverUnion = void | Promise<void> | never;',
       options: [{ allowInGenericTypeArguments: ['Promise'] }],
     },
-    // Heritage clause with whitelist - in whitelist
-    {
-      code: `
-interface Base<T> {}
-interface Foo extends Base<void> {}
-      `,
-      options: [{ allowInGenericTypeArguments: ['Base'] }],
-    },
-    {
-      code: `
-interface A<T> {}
-interface B<T> {}
-interface Foo extends A<void>, B<void> {}
-      `,
-      options: [{ allowInGenericTypeArguments: ['A', 'B'] }],
-    },
-
     // === allowAsThisParameter: true ===
     {
       code: 'function f(this: void) {}',
@@ -654,19 +637,30 @@ class Foo implements A<void> {}`,
       ],
       options: [{ allowInGenericTypeArguments: ['Allowed'] }],
     },
-    // Heritage clause with whitelist - not in whitelist
+    // A whitelist applies only to type references upstream. Heritage type
+    // arguments use the ordinary not-return-or-generic diagnostic.
     {
       code: `
 interface Base<T> {}
 interface Foo extends Base<void> {}`,
       errors: [
         {
-          messageId: 'invalidVoidForGeneric',
+          messageId: 'invalidVoidNotReturnOrGeneric',
+        },
+      ],
+      options: [{ allowInGenericTypeArguments: ['Base'] }],
+    },
+    {
+      code: `
+interface Base<T> {}
+interface Foo extends Base<void> {}`,
+      errors: [
+        {
+          messageId: 'invalidVoidNotReturnOrGeneric',
         },
       ],
       options: [{ allowInGenericTypeArguments: ['Allowed'] }],
     },
-    // Heritage clause with whitelist - multiple extends, one allowed one not
     {
       code: `
 interface Allowed<T> {}
@@ -674,10 +668,28 @@ interface Banned<T> {}
 interface Foo extends Allowed<void>, Banned<void> {}`,
       errors: [
         {
-          messageId: 'invalidVoidForGeneric',
+          messageId: 'invalidVoidNotReturnOrGeneric',
+        },
+        {
+          messageId: 'invalidVoidNotReturnOrGeneric',
         },
       ],
       options: [{ allowInGenericTypeArguments: ['Allowed'] }],
+    },
+    {
+      code: `
+interface A<T> {}
+interface B<T> {}
+interface Foo extends A<void>, B<void> {}`,
+      errors: [
+        {
+          messageId: 'invalidVoidNotReturnOrGeneric',
+        },
+        {
+          messageId: 'invalidVoidNotReturnOrGeneric',
+        },
+      ],
+      options: [{ allowInGenericTypeArguments: ['A', 'B'] }],
     },
 
     // === allowAsThisParameter: true ===

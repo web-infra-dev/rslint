@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
@@ -47,6 +48,15 @@ func TestRelativeGlobPatternPreservesFilesystemRoots(t *testing.T) {
 	}
 }
 
+func TestNewConfigLoaderRequiresRuleCatalog(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected nil rule catalog to panic")
+		}
+	}()
+	NewConfigLoader(osvfs.FS(), t.TempDir(), nil)
+}
+
 func TestLoadRslintConfig_RejectsEmptyFilesArray(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "rslint.jsonc")
@@ -59,7 +69,7 @@ func TestLoadRslintConfig_RejectsEmptyFilesArray(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	_, _, err := loader.LoadRslintConfig("rslint.jsonc")
 	assert.ErrorContains(t, err, `key "files": expected value to be a non-empty array`)
 }
@@ -75,7 +85,7 @@ func TestLoadRslintConfig_AllowsMissingFiles(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	cfg, _, err := loader.LoadRslintConfig("rslint.jsonc")
 	assert.NilError(t, err)
 	assert.Equal(t, len(cfg), 1)
@@ -88,7 +98,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
 	createTestFile(t, filepath.Join(tmpDir, "packages/utils/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "apps/web/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -113,7 +123,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
 
 func TestLoadTsConfigsFromRslintConfig_NoMatches(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -133,7 +143,7 @@ func TestLoadTsConfigsFromRslintConfig_MixedGlobAndNonGlob(t *testing.T) {
 	createTestFile(t, filepath.Join(tmpDir, "tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -159,7 +169,7 @@ func TestLoadTsConfigsFromRslintConfig_DeduplicatesMatches(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -188,7 +198,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansionWithOverlayVFS(t *testing.T)
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/utils/tsconfig.json")): `{}`,
 	}
 
-	loader := NewConfigLoader(utils.NewOverlayVFS(osvfs.FS(), virtualFiles), tmpDir)
+	loader := NewConfigLoader(utils.NewOverlayVFS(osvfs.FS(), virtualFiles), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -209,7 +219,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansionWithOverlayVFS(t *testing.T)
 
 func TestLoadTsConfigsFromRslintConfig_NonExistentNonGlobFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -230,7 +240,7 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarPattern(t *testing.T) {
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/subpackage/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/stores/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -258,7 +268,7 @@ func TestLoadTsConfigsFromRslintConfig_SingleStarDoesNotMatchNested(t *testing.T
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/node_modules/foo/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/src/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -278,7 +288,7 @@ func TestLoadTsConfigsFromRslintConfig_SingleStarDoesNotMatchNested(t *testing.T
 
 func TestLoadTsConfigsFromRslintConfig_NonExistentSearchRoot(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -302,7 +312,7 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarWithSymlinkCycle(t *testing.T) 
 		filepath.Join(tmpDir, "packages/ui/loop"),
 	))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -334,7 +344,7 @@ func TestLoadTsConfigsFromRslintConfig_QuestionMarkPattern(t *testing.T) {
 	// "ab" is two chars — should NOT match single ?
 	createTestFile(t, filepath.Join(tmpDir, "packages/ab/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -360,7 +370,7 @@ func TestLoadTsConfigsFromRslintConfig_CharacterClassPattern(t *testing.T) {
 	// "a" is not in [0-9] — should NOT match
 	createTestFile(t, filepath.Join(tmpDir, "tsconfiga.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -385,7 +395,7 @@ func TestLoadTsConfigsFromRslintConfig_NegatedCharacterClass(t *testing.T) {
 	createTestFile(t, filepath.Join(tmpDir, "packages/b/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/c/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -477,6 +487,22 @@ func TestResolveTsConfigPaths_FallbackToDefaultTsConfig(t *testing.T) {
 	}
 }
 
+func TestResolveTsConfigPaths_ExplicitEmptyProjectDisablesFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "tsconfig.json"))
+	cfg := RslintConfig{{
+		LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+			Project: ProjectPaths{},
+		}},
+	}}
+
+	paths, err := ResolveTsConfigPaths(cfg, tmpDir, osvfs.FS())
+	assert.NilError(t, err)
+	if paths != nil {
+		t.Fatalf("explicit project: [] selected an implicit tsconfig: %v", paths)
+	}
+}
+
 func TestResolveTsConfigPaths_NilFS(t *testing.T) {
 	paths, err := ResolveTsConfigPaths(RslintConfig{{}}, "/any", nil)
 	assert.NilError(t, err)
@@ -501,4 +527,77 @@ func TestResolveTsConfigPaths_ErrorOnNonExistentTsConfig(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for non-existent tsconfig")
 	}
+}
+
+func TestAuthoredPathBaseAppliesToFilesIgnoresAndProjects(t *testing.T) {
+	root := t.TempDir()
+	configDirectory := filepath.Join(root, "config")
+	authoredDirectory := filepath.Join(root, "workspace")
+	target := filepath.Join(authoredDirectory, "src", "index.ts")
+	ignored := filepath.Join(authoredDirectory, "src", "ignored.ts")
+	ownerProject := filepath.Join(configDirectory, "tsconfig.json")
+	authoredProject := filepath.Join(authoredDirectory, "tsconfig.json")
+	for _, path := range []string{target, ignored, ownerProject, authoredProject} {
+		createTestFile(t, path)
+	}
+
+	base := RslintConfig{{
+		LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+			Project: ProjectPaths{"./tsconfig.json"},
+		}},
+	}}
+	override := RslintConfig{
+		{Ignores: []string{"src/ignored.ts"}},
+		{
+			Files: []string{"src/**/*.ts"},
+			LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+				Project: ProjectPaths{"./tsconfig.json"},
+			}},
+			Rules: Rules{"no-debugger": "error"},
+		},
+	}
+	composed := append(base, ConfigWithAuthoredPathBase(override, authoredDirectory)...)
+	if override[0].authoredPathBase != nil || override[1].authoredPathBase != nil {
+		t.Fatal("ConfigWithAuthoredPathBase mutated its input")
+	}
+	composed, optionErrors := ValidateRuleOptions(composed, baseRuleCatalog())
+	if len(optionErrors) != 0 {
+		t.Fatalf("ValidateRuleOptions returned errors: %v", optionErrors)
+	}
+
+	merged := composed.GetConfigForFile(target, configDirectory)
+	if merged == nil || merged.Rules["no-debugger"] == nil {
+		t.Fatalf("authored files base did not select target: %+v", merged)
+	}
+	if !composed.IsFileIgnored(ignored, configDirectory) {
+		t.Fatal("authored ignores base did not exclude target")
+	}
+
+	projects, err := ResolveTsConfigPaths(composed, configDirectory, osvfs.FS())
+	assert.NilError(t, err)
+	wantProjects := []string{
+		tspath.NormalizePath(ownerProject),
+		tspath.NormalizePath(authoredProject),
+	}
+	assert.DeepEqual(t, projects, wantProjects)
+}
+
+func TestResolveTsConfigPathsDefaultRemainsAtOwningConfigBase(t *testing.T) {
+	root := t.TempDir()
+	configDirectory := filepath.Join(root, "config")
+	authoredDirectory := filepath.Join(root, "workspace")
+	ownerProject := filepath.Join(configDirectory, "tsconfig.json")
+	for _, path := range []string{
+		ownerProject,
+		filepath.Join(authoredDirectory, "tsconfig.json"),
+	} {
+		createTestFile(t, path)
+	}
+
+	config := ConfigWithAuthoredPathBase(RslintConfig{{
+		Rules: Rules{"no-debugger": "error"},
+	}}, authoredDirectory)
+	projects, err := ResolveTsConfigPaths(config, configDirectory, osvfs.FS())
+	assert.NilError(t, err)
+	assert.DeepEqual(t, projects, []string{tspath.NormalizePath(ownerProject)})
 }

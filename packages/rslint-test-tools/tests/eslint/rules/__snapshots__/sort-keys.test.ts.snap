@@ -1,0 +1,2953 @@
+// Rstest Snapshot v1
+
+exports[`sort-keys > invalid 1`] = `
+{
+  "code": "var obj = {a:1, '':2} // default",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 2`] = `
+{
+  "code": "var obj = {a:1, [\`\`]:2} // default",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 3`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // default",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 4`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 5`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 6`] = `
+{
+  "code": "var obj = {b_:1, c:2, C:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'C' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 7`] = `
+{
+  "code": "var obj = {$:1, _:2, A:3, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'A' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 8`] = `
+{
+  "code": "var obj = {1:1, 2:4, A:3, '11':2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '11' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 9`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'Z' should be before 'À'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 10`] = `
+{
+  "code": "var obj = { null: 1, [/(?<zero>0)/]: 2 }",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '/(?<zero>0)/' should be before 'null'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 11`] = `
+{
+  "code": "var obj = {...z, c:1, b:1}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 12`] = `
+{
+  "code": "var obj = {...z, ...c, d:4, b:1, ...y, ...f, e:2, a:1}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'd'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'e'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 13`] = `
+{
+  "code": "var obj = {c:1, b:1, ...a}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 14`] = `
+{
+  "code": "var obj = {...z, ...a, c:1, b:1}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 15`] = `
+{
+  "code": "var obj = {...z, b:1, a:1, ...d, ...c}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 16`] = `
+{
+  "code": "var obj = {...z, a:2, b:0, ...x, ...c}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'b' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 17`] = `
+{
+  "code": "var obj = {...z, a:2, b:0, ...x}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'b' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 18`] = `
+{
+  "code": "var obj = {...z, '':1, a:2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'a' should be before ''.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 19`] = `
+{
+  "code": "var obj = {a:1, [b+c]:2, '':3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 20`] = `
+{
+  "code": "var obj = {'':1, [b+c]:2, a:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'a' should be before ''.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 21`] = `
+{
+  "code": "var obj = {b:1, [f()]:2, '':3, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'a' should be before ''.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 22`] = `
+{
+  "code": "var obj = {a:1, b:3, [a]: -1, c:2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 23`] = `
+{
+  "code": "var obj = {a:1, c:{y:1, x:1}, b:1}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'x' should be before 'y'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 24`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // asc",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 25`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 26`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 27`] = `
+{
+  "code": "var obj = {b_:1, c:2, C:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'C' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 28`] = `
+{
+  "code": "var obj = {$:1, _:2, A:3, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'A' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 29`] = `
+{
+  "code": "var obj = {1:1, 2:4, A:3, '11':2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '11' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 30`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'Z' should be before 'À'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 31`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 32`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // asc, insensitive",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 33`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 34`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive ascending order. 'a' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 35`] = `
+{
+  "code": "var obj = {$:1, A:3, _:2, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive ascending order. '_' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 36`] = `
+{
+  "code": "var obj = {1:1, 2:4, A:3, '11':2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive ascending order. '11' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 37`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive ascending order. 'Z' should be before 'À'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 38`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 39`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // asc, natural",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 40`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 41`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural ascending order. 'a' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 42`] = `
+{
+  "code": "var obj = {b_:1, c:2, C:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural ascending order. 'C' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 43`] = `
+{
+  "code": "var obj = {$:1, A:3, _:2, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural ascending order. '_' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 44`] = `
+{
+  "code": "var obj = {1:1, 2:4, A:3, '11':2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural ascending order. '11' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 45`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural ascending order. 'Z' should be before 'À'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 46`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 47`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // asc, natural, insensitive",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 48`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive ascending order. 'b' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 49`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive ascending order. 'a' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 50`] = `
+{
+  "code": "var obj = {$:1, A:3, _:2, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive ascending order. '_' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 51`] = `
+{
+  "code": "var obj = {1:1, '11':2, 2:4, A:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive ascending order. '2' should be before '11'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 52`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive ascending order. 'Z' should be before 'À'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 53`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive ascending order. '_' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 54`] = `
+{
+  "code": "var obj = {'':1, a:'2'} // desc",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'a' should be before ''.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 55`] = `
+{
+  "code": "var obj = {[\`\`]:1, a:'2'} // desc",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'a' should be before ''.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 56`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // desc",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'b' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 57`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'c' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 58`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'b' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 59`] = `
+{
+  "code": "var obj = {b_:1, c:2, C:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'c' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 60`] = `
+{
+  "code": "var obj = {$:1, _:2, A:3, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. '_' should be before '$'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in descending order. 'a' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 61`] = `
+{
+  "code": "var obj = {1:1, 2:4, A:3, '11':2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. '2' should be before '1'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in descending order. 'A' should be before '2'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 62`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'À' should be before '#'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in descending order. 'è' should be before 'Z'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 63`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in descending order. 'b' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 64`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // desc, insensitive",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'b' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 65`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'c' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 66`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'b' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 67`] = `
+{
+  "code": "var obj = {b_:1, c:2, C:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'c' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 68`] = `
+{
+  "code": "var obj = {$:1, _:2, A:3, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive descending order. '_' should be before '$'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'A' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 69`] = `
+{
+  "code": "var obj = {1:1, 2:4, A:3, '11':2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive descending order. '2' should be before '1'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'A' should be before '2'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 70`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'À' should be before '#'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'è' should be before 'Z'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 71`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in insensitive descending order. 'b' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 72`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // desc, natural",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural descending order. 'b' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 73`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural descending order. 'c' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 74`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural descending order. 'b' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 75`] = `
+{
+  "code": "var obj = {b_:1, c:2, C:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural descending order. 'c' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 76`] = `
+{
+  "code": "var obj = {$:1, _:2, A:3, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural descending order. '_' should be before '$'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in natural descending order. 'A' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in natural descending order. 'a' should be before 'A'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 77`] = `
+{
+  "code": "var obj = {1:1, 2:4, A:3, '11':2}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural descending order. '2' should be before '1'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in natural descending order. 'A' should be before '2'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 78`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural descending order. 'À' should be before '#'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in natural descending order. 'è' should be before 'Z'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 79`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural descending order. 'b' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 80`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3} // desc, natural, insensitive",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'b' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 81`] = `
+{
+  "code": "var obj = {a:1, c:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'c' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 82`] = `
+{
+  "code": "var obj = {b_:1, a:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'b' should be before 'a'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 83`] = `
+{
+  "code": "var obj = {b_:1, c:2, C:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'c' should be before 'b_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 84`] = `
+{
+  "code": "var obj = {$:1, _:2, A:3, a:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. '_' should be before '$'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'A' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 85`] = `
+{
+  "code": "var obj = {1:1, 2:4, '11':2, A:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. '2' should be before '1'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. '11' should be before '2'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'A' should be before '11'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 86`] = `
+{
+  "code": "var obj = {'#':1, À:3, 'Z':2, è:4}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'À' should be before '#'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'è' should be before 'Z'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 87`] = `
+{
+  "code": "var obj = {a:1, _:2, b:3}",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in natural insensitive descending order. 'b' should be before '_'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 88`] = `
+{
+  "code": "
+                var obj = {
+                    b: 1,
+                    c: 2,
+                    a: 3
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 21,
+          "line": 5,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 89`] = `
+{
+  "code": "
+                let obj = {
+                    b
+
+                    ,a
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 22,
+          "line": 5,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 90`] = `
+{
+  "code": "
+                let obj = {
+                    b
+
+                    ,a
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 22,
+          "line": 5,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 91`] = `
+{
+  "code": "
+                 var obj = {
+                    b: 1,
+                    c () {
+
+                    },
+                    a: 3
+                  }
+             ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 92`] = `
+{
+  "code": "
+                 var obj = {
+                    a: 1,
+                    b: 2,
+
+                    z () {
+
+                    },
+                    y: 3
+                  }
+             ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'y' should be before 'z'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 9,
+        },
+        "start": {
+          "column": 21,
+          "line": 9,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 93`] = `
+{
+  "code": "
+                 var obj = {
+                    b: 1,
+                    c () {
+                    },
+                    // comment
+                    a: 3
+                  }
+             ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'c'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 94`] = `
+{
+  "code": "
+                var obj = {
+                  b,
+                  [a+b]: 1,
+                  a // sort-keys: 'a' should be before 'b'
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 95`] = `
+{
+  "code": "
+                var obj = {
+                    c: 1,
+                    d: 2,
+                    // comment
+                    // comment
+                    b() {
+                    },
+                    e: 4
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'd'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 96`] = `
+{
+  "code": "
+                var obj = {
+                    c: 1,
+                    d: 2,
+
+                    z() {
+
+                    },
+                    f: 3,
+                    /*
+
+
+                    */
+                    [a+b]: 1,
+                    b: 1,
+                    e: 2
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'f' should be before 'z'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 9,
+        },
+        "start": {
+          "column": 21,
+          "line": 9,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+    {
+      "message": "Expected object keys to be in ascending order. 'b' should be before 'f'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 15,
+        },
+        "start": {
+          "column": 21,
+          "line": 15,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 97`] = `
+{
+  "code": "
+                var obj = {
+                    b: "/*",
+                    a: "*/",
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 98`] = `
+{
+  "code": "
+                var obj = {
+                    b: 1
+                    // comment before comma
+                    , a: 2
+                };
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 23,
+          "line": 5,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 99`] = `
+{
+  "code": "
+                let obj = {
+                  b,
+                  [foo()]: [
+                  // ↓ this blank is inside a property and therefore should not count
+
+                  ],
+                  a
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 8,
+        },
+        "start": {
+          "column": 19,
+          "line": 8,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-keys > invalid 100`] = `
+{
+  "code": "var obj = { d: 1, ['c']: 2, b: 3, a: 4 }",
+  "diagnostics": [
+    {
+      "message": "Expected object keys to be in ascending order. 'a' should be before 'b'.",
+      "messageId": "sortKeys",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

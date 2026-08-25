@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@rstest/core';
-import { globalIgnores } from '../src/config/define-config.js';
+import { defineConfig, globalIgnores } from '../src/config/define-config.js';
 import type { RuleEntry, RulesRecord } from '../src/config/define-config.js';
 
 describe('globalIgnores', () => {
@@ -75,6 +75,31 @@ describe('RuleEntry / RulesRecord typing', () => {
       1,
       2,
       3,
+    ]);
+  });
+});
+
+describe('defineConfig languageOptions typing', () => {
+  test('accepts every supported sourceType', () => {
+    const config = defineConfig([
+      { languageOptions: { sourceType: 'module' } },
+      { languageOptions: { sourceType: 'script' } },
+      { languageOptions: { sourceType: 'commonjs' } },
+    ]);
+
+    // Compile-time assertion: defineConfig's public declaration rejects values
+    // outside the runtime-supported sourceType set.
+    defineConfig([
+      {
+        // @ts-expect-error `esm` is not a supported sourceType
+        languageOptions: { sourceType: 'esm' },
+      },
+    ]);
+
+    expect(config).toEqual([
+      { languageOptions: { sourceType: 'module' } },
+      { languageOptions: { sourceType: 'script' } },
+      { languageOptions: { sourceType: 'commonjs' } },
     ]);
   });
 });

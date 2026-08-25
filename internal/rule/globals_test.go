@@ -193,7 +193,7 @@ func TestGlobalsApplyToCanRestoreOlderEditionNameFromConfig(t *testing.T) {
 func TestLanguageDefaultsPrecedenceAndApplyTo(t *testing.T) {
 	t.Parallel()
 
-	globalsInit, _ := ResolveLanguageDefaults("/repo/file.cjs")
+	globalsInit, _, _ := ResolveLanguageDefaults("/repo/file.cjs", LanguageOptions{})
 	globals := NewGlobals(
 		LanguageOptions{},
 		globalsInit,
@@ -257,7 +257,7 @@ func TestLanguageDefaultsPrecedenceAndApplyTo(t *testing.T) {
 func TestLanguageDefaultsCanBeDisabled(t *testing.T) {
 	t.Parallel()
 
-	globalsInit, _ := ResolveLanguageDefaults("file.cjs")
+	globalsInit, _, _ := ResolveLanguageDefaults("file.cjs", LanguageOptions{})
 	globals := NewGlobals(
 		LanguageOptions{},
 		globalsInit,
@@ -275,7 +275,7 @@ func TestLanguageDefaultsCanBeDisabled(t *testing.T) {
 func TestLanguageDefaultsDoNotLeakThroughApplyToSeed(t *testing.T) {
 	t.Parallel()
 
-	globalsInit, _ := ResolveLanguageDefaults("file.js")
+	globalsInit, _, _ := ResolveLanguageDefaults("file.js", LanguageOptions{})
 	globals := NewGlobals(LanguageOptions{}, globalsInit, nil, nil, nil)
 	dst := map[string]bool{
 		"exports": true,

@@ -156,9 +156,9 @@ export class LspConfigTransactionAdapter {
       throwIfAborted(signal);
       return {
         transactionId: activation.transactionId,
-        // Never ask Go to register/dispatch placeholder rules without the
+        // Never include dispatch placeholders in Go's catalog without the
         // matching worker generation. On first startup Go may still commit the
-        // ordinary native config as a degraded no-host generation; with a
+        // ordinary Go config as a degraded no-host generation; with a
         // last-good generation it instead aborts this transaction.
         eslintPluginEntries: pluginHostReady
           ? activation.eslintPluginEntries

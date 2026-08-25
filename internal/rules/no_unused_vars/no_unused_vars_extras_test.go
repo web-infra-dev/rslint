@@ -30,16 +30,32 @@ func TestNoUnusedVarsExtras(t *testing.T) {
 			{Code: `let captured; const read = () => captured; read();`},
 
 			// String-form options skip only the global scope.
-			{Code: `const globalOnly = 1;`, Options: []interface{}{"local"}},
+			{
+				Code:            `const globalOnly = 1;`,
+				Options:         []interface{}{"local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
 
 			// JavaScript-compatible regexp syntax uses regexp2.
 			{Code: `const _unused = 1;`, Options: map[string]interface{}{"varsIgnorePattern": `(?<=_)unused`}},
 
 			// Locks in upstream collectUnusedVariables() global-scope branch:
 			// `local` ignores a script global but not an ES module binding.
-			{Code: `const scriptGlobal = 1;`, Options: map[string]interface{}{"vars": "local"}},
-			{Code: `const { x, nested: [y] } = source;`, Options: map[string]interface{}{"vars": "local"}},
-			{Code: `{ var blockVar = 1; } for (var loopVar of source) { consume(); }`, Options: map[string]interface{}{"vars": "local"}},
+			{
+				Code:            `const scriptGlobal = 1;`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `const { x, nested: [y] } = source;`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `{ var blockVar = 1; } for (var loopVar of source) { consume(); }`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
 
 			// Locks in upstream array-pattern precedence: only an identifier that
 			// is a direct ArrayPattern child matches this option.

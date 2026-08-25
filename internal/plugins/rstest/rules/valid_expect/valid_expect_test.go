@@ -17,6 +17,14 @@ func TestValidExpectRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// Basic well-formed assertions.
 			{Code: `expect(value).toBe(1);`},
+
+			// Reading a property of a completed assertion is not part of the
+			// chain, so the assertion stays well-formed.
+			{Code: `expect(value).toBe(1).message;`},
+			{Code: `const r = expect(value).toHaveBeenCalled().message;`},
+			{Code: `expect(value).toBe(1)[key];`},
+			{Code: `expect(value).toHaveReturned()[key]();`},
+			{Code: `test("t", async () => { (await expect(value).resolves.toBe(1)).message; });`},
 			{Code: `expect(value).not.toBe(1);`},
 			{Code: `expect("something").toEqual("else");`},
 

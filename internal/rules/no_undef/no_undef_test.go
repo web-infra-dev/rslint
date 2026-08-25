@@ -1890,12 +1890,43 @@ func TestNoUndefLanguageDefaults(t *testing.T) {
 				FileName: "local-require.cjs",
 				Globals:  map[string]any{"require": "off"},
 			},
+			{
+				Code:            `require('x'); global;`,
+				FileName:        "a.js",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+			},
+			{
+				Code:            `arguments;`,
+				FileName:        "a.js",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+			},
+			{
+				Code:            `require;`,
+				FileName:        "authored-commonjs.ts",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+			},
+			{
+				Code:            `arguments;`,
+				FileName:        "a.jsx",
+				TSConfig:        "tsconfig.allow-js.json",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
 				Code:     `require;`,
 				FileName: "plain-script.js",
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `require('x'); global; arguments;`,
+				FileName:        "a.cjs",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
+					{MessageId: "undef", Line: 1, Column: 15},
+					{MessageId: "undef", Line: 1, Column: 23},
+				},
 			},
 			{
 				Code:     `arguments;`,
@@ -1913,6 +1944,12 @@ func TestNoUndefLanguageDefaults(t *testing.T) {
 				Code:     `require;`,
 				FileName: "typed-commonjs.cts",
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
+			},
+			{
+				Code:            `arguments;`,
+				FileName:        "authored-commonjs.ts",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
 			},
 			{
 				Code:     `process;`,

@@ -1046,6 +1046,18 @@ func TestNoConditionalInTestRule(t *testing.T) {
 				{MessageId: "conditionalInTest", Line: 2, Column: 41},
 			},
 		},
+		// The reported range covers the trailing `!`, the way ESLint's
+		// ChainExpression range does.
+		{
+			Code:    `it('is invalid', () => { obj?.bar!; });`,
+			Options: []interface{}{map[string]interface{}{"allowOptionalChaining": false}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionalInTest", Line: 1, Column: 26, EndLine: 1, EndColumn: 35},
+			},
+		},
+
+		// Divergence from upstream: the inner registration exiting does not
+		// clear the outer test's scope, so the trailing `if` is reported too.
 		{
 			Code: `
         it('outer', () => {
@@ -1056,6 +1068,7 @@ func TestNoConditionalInTestRule(t *testing.T) {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "conditionalInTest", Line: 2, Column: 3},
+				{MessageId: "conditionalInTest", Line: 4, Column: 3},
 			},
 		},
 	}

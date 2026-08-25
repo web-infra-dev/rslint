@@ -1683,6 +1683,52 @@ describe('hand-crafted cases', () => {
       "foo === 'undefined' && foo.length;",
       'foo == bar && foo.bar == null;',
       'foo === 1 && foo.toFixed();',
+      // An existing optional chain closes the logical chain before a comparison.
+      `
+        declare const value: { field: number } | null;
+        value && value?.field === 1;
+      `,
+      `
+        declare const value: { nested: { field: number } } | null;
+        value && value?.nested.field === 1;
+      `,
+      `
+        declare const value: Record<string, number> | null;
+        value && value?.['field'] === 1;
+      `,
+      `
+        declare const value: { method(): number } | null;
+        value && value?.method() === 1;
+      `,
+      `
+        declare const value: { field: number } | null;
+        value && 1 === value?.field;
+      `,
+      // Parentheses stop optional-chain propagation.
+      `
+        declare const value: { nested?: { field: number } } | null;
+        value && (value?.nested).field === 1;
+      `,
+      `
+        declare const value:
+          | { nested?: Record<string, number> }
+          | null;
+        value && (value?.nested)['field'] === 1;
+      `,
+      `
+        declare const value: { method?: () => number } | null;
+        value && (value?.method)() === 1;
+      `,
+      `
+        declare const value:
+          | { nested: { field: { deep: number } } }
+          | null;
+        value && (value?.nested.field).deep === 1;
+      `,
+      `
+        declare const value: { nested?: { field: number } } | null;
+        value && (((value?.nested))).field === 1;
+      `,
       // call arguments are considered
       'foo.bar(a) && foo.bar(a, b).baz;',
       // type parameters are considered

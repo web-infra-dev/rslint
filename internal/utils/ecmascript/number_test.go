@@ -17,6 +17,10 @@ func TestNumberToString(t *testing.T) {
 		{name: "negative zero", value: math.Copysign(0, -1), want: "0"},
 		{name: "one", value: 1, want: "1"},
 		{name: "minus one", value: -1, want: "-1"},
+		{name: "fraction", value: 1.25, want: "1.25"},
+		{name: "last small fixed", value: 1e-6, want: "0.000001"},
+		{name: "first small exponential", value: 1e-7, want: "1e-7"},
+		{name: "small fraction", value: 1.2e-7, want: "1.2e-7"},
 		{name: "large", value: 1e15, want: "1000000000000000"},
 		// The decimal point sits in the twenty-first place here and the
 		// twenty-second one below, which is where JavaScript switches.
@@ -27,6 +31,15 @@ func TestNumberToString(t *testing.T) {
 		// Past 2^53 the shortest run of digits that reads back the same is
 		// shorter than the whole number.
 		{name: "past 2^53", value: 9223372036854774096, want: "9223372036854774000"},
+		{name: "fraction", value: 1.5, want: "1.5"},
+		{name: "fraction with several digits", value: 123.456, want: "123.456"},
+		{name: "below one", value: 0.5, want: "0.5"},
+		// The decimal point sits in the sixth place behind the digits here and
+		// the seventh one below, which is where JavaScript switches.
+		{name: "last fixed fraction", value: 1e-6, want: "0.000001"},
+		{name: "first small exponential", value: 1e-7, want: "1e-7"},
+		{name: "first small exponential negative", value: -1e-7, want: "-1e-7"},
+		{name: "small with several digits", value: 1.25e-7, want: "1.25e-7"},
 		{name: "not a number", value: math.NaN(), want: "NaN"},
 		{name: "infinity", value: math.Inf(1), want: "Infinity"},
 		{name: "negative infinity", value: math.Inf(-1), want: "-Infinity"},
@@ -41,84 +54,42 @@ func TestNumberToString(t *testing.T) {
 	}
 }
 
-// Every expectation here is what `String(Number(s))` answers in JavaScript.
 func TestStringToNumber(t *testing.T) {
 	tests := []struct {
-		input string
-		want  string
+		name  string
+		value string
+		want  float64
+		ok    bool
 	}{
-		{input: "", want: "0"},
-		{input: " ", want: "0"},
-		{input: "\t\n ", want: "0"},
-		{input: "\ufeff5", want: "5"},
-		{input: "5\ufeff", want: "5"},
-		{input: "0x10", want: "16"},
-		{input: "0X10", want: "16"},
-		{input: "0b11", want: "3"},
-		{input: "0B11", want: "3"},
-		{input: "0o17", want: "15"},
-		{input: "0O17", want: "15"},
-		{input: "017", want: "17"},
-		{input: "08", want: "8"},
-		{input: "0x", want: "NaN"},
-		{input: "0b", want: "NaN"},
-		{input: "0x+1", want: "NaN"},
-		{input: "0x-1", want: "NaN"},
-		{input: "0x1p2", want: "NaN"},
-		{input: "1_000", want: "NaN"},
-		{input: "1_0.5", want: "NaN"},
-		{input: "inf", want: "NaN"},
-		{input: "Infinity", want: "Infinity"},
-		{input: "+Infinity", want: "Infinity"},
-		{input: "-Infinity", want: "-Infinity"},
-		{input: "infinity", want: "NaN"},
-		{input: "INFINITY", want: "NaN"},
-		{input: "NaN", want: "NaN"},
-		{input: "nan", want: "NaN"},
-		{input: ".5", want: "0.5"},
-		{input: "5.", want: "5"},
-		{input: "1.e5", want: "100000"},
-		{input: "5e", want: "NaN"},
-		{input: "5e+", want: "NaN"},
-		{input: "5e3", want: "5000"},
-		{input: "5E-3", want: "0.005"},
-		{input: "+5", want: "5"},
-		{input: "-5", want: "-5"},
-		{input: "- 5", want: "NaN"},
-		{input: "1e400", want: "Infinity"},
-		{input: "1e-400", want: "0"},
-		{input: "0x1FFFFFFFFFFFFFFFFF", want: "590295810358705700000"},
-		{input: "0xffffffffffffffffffffffffffffffffff", want: "8.711228593176025e+40"},
-		{input: "9007199254740993", want: "9007199254740992"},
-		{input: ".", want: "NaN"},
-		{input: "..5", want: "NaN"},
-		{input: "1.2.3", want: "NaN"},
-		{input: "0o8", want: "NaN"},
-		{input: "0b2", want: "NaN"},
-		{input: "0xg", want: "NaN"},
-		{input: " 12 ", want: "12"},
-		{input: "\n12\t", want: "12"},
-		{input: "12\u00a0", want: "12"},
-		{input: "\u00a012", want: "12"},
-		{input: "1,000", want: "NaN"},
-		{input: "\u0665", want: "NaN"},
-		{input: "0x1_0", want: "NaN"},
-		{input: "+0x10", want: "NaN"},
-		{input: "-0", want: "0"},
-		{input: "0.0", want: "0"},
-		{input: "00.5", want: "0.5"},
-		{input: "0e0", want: "0"},
-		{input: ".e5", want: "NaN"},
-		{input: "1e", want: "NaN"},
-		{input: "e5", want: "NaN"},
-		{input: "0xA", want: "10"},
-		{input: "0XaB", want: "171"},
+		{name: "empty", value: "", want: 0, ok: true},
+		{name: "ECMAScript whitespace", value: "\uFEFF\u00A01\u2029", want: 1, ok: true},
+		{name: "negative zero", value: "-0", want: math.Copysign(0, -1), ok: true},
+		{name: "decimal", value: "1.25", want: 1.25, ok: true},
+		{name: "exponent", value: "1e2", want: 100, ok: true},
+		{name: "hex", value: "0x10", want: 16, ok: true},
+		{name: "octal", value: "0o10", want: 8, ok: true},
+		{name: "binary", value: "0b10", want: 2, ok: true},
+		{name: "positive infinity", value: "+Infinity", want: math.Inf(1), ok: true},
+		{name: "overflow", value: "1e9999", want: math.Inf(1), ok: true},
+		{name: "malformed overflow", value: "1e9999x", ok: false},
+		{name: "not a number", value: "NaN", ok: false},
+		{name: "Go infinity", value: "Inf", ok: false},
+		{name: "case-folded infinity", value: "infinity", ok: false},
+		{name: "signed hex", value: "-0x10", ok: false},
+		{name: "sign after hex prefix", value: "0x+10", ok: false},
+		{name: "hex float", value: "0x1p2", ok: false},
+		{name: "numeric separator", value: "1_000", ok: false},
+		{name: "text", value: "value", ok: false},
 	}
 
 	for _, test := range tests {
-		t.Run(test.input, func(t *testing.T) {
-			if got := NumberToString(StringToNumber(test.input)); got != test.want {
-				t.Errorf("StringToNumber(%q) = %v, want %v", test.input, got, test.want)
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := StringToNumber(test.value)
+			if ok != test.ok {
+				t.Fatalf("StringToNumber(%q) ok = %v, want %v", test.value, ok, test.ok)
+			}
+			if ok && math.Float64bits(got) != math.Float64bits(test.want) {
+				t.Errorf("StringToNumber(%q) = %v, want %v", test.value, got, test.want)
 			}
 		})
 	}

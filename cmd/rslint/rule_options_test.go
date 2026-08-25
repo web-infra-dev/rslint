@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	api "github.com/web-infra-dev/rslint/internal/api"
-	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 )
@@ -95,60 +94,6 @@ func TestCLIValidRuleOptionsLintNormally(t *testing.T) {
 	}
 }
 
-func TestValidateResolvedRuleOptionsReturnsNormalizedSingleConfig(t *testing.T) {
-	inputOptions := map[string]any{"values": []any{"original"}}
-	input := rslintconfig.RslintConfig{{
-		Rules: rslintconfig.Rules{
-			"unknown-rule": []any{"error", inputOptions},
-		},
-	}}
-
-	normalizedMap, normalized, messages := validateResolvedRuleOptions(nil, input)
-	if normalizedMap != nil {
-		t.Fatalf("single-config mode returned a non-nil config map: %#v", normalizedMap)
-	}
-	if len(messages) != 0 {
-		t.Fatalf("unexpected validation messages: %v", messages)
-	}
-
-	normalizedOptions := normalized[0].Rules["unknown-rule"].([]any)[1].(map[string]any)
-	normalizedOptions["values"].([]any)[0] = "changed"
-	if got := inputOptions["values"].([]any)[0]; got != "original" {
-		t.Fatalf("helper returned the input config instead of its normalized copy: %#v", got)
-	}
-}
-
-func TestValidateResolvedRuleOptionsPreservesMultiConfigMode(t *testing.T) {
-	normalizedMap, _, messages := validateResolvedRuleOptions(
-		map[string]rslintconfig.RslintConfig{},
-		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"unused": "error"}}},
-	)
-	if normalizedMap == nil || len(normalizedMap) != 0 {
-		t.Fatalf("non-nil empty config map changed mode: %#v", normalizedMap)
-	}
-	if len(messages) != 0 {
-		t.Fatalf("unexpected validation messages: %v", messages)
-	}
-
-	inputOptions := map[string]any{"values": []any{"original"}}
-	inputMap := map[string]rslintconfig.RslintConfig{
-		"/workspace/a": {{
-			Rules: rslintconfig.Rules{
-				"unknown-rule": []any{"error", inputOptions},
-			},
-		}},
-	}
-	normalizedMap, _, messages = validateResolvedRuleOptions(inputMap, nil)
-	if len(messages) != 0 {
-		t.Fatalf("unexpected validation messages: %v", messages)
-	}
-	normalizedOptions := normalizedMap["/workspace/a"][0].Rules["unknown-rule"].([]any)[1].(map[string]any)
-	normalizedOptions["values"].([]any)[0] = "changed"
-	if got := inputOptions["values"].([]any)[0]; got != "original" {
-		t.Fatalf("multi-config helper returned an aliased input value: %#v", got)
-	}
-}
-
 const apiFirstRuleOptionsValidationProcess = "RSLINT_TEST_API_FIRST_RULE_OPTIONS_VALIDATION"
 
 func TestHandleLintFirstRequestValidatesRuleOptions(t *testing.T) {
@@ -167,8 +112,8 @@ func TestHandleLintFirstRequestValidatesRuleOptions(t *testing.T) {
 		return
 	}
 
-	// Run this assertion in a fresh test process so no earlier API request can
-	// have populated the process-global rule registry and hidden an ordering bug.
+	// Run this assertion in a fresh test process so first-request catalog setup
+	// cannot accidentally depend on initialization performed by an earlier call.
 	cmd := exec.Command(os.Args[0], "-test.run=^TestHandleLintFirstRequestValidatesRuleOptions$")
 	cmd.Env = append(os.Environ(), apiFirstRuleOptionsValidationProcess+"=1")
 	if output, err := cmd.CombinedOutput(); err != nil {

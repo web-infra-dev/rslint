@@ -1,6 +1,6 @@
 {
   "name": "@rslint/tsgo-server-darwin-x64",
-  "version": "0.0.8",
+  "version": "0.0.10",
   "license": "MIT",
   "description": "tsgo server binary for darwin x64",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",

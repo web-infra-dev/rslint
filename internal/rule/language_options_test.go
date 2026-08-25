@@ -34,3 +34,21 @@ func TestLanguageOptionsDefaultECMAScriptVersion(t *testing.T) {
 		t.Fatalf("zero-value ecmaVersion = %d, want latest %d", got, LatestECMAScriptVersion)
 	}
 }
+
+func TestLanguageOptionsEffectiveSourceType(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		options LanguageOptions
+		want    string
+	}{
+		{want: "module"},
+		{options: LanguageOptions{SourceType: "module"}, want: "module"},
+		{options: LanguageOptions{SourceType: "script"}, want: "script"},
+		{options: LanguageOptions{SourceType: "commonjs"}, want: "commonjs"},
+	} {
+		if got := test.options.EffectiveSourceType(); got != test.want {
+			t.Errorf("EffectiveSourceType() = %q, want %q", got, test.want)
+		}
+	}
+}

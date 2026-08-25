@@ -147,6 +147,17 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			{Code: `expect(x).toHaveBeenCalledOnce(); const { b } = obj; expect(x).toHaveBeenCalledWith('a');`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Parenthesized computed matcher keys are deliberately absent from
+			// SourceFile.Identifiers, so the file gate must retain them through
+			// its narrow AST fallback.
+			{
+				Code:   `expect(getMock())[("toHaveBeenCalledOnce")](); expect(getMock())[("toHaveBeenCalledWith")]('a');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
+			{
+				Code:   `expect(getMock())[("\x74oHaveBeenCalledOnce")](); expect(getMock()).toHaveBeenCalledWith('a');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},
+			},
 			// An argument that is not stable under a second evaluation is still
 			// worth reporting, but folding the pair would drop an evaluation.
 			{
