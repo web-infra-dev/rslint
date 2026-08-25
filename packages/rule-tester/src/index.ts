@@ -51,6 +51,26 @@ async function buildConfigForSettings(
   return { config: merged, configDirectory: path.dirname(baseConfigPath) };
 }
 
+function mergeLanguageOptions(
+  defaults: RuleTesterOptions['languageOptions'],
+  override: RuleTesterOptions['languageOptions'] | undefined,
+): RuleTesterOptions['languageOptions'] {
+  if (!override) {
+    return defaults;
+  }
+  if (!defaults) {
+    return override;
+  }
+  return {
+    ...defaults,
+    ...override,
+    parserOptions: {
+      ...defaults.parserOptions,
+      ...override.parserOptions,
+    },
+  };
+}
+
 // Fold the rule-under-test (its options) and the per-case languageOptions into
 // the resolved base config as one appended entry. The Go `--api` reads rules and
 // languageOptions solely from the config object — there is no separate
@@ -161,6 +181,7 @@ function checkDiagnosticEqual(
 
 interface RuleTesterOptions {
   languageOptions?: {
+    sourceType?: 'module' | 'script' | 'commonjs';
     globals?: any;
     parser?: any;
     parserOptions?: {
@@ -274,10 +295,12 @@ export class RuleTester {
           }
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
-          const languageOptions =
+          const languageOptions = mergeLanguageOptions(
+            this.options.languageOptions,
             typeof validCase === 'string'
-              ? this.options.languageOptions
-              : (validCase.languageOptions ?? this.options.languageOptions);
+              ? undefined
+              : validCase.languageOptions,
+          );
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
 
           const options =
@@ -339,8 +362,10 @@ export class RuleTester {
           if (hasOnly && !only) {
             continue;
           }
-          const languageOptions =
-            item.languageOptions ?? this.options.languageOptions;
+          const languageOptions = mergeLanguageOptions(
+            this.options.languageOptions,
+            item.languageOptions,
+          );
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
           const isDts = item.filename && item.filename.endsWith('.d.ts');
           const test_virtual_entry = path.resolve(

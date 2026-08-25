@@ -21,6 +21,26 @@ The `'latest'` value remains semantic rather than being frozen into the config, 
 }
 ```
 
+## languageOptions.sourceType
+
+- **Type:** `'module' | 'script' | 'commonjs'`
+- **Default:** exact lowercase `.cjs` extension → `'commonjs'`; every other filename → `'module'`
+
+Selects the module kind used by the per-file language context, including CommonJS globals (`require`, `module`, `exports`, `global`) and whether the top-level scope is the global object. When omitted, a filename with an exact lowercase `.cjs` extension resolves to `'commonjs'`; every other filename, including unknown extensions and extension-less filenames, resolves to `'module'` before rules see the value, matching ESLint. An authored value applies on every extension.
+
+This option does not change TypeScript parsing or compiler module resolution. Support in an individual native rule depends on that rule consulting the configured value; rules that still document syntax-based module detection continue to use that behavior.
+
+Set `sourceType` directly on `languageOptions`; the legacy `languageOptions.parserOptions.sourceType` location is not supported.
+
+```ts
+{
+  files: ['scripts/**/*.js'],
+  languageOptions: {
+    sourceType: 'commonjs',
+  },
+}
+```
+
 ## languageOptions.parserOptions.projectService
 
 - **Type:** `boolean`

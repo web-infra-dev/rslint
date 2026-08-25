@@ -1898,13 +1898,12 @@ func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*
 // `/* global name */` entries, which have no declaration node or binder symbol.
 // Local shadows were removed while collecting globalRefsByName.
 func hasInlineGlobalUse(sourceFile *ast.SourceFile, refs *rule.RefStore, name string, references []*ast.Node) bool {
-	// An explicit global belongs to ESLint's outer global scope. JavaScript
-	// modules and CommonJS files execute in a distinct top-level scope, so an
+	// An explicit global belongs to ESLint's outer global scope. Modules and
+	// CommonJS files execute in a distinct top-level scope, so an
 	// `x = x + 1` there can be observed outside the file and its RHS is a real
 	// use. A plain script shares the SourceFile scope with the global instead.
 	var declarationScope *ast.Node
-	if sourceFile != nil && !ast.IsExternalModule(sourceFile) &&
-		(refs == nil || !refs.HasNonGlobalTopLevelScope()) {
+	if sourceFile != nil && (refs == nil || !refs.HasNonGlobalProgramScope()) {
 		declarationScope = sourceFile.AsNode()
 	}
 	for _, reference := range references {
