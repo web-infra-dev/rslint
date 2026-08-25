@@ -362,7 +362,6 @@ const Playground: React.FC = () => {
                       {wasmVersions.map((version) => (
                         <SelectItem key={version} value={version}>
                           {version}
-                          {version === wasmVersions[0] ? ' (latest)' : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
