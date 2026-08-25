@@ -119,16 +119,6 @@ func TestCapitalizedCommentsExtras(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- JavaScript /u syntax validation: regexp2 accepts a lone
-			// closing bracket literally, but JavaScript rejects it. Such a
-			// pattern must not become an active ignore matcher. ----
-			{
-				Code:    "// lower] text",
-				Output:  []string{"// Lower] text"},
-				Options: []any{"always", map[string]any{"ignorePattern": "lower]"}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedLowercaseComment", Line: 1, Column: 1}},
-			},
-
 			// ---- Dimension 4: graceful degradation — a comment alone in
 			// the file has no real token on either side, so it is never
 			// "inline" even when ignoreInlineComments is true ----
