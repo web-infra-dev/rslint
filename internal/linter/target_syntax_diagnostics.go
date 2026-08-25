@@ -1,4 +1,4 @@
-package main
+package linter
 
 import (
 	"context"
@@ -8,30 +8,30 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-type syntacticDiagnosticKey struct {
+type targetSyntacticDiagnosticKey struct {
 	path string
 	code int32
 	pos  int
 	end  int
 }
 
-func collectTargetSyntacticDiagnostics(
+// CollectTargetSyntacticDiagnostics returns syntax diagnostics for the exact
+// lint projection. When program diagnostics are included by the caller,
+// project-backed Programs are skipped because their syntax diagnostics are
+// emitted by that phase; source-only Programs remain covered here.
+func CollectTargetSyntacticDiagnostics(
 	programs []*lintprogram.Program,
 	targetsByProgram [][]string,
-	typeCheck bool,
-	typeCheckOnly bool,
+	programDiagnosticsIncluded bool,
 ) []rule.RuleDiagnostic {
 	if len(programs) == 0 || len(targetsByProgram) == 0 {
 		return nil
 	}
 
-	seen := make(map[syntacticDiagnosticKey]struct{})
+	seen := make(map[targetSyntacticDiagnosticKey]struct{})
 	var diagnostics []rule.RuleDiagnostic
 	for i, program := range programs {
-		// When --type-check runs, tsconfig-backed Programs surface syntactic
-		// diagnostics through the type-check phase. We still inspect every target
-		// here so the lint-rule phase can skip malformed files, matching ESLint.
-		coveredByTypeCheck := typeCheck && program.CanProvideProgramDiagnostics()
+		coveredByProgramDiagnostics := programDiagnosticsIncluded && program.CanProvideProgramDiagnostics()
 		if i >= len(targetsByProgram) || len(targetsByProgram[i]) == 0 {
 			continue
 		}
@@ -42,11 +42,11 @@ func collectTargetSyntacticDiagnostics(
 				continue
 			}
 			for _, diagnostic := range program.SyntacticDiagnostics(ctx, file) {
-				if coveredByTypeCheck || typeCheckOnly {
+				if coveredByProgramDiagnostics {
 					continue
 				}
 				loc := diagnostic.Loc()
-				key := syntacticDiagnosticKey{
+				key := targetSyntacticDiagnosticKey{
 					path: file.FileName(),
 					code: diagnostic.Code(),
 					pos:  loc.Pos(),

@@ -514,19 +514,6 @@ func resolveTargetPlanForTest(
 	})
 }
 
-func activeConfigsForTest(
-	configs map[string]rslintconfig.RslintConfig,
-	plan target.Plan,
-) map[string]rslintconfig.RslintConfig {
-	active := make(map[string]rslintconfig.RslintConfig)
-	for _, owner := range plan.ActiveOwners() {
-		if entries, ok := configs[owner]; ok {
-			active[owner] = entries
-		}
-	}
-	return active
-}
-
 func preferredCallerPathsForTest(plan target.Plan) map[string]string {
 	return plan.PreferredCallerPaths()
 }
