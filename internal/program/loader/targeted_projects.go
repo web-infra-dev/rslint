@@ -368,6 +368,35 @@ func orderedProjectIndexesForConfig(plan projectPlan, configDir string) []int {
 	return indexes
 }
 
+func configsForActiveOwners(
+	configs map[string]rslintconfig.RslintConfig,
+	targetPlan target.Plan,
+) map[string]rslintconfig.RslintConfig {
+	owners := targetPlan.ActiveOwners()
+	if len(configs) == 0 || len(owners) == 0 {
+		return nil
+	}
+	active := make(map[string]rslintconfig.RslintConfig, len(owners))
+	for _, owner := range owners {
+		if entries, ok := configs[owner]; ok {
+			active[owner] = entries
+		}
+	}
+	return active
+}
+
+// BuildProjectsForTargetOwners constructs every project declared by the
+// configs that govern at least one selected target. Unlike BuildTargetProjects,
+// it does not narrow each active owner's project declarations by root or import
+// membership.
+func (s *Session) BuildProjectsForTargetOwners(
+	configs map[string]rslintconfig.RslintConfig,
+	targetPlan target.Plan,
+	singleThreaded bool,
+) (ProjectSet, error) {
+	return s.BuildProjects(configsForActiveOwners(configs, targetPlan), singleThreaded)
+}
+
 // BuildTargetProjects materializes only configured projects needed to decide
 // ownership for the supplied lint targets. TypeScript config roots have first
 // priority; targets outside every root retain the historical declaration-order
@@ -380,6 +409,7 @@ func (s *Session) BuildTargetProjects(
 	if err := s.validate(); err != nil {
 		return ProjectSet{}, err
 	}
+	configs = configsForActiveOwners(configs, targetPlan)
 	if len(configs) == 0 || len(targetPlan.Files) == 0 {
 		return ProjectSet{}, nil
 	}
