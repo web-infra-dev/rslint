@@ -19,6 +19,26 @@ func TestNoCycleExtras(t *testing.T) {
 		t,
 		&no_cycle.NoCycleRule,
 		[]rule_tester.ValidTestCase{
+			// ---- JSDoc import types are comments, not module-graph edges ----
+			// @typescript-eslint/parser exposes these through comments / parser
+			// services rather than ESTree import nodes, so import/no-cycle ignores
+			// them even though TypeScript-Go reparses them into synthetic syntax.
+			{
+				Code:     `/** @type {import("./no-cycle/depth-one").depthOne} */ const value = {}; export const rootValue = 1;`,
+				FileName: "file.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code:     `/** @typedef {import("./no-cycle/depth-one").depthOne} DepthOne */ export const rootValue = 1;`,
+				FileName: "file.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+			{
+				Code:     `/** @import {depthOne} from "./no-cycle/depth-one" */ export const rootValue = 1;`,
+				FileName: "file.js",
+				TSConfig: "tsconfig.allow-js.json",
+			},
+
 			// ---- Dimension 4: empty and non-string call arguments are not module edges ----
 			{Code: `const name = "./no-cycle/depth-one"; import(name); require(); define([name]); ` + rootExports, Options: map[string]interface{}{"commonjs": true, "amd": true}},
 
@@ -67,6 +87,18 @@ func TestNoCycleExtras(t *testing.T) {
 			{Code: `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`, Options: []interface{}{map[string]interface{}{"maxDepth": json.Number("2")}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Control for the JSDoc cases above: with the same JavaScript filename,
+			// tsconfig, and target, an authored import is a graph edge and closes
+			// the cycle through no-cycle/depth-one.ts.
+			{
+				Code:     `import { depthOne } from "./no-cycle/depth-one"; export const rootValue = depthOne;`,
+				FileName: "file.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					cycleError(messageDetected),
+				},
+			},
+
 			// Module-augmentation bodies are not present in SourceFile.Imports and must use the full collector.
 			{
 				Code: `declare module "virtual" { import { depthOne } from "./no-cycle/depth-one"; export { depthOne }; } ` + rootExports,
