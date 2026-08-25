@@ -1,0 +1,422 @@
+// Rstest Snapshot v1
+
+exports[`no-lonely-if > invalid 1`] = `
+{
+  "code": "if (a) {;} else { if (b) {;} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 2`] = `
+{
+  "code": "if (a) {
+  foo();
+} else {
+  if (b) {
+    bar();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 3`] = `
+{
+  "code": "if (a) {
+  foo();
+} else /* comment */ {
+  if (b) {
+    bar();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 4`] = `
+{
+  "code": "if (a) {
+  foo();
+} else {
+  /* otherwise, do the other thing */ if (b) {
+    bar();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 6,
+        },
+        "start": {
+          "column": 39,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 5`] = `
+{
+  "code": "if (a) {
+  foo();
+} else {
+  if /* this comment is ok */ (b) {
+    bar();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 6`] = `
+{
+  "code": "if (a) {
+  foo();
+} else {
+  if (b) {
+    bar();
+  } /* this comment will prevent this test case from being autofixed. */
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 7`] = `
+{
+  "code": "if (foo) {} else { if (bar) baz(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 8`] = `
+{
+  "code": "if (foo) {} else { if (bar) baz() } qux();",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 9`] = `
+{
+  "code": "if (foo) {} else { if (bar) baz(); } qux();",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 10`] = `
+{
+  "code": "if (foo) {
+} else {
+  if (bar) baz()
+}
+[1, 2, 3].forEach(foo);",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 11`] = `
+{
+  "code": "if (foo) {
+} else {
+  if (bar) baz++
+}
+foo;",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 12`] = `
+{
+  "code": "if (foo) {
+} else {
+  if (bar) baz++;
+}
+foo;",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 13`] = `
+{
+  "code": "if (a) {
+  foo();
+} else {
+  if (b) bar()
+}
+\`template literal\`;",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lonely-if > invalid 14`] = `
+{
+  "code": "if (a) {
+  foo();
+} else {
+  if (b) {
+    bar();
+  } else if (c) {
+    baz();
+  } else {
+    qux();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected if as the only statement in an else block.",
+      "messageId": "unexpectedLonelyIf",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lonely-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

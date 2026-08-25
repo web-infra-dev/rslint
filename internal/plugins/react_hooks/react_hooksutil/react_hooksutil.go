@@ -682,7 +682,10 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 		// fall through to anonymous handling
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		if fn.Parent != nil && ast.IsObjectLiteralExpression(fn.Parent) {
-			return fn.Name()
+			name := fn.Name()
+			if name != nil && !ast.IsComputedPropertyName(name) {
+				return name
+			}
 		}
 		return nil
 	case ast.KindArrowFunction:
@@ -719,7 +722,7 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 		}
 	case ast.KindPropertyAssignment:
 		pa := p.AsPropertyAssignment()
-		if pa.Initializer == child {
+		if pa.Initializer == child && p.Name() != nil && !ast.IsComputedPropertyName(p.Name()) {
 			return p.Name()
 		}
 	case ast.KindBindingElement:

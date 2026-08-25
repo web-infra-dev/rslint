@@ -24,7 +24,8 @@ type ConfiguredRule struct {
 type RuleEnvironment struct {
 	Settings map[string]interface{}
 	// LanguageOptions is normalized once and exposed through ctx.LanguageOptions;
-	// it also selects the language-global catalog. Its zero value selects latest.
+	// it also selects the language-global catalog. Its zero value means latest
+	// ECMAScript with module source semantics.
 	LanguageOptions LanguageOptions
 	// Globals contains config-declared language globals. Inline declarations
 	// are merged once per source file during execution.

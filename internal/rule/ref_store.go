@@ -563,11 +563,16 @@ func isJSDocSynthesized(node *ast.Node) bool {
 	return false
 }
 
-// HasNonGlobalTopLevelScope reports whether the resolved language defaults
-// place source declarations in a scope outside the global scope.
-// This supplements parser module classification for scope-oriented rules.
-func (s *RefStore) HasNonGlobalTopLevelScope() bool {
-	return s != nil && s.init.nonGlobalTopLevelScope
+// HasNonGlobalProgramScope reports whether program-level declarations should
+// be treated as living outside the global scope. Module syntax and resolved
+// language defaults can both contribute; an authored global program scope
+// (script, or commonjs on TypeScript-flavoured extensions) forces global
+// program scope instead.
+func (s *RefStore) HasNonGlobalProgramScope() bool {
+	if s == nil || s.init.globalTopLevelScope {
+		return false
+	}
+	return ast.IsExternalModule(s.sourceFile) || s.init.nonGlobalTopLevelScope
 }
 
 // binderReferenceSymbol resolves one reference without checker work. A named

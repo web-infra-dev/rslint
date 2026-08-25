@@ -63,6 +63,7 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const numeric = 1 + 2;\n" +
 		"const unknownUse = unknownValue;\n" +
 		"const stableArray = [\"\", \"message\"];\n" +
+		"const stableObject = {message: \"value\"};\n" +
 		"const stableArrayUse = stableArray[0];\n" +
 		"const writtenArray = [\"\"];\n" +
 		"writtenArray[0] = \"message\";\n" +
@@ -181,6 +182,16 @@ func TestStaticStringEvaluator(t *testing.T) {
 				t.Fatalf("Eval(%s) = (%q, %v), want (%q, %v)", tt.name, got, ok, tt.want, tt.ok)
 			}
 		})
+	}
+
+	if isArray, known := staticEvaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "stableArray")); !known || !isArray {
+		t.Fatalf("EvalArrayValue(stableArray) = (%v, %v), want (true, true)", isArray, known)
+	}
+	if isArray, known := staticEvaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "stableObject")); !known || isArray {
+		t.Fatalf("EvalArrayValue(stableObject) = (%v, %v), want (false, true)", isArray, known)
+	}
+	if isArray, known := staticEvaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "unknownUse")); known || isArray {
+		t.Fatalf("EvalArrayValue(unknownUse) = (%v, %v), want (false, false)", isArray, known)
 	}
 }
 

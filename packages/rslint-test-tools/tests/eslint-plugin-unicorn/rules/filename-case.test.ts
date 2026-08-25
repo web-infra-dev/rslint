@@ -6,7 +6,9 @@ function valid(filename: string | undefined, c?: string) {
   return {
     code: `/* Filename: ${filename ?? '<none>'} */`,
     filename,
-    options: c ? [{ case: c }] : [],
+    // This helper exercises basename behavior. Directory behavior has focused
+    // cases below whose path is relative to the rslint working directory.
+    options: c ? [{ case: c, checkDirectories: false }] : [],
   };
 }
 
@@ -14,7 +16,7 @@ function validCases(filename: string, cases: Record<string, boolean>) {
   return {
     code: `/* Filename: ${filename} */`,
     filename,
-    options: [{ cases }],
+    options: [{ cases, checkDirectories: false }],
   };
 }
 
@@ -22,7 +24,10 @@ function validWithOptions(filename: string | undefined, options: any[] = []) {
   return {
     code: `/* Filename: ${filename ?? '<none>'} */`,
     filename,
-    options,
+    options:
+      options.length > 0
+        ? [{ checkDirectories: false, ...options[0] }, ...options.slice(1)]
+        : options,
   };
 }
 
@@ -30,8 +35,8 @@ function invalid(filename: string, c: string | undefined, message: string) {
   return {
     code: `/* Filename: ${filename} */`,
     filename,
-    options: c ? [{ case: c }] : [],
-    errors: [{ message }],
+    options: c ? [{ case: c, checkDirectories: false }] : [],
+    errors: [{ message, messageId: 'filename-case' }],
   };
 }
 
@@ -43,8 +48,8 @@ function invalidCases(
   return {
     code: `/* Filename: ${filename} */`,
     filename,
-    options: cases ? [{ cases }] : [],
-    errors: [{ message }],
+    options: cases ? [{ cases, checkDirectories: false }] : [],
+    errors: [{ message, messageId: 'filename-case' }],
   };
 }
 
@@ -52,8 +57,8 @@ function invalidWithOptions(filename: string, options: any[], message: string) {
   return {
     code: `/* Filename: ${filename} */`,
     filename,
-    options,
-    errors: [{ message }],
+    options: [{ checkDirectories: false, ...options[0] }, ...options.slice(1)],
+    errors: [{ message, messageId: 'filename-case' }],
   };
 }
 
@@ -67,6 +72,10 @@ ruleTester.run('filename-case', {} as never, {
     valid('src/foo/fooBar.test-utils.js', 'camelCase'),
     valid('src/foo/fooBar.test_utils.js', 'camelCase'),
     valid('src/foo/.test_utils.js', 'camelCase'),
+    valid('src/foo/innerHTML.js', 'camelCaseWithAcronyms'),
+    valid('src/foo/getDOMRangeRect.js', 'camelCaseWithAcronyms'),
+    valid('src/foo/apiURL.js', 'camelCaseWithAcronyms'),
+    valid('src/foo/getHTML5Parser.js', 'camelCaseWithAcronyms'),
     valid('src/foo/foo.js', 'snakeCase'),
     valid('src/foo/foo_bar.js', 'snakeCase'),
     valid('src/foo/foo.test.js', 'snakeCase'),
@@ -88,6 +97,11 @@ ruleTester.run('filename-case', {} as never, {
     valid('src/foo/FooBar.test-utils.js', 'pascalCase'),
     valid('src/foo/FooBar.test_utils.js', 'pascalCase'),
     valid('src/foo/.test_utils.js', 'pascalCase'),
+    valid('src/foo/FAQPage.js', 'pascalCase'),
+    valid('src/foo/DIYWidget.js', 'pascalCase'),
+    valid('src/foo/URL2Path.js', 'pascalCase'),
+    valid('src/foo/FAQI18n.js', 'pascalCase'),
+    valid('src/foo/URL2I18n.js', 'pascalCase'),
 
     // ---- Numeric / mixed identifier cases ----
     valid('spec/iss47Spec.js', 'camelCase'),
@@ -117,6 +131,8 @@ ruleTester.run('filename-case', {} as never, {
 
     // ---- Default kebab + special chars at start ----
     valid('src/foo/$foo.js'),
+    valid('src/foo/$foo_bar.js'),
+    valid('src/foo/$fooBar.js'),
 
     // ---- `cases` option ----
     {
@@ -125,6 +141,9 @@ ruleTester.run('filename-case', {} as never, {
       options: [{ cases: {} }],
     },
     validCases('src/foo/fooBar.js', { camelCase: true }),
+    validCases('src/foo/innerHTML.js', {
+      camelCaseWithAcronyms: true,
+    }),
     validCases('src/foo/FooBar.js', { kebabCase: true, pascalCase: true }),
     validCases('src/foo/___foo_bar.js', { snakeCase: true, pascalCase: true }),
 
@@ -245,6 +264,16 @@ ruleTester.run('filename-case', {} as never, {
       },
     ]),
 
+    // ---- Latest upstream path behavior ----
+    { code: '', filename: 'src/foo-bar/file.js' },
+    { code: '', filename: 'src/$UserId/page.js' },
+    validWithOptions('src/FooBar/file.js', [
+      { case: 'kebabCase', checkDirectories: false },
+    ]),
+    validWithOptions('src/meta/BadName.js', [
+      { case: 'kebabCase', ignore: ['^meta$'], checkDirectories: true },
+    ]),
+
     // ---- multipleFileExtensions=false ----
     validWithOptions('index.tsx', [
       { case: 'pascalCase', multipleFileExtensions: false },
@@ -297,10 +326,10 @@ ruleTester.run('filename-case', {} as never, {
     validWithOptions('test/foo/FooBar.TestUtils.js', [{ case: 'pascalCase' }]),
     validWithOptions('test/foo/.TestUtils.js', [{ case: 'pascalCase' }]),
 
-    // ---- Snapshot-style: directory with uppercase ext doesn't matter ----
-    { code: '', filename: 'src/foo.JS/bar.js' },
-    { code: '', filename: 'src/foo.JS/bar.spec.js' },
-    { code: '', filename: 'src/foo.JS/.spec.js' },
+    // ---- Snapshot-style dotted filename parts ----
+    { code: '', filename: 'src/foo-js/bar.js' },
+    { code: '', filename: 'src/foo-js/bar.spec.js' },
+    { code: '', filename: 'src/foo-js/.spec.js' },
     { code: '', filename: 'foo.SPEC.js' },
     { code: '', filename: '.SPEC.js' },
   ],
@@ -375,6 +404,26 @@ ruleTester.run('filename-case', {} as never, {
       'pascalCase',
       'Filename is not in pascal case. Rename it to `FooBar.test-utils.js`.',
     ),
+    invalid(
+      'src/foo/FAQPageFOO.js',
+      'pascalCase',
+      'Filename is not in pascal case. Rename it to `FaqPageFoo.js`.',
+    ),
+    invalid(
+      'src/foo/UIPath.js',
+      'pascalCase',
+      'Filename is not in pascal case. Rename it to `UiPath.js`.',
+    ),
+    invalid(
+      'src/foo/HTMLParser.js',
+      'camelCaseWithAcronyms',
+      'Filename is not in camel case with acronyms. Rename it to `htmlParser.js`.',
+    ),
+    invalid(
+      'src/foo/XMLHttpRequest.js',
+      'camelCaseWithAcronyms',
+      'Filename is not in camel case with acronyms. Rename it to `xmlHttpRequest.js`.',
+    ),
 
     // ---- Leading underscores preserved verbatim ----
     invalid(
@@ -418,7 +467,7 @@ ruleTester.run('filename-case', {} as never, {
       'Filename is not in pascal case. Rename it to `___FooBar.js`.',
     ),
 
-    // ---- `cases` option failures (canonical case order in our message) ----
+    // ---- `cases` option failures (canonical case order in messages) ----
     invalidCases(
       'src/foo/foo_bar.js',
       undefined,
@@ -447,14 +496,9 @@ ruleTester.run('filename-case', {} as never, {
       'Filename is not in kebab case. Rename it to `[foo-bar].js`.',
     ),
     invalid(
-      'src/foo/$foo_bar.js',
+      'src/foo/foo$Bar.js',
       undefined,
-      'Filename is not in kebab case. Rename it to `$foo-bar.js`.',
-    ),
-    invalid(
-      'src/foo/$fooBar.js',
-      undefined,
-      'Filename is not in kebab case. Rename it to `$foo-bar.js`.',
+      'Filename is not in kebab case. Rename it to `foo$bar.js`.',
     ),
     invalidCases(
       'src/foo/{foo_bar}.js',
@@ -493,6 +537,45 @@ ruleTester.run('filename-case', {} as never, {
       ],
       'Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.',
     ),
+
+    // ---- Latest upstream directory behavior ----
+    {
+      code: '',
+      filename: 'src/FooBar/file.js',
+      errors: [
+        {
+          messageId: 'directory-case',
+          message:
+            'Directory name `FooBar` is not in kebab case. Rename it to `foo-bar`.',
+        },
+      ],
+    },
+    {
+      code: '',
+      filename: 'src/FooBar/index.js',
+      errors: [
+        {
+          messageId: 'directory-case',
+          message:
+            'Directory name `FooBar` is not in kebab case. Rename it to `foo-bar`.',
+        },
+      ],
+    },
+    invalidWithOptions(
+      'src/FooBar/foo_bar.js',
+      [{ case: 'kebabCase', checkDirectories: false }],
+      'Filename is not in kebab case. Rename it to `foo-bar.js`.',
+    ),
+    {
+      code: '',
+      filename: 'src/$UserId/fooBar.js',
+      errors: [
+        {
+          messageId: 'filename-case',
+          message: 'Filename is not in kebab case. Rename it to `foo-bar.js`.',
+        },
+      ],
+    },
 
     // ---- #1136: trailing underscore on a digit-only word ----
     invalidCases(
