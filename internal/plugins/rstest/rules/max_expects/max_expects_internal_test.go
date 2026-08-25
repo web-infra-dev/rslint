@@ -101,6 +101,6 @@ func TestActivationDeactivatesWithoutPopping(t *testing.T) {
 	// A later sibling in the same candidate root activates the frame again.
 	sibling := &ast.Node{Parent: root}
 	if !canActivateRegistrationFallback(stack.top(), sibling) {
-		t.Fatal("a deactivated frame must be activatable again")
+		t.Fatal("a deactivated frame must be able to activate again")
 	}
 }
