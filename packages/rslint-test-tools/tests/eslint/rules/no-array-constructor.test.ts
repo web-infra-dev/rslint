@@ -17,6 +17,7 @@ ruleTester.run('no-array-constructor', {
     'var Array; new Array;',
     {
       code: 'new Array()',
+      filename: 'src/virtual.js',
       languageOptions: {
         globals: { Array: 'off' },
       },

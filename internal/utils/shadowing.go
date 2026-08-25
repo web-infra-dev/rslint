@@ -219,6 +219,37 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 	return false
 }
 
+// HasEnclosingParameter reports whether scope-manager exposes an enclosing
+// function-like declaration's parameter called name at node. This is needed
+// in addition to binder-backed resolution for references directly inside a
+// parameter decorator: scope-manager gives the decorator the decorated
+// function's scope, while TypeScript resolves the decorator in the enclosing
+// class scope. A scope created inside the decorator drops the function scope
+// from the chain, just as it does for type parameters and body declarations.
+func HasEnclosingParameter(node *ast.Node, name string) bool {
+	prevChild := node
+	inParameterDecorator := false
+	crossedScope := false
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindParameter {
+			inParameterDecorator = prevChild.Kind == ast.KindDecorator
+		}
+		if ast.IsFunctionLikeDeclaration(current) &&
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
+			for _, parameter := range current.Parameters() {
+				if parameter != nil && parameter.Name() != nil && HasNameInBindingPattern(parameter.Name(), name) {
+					return true
+				}
+			}
+		}
+		if ast.IsFunctionLikeDeclaration(current) || ast.IsClassLike(current) {
+			crossedScope = true
+		}
+		prevChild = current
+	}
+	return false
+}
+
 // HasEnclosingClassExpressionName reports whether scope-manager exposes an
 // enclosing class expression's own name at node. A reference sitting directly
 // in the class's decorator acquires the class scope, while a scope created

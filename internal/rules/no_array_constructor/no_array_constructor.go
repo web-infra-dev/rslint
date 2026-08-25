@@ -127,12 +127,14 @@ var NoArrayConstructorRule = rule.Rule{
 			) {
 				return
 			}
-			// scope-manager keeps class type parameters visible inside static
-			// members, where TypeScript's resolver hides them, and keeps a
-			// function's parameter initializers in the same scope as its body
-			// declarations, where both TypeScript's resolver and IsShadowed
+			// scope-manager keeps function parameters visible directly inside
+			// parameter decorators and class type parameters visible inside
+			// static members, where TypeScript's resolver hides them. It also
+			// keeps a function's parameter initializers in the same scope as its
+			// body declarations, where both TypeScript's resolver and IsShadowed
 			// follow runtime lexical semantics instead.
-			if utils.HasEnclosingTypeParameter(callee, "Array") ||
+			if utils.HasEnclosingParameter(callee, "Array") ||
+				utils.HasEnclosingTypeParameter(callee, "Array") ||
 				utils.HasEnclosingClassExpressionName(callee, "Array") ||
 				utils.IsShadowedFromParameterInitializer(callee, "Array") {
 				return

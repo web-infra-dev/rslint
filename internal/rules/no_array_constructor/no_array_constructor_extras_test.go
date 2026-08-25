@@ -118,6 +118,7 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			// decorated function's own scope.
 			{Code: `class C { m(@dec(Array()) x: number) { var Array; } }`},
 			{Code: `class C { m(@dec(Array()) x: number) { let Array; } }`},
+			{Code: `class C { m(@dec(Array()) x: number, Array: any) { } }`},
 			// The enclosing class stays in the chain, so its name and type
 			// parameters shadow a call nested inside a parameter decorator.
 			{Code: "class Array { m(@dec(() => Array()) x: number) { } }"},
