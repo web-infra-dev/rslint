@@ -1,5 +1,6 @@
 # Custom Dictionary Words
 aavascript
+abce
 accesskey
 accum
 acdfg
@@ -412,6 +413,7 @@ optgroup
 optionable
 Orya
 osvfs
+otherthing
 outputfixes
 ovsx
 oxendict
@@ -430,6 +432,7 @@ picomatch
 Pipeable
 pollable
 posinset
+postamble
 Prag
 preact
 prebundle

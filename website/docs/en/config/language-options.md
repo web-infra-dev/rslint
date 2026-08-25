@@ -21,6 +21,26 @@ The `'latest'` value remains semantic rather than being frozen into the config, 
 }
 ```
 
+## languageOptions.sourceType
+
+- **Type:** `'module' | 'script' | 'commonjs'`
+- **Default:** exact lowercase `.cjs` extension → `'commonjs'`; every other filename → `'module'`
+
+Selects the module kind used by the per-file language context, including CommonJS globals (`require`, `module`, `exports`, `global`) and whether the top-level scope is the global object. When omitted, a filename with an exact lowercase `.cjs` extension resolves to `'commonjs'`; every other filename, including unknown extensions and extension-less filenames, resolves to `'module'` before rules see the value, matching ESLint. An authored value applies on every extension.
+
+This option does not change TypeScript parsing or compiler module resolution. Support in an individual native rule depends on that rule consulting the configured value; rules that still document syntax-based module detection continue to use that behavior.
+
+Set `sourceType` directly on `languageOptions`; the legacy `languageOptions.parserOptions.sourceType` location is not supported.
+
+```ts
+{
+  files: ['scripts/**/*.js'],
+  languageOptions: {
+    sourceType: 'commonjs',
+  },
+}
+```
+
 ## languageOptions.parserOptions.projectService
 
 - **Type:** `boolean`
@@ -55,7 +75,9 @@ Files outside all tsconfigs are still linted, but only rules that do not require
 }
 ```
 
-Relative project patterns are resolved from the config file's directory for automatically discovered configs, or from the current working directory when the config is supplied with `--config`.
+Relative project patterns in a config file are resolved from that file's directory. Relative project patterns in the JavaScript API's inline `overrideConfig` are resolved from the API `cwd`.
+
+Omit `project` to use the governing config directory's default `tsconfig.json`. Set `project: []` to disable that fallback explicitly.
 
 ## languageOptions.globals
 

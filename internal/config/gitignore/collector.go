@@ -28,6 +28,13 @@ type Pattern struct {
 	Negated       bool
 	DirectoryOnly bool
 	ContentsOnly  bool
+	// MatchDirectory is the config owner's matching-space projection of the Git
+	// root in which Glob and NodeGlob are interpreted. PhysicalMatchDirectory
+	// and LexicalMatchDirectory retain the Git root's own filesystem identities
+	// when they differ from that projection.
+	MatchDirectory         string
+	PhysicalMatchDirectory string
+	LexicalMatchDirectory  string
 }
 
 func normalizeGlobPath(path string) string {
@@ -443,6 +450,12 @@ func NewCursor(ownerRoot string, useCaseSensitive bool) Cursor {
 // current directory's .gitignore.
 func (cursor Cursor) SourceReachable() bool {
 	return cursor.sourceReachable
+}
+
+// RootDirectory returns the path space in which AppendSourcePatterns projects
+// its globs. It is immutable for the cursor's lifetime.
+func (cursor Cursor) RootDirectory() string {
+	return cursor.rootDir
 }
 
 // BlockSourceTraversal preserves already-observed matching rules while making

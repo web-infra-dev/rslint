@@ -41,8 +41,8 @@ var ExpectExpectRule = shared.NewRule(shared.Config{
 		return shared.Runtime{
 			IsAssertion: isAssertion,
 			ClassifyTest: func(node *ast.Node) shared.TestClassification {
-				parsed := analysis.ParseFnCall(node)
-				if parsed == nil || parsed.Kind != rstestUtils.RstestFnTypeTest {
+				parsed := analysis.ParseTestCall(node)
+				if parsed == nil {
 					return shared.TestClassification{}
 				}
 				// Todo is a semantic field that survives const aliases; the

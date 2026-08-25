@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
 // sanitizeSymbolName replaces the internal symbol name prefix (\xFE) with "__"
@@ -62,6 +63,49 @@ type TypeInfo struct {
 }
 type SymbolTable = map[NodeReference]SymbolInfo
 type TypeTable = map[NodeReference]TypeInfo
+
+// getChildren is equivalent to TypeScript's token-inclusive node.getChildren.
+// TypeScript-Go exposes the structural children through ForEachChild, so scan
+// the gaps between them to materialize keyword and punctuation token nodes.
+func getChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
+	var childNodes []*ast.Node
+	node.ForEachChild(func(child *ast.Node) bool {
+		childNodes = append(childNodes, child)
+		return false
+	})
+	if len(childNodes) == 0 {
+		return nil
+	}
+	if node.Flags&ast.NodeFlagsReparsed != 0 {
+		return childNodes
+	}
+
+	var children []*ast.Node
+	pos := node.Pos()
+	appendTokensBefore := func(end int) {
+		scanner := scanner.GetScannerForSourceFile(sourceFile, pos)
+		for pos < end {
+			token := sourceFile.GetOrCreateToken(
+				scanner.Token(),
+				scanner.TokenFullStart(),
+				scanner.TokenEnd(),
+				node,
+				scanner.TokenFlags(),
+			)
+			children = append(children, token)
+			pos = scanner.TokenEnd()
+			scanner.Scan()
+		}
+	}
+
+	for _, child := range childNodes {
+		appendTokensBefore(child.Pos())
+		children = append(children, child)
+		pos = child.End()
+	}
+	appendTokensBefore(node.End())
+	return children
+}
 
 // collect_symbol_table walks every AST node in the program once and records the
 // symbol (if any) associated with that node keyed by its file/span tuple.
@@ -241,6 +285,44 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 
 		return typeID
 	}
+	// A symbol can be reached from multiple AST nodes and alias edges. Record each
+	// Symtab entry once, then reuse it on subsequent visits.
+	recordSymbolInfo := func(symbol *ast.Symbol) ast.SymbolId {
+		if symbol == nil {
+			return 0
+		}
+
+		symbolID := ast.GetSymbolId(symbol)
+		if _, exists := semantic.Symtab[symbolID]; !exists {
+			semantic.Symtab[symbolID] = SymbolInfo{
+				Id:         symbolID,
+				Name:       sanitizeSymbolName(symbol.Name),
+				Flags:      int(symbol.Flags),
+				CheckFlags: int(symbol.CheckFlags),
+				Decl:       nodeReference(symbol.ValueDeclaration),
+			}
+		}
+		return symbolID
+	}
+	recordSymbol := func(symbol *ast.Symbol) (ast.SymbolId, checker.TypeId, bool) {
+		if symbol == nil {
+			return 0, 0, false
+		}
+
+		symbolID := ast.GetSymbolId(symbol)
+		if typeID, exists := semantic.Sym2type[symbolID]; exists {
+			recordSymbolInfo(symbol)
+			return symbolID, typeID, true
+		}
+		ty := tc.GetTypeOfSymbol(symbol)
+		if ty == nil {
+			return symbolID, 0, false
+		}
+		recordSymbolInfo(symbol)
+		typeID := recordType(ty)
+		semantic.Sym2type[symbolID] = typeID
+		return symbolID, typeID, true
+	}
 
 	var visit func(node *ast.Node)
 	visit = func(node *ast.Node) {
@@ -268,19 +350,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			}
 
 			if symbol := tc.GetSymbolAtLocation(node); symbol != nil {
-				if ty := tc.GetTypeOfSymbol(symbol); ty != nil {
-					typeID := recordType(ty)
-					sym_id := ast.GetSymbolId(symbol)
-					declRef := nodeReference(symbol.ValueDeclaration)
-
-					semantic.Symtab[sym_id] = SymbolInfo{
-						Id:         sym_id,
-						Name:       sanitizeSymbolName(symbol.Name),
-						Flags:      int(symbol.Flags),
-						CheckFlags: int(symbol.CheckFlags),
-						Decl:       declRef,
-					}
-					semantic.Sym2type[sym_id] = typeID
+				if sym_id, typeID, ok := recordSymbol(symbol); ok {
 					semantic.Node2sym[key] = sym_id
 					semantic.Node2type[key] = typeID
 
@@ -291,20 +361,14 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 							aliased_id := ast.GetSymbolId(aliasedSymbol)
 							if aliased_id != sym_id {
 								semantic.AliasSymbols[sym_id] = aliased_id
+								if _, _, ok := recordSymbol(aliasedSymbol); !ok {
+									recordSymbolInfo(aliasedSymbol)
+								}
 							}
 						}
 					}
 				} else if isImportModuleSpecifier(node) {
-					sym_id := ast.GetSymbolId(symbol)
-					declRef := nodeReference(symbol.ValueDeclaration)
-
-					semantic.Symtab[sym_id] = SymbolInfo{
-						Id:         sym_id,
-						Name:       sanitizeSymbolName(symbol.Name),
-						Flags:      int(symbol.Flags),
-						CheckFlags: int(symbol.CheckFlags),
-						Decl:       declRef,
-					}
+					sym_id := recordSymbolInfo(symbol)
 					semantic.Node2sym[key] = sym_id
 				}
 			}
@@ -313,21 +377,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			if valueSymbol := tc.GetShorthandAssignmentValueSymbol(node); valueSymbol != nil {
 				value_sym_id := ast.GetSymbolId(valueSymbol)
 				semantic.ShorthandSymbols[key] = value_sym_id
-				// Also record this symbol if not already recorded
-				if _, exists := semantic.Symtab[value_sym_id]; !exists {
-					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
-						typeID := recordType(ty)
-						declRef := nodeReference(valueSymbol.ValueDeclaration)
-						semantic.Symtab[value_sym_id] = SymbolInfo{
-							Id:         value_sym_id,
-							Name:       sanitizeSymbolName(valueSymbol.Name),
-							Flags:      int(valueSymbol.Flags),
-							CheckFlags: int(valueSymbol.CheckFlags),
-							Decl:       declRef,
-						}
-						semantic.Sym2type[value_sym_id] = typeID
-					}
-				}
+				recordSymbol(valueSymbol)
 			}
 
 			if ast.IsParameterPropertyDeclaration(node, node.Parent) {
@@ -338,30 +388,16 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 						if parameterSymbol != nil {
 							parameterSymbolID := ast.GetSymbolId(parameterSymbol)
 							semantic.ParameterPropertySymbols[*nameKey] = parameterSymbolID
-							if _, exists := semantic.Symtab[parameterSymbolID]; !exists {
-								if ty := tc.GetTypeOfSymbol(parameterSymbol); ty != nil {
-									typeID := recordType(ty)
-									declRef := nodeReference(parameterSymbol.ValueDeclaration)
-									semantic.Symtab[parameterSymbolID] = SymbolInfo{
-										Id:         parameterSymbolID,
-										Name:       sanitizeSymbolName(parameterSymbol.Name),
-										Flags:      int(parameterSymbol.Flags),
-										CheckFlags: int(parameterSymbol.CheckFlags),
-										Decl:       declRef,
-									}
-									semantic.Sym2type[parameterSymbolID] = typeID
-								}
-							}
+							recordSymbol(parameterSymbol)
 						}
 					}
 				}
 			}
 		}
 
-		node.ForEachChild(func(child *ast.Node) bool {
+		for _, child := range getChildren(node, file) {
 			visit(child)
-			return false
-		})
+		}
 	}
 
 	visit(file.AsNode())

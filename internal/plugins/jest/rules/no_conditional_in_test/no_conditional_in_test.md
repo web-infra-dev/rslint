@@ -117,6 +117,12 @@ it('foo', () => {
 });
 ```
 
+## Limitations
+
+Unlike the upstream rule, an inner registration exiting does not clear the
+outer test's scope, so a conditional written after a nested `it(...)` is still
+reported.
+
 ## Original Documentation
 
 - [eslint-plugin-jest: no-conditional-in-test](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-conditional-in-test.md)
