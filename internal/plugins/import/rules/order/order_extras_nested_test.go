@@ -33,17 +33,31 @@ func TestOrderNestedAndSyntaxEdges(t *testing.T) {
 		t,
 		&order.OrderRule,
 		[]rule_tester.ValidTestCase{
-			// Different relative roots compare equal at the same depth. This
-			// real-world interleaving is valid in eslint-plugin-import even though
-			// the two sibling paths would sort differently without the parent.
+			// Parent and sibling imports in one rank use a transitive full-path
+			// fallback. Descending order puts the sibling paths first and still
+			// sorts those paths amongst themselves.
 			{
-				Code: "import { registerHostAuthHeaders } from './host-auth';\n" +
+				Code: "import { registerHostChat } from './host-chat';\n" +
+					"import { registerHostAuthHeaders } from './host-auth';\n" +
 					"import { registerHostAccountRpcHandlers } from './host-account';\n" +
-					"import { OverlayAsideHostEnv, Scene, TrackEventData } from '../types';\n" +
-					"import { registerHostChat } from './host-chat';",
+					"import { OverlayAsideHostEnv, Scene, TrackEventData } from '../types';",
 				Options: map[string]any{
 					"groups":      []any{[]any{"parent", "sibling"}},
 					"alphabetize": map[string]any{"order": "desc", "caseInsensitive": true},
+				},
+			},
+			// Upstream regression for import-js/eslint-plugin-import#3235: omitted
+			// relative groups share the catch-all rank, but this canonical order
+			// remains valid on every JavaScript sorting implementation.
+			{
+				Code: "import checkpoint from '../../checkpoint/models';\n" +
+					"import common from '../common/files';\n" +
+					"import avatar from './adapters/avatar';\n" +
+					"import execution from './adapters/execution';\n" +
+					"import config from './config';",
+				Options: map[string]any{
+					"groups":      []any{"builtin", "external", "internal", "type"},
+					"alphabetize": map[string]any{"order": "asc", "caseInsensitive": true},
 				},
 			},
 			// Case-insensitive alphabetizing uses JavaScript's full default case
@@ -126,29 +140,38 @@ func TestOrderNestedAndSyntaxEdges(t *testing.T) {
 					{MessageId: "order", Line: 2},
 				},
 			},
-			// With four interleaved relative imports, the upstream V8 sort extends
-			// its initial run before inserting the final sibling. This locks in the
-			// observable diagnostic and fixer order for the non-transitive path
-			// comparator rather than substituting Go's stable-sort call sequence.
+			// Upstream regression for import-js/eslint-plugin-import#3235. Relative
+			// groups omitted from `groups` share the catch-all rank; the full-path
+			// fallback must order the parent path first and let autofix converge.
 			{
-				Code: "import c from './c';\n" +
-					"import a from './a';\n" +
-					"import parent from '../a';\n" +
-					"import b from './b';",
+				Code: "import a from './foo';\n" +
+					"import b from '../bar';\n",
 				Options: map[string]any{
-					"groups":      []any{[]any{"parent", "sibling"}},
-					"alphabetize": map[string]any{"order": "asc"},
+					"groups":      []any{"builtin", "external", "internal", "type"},
+					"alphabetize": map[string]any{"order": "asc", "caseInsensitive": true},
 				},
 				Output: []string{
-					"import a from './a';\n" +
-						"import c from './c';\n" +
-						"import parent from '../a';\n" +
-						"import b from './b';",
+					"import b from '../bar';\n" +
+						"import a from './foo';\n",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "order", Line: 2},
-					{MessageId: "order", Line: 4},
+					{MessageId: "order", Message: "`../bar` import should occur before import of `./foo`", Line: 2},
 				},
+			},
+			// Descending order reverses the same cross-root comparison instead of
+			// relying on the source order of an equal comparator result.
+			{
+				Code: "import parent from '../a';\n" +
+					"import sibling from './c';\n",
+				Options: map[string]any{
+					"groups":      []any{[]any{"parent", "sibling"}},
+					"alphabetize": map[string]any{"order": "desc"},
+				},
+				Output: []string{
+					"import sibling from './c';\n" +
+						"import parent from '../a';\n",
+				},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "order", Line: 2}},
 			},
 			// The line-range fixer stops only at LF. ECMAScript still counts U+2028
 			// as whitespace, so removing a blank Unicode-separated line

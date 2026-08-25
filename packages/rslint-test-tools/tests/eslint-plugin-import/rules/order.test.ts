@@ -1,6 +1,6 @@
 // cspell:ignore asdas barfoo blist chpro Promisable rootverse vtaits xcompose yargs
 // Migrated from eslint-plugin-import v2.32.0 tests/src/rules/order.js.
-// Semantic duplicates across the core, TypeScript, and Babel suites are collapsed: 162 valid + 132 invalid.
+// Semantic duplicates across the core, TypeScript, and Babel suites are collapsed: 163 valid + 133 invalid.
 // Four Flow-only `import typeof` cases are omitted because the TypeScript parser rejects them; the generic Flow-suite case remains below.
 import { RuleTester } from '../rule-tester.js';
 
@@ -10,6 +10,19 @@ const rule = null as never;
 ruleTester.run('order', rule, {
   valid: [],
   invalid: [
+    // Upstream regression: https://github.com/import-js/eslint-plugin-import/issues/3235
+    {
+      code: "import a from './foo';\nimport b from '../bar';\n",
+      options: [
+        {
+          groups: ['builtin', 'external', 'internal', 'type'],
+          alphabetize: { order: 'asc', caseInsensitive: true },
+        },
+      ],
+      errors: [
+        { message: '`../bar` import should occur before import of `./foo`' },
+      ],
+    },
     // Upstream case 0:0.
     {
       code: "\n        var async = require('async');\n        var fs = require('fs');\n      ",
@@ -2122,6 +2135,16 @@ ruleTester.run('order', rule, {
 
 ruleTester.run('order', rule, {
   valid: [
+    // Upstream regression: https://github.com/import-js/eslint-plugin-import/issues/3235
+    {
+      code: "import checkpoint from '../../checkpoint/models';\nimport common from '../common/files';\nimport avatar from './adapters/avatar';\nimport execution from './adapters/execution';\nimport config from './config';",
+      options: [
+        {
+          groups: ['builtin', 'external', 'internal', 'type'],
+          alphabetize: { order: 'asc', caseInsensitive: true },
+        },
+      ],
+    },
     // Upstream case 0:0.
     {
       code: "\n        var fs = require('fs');\n        var async = require('async');\n        var relParent1 = require('../foo');\n        var relParent2 = require('../foo/bar');\n        var relParent3 = require('../');\n        var relParent4 = require('..');\n        var sibling = require('./foo');\n        var index = require('./');",

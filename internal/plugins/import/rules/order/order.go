@@ -4,7 +4,6 @@
 package order
 
 import (
-	"cmp"
 	_ "embed"
 	"fmt"
 	"math"
@@ -1406,7 +1405,7 @@ func mutateRanksToAlphabetize(imported []*importEntry, opts alphabetizeOptions) 
 
 	cmp := makeAlphaComparator(multiplier, multiplierKind)
 	for _, k := range keys {
-		v8StableSortAlphabetized(groups[k], cmp)
+		slices.SortStableFunc(groups[k], cmp)
 	}
 
 	newRanks := make(map[alphabetizedRankKey]float64, len(imported))
@@ -1470,9 +1469,9 @@ func compareAlphaValues(a, b alphabetizeEntry) int {
 		aPart, bPart := a.value[aStart:aEnd], b.value[bStart:bEnd]
 
 		if segment == 0 && isRelativeRoot(aPart) && isRelativeRoot(bPart) && aPart != bPart {
-			// The upstream comparator stops at different relative roots, then
-			// still uses segment count as its fallback.
-			return cmp.Compare(a.segmentCount, b.segmentCount)
+			// Comparing the complete paths keeps parent/sibling ordering
+			// transitive when configuration puts both kinds in one rank group.
+			return ecmascript.CompareStrings(a.value, b.value)
 		}
 		if result := ecmascript.CompareStrings(aPart, bPart); result != 0 {
 			return result
