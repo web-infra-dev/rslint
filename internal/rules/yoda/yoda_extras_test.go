@@ -126,6 +126,16 @@ func TestYodaExtras(t *testing.T) {
 			// a string bound, which is ECMAScript whitespace but not Go's ----
 			{Code: "if ('\ufeff5' <= x && x < 10) {}", Options: []any{"never", map[string]any{"exceptRange": true}}},
 			{Code: "if (1n <= x && x < '\ufeff2') {}", Options: []any{"never", map[string]any{"exceptRange": true}}},
+
+			// ---- Bug fix: static numeric member keys use JavaScript's NumberToString
+			// notation before isSameReference compares them with a string key ----
+			{Code: `if (0 <= a[1e-7] && a['1e-7'] < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 <= a[1e-6] && a['0.000001'] < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 <= a[1e20] && a['100000000000000000000'] < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 <= a[1e21] && a['1e+21'] < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
+			// ---- A sign is allowed before a decimal StringToBigInt input ----
+			{Code: `if ('+1' <= x && x < 2n) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Real-user: optional chaining under "always" mode ----
@@ -261,6 +271,27 @@ func TestYodaExtras(t *testing.T) {
 				Output:  []string{"if (x >= 2n && x < '\ufeff1') {}"},
 				Options: []any{"never", map[string]any{"exceptRange": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 12}},
+			},
+
+			// ---- Bug fix: StringToBigInt rejects either sign before a non-decimal
+			// prefix, so these are not ascending ranges and must not be exempt ----
+			{
+				Code:    `if ('+0x1' <= x && x < 2n) {}`,
+				Output:  []string{`if (x >= '+0x1' && x < 2n) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code:    `if ('+0o1' <= x && x < 2n) {}`,
+				Output:  []string{`if (x >= '+0o1' && x < 2n) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code:    `if ('+0b1' <= x && x < 2n) {}`,
+				Output:  []string{`if (x >= '+0b1' && x < 2n) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 16}},
 			},
 		},
 	)

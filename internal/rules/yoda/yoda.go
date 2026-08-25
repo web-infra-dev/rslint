@@ -190,8 +190,10 @@ func stringToBigInt(s string) (*big.Int, bool) {
 	if rest == "" {
 		return big.NewInt(0), true
 	}
+	hasSign := false
 	neg := false
 	if rest[0] == '+' || rest[0] == '-' {
+		hasSign = true
 		neg = rest[0] == '-'
 		rest = rest[1:]
 	}
@@ -206,7 +208,7 @@ func stringToBigInt(s string) (*big.Int, bool) {
 			base, rest = 2, rest[2:]
 		}
 	}
-	if base != 10 && neg {
+	if base != 10 && hasSign {
 		// JS's StringIntegerLiteral only allows a sign before a decimal
 		// StrNumericLiteral; a signed 0x/0o/0b literal never parses.
 		return nil, false
@@ -249,7 +251,9 @@ func (v literalValue) numeric() float64 {
 	case "number":
 		return v.num
 	case "string":
-		return ecmascript.StringToNumber(v.str)
+		if number, ok := ecmascript.StringToNumber(v.str); ok {
+			return number
+		}
 	}
 	return math.NaN()
 }
