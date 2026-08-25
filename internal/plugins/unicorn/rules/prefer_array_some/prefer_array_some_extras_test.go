@@ -106,6 +106,10 @@ func TestPreferArraySomeExtras(t *testing.T) {
 			Code:   `if ((foo).find(fn)) {}`,
 			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`if ((foo).some(fn)) {}`)},
 		},
+		// ---- Shared type classifier: actual interface heritage wins over a keyed-collection name ----
+		// The local interface is deliberately named Map to exercise the fallback
+		// ordering used by the shared Unicorn type classifier.
+		{Code: `export {}; interface Map<T> extends Array<T> {} function run(xs: Map<number>) { if (xs.find(Boolean)) {} }`, Tsx: false, Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`export {}; interface Map<T> extends Array<T> {} function run(xs: Map<number>) { if (xs.some(Boolean)) {} }`)}},
 		// The type-information path matches the type symbol name without
 		// requiring the declaration to come from the standard library.
 		{

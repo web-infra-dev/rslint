@@ -26,12 +26,15 @@ func IsArray(ctx rule.RuleContext, node *ast.Node) bool {
 	return classifyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassTarget
 }
 
-type arrayClass int
+// arrayClass is the array-receiver spelling of the shared TypeClass. It is an
+// alias rather than its own type so the syntactic path below and the shared
+// type-checker classifier can hand values to each other directly.
+type arrayClass = TypeClass
 
 const (
-	arrayClassUnknown arrayClass = iota
-	arrayClassTarget
-	arrayClassNonTarget
+	arrayClassUnknown   = TypeUnknown
+	arrayClassTarget    = TypeTarget
+	arrayClassNonTarget = TypeNonTarget
 )
 
 var arrayTargets = utils.NewSetFromItems("Array", "ReadonlyArray")
@@ -469,111 +472,17 @@ func isSyntacticNonArrayNode(node *ast.Node) bool {
 	return false
 }
 
-// classifyArrayType mirrors unicorn's getTypeScriptType. It takes no
-// non-target name set: upstream ends with targetTypeNames.has(typeName) ? target
-// : nonTarget, so a name that is not a target is already non-target. Name-based
-// non-target matching belongs to the syntactic path, in
-// classifyKnownArrayTypeName.
+// classifyArrayType mirrors unicorn's getTypeScriptType by delegating to the
+// shared type classifier. It takes no non-target name set: upstream ends with
+// targetTypeNames.has(typeName) ? target : nonTarget, so a name that is not a
+// target is already non-target. Name-based non-target matching belongs to the
+// syntactic path, in classifyKnownArrayTypeName.
 func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames *utils.Set[string]) arrayClass {
-	if t == nil {
-		return arrayClassUnknown
-	}
-	if utils.IsTypeAnyType(t) || utils.IsTypeUnknownType(t) || utils.IsIntrinsicErrorType(t) {
-		return arrayClassUnknown
-	}
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-		return arrayClassNonTarget
-	}
-
-	if utils.IsTypeParameter(t) {
-		constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
-		if constraint == nil {
-			return arrayClassUnknown
-		}
-		return classifyArrayType(ctx, constraint, targetNames)
-	}
-	if utils.IsUnionType(t) {
-		return combineArrayUnion(ctx, utils.UnionTypeParts(t), targetNames)
-	}
-	if utils.IsIntersectionType(t) {
-		return combineArrayIntersection(ctx, utils.IntersectionTypeParts(t), targetNames)
-	}
-
-	if targetNames.Has("Array") && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
-		return arrayClassTarget
-	}
-
-	constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
-	if constraint != nil && constraint != t {
-		return classifyArrayType(ctx, constraint, targetNames)
-	}
-
-	symbol := arrayTypeSymbol(t)
-	if symbol == nil {
-		if utils.IsTypeFlagSet(t, checker.TypeFlagsPrimitive|checker.TypeFlagsIntrinsic) {
-			return arrayClassNonTarget
-		}
-		return arrayClassUnknown
-	}
-	if targetNames.Has(symbol.Name) {
-		return arrayClassTarget
-	}
-	return arrayClassNonTarget
-}
-
-func combineArrayUnion(ctx rule.RuleContext, parts []*checker.Type, targetNames *utils.Set[string]) arrayClass {
-	classes := make([]arrayClass, 0, len(parts))
-	for _, part := range parts {
-		classes = append(classes, classifyArrayType(ctx, part, targetNames))
-	}
-	if len(classes) == 0 {
-		return arrayClassNonTarget
-	}
-	allTarget := true
-	allNonTarget := true
-	for _, class := range classes {
-		if class != arrayClassTarget {
-			allTarget = false
-		}
-		if class != arrayClassNonTarget {
-			allNonTarget = false
-		}
-	}
-	if allTarget {
-		return arrayClassTarget
-	}
-	if allNonTarget {
-		return arrayClassNonTarget
-	}
-	return arrayClassUnknown
-}
-
-func combineArrayIntersection(ctx rule.RuleContext, parts []*checker.Type, targetNames *utils.Set[string]) arrayClass {
-	classes := make([]arrayClass, 0, len(parts))
-	for _, part := range parts {
-		classes = append(classes, classifyArrayType(ctx, part, targetNames))
-	}
-	for _, class := range classes {
-		if class == arrayClassTarget {
-			return arrayClassTarget
-		}
-	}
-	for _, class := range classes {
-		if class != arrayClassNonTarget {
-			return arrayClassUnknown
-		}
-	}
-	return arrayClassNonTarget
-}
-
-func arrayTypeSymbol(t *checker.Type) *ast.Symbol {
-	if symbol := checker.Type_symbol(t); symbol != nil && symbol.Name != "" {
-		return symbol
-	}
-	if alias := checker.Type_alias(t); alias != nil {
-		if symbol := alias.Symbol(); symbol != nil && symbol.Name != "" {
-			return symbol
-		}
-	}
-	return nil
+	return ClassifyType(ctx, t, TypeClassifierOptions{
+		TargetTypeNames: targetNames,
+		IsTargetType: func(t *checker.Type) bool {
+			return targetNames.Has("Array") &&
+				checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
+		},
+	})
 }

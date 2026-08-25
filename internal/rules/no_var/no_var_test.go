@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -24,40 +25,46 @@ func TestNoVarRule(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			// ================================================================
-			// TypeScript script mode (no import/export → global scope → no fix)
+			// Explicit TypeScript script mode (global scope → no fix)
 			// ================================================================
 			{
-				Code: `var foo = bar;`,
+				Code:            `var foo = bar;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `var foo = bar, toast = most;`,
+				Code:            `var foo = bar, toast = most;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `if (true) { var x = 1; }`,
+				Code:            `if (true) { var x = 1; }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 13},
 				},
 			},
 			{
-				Code: `for (var i = 0; i < 10; i++) {}`,
+				Code:            `for (var i = 0; i < 10; i++) {}`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 6},
 				},
 			},
 			{
-				Code: `var { a, b } = { a: 1, b: 2 };`,
+				Code:            `var { a, b } = { a: 1, b: 2 };`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `declare var declaredVar: number;`,
+				Code:            `declare var declaredVar: number;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 1},
 				},

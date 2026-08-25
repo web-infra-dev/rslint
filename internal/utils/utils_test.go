@@ -32,6 +32,28 @@ func TestExtractRegexPatternAndFlags(t *testing.T) {
 	}
 }
 
+func TestIsESTreeLiteralKind(t *testing.T) {
+	literals := []ast.Kind{
+		ast.KindStringLiteral,
+		ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword,
+	}
+	for _, kind := range literals {
+		if !IsESTreeLiteralKind(kind) {
+			t.Errorf("IsESTreeLiteralKind(%v) = false, want true", kind)
+		}
+	}
+	for _, kind := range []ast.Kind{ast.KindIdentifier, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression} {
+		if IsESTreeLiteralKind(kind) {
+			t.Errorf("IsESTreeLiteralKind(%v) = true, want false", kind)
+		}
+	}
+}
+
 func TestHasCommentInsideNode(t *testing.T) {
 	source := "const a = \"https://example.com/*x*/\";\n" +
 		"const b = /\\/\\//;\n" +

@@ -105,19 +105,9 @@ func runTypeCheckForProgram(prog *program.Program) []collectedTypeCheckDiagnosti
 		// type-check is meant to be a transparent passthrough of tsc.
 
 		message := flattenDiagnosticMessage(d)
-		loc := d.Loc()
 		collected = append(collected, collectedTypeCheckDiagnostic{
-			key: typeCheckDedupeKeyForDiagnostic(prog, d),
-			ruleDiagnostic: rule.RuleDiagnostic{
-				RuleName:     fmt.Sprintf("TypeScript(TS%d)", d.Code()),
-				Range:        loc,
-				Message:      rule.RuleMessage{Description: message},
-				SourceFile:   file,
-				FilePath:     file.FileName(),
-				Severity:     rule.SeverityError,
-				Origin:       rule.DiagnosticOriginTypeScript,
-				PreFormatted: true,
-			},
+			key:            typeCheckDedupeKeyForDiagnostic(prog, d),
+			ruleDiagnostic: newTypeScriptDiagnostic(file, d, message),
 		})
 	}
 	return collected

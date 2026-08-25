@@ -27,6 +27,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
@@ -1644,14 +1645,14 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		t.Fatalf("target discovery should retain the default baseline despite --rule overlay, got %v", targetFiles)
 	}
 
-	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		Config:                  activeConfig,
-		CurrentDirectory:        dir,
-		RuleCatalog:             rules.All(),
-		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
-		SourceMappingsCanonical: true,
-		PathSpaces:              targetPlan.PathSpaces(),
-		FS:                      fs,
+	fileConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
+		Config:                              activeConfig,
+		ConfigDirectory:                     dir,
+		Catalog:                             rules.All(),
+		TargetsBySourcePath:                 binding.LintTargetBySourcePath,
+		SourceMappingsIncludeCanonicalPaths: true,
+		PathSpaces:                          targetPlan.PathSpaces(),
+		FS:                                  fs,
 	})
 	var diagnostics []rule.RuleDiagnostic
 	_, err = linter.RunLinter(linter.RunLinterOptions{
@@ -1659,7 +1660,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		SingleThreaded: true,
 		TargetFiles:    targetsByProgram,
 		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
-			return fileConfigResolver.EnabledRulesForFile(sf.FileName())
+			return fileConfigResolver.EnabledRulesForSourcePath(sf.FileName())
 		},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,

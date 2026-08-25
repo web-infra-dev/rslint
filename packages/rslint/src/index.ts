@@ -3,6 +3,7 @@ export { globals } from './config/globals/index.js';
 export type {
   RslintConfig,
   RslintConfigEntry,
+  LanguageOptions,
   ESLintPlugin,
 } from './config/define-config.js';
 export {
