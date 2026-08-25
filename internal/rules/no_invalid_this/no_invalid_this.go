@@ -2,14 +2,15 @@ package no_invalid_this
 
 import (
 	_ "embed"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_invalid_this.schema.json
@@ -300,8 +301,20 @@ func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, comments []*ast.Co
 // "use strict", or a class body — see utils.IsInStrictMode), OR the function
 // declares its own "use strict" directive.
 func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int) bool {
-	// Strict mode was introduced in ES5; in ES3 even directive-looking string
-	// literals are semantically inert.
+	// Modules, classes, and TypeScript namespaces impose strict mode
+	// independently of directive prologues and therefore remain strict even
+	// when the configured language version is ES3.
+	if ast.IsExternalModule(sf) {
+		return true
+	}
+	for current := fn.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindModuleDeclaration || ast.IsClassLike(current) {
+			return true
+		}
+	}
+
+	// Strict-mode directives were introduced in ES5. In ES3, only the
+	// syntax-imposed contexts handled above can make the function strict.
 	if ecmaVersion == 3 {
 		return false
 	}
@@ -340,9 +353,36 @@ func hasOwnFunctionName(node *ast.Node) bool {
 	return false
 }
 
-// thisTagPattern is ESLint's exact pattern: `^[\s*]*@this` applied to a
-// comment's *value*, i.e. with `/*` / `*/` / `//` markers stripped.
-var thisTagPattern = regexp.MustCompile(`(?m)^[\s*]*@this`)
+// matchesThisTagPattern implements ESLint's `/^[\s*]*@this/mu` against a
+// comment value. The whitespace predicate deliberately uses ECMAScript's
+// `\s` semantics, which include U+00A0, U+FEFF, and every Space_Separator.
+func matchesThisTagPattern(value string) bool {
+	for lineStart := 0; lineStart <= len(value); {
+		pos := lineStart
+		for pos < len(value) {
+			r, size := utf8.DecodeRuneInString(value[pos:])
+			if r != '*' && !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
+				break
+			}
+			pos += size
+		}
+		if strings.HasPrefix(value[pos:], "@this") {
+			return true
+		}
+
+		for lineStart < len(value) {
+			r, size := utf8.DecodeRuneInString(value[lineStart:])
+			lineStart += size
+			if ecmascript.IsLineTerminator(r) {
+				break
+			}
+		}
+		if lineStart == len(value) {
+			break
+		}
+	}
+	return false
+}
 
 // hasJSDocThisTag mirrors `astUtils.hasJSDocThisTag`. Two sources are checked
 // per ESLint:
@@ -369,53 +409,52 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, text string) bo
 	if hasThisTagInLeadingComments(fn, comments, text) {
 		return true
 	}
-	// Walk up through transparent statement-context parents. Stop at the
-	// first parent whose comments we should *not* attribute to the function
-	// (e.g. CallExpression — upstream's `getJSDocComment` excludes it).
-	current := fn
-	for {
-		parent := current.Parent
-		// Skip parens and TS expression wrappers — eslint-utils's
-		// `getJSDocComment` keeps walking past them when looking for a
-		// JSDoc anchor, so we do the same.
-		for parent != nil && ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions) {
-			current = parent
-			parent = current.Parent
-		}
-		if parent == nil {
-			return false
-		}
-		switch parent.Kind {
-		case ast.KindReturnStatement, ast.KindExpressionStatement:
-			return hasThisTagInLeadingComments(parent, comments, text)
-		case ast.KindVariableDeclaration:
-			// Walk through VariableDeclarationList → VariableStatement so the
-			// JSDoc on the statement itself is checked. tsgo splits what
-			// ESTree models as a flat VariableDeclaration into three nested
-			// nodes; the user-visible JSDoc anchor is the outermost.
-			grand := parent.Parent
-			if grand != nil && grand.Kind == ast.KindVariableDeclarationList {
-				vs := grand.Parent
-				if vs != nil && vs.Kind == ast.KindVariableStatement {
-					return hasThisTagInLeadingComments(vs, comments, text)
-				}
-			}
-			return hasThisTagInLeadingComments(parent, comments, text)
-		case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
-			ast.KindPropertyDeclaration, ast.KindBindingElement, ast.KindParameter:
-			return hasThisTagInLeadingComments(parent, comments, text)
-		case ast.KindBinaryExpression:
-			// Assignment / logical / conditional — defer to the enclosing
-			// statement. Continue walking.
-			current = parent
-			continue
-		case ast.KindConditionalExpression:
-			current = parent
-			continue
-		default:
-			return false
-		}
+	if fn.Kind != ast.KindFunctionExpression {
+		return false
 	}
+
+	// ESTree discards parentheses and TypeScript expression wrappers, so find
+	// the first semantic parent before applying its direct-call exception.
+	current := fn
+	parent := current.Parent
+	for parent != nil && ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions) {
+		current = parent
+		parent = current.Parent
+	}
+	if parent == nil || parent.Kind == ast.KindCallExpression || parent.Kind == ast.KindNewExpression {
+		return false
+	}
+
+	// ESLint keeps climbing while the intermediate node has no leading
+	// comments and is not a function, method, or property boundary. This is
+	// intentionally broader than a hand-picked expression list: arrays,
+	// unary expressions, nested calls, and other containers are transparent.
+	for parent != nil && parent.Kind != ast.KindSourceFile {
+		hasComments, hasTag := leadingCommentSummary(parent, comments, text)
+		if hasComments {
+			return hasTag
+		}
+		if isJSDocLookupBoundary(parent) {
+			return false
+		}
+		current = parent
+		parent = current.Parent
+	}
+	return false
+}
+
+func isJSDocLookupBoundary(node *ast.Node) bool {
+	if ast.IsFunctionLike(node) {
+		return true
+	}
+	switch node.Kind {
+	case ast.KindMethodDeclaration, ast.KindConstructor,
+		ast.KindGetAccessor, ast.KindSetAccessor,
+		ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
+		ast.KindPropertyDeclaration, ast.KindBindingElement:
+		return true
+	}
+	return false
 }
 
 // hasThisTagInLeadingComments reports whether any comment in `node`'s
@@ -438,23 +477,29 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, text string) bo
 // `CommentStore.All`), so a plain forward scan over it sees every case
 // uniformly.
 func hasThisTagInLeadingComments(node *ast.Node, comments []*ast.CommentRange, text string) bool {
+	_, hasTag := leadingCommentSummary(node, comments, text)
+	return hasTag
+}
+
+func leadingCommentSummary(node *ast.Node, comments []*ast.CommentRange, text string) (hasComments, hasTag bool) {
 	if node == nil {
-		return false
+		return false, false
 	}
 	pos := node.Pos()
 	idx := sort.Search(len(comments), func(i int) bool { return comments[i].Pos() >= pos })
 	for i := idx; i < len(comments); i++ {
 		c := comments[i]
-		if strings.TrimSpace(text[pos:c.Pos()]) != "" {
+		if !ecmascript.IsBlank(text[pos:c.Pos()]) {
 			break
 		}
+		hasComments = true
 		value := stripCommentMarkers(text[c.Pos():c.End()], c.Kind)
-		if thisTagPattern.MatchString(value) {
-			return true
+		if matchesThisTagPattern(value) {
+			hasTag = true
 		}
 		pos = c.End()
 	}
-	return false
+	return hasComments, hasTag
 }
 
 // stripCommentMarkers removes `/*`/`*/` from block comments and `//` from

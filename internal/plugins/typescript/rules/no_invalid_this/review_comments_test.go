@@ -15,6 +15,10 @@ func TestReviewComments(t *testing.T) {
 		&NoInvalidThisRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `/* @thisX */ function g(){ this; }`},
+			{Code: "/** \u00a0@this */ function g(){ this; }"},
+			{Code: "/** \ufeff@this */ function g(){ this; }"},
+			{Code: `/** @this */ const x = [function(){ this; }];`},
+			{Code: `/** @this */ const x = !function(){ this; };`},
 			{Code: `Uint8Array.from([], function () { this; }, obj);`},
 			{Code: `BigInt64Array['from']([], function () { this; }, obj);`},
 		},
