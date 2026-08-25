@@ -142,6 +142,8 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			{Code: `((Object as any) as any) = 1;`},
 			{Code: `(Object as any)! = 1;`},
 			{Code: `Object!! = 1;`},
+			{Code: `((Object as any) as any) += 1;`},
+			{Code: `((Object as any) as any)++;`},
 
 			// Satisfies expression write is NOT detected by ESLint scope analysis
 			{Code: `(Object satisfies any) = 1;`},
@@ -608,11 +610,16 @@ func TestNoGlobalAssignRule(t *testing.T) {
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 7},
 				},
 			},
-			// A wrapped destructuring element or compound-assignment target is
-			// recognized at any depth — only the plain `=` form is limited to
-			// one unwrap.
+			// A destructuring element remains a write through its wrappers, while
+			// direct assignment and update targets are unwrapped only once.
 			{
 				Code: `[Object as any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},
+				},
+			},
+			{
+				Code: `[Object!! = 0] = arr;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},
 				},

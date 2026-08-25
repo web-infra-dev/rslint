@@ -35,16 +35,16 @@ func parseOptions(rawOptions []any) options {
 	return opts
 }
 
-// hasStackedTypeWrappers reports whether the identifier reaches a plain `=`
-// assignment's target through more than one TypeScript expression wrapper.
-// ESLint's scope analysis unwraps that target exactly once — an AsExpression,
-// TypeAssertionExpression or NonNullExpression — before asking whether what
-// remains is an assignment pattern, so `(Object as any) = 1` is a write while
-// `((Object as any) as any) = 1` is not. Parentheses never count: the ESTree
-// AST has no node for them. Only the plain `=` form takes that path; compound
-// assignments, update expressions and destructuring patterns recognize a
-// wrapped target however deeply it is nested. A `satisfies` target is not a
-// write at any depth, which IsWriteReference already answers.
+// hasStackedTypeWrappers reports whether the identifier reaches a direct
+// assignment or update target through more than one TypeScript expression
+// wrapper. ESLint's scope analysis unwraps such a target exactly once — an
+// AsExpression, TypeAssertionExpression or NonNullExpression — so
+// `(Object as any) = 1` is a write while `((Object as any) as any) = 1` is not.
+// Parentheses never count because the ESTree AST has no node for them.
+// Destructuring defaults are AssignmentPattern nodes in ESTree rather than
+// direct assignment targets, so their inner `=` must not stop this walk. A
+// `satisfies` target is not a write at any depth, which IsWriteReference already
+// answers.
 func hasStackedTypeWrappers(node *ast.Node) bool {
 	wrappers := 0
 	current := node
@@ -55,8 +55,21 @@ func hasStackedTypeWrappers(node *ast.Node) bool {
 		case ast.KindParenthesizedExpression:
 		case ast.KindBinaryExpression:
 			binary := parent.AsBinaryExpression()
-			return wrappers > 1 && binary != nil && binary.OperatorToken != nil &&
-				binary.OperatorToken.Kind == ast.KindEqualsToken && binary.Left == current
+			if binary == nil || binary.OperatorToken == nil || binary.Left != current {
+				return false
+			}
+			if utils.IsDefaultValueInDestructuringAssignment(parent) {
+				return false
+			}
+			return wrappers > 1 && ast.IsAssignmentOperator(binary.OperatorToken.Kind)
+		case ast.KindPrefixUnaryExpression:
+			prefix := parent.AsPrefixUnaryExpression()
+			return wrappers > 1 && prefix != nil && prefix.Operand == current &&
+				(prefix.Operator == ast.KindPlusPlusToken || prefix.Operator == ast.KindMinusMinusToken)
+		case ast.KindPostfixUnaryExpression:
+			postfix := parent.AsPostfixUnaryExpression()
+			return wrappers > 1 && postfix != nil && postfix.Operand == current &&
+				(postfix.Operator == ast.KindPlusPlusToken || postfix.Operator == ast.KindMinusMinusToken)
 		default:
 			return false
 		}
