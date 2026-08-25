@@ -27,6 +27,13 @@ And this rule allows `this` keywords in functions below:
 
 Otherwise, this rule warns on `this` keywords. It also reports `this` at the top level.
 
+## Differences from ESLint
+
+Top-level `this` is always reported, independently of
+`languageOptions.sourceType`; setting it to `'script'` or `'commonjs'` does not
+change that behavior. The
+`parserOptions.ecmaFeatures.globalReturn` option is also not supported.
+
 Examples of **incorrect** code for this rule:
 
 ```typescript

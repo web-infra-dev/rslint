@@ -14,10 +14,13 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 // textOnlySourceFile is a minimal ast.SourceFileLike (Text + ECMALineMap) — the
@@ -37,6 +40,19 @@ func pluginDiag(text, ruleName, message string, start, end int) rule.RuleDiagnos
 		Range:      core.NewTextRange(start, end),
 		Message:    rule.RuleMessage{Description: message},
 		SourceFile: textOnlySourceFile{text: text},
+	}
+}
+
+func TestDeriveLSPRuleCatalogSkipsEmptyRuleNames(t *testing.T) {
+	catalog, _ := deriveLSPRuleCatalog(
+		rule.NewCatalog(),
+		[]config.EslintPluginEntry{{Prefix: "community", RuleNames: []string{"", "check"}}},
+	)
+	if _, ok := catalog.Lookup("community/"); ok {
+		t.Fatal("empty plugin rule name became resolvable")
+	}
+	if _, ok := catalog.Lookup("community/check"); !ok {
+		t.Fatal("non-empty plugin rule name was dropped")
 	}
 }
 
@@ -242,10 +258,6 @@ func TestPluginConfigKeyForURI_NoJSConfigs(t *testing.T) {
 // pass) must win over the editor overlay, else multi-pass fixAll would lint
 // stale bytes and misplace plugin fix offsets.
 func TestBuildPluginFileInput_TextOverridePrecedence(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tplsp", RuleNames: []string{"no-foo"}},
-	})
-
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/proj": {
@@ -285,10 +297,6 @@ func TestBuildPluginFileInput_TextOverridePrecedence(t *testing.T) {
 }
 
 func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tplfiles", RuleNames: []string{"no-foo"}},
-	})
-
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/proj": {
@@ -313,11 +321,95 @@ func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
 	}
 }
 
-func TestBuildPluginFileInput_RespectsGitignore(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpgitignore", RuleNames: []string{"no-foo"}},
-	})
+func TestBuildPluginFileInputPreservesTargetIdentityAcrossAuthoredConfigBases(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "workspace")
+	configDir := filepath.Join(root, "physical", "package")
+	physicalSourceDir := filepath.Join(configDir, "src")
+	aliasSourceDir := filepath.Join(workspace, "linked-src")
+	for _, directory := range []string{workspace, physicalSourceDir} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(physicalSourceDir, aliasSourceDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	aliasFile := filepath.Join(aliasSourceDir, "index.ts")
+	if err := os.WriteFile(aliasFile, []byte("foo();\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	effective := config.ConfigWithAuthoredPathBase(config.RslintConfig{{
+		Files:   []string{"linked-src/**/*.ts"},
+		Plugins: []string{"tpauthoredbase"},
+		Rules:   config.Rules{"tpauthoredbase/no-foo": "error"},
+	}}, workspace)
 
+	s := newTestServer()
+	installRuleCatalogForTest(s, effective)
+	s.cwd = workspace
+	s.fs = osvfs.FS()
+	uri := documentURIFromPath(aliasFile)
+	s.documents[uri] = "foo();\n"
+	input, ok := s.buildPluginFileInputWithConfig(uri, nil, effective, configDir, true)
+	if !ok {
+		t.Fatal("workspace-authored plugin rule lost the lexical symlink target")
+	}
+	if len(input.Rules) != 1 || input.Rules[0].Name != "tpauthoredbase/no-foo" {
+		t.Fatalf("unexpected plugin rules: %+v", input.Rules)
+	}
+}
+
+func TestBuildPluginFileInputExternalConfigPreservesGitignoreTargetIdentity(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "workspace")
+	configDir := filepath.Join(root, "physical", "package")
+	physicalSourceDir := filepath.Join(configDir, "src")
+	aliasSourceDir := filepath.Join(workspace, "linked-src")
+	for _, directory := range []string{workspace, physicalSourceDir} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(physicalSourceDir, aliasSourceDir); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	aliasFile := filepath.Join(aliasSourceDir, "ignored.ts")
+	if err := os.WriteFile(aliasFile, []byte("foo();\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(workspace, ".gitignore"),
+		[]byte("linked-src/ignored.ts\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	effective := config.ConfigWithGitignoreForTargetsFromRoot(
+		config.RslintConfig{{
+			Files:   []string{"src/**/*.ts"},
+			Plugins: []string{"tpexternalgit"},
+			Rules:   config.Rules{"tpexternalgit/no-foo": "error"},
+		}},
+		configDir,
+		workspace,
+		osvfs.FS(),
+		[]string{aliasFile},
+		nil,
+	)
+
+	s := newTestServer()
+	installRuleCatalogForTest(s, effective)
+	s.cwd = workspace
+	s.fs = osvfs.FS()
+	uri := documentURIFromPath(aliasFile)
+	s.documents[uri] = "foo();\n"
+	if input, ok := s.buildPluginFileInputWithConfig(uri, nil, effective, configDir, true); ok {
+		t.Fatalf("external-config Git ignore produced plugin input: %+v", input)
+	}
+}
+
+func TestBuildPluginFileInput_RespectsGitignore(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "ignored.ts")
 	if err := os.WriteFile(target, []byte("foo();\n"), 0o644); err != nil {
@@ -341,24 +433,23 @@ func TestBuildPluginFileInput_RespectsGitignore(t *testing.T) {
 	}
 }
 
-func TestBuildPluginFileInput_UsesEffectiveConfigSnapshot(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpsnapshot", RuleNames: []string{"no-foo"}},
-	})
-
+func TestBuildPluginFileInput_UsesEffectiveJSConfigSnapshot(t *testing.T) {
 	dir := t.TempDir()
-	target := filepath.Join(dir, "source.ts")
-	if err := os.WriteFile(target, []byte("foo();\n"), 0o644); err != nil {
+	targetPath := filepath.Join(dir, "source.ts")
+	if err := os.WriteFile(targetPath, []byte("foo();\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	s := newTestServer()
 	s.cwd = dir
 	s.fs = osvfs.FS()
-	s.jsonConfig = config.RslintConfig{{
+	jsConfig := config.RslintConfig{{
 		Plugins: []string{"tpsnapshot"},
 		Rules:   config.Rules{"tpsnapshot/no-foo": "error"},
 	}}
-	uri := documentURIFromPath(target)
+	s.jsConfigs = map[string]config.RslintConfig{tspath.NormalizePath(dir): jsConfig}
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
+	installRuleCatalogForTest(s, jsConfig)
+	uri := documentURIFromPath(targetPath)
 	s.documents[uri] = "foo();\n"
 
 	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
@@ -375,42 +466,103 @@ func TestBuildPluginFileInput_UsesEffectiveConfigSnapshot(t *testing.T) {
 	}
 }
 
-func TestPluginRulesForCurrentGenerationRejectsStalePlaceholders(t *testing.T) {
-	rules := []linter.ConfiguredRule{
-		{Name: "native", IsEslintPluginRule: false},
-		{Name: "current/check", IsEslintPluginRule: true},
-		{Name: "stale/check", IsEslintPluginRule: true},
+func TestDocumentLintSnapshotKeepsObjectPluginCatalogInsideJSOwner(t *testing.T) {
+	root := t.TempDir()
+	nested := filepath.Join(root, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
 	}
+	rootFile := filepath.Join(root, "root.ts")
+	nestedFile := filepath.Join(nested, "nested.ts")
+	for _, filePath := range []string{rootFile, nestedFile} {
+		if err := os.WriteFile(filePath, []byte("debugger;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	s := newTestServer()
-
-	// A nil gate is reserved for isolated pre-transaction call sites.
-	if got := s.pluginRulesForCurrentGeneration(rules); len(got) != len(rules) {
-		t.Fatalf("nil generation gate filtered rules: %+v", got)
-	}
-
-	s.eslintPluginRules = eslintPluginRuleSet([]config.EslintPluginEntry{{
-		Prefix:    "current",
+	s.cwd = root
+	s.fs = osvfs.FS()
+	s.configSnapshotIncludesGitignore = true
+	jsonOwnerDirectory := tspath.NormalizePath(root)
+	jsOwnerDirectory := tspath.NormalizePath(nested)
+	jsonConfig := config.RslintConfig{{Rules: config.Rules{
+		"community/check": "error",
+		"no-debugger":     "error",
+	}}}
+	jsConfig := config.RslintConfig{{
+		Plugins: []string{"community"},
+		Rules:   config.Rules{"community/check": "error"},
+	}}
+	s.ruleCatalog, _ = rules.All().ForESLintPlugins([]rule.ESLintPluginMetadata{{
+		Prefix:    "community",
 		RuleNames: []string{"check"},
 	}})
-	got := s.pluginRulesForCurrentGeneration(rules)
-	if len(got) != 2 || got[0].Name != "native" || got[1].Name != "current/check" {
-		t.Fatalf("generation gate retained stale plugin rules: %+v", got)
+	installJSONConfigForTest(s, jsonOwnerDirectory, jsonConfig)
+	s.jsConfigs = map[string]config.RslintConfig{jsOwnerDirectory: jsConfig}
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
+	jsResolver, err := config.NewFileConfigResolverWithPathSpaces(
+		jsConfig,
+		jsOwnerDirectory,
+		s.fs,
+		s.jsConfigOwnerIndex.PathSpaces(),
+		s.ruleCatalog,
+		true,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.jsFileConfigResolvers = map[string]*config.FileConfigResolver{
+		jsOwnerDirectory: jsResolver,
 	}
 
-	// An explicit empty generation must block every process-global plugin
-	// placeholder while preserving native rules.
-	s.eslintPluginRules = eslintPluginRuleSet(nil)
-	got = s.pluginRulesForCurrentGeneration(rules)
-	if len(got) != 1 || got[0].Name != "native" {
-		t.Fatalf("empty generation did not block plugin rules: %+v", got)
+	rootURI := documentURIFromPath(rootFile)
+	s.documents[rootURI] = "debugger;\n"
+	rootSnapshot := s.documentLintSnapshot(rootURI)
+	if rootSnapshot.usesJavaScriptConfig {
+		t.Fatal("root file unexpectedly selected the nested JS config")
+	}
+	if rootSnapshot.ruleCatalog != rules.All() {
+		t.Fatal("JSON fallback did not retain the pure Go rule catalog")
+	}
+	if len(rootSnapshot.resolvedConfig.EnabledRules) != 1 ||
+		rootSnapshot.resolvedConfig.EnabledRules[0].Name != "no-debugger" {
+		t.Fatalf("JSON fallback resolved object-plugin rules: %+v", rootSnapshot.resolvedConfig.EnabledRules)
+	}
+	if input, ok := s.buildPluginFileInput(rootURI, nil); ok {
+		t.Fatalf("JSON fallback produced an object-plugin request: %+v", input)
+	}
+
+	nestedSnapshot := s.documentLintSnapshot(documentURIFromPath(nestedFile))
+	if !nestedSnapshot.usesJavaScriptConfig {
+		t.Fatal("nested file did not select its JS config")
+	}
+	if pluginRule, ok := nestedSnapshot.ruleCatalog.Lookup("community/check"); !ok || !pluginRule.IsEslintPluginRule {
+		t.Fatalf("JS owner lost its object-plugin rule: %+v", pluginRule)
+	}
+	if len(nestedSnapshot.resolvedConfig.EnabledRules) != 1 ||
+		nestedSnapshot.resolvedConfig.EnabledRules[0].Name != "community/check" {
+		t.Fatalf("JS owner did not resolve its object-plugin rule: %+v", nestedSnapshot.resolvedConfig.EnabledRules)
+	}
+}
+
+func TestRuleCatalogGenerationDoesNotRetainRemovedPlugin(t *testing.T) {
+	s := newTestServer()
+	installRuleCatalogForTest(s, config.RslintConfig{{
+		Plugins: []string{"current"},
+		Rules:   config.Rules{"current/check": "error"},
+	}})
+	if _, ok := s.ruleCatalog.Lookup("current/check"); !ok {
+		t.Fatal("plugin rule missing from current generation catalog")
+	}
+
+	installRuleCatalogForTest(s, config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}})
+	if _, ok := s.ruleCatalog.Lookup("current/check"); ok {
+		t.Fatal("removed plugin rule leaked into the next generation catalog")
 	}
 }
 
 func TestBuildPluginFileInput_RespectsDefaultExcludedDirectories(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tplexcluded", RuleNames: []string{"no-foo"}},
-	})
-
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/proj": {{
@@ -431,11 +583,6 @@ func TestBuildPluginFileInput_RespectsDefaultExcludedDirectories(t *testing.T) {
 }
 
 func TestBuildPluginFileInput_NestedEncodedConfigKeyAndCwd(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tprootcfg", RuleNames: []string{"no-root"}},
-		{Prefix: "tpnestedcfg", RuleNames: []string{"no-foo"}},
-	})
-
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/Users/John Doe/my project": {
@@ -475,9 +622,6 @@ func TestBuildPluginFileInput_NestedEncodedConfigKeyAndCwd(t *testing.T) {
 // helper turns a mocked worker result into a RuleDiagnostic carrying the fix
 // (so ApplyRuleFixes can apply it) with the configured severity reattached.
 func TestLintPluginRulesSync_RebuildsWithFixes(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tplsync", RuleNames: []string{"no-bar"}},
-	})
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/proj": {
@@ -544,9 +688,6 @@ func TestLintPluginRulesSync_RebuildsWithFixes(t *testing.T) {
 // fold), the plugin fix is not clobbered by the native one, and the loop
 // converges across passes on the in-progress content.
 func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpfold", RuleNames: []string{"no-bar"}},
-	})
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/proj": {
@@ -586,7 +727,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	// Injected native lint: fix the first "1" → "2" wherever it appears. Returns
 	// no fix once the digit is gone (so the loop converges).
 	var nativePasses int
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ documentLintSnapshot) (lintPassResult, error) {
 		nativePasses++
 		idx := strings.Index(content, "1")
 		if idx < 0 {
@@ -601,8 +742,7 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 		}}}, nil
 	}
 
-	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
+	got := s.computeFixAllContent(context.Background(), uri, original, s.documentLintSnapshot(uri))
 
 	// Both fixes applied (native "1"→"2" AND plugin "bar"→"baz") proves the
 	// fold: the plugin fix survived alongside the native one in the same pass.
@@ -615,14 +755,221 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	}
 }
 
+type retargetingDocumentFS struct {
+	mockFS
+	targetPath string
+	targets    []string
+	targetCall int
+}
+
+type retargetingConfigEvaluationFS struct {
+	mockFS
+	targetPath       string
+	targetParentPath string
+	configPath       string
+	configCalls      int
+}
+
+func (fsys *retargetingConfigEvaluationFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	switch filePath {
+	case fsys.targetPath:
+		return "/owner-a/src/index.ts"
+	case fsys.targetParentPath:
+		return "/owner-a/src"
+	case fsys.configPath:
+		fsys.configCalls++
+		if fsys.configCalls == 1 {
+			return "/owner-a"
+		}
+		return "/owner-b"
+	default:
+		return filePath
+	}
+}
+
+func TestDocumentLintSnapshotCollectsGitignoreFromFrozenTarget(t *testing.T) {
+	uri := lsproto.DocumentUri("file:///alias/source.ts")
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	fsys := &retargetingDocumentFS{
+		targetPath: filePath,
+		targets:    []string{"/owner-a/source.ts", "/owner-b/source.ts"},
+	}
+	s := newTestServer()
+	s.cwd = "/alias"
+	s.fs = fsys
+	s.jsonConfig = config.RslintConfig{{}}
+
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.target.CanonicalPath != "/owner-a/source.ts" {
+		t.Fatalf("snapshot target = %+v", snapshot.target)
+	}
+	if fsys.targetCall != 1 {
+		t.Fatalf("target Realpath calls = %d, want one identity observation", fsys.targetCall)
+	}
+}
+
+func TestDocumentLintSnapshotFreezesBootstrapConfigEvaluation(t *testing.T) {
+	uri := lsproto.DocumentUri("file:///outside-link/src/index.ts")
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	configPath := "/config-link"
+	fsys := &retargetingConfigEvaluationFS{
+		targetPath:       filePath,
+		targetParentPath: tspath.GetDirectoryPath(filePath),
+		configPath:       configPath,
+	}
+	s := newTestServer()
+	s.cwd = configPath
+	s.fs = fsys
+	s.jsonConfig = config.RslintConfig{{
+		Files: []string{"src/*.ts"},
+		Rules: config.Rules{"no-debugger": "error"},
+	}}
+
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.target.CanonicalPath != "/owner-a/src/index.ts" ||
+		snapshot.resolvedConfig.MergedConfig == nil {
+		t.Fatalf("bootstrap snapshot mixed config generations: %+v", snapshot)
+	}
+	if fsys.configCalls != 1 {
+		t.Fatalf("config directory Realpath calls = %d, want one evaluation observation", fsys.configCalls)
+	}
+}
+
+func TestNativeFixPassUsesFrozenTargetOverlay(t *testing.T) {
+	uri := lsproto.DocumentUri("file:///alias/source.ts")
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	fsys := &retargetingDocumentFS{
+		targetPath: filePath,
+		targets:    []string{"/owner-a/source.ts", "/owner-b/source.ts"},
+	}
+	s := newTestServer()
+	s.cwd = "/alias"
+	s.fs = fsys
+	s.configSnapshotIncludesGitignore = true
+	installJSONConfigForTest(s, "/alias", config.RslintConfig{{
+		Rules: config.Rules{"no-debugger": "error"},
+	}})
+	const content = "debugger;\n"
+	s.documents[uri] = content
+	snapshot := s.documentLintSnapshot(uri)
+
+	result, err := s.runConfiguredLintForContentWithSnapshot(
+		uri,
+		context.Background(),
+		content,
+		snapshot,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("native diagnostics = %+v", result.Diagnostics)
+	}
+	if fsys.targetCall != 1 {
+		t.Fatalf("target Realpath calls = %d, want one frozen observation", fsys.targetCall)
+	}
+}
+
+func (fsys *retargetingDocumentFS) Realpath(filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	if filePath != fsys.targetPath {
+		return filePath
+	}
+	index := fsys.targetCall
+	fsys.targetCall++
+	if index >= len(fsys.targets) {
+		index = len(fsys.targets) - 1
+	}
+	return fsys.targets[index]
+}
+
+func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T) {
+	uri := lsproto.DocumentUri("file:///alias/source.ts")
+	filePath := tspath.NormalizePath(uriToPath(uri))
+	fsys := &retargetingDocumentFS{
+		targetPath: filePath,
+		targets:    []string{"/owner-a/source.ts", "/owner-b/source.ts"},
+	}
+	s := newTestServer()
+	s.cwd = "/alias"
+	s.fs = fsys
+	s.configSnapshotIncludesGitignore = true
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/owner-a": {{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"tpfrozentarget"},
+			Rules:   config.Rules{"tpfrozentarget/owner-a": "error"},
+		}},
+		"/owner-b": {{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"tpfrozentarget"},
+			Rules:   config.Rules{"tpfrozentarget/owner-b": "error"},
+		}},
+	})
+	s.tsConfigPathsByConfig = map[string][]string{
+		"/owner-a": {"/owner-a/tsconfig.json"},
+		"/owner-b": {"/owner-b/tsconfig.json"},
+	}
+	const source = "const value = 1;"
+	s.documents[uri] = source
+
+	snapshot := s.documentLintSnapshot(uri)
+	if snapshot.target.CanonicalPath != "/owner-a/source.ts" ||
+		snapshot.target.ConfigDirectory != "/owner-a" ||
+		len(snapshot.typeScriptConfigPaths) != 1 ||
+		snapshot.typeScriptConfigPaths[0] != "/owner-a/tsconfig.json" {
+		t.Fatalf("snapshot mixed target/config/project owners: %+v", snapshot)
+	}
+
+	nativeCalls := 0
+	s.fixAllNativeLint = func(
+		_ context.Context,
+		_ lsproto.DocumentUri,
+		_ int,
+		_ string,
+		got documentLintSnapshot,
+	) (lintPassResult, error) {
+		nativeCalls++
+		if got.target != snapshot.target ||
+			len(got.typeScriptConfigPaths) != 1 ||
+			got.typeScriptConfigPaths[0] != "/owner-a/tsconfig.json" {
+			t.Fatalf("native pass received a different snapshot: %+v", got)
+		}
+		return lintPassResult{}, nil
+	}
+	pluginCalls := 0
+	s.eslintPluginDispatch = func(
+		_ context.Context,
+		req linter.EslintPluginLintRequest,
+	) (*linter.EslintPluginLintResult, error) {
+		pluginCalls++
+		_, hasOwnerA := req.Rules["tpfrozentarget/owner-a"]
+		if len(req.Files) != 1 || len(req.Rules) != 1 || !hasOwnerA ||
+			req.Files[0].ConfigKey != "/owner-a" {
+			t.Fatalf("plugin pass received a different owner: %+v", req.Files)
+		}
+		return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+			FilePath: req.Files[0].Path,
+		}}}, nil
+	}
+
+	if got := s.computeFixAllContent(context.Background(), uri, source, snapshot); got != source {
+		t.Fatalf("fixAll changed source without fixes: %q", got)
+	}
+	if nativeCalls != 1 || pluginCalls != 1 {
+		t.Fatalf("native/plugin calls = %d/%d, want 1/1", nativeCalls, pluginCalls)
+	}
+	if fsys.targetCall != 1 {
+		t.Fatalf("target Realpath calls = %d, want one frozen observation", fsys.targetCall)
+	}
+}
+
 // TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly asserts the
 // source.fixAll plugin reverse requests are bounded by a deadline: a wedged
 // client that never answers must not freeze the dispatch loop. On timeout the
 // plugin pass is dropped and native fixes still apply.
 func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tptimeout", RuleNames: []string{"no-bar"}},
-	})
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/proj": {
@@ -645,7 +992,7 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 		return nil, ctx.Err()
 	}
 	// Injected native lint: fix the first "1" → "2", nothing once it is gone.
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ documentLintSnapshot) (lintPassResult, error) {
 		idx := strings.Index(content, "1")
 		if idx < 0 {
 			return lintPassResult{}, nil
@@ -660,8 +1007,7 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	}
 
 	start := time.Now()
-	effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-	got := s.computeFixAllContent(context.Background(), uri, original, effective, configCwd, isJSConfig, nil)
+	got := s.computeFixAllContent(context.Background(), uri, original, s.documentLintSnapshot(uri))
 	elapsed := time.Since(start)
 
 	// Native fix applied; the wedged plugin pass timed out and was dropped
@@ -694,11 +1040,16 @@ func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
 		pluginCalls++
 		return &linter.EslintPluginLintResult{}, nil
 	}
-	s.fixAllNativeLint = func(context.Context, lsproto.DocumentUri, int, string, config.RslintConfig, string, bool, []string) (lintPassResult, error) {
+	s.fixAllNativeLint = func(context.Context, lsproto.DocumentUri, int, string, documentLintSnapshot) (lintPassResult, error) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}, HasSyntaxErrors: true}, nil
 	}
 
-	got := s.computeFixAllContent(context.Background(), uri, malformed, config.RslintConfig{}, "", true, nil)
+	got := s.computeFixAllContent(
+		context.Background(),
+		uri,
+		malformed,
+		documentLintSnapshotForTest(s, uri, config.RslintConfig{}, "", true, nil),
+	)
 	if got != malformed {
 		t.Fatalf("syntax-error fixAll changed content to %q", got)
 	}
@@ -712,9 +1063,6 @@ func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
 // has expired, a later pass's call returns nil promptly instead of blocking
 // another full timeout.
 func TestLintPluginRulesSync_ExpiredCtxReturnsNil(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpexpired", RuleNames: []string{"no-bar"}},
-	})
 	s := newTestServer()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/proj": {
@@ -883,9 +1231,6 @@ func titleSet(m map[string]*lsproto.CodeAction) []string {
 // backgroundCtx alone only cancels at shutdown, so without the deadline the
 // goroutine + its pendingServerRequests entry would leak on every relint.
 func TestDispatchPluginLint_TimesOutWedgedClient(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpleak", RuleNames: []string{"no-bar"}},
-	})
 	s := newTestServer()
 	s.backgroundCtx = context.Background()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
@@ -962,9 +1307,6 @@ func (b *syncBuffer) String() string {
 // deadline that expires in the gap before the send (the buffered channel has
 // room).
 func TestDispatchPluginLint_DeliversSuccessResultNotRacedAway(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpok", RuleNames: []string{"no-bar"}},
-	})
 	s := newTestServer()
 	s.backgroundCtx = context.Background()
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
@@ -1030,9 +1372,6 @@ func TestSendCancelRequest_QueuesCancelNotification(t *testing.T) {
 // stops instead of running to completion). Uses the real sendRequest path so
 // automatic context-to-$/cancelRequest forwarding is exercised end to end.
 func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpsup", RuleNames: []string{"no-bar"}},
-	})
 	s, queue := newTestServerWithQueue()
 	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
 	s.backgroundCtx = context.Background()
@@ -1084,9 +1423,6 @@ func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 }
 
 func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpfilescancel", RuleNames: []string{"no-bar"}},
-	})
 	s, queue := newTestServerWithQueue()
 	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
 	s.backgroundCtx = context.Background()
@@ -1152,9 +1488,6 @@ func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T)
 // an in-flight plugin dispatch cancels it (Go-side + $/cancelRequest) — the
 // close path has no superseding keystroke to do it.
 func TestHandleDidClose_CancelsInflightDispatch(t *testing.T) {
-	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
-		{Prefix: "tpclose", RuleNames: []string{"no-bar"}},
-	})
 	s, queue := newTestServerWithQueue()
 	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
 	s.backgroundCtx = context.Background()

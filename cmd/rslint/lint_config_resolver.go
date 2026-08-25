@@ -3,55 +3,74 @@ package main
 import (
 	"sort"
 
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type lintConfigResolver struct {
-	configMap                  map[string]rslintconfig.RslintConfig
-	currentDirectory           string
-	configPathBySourcePath     map[string]string
-	ownerConfigDirBySourcePath map[string]string
-	fsys                       vfs.FS
-	singleResolver             *rslintconfig.FileConfigResolver
-	configResolvers            map[string]*rslintconfig.FileConfigResolver
-	matchConfigMap             map[string]rslintconfig.RslintConfig
-	ownerByMatchConfigDir      map[string]string
-	configOwnerResolver        *rslintconfig.ConfigOwnerResolver
-	matchConfigOwnerResolver   *rslintconfig.ConfigOwnerResolver
+	configMap              map[string]rslintconfig.RslintConfig
+	currentDirectory       string
+	lintTargetBySourcePath map[string]target.File
+	fsys                   vfs.FS
+	singleResolver         *rslintconfig.FileConfigResolver
+	configResolvers        map[string]*rslintconfig.FileConfigResolver
 }
 
 type lintConfigResolverOptions struct {
-	ConfigMap                  map[string]rslintconfig.RslintConfig
-	Config                     rslintconfig.RslintConfig
-	CurrentDirectory           string
-	EnforcePlugins             bool
-	ConfigPathBySourcePath     map[string]string
-	OwnerConfigDirBySourcePath map[string]string
+	ConfigMap              map[string]rslintconfig.RslintConfig
+	Config                 rslintconfig.RslintConfig
+	CurrentDirectory       string
+	RuleCatalog            *rule.Catalog
+	EnforcePlugins         bool
+	LintTargetBySourcePath map[string]target.File
 	// SourceMappingsCanonical indicates that binding already supplied both
 	// lexical and canonical source keys, so normalization needs no filesystem IO.
 	SourceMappingsCanonical bool
+	PathSpaces              *rslintconfig.PathSpaceSnapshot
 	FS                      vfs.FS
 }
 
 func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
+	if opts.RuleCatalog == nil {
+		panic("rule catalog is required")
+	}
+	if opts.PathSpaces == nil {
+		panic("path-space snapshot is required")
+	}
 	resolver := &lintConfigResolver{
-		configMap:                  opts.ConfigMap,
-		currentDirectory:           opts.CurrentDirectory,
-		configPathBySourcePath:     normalizeSourcePathMappings(opts.ConfigPathBySourcePath, opts.FS, opts.SourceMappingsCanonical),
-		ownerConfigDirBySourcePath: normalizeSourcePathMappings(opts.OwnerConfigDirBySourcePath, opts.FS, opts.SourceMappingsCanonical),
-		fsys:                       opts.FS,
+		configMap:              opts.ConfigMap,
+		currentDirectory:       opts.CurrentDirectory,
+		lintTargetBySourcePath: normalizeSourceTargetMappings(opts.LintTargetBySourcePath, opts.FS, opts.SourceMappingsCanonical),
+		fsys:                   opts.FS,
+	}
+	newFileResolver := func(
+		entries rslintconfig.RslintConfig,
+		configDirectory string,
+	) *rslintconfig.FileConfigResolver {
+		fileResolver, err := rslintconfig.NewFileConfigResolverWithPathSpaces(
+			entries,
+			configDirectory,
+			opts.FS,
+			opts.PathSpaces,
+			opts.RuleCatalog,
+			opts.EnforcePlugins,
+		)
+		if err != nil {
+			panic(err)
+		}
+		return fileResolver
 	}
 	if opts.ConfigMap == nil {
-		matchRoot := authoritativeFilesystemPath(opts.CurrentDirectory, opts.FS)
-		resolver.singleResolver = rslintconfig.NewFileConfigResolver(opts.Config, matchRoot, opts.EnforcePlugins)
+		resolver.singleResolver = newFileResolver(
+			opts.Config,
+			opts.CurrentDirectory,
+		)
 		return resolver
 	}
 	resolver.configResolvers = make(map[string]*rslintconfig.FileConfigResolver, len(opts.ConfigMap)*2)
-	resolver.matchConfigMap = make(map[string]rslintconfig.RslintConfig, len(opts.ConfigMap))
-	resolver.ownerByMatchConfigDir = make(map[string]string, len(opts.ConfigMap))
-	resolver.configOwnerResolver = rslintconfig.NewConfigOwnerResolver(opts.ConfigMap, opts.FS)
 	configDirs := make([]string, 0, len(opts.ConfigMap))
 	for configDir := range opts.ConfigMap {
 		configDirs = append(configDirs, configDir)
@@ -59,43 +78,52 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
 	sort.Strings(configDirs)
 	for _, configDir := range configDirs {
 		cfg := opts.ConfigMap[configDir]
-		matchRoot := authoritativeFilesystemPath(configDir, opts.FS)
-		fileResolver := rslintconfig.NewFileConfigResolver(cfg, matchRoot, opts.EnforcePlugins)
+		fileResolver := newFileResolver(
+			cfg,
+			configDir,
+		)
 		resolver.configResolvers[configDir] = fileResolver
 		resolver.configResolvers[canonicalFilesystemPathID(configDir, opts.FS)] = fileResolver
-		matchRootID := canonicalFilesystemPathID(matchRoot, opts.FS)
-		if _, exists := resolver.ownerByMatchConfigDir[matchRootID]; !exists {
-			resolver.matchConfigMap[matchRoot] = cfg
-			resolver.ownerByMatchConfigDir[matchRootID] = configDir
-		}
 	}
-	resolver.matchConfigOwnerResolver = rslintconfig.NewConfigOwnerResolver(resolver.matchConfigMap, opts.FS)
 	return resolver
 }
 
-func normalizeSourcePathMappings(mapping map[string]string, fsys vfs.FS, canonicalKeysPresent bool) map[string]string {
+func normalizeSourceTargetMappings(
+	mapping map[string]target.File,
+	fsys vfs.FS,
+	canonicalKeysPresent bool,
+) map[string]target.File {
 	if len(mapping) == 0 {
 		return mapping
 	}
-	normalized := make(map[string]string, len(mapping)*2)
-	for sourcePath, value := range mapping {
+	normalized := make(map[string]target.File, len(mapping)*2)
+	for sourcePath, target := range mapping {
+		target.Path = tspath.NormalizePath(target.Path)
+		target.CanonicalPath = tspath.NormalizePath(target.CanonicalPath)
+		target.CanonicalParentPath = tspath.NormalizePath(target.CanonicalParentPath)
+		target.ConfigDirectory = tspath.NormalizePath(target.ConfigDirectory)
 		normalizedPath := exactFilesystemPathID(sourcePath)
-		normalized[normalizedPath] = value
+		normalized[normalizedPath] = target
 		if !canonicalKeysPresent {
-			normalized[canonicalFilesystemPathID(normalizedPath, fsys)] = value
+			normalized[canonicalFilesystemPathID(normalizedPath, fsys)] = target
 		}
 	}
 	return normalized
 }
 
-func (r *lintConfigResolver) pathMappingValue(mapping map[string]string, filePath string) string {
+func lookupLintTarget(
+	mapping map[string]target.File,
+	filePath string,
+	fsys vfs.FS,
+) (target.File, bool) {
 	if len(mapping) == 0 {
-		return ""
+		return target.File{}, false
 	}
-	if value := mapping[exactFilesystemPathID(filePath)]; value != "" {
-		return value
+	if target, ok := mapping[exactFilesystemPathID(filePath)]; ok {
+		return target, true
 	}
-	return mapping[canonicalFilesystemPathID(filePath, r.fsys)]
+	target, ok := mapping[canonicalFilesystemPathID(filePath, fsys)]
+	return target, ok
 }
 
 func (r *lintConfigResolver) configResolver(configDir string) *rslintconfig.FileConfigResolver {
@@ -105,60 +133,47 @@ func (r *lintConfigResolver) configResolver(configDir string) *rslintconfig.File
 	return r.configResolvers[canonicalFilesystemPathID(configDir, r.fsys)]
 }
 
-func (r *lintConfigResolver) resolverForFile(sourcePath string, configPath string) (string, *rslintconfig.FileConfigResolver, bool) {
-	if r.configMap != nil {
-		ownerConfigDir := r.pathMappingValue(r.ownerConfigDirBySourcePath, sourcePath)
-		if ownerConfigDir != "" {
-			resolver := r.configResolver(ownerConfigDir)
-			return ownerConfigDir, resolver, resolver != nil
+func (r *lintConfigResolver) targetForFile(filePath string) (target.File, bool) {
+	if r != nil {
+		if target, ok := lookupLintTarget(r.lintTargetBySourcePath, filePath, r.fsys); ok {
+			return target, true
 		}
-
-		// Path-based fallback for current low-level callers that do not provide a
-		// target binding, and for focused resolver tests.
-		cfgDir, cfg := r.configOwnerResolver.Resolve(sourcePath)
-		if cfg != nil {
-			resolver := r.configResolver(cfgDir)
-			return cfgDir, resolver, resolver != nil
-		}
-		matchDir, cfg := r.matchConfigOwnerResolver.Resolve(configPath)
-		if cfg == nil {
-			return "", nil, false
-		}
-		ownerConfigDir = r.ownerByMatchConfigDir[canonicalFilesystemPathID(matchDir, r.fsys)]
-		resolver := r.configResolver(ownerConfigDir)
-		return ownerConfigDir, resolver, resolver != nil
 	}
-	return r.currentDirectory, r.singleResolver, true
+	return target.File{PathIdentity: rslintconfig.PathIdentity{Path: tspath.NormalizePath(filePath)}}, false
 }
 
-func (r *lintConfigResolver) configPathFor(filePath string) string {
-	if r == nil || len(r.configPathBySourcePath) == 0 {
-		return filePath
+func (r *lintConfigResolver) resolveFile(
+	sourcePath string,
+) (string, rslintconfig.ResolvedFileConfig, bool) {
+	target, bound := r.targetForFile(sourcePath)
+	if r.configMap != nil {
+		if bound {
+			resolver := r.configResolver(target.ConfigDirectory)
+			if resolver == nil {
+				return "", rslintconfig.ResolvedFileConfig{}, false
+			}
+			return target.ConfigDirectory, resolver.ResolveTarget(target.Identity()), true
+		}
+		return "", rslintconfig.ResolvedFileConfig{}, false
 	}
-	if configPath := r.pathMappingValue(r.configPathBySourcePath, filePath); configPath != "" {
-		return configPath
-	}
-	return filePath
+	return r.currentDirectory, r.singleResolver.ResolveTarget(target.Identity()), true
 }
 
 func (r *lintConfigResolver) ConfigForFile(filePath string) *rslintconfig.MergedConfig {
-	configPath := r.configPathFor(filePath)
-	_, resolver, ok := r.resolverForFile(filePath, configPath)
+	_, resolved, ok := r.resolveFile(filePath)
 	if !ok {
 		return nil
 	}
-	return resolver.ConfigForFile(configPath)
+	return resolved.MergedConfig
 }
 
 // EnabledRulesForFile returns the complete configured rule set. Program
 // capabilities are applied once by the lint planner, not while resolving
 // configuration.
 func (r *lintConfigResolver) EnabledRulesForFile(filePath string) []rule.ConfiguredRule {
-	configPath := r.configPathFor(filePath)
-	_, resolver, ok := r.resolverForFile(filePath, configPath)
+	_, resolved, ok := r.resolveFile(filePath)
 	if !ok {
 		return nil
 	}
-	enabledRules, _ := resolver.EnabledRulesForFile(configPath)
-	return enabledRules
+	return resolved.EnabledRules
 }

@@ -887,7 +887,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// Category 21: Mixed binary checks (long chains)
 		// =================================================================
 		{
-			Code:   "a &&\n  a.b != null &&\n  a.b.c !== undefined &&\n  a.b.c !== null &&\n  a.b.c.d != null &&\n  a.b.c.d.e !== null &&\n  a.b.c.d.e !== undefined &&\n  a.b.c.d.e.f != undefined &&\n  typeof a.b.c.d.e.f.g !== 'undefined' &&\n  a.b.c.d.e.f.g !== null &&\n  a.b.c.d.e.f.g.h;",
+			Code: "a &&\n  a.b != null &&\n  a.b.c !== undefined &&\n  a.b.c !== null &&\n  a.b.c.d != null &&\n  a.b.c.d.e !== null &&\n  a.b.c.d.e !== undefined &&\n  a.b.c.d.e.f != undefined &&\n  typeof a.b.c.d.e.f.g !== 'undefined' &&\n  a.b.c.d.e.f.g !== null &&\n  a.b.c.d.e.f.g.h;",
 			Output: []string{"a?.b?.c?.d?.e?.f?.g?.h;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "preferOptionalChain"},
@@ -1476,7 +1476,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// Deep mixed checks (long chains with mixed operators)
 		// =================================================================
 		{
-			Code: "a &&\n  a.b != null &&\n  a.b.c !== undefined &&\n  a.b.c !== null &&\n  a.b.c.d != null &&\n  a.b.c.d.e !== null &&\n  a.b.c.d.e !== undefined &&\n  a.b.c.d.e.f != undefined &&\n  typeof a.b.c.d.e.f.g !== 'undefined' &&\n  a.b.c.d.e.f.g !== null &&\n  a.b.c.d.e.f.g.h;",
+			Code:   "a &&\n  a.b != null &&\n  a.b.c !== undefined &&\n  a.b.c !== null &&\n  a.b.c.d != null &&\n  a.b.c.d.e !== null &&\n  a.b.c.d.e !== undefined &&\n  a.b.c.d.e.f != undefined &&\n  typeof a.b.c.d.e.f.g !== 'undefined' &&\n  a.b.c.d.e.f.g !== null &&\n  a.b.c.d.e.f.g.h;",
 			Output: []string{"a?.b?.c?.d?.e?.f?.g?.h;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
@@ -1964,4 +1964,27 @@ func TestPreferOptionalChainRule(t *testing.T) {
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferOptionalChainRule,
 		allValid, allInvalid)
+}
+
+func TestPreferOptionalChainOptionalComparisonBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferOptionalChainRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "declare const value: {field: number} | null;\nvalue && value?.field === 1;"},
+			{Code: "declare const value: {nested: {field: number}} | null;\nvalue && value?.nested.field === 1;"},
+			{Code: "declare const value: Record<string, number> | null;\nvalue && value?.['field'] === 1;"},
+			{Code: "declare const value: {method(): number} | null;\nvalue && value?.method() === 1;"},
+			{Code: "declare const value: {field: number} | null;\nvalue && 1 === value?.field;"},
+			{Code: "declare const value: {nested?: {field: number}} | null;\nvalue && (value?.nested).field === 1;"},
+			{Code: "declare const value: {nested?: Record<string, number>} | null;\nvalue && (value?.nested)['field'] === 1;"},
+			{Code: "declare const value: {method?: () => number} | null;\nvalue && (value?.method)() === 1;"},
+			{Code: "declare const value: {nested: {field: {deep: number}}} | null;\nvalue && (value?.nested.field).deep === 1;"},
+			{Code: "declare const value: {nested?: {field: number}} | null;\nvalue && (((value?.nested))).field === 1;"},
+		}, []rule_tester.InvalidTestCase{
+			{
+				Code: "declare const value: {nested: {field: number}} | null;\nvalue && (value.nested).field === 1;",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "optionalChainSuggest", Output: "declare const value: {nested: {field: number}} | null;\nvalue?.nested.field === 1;"},
+				}}},
+			},
+		})
 }
