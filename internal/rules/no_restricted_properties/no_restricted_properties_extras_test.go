@@ -87,6 +87,27 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 			{Code: `({} = foo);`, Options: []any{map[string]any{"object": "foo"}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Review regression: assignment-form object patterns used as a
+			// direct for-in initializer are ESTree ObjectPattern nodes. ----
+			{
+				Code:    `for ({bad} in xs) {}`,
+				Options: []any{map[string]any{"property": "bad"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bad' is restricted from being used.",
+					Line:      1, Column: 6, EndLine: 1, EndColumn: 11,
+				}},
+			},
+			{
+				Code:    `for ({outer: {bad}} in xs) {}`,
+				Options: []any{map[string]any{"property": "bad"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bad' is restricted from being used.",
+					Line:      1, Column: 14, EndLine: 1, EndColumn: 19,
+				}},
+			},
+
 			// ---- Dimension 4: parenthesized receiver, single and multi-level ----
 			// tsgo keeps ParenthesizedExpression as an explicit node; ESTree has none,
 			// so `(foo).bar` reads `foo` as object.name directly. Unwrapping via

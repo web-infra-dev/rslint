@@ -312,6 +312,36 @@ func checkPattern(ctx rule.RuleContext, r restrictions, pattern *ast.Node) {
 	}
 }
 
+func isObjectLiteralDestructuringPattern(node *ast.Node) bool {
+	if ast.IsArrayLiteralOrObjectLiteralDestructuringPattern(node) {
+		return true
+	}
+	if node == nil || node.Kind != ast.KindObjectLiteralExpression {
+		return false
+	}
+
+	current := node
+	for current.Parent != nil {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindForInStatement:
+			statement := parent.AsForInOrOfStatement()
+			return statement != nil && statement.Initializer == current
+		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+			current = parent
+		case ast.KindPropertyAssignment:
+			property := parent.AsPropertyAssignment()
+			if property == nil || property.Initializer != current || parent.Parent == nil {
+				return false
+			}
+			current = parent.Parent
+		default:
+			return false
+		}
+	}
+	return false
+}
+
 // https://eslint.org/docs/latest/rules/no-restricted-properties
 var NoRestrictedPropertiesRule = rule.Rule{
 	Name:   "no-restricted-properties",
@@ -346,7 +376,7 @@ var NoRestrictedPropertiesRule = rule.Rule{
 				checkPattern(ctx, r, node)
 			},
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
-				if !ast.IsArrayLiteralOrObjectLiteralDestructuringPattern(node) {
+				if !isObjectLiteralDestructuringPattern(node) {
 					return
 				}
 				checkPattern(ctx, r, node)
