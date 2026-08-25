@@ -2,7 +2,7 @@
 
 ## Rule Details
 
-This rule requires function names to match the name of the variable or property to which they are assigned. The rule will ignore property assignments where the property name is a literal that is not a valid identifier in the ECMAScript version specified in your configuration (default ES5).
+This rule requires function names to match the name of the variable or property to which they are assigned. The rule will ignore property assignments where the property name is a literal that is not a valid identifier in the ECMAScript version specified in your configuration (which defaults to the latest version).
 
 Examples of **incorrect** code for this rule:
 
@@ -178,7 +178,7 @@ module["exports"] = function foo(name) {};
 
 ## Differences from ESLint
 
-- For a property whose name comes from a string literal (e.g. `{ "ᢅ": function foo() {} }`), rslint decides whether that name is a valid identifier using the same character rules at every configured ECMAScript version. ESLint's `ecmaVersion: 5` mode instead uses an older, frozen table of valid identifier characters, so a handful of characters that were only added to the identifier rules in later Unicode versions are treated as invalid identifiers by ESLint at `ecmaVersion: 5` — and the property is left unchecked — while rslint treats them as valid identifiers and checks the property at every ECMAScript version, including 5.
+- For a property whose name comes from a string literal, rslint decides whether that name is a valid identifier using ts-go's current Unicode character table. ESLint's `esutils@2.0.3` uses frozen tables for both its ES5 and ES6 checks. This can make rslint check a property that ESLint leaves unchecked: for example, `{ "ᢅ": function foo() {} }` under `ecmaVersion: 5`, or `{ "𐕰": function foo() {} }` under a modern version. Assignment expressions have the same character-table difference at every configured version because ESLint always uses its default ES5 check on that path, while rslint uses ts-go's current table.
 
 - With `considerPropertyDescriptor` enabled, an `Object.defineProperties()` or `Object.create()` descriptor map is checked against its entry's key when that key is an identifier (e.g. `{ bar: { value: function bar() {} } }`). ESLint also reports entries keyed by a string or numeric literal (e.g. `{ "bar": { value: function baz() {} } }`), but names the property `undefined` in the message; rslint leaves those entries unchecked.
 

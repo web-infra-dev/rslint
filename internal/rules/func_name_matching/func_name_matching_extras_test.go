@@ -74,6 +74,11 @@ func TestFuncNameMatchingExtras(t *testing.T) {
 			// name ----
 			{Code: `({'yield': function yield() {}})`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 5}},
 
+			// ---- Default-version lock-in: rslint and ESLint flat config
+			// default to the latest ECMAScript version, where "yield" is
+			// reserved and a string-literal property key is not compared ----
+			{Code: `({'yield': function y() {}})`},
+
 			// ---- Branch lock-in: at ecmaVersion 2015, "yield" is reserved
 			// (esutils' ES6 keyword table always rejects it, regardless of
 			// strict mode), so the property key is left unchecked even
@@ -226,6 +231,17 @@ func TestFuncNameMatchingExtras(t *testing.T) {
 				},
 			},
 
+			// ---- Explicit-version lock-in: unlike the default/latest case
+			// above, ES5 accepts "yield" as an identifier-shaped property
+			// name, so a mismatch is reported ----
+			{
+				Code:            `({'yield': function y() {}})`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `y` should match property name `yield`.", Line: 1, Column: 3},
+				},
+			},
+
 			// ---- Branch lock-in: a class field named exactly "value" with
 			// considerPropertyDescriptor enabled never enters the
 			// descriptor-call branches, because its parent is a class body,
@@ -294,6 +310,25 @@ func TestFuncNameMatchingExtras(t *testing.T) {
 				},
 			},
 
+			// ---- Wrapper boundary: ESTree omits parentheses around the
+			// descriptor-name argument. tsgo keeps them, so both direct
+			// descriptor-call branches must unwrap the argument before
+			// checking whether it is a string literal ----
+			{
+				Code:    `Object.defineProperty(foo, ("bar"), { value: function baz() {} })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `bar`.", Line: 1, Column: 39},
+				},
+			},
+			{
+				Code:    `Reflect.defineProperty(foo, ("bar"), { value: function baz() {} })`,
+				Options: []any{"always", map[string]any{"considerPropertyDescriptor": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `baz` should match property name `bar`.", Line: 1, Column: 40},
+				},
+			},
+
 			// ---- Branch lock-in: the reserved-word table esutils applies here
 			// is its non-strict one, so `await`, `let`, `static` and
 			// `implements` are all still identifier-shaped property names and
@@ -318,6 +353,29 @@ func TestFuncNameMatchingExtras(t *testing.T) {
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "matchProperty", Message: "Function name `foo` should match property name `static`.", Line: 1, Column: 1},
+				},
+			},
+
+			// ---- Divergence lock-in: esutils uses its frozen Unicode 9
+			// identifier table for the ES6 path too, so a post-Unicode-9
+			// code point stays unchecked upstream at a modern ecmaVersion.
+			// tsgo's current scanner table accepts U+10570 and reports ----
+			{
+				Code:            `({ "𐕰": function foo() {} })`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `foo` should match property name `𐕰`.", Line: 1, Column: 4},
+				},
+			},
+
+			// ---- Divergence lock-in: the assignment path asks upstream
+			// for its default ES5 identifier check at every configured
+			// version, while rslint still uses tsgo's current table ----
+			{
+				Code:            `obj["ᢅ"] = function foo() {};`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matchProperty", Message: "Function name `foo` should match property name `ᢅ`.", Line: 1, Column: 1},
 				},
 			},
 

@@ -154,8 +154,8 @@ var FuncNameMatchingRule = rule.Rule{
 						isPropertyCall(nthEstreeAncestor(node, 2), "Reflect", "defineProperty"):
 						call := nthEstreeAncestor(node, 2).AsCallExpression()
 						if call.Arguments != nil && len(call.Arguments.Nodes) > 1 {
-							propArg := call.Arguments.Nodes[1]
-							if propArg.Kind == ast.KindStringLiteral {
+							propArg := ast.SkipParentheses(call.Arguments.Nodes[1])
+							if propArg != nil && propArg.Kind == ast.KindStringLiteral {
 								propValue := propArg.AsStringLiteral().Text
 								if shouldWarn(opts, propValue, functionName) {
 									reportMismatch(ctx, opts, node, propValue, functionName, true)
@@ -381,10 +381,11 @@ var es6ReservedWords = map[string]bool{
 // Divergence: character-shape validity is answered by tsgo's own scanner
 // tables (github.com/microsoft/typescript-go/shim/scanner.IsValidIdentifier),
 // which track a current Unicode identifier snapshot rather than the frozen
-// ES5.1/Unicode-v9 tables esutils ships for its ES5 path. A small number of
-// code points added to Unicode's identifier properties after that snapshot
-// (e.g. U+1885) are treated as valid identifier characters here at every
-// ecmaVersion, where ESLint's ES5 mode rejects them.
+// tables esutils ships for both its ES5 and ES6 paths. Code points absent from
+// those tables (e.g. U+1885 in the ES5 path or post-Unicode-9 U+10570 in the
+// ES6 path) can therefore be accepted here when ESLint rejects them. The
+// assignment listener also uses this current table even though upstream asks
+// isIdentifier for its default ES5 path regardless of configured ecmaVersion.
 func isIdentifierName(name string, ecmaVersion int) bool {
 	if !scanner.IsValidIdentifier(name) {
 		return false
