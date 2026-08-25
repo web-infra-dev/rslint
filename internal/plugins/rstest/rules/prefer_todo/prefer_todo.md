@@ -80,14 +80,16 @@ still be the callback.
 
 ### Rstest-specific behavior
 
-The rule intentionally recognizes two registration shapes that the upstream
-Jest parser leaves alone:
+The rule intentionally differs from upstream in these cases:
 
 - interpolated template titles such as ``test(`case ${name}`)`` are reported,
   because the dynamic title does not make a missing or empty callback ambiguous;
 - nested registrations such as `wrap(test('case'))` are reported, because the
   inner `test(...)` call still executes and registers an Rstest test. Rewriting
-  that inner call to `test.todo(...)` preserves its registration role.
+  that inner call to `test.todo(...)` preserves its registration role;
+- parentheses around an inline empty callback are removed together with the
+  callback. Upstream's fix range ends at the inner function and can leave
+  unmatched closing parentheses, while this rule keeps the fixed call parseable.
 
 ## Original Documentation
 

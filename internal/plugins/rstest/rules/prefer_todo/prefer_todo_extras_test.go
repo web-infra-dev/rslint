@@ -357,11 +357,26 @@ api.test.todo("case");`},
   . /* keep */ todo("case");`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
 			},
-			// ---- parenthesized callee remains parseable.
+			// ---- parenthesized callees and removable arguments remain parseable.
 			{
 				Code:   `(test)("case");`,
 				Output: []string{`(test).todo("case");`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unimplementedTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", (() => {}));`,
+				Output: []string{`test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", { retry: 1 }, (() => {}));`,
+				Output: []string{`test.todo("case", { retry: 1 });`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `test("case", (() => {}), (1000));`,
+				Output: []string{`test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 1, Column: 1}},
 			},
 			// ---- real-user shape: options overload from migrated suites.
 			{
