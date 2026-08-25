@@ -949,6 +949,26 @@ func TestRefStoreImplicitFileArguments(t *testing.T) {
 	}
 }
 
+func TestRefStoreCommonJSGlobalReference(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{name: "wrapper global", source: "exports.foo = 1;", want: true},
+		{name: "authored declaration", source: "const exports = {}; exports.foo = 1;"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/file.cjs", core.ScriptKindJS, test.source)
+			exports := identifiers(sourceFile.AsNode(), "exports")
+			reference := exports[len(exports)-1]
+			if got := refs.IsGlobalReference(reference); got != test.want {
+				t.Fatalf("IsGlobalReference(exports) = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestRefStoreResolveCheckerFallbackExcludedPositions(t *testing.T) {
 	// A TypeChecker resolves a property key's own declaration name to the
 	// property's symbol (its only declaration is that very key), not to

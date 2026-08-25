@@ -75,6 +75,9 @@ func shouldCheck(ctx rule.RuleContext, node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
+	if utils.IsInJSDocSyntax(node) {
+		return false
+	}
 
 	// Import attributes are defined by environments, so naming conventions
 	// shouldn't apply to them.
@@ -107,9 +110,14 @@ func shouldCheck(ctx rule.RuleContext, node *ast.Node) bool {
 	// A callee or an argument of a call or a `new` is never checked. tsgo
 	// spells `import(specifier, options)` as a CallExpression too, where
 	// upstream has a distinct ImportExpression that this exclusion misses.
-	switch parent.Kind {
+	callChild := utils.OutermostParenthesizedExpression(node)
+	callParent := callChild.Parent
+	if callParent == nil {
+		return false
+	}
+	switch callParent.Kind {
 	case ast.KindCallExpression:
-		if !ast.IsImportCall(parent) {
+		if !ast.IsImportCall(callParent) {
 			return false
 		}
 	case ast.KindNewExpression:
@@ -168,9 +176,17 @@ func isDestructuredFrom(node *ast.Node) bool {
 		return false
 	}
 	assignment := ast.GetAssignmentTarget(node)
-	return assignment != nil &&
-		assignment.Kind != ast.KindPrefixUnaryExpression &&
-		assignment.Kind != ast.KindPostfixUnaryExpression
+	if assignment == nil ||
+		assignment.Kind == ast.KindPrefixUnaryExpression ||
+		assignment.Kind == ast.KindPostfixUnaryExpression {
+		return false
+	}
+	for current := node; current != nil && current != assignment; current = current.Parent {
+		if current.Kind == ast.KindNonNullExpression {
+			return false
+		}
+	}
+	return true
 }
 
 // isRenamedImport reports whether node is an imported or re-exported name that
@@ -216,23 +232,7 @@ func isReferenceToGlobalVariable(ctx rule.RuleContext, node *ast.Node) bool {
 	if !ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
-	// A name this file declares in the reference's own declaration space
-	// resolves to that declaration instead of to the global.
-	if ctx.Refs.ResolveInFile(node) != nil {
-		return false
-	}
-	// In a script every top-level declaration shares the one global scope, so a
-	// single one of them takes the name away from the global for the whole
-	// file: `interface Number {}` at the top of a script also claims a later
-	// `Number` used as a value, and a `Number` read from inside a function. A
-	// module keeps its top level to itself, and a declaration nested in a scope
-	// of its own reaches only what that scope encloses; the resolution above
-	// already settles both.
-	if ctx.SourceFile != nil && ast.IsGlobalSourceFile(ctx.SourceFile.AsNode()) &&
-		ctx.SourceFile.Locals[name] != nil {
-		return false
-	}
-	return true
+	return ctx.Refs.IsGlobalReference(node)
 }
 
 // isVariableReference reports whether node occupies a position that upstream's

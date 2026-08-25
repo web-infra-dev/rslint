@@ -530,20 +530,33 @@ func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meanin
 		hasAuthoredDeclaration(s.sourceFile.Locals[name]) {
 		return false
 	}
-	return !s.IsNameDefinedInFileWithMeaning(location, name, meaning)
+	if hasAuthoredDeclaration(s.resolveName(location, name, meaning)) {
+		return false
+	}
+	return meaning&ast.SymbolFlagsValue == 0 || !s.HasImplicitWrapperBinding(name)
+}
+
+// IsGlobalReference is IsGlobalNameReference using the declaration-space
+// meaning implied by node's syntactic reference position.
+func (s *RefStore) IsGlobalReference(node *ast.Node) bool {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return false
+	}
+	return s.IsGlobalNameReference(node, node.Text(), referenceMeaning(node))
 }
 
 // hasAuthoredDeclaration reports whether symbol has a declaration the file
 // actually spells in syntax. A JSDoc tag such as `@typedef` or `@import` is
 // reparsed into synthesized declaration nodes that join the file's symbol
 // table; ESLint reads that same text as a comment and creates no scope variable
-// for it, so a symbol declared only that way defines nothing.
+// for it, so a symbol declared only that way defines nothing. A SourceFile
+// declaration is likewise synthesized for the CommonJS `exports` wrapper.
 func hasAuthoredDeclaration(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if !isJSDocSynthesized(decl) {
+		if decl.Kind != ast.KindSourceFile && !isJSDocSynthesized(decl) {
 			return true
 		}
 	}

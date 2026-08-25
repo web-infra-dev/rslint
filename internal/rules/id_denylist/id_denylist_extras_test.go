@@ -29,6 +29,13 @@ func TestIdDenylistExtras(t *testing.T) {
 			// An empty deny list denies nothing.
 			{Code: `var foo = bar;`},
 
+			// Parentheses are transparent when upstream decides whether an identifier
+			// is the callee or an argument of a call.
+			{Code: `(foo)();`, Options: deny("foo")},
+			{Code: `foo((bar));`, Options: deny("bar")},
+			{Code: `new (foo)();`, Options: deny("foo")},
+			{Code: `new foo((bar));`, Options: deny("bar")},
+
 			// ---- Dimension 4: parenthesized receiver and parenthesized assignment target ----
 			{Code: `(foo).bar`, Options: deny("bar")},
 
@@ -87,6 +94,15 @@ func TestIdDenylistExtras(t *testing.T) {
 			{Code: `[...[obj.b][0]] = d;`, Options: deny("b")},
 			{Code: `({ x: { a: obj.b }.c } = d);`, Options: deny("b")},
 			{Code: `({ a: { ...obj.b }.c } = d);`, Options: deny("b")},
+			{Code: `[foo.bar]! = source;`, Options: deny("bar")},
+
+			// JSDoc syntax is comment-only upstream, including declarations that tsgo
+			// synthesizes into a script's global symbol table.
+			{Code: `/** @type {Foo} */ let x;`, FileName: "jsdoc-type.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Foo")},
+			{Code: `/** @typedef {number} Number */ Number;`, FileName: "jsdoc-global.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Number")},
+
+			// CommonJS wrapper globals have no authored definitions upstream.
+			{Code: `exports.foo = 1;`, FileName: "wrapper.cjs", TSConfig: "tsconfig.allow-js.json", Options: deny("exports")},
 
 			// Parentheses around a dynamic import's options object, or around a nested
 			// attribute value, still leave their keys import attributes.
@@ -211,6 +227,7 @@ function foo(a: any) {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTes
 			// In a script every top-level declaration shares the global scope, so one of
 			// them claims the name for the whole file even from another declaration
 			// space; a nested one, and a module's top level, reach only their own scope.
+			{Code: `const exports = {}; exports.foo = 1;`, FileName: "authored.cjs", TSConfig: "tsconfig.allow-js.json", Options: deny("exports"), Errors: []rule_tester.InvalidTestCaseError{restricted("exports", 1, 7), restricted("exports", 1, 21)}},
 			{Code: "interface Number { q: string }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 2, 1)}},
 			{Code: "const Number = 1;\nlet x: Number;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 7), restricted("Number", 2, 8)}},
 			{Code: "namespace Number { export type A = 1; }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 2, 1)}},
