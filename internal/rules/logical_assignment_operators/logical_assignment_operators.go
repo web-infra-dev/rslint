@@ -233,7 +233,8 @@ func isUndefined(ctx *rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 	if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == "undefined" {
-		return ctx.Refs.IsGlobalNameReference(node, "undefined", globalValueMeaning)
+		return ctx.Globals.Access("undefined").IsDeclared() &&
+			ctx.Refs.IsGlobalNameReference(node, "undefined", globalValueMeaning)
 	}
 	if node.Kind != ast.KindVoidExpression {
 		return false
@@ -348,7 +349,8 @@ func booleanCastArgument(ctx *rule.RuleContext, node *ast.Node) (*ast.Node, bool
 	if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
 		return nil, false
 	}
-	if !ctx.Refs.IsGlobalNameReference(callee, "Boolean", globalValueMeaning) {
+	if !ctx.Globals.Access("Boolean").IsDeclared() ||
+		!ctx.Refs.IsGlobalNameReference(callee, "Boolean", globalValueMeaning) {
 		return nil, false
 	}
 	return skipParens(call.Arguments.Nodes[0]), true
@@ -872,8 +874,7 @@ var LogicalAssignmentOperatorsRule = rule.Rule{
 			ctx: &ctx,
 			// Upstream reads the global scope's strictness, which a `"use
 			// strict"` directive inside a `with` body does not reach.
-			isStrict: ast.IsExternalModule(ctx.SourceFile) ||
-				utils.HasUseStrictDirective(ctx.SourceFile.AsNode()),
+			isStrict: utils.HasUseStrictDirective(ctx.SourceFile.AsNode()),
 		}
 
 		if opts.never {

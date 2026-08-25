@@ -72,6 +72,19 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `declare const undefined: any; if (a == undefined) a = b`},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `namespace N { const undefined = 1; if (a == undefined) a = b }`},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `var undefined; if (a == undefined) a = b`},
+			{
+				Options:  []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				Code:     `if (a == undefined) a = b`,
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Globals:  map[string]any{"undefined": "off"},
+			},
+			{
+				Options:  []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				Code:     `/* global Boolean:off */ if (Boolean(a)) a = b`,
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+			},
 			// ---- Locks in upstream isImplicitNullishComparison() arms ----
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `if (a != null) a = b`},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `if (a == 0) a = b`},
@@ -86,6 +99,18 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 			{Code: `a = b || a`},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `export {}; with (object) a = a || b`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: `assignment`, Message: `Assignment (=) can be replaced with operator assignment (||=).`,
+						Line: 1, Column: 26, EndLine: 1, EndColumn: 36,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: `useLogicalOperator`, Output: `export {}; with (object) a ||= b`},
+						},
+					},
+				},
+			},
 			// ---- Dimension 4: parenthesized receiver (tsgo keeps the node, ESTree drops it) ----
 			{
 				Code:   `(a).b || ((a).b = c)`,
