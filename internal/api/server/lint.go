@@ -12,8 +12,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
@@ -379,13 +377,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		return tspath.ConvertToRelativePath(targetPathForSourcePath(sourcePath), comparePathOptions)
 	}
 
-	// Collect diagnostics and source files
-	var diagnostics []api.Diagnostic
+	// Collect diagnostics in the shared internal model. Each diagnostic is
+	// copied into the API's caller-visible path space before the completed set
+	// is sorted and projected to wire fields below.
+	var diagnostics []rule.RuleDiagnostic
 	var diagnosticsLock sync.Mutex
-	errorsCount := 0
-	warningsCount := 0
-	fixableErrorsCount := 0
-	fixableWarningsCount := 0
 	// When Fix is requested, the original RuleDiagnostics (byte-offset fixes +
 	// their SourceFile) are retained per file for the in-band fix pass below.
 	var diagnosticsByFile map[string][]rule.RuleDiagnostic
@@ -401,105 +397,25 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
 		diagnosticsLock.Lock()
 		defer diagnosticsLock.Unlock()
+		responsePath := responsePathForSourcePath(d.FilePath)
 		if d.SourceFile != nil {
 			sourceFilesLock.Lock()
-			filePath := responsePathForSourcePath(d.FilePath)
 			if sf, ok := d.SourceFile.(*ast.SourceFile); ok {
-				sourceFiles[filePath] = sf
+				sourceFiles[responsePath] = sf
 			}
 			sourceFilesLock.Unlock()
 		}
 
-		diagnosticStart := d.Range.Pos()
-		diagnosticEnd := d.Range.End()
-
-		startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
-		endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
-
-		diagnostic := api.Diagnostic{
-			RuleName:  d.RuleName,
-			MessageId: d.Message.Id,
-			Message:   d.Message.Description,
-			FilePath:  responsePathForSourcePath(d.FilePath),
-			Range: api.Range{
-				Start: api.Position{
-					Line:   startLine + 1, // Convert to 1-based indexing
-					Column: int(startColumn) + 1,
-				},
-				End: api.Position{
-					Line:   endLine + 1,
-					Column: int(endColumn) + 1,
-				},
-			},
-			Severity: d.Severity.String(),
-		}
-
-		// Fix and suggestion ranges are flat UTF-16 offsets (ESLint's unit),
-		// converted from the rule's byte offsets via byteOffsetToUTF16. This is
-		// a DIFFERENT conversion than the line/column above (which counts UTF-16
-		// units from the line start, not a flat file offset).
-		fixText := d.SourceFile.Text()
-
-		// Add fixes if available.
-		if d.FixesPtr != nil && len(*d.FixesPtr) > 0 {
-			var fixes []api.Fix
-			for _, fix := range *d.FixesPtr {
-				fixes = append(fixes, api.Fix{
-					Text:     fix.Text,
-					StartPos: byteOffsetToUTF16(fixText, fix.Range.Pos()),
-					EndPos:   byteOffsetToUTF16(fixText, fix.Range.End()),
-				})
-			}
-			diagnostic.Fixes = fixes
-		}
-
-		// Add suggestions if available — optional, user-selected fixes the
-		// editor surfaces (distinct from auto-applied Fixes).
-		if d.Suggestions != nil && len(*d.Suggestions) > 0 {
-			suggestions := make([]api.Suggestion, 0, len(*d.Suggestions))
-			for _, sug := range *d.Suggestions {
-				var fixes []api.Fix
-				for _, fix := range sug.FixesArr {
-					fixes = append(fixes, api.Fix{
-						Text:     fix.Text,
-						StartPos: byteOffsetToUTF16(fixText, fix.Range.Pos()),
-						EndPos:   byteOffsetToUTF16(fixText, fix.Range.End()),
-					})
-				}
-				suggestions = append(suggestions, api.Suggestion{
-					MessageId: sug.Message.Id,
-					Message:   sug.Message.Description,
-					Data:      sug.Message.Data,
-					Fixes:     fixes,
-				})
-			}
-			diagnostic.Suggestions = suggestions
-		}
-
-		diagnostics = append(diagnostics, diagnostic)
-
-		// Split counts by severity (ESLint semantics): errorCount counts errors
-		// only, not the total. fixable*Count counts the fixable subset.
 		hasFix := d.FixesPtr != nil && len(*d.FixesPtr) > 0
-		switch d.Severity {
-		case rule.SeverityError:
-			errorsCount++
-			if hasFix {
-				fixableErrorsCount++
-			}
-		case rule.SeverityWarning:
-			warningsCount++
-			if hasFix {
-				fixableWarningsCount++
-			}
-		}
-
 		// Retain the original diagnostic (byte-offset fixes + SourceFile) for the
 		// in-band fix pass, grouped by the caller-visible target path.
 		if req.Fix && hasFix {
 			targetPath := targetPathForSourcePath(d.FilePath)
 			diagnosticsByFile[targetPath] = append(diagnosticsByFile[targetPath], d)
 		}
+
+		d.FilePath = responsePath
+		diagnostics = append(diagnostics, d)
 	}
 
 	// Every selected target is parsed even when no config entry contributes
@@ -606,26 +522,8 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 	}
 
-	if diagnostics == nil {
-		diagnostics = []api.Diagnostic{}
-	}
-	// Sort diagnostics by (file, start position) only — deliberately NO
-	// end/rule tie-break: ESLint and the upstream rule tests order
-	// same-start diagnostics by emission order (parent reported before
-	// nested child), and a file's diagnostics are all emitted by a single
-	// worker, so under a STABLE sort this key is already fully
-	// deterministic. Keep this comparator in sync with the CLI comparator
-	// over rule.RuleDiagnostic.
-	sort.SliceStable(diagnostics, func(i, j int) bool {
-		a, b := diagnostics[i], diagnostics[j]
-		if a.FilePath != b.FilePath {
-			return a.FilePath < b.FilePath
-		}
-		if a.Range.Start.Line != b.Range.Start.Line {
-			return a.Range.Start.Line < b.Range.Start.Line
-		}
-		return a.Range.Start.Column < b.Range.Start.Column
-	})
+	linter.StableSortDiagnosticsByFileAndStart(diagnostics)
+	diagnosticProjection := projectLintDiagnostics(diagnostics)
 
 	// Apply fixes in-band when requested. ApplyRuleFixes is the same pure fixer
 	// the CLI uses through applyFixPass, but here the result stays in-memory in
@@ -668,11 +566,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 
 	// Create response
 	response := &api.LintResponse{
-		Diagnostics:         diagnostics,
-		ErrorCount:          errorsCount,
-		WarningCount:        warningsCount,
-		FixableErrorCount:   fixableErrorsCount,
-		FixableWarningCount: fixableWarningsCount,
+		Diagnostics:         diagnosticProjection.diagnostics,
+		ErrorCount:          diagnosticProjection.errorCount,
+		WarningCount:        diagnosticProjection.warningCount,
+		FixableErrorCount:   diagnosticProjection.fixableErrorCount,
+		FixableWarningCount: diagnosticProjection.fixableWarningCount,
 		// FileCount mirrors the unique caller-visible LintedFiles result set.
 		FileCount:   len(lintedFiles),
 		RuleCount:   len(lintResult.ExecutedRules),
@@ -695,25 +593,4 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		response.EncodedSourceFiles = encodedSourceFiles
 	}
 	return response, nil
-}
-
-// byteOffsetToUTF16 converts a byte offset within text to a flat UTF-16 code
-// unit offset — the unit ESLint uses for fix / suggestion ranges. This is a
-// DIFFERENT conversion than line/column (scanner.GetECMALineAndUTF16CharacterOfPosition,
-// which counts UTF-16 units from a line start); fix ranges are flat offsets
-// from the start of the file.
-func byteOffsetToUTF16(text string, byteOffset int) int {
-	if byteOffset < 0 {
-		// A fix reaching back before the text — ESLint's [-1, 0] for removing
-		// a byte order mark. There is nothing to measure, and the position is
-		// meaningful as it stands.
-		return byteOffset
-	}
-	if byteOffset == 0 {
-		return 0
-	}
-	if byteOffset >= len(text) {
-		return int(core.UTF16Len(text))
-	}
-	return int(core.UTF16Len(text[:byteOffset]))
 }
