@@ -29,11 +29,20 @@ const (
 	frameRegistrationFallback
 )
 
+// owner is the node whose exit tears the frame down: the registration call for
+// a fallback frame, the function itself for a callback or detached frame. Node
+// identity is stable across the traversal and the traversal is strictly nested,
+// so matching the owner on exit is enough to pair enter with exit — no separate
+// record of what each enter did is needed.
+//
+// activationOwner is the function that positionally activated a fallback frame;
+// its exit deactivates the frame again without popping it.
 type countFrame struct {
 	kind                   frameKind
 	count                  int
 	active                 bool
-	registration           *ast.Node
+	owner                  *ast.Node
+	activationOwner        *ast.Node
 	callbackCandidateRoots []*ast.Node
 }
 
@@ -49,84 +58,6 @@ const (
 	functionPushDetached
 	functionActivateRegistrationFallback
 )
-
-const (
-	// Listener events follow AST nesting, so ordinary files only use a few
-	// slots. Keep that path allocation-free while retaining a sound overflow
-	// path for generated or adversarially deep expressions.
-	inlineFunctionEventCapacity = 8
-	inlineCallEventCapacity     = 16
-)
-
-type functionEventStack struct {
-	inline   [inlineFunctionEventCapacity]functionPushKind
-	overflow []functionPushKind
-	depth    int
-}
-
-func (events *functionEventStack) push(kind functionPushKind) {
-	if events.depth < len(events.inline) {
-		events.inline[events.depth] = kind
-	} else {
-		events.overflow = append(events.overflow, kind)
-	}
-	events.depth++
-}
-
-func (events *functionEventStack) pop() functionPushKind {
-	if events.depth == 0 {
-		return functionPushNone
-	}
-	events.depth--
-	if events.depth < len(events.inline) {
-		return events.inline[events.depth]
-	}
-	last := len(events.overflow) - 1
-	kind := events.overflow[last]
-	events.overflow = events.overflow[:last]
-	return kind
-}
-
-type callEventStack struct {
-	inline   [inlineCallEventCapacity]bool
-	overflow []bool
-	depth    int
-}
-
-func (events *callEventStack) push(didPushRegistrationFrame bool) {
-	if events.depth < len(events.inline) {
-		events.inline[events.depth] = didPushRegistrationFrame
-	} else {
-		events.overflow = append(events.overflow, didPushRegistrationFrame)
-	}
-	events.depth++
-}
-
-func (events *callEventStack) markRegistrationFrame() {
-	if events.depth == 0 {
-		return
-	}
-	index := events.depth - 1
-	if index < len(events.inline) {
-		events.inline[index] = true
-	} else {
-		events.overflow[index-len(events.inline)] = true
-	}
-}
-
-func (events *callEventStack) pop() bool {
-	if events.depth == 0 {
-		return false
-	}
-	events.depth--
-	if events.depth < len(events.inline) {
-		return events.inline[events.depth]
-	}
-	last := len(events.overflow) - 1
-	didPushRegistrationFrame := events.overflow[last]
-	events.overflow = events.overflow[:last]
-	return didPushRegistrationFrame
-}
 
 func parseOptions(rawOptions []any) options {
 	opts := options{Max: defaultMax}
@@ -166,12 +97,12 @@ func (stack *frameStack) top() *countFrame {
 	return &stack.frames[len(stack.frames)-1]
 }
 
-func (stack *frameStack) push(kind frameKind, active bool, registration *ast.Node, callbackCandidateRoots []*ast.Node) {
+func (stack *frameStack) push(kind frameKind, active bool, owner *ast.Node, callbackCandidateRoots []*ast.Node) {
 	stack.frames = append(stack.frames, countFrame{
 		kind:                   kind,
 		count:                  0,
 		active:                 active,
-		registration:           registration,
+		owner:                  owner,
 		callbackCandidateRoots: callbackCandidateRoots,
 	})
 }
@@ -336,7 +267,7 @@ func nodeWithinSubtree(node *ast.Node, root *ast.Node) bool {
 }
 
 func canActivateRegistrationFallback(frame *countFrame, node *ast.Node) bool {
-	if frame == nil || frame.kind != frameRegistrationFallback || frame.active || frame.registration == nil {
+	if frame == nil || frame.kind != frameRegistrationFallback || frame.active || frame.owner == nil {
 		return false
 	}
 	for _, root := range frame.callbackCandidateRoots {
@@ -356,8 +287,6 @@ var MaxExpectsRule = rule.Rule{
 		callbacks := analysis.Callbacks().Functions
 
 		stack := newFrameStack()
-		functionEvents := functionEventStack{}
-		callEvents := callEventStack{}
 
 		enterFunction := func(node *ast.Node) {
 			kind := functionPushForNode(node, callbacks)
@@ -374,27 +303,30 @@ var MaxExpectsRule = rule.Rule{
 				canActivateRegistrationFallback(stack.top(), node) {
 				kind = functionActivateRegistrationFallback
 			}
-			functionEvents.push(kind)
-
 			switch kind {
 			case functionPushTestCallback:
-				stack.push(frameTestCallback, true, nil, nil)
+				stack.push(frameTestCallback, true, node, nil)
 			case functionPushDetached:
-				stack.push(frameDetachedFunction, stack.top().active, nil, nil)
+				stack.push(frameDetachedFunction, stack.top().active, node, nil)
 			case functionActivateRegistrationFallback:
-				stack.top().active = true
+				top := stack.top()
+				top.active = true
+				top.activationOwner = node
 			}
 		}
 
-		exitFunction := func(_ *ast.Node) {
-			switch functionEvents.pop() {
-			case functionPushNone:
-				return
-			case functionActivateRegistrationFallback:
-				stack.top().active = false
+		// A function that changed no state owns neither the top frame nor its
+		// activation, so both comparisons miss and the exit is a no-op.
+		exitFunction := func(node *ast.Node) {
+			top := stack.top()
+			if top.owner == node {
+				stack.pop()
 				return
 			}
-			stack.pop()
+			if top.activationOwner == node {
+				top.active = false
+				top.activationOwner = nil
+			}
 		}
 
 		return rule.RuleListeners{
@@ -413,7 +345,6 @@ var MaxExpectsRule = rule.Rule{
 			ast.KindConstructor:                              enterFunction,
 			rule.ListenerOnExit(ast.KindConstructor):         exitFunction,
 			ast.KindCallExpression: func(node *ast.Node) {
-				callEvents.push(false)
 				if analysis.ParseTestCall(node) != nil {
 					stack.push(
 						frameRegistrationFallback,
@@ -421,7 +352,6 @@ var MaxExpectsRule = rule.Rule{
 						node,
 						registrationFallbackCandidateRoots(node.AsCallExpression()),
 					)
-					callEvents.markRegistrationFrame()
 					return
 				}
 
@@ -436,7 +366,6 @@ var MaxExpectsRule = rule.Rule{
 						node,
 						hookFallbackCandidateRoots(node.AsCallExpression()),
 					)
-					callEvents.markRegistrationFrame()
 					return
 				}
 
@@ -450,11 +379,12 @@ var MaxExpectsRule = rule.Rule{
 					ctx.ReportNode(node, buildExceededMaxAssertionMessage(count, opts.Max))
 				}
 			},
-			rule.ListenerOnExit(ast.KindCallExpression): func(_ *ast.Node) {
-				if !callEvents.pop() {
-					return
+			// Only a registration call owns a frame; every ordinary call misses
+			// the comparison and does no bookkeeping at all.
+			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
+				if stack.top().owner == node {
+					stack.pop()
 				}
-				stack.pop()
 			},
 		}
 	},
