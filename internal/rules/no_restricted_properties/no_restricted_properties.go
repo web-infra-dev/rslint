@@ -346,7 +346,7 @@ var NoRestrictedPropertiesRule = rule.Rule{
 				checkPattern(ctx, r, node)
 			},
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
-				if !utils.IsInDestructuringAssignment(node) {
+				if !ast.IsArrayLiteralOrObjectLiteralDestructuringPattern(node) {
 					return
 				}
 				checkPattern(ctx, r, node)

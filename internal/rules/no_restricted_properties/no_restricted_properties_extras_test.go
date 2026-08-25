@@ -29,6 +29,11 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 		t,
 		&NoRestrictedPropertiesRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Review regression: an object expression nested inside a member
+			// assignment target remains an ESTree ObjectExpression, not an
+			// ObjectPattern, even though the surrounding assignment destructures. ----
+			{Code: `let x; ({ a: ({bad}).x } = foo);`, Options: []any{map[string]any{"property": "bad"}}},
+
 			// ---- Dimension 4: TS non-null / type-expression wrappers on the receiver ----
 			// `foo!.bar` / `(foo as Foo).bar` / `(foo satisfies Foo).bar` are never
 			// unwrapped back to a bare Identifier (ESTree/typescript-eslint don't
