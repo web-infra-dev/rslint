@@ -364,25 +364,29 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 				},
 			},
 			{
-				Code: `/*global foo:writable*/ foo = 1;`,
+				Code:            `/*global foo:writable*/ foo = 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
 				},
 			},
 			{
-				Code: `/*global foo:writable*/ foo += 1;`,
+				Code:            `/*global foo:writable*/ foo += 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
 				},
 			},
 			{
-				Code: `/*global foo:writable*/ foo = foo + 1;`,
+				Code:            `/*global foo:writable*/ foo = foo + 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
 				},
 			},
 			{
-				Code: `/*global foo:writable*/ foo++;`,
+				Code:            `/*global foo:writable*/ foo++;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
 				},

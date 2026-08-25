@@ -1318,7 +1318,7 @@ func TestHandleLint_SuggestionsConverted(t *testing.T) {
 	}
 }
 
-// F2: pins the suggestion `data` conversion (api.go: Data: sug.Message.Data).
+// F2: pins the suggestion `data` conversion (api_lint.go: Data: sug.Message.Data).
 // no-explicit-any's suggestions carry no data, so use no-restricted-types whose
 // suggestion carries {name, replacement}.
 func TestHandleLint_SuggestionDataConverted(t *testing.T) {
