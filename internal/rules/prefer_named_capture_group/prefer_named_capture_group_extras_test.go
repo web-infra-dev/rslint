@@ -54,10 +54,9 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			{Code: "const pattern = '(a)'; new RegExp(pattern);"},
 			{Code: "const pattern = '(a)'; new RegExp('a' + pattern);"},
 
-			// Documented difference from ESLint: rslint's isGlobalRegExpCallee only
-			// recognizes the `RegExp` identifier or a global-object property/element
-			// access directly at the call site — it doesn't follow a local alias
-			// assigned from the global constructor.
+			// Documented difference from ESLint: rslint traces supported call-site
+			// expressions back to the global constructor, but doesn't follow a local
+			// alias assigned from that constructor.
 			{Code: "const R = RegExp; new R('(a)');"},
 
 			// ---- Dimension 4: empty pattern stays valid regardless of form ----
@@ -74,6 +73,9 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			{Code: "RegExp('[');"},                  // unterminated character class
 			{Code: "RegExp('a{');"},                 // standalone quantifier-shaped literal, no group
 			{Code: "RegExp('(?<dup>a)(?<dup>b)');"}, // duplicate group name — no unnamed group to report
+			{Code: "new RegExp('(a){2,1}');"},       // descending quantifier bounds
+			{Code: "new RegExp('(a)[z-a]');"},       // descending character-class range
+			{Code: "new RegExp('(a)', 'u' + 'v');"}, // mutually exclusive Unicode modes
 
 			// ---- ES2025 modifier-group headers the host engine rejects ----
 			{Code: "RegExp('(?ii:(a))');"},  // flag repeated within one set
@@ -93,6 +95,35 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			// invalid case below.
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- ReferenceTracker-compatible callee expression forms ----
+			{
+				Code:            "globalThis['Reg' + 'Exp']('(a)');",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      1,
+					Column:    1,
+					EndColumn: 33,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addGroupName", Output: "globalThis['Reg' + 'Exp']('(?<temp1>a)');"},
+						{MessageId: "addNonCapture", Output: "globalThis['Reg' + 'Exp']('(?:a)');"},
+					},
+				}},
+			},
+			{
+				Code: "(0, RegExp)('(a)');",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      1,
+					Column:    1,
+					EndColumn: 19,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addGroupName", Output: "(0, RegExp)('(?<temp1>a)');"},
+						{MessageId: "addNonCapture", Output: "(0, RegExp)('(?:a)');"},
+					},
+				}},
+			},
+
 			// ---- Dimension 4: parenthesized/assertion/optional callee wrappers ----
 			{
 				Code: "((RegExp))('(a)');",
@@ -437,6 +468,23 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 					Line:      1,
 					Column:    1,
 					EndColumn: 20,
+				}},
+			},
+
+			// Escaped IdentifierName characters are decoded when named
+			// backreferences resolve, so the later unnamed group is still seen.
+			{
+				Code: `/(?<\u0061>a)\k<a>(b)/u;`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Message:   "Capture group '(b)' should be converted to a named or non-capturing group.",
+					Line:      1,
+					Column:    1,
+					EndColumn: 24,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addGroupName", Output: `/(?<\u0061>a)\k<a>(?<temp1>b)/u;`},
+						{MessageId: "addNonCapture", Output: `/(?<\u0061>a)\k<a>(?:b)/u;`},
+					},
 				}},
 			},
 

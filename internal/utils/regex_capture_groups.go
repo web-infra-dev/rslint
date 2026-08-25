@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"strconv"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -29,6 +31,25 @@ type RegexCapturingGroup struct {
 // them: unknown `\p{...}` property names, a group name repeated within one
 // alternative, and v-mode's rule that a class `-` outside a range be escaped.
 func RegexCapturingGroups(pattern string, flags RegexFlags) (groups []RegexCapturingGroup, ok bool) {
+	if flags.Unicode && flags.UnicodeSets {
+		return nil, false
+	}
+	classesValid := true
+	if !IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
+		elements, _, parsed := ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
+		if !parsed {
+			return
+		}
+		for _, element := range elements {
+			if element.Kind == RegexCharRange && element.Value > element.Max {
+				classesValid = false
+				return
+			}
+		}
+	}) || !classesValid {
+		return nil, false
+	}
+
 	pos := 0
 	if !scanRegexAlternatives(pattern, flags, &pos, &groups, false) {
 		return nil, false
@@ -89,12 +110,84 @@ func unicodeBackrefsResolve(pattern string, flags RegexFlags, groups []RegexCapt
 }
 
 func hasGroupNamed(groups []RegexCapturingGroup, name string) bool {
+	want, ok := normalizeRegexGroupName(name)
+	if !ok {
+		return false
+	}
 	for _, group := range groups {
-		if group.Name == name {
+		got, ok := normalizeRegexGroupName(group.Name)
+		if ok && got == want {
 			return true
 		}
 	}
 	return false
+}
+
+// normalizeRegexGroupName decodes the Unicode escapes allowed in a capture
+// name so a backreference can be compared by IdentifierName value rather than
+// by its authored spelling.
+func normalizeRegexGroupName(name string) (string, bool) {
+	var result strings.Builder
+	for i := 0; i < len(name); {
+		if name[i] != '\\' {
+			r, width := utf8.DecodeRuneInString(name[i:])
+			if r == utf8.RuneError && width == 1 {
+				return "", false
+			}
+			result.WriteRune(r)
+			i += width
+			continue
+		}
+
+		value, width, ok := decodeRegexNameEscape(name, i)
+		if !ok {
+			return "", false
+		}
+		if value >= 0xD800 && value <= 0xDBFF {
+			next, nextWidth, ok := decodeRegexNameEscape(name, i+width)
+			if !ok || next < 0xDC00 || next > 0xDFFF {
+				return "", false
+			}
+			result.WriteRune(utf16.DecodeRune(rune(value), rune(next)))
+			width += nextWidth
+		} else {
+			if value >= 0xDC00 && value <= 0xDFFF {
+				return "", false
+			}
+			result.WriteRune(rune(value))
+		}
+		i += width
+	}
+	return result.String(), true
+}
+
+func decodeRegexNameEscape(name string, start int) (uint32, int, bool) {
+	if start+2 >= len(name) || name[start] != '\\' || name[start+1] != 'u' {
+		return 0, 0, false
+	}
+	if name[start+2] == '{' {
+		closeRel := strings.IndexByte(name[start+3:], '}')
+		if closeRel < 1 {
+			return 0, 0, false
+		}
+		digits := name[start+3 : start+3+closeRel]
+		if len(digits) > 6 || !allHexStr(digits) {
+			return 0, 0, false
+		}
+		value, err := strconv.ParseUint(digits, 16, 32)
+		if err != nil || value > utf8.MaxRune {
+			return 0, 0, false
+		}
+		return uint32(value), closeRel + 4, true
+	}
+	if start+6 > len(name) || !allHexStr(name[start+2:start+6]) {
+		return 0, 0, false
+	}
+	value, err := strconv.ParseUint(name[start+2:start+6], 16, 16)
+	if err != nil {
+		return 0, 0, false
+	}
+	return uint32(value), 6, true
 }
 
 func scanRegexAlternatives(pattern string, flags RegexFlags, pos *int, groups *[]RegexCapturingGroup, expectClose bool) bool {
@@ -162,7 +255,9 @@ func scanRegexTerm(pattern string, flags RegexFlags, pos *int, groups *[]RegexCa
 		// which is a syntax error in every mode. A `{` that doesn't spell a
 		// quantifier is a syntax error under u/v and a literal outside it.
 		probe := *pos
-		skipRegexQuantifier(pattern, &probe)
+		if !skipRegexQuantifier(pattern, &probe) {
+			return false
+		}
 		if probe != *pos || flags.UV() {
 			return false
 		}
@@ -181,11 +276,12 @@ func scanRegexTerm(pattern string, flags RegexFlags, pos *int, groups *[]RegexCa
 		*pos += w
 	}
 	if quantifiable {
-		skipRegexQuantifier(pattern, pos)
-		return true
+		return skipRegexQuantifier(pattern, pos)
 	}
 	probe := *pos
-	skipRegexQuantifier(pattern, &probe)
+	if !skipRegexQuantifier(pattern, &probe) {
+		return false
+	}
 	return probe == *pos
 }
 
@@ -275,9 +371,9 @@ func skipUnicodePatternEscape(pattern string, i int) (int, bool) {
 	return 0, false
 }
 
-func skipRegexQuantifier(pattern string, pos *int) {
+func skipRegexQuantifier(pattern string, pos *int) bool {
 	if *pos >= len(pattern) {
-		return
+		return true
 	}
 	switch pattern[*pos] {
 	case '?', '*', '+':
@@ -290,26 +386,51 @@ func skipRegexQuantifier(pattern string, pos *int) {
 			i++
 		}
 		if i == nStart {
-			return
+			return true
 		}
+		minimum := pattern[nStart:i]
+		maximum := ""
 		if i < len(pattern) && pattern[i] == ',' {
 			i++
+			maximumStart := i
 			for i < len(pattern) && isRegexDigit(pattern[i]) {
 				i++
 			}
+			if maximumStart != i {
+				maximum = pattern[maximumStart:i]
+			}
 		}
 		if i < len(pattern) && pattern[i] == '}' {
+			if maximum != "" && decimalLess(maximum, minimum) {
+				return false
+			}
 			*pos = i + 1
 		} else {
 			*pos = save
-			return
+			return true
 		}
 	default:
-		return
+		return true
 	}
 	if *pos < len(pattern) && pattern[*pos] == '?' {
 		*pos++
 	}
+	return true
+}
+
+func decimalLess(left, right string) bool {
+	left = strings.TrimLeft(left, "0")
+	right = strings.TrimLeft(right, "0")
+	if left == "" {
+		left = "0"
+	}
+	if right == "" {
+		right = "0"
+	}
+	if len(left) != len(right) {
+		return len(left) < len(right)
+	}
+	return left < right
 }
 
 // scanRegexGroup consumes the `(...)` starting at pattern[*pos], recording it

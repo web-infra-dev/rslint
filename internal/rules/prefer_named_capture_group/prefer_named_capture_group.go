@@ -26,7 +26,7 @@ var PreferNamedCaptureGroupRule = rule.Rule{
 		}
 
 		checkConstructor := func(node *ast.Node, callee *ast.Node, args *ast.NodeList) {
-			if !isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(callee)) {
+			if !isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(callee), getEval()) {
 				return
 			}
 			if args == nil || len(args.Nodes) == 0 {
@@ -163,12 +163,12 @@ func buildSuggestions(ctx rule.RuleContext, patternSourceNode *ast.Node, pattern
 	}
 }
 
-// isGlobalRegExpCallee reports whether callee is a reference to the global
-// `RegExp` constructor: the bare identifier, or a property/element access on
-// one of the global-object aliases ESLint's ReferenceTracker recognizes
-// (`globalThis`, `window`, `self`, `global`). Each name must resolve to the
-// real global — not a local declaration or an `off`-disabled global.
-func isGlobalRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
+// isGlobalRegExpCallee reports whether callee resolves to the global `RegExp`
+// constructor through the expression forms ESLint's ReferenceTracker follows:
+// the bare identifier, a property/element access on a global-object alias, or
+// the final value of a comma expression. Each name must resolve to the real
+// global — not a local declaration or an `off`-disabled global.
+func isGlobalRegExpCallee(ctx rule.RuleContext, callee *ast.Node, eval *utils.StaticStringEvaluator) bool {
 	if callee == nil {
 		return false
 	}
@@ -193,11 +193,17 @@ func isGlobalRegExpCallee(ctx rule.RuleContext, callee *ast.Node) bool {
 		if access == nil || access.ArgumentExpression == nil {
 			return false
 		}
-		value, ok := utils.GetStaticExpressionValue(utils.SkipAssertionsAndParens(access.ArgumentExpression))
+		value, ok := eval.EvalToString(utils.SkipAssertionsAndParens(access.ArgumentExpression))
 		if !ok || value != "RegExp" {
 			return false
 		}
 		return isKnownGlobalObject(ctx, access.Expression)
+	case ast.KindBinaryExpression:
+		binary := callee.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindCommaToken {
+			return false
+		}
+		return isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(binary.Right), eval)
 	}
 
 	return false

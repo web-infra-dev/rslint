@@ -13,6 +13,7 @@ import (
 func TestRegexCapturingGroups_Rejects(t *testing.T) {
 	u := RegexFlags{Unicode: true}
 	v := RegexFlags{UnicodeSets: true}
+	uv := RegexFlags{Unicode: true, UnicodeSets: true}
 
 	cases := []struct {
 		pattern string
@@ -34,6 +35,7 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 		{`\p(a)`, u},
 		{`\k(a)`, u},
 		{`\01(a)`, u},
+		{`(a)`, uv},
 
 		// Backreferences have to resolve under u/v.
 		{`\8(a)`, u},
@@ -63,7 +65,12 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 		{`{2,}(a)`, RegexFlags{}},
 		{`{1,3}?(a)`, RegexFlags{}},
 		{`(a){1}{2}`, RegexFlags{}},
+		{`(a){2,1}`, RegexFlags{}},
 		{`*(a)`, RegexFlags{}},
+
+		// Character-class ranges must be ordered by their character value.
+		{`(a)[z-a]`, RegexFlags{}},
+		{`(a)[\u007a-a]`, u},
 
 		// Assertions can't be quantified. Annex B exempts lookahead; u/v doesn't.
 		{`^*(a)`, RegexFlags{}},
@@ -134,6 +141,14 @@ func TestRegexCapturingGroups_Accepts(t *testing.T) {
 		{`(a)\1`, u, []RegexCapturingGroup{{Start: 0, End: 3}}},
 		{`(?<n>a)\k<n>`, u, []RegexCapturingGroup{{Start: 0, End: 7, Name: "n"}}},
 		{`(?<n>a)\k<n>`, v, []RegexCapturingGroup{{Start: 0, End: 7, Name: "n"}}},
+		{`(?<\u0061>a)\k<a>(b)`, u, []RegexCapturingGroup{
+			{Start: 0, End: 12, Name: `\u0061`},
+			{Start: 17, End: 20},
+		}},
+		{`(?<\uD835\uDC9C>a)\k<𝒜>(b)`, u, []RegexCapturingGroup{
+			{Start: 0, End: 18, Name: `\uD835\uDC9C`},
+			{Start: 26, End: 29},
+		}},
 
 		// The escapes u/v does spell out.
 		{`\p{L}(a)`, u, []RegexCapturingGroup{{Start: 5, End: 8}}},
@@ -155,6 +170,7 @@ func TestRegexCapturingGroups_Accepts(t *testing.T) {
 		{`](a)`, RegexFlags{}, []RegexCapturingGroup{{Start: 1, End: 4}}},
 		{`}(a)`, RegexFlags{}, []RegexCapturingGroup{{Start: 1, End: 4}}},
 		{`a{(b)`, RegexFlags{}, []RegexCapturingGroup{{Start: 2, End: 5}}},
+		{`a{2,1x}(b)`, RegexFlags{}, []RegexCapturingGroup{{Start: 7, End: 10}}},
 
 		// Group names, including the non-ASCII and `\u`-escaped forms. Name
 		// carries the raw source text, so an escape stays unresolved in it.
