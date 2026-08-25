@@ -24,10 +24,25 @@ expect.soft(value).toBeTypeOf('object');
 expect(typeof value === 'string').toBe(true);
 ```
 
+## Recognized assertions
+
 The rule reports only a matcher that is actually called with exactly one
 argument. A broken chain such as `expect(typeof value).toBe`, a spread argument
 such as `expect(typeof value).toBe(...types)`, and a Chai property assertion
-such as `expect(typeof value).to.be.ok` are all left alone.
+such as `expect(typeof value).to.be.ok` are all left alone. So is a matcher
+named by a computed key, `expect(typeof value)[matcherName]('string')`, because
+which assertion runs is only known at runtime.
+
+Every expect source is covered: globals, `@rstest/core` named imports and
+renamed imports, `require('@rstest/core')` destructuring, namespace imports,
+whole-module `require`, `import.meta.rstest`, `@rstest/playwright`, and the
+`expect` a test callback receives through its context (`({ expect })` and
+`ctx.expect`). An `expect` from another assertion library, and a local variable
+that shadows `expect`, are not reported.
+
+`expect.poll(fn)` and `expect.element(locator)` are excluded: the first takes a
+callback and the second a locator, so neither carries the value being type
+checked.
 
 ## Fix
 
@@ -46,45 +61,3 @@ expect.soft(value, 'should be a string')['toBeTypeOf']('string');
 
 A comment written between `typeof` and its operand sits inside the removed span
 and is removed with it. Every comment outside those two spans is preserved.
-
-## Rstest specifics
-
-The assertion is recognised through Rstest's shared expect parser, so every
-expect source is covered: globals, `@rstest/core` named imports and renamed
-imports, `require('@rstest/core')` destructuring, namespace imports, whole-module
-`require`, `import.meta.rstest`, `@rstest/playwright`, and the `expect` a test
-callback receives through its context (`({ expect })` and `ctx.expect`). An
-`expect` imported from Vitest, Jest, Playwright or Chai, and a local variable
-that shadows `expect`, are not reported.
-
-`expect.poll(fn)` and `expect.element(locator)` are excluded: the first takes a
-callback and the second a locator, so neither carries the value being type
-checked.
-
-## Differences from ESLint
-
-`@vitest/eslint-plugin` rewrites the whole assertion to
-`expect(<value>)<modifiers>.toBeTypeOf(<type>)`. On Rstest that rewrite loses
-information, so this port edits only the `typeof` operator and the matcher name.
-Three shapes come out differently:
-
-- `expect(actual, message)` keeps its message. Rstest's `expect` takes an
-  optional second argument, which upstream's whole-call rewrite drops.
-- `expect.soft(typeof value).toBe('string')` stays soft. Upstream rewrites it to
-  a plain `expect(...)`, which turns a soft assertion into one that aborts the
-  test.
-- The expect root keeps its spelling. `import.meta.rstest.expect(...)`, a
-  renamed import, and a test context's `expect` are all rewritten to a bare
-  `expect` by upstream, which may not even be bound in that scope.
-
-The port also narrows one shape:
-
-- A computed identifier key, `expect(typeof value)[matcherName]('string')`, is
-  not reported. The matcher is chosen at runtime, so `toBe` there is the name of
-  a variable rather than of a matcher, and neither the report nor a rename of
-  that variable would be correct.
-
-## Original Documentation
-
-- [@vitest/eslint-plugin: prefer-expect-type-of](https://github.com/vitest-dev/eslint-plugin-vitest/blob/v1.6.27/docs/rules/prefer-expect-type-of.md)
-- [Source code](https://github.com/vitest-dev/eslint-plugin-vitest/blob/v1.6.27/src/rules/prefer-expect-type-of.ts)
