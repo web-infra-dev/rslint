@@ -87,6 +87,34 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 			{Code: `({} = foo);`, Options: []any{map[string]any{"object": "foo"}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Review regression: object patterns nested under an array rest
+			// target remain ESTree ObjectPattern nodes in assignment, for-of, and
+			// for-in destructuring forms. ----
+			{
+				Code:    `([...{bad}] = xs);`,
+				Options: []any{map[string]any{"property": "bad"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bad' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `for ([...{bad}] of xs) {}`,
+				Options: []any{map[string]any{"property": "bad"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bad' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `for ([...{bad}] in xs) {}`,
+				Options: []any{map[string]any{"property": "bad"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bad' is restricted from being used.",
+				}},
+			},
+
 			// ---- Review regression: assignment-form object patterns used as a
 			// direct for-in initializer are ESTree ObjectPattern nodes. ----
 			{
@@ -257,6 +285,22 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "restrictedProperty",
 					Message:   "'1152921504606847500' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `foo[0b10100010000111101000011111100111101111100110100011110110000010100]`,
+				Options: []any{map[string]any{"property": "23363847825694777000"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'23363847825694777000' is restricted from being used.",
+				}},
+			},
+			{
+				Code:    `const {[0b10100010000111101000011111100111101111100110100011110110000010100]: value} = foo;`,
+				Options: []any{map[string]any{"property": "23363847825694777000"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'23363847825694777000' is restricted from being used.",
 				}},
 			},
 			{

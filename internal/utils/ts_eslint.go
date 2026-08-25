@@ -1733,9 +1733,11 @@ func numericLiteralPropertyName(node *ast.Node) string {
 	return NormalizeNumericLiteral(literal.Text)
 }
 
-// radixLiteralValue accumulates an explicit binary, octal, or hexadecimal
-// literal into a float64 one source digit at a time. Numeric separators do not
-// contribute to the value.
+// radixLiteralValue mirrors Acorn's readInt for an explicit binary, octal, or
+// hexadecimal literal. The multiplication and addition stay in separate
+// statements because JavaScript rounds each Number operation independently;
+// combining them permits a fused multiply-add with a different result.
+// Numeric separators do not contribute to the value.
 func radixLiteralValue(raw string) (float64, bool) {
 	if len(raw) < 3 || raw[0] != '0' {
 		return 0, false
@@ -1768,7 +1770,8 @@ func radixLiteralValue(raw string) (float64, bool) {
 		if digit < 0 || digit >= radix {
 			return 0, false
 		}
-		value = value*float64(radix) + float64(digit)
+		value *= float64(radix)
+		value += float64(digit)
 		digits++
 		previousSeparator = false
 	}

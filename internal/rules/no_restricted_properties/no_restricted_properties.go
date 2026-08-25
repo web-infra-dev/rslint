@@ -324,10 +324,19 @@ func isObjectLiteralDestructuringPattern(node *ast.Node) bool {
 	for current.Parent != nil {
 		parent := current.Parent
 		switch parent.Kind {
-		case ast.KindForInStatement:
+		case ast.KindForInStatement, ast.KindForOfStatement:
 			statement := parent.AsForInOrOfStatement()
 			return statement != nil && statement.Initializer == current
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			return binary != nil && binary.Left == current && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken
 		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+			current = parent
+		case ast.KindSpreadElement:
+			spread := parent.AsSpreadElement()
+			if spread == nil || spread.Expression != current || parent.Parent == nil || parent.Parent.Kind != ast.KindArrayLiteralExpression {
+				return false
+			}
 			current = parent
 		case ast.KindPropertyAssignment:
 			property := parent.AsPropertyAssignment()
