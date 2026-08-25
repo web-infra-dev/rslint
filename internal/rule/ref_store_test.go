@@ -23,7 +23,7 @@ func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind,
 		Path:     tspath.Path(fileName),
 	}, source, scriptKind)
 	binder.BindSourceFile(sourceFile)
-	_, refsInit := ResolveLanguageDefaults(fileName)
+	_, refsInit, _ := ResolveLanguageDefaults(fileName, LanguageOptions{})
 	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit)
 }
 
@@ -49,7 +49,7 @@ func newCheckedRefStore(t *testing.T, source string) (*ast.SourceFile, *RefStore
 		t.Fatalf("GetSourceFile(%q) = nil", filePath)
 	}
 	tc, done := program.GetTypeChecker(t.Context())
-	_, refsInit := ResolveLanguageDefaults(sourceFile.FileName())
+	_, refsInit, _ := ResolveLanguageDefaults(sourceFile.FileName(), LanguageOptions{})
 	return sourceFile, NewRefStore(sourceFile, program.Options(), tc, refsInit), done
 }
 

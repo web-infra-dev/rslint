@@ -258,7 +258,7 @@ exports[`no-unused-vars > invalid 9`] = `
   "code": "const foo = 1;",
   "diagnostics": [
     {
-      "message": "'foo' is assigned a value but never used.",
+      "message": "'foo' is assigned a value but never used. Allowed unused vars must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -286,7 +286,7 @@ const _foo = 1; console.log(_foo);
       ",
   "diagnostics": [
     {
-      "message": "'_foo' is marked as ignored but is used.",
+      "message": "'_foo' is marked as ignored but is used. Used vars must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -315,7 +315,7 @@ foo(1);
       ",
   "diagnostics": [
     {
-      "message": "'_x' is marked as ignored but is used.",
+      "message": "'_x' is marked as ignored but is used. Used args must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -341,7 +341,7 @@ exports[`no-unused-vars > invalid 12`] = `
   "code": "try { throw 1; } catch (_e) { console.log(_e); }",
   "diagnostics": [
     {
-      "message": "'_e' is marked as ignored but is used.",
+      "message": "'_e' is marked as ignored but is used. Used caught errors must not match /^_/u.",
       "messageId": "usedIgnoredVar",
       "range": {
         "end": {
@@ -422,7 +422,7 @@ exports[`no-unused-vars > invalid 15`] = `
   "code": "export function foo(bar: number) {}",
   "diagnostics": [
     {
-      "message": "'bar' is defined but never used.",
+      "message": "'bar' is defined but never used. Allowed unused args must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -448,7 +448,7 @@ exports[`no-unused-vars > invalid 16`] = `
   "code": "try {} catch (err) {}",
   "diagnostics": [
     {
-      "message": "'err' is defined but never used.",
+      "message": "'err' is defined but never used. Allowed unused caught errors must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -1140,7 +1140,7 @@ foo({ a: 1, b: "x" });
       ",
   "diagnostics": [
     {
-      "message": "'b' is assigned a value but never used.",
+      "message": "'b' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -1166,7 +1166,7 @@ exports[`no-unused-vars > invalid 40`] = `
   "code": "const [foo] = [1];",
   "diagnostics": [
     {
-      "message": "'foo' is assigned a value but never used.",
+      "message": "'foo' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {

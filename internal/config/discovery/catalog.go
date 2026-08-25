@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 
 // AutoJSConfigFileNames is the automatic-discovery priority. Explicit config
@@ -73,12 +74,6 @@ type ExplicitConfigRequest struct {
 	SingleThreaded    bool
 }
 
-type configSource struct {
-	CandidateID   string
-	CandidatePath string
-	ExplicitOnly  bool
-}
-
 type ConfigFailure struct {
 	Path      string
 	Directory string
@@ -105,7 +100,7 @@ type ConfigCatalog struct {
 	Configs            map[string]rslintconfig.RslintConfig
 	EffectiveConfigIDs []string
 	EslintPlugins      []rslintconfig.EslintPluginEntry
-	Scopes             map[string]rslintconfig.LintDiscoveryScope
+	Scopes             map[string]target.OwnerScope
 	Failures           []ConfigFailure
 	Stats              ConfigDiscoveryStats
 	// Explicit reports that the catalog came from one explicitly selected
@@ -208,21 +203,15 @@ func buildConfigCatalog(
 	}
 	transactionID := nextConfigDiscoveryTransactionID()
 
-	builder := configCatalogBuilder{
-		ctx:                 ctx,
-		fs:                  fsys,
-		loader:              loader,
-		request:             request,
-		explicitConfigPath:  explicitConfigPath,
-		transactionID:       transactionID,
-		loadStates:          make(map[string]*configLoadState),
-		loadStateByIdentity: make(map[tspath.Path]*configLoadState),
-		configs:             make(map[string]rslintconfig.RslintConfig),
-		sources:             make(map[string]configSource),
-		scopes:              make(map[string]rslintconfig.LintDiscoveryScope),
-		failureByPath:       make(map[string]ConfigFailure),
-	}
-	return builder.build()
+	coordinator := newDiscoveryCoordinator(
+		ctx,
+		fsys,
+		loader,
+		request,
+		explicitConfigPath,
+		transactionID,
+	)
+	return coordinator.build()
 }
 
 func normalizeDiscoveryPath(path string, cwd string) string {

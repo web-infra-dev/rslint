@@ -5,7 +5,7 @@ exports[`no-this-alias > invalid 1`] = `
   "code": "const self = this;",
   "diagnostics": [
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
@@ -31,7 +31,7 @@ exports[`no-this-alias > invalid 2`] = `
   "code": "const self = this;",
   "diagnostics": [
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
@@ -60,7 +60,7 @@ that = this;
       ",
   "diagnostics": [
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
@@ -86,7 +86,7 @@ exports[`no-this-alias > invalid 4`] = `
   "code": "const { props, state } = this;",
   "diagnostics": [
     {
-      "message": "Destructuring \`this\` is not allowed.",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
       "messageId": "thisDestructure",
       "range": {
         "end": {
@@ -121,7 +121,7 @@ const testLambda = () => {
       ",
   "diagnostics": [
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
@@ -136,7 +136,7 @@ const testLambda = () => {
       "ruleName": "@typescript-eslint/no-this-alias",
     },
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
@@ -151,7 +151,7 @@ const testLambda = () => {
       "ruleName": "@typescript-eslint/no-this-alias",
     },
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
@@ -196,7 +196,7 @@ class TestClass {
       ",
   "diagnostics": [
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
@@ -211,11 +211,11 @@ class TestClass {
       "ruleName": "@typescript-eslint/no-this-alias",
     },
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
-          "column": 17,
+          "column": 23,
           "line": 5,
         },
         "start": {
@@ -226,7 +226,7 @@ class TestClass {
       "ruleName": "@typescript-eslint/no-this-alias",
     },
     {
-      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "message": "Unexpected aliasing of 'this' to local variable.",
       "messageId": "thisAssignment",
       "range": {
         "end": {
@@ -241,7 +241,7 @@ class TestClass {
       "ruleName": "@typescript-eslint/no-this-alias",
     },
     {
-      "message": "Destructuring \`this\` is not allowed.",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
       "messageId": "thisDestructure",
       "range": {
         "end": {
@@ -256,7 +256,7 @@ class TestClass {
       "ruleName": "@typescript-eslint/no-this-alias",
     },
     {
-      "message": "Destructuring \`this\` is not allowed.",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
       "messageId": "thisDestructure",
       "range": {
         "end": {
@@ -271,7 +271,7 @@ class TestClass {
       "ruleName": "@typescript-eslint/no-this-alias",
     },
     {
-      "message": "Destructuring \`this\` is not allowed.",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
       "messageId": "thisDestructure",
       "range": {
         "end": {
@@ -286,7 +286,7 @@ class TestClass {
       "ruleName": "@typescript-eslint/no-this-alias",
     },
     {
-      "message": "Destructuring \`this\` is not allowed.",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
       "messageId": "thisDestructure",
       "range": {
         "end": {

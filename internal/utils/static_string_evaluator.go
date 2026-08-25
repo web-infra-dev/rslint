@@ -18,6 +18,7 @@ type StaticStringEvaluator struct {
 	sourceFile             *ast.SourceFile
 	referenceResolver      StaticReferenceResolver
 	evaluator              evaluator.Evaluator
+	resolveIdentifiers     bool
 	resolving              map[*ast.Symbol]bool
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
@@ -44,12 +45,22 @@ func NewStaticStringEvaluatorWithReferenceResolver(
 	referenceResolver StaticReferenceResolver,
 ) *StaticStringEvaluator {
 	staticEvaluator := &StaticStringEvaluator{
-		typeChecker:       typeChecker,
-		sourceFile:        sourceFile,
-		referenceResolver: referenceResolver,
-		resolving:         map[*ast.Symbol]bool{},
+		typeChecker:        typeChecker,
+		sourceFile:         sourceFile,
+		referenceResolver:  referenceResolver,
+		resolveIdentifiers: true,
+		resolving:          map[*ast.Symbol]bool{},
 	}
 	staticEvaluator.evaluator = evaluator.NewEvaluator(staticEvaluator.evaluateEntity, ast.OEKAssertions)
+	return staticEvaluator
+}
+
+// NewStaticStringEvaluatorWithoutScope mirrors eslint-utils getStaticValue
+// when no initial scope is supplied: literal expressions can still be folded,
+// but identifiers (including built-in globals) cannot be resolved.
+func NewStaticStringEvaluatorWithoutScope() *StaticStringEvaluator {
+	staticEvaluator := NewStaticStringEvaluator(nil)
+	staticEvaluator.resolveIdentifiers = false
 	return staticEvaluator
 }
 
@@ -133,6 +144,20 @@ func (staticEvaluator *StaticStringEvaluator) Eval(node *ast.Node) (string, bool
 	return staticValueAsString(result.value)
 }
 
+// EvalToString returns JavaScript's String conversion of a statically known
+// value. This matches eslint-utils getStringIfConstant after getStaticValue has
+// evaluated an expression.
+func (staticEvaluator *StaticStringEvaluator) EvalToString(node *ast.Node) (string, bool) {
+	if staticEvaluator == nil || node == nil {
+		return "", false
+	}
+	result := staticEvaluator.evalValue(node)
+	if !result.ok {
+		return "", false
+	}
+	return staticValueToString(result.value)
+}
+
 // EvalValue returns the static value of node if it can be determined, regardless
 // of its type. It allows rules to check if a value is statically known to be a
 // non-string (like a boolean or number).
@@ -148,6 +173,23 @@ func (staticEvaluator *StaticStringEvaluator) EvalValue(node *ast.Node) (any, bo
 		return value, true
 	}
 	return result.value, true
+}
+
+// EvalArrayValue classifies a statically known value by whether it is an
+// array. The second result is false when the expression cannot be folded. It
+// keeps the evaluator's private aggregate representation encapsulated while
+// allowing callers that mirror eslint-utils' getStaticValue + Array.isArray
+// pattern to distinguish arrays from other known values.
+func (staticEvaluator *StaticStringEvaluator) EvalArrayValue(node *ast.Node) (isArray bool, known bool) {
+	if staticEvaluator == nil || node == nil {
+		return false, false
+	}
+	result := staticEvaluator.evalValue(node)
+	if !result.ok {
+		return false, false
+	}
+	_, isArray = result.value.(*staticArrayValue)
+	return isArray, true
 }
 
 // EvalStringValue returns a string without boxing it into an interface, or
@@ -201,8 +243,14 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 	case ast.KindNullKeyword:
 		return staticEvalResult{value: staticNullValue{}, ok: true}
 	case ast.KindUndefinedKeyword:
+		if !staticEvaluator.resolveIdentifiers {
+			return staticEvalResult{}
+		}
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	case ast.KindIdentifier:
+		if !staticEvaluator.resolveIdentifiers {
+			return staticEvalResult{}
+		}
 		identifier := node.AsIdentifier()
 		if identifier != nil && identifier.Text == "undefined" && !IsShadowed(node, "undefined") {
 			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
@@ -250,6 +298,9 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalIdentifier(node *ast.Node) staticEvalResult {
+	if !staticEvaluator.resolveIdentifiers {
+		return staticEvalResult{}
+	}
 	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
 	if !ok || staticEvaluator.resolving[symbol] {
 		return staticEvalResult{}
@@ -805,6 +856,9 @@ func staticArrayIndex(key string) (int, bool) {
 // evalObjectPassThroughCall folds `Object.freeze(x)` and its siblings to the
 // value of x.
 func (staticEvaluator *StaticStringEvaluator) evalObjectPassThroughCall(node *ast.Node) staticEvalResult {
+	if !staticEvaluator.resolveIdentifiers {
+		return staticEvalResult{}
+	}
 	argument, ok := staticEvaluator.objectPassThroughArgument(node)
 	if !ok {
 		return staticEvalResult{}
@@ -997,6 +1051,9 @@ func (staticEvaluator *StaticStringEvaluator) isStringRawTag(tag *ast.Node) bool
 }
 
 func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
+	if !staticEvaluator.resolveIdentifiers {
+		return false
+	}
 	node = SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
