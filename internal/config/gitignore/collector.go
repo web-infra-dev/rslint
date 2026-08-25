@@ -28,6 +28,13 @@ type Pattern struct {
 	Negated       bool
 	DirectoryOnly bool
 	ContentsOnly  bool
+	// MatchDirectory is the config owner's matching-space projection of the Git
+	// root in which Glob and NodeGlob are interpreted. PhysicalMatchDirectory
+	// and LexicalMatchDirectory retain the Git root's own filesystem identities
+	// when they differ from that projection.
+	MatchDirectory         string
+	PhysicalMatchDirectory string
+	LexicalMatchDirectory  string
 }
 
 func normalizeGlobPath(path string) string {
@@ -84,6 +91,30 @@ func CollectPatternsWithBoundaries(configDir string, fsys vfs.FS, targetFiles []
 	return readGitignoreAsPatternsForFilesWithBoundaries(configDir, fsys, targetFiles, stopDirs)
 }
 
+// CollectPatternsForTargets collects the Git sources that can affect one
+// invocation containing recursive directory targets. Exact-file-only calls
+// keep using CollectPatterns so their established chain behavior remains
+// unchanged. When directories are present, collection visits only target
+// ancestor chains and target directory subtrees.
+func CollectPatternsForTargets(
+	configDir string,
+	fsys vfs.FS,
+	targetFiles []string,
+	targetDirectories []string,
+	isDirectoryBlocked func(string) bool,
+) []Pattern {
+	if len(targetDirectories) == 0 {
+		return CollectPatterns(configDir, fsys, targetFiles, isDirectoryBlocked)
+	}
+	return readGitignoreAsPatternsForTargets(
+		configDir,
+		fsys,
+		targetFiles,
+		targetDirectories,
+		isDirectoryBlocked,
+	)
+}
+
 func patternGlobs(patterns []Pattern) []string {
 	if len(patterns) == 0 {
 		return nil
@@ -124,12 +155,127 @@ func readGitignoreAsPatternsWithBoundaries(configDir string, fsys vfs.FS, isDire
 	boundaries := normalizeCollectionBoundaries(normalizedRoot, stopDirs, fsys.UseCaseSensitiveFileNames())
 	var allPatterns []Pattern
 
-	collectGitignorePatterns(normalizedRoot, "", fsys, &allPatterns, isDirectoryBlocked, nil, boundaries)
+	collectGitignorePatterns(normalizedRoot, "", fsys, &allPatterns, isDirectoryBlocked, nil, boundaries, nil)
 
 	if len(allPatterns) == 0 {
 		return nil
 	}
 	return allPatterns
+}
+
+type collectionTargetKind uint8
+
+const (
+	collectionTargetLeaf collectionTargetKind = iota + 1
+	collectionTargetBranch
+	collectionTargetRecursive
+)
+
+type collectionTargets map[tspath.Path]collectionTargetKind
+
+func readGitignoreAsPatternsForTargets(
+	configDir string,
+	fsys vfs.FS,
+	files []string,
+	directories []string,
+	isDirectoryBlocked func(string) bool,
+) []Pattern {
+	if fsys == nil {
+		return nil
+	}
+
+	normalizedRoot := normalizeGlobPath(configDir)
+	targets := buildCollectionTargets(
+		normalizedRoot,
+		files,
+		directories,
+		fsys.UseCaseSensitiveFileNames(),
+	)
+	if len(targets) == 0 {
+		return nil
+	}
+
+	var allPatterns []Pattern
+	collectGitignorePatterns(
+		normalizedRoot,
+		"",
+		fsys,
+		&allPatterns,
+		isDirectoryBlocked,
+		nil,
+		nil,
+		targets,
+	)
+	if len(allPatterns) == 0 {
+		return nil
+	}
+	return allPatterns
+}
+
+func buildCollectionTargets(
+	configDir string,
+	files []string,
+	directories []string,
+	useCaseSensitive bool,
+) collectionTargets {
+	targets := make(collectionTargets)
+	for _, file := range files {
+		addCollectionTarget(
+			targets,
+			configDir,
+			dirOfPath(normalizeGlobPath(file)),
+			false,
+			useCaseSensitive,
+		)
+	}
+	for _, directory := range directories {
+		addCollectionTarget(
+			targets,
+			configDir,
+			normalizeGlobPath(directory),
+			true,
+			useCaseSensitive,
+		)
+	}
+	return targets
+}
+
+func addCollectionTarget(
+	targets collectionTargets,
+	configDir string,
+	targetDirectory string,
+	recursive bool,
+	useCaseSensitive bool,
+) {
+	relative, within := relativeDir(configDir, targetDirectory, useCaseSensitive)
+	if !within {
+		if !recursive {
+			return
+		}
+		if _, containsRoot := relativeDir(targetDirectory, configDir, useCaseSensitive); !containsRoot {
+			return
+		}
+		relative = ""
+	}
+
+	components := splitPathComponents(relative)
+	current := configDir
+	for index := 0; index <= len(components); index++ {
+		kind := collectionTargetBranch
+		if index == len(components) {
+			kind = collectionTargetLeaf
+			if recursive {
+				kind = collectionTargetRecursive
+			}
+		}
+		identity := tspath.ToPath(current, "", useCaseSensitive)
+		if targets[identity] < kind {
+			targets[identity] = kind
+		}
+		if index < len(components) {
+			current = tspath.CombinePaths(current, components[index])
+		}
+	}
 }
 
 // readGitignoreAsPatternsForFilesWithBoundaries reads only .gitignore files on
@@ -304,6 +450,12 @@ func NewCursor(ownerRoot string, useCaseSensitive bool) Cursor {
 // current directory's .gitignore.
 func (cursor Cursor) SourceReachable() bool {
 	return cursor.sourceReachable
+}
+
+// RootDirectory returns the path space in which AppendSourcePatterns projects
+// its globs. It is immutable for the cursor's lifetime.
+func (cursor Cursor) RootDirectory() string {
+	return cursor.rootDir
 }
 
 // BlockSourceTraversal preserves already-observed matching rules while making
@@ -570,8 +722,8 @@ func filesystemPathDepth(path string) int {
 // isDirectoryBlocked provides directory-level pruning from the caller's
 // config policy. If it returns true, files below that directory cannot be
 // linted, so nested .gitignore sources there are irrelevant.
-func collectGitignorePatterns(absDir string, relDir string, fsys vfs.FS, result *[]Pattern, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string) {
-	collectGitignorePatternsRecursive(absDir, relDir, fsys, result, isDirectoryBlocked, pruneRules, boundaries, &gitignoreWalkState{
+func collectGitignorePatterns(absDir string, relDir string, fsys vfs.FS, result *[]Pattern, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string, targets collectionTargets) {
+	collectGitignorePatternsRecursive(absDir, relDir, fsys, result, isDirectoryBlocked, pruneRules, boundaries, targets, &gitignoreWalkState{
 		resolvedPaths: make(map[string]string),
 		visited:       make(map[string]struct{}),
 	})
@@ -591,7 +743,19 @@ func (s *gitignoreWalkState) realpath(path string, fsys vfs.FS) string {
 	return realpath
 }
 
-func collectGitignorePatternsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]Pattern, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string, state *gitignoreWalkState) {
+func collectGitignorePatternsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]Pattern, isDirectoryBlocked func(string) bool, pruneRules []gitignorePruneRule, boundaries []string, targets collectionTargets, state *gitignoreWalkState) {
+	targetKind := collectionTargetBranch
+	if targets != nil {
+		var relevant bool
+		targetKind, relevant = targets[tspath.ToPath(absDir, "", fsys.UseCaseSensitiveFileNames())]
+		if !relevant {
+			return
+		}
+		if targetKind == collectionTargetRecursive {
+			targets = nil
+		}
+	}
+
 	gitignorePath := tspath.CombinePaths(absDir, ".gitignore")
 	if content, ok := fsys.ReadFile(gitignorePath); ok {
 		localPatterns := convertGitignoreToPatterns(content, relDir)
@@ -599,6 +763,9 @@ func collectGitignorePatternsRecursive(absDir string, relDir string, fsys vfs.FS
 		if len(localPatterns) > 0 {
 			pruneRules = append(pruneRules, gitignorePruneRule{patterns: localPatterns})
 		}
+	}
+	if targetKind == collectionTargetLeaf {
+		return
 	}
 
 	entries := fsys.GetAccessibleEntries(absDir)
@@ -608,11 +775,16 @@ func collectGitignorePatternsRecursive(absDir string, relDir string, fsys vfs.FS
 		state.visited[parentRealPath] = struct{}{}
 	}
 	for _, dir := range entries.Directories {
+		childAbs := tspath.CombinePaths(absDir, dir)
+		if targets != nil {
+			if _, relevant := targets[tspath.ToPath(childAbs, "", fsys.UseCaseSensitiveFileNames())]; !relevant {
+				continue
+			}
+		}
 		if isDefaultExcludedDirName(dir, fsys.UseCaseSensitiveFileNames()) {
 			continue
 		}
 
-		childAbs := tspath.CombinePaths(absDir, dir)
 		if isCollectionBoundary(childAbs, boundaries, fsys.UseCaseSensitiveFileNames()) {
 			continue
 		}
@@ -652,7 +824,7 @@ func collectGitignorePatternsRecursive(absDir string, relDir string, fsys vfs.FS
 			state.visited[childRealPath] = struct{}{}
 		}
 
-		collectGitignorePatternsRecursive(childAbs, childRel, fsys, result, isDirectoryBlocked, pruneRules, boundaries, state)
+		collectGitignorePatternsRecursive(childAbs, childRel, fsys, result, isDirectoryBlocked, pruneRules, boundaries, targets, state)
 	}
 }
 

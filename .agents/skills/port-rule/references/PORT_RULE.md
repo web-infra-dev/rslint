@@ -54,7 +54,7 @@ Three principles follow — internalize them before writing a single test case:
 
 **Coverage bar.** The point of layers 2 + 3 is to prove the Go/tsgo port stays aligned where it structurally diverges from upstream's ESTree implementation — so the bar is _what they cover_, not how many cases they add up to. There is no case-count target. Concretely: every applicable Dimension 4 edge shape and ≥2 real-user shapes from the issue tracker (Phase 1 Step 4), plus every reachable branch locked in (Phase 1 Step 5). A near-empty `_extras_test.go` — or worse, none at all — is a reliable smell that Phase 1 Steps 4 and 5 were skipped: re-walk them before submitting. Phase 4 Step 6's per-layer checkboxes are what enforce this.
 
-**JS tests are not a coverage layer — do not split them.** The three-layer model and the `_upstream_*` / `_extras_*` file split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` exists for a different purpose: it spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape end-to-end. That contract is input-independent — running it against more cases doesn't verify it any better. So:
+**JS tests are not a coverage layer — do not split them.** The three-layer model and the `_upstream_*` / `_extras_*` file split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` exists for a different purpose: it spawns the compiled binary over IPC and verifies catalog inclusion + wire protocol + ESLint-compatible diagnostic shape end-to-end. That contract is input-independent — running it against more cases doesn't verify it any better. So:
 
 - **JS mirrors Layer 1 only** (upstream `valid` / `invalid` cases). Layers 2 and 3 stay in Go.
 - A JS file far smaller than the Go suite — sometimes by 10× or more, depending on whether upstream uses fixture files — is the **expected** state, not "JS is under-tested." The semantic check is "every JS-asserted behavior also has a Go-upstream case"; literal case-count parity is **not** required (see Phase 4 Step 5).
@@ -78,20 +78,21 @@ Before starting, familiarize yourself with these key source locations:
 
 ### Core Infrastructure
 
-| File/Directory                          | Description                                                                                                                                                |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `internal/rule/rule.go`                 | **Core rule interface** - `Rule` and `RuleListeners`                                                                                                       |
-| `internal/rule/configured.go`           | Enabled `ConfiguredRule` descriptors, shared `RuleEnvironment`, and type-aware filtering                                                                   |
-| `internal/rule/context.go`              | `RuleContext`, edit demand, and diagnostic reporting APIs                                                                                                  |
-| `internal/rule/diagnostic.go`           | `RuleMessage`, `RuleFix`, `RuleSuggestion`, and fix helpers                                                                                                |
-| `internal/rule/ref_store.go`            | Lazy per-file reference index exposed as `ctx.Refs`                                                                                                        |
-| `internal/rule/comment_store.go`        | Lazy canonical comment list exposed as `ctx.Comments`                                                                                                      |
-| `internal/rule/disable_manager.go`      | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                                                    |
-| `internal/program/program.go`           | Unified source-generation facade exposed through `ctx.Program()`                                                                                           |
-| `internal/program/module_graph.go`      | Generic module-reference syntax and resolution index exposed by `Program.ModuleGraph()`                                                                    |
-| `internal/program/module_resolution.go` | Program-owned module resolution for one source/specifier pair                                                                                              |
-| `internal/config/config.go`             | Registration orchestration and config loading. Per-rule registration data lives in each group's `all.go` — see Phase 3 Step 4 for where to add a new rule. |
-| `internal/rule_tester/rule_tester.go`   | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                                                    |
+| File/Directory                          | Description                                                                                        |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `internal/rule/rule.go`                 | **Core rule interface** - `Rule` and `RuleListeners`                                               |
+| `internal/rule/configured.go`           | Enabled `ConfiguredRule` descriptors, shared `RuleEnvironment`, and type-aware filtering           |
+| `internal/rule/context.go`              | `RuleContext`, edit demand, and diagnostic reporting APIs                                          |
+| `internal/rule/diagnostic.go`           | `RuleMessage`, `RuleFix`, `RuleSuggestion`, and fix helpers                                        |
+| `internal/rule/ref_store.go`            | Lazy per-file reference index exposed as `ctx.Refs`                                                |
+| `internal/rule/comment_store.go`        | Lazy canonical comment list exposed as `ctx.Comments`                                              |
+| `internal/rule/disable_manager.go`      | Logic for handling `// rslint-disable` and `// eslint-disable` comments                            |
+| `internal/program/program.go`           | Unified source-generation facade exposed through `ctx.Program()`                                   |
+| `internal/program/module_graph.go`      | Generic module-reference syntax and resolution index exposed by `Program.ModuleGraph()`            |
+| `internal/program/module_resolution.go` | Program-owned module resolution for one source/specifier pair                                      |
+| `internal/config/config.go`             | Configuration models and validation; concrete rule composition remains outside the config package. |
+| `internal/rules/all.go`                 | Final aggregation of core and plugin `all.go` sources into the shared immutable Go rule catalog.   |
+| `internal/rule_tester/rule_tester.go`   | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                            |
 
 ### AST & Type System
 
@@ -168,14 +169,14 @@ Before starting, familiarize yourself with these key source locations:
 
    Some rules exist in both core ESLint and typescript-eslint. Before implementing, determine the canonical source:
 
-   | Scenario                                                                         | Registration                                | Test Location                    | Rule Wrapper        |
+   | Scenario                                                                         | Catalog key                                 | Test Location                    | Rule Wrapper        |
    | -------------------------------------------------------------------------------- | ------------------------------------------- | -------------------------------- | ------------------- |
    | **Core ESLint only** (e.g., `no-debugger`)                                       | `"no-debugger"`                             | `tests/eslint/rules/`            | `rule.Rule{}`       |
    | **typescript-eslint only** (e.g., `await-thenable`)                              | `"@typescript-eslint/await-thenable"`       | `tests/typescript-eslint/rules/` | `rule.CreateRule()` |
    | **typescript-eslint extends core** (active, e.g., `no-array-constructor`)        | `"@typescript-eslint/no-array-constructor"` | `tests/typescript-eslint/rules/` | `rule.CreateRule()` |
    | **typescript-eslint deprecated in favor of core** (e.g., `no-loss-of-precision`) | `"no-loss-of-precision"`                    | `tests/eslint/rules/`            | `rule.Rule{}`       |
 
-   **How to check**: Visit the typescript-eslint rule page. If it shows a deprecation notice like _"use the base ESLint rule instead"_, treat it as a **core ESLint rule** — do NOT register with `@typescript-eslint/` prefix.
+   **How to check**: Visit the typescript-eslint rule page. If it shows a deprecation notice like _"use the base ESLint rule instead"_, treat it as a **core ESLint rule** — do NOT use the `@typescript-eslint/` prefix.
 
 3. **Collect Test Cases — Layer 1 (baseline migration)**:
 
@@ -283,7 +284,7 @@ Before starting, familiarize yourself with these key source locations:
    | `is-glob`                             | `utils/isglob`                                              |
    | any other glob package                | **not supported — stop and report to the user (see below)** |
 
-   `depguard` denies `regexp2` and `doublestar` under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. Trimming, blankness, case comparison and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
+   `depguard` denies `regexp2`, `doublestar` and the standard library's `unicode` under `internal/rules/**` and `internal/plugins/**`, and `forbidigo` denies `strings.ToLower`, `strings.ToUpper` and `strings.TrimSpace` there, so a rule cannot reach past these by accident. Trimming, blankness, casing, character categories and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
 
    The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks, because RE2 refuses syntax JavaScript accepts and the caller usually swallows the compile error.
 
@@ -718,7 +719,7 @@ Assert that diagnostic count, message, and range are identical in all four modes
 
 ### Step 2: Add JS Tests
 
-**Purpose & scope.** The JS suite is **not** a duplicate of the Go suite. It spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape — a contract that is input-independent. So the JS file **mirrors Layer 1 only** (the upstream `valid` / `invalid` cases). Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) live exclusively in `<rule>_extras_test.go` on the Go side and **must not** be copied into the JS file. See [Testing Philosophy](#testing-philosophy) for the rationale.
+**Purpose & scope.** The JS suite is **not** a duplicate of the Go suite. It spawns the compiled binary over IPC and verifies catalog inclusion + wire protocol + ESLint-compatible diagnostic shape — a contract that is input-independent. So the JS file **mirrors Layer 1 only** (the upstream `valid` / `invalid` cases). Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) live exclusively in `<rule>_extras_test.go` on the Go side and **must not** be copied into the JS file. See [Testing Philosophy](#testing-philosophy) for the rationale.
 
 **Practical rule:** the JS file should assert exactly the upstream `valid` / `invalid` semantic set — nothing less, nothing more. Case **counts** between JS and `<rule>_upstream_test.go` may legitimately differ (one side may inline what the other folds into a fixture file); the contract is semantic-subset equivalence, not numeric parity. If you find yourself reaching for a tsgo-specific edge shape, a Dimension 4 row, a branch lock-in, or a GitHub-issue real-user shape while writing the JS file — stop. Those belong in Go extras.
 
@@ -742,25 +743,25 @@ Assert that diagnostic count, message, and range are identical in all four modes
 
 Add the new test file path to the `include` array.
 
-### Step 4: Register Rule
+### Step 4: Include Rule in the Catalog
 
 **Where to add depends on rule type** (determined by Phase 1 Step 2):
 
-| Rule type                                              | File to edit                         | What to add                                                                |
-| ------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------- |
-| Core ESLint (incl. deprecated typescript-eslint rules) | `internal/rules/all.go`              | Import the rule package; append `package.RuleNameRule` to `GetAllRules()`. |
-| typescript-eslint (active)                             | `internal/plugins/typescript/all.go` | Same — append to that plugin's `GetAllRules()`.                            |
-| Other plugins (react, jest, import, jsx-a11y, …)       | `internal/plugins/<plugin>/all.go`   | Same.                                                                      |
+| Rule type                                              | File to edit                         | What to add                                                              |
+| ------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------ |
+| Core ESLint (incl. deprecated typescript-eslint rules) | `internal/rules/all.go`              | Import the rule package; append `package.RuleNameRule` to `coreRules()`. |
+| typescript-eslint (active)                             | `internal/plugins/typescript/all.go` | Same — append to that plugin's `GetAllRules()`.                          |
+| Other plugins (react, jest, import, jsx-a11y, …)       | `internal/plugins/<plugin>/all.go`   | Same.                                                                    |
 
-Each `all.go` exports a `GetAllRules() []rule.Rule` slice. `RegisterAllRules()` in `internal/config/config.go` iterates each slice and calls `GlobalRuleRegistry.Register(rule.Name, rule)` — **do not edit `config.go` for a new rule**.
+Each plugin `all.go` exports `GetAllRules() []rule.Rule`; core rules use `coreRules()` in `internal/rules/all.go`. `rules.All()` assembles those sources into the shared immutable catalog — **do not edit `internal/config` for a new rule**.
 
-**Registration key vs `rule.Name` must match** — the registrar uses `rule.Name` as the key. How that key is produced depends on the rule wrapper:
+**Catalog key vs `rule.Name` must match** — catalog construction uses `rule.Name` as the key. How that key is produced depends on the rule wrapper:
 
-- **Core rule** — `rule.Rule{Name: "no-debugger", ...}` registers as `"no-debugger"`.
-- **typescript-eslint rule** — `rule.CreateRule(rule.Rule{Name: "no-shadow", ...})` registers as `"@typescript-eslint/no-shadow"`. The factory auto-prefixes; **only** use it for `@typescript-eslint/` rules — using it on a core or other-plugin rule will silently mis-register the rule key.
+- **Core rule** — `rule.Rule{Name: "no-debugger", ...}` appears as `"no-debugger"`.
+- **typescript-eslint rule** — `rule.CreateRule(rule.Rule{Name: "no-shadow", ...})` appears as `"@typescript-eslint/no-shadow"`. The factory auto-prefixes; **only** use it for `@typescript-eslint/` rules — using it on a core or other-plugin rule will silently produce the wrong key.
 - **Other plugins** — `rule.Rule{Name: "react/jsx-key", ...}` — the prefix is part of the literal `Name`, no factory.
 
-**Do NOT register a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status.
+**Do NOT include a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status.
 
 ---
 
@@ -813,7 +814,7 @@ Follow this **strict order** — each step depends on the previous one:
 5. **Verify Go ↔ JS Alignment** (asymmetric — JS is a Layer-1 semantic subset of Go):
 
    The two suites have asymmetric roles (see [Testing Philosophy](#testing-philosophy) and Phase 3 Step 2):
-   - **JS suite** = Layer 1 mirror only. It exists to verify the binary, registration, and wire protocol — not rule logic.
+   - **JS suite** = Layer 1 mirror only. It exists to verify the binary, catalog inclusion, and wire protocol — not rule logic.
    - **Go suite** = Layer 1 + Layer 2 + Layer 3 (full coverage). It is the source of truth for rule behavior.
 
    Two checks:
@@ -1083,7 +1084,7 @@ For complex rules (rules involving scope tracking, autofix, or many configuratio
 If JS tests fail with 0 diagnostics found:
 
 1. **Did you rebuild the binary?** Run `cd packages/rslint && pnpm run build:bin`
-2. **Is the rule registered?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `GetAllRules()` are present.
+2. **Is the rule catalogued?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `coreRules()` or the plugin's `GetAllRules()` are present.
 3. **Are test files included?** Check `rstest.config.mts`
 4. **Is the test-dir `rslint.config.mjs` configured?** Ensure the plugin is listed and the rule is enabled
 5. **Debug Mode**: Use `fmt.Fprintf(os.Stderr, "DEBUG: ...")` in Go code

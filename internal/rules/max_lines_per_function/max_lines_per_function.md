@@ -115,4 +115,4 @@ Examples of **incorrect** code for this rule with the above configuration:
 ## Original Documentation
 
 - [ESLint: max-lines-per-function](https://eslint.org/docs/latest/rules/max-lines-per-function)
-- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/max-lines-per-function.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/max-lines-per-function.js)

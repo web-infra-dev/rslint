@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_deprecated.schema.json
@@ -155,7 +156,7 @@ func getJsDocDeprecationFromNode(typeChecker *checker.Checker, node *ast.Node) s
 			}
 			deprecatedTag := tagNode.AsJSDocDeprecatedTag()
 			if deprecatedTag != nil {
-				return strings.TrimSpace(jsDocCommentText(typeChecker, deprecatedTag.Comment))
+				return ecmascript.StringTrim(jsDocCommentText(typeChecker, deprecatedTag.Comment))
 			}
 			return ""
 		}
@@ -462,7 +463,7 @@ func searchForDeprecationInAliasesChain(
 }
 
 func stripQuotes(text string) string {
-	text = strings.TrimSpace(text)
+	text = ecmascript.StringTrim(text)
 	if len(text) >= 2 {
 		if (strings.HasPrefix(text, "'") && strings.HasSuffix(text, "'")) ||
 			(strings.HasPrefix(text, "\"") && strings.HasSuffix(text, "\"")) ||
@@ -504,25 +505,25 @@ func sourceSpanText(sourceFile *ast.SourceFile, pos int, end int) string {
 }
 
 func cleanupDeprecatedReason(text string) string {
-	text = strings.TrimSpace(text)
+	text = ecmascript.StringTrim(text)
 	if text == "" {
 		return ""
 	}
 	text = strings.TrimPrefix(text, ":")
-	text = strings.TrimSpace(text)
+	text = ecmascript.StringTrim(text)
 	text = strings.TrimSuffix(text, "*/")
-	text = strings.TrimSpace(text)
+	text = ecmascript.StringTrim(text)
 	lines := strings.Split(text, "\n")
 	parts := make([]string, 0, len(lines))
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := ecmascript.StringTrim(line)
 		trimmed = strings.TrimPrefix(trimmed, "*")
-		trimmed = strings.TrimSpace(trimmed)
+		trimmed = ecmascript.StringTrim(trimmed)
 		if trimmed != "" {
 			parts = append(parts, trimmed)
 		}
 	}
-	return strings.TrimSpace(strings.Join(parts, "\n"))
+	return ecmascript.StringTrim(strings.Join(parts, "\n"))
 }
 
 func deprecatedReasonFromDiagnostic(diagnostic *ast.Diagnostic) string {
@@ -1335,7 +1336,7 @@ func isInImportStatementRange(sourceFile *ast.SourceFile, pos int) bool {
 		lineEnd = pos + lineEndRelative
 	}
 	lineText := text[lineStart:lineEnd]
-	trimmedLine := strings.TrimSpace(lineText)
+	trimmedLine := ecmascript.StringTrim(lineText)
 	if !strings.HasPrefix(trimmedLine, "import ") {
 		return false
 	}

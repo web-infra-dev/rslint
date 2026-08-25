@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_no_literals.schema.json
@@ -143,7 +144,7 @@ func populateStringSetFromMap(source map[string]interface{}, key string, target 
 			if *target == nil {
 				*target = make(map[string]struct{}, len(arr))
 			}
-			(*target)[strings.TrimSpace(str)] = struct{}{}
+			(*target)[ecmascript.StringTrim(str)] = struct{}{}
 		}
 	}
 }
@@ -239,7 +240,7 @@ func hasJSXContentParentOrGrandParent(node *ast.Node) bool {
 // classifies whether the parent shape qualifies as a JSX literal site.
 // `text` is the cooked literal value used to check whitespace-only short-circuit.
 func isStandardJSXNode(text string, parentKind ast.Kind, cfg *elementConfig) bool {
-	if strings.TrimSpace(text) == "" {
+	if ecmascript.StringTrim(text) == "" {
 		return false
 	}
 	switch parentKind {
@@ -254,8 +255,8 @@ func isStandardJSXNode(text string, parentKind ast.Kind, cfg *elementConfig) boo
 }
 
 func isViableTextNode(rawText, cookedText string, parentKind ast.Kind, cfg *elementConfig) bool {
-	rawTrim := strings.TrimSpace(rawText)
-	cookedTrim := strings.TrimSpace(cookedText)
+	rawTrim := ecmascript.StringTrim(rawText)
+	cookedTrim := ecmascript.StringTrim(cookedText)
 	if _, ok := cfg.allowedStrings[rawTrim]; ok {
 		return false
 	}
@@ -569,7 +570,7 @@ func collectRenamedImports(sf *ast.SourceFile) map[string]string {
 
 // trimmedSource returns `node`'s raw source text with leading/trailing whitespace stripped.
 func trimmedSource(ctx rule.RuleContext, node *ast.Node) string {
-	return strings.TrimSpace(utils.TrimmedNodeText(ctx.SourceFile, node))
+	return ecmascript.StringTrim(utils.TrimmedNodeText(ctx.SourceFile, node))
 }
 
 // stringLiteralValue extracts the cooked text of a StringLiteral node.
@@ -610,7 +611,7 @@ func handleJsxAttribute(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, r
 		attrName := nameNode.AsIdentifier().Text
 		if _, restricted := resolved.restrictedAttributes[attrName]; restricted {
 			cooked := stringLiteralValue(init)
-			if _, allowed := resolved.allowedStrings[strings.TrimSpace(cooked)]; !allowed {
+			if _, allowed := resolved.allowedStrings[ecmascript.StringTrim(cooked)]; !allowed {
 				reportRestrictedAttribute(ctx, node, trimmedSource(ctx, init), attrName, resolved)
 			}
 			return
@@ -654,10 +655,10 @@ func handleStringLiteral(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, 
 		return
 	}
 	rawSource := trimmedSource(ctx, node)
-	if _, allowed := resolved.allowedStrings[strings.TrimSpace(rawSource)]; allowed {
+	if _, allowed := resolved.allowedStrings[ecmascript.StringTrim(rawSource)]; allowed {
 		return
 	}
-	if _, allowed := resolved.allowedStrings[strings.TrimSpace(cooked)]; allowed {
+	if _, allowed := resolved.allowedStrings[ecmascript.StringTrim(cooked)]; allowed {
 		return
 	}
 	// Upstream gates the report on `hasJSXParentOrGrandParent || !config.ignoreProps`
@@ -695,7 +696,7 @@ func handleJsxText(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, rename
 	// text such as `// {marker}` is not a JavaScript comment. Treating it as
 	// one can advance the trimmed start beyond this node's end and panic.
 	cooked := html.UnescapeString(jt.Text)
-	rawSource := strings.TrimSpace(jt.Text)
+	rawSource := ecmascript.StringTrim(jt.Text)
 	if !isViableTextNode(rawSource, cooked, parent.Kind, resolved) {
 		return
 	}

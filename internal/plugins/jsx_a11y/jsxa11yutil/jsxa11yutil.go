@@ -8,12 +8,12 @@
 package jsxa11yutil
 
 import (
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // directAttributeStringValue extracts the JSX attribute's string value with
@@ -136,11 +136,11 @@ func FindAttributeByName(attrs []*ast.Node, name string) *ast.Node {
 	for _, attr := range attrs {
 		switch attr.Kind {
 		case ast.KindJsxAttribute:
-			if strings.EqualFold(reactutil.GetJsxPropName(attr), name) {
+			if ecmascript.EqualsWhenUppercased(reactutil.GetJsxPropName(attr), name) {
 				return attr
 			}
 		case ast.KindJsxSpreadAttribute:
-			if strings.EqualFold(name, "key") {
+			if ecmascript.EqualsWhenUppercased(name, "key") {
 				continue
 			}
 			spread := attr.AsJsxSpreadAttribute()
@@ -201,7 +201,7 @@ func FindAttributeByName(attrs []*ast.Node, name string) *ast.Node {
 				if keyNode == nil || keyNode.Kind != ast.KindIdentifier {
 					continue
 				}
-				if strings.EqualFold(keyNode.AsIdentifier().Text, name) {
+				if ecmascript.EqualsWhenUppercased(keyNode.AsIdentifier().Text, name) {
 					return prop
 				}
 			}
@@ -234,7 +234,7 @@ func HasAnyJsxPropStrict(attrs []*ast.Node, names ...string) bool {
 		}
 		propName := reactutil.GetJsxPropName(attr)
 		for _, name := range names {
-			if strings.EqualFold(propName, name) {
+			if ecmascript.EqualsWhenUppercased(propName, name) {
 				return true
 			}
 		}
@@ -1301,7 +1301,7 @@ func IsHiddenFromScreenReader(child *ast.Node, getElementType func(*ast.Node) st
 // arguments by value, so passing the filtered list mirrors upstream
 // byte-for-byte.
 func IsHiddenFromScreenReaderFromTagAttrs(elementType string, attrs []*ast.Node) bool {
-	tag := strings.ToUpper(elementType)
+	tag := ecmascript.StringToUpperCase(elementType)
 	if tag == "INPUT" {
 		typeAttr := FindAttributeByName(attrs, "type")
 		if typeAttr != nil {
@@ -1310,12 +1310,12 @@ func IsHiddenFromScreenReaderFromTagAttrs(elementType string, attrs []*ast.Node)
 			// must match. The JsxExpression / spread path doesn't need decoding
 			// (those carry JS string literals, not JSX attribute text).
 			if decoded, ok := directAttributeStringValue(typeAttr); ok {
-				if strings.EqualFold(decoded, "hidden") {
+				if ecmascript.EqualsWhenUppercased(decoded, "hidden") {
 					return true
 				}
 			} else if inner := attributeInnerExpression(typeAttr); inner != nil {
 				v := literalPropValue(inner)
-				if v.Kind == jvString && strings.EqualFold(v.Str, "hidden") {
+				if v.Kind == jvString && ecmascript.EqualsWhenUppercased(v.Str, "hidden") {
 					return true
 				}
 			}

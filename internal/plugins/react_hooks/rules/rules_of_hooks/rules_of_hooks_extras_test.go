@@ -49,9 +49,8 @@ var rulesOfHooksExtrasValid = []rule_tester.ValidTestCase{
 				useFoo();
 			}
 		`, Tsx: true},
-		// Hook inside a `finally` block — finally runs on every path, so the
-		// hook is unconditional. (Upstream's CFG includes finally on the
-		// natural exit.)
+		// A hook after a `finally` block is reached through the natural
+		// continuation in upstream's CFG.
 		{Code: `
 			function ComponentWithFinally() {
 				try { mayThrow(); } finally { /* no hook here */ }
@@ -66,7 +65,7 @@ var rulesOfHooksExtrasValid = []rule_tester.ValidTestCase{
 			}
 		`, Tsx: true},
 
-		// ---- Path-counting edge cases (where AST heuristic vs upstream CFG could diverge) ----
+		// ---- Path-counting edge cases ----
 		// for-loop initializer: hook runs once before the loop starts.
 		// Upstream CFG places the init segment outside the loop; we must
 		// not trigger loopError here.
@@ -104,14 +103,16 @@ var rulesOfHooksExtrasValid = []rule_tester.ValidTestCase{
 				} catch {}
 			}
 		`, Tsx: true},
-		// finally block first statement: finally runs on every code path,
-		// so the hook is unconditional.
+		// A hook after a throwable node in a try/finally remains on every
+		// non-thrown final path. ESLint excludes the abrupt thrown segment
+		// from its path count.
 		{Code: `
 			function Component() {
 				try {
 					foo();
-				} finally {
 					useHook();
+				} finally {
+					bar();
 				}
 			}
 		`, Tsx: true},
@@ -187,10 +188,59 @@ var rulesOfHooksExtrasValid = []rule_tester.ValidTestCase{
 				return (a, useHook());
 			}
 		`, Tsx: true},
-		// for-loop CONDITION position: every iteration evaluates the
-		// condition, including the very first one — this DOES make the
-		// hook cycled. (Sanity check: confirm we still flag it as a loop.)
-		// — moved to invalid below.
+		// ESLint keeps a for-loop test on the repeated loop header segment.
+		// Its cycle collector deliberately excludes that repeated segment
+		// itself, so a hook in the test is not reported.
+		{Code: `
+			function Component() {
+				for (; useHook(); ) {}
+			}
+		`, Tsx: true},
+		// With no condition or incrementor, ESLint keeps the top of the body
+		// on the repeated loop-header segment and excludes that segment from
+		// its cycle set.
+		{Code: `
+			function Component() {
+				for (;;) {
+					useHook();
+				}
+			}
+		`, Tsx: true},
+		// The incrementor is laid out before the body, but ESLint settles its
+		// segment as unreachable when the body always returns.
+		{Code: `
+			function Component(condition) {
+				for (; condition; useHook()) {
+					return null;
+				}
+			}
+		`, Tsx: true},
+		// A yield does not end the generator's ESLint code path. A hook after
+		// it remains on the same ordinary path.
+		{Code: `
+			function* useGenerator() {
+				yield 1;
+				useAfterYield();
+			}
+		`, Tsx: true},
+		// After a return, ESLint's AST listener observes the outer segment.
+		// A one-path component therefore gets no conditional diagnostic.
+		{Code: `
+			function Component() {
+				return null;
+				useAfterReturn();
+			}
+		`, Tsx: true},
+		// The same detached-segment behavior after continue still compares as
+		// one path through a loop that has no break path.
+		{Code: `
+			function Component(condition) {
+				while (condition) {
+					continue;
+					useAfterContinue();
+				}
+			}
+		`, Tsx: true},
 
 		// ---- Callee-shape edge cases (rslint-only) ----
 		// Element access form: `Foo['useBar']()` — upstream rejects
@@ -327,6 +377,19 @@ var rulesOfHooksExtrasValid = []rule_tester.ValidTestCase{
 			function Component() {
 				try {
 					return 1;
+				} finally {
+					useHook();
+				}
+			}
+		`, Tsx: true},
+		// ESLint combines return and throw into the same abrupt finally
+		// segment. With no normal continuation, that segment is not
+		// conditional even though it represents both completion kinds.
+		{Code: `
+			function Component(condition) {
+				try {
+					if (condition) return null;
+					throw condition;
 				} finally {
 					useHook();
 				}
@@ -679,7 +742,7 @@ var rulesOfHooksExtrasValid = []rule_tester.ValidTestCase{
 			},
 		},
 
-		// ---- Edge cases of "AST heuristic vs BigInt path counting" ----
+		// ---- Edge cases with many control-flow paths ----
 		// #5 multiple `break outer` jumping to the same label, hook AFTER
 		// the outer loop. useBar is on every reachable path.
 		{Code: `
@@ -854,20 +917,7 @@ var rulesOfHooksExtrasInvalid = []rule_tester.InvalidTestCase{
 				{Message: `React Hook "useState" is called in function "notAComponent" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
 			},
 		},
-		// for-loop CONDITION: hook in `for (; useFoo(); ) {}` IS cycled
-		// (re-evaluated each iteration) — should still report loopError.
-		{
-			Code: `
-				function Component() {
-					for (; useHook(); ) {}
-				}
-			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHook" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`},
-			},
-		},
-		// for-loop INCREMENTOR: same as condition — runs each iteration.
+		// Unlike the loop test, the incrementor is inside the collected cycle.
 		{
 			Code: `
 				function Component() {
@@ -879,9 +929,82 @@ var rulesOfHooksExtrasInvalid = []rule_tester.InvalidTestCase{
 				{Message: `React Hook "useHook" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`},
 			},
 		},
+		// A short-circuit operand in a loop test occupies a later segment than
+		// the repeated header, so upstream includes it in the cycle.
+		{
+			Code: `
+				function Component(condition) {
+					for (; condition && useHook(); ) {}
+				}
+			`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{Message: `React Hook "useHook" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`},
+			},
+		},
+		// A branch inside an otherwise empty for-loop creates a later segment,
+		// which is included in the cycle even though the header itself is not.
+		{
+			Code: `
+				function Component(condition) {
+					for (;;) {
+						if (condition) useHook();
+					}
+				}
+			`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{Message: `React Hook "useHook" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`},
+			},
+		},
+		// A resumable yield does not hide the loop back edge from ESLint's
+		// cycle collector.
+		{
+			Code: `
+				function* useGenerator(condition) {
+					while (condition) {
+						useBeforeYield();
+						yield condition;
+					}
+				}
+			`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{Message: `React Hook "useBeforeYield" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`},
+			},
+		},
+		// The detached outer segment after an uncaught throw has one path,
+		// while the function has zero non-thrown paths.
+		{
+			Code: `
+				function Component() {
+					throw error;
+					useAfterThrow();
+				}
+			`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{Message: `React Hook "useAfterThrow" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`},
+			},
+		},
+		// A loop break adds a second final path, so a hook visited on the
+		// detached outer segment compares as conditional without an early exit.
+		{
+			Code: `
+				function Component(condition) {
+					while (condition) {
+						break;
+						useAfterBreak();
+					}
+				}
+			`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{Message: `React Hook "useAfterBreak" is called conditionally. React Hooks must be called in the exact same order in every component render.`},
+			},
+		},
 		// Try block with prior throwable statement: still conditional (mirrors
-		// upstream's existing test, kept here too as a position-aware check
-		// for our `isInsideTryBlockWithPriorStmt` helper).
+		// upstream's existing test, kept here too as a CFG position check).
 		{
 			Code: `
 				function Component() {
@@ -1285,8 +1408,8 @@ var rulesOfHooksExtrasInvalid = []rule_tester.InvalidTestCase{
 			`,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useFoo" is called conditionally. React Hooks must be called in the exact same order in every component render.`},
-				{Message: `React Hook "useBar" is called conditionally. React Hooks must be called in the exact same order in every component render.`},
+				{Message: `React Hook "useFoo" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`},
+				{Message: `React Hook "useBar" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`},
 			},
 		},
 
@@ -1322,31 +1445,48 @@ var rulesOfHooksExtrasInvalid = []rule_tester.InvalidTestCase{
 			},
 		},
 
-		// ---- Try-finally without catch, hook AFTER throwable in try ----
-		// (Potential divergence point: upstream's path counting reasoning
-		// vs our "any prior throwable in try" heuristic.)
+		// A finally hook is recorded on ESLint's abrupt segment. When the try
+		// body can throw, that segment is excluded from the ordinary path count
+		// while the separate normal continuation remains, so upstream reports
+		// the hook as conditional with its early-return suffix.
 		{
 			Code: `
 				function Component() {
 					try {
 						foo();
-						useHook();
 					} finally {
-						bar();
+						useHook();
 					}
 				}
 			`,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`},
+				{Message: `React Hook "useHook" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`},
+			},
+		},
+		// A normal and a returned path use different finally layouts. ESLint
+		// observes the abrupt layout while visiting the hook, so it reports the
+		// normal layout as the skipped path and adds the early-return suffix.
+		{
+			Code: `
+				function Component(condition) {
+					try {
+						if (condition) return null;
+					} finally {
+						useHook();
+					}
+				}
+			`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{Message: `React Hook "useHook" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`},
 			},
 		},
 
-		// ---- Edge: BigInt-territory checks ----
+		// ---- Edge: many-path checks ----
 		// #1 N if-else with one branch returning each time, then hook.
 		// Upstream's path counting: useState segment path = 1 / total = 2^N.
-		// Our sibling-walk catches the first `if (...) return;` and reports
-		// early-return; both implementations report.
+		// The shared CFG must report the conditional call and early-return suffix.
 		{
 			Code: `
 				function useFoo() {

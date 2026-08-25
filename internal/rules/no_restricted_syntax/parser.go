@@ -3,9 +3,11 @@ package no_restricted_syntax
 import (
 	"errors"
 	"fmt"
-	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"strconv"
 	"strings"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // parseSelector parses an ESLint selector string into a selector tree.
@@ -563,7 +565,7 @@ func (p *parser) parsePseudo(inner selector) (selector, error) {
 		}
 		return wrapPseudo(inner, pseudoSelector{Name: name, Args: args}), nil
 	}
-	className := strings.ToLower(name)
+	className := ecmascript.StringToLowerCase(name)
 	switch className {
 	case "statement", "expression", "declaration", "function", "pattern":
 		return wrapPseudo(inner, pseudoSelector{Name: className}), nil

@@ -1,0 +1,43 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowAfterThis": {
+          "type": "boolean"
+        },
+        "allowAfterSuper": {
+          "type": "boolean"
+        },
+        "allowAfterThisConstructor": {
+          "type": "boolean"
+        },
+        "enforceInMethodNames": {
+          "type": "boolean"
+        },
+        "allowFunctionParams": {
+          "type": "boolean"
+        },
+        "enforceInClassFields": {
+          "type": "boolean"
+        },
+        "allowInArrayDestructuring": {
+          "type": "boolean"
+        },
+        "allowInObjectDestructuring": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

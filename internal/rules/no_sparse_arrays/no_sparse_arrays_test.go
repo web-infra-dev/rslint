@@ -25,41 +25,42 @@ func TestNoSparseArraysRule(t *testing.T) {
 			{Code: `[a, , b] = [1, 2, 3];`},
 			{Code: `for ([, x] of y) {}`},
 			{Code: `[[, a]] = b;`},
+			{Code: `({ value: [, a] } = b);`},
+			{Code: `[...[, a]] = b;`},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
 			{
 				Code: `var a = [,];`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpectedSparseArray", Line: 1, Column: 9},
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 10, EndLine: 1, EndColumn: 11},
 				},
 			},
 			{
 				Code: `var a = [ 1,, 2];`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpectedSparseArray", Line: 1, Column: 9},
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 13, EndLine: 1, EndColumn: 14},
 				},
 			},
-			// This test case is commented out because it produces a TypeScript compilation error:
-			// error creating TS program for /tsconfig.json: found 5 syntactic errors. [Invalid character. [\r\n\t/* comment */,\n// comment\n ,]; Invalid character. [\r\n\t/* comment */,\n// comment\n ,]; Invalid character. [\r\n\t/* comment */,\n// comment\n ,]; Invalid character. [\r\n\t/* comment */,\n// comment\n ,]; ']' expected. [\r\n\t/* comment */,\n// comment\n ,];]
-			//{
-			//	Code: `[\r\n\t/* comment */,\n// comment\n ,];`,
-			//	Errors: []rule_tester.InvalidTestCaseError{
-			//		{MessageId: "unexpectedSparseArray", Line: 1, Column: 9},
-			//	},
-			//},
+			{
+				Code: "[\r\n\t/* comment */,\n// comment\n ,];",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedSparseArray", Line: 2, Column: 15, EndLine: 2, EndColumn: 16},
+					{MessageId: "unexpectedSparseArray", Line: 4, Column: 2, EndLine: 4, EndColumn: 3},
+				},
+			},
 			{
 				Code: `[(( [a,] )),,,];`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpectedSparseArray", Line: 1, Column: 1},
-					{MessageId: "unexpectedSparseArray", Line: 1, Column: 1},
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 13, EndLine: 1, EndColumn: 14},
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 14, EndLine: 1, EndColumn: 15},
 				},
 			},
 			{
 				Code: `[,(( [a,] )),,];`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpectedSparseArray", Line: 1, Column: 1},
-					{MessageId: "unexpectedSparseArray", Line: 1, Column: 1},
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 2, EndLine: 1, EndColumn: 3},
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 14, EndLine: 1, EndColumn: 15},
 				},
 			},
 			{
@@ -67,7 +68,21 @@ func TestNoSparseArraysRule(t *testing.T) {
 				// RHS is a genuine sparse array literal and must still be flagged.
 				Code: `[a, b] = [1, , 2];`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpectedSparseArray", Line: 1, Column: 10},
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 14, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				// An array literal used as a destructuring default remains a real
+				// array expression, even though the surrounding array is a target.
+				Code: `[value = [,]] = source;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 11, EndLine: 1, EndColumn: 12},
+				},
+			},
+			{
+				Code: `const emoji = "😀"; const values = [1,, 2];`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 39, EndLine: 1, EndColumn: 40},
 				},
 			},
 		},

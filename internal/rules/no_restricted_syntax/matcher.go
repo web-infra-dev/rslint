@@ -9,6 +9,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -850,7 +852,7 @@ func rightRelationalPrimitive(value attrValue) (text string, isString bool, numb
 }
 
 func jsStringToNumber(value string) (float64, bool) {
-	value = strings.TrimSpace(value)
+	value = ecmascript.StringTrim(value)
 	if value == "" {
 		return 0, true
 	}
@@ -1680,24 +1682,10 @@ func readValueAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 }
 
 func readRawAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
-	if mc == nil || mc.sf == nil || !isEstreeLiteralKind(node.Kind) {
+	if mc == nil || mc.sf == nil || !utils.IsESTreeLiteralKind(node.Kind) {
 		return nil, false
 	}
 	return scanner.GetSourceTextOfNodeFromSourceFile(mc.sf, node, false), true
-}
-
-func isEstreeLiteralKind(kind ast.Kind) bool {
-	switch kind {
-	case ast.KindStringLiteral,
-		ast.KindNumericLiteral,
-		ast.KindBigIntLiteral,
-		ast.KindRegularExpressionLiteral,
-		ast.KindTrueKeyword,
-		ast.KindFalseKeyword,
-		ast.KindNullKeyword:
-		return true
-	}
-	return false
 }
 
 func readOptionalAttr(node *ast.Node) (interface{}, bool) {

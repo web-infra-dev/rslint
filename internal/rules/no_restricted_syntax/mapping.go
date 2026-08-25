@@ -1,9 +1,8 @@
 package no_restricted_syntax
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // estreeKindMap maps an ESTree node-type name to the tsgo ast.Kind values it
@@ -161,13 +160,13 @@ func kindsForEstreeName(name string) []ast.Kind {
 var canonicalEstreeNames = func() map[string]string {
 	names := make(map[string]string, len(estreeKindMap))
 	for name := range estreeKindMap {
-		names[strings.ToLower(name)] = name
+		names[ecmascript.StringToLowerCase(name)] = name
 	}
 	return names
 }()
 
 func canonicalEstreeName(name string) (string, bool) {
-	canonical, ok := canonicalEstreeNames[strings.ToLower(name)]
+	canonical, ok := canonicalEstreeNames[ecmascript.StringToLowerCase(name)]
 	return canonical, ok
 }
 

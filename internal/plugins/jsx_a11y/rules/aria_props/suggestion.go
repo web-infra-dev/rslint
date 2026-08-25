@@ -4,7 +4,8 @@ package aria_props
 
 import (
 	"sort"
-	"strings"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // getSuggestion mirrors `eslint-plugin-jsx-a11y/src/util/getSuggestion.js`.
@@ -27,7 +28,7 @@ func getSuggestion(word string, dictionary, dictionaryUpper []string, limit int)
 		word     string
 		distance int
 	}
-	wordUpper := strings.ToUpper(word)
+	wordUpper := ecmascript.StringToUpperCase(word)
 	candidates := make([]candidate, 0, len(dictionary))
 	for i, dUpper := range dictionaryUpper {
 		dist := osaDistance(wordUpper, dUpper)

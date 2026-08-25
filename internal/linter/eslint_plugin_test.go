@@ -19,6 +19,52 @@ func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) Configured
 	return ConfiguredRule{Name: name, Options: opts, Severity: sev, IsEslintPluginRule: true}
 }
 
+func TestBuildEslintPluginFileInput_EffectiveLanguageOptions(t *testing.T) {
+	raw := map[string]any{
+		"parserOptions": map[string]any{"ecmaFeatures": map[string]any{"jsx": true}},
+	}
+	rules := []ConfiguredRule{{
+		Name:               "plugin/rule",
+		IsEslintPluginRule: true,
+		Environment:        &rule.RuleEnvironment{},
+	}}
+
+	input, ok := BuildEslintPluginFileInput("/repo/file.cjs", "/repo", rules, raw, nil, nil, nil)
+	if !ok {
+		t.Fatal("plugin rule should produce an input")
+	}
+	if got := input.LanguageOptions["sourceType"]; got != "commonjs" {
+		t.Errorf(".cjs sourceType = %v, want commonjs", got)
+	}
+	if got := input.LanguageOptions["ecmaVersion"]; got != rule.LatestECMAScriptVersion {
+		t.Errorf("default ecmaVersion = %v, want %d", got, rule.LatestECMAScriptVersion)
+	}
+	if _, ok := input.LanguageOptions["parserOptions"]; !ok {
+		t.Error("raw parserOptions were not preserved")
+	}
+	if _, ok := raw["sourceType"]; ok {
+		t.Error("building plugin input mutated the shared raw languageOptions map")
+	}
+	if _, ok := raw["ecmaVersion"]; ok {
+		t.Error("building plugin input mutated the shared raw languageOptions map")
+	}
+
+	rules[0].Environment = &rule.RuleEnvironment{LanguageOptions: rule.LanguageOptions{
+		ECMAVersion: 2020,
+		SourceType:  "script",
+	}}
+	input, ok = BuildEslintPluginFileInput("/repo/file.unknown", "/repo", rules, raw, nil, nil, nil)
+	if !ok {
+		t.Fatal("plugin rule should produce an input")
+	}
+	if got := input.LanguageOptions["sourceType"]; got != "script" {
+		t.Errorf("authored sourceType = %v, want script", got)
+	}
+	if got := input.LanguageOptions["ecmaVersion"]; got != 2020 {
+		t.Errorf("authored ecmaVersion = %v, want 2020", got)
+	}
+}
+
 func TestDispatchEslintPlugin_EmptyShortCircuit(t *testing.T) {
 	called := 0
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {

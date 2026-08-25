@@ -39,11 +39,15 @@ type DiagnosticConsumer struct {
 type RuleContext struct {
 	SourceFile *ast.SourceFile
 	Settings   map[string]interface{}
-	fileCache  *FileCache
+	// LanguageOptions is the normalized, effective per-file language config.
+	// Rules should use its Effective methods when they need ESLint defaults.
+	LanguageOptions LanguageOptions
+	fileCache       *FileCache
 	// Globals owns the file's complete global-variable view: the selected
 	// ECMAScript edition, languageOptions.globals, inline /* global */ comments,
 	// their effective access, and inline declaration metadata. Rules should use
-	// its accessors instead of reimplementing precedence or version selection.
+	// its accessors instead of reimplementing global precedence or edition-global
+	// selection.
 	Globals Globals
 	// Comments lazily provides every comment in SourceFile, in source order.
 	// Rules should call Comments.All instead of walking the token tree with
