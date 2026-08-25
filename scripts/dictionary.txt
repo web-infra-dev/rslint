@@ -89,6 +89,7 @@ Cbar
 cdylib
 centralising
 CHARCLASS
+cerialize
 checkerpool
 classnames
 CLASSSET

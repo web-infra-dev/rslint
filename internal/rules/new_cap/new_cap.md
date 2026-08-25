@@ -1,0 +1,50 @@
+# new-cap
+
+## Rule Details
+
+This rule requires constructor names to begin with an uppercase letter and
+requires functions whose names begin with an uppercase letter to be called with
+`new`.
+
+Examples of **incorrect** code for this rule:
+
+```javascript
+const friend = new person();
+const colleague = Person();
+```
+
+Examples of **correct** code for this rule:
+
+```javascript
+const friend = new Person();
+const value = Boolean(input);
+```
+
+The object option supports `newIsCap`, `capIsNew`, `newIsCapExceptions`,
+`newIsCapExceptionPattern`, `capIsNewExceptions`,
+`capIsNewExceptionPattern`, and `properties`. The two checks and property
+checking are enabled by default.
+
+```json
+{
+  "new-cap": [
+    "error",
+    {
+      "newIsCapExceptions": ["events"],
+      "capIsNewExceptionPattern": "\\.Factory$",
+      "properties": false
+    }
+  ]
+}
+```
+
+```javascript
+const emitter = new events();
+const value = library.Factory();
+const widget = new library.widget();
+```
+
+## Original Documentation
+
+- [ESLint: new-cap](https://eslint.org/docs/latest/rules/new-cap)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/new-cap.js)
