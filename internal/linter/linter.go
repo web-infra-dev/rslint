@@ -165,12 +165,14 @@ func (r *listenerRegistry) reset() {
 }
 
 // isJSDocSyntaxNode identifies syntax that TypeScript-Go synthesized while
-// reparsing a JSDoc comment. ESLint-compatible parsers expose that source text
-// only through their comment APIs, never through rule AST traversal. The DFS
-// prunes at the first such node, so checking the current node is sufficient and
-// avoids walking its ancestors for every ordinary source node.
+// reparsing a JSDoc comment. Reparsed roots such as JSTypeAliasDeclaration and
+// their JSDoc-flagged descendants are both absent from ESLint-compatible rule
+// AST traversal; comment and TypeScript compiler APIs expose the authored
+// metadata separately. The DFS prunes at the first such node, so checking the
+// current node is sufficient and avoids walking its ancestors for every
+// ordinary source node.
 func isJSDocSyntaxNode(node *ast.Node) bool {
-	return node != nil && (node.Flags&ast.NodeFlagsJSDoc != 0 || ast.IsJSDocNode(node))
+	return node != nil && (node.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0 || ast.IsJSDocNode(node))
 }
 
 // runLintRulesInProgram lints files in a single Program. Files are filtered

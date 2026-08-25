@@ -81,10 +81,23 @@ func TestRunLinter_PrunesSyntheticJSDocSyntax(t *testing.T) {
 	program, paths := createTestProgramWithFilesAndCompilerOptions(t, map[string]string{
 		"input.mjs": `/** @type {Array<{ value: number | null }>} */
 const annotated = value;
+
+/** @template {string} T */
+function generic(value) { return value; }
+
+/** @typedef {{ value: Missing }} Thing */
+const typedefHost = 1;
+
+/** @import { Imported } from "pkg" */
+const importHost = 1;
+
 const runtime = null;`,
 	}, `{"allowJs":true,"checkJs":false}`)
 
 	var typeReferences int
+	var typeParameters int
+	var jsTypeAliases int
+	var jsImports int
 	var nullEntries int
 	var nullExits int
 	_, err := RunLinter(RunLinterOptions{
@@ -99,6 +112,15 @@ const runtime = null;`,
 					return rule.RuleListeners{
 						ast.KindTypeReference: func(*ast.Node) {
 							typeReferences++
+						},
+						ast.KindTypeParameter: func(*ast.Node) {
+							typeParameters++
+						},
+						ast.KindJSTypeAliasDeclaration: func(*ast.Node) {
+							jsTypeAliases++
+						},
+						ast.KindJSImportDeclaration: func(*ast.Node) {
+							jsImports++
 						},
 						ast.KindNullKeyword: func(*ast.Node) {
 							nullEntries++
@@ -116,6 +138,14 @@ const runtime = null;`,
 	}
 	if typeReferences != 0 {
 		t.Fatalf("JSDoc TypeReference listener calls = %d, want 0", typeReferences)
+	}
+	if typeParameters != 0 || jsTypeAliases != 0 || jsImports != 0 {
+		t.Fatalf(
+			"JSDoc reparsed root listener calls = (%d type parameters, %d type aliases, %d imports), want all 0",
+			typeParameters,
+			jsTypeAliases,
+			jsImports,
+		)
 	}
 	if nullEntries != 1 || nullExits != 1 {
 		t.Fatalf("runtime null listener calls = (%d enter, %d exit), want (1, 1)", nullEntries, nullExits)
