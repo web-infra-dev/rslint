@@ -259,6 +259,11 @@ func TestShadowingScopeModels(t *testing.T) {
 			code:                   `class C { m<Target>(@dec(Target()) x: number) { } }`,
 			enclosingTypeParameter: true,
 		},
+		{
+			name:               "parameter decorator, object method computed name, sibling parameter",
+			code:               `class C { m(@dec({ [Target()]() {} }) x: number, Target: any) { } }`,
+			enclosingParameter: true,
+		},
 
 		// A scope created inside a parameter decorator belongs to the enclosing
 		// class, so the decorated function drops out of the chain.

@@ -199,8 +199,10 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 		}
 		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
 		isClassLike := ast.IsClassLike(current)
-		if (isFunctionLike && !escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)) ||
-			(isClassLike && !escapesClassScope(prevChild, crossedScope)) {
+		entersFunctionScope := isFunctionLike &&
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)
+		entersClassScope := isClassLike && !escapesClassScope(prevChild, crossedScope)
+		if entersFunctionScope || entersClassScope {
 			for _, typeParameter := range current.TypeParameters() {
 				// TypeScript creates synthetic type parameters from JSDoc @template
 				// tags and attaches them to the host declaration. They remain comments
@@ -211,7 +213,7 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 				}
 			}
 		}
-		if isFunctionLike || isClassLike {
+		if entersFunctionScope || entersClassScope {
 			crossedScope = true
 		}
 		prevChild = current
@@ -234,15 +236,19 @@ func HasEnclosingParameter(node *ast.Node, name string) bool {
 		if current.Kind == ast.KindParameter {
 			inParameterDecorator = prevChild.Kind == ast.KindDecorator
 		}
-		if ast.IsFunctionLikeDeclaration(current) &&
-			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
+		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
+		isClassLike := ast.IsClassLike(current)
+		entersFunctionScope := isFunctionLike &&
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)
+		entersClassScope := isClassLike && !escapesClassScope(prevChild, crossedScope)
+		if entersFunctionScope && inParameterDecorator && isDirectParameterOf(current, prevChild) {
 			for _, parameter := range current.Parameters() {
 				if parameter != nil && parameter.Name() != nil && HasNameInBindingPattern(parameter.Name(), name) {
 					return true
 				}
 			}
 		}
-		if ast.IsFunctionLikeDeclaration(current) || ast.IsClassLike(current) {
+		if entersFunctionScope || entersClassScope {
 			crossedScope = true
 		}
 		prevChild = current
@@ -258,12 +264,17 @@ func HasEnclosingClassExpressionName(node *ast.Node, name string) bool {
 	prevChild := node
 	crossedScope := false
 	for current := node.Parent; current != nil; current = current.Parent {
-		if current.Kind == ast.KindClassExpression && !escapesClassScope(prevChild, crossedScope) {
+		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
+		isClassLike := ast.IsClassLike(current)
+		entersFunctionScope := isFunctionLike &&
+			!escapesFunctionScope(current, prevChild, false, crossedScope)
+		entersClassScope := isClassLike && !escapesClassScope(prevChild, crossedScope)
+		if current.Kind == ast.KindClassExpression && entersClassScope {
 			if className := current.Name(); className != nil && className.Kind == ast.KindIdentifier && className.Text() == name {
 				return true
 			}
 		}
-		if ast.IsFunctionLikeDeclaration(current) || ast.IsClassLike(current) {
+		if entersFunctionScope || entersClassScope {
 			crossedScope = true
 		}
 		prevChild = current
@@ -334,14 +345,18 @@ func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
 		if current.Kind == ast.KindParameter {
 			inParameterDecorator = prevChild.Kind == ast.KindDecorator
 		}
-		if ast.IsFunctionLikeDeclaration(current) && isDirectParameterOf(current, prevChild) &&
-			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
+		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
+		isClassLike := ast.IsClassLike(current)
+		entersFunctionScope := isFunctionLike &&
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)
+		entersClassScope := isClassLike && !escapesClassScope(prevChild, crossedScope)
+		if entersFunctionScope && isDirectParameterOf(current, prevChild) {
 			if body := current.Body(); body != nil &&
 				(hasFunctionScopeDeclaration(body, name) || HasHoistedVarDeclaration(body, name)) {
 				return true
 			}
 		}
-		if ast.IsFunctionLikeDeclaration(current) || ast.IsClassLike(current) {
+		if entersFunctionScope || entersClassScope {
 			crossedScope = true
 		}
 		prevChild = current

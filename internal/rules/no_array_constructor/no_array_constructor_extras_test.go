@@ -119,6 +119,10 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			{Code: `class C { m(@dec(Array()) x: number) { var Array; } }`},
 			{Code: `class C { m(@dec(Array()) x: number) { let Array; } }`},
 			{Code: `class C { m(@dec(Array()) x: number, Array: any) { } }`},
+			// Evaluating an object member's computed name does not enter that
+			// member's function scope, so the decorated method stays visible.
+			{Code: `class C { m(@dec({ [Array()]() {} }) x: number, Array: any) { } }`},
+			{Code: `class C { m(@dec({ get [Array()]() { return 1 } }) x: number, Array: any) { } }`},
 			// The enclosing class stays in the chain, so its name and type
 			// parameters shadow a call nested inside a parameter decorator.
 			{Code: "class Array { m(@dec(() => Array()) x: number) { } }"},
@@ -619,6 +623,39 @@ func BenchmarkNoArrayConstructorRepeatedCalls(b *testing.B) {
 			source.WriteByte('}')
 
 			program, sourceFile := createNoArrayConstructorProgram(b, "repeated-calls.ts", source.String())
+			var options []any
+			b.ResetTimer()
+			for range b.N {
+				diagnostics := lintNoArrayConstructorWithDemand(program, sourceFile, options, rule.EditDemandNone)
+				if len(diagnostics) != count {
+					b.Fatalf("diagnostics = %d, want %d", len(diagnostics), count)
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkNoArrayConstructorRepeatedCallsWithParameters protects parameter
+// lookup from becoming O(parameters * calls) in an ordinary function body.
+func BenchmarkNoArrayConstructorRepeatedCallsWithParameters(b *testing.B) {
+	for _, count := range []int{500, 1_000, 2_000, 4_000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			var source strings.Builder
+			source.WriteString("function f(")
+			for i := range count {
+				if i > 0 {
+					source.WriteByte(',')
+				}
+				source.WriteString("p")
+				source.WriteString(strconv.Itoa(i))
+			}
+			source.WriteString(") {")
+			for range count {
+				source.WriteString("void Array(1, 2);")
+			}
+			source.WriteByte('}')
+
+			program, sourceFile := createNoArrayConstructorProgram(b, "repeated-calls-with-parameters.ts", source.String())
 			var options []any
 			b.ResetTimer()
 			for range b.N {
