@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -36,8 +37,8 @@ func remapDiagnosticTargetPaths(
 		fsys = filesystems[0]
 	}
 	for i := range diags {
-		if target, ok := lookupLintTarget(lintTargetBySourcePath, diags[i].FilePath, fsys); ok {
-			diags[i].FilePath = target.Path
+		if lintTarget, ok := target.LookupSourceTarget(lintTargetBySourcePath, diags[i].FilePath, fsys); ok {
+			diags[i].FilePath = lintTarget.Path
 		}
 	}
 }
@@ -116,8 +117,8 @@ func deduplicateTypeScriptDiagnostics(
 
 func preferTypeScriptDiagnostic(candidate rule.RuleDiagnostic, current rule.RuleDiagnostic, callerTarget string, fsys vfs.FS) bool {
 	if callerTarget != "" {
-		candidateIsCaller := exactFilesystemPathID(candidate.FilePath) == exactFilesystemPathID(callerTarget)
-		currentIsCaller := exactFilesystemPathID(current.FilePath) == exactFilesystemPathID(callerTarget)
+		candidateIsCaller := rslintconfig.ExactPathID(candidate.FilePath) == rslintconfig.ExactPathID(callerTarget)
+		currentIsCaller := rslintconfig.ExactPathID(current.FilePath) == rslintconfig.ExactPathID(callerTarget)
 		if candidateIsCaller != currentIsCaller {
 			return candidateIsCaller
 		}

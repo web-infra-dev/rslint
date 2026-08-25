@@ -81,7 +81,7 @@ func TestCanonicalPathVFS_UsesRequestHintBeforeBaseFilesystem(t *testing.T) {
 	base := &canonicalPathBaseFS{FS: osvfs.FS()}
 	fsys := &canonicalPathVFS{
 		FS:             base,
-		canonicalPaths: map[string]string{exactFilesystemPathID("/lexical/a.ts"): "/physical/a.ts"},
+		canonicalPaths: map[string]string{rslintconfig.ExactPathID("/lexical/a.ts"): "/physical/a.ts"},
 	}
 	if got := fsys.Realpath("/lexical/a.ts"); got != "/physical/a.ts" {
 		t.Fatalf("Realpath returned %q, want request hint", got)

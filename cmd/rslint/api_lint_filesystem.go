@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -12,7 +13,7 @@ type canonicalPathVFS struct {
 }
 
 func (fs *canonicalPathVFS) Realpath(filePath string) string {
-	if canonicalPath := fs.canonicalPaths[exactFilesystemPathID(filePath)]; canonicalPath != "" {
+	if canonicalPath := fs.canonicalPaths[rslintconfig.ExactPathID(filePath)]; canonicalPath != "" {
 		return canonicalPath
 	}
 	return fs.FS.Realpath(filePath)
