@@ -1,7 +1,14 @@
-import { useState, useRef, useEffect, useImperativeHandle, Ref } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useImperativeHandle,
+  Ref,
+  ReactNode,
+} from 'react';
 import * as monaco from 'monaco-editor';
 import { jsonDefaults } from 'monaco-editor/languages/features/json/register';
-import { type Diagnostic } from '@rslint/wasm';
+import { type Diagnostic } from '@rslint/core/service';
 import { Button } from '@components/ui/button';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
@@ -44,6 +51,7 @@ interface EditorTabsProps {
   onChange: (value: string) => void;
   onSelectionChange?: (start: number, end: number) => void;
   onConfigChange?: () => void;
+  toolbarEnd?: ReactNode;
 }
 
 const DEFAULT_RSLINT_CONFIG = `[
@@ -88,6 +96,7 @@ export const EditorTabs = ({
   onChange,
   onSelectionChange,
   onConfigChange,
+  toolbarEnd,
 }: EditorTabsProps) => {
   const [activeTab, setActiveTab] = useState<EditorTabType>('code');
 
@@ -422,20 +431,23 @@ export const EditorTabs = ({
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="flex items-center gap-2 bg-gray-50 p-2 flex-shrink-0">
-        {tabs.map((tab) => (
-          <Button
-            key={tab.key}
-            type="button"
-            variant={activeTab === tab.key ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTab(tab.key)}
-            aria-pressed={activeTab === tab.key}
-            className="dark:text-accent dark:border-muted/20"
-          >
-            {tab.label}
-          </Button>
-        ))}
+      <div className="flex items-center justify-between gap-2 bg-gray-50 p-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          {tabs.map((tab) => (
+            <Button
+              key={tab.key}
+              type="button"
+              variant={activeTab === tab.key ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab(tab.key)}
+              aria-pressed={activeTab === tab.key}
+              className="dark:text-accent dark:border-muted/20"
+            >
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        {toolbarEnd}
       </div>
       <div className="flex-1 relative overflow-visible">
         <div
