@@ -25,6 +25,23 @@ func StringCodeUnits(s string) []uint16 {
 	return units
 }
 
+// StringCodeUnitCount reports s's length in the UTF-16 code units counted by
+// JavaScript String#length. Unlike core.UTF16Len, it also preserves lone
+// surrogates in the WTF-8 form used by compiler string values.
+func StringCodeUnitCount(s string) int {
+	count := 0
+	for i := 0; i < len(s); {
+		r, size := decodeStringRune(s[i:])
+		if r > 0xFFFF {
+			count += 2
+		} else {
+			count++
+		}
+		i += size
+	}
+	return count
+}
+
 // CompareStrings ports the comparison JavaScript's relational operators make of
 // two strings: code unit by code unit, with the shorter of the two first when
 // one is a prefix of the other. It returns -1 if a sorts before b, 1 if it

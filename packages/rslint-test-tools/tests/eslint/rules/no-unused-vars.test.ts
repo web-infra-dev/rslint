@@ -7,6 +7,9 @@ interface FixtureCase {
   code: string;
   options?: unknown;
   globals?: Record<string, boolean>;
+  languageOptions?: {
+    sourceType?: 'module' | 'script' | 'commonjs';
+  };
   skip?: boolean;
   tsx?: boolean;
 }
@@ -34,15 +37,20 @@ const fixture = JSON.parse(
   fs.readFileSync(fixturePath, 'utf8'),
 ) as FixtureSuite;
 
-function languageOptions(globals?: Record<string, boolean>) {
-  if (!globals) return undefined;
+function languageOptions(testCase: FixtureCase) {
+  if (!testCase.globals && !testCase.languageOptions) return undefined;
   return {
-    globals: Object.fromEntries(
-      Object.entries(globals).map(([name, enabled]) => [
-        name,
-        enabled ? 'readonly' : 'off',
-      ]),
-    ),
+    ...testCase.languageOptions,
+    ...(testCase.globals
+      ? {
+          globals: Object.fromEntries(
+            Object.entries(testCase.globals).map(([name, enabled]) => [
+              name,
+              enabled ? 'readonly' : 'off',
+            ]),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -56,7 +64,7 @@ ruleTester.run('no-unused-vars', {
   valid: fixture.valid.map((testCase) => ({
     code: integrationCode(testCase.code),
     options: testCase.options,
-    languageOptions: languageOptions(testCase.globals),
+    languageOptions: languageOptions(testCase),
     filename: testCase.tsx ? 'src/virtual.tsx' : undefined,
     skip: testCase.skip,
   })) as any,
@@ -64,7 +72,7 @@ ruleTester.run('no-unused-vars', {
     code: integrationCode(testCase.code),
     errors: testCase.errors,
     options: testCase.options,
-    languageOptions: languageOptions(testCase.globals),
+    languageOptions: languageOptions(testCase),
     filename: testCase.tsx ? 'src/virtual.tsx' : undefined,
     skip: testCase.skip,
   })) as any,

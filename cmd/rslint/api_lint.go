@@ -12,134 +12,22 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
-	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
-
-// IPCHandler implements the ipc.Handler interface
-type IPCHandler struct{}
-
-type canonicalPathVFS struct {
-	vfs.FS
-	canonicalPaths map[string]string
-}
-
-func (fs *canonicalPathVFS) Realpath(filePath string) string {
-	if canonicalPath := fs.canonicalPaths[exactFilesystemPathID(filePath)]; canonicalPath != "" {
-		return canonicalPath
-	}
-	return fs.FS.Realpath(filePath)
-}
-
-// SourceHasBOM forwards to the wrapped VFS. Embedding vfs.FS promotes only
-// that interface's methods, so this layer has to pass [utils.BOMSource]
-// through by hand or every overlay identity below it becomes invisible.
-func (fs *canonicalPathVFS) SourceHasBOM(filePath string) bool {
-	return utils.SourceHasBOM(fs.FS, filePath)
-}
-
-// programCache holds a cached Program instance for AST info requests
-type programCache struct {
-	mu              sync.RWMutex
-	fileContent     string
-	compilerOptions string // JSON serialized for comparison
-	program         *compiler.Program
-	sourceFile      *ast.SourceFile
-}
-
-// Global program cache for AST info requests
-var astInfoProgramCache = &programCache{}
-
-// HandleLint handles lint requests in IPC mode
-func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
-	return h.handleLint(context.Background(), req, nil, nil)
-}
-
-type apiConfigModuleLoader struct {
-	requester      api.Requester
-	overrideConfig rslintconfig.RslintConfig
-}
-
-func (loader *apiConfigModuleLoader) LoadConfigs(ctx context.Context, request discovery.ConfigLoadBatchRequest) (discovery.ConfigLoadBatchResponse, error) {
-	if loader == nil || loader.requester == nil {
-		return discovery.ConfigLoadBatchResponse{}, errors.New("reverse config loading is unavailable")
-	}
-	msg, err := loader.requester.SendRequest(ctx, api.KindLoadConfigs, request)
-	if err != nil {
-		return discovery.ConfigLoadBatchResponse{}, err
-	}
-	var response discovery.ConfigLoadBatchResponse
-	if err := msg.Decode(&response); err != nil {
-		return discovery.ConfigLoadBatchResponse{}, fmt.Errorf("decode loadConfigs result: %w", err)
-	}
-	// API override entries are the final suffix of every loaded config. Attach
-	// them at the loader boundary so discovery reachability and the published
-	// catalog observe the same effective config; callers must not append them a
-	// second time after discovery.
-	if len(loader.overrideConfig) > 0 {
-		for index := range response.Results {
-			result := &response.Results[index]
-			if result.Status != "loaded" {
-				continue
-			}
-			effective := make(rslintconfig.RslintConfig, 0, len(result.Entries)+len(loader.overrideConfig))
-			effective = append(effective, result.Entries...)
-			effective = append(effective, loader.overrideConfig...)
-			result.Entries = effective
-		}
-	}
-	return response, nil
-}
-
-func (loader *apiConfigModuleLoader) ActivateConfigs(ctx context.Context, request discovery.ConfigActivationRequest) (discovery.ConfigActivationResponse, error) {
-	if loader == nil || loader.requester == nil {
-		return discovery.ConfigActivationResponse{}, errors.New("reverse config activation is unavailable")
-	}
-	msg, err := loader.requester.SendRequest(ctx, api.KindActivateConfigs, request)
-	if err != nil {
-		return discovery.ConfigActivationResponse{}, err
-	}
-	var response discovery.ConfigActivationResponse
-	if err := msg.Decode(&response); err != nil {
-		return discovery.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs result: %w", err)
-	}
-	return response, nil
-}
-
-// HandleLintWithContext enables reverse pluginLint requests when IPCHandler is
-// hosted by the bidirectional API service. HandleLint remains available for
-// direct callers that do not need community plugin execution.
-func (h *IPCHandler) HandleLintWithContext(ctx context.Context, req api.LintRequest, requester api.Requester) (*api.LintResponse, error) {
-	var dispatch linter.EslintPluginDispatcher
-	if requester != nil {
-		dispatch = func(reqCtx context.Context, pluginReq linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-			msg, err := requester.SendRequest(reqCtx, api.KindPluginLint, pluginReq)
-			if err != nil {
-				return nil, err
-			}
-			var result linter.EslintPluginLintResult
-			if err := msg.Decode(&result); err != nil {
-				return nil, fmt.Errorf("decode pluginLint result: %w", err)
-			}
-			return &result, nil
-		}
-	}
-	return h.handleLint(ctx, req, dispatch, requester)
-}
 
 func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispatch linter.EslintPluginDispatcher, requester api.Requester) (*api.LintResponse, error) {
 
@@ -176,8 +64,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	for index, canonicalPath := range req.CanonicalFiles {
 		filePath := resolveRequestPath(req.Files[index])
 		canonicalPath = resolveRequestPath(canonicalPath)
-		canonicalPaths[exactFilesystemPathID(filePath)] = canonicalPath
-		canonicalPaths[exactFilesystemPathID(canonicalPath)] = canonicalPath
+		canonicalPaths[rslintconfig.ExactPathID(filePath)] = canonicalPath
+		canonicalPaths[rslintconfig.ExactPathID(canonicalPath)] = canonicalPath
 	}
 
 	addAllowedFile := func(filePath string) string {
@@ -251,11 +139,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	fs = programSession.FS()
 
 	var (
-		configMap              map[string]rslintconfig.RslintConfig
-		configTargetScopes     map[string]target.OwnerScope
-		catalogPlugins         []rslintconfig.EslintPluginEntry
-		pluginConfigDirByOwner map[string]string
-		configGitignoreFrozen  bool
+		configMap                    map[string]rslintconfig.RslintConfig
+		configTargetScopes           map[string]target.OwnerScope
+		catalogPlugins               []rslintconfig.EslintPluginEntry
+		pluginConfigDirectoryByOwner map[string]string
+		configGitignoreFrozen        bool
 	)
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
@@ -313,7 +201,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				for _, filePath := range allowedFiles {
 					targetFiles = append(targetFiles, discovery.DiscoveryFile{
 						Path:          filePath,
-						CanonicalPath: canonicalPaths[exactFilesystemPathID(filePath)],
+						CanonicalPath: canonicalPaths[rslintconfig.ExactPathID(filePath)],
 					})
 				}
 			}
@@ -354,18 +242,18 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				// the selected module governs the complete supplied target set.
 				configDirectory = configDirectories[0]
 				rslintConfig = append(rslintconfig.RslintConfig(nil), configCatalog.Configs[configDirectory]...)
-				pluginConfigDirByOwner = map[string]string{configDirectory: configDirectory}
+				pluginConfigDirectoryByOwner = map[string]string{configDirectory: configDirectory}
 				configGitignoreFrozen = true
 			} else {
 				configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
-				pluginConfigDirByOwner = make(map[string]string, len(configCatalog.Configs))
+				pluginConfigDirectoryByOwner = make(map[string]string, len(configCatalog.Configs))
 			}
 			for ownerDirectory, entries := range configCatalog.Configs {
 				if configMap == nil {
 					continue
 				}
 				configMap[ownerDirectory] = append(rslintconfig.RslintConfig(nil), entries...)
-				pluginConfigDirByOwner[ownerDirectory] = ownerDirectory
+				pluginConfigDirectoryByOwner[ownerDirectory] = ownerDirectory
 			}
 			if configMap != nil {
 				configTargetScopes = configCatalog.Scopes
@@ -397,11 +285,15 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			RuleNames: append([]string(nil), plugin.RuleNames...),
 		})
 	}
-	ruleCatalog, shadowedPluginRules := deriveRuleCatalog(pluginEntries)
-	var optionsMessages []string
-	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig, ruleCatalog)
-	if len(optionsMessages) > 0 {
-		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(optionsMessages, "\n"))
+	ruleCatalog, shadowedPluginRules := rules.All().ForESLintPlugins(pluginEntries)
+	var optionErrors []rslintconfig.ResolvedRuleOptionsError
+	configMap, rslintConfig, optionErrors = rslintconfig.ValidateResolvedRuleOptions(configMap, rslintConfig, ruleCatalog)
+	if len(optionErrors) > 0 {
+		messages := make([]string, len(optionErrors))
+		for index, optionError := range optionErrors {
+			messages[index] = optionError.Error()
+		}
+		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(messages, "\n"))
 	}
 	reportShadowedPluginRules(shadowedPluginRules)
 
@@ -444,7 +336,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if len(targetPlan.Files) > 0 {
 		if configMap != nil {
 			projectSet, err = programSession.BuildTargetProjects(
-				configsForOwners(configMap, targetPlan.ActiveOwners()),
+				configMap,
 				targetPlan,
 				false,
 			)
@@ -466,19 +358,19 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	}
 	programs := binding.Programs
 	targetsByProgram := binding.TargetsByProgram
-	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:               configMap,
-		Config:                  rslintConfig,
-		CurrentDirectory:        configDirectory,
-		RuleCatalog:             ruleCatalog,
-		EnforcePlugins:          true,
-		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
-		SourceMappingsCanonical: true,
-		PathSpaces:              targetPlan.PathSpaces(),
-		FS:                      fs,
+	fileConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
+		ConfigsByOwner:                      configMap,
+		Config:                              rslintConfig,
+		ConfigDirectory:                     configDirectory,
+		Catalog:                             ruleCatalog,
+		EnforcePlugins:                      true,
+		TargetsBySourcePath:                 binding.LintTargetBySourcePath,
+		SourceMappingsIncludeCanonicalPaths: true,
+		PathSpaces:                          targetPlan.PathSpaces(),
+		FS:                                  fs,
 	})
 	targetPathForSourcePath := func(sourcePath string) string {
-		if target, bound := fileConfigResolver.targetForFile(sourcePath); bound {
+		if target, bound := fileConfigResolver.TargetForSourcePath(sourcePath); bound {
 			return target.Path
 		}
 		return sourcePath
@@ -612,7 +504,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 
 	// Every selected target is parsed even when no config entry contributes
 	// rules. Global ignores were already removed during target discovery.
-	syntaxDiagnostics := collectTargetSyntacticDiagnostics(programs, targetsByProgram, false, false)
+	syntaxDiagnostics := linter.CollectTargetSyntacticDiagnostics(programs, targetsByProgram, false)
 	for _, diagnostic := range syntaxDiagnostics {
 		diagnosticCollector(diagnostic)
 	}
@@ -641,7 +533,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			// so a rule carrying a plugin prefix runs only when its plugin is
 			// declared in the config's `plugins` — matching CLI and ESLint
 			// semantics (a rule whose plugin is not declared is skipped).
-			return fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
+			return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
 		},
 		// The API returns concrete fixes, suggestions, and fixable counts
 		// independently of whether req.Fix later applies autofixes.
@@ -662,7 +554,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	var pluginCh <-chan []rule.RuleDiagnostic
 	var cancelPlugin context.CancelFunc
 	if len(pluginEntries) > 0 {
-		if pluginConfigDirByOwner == nil {
+		if pluginConfigDirectoryByOwner == nil {
 			wireConfigDirectory := req.PluginConfigDirectory
 			if wireConfigDirectory == "" {
 				wireConfigDirectory = req.ConfigDirectory
@@ -670,12 +562,12 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			if wireConfigDirectory == "" {
 				wireConfigDirectory = configDirectory
 			}
-			pluginConfigDirByOwner = map[string]string{configDirectory: wireConfigDirectory}
+			pluginConfigDirectoryByOwner = map[string]string{configDirectory: wireConfigDirectory}
 		}
-		pluginInputs := buildPluginFileInputs(runOpts.PreparedPlan, pluginConfigResolver{
-			lintResolver:           fileConfigResolver,
-			pluginConfigDirByOwner: pluginConfigDirByOwner,
-		})
+		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, eslintPluginConfigResolver{
+			lintResolver:                 fileConfigResolver,
+			pluginConfigDirectoryByOwner: pluginConfigDirectoryByOwner,
+		}.resolve)
 		for i := range pluginInputs {
 			// Programmatic lint supports in-memory overlays. Always send the exact
 			// parsed source frame instead of asking the host to re-read disk.
@@ -692,7 +584,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 					return nil, errors.New("bidirectional pluginLint transport is unavailable")
 				}
 			}
-			pluginCh = dispatchPluginLintAsync(pluginCtx, dispatch, pluginInputs, req.Fix, pluginSuggestionsMode(req.Fix), nil)
+			suggestionsMode := linter.SuggestionsModeOff
+			if req.Fix {
+				suggestionsMode = linter.SuggestionsModeEager
+			}
+			pluginCh = dispatchEslintPluginRulesAsync(pluginCtx, dispatch, pluginInputs, req.Fix, suggestionsMode, nil)
 		}
 	}
 	if cancelPlugin != nil {
@@ -718,8 +614,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// same-start diagnostics by emission order (parent reported before
 	// nested child), and a file's diagnostics are all emitted by a single
 	// worker, so under a STABLE sort this key is already fully
-	// deterministic. Keep this comparator in sync with the CLI one in
-	// cmd.go (same policy over rule.RuleDiagnostic).
+	// deterministic. Keep this comparator in sync with the CLI comparator
+	// over rule.RuleDiagnostic.
 	sort.SliceStable(diagnostics, func(i, j int) bool {
 		a, b := diagnostics[i], diagnostics[j]
 		if a.FilePath != b.FilePath {
@@ -732,7 +628,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	})
 
 	// Apply fixes in-band when requested. ApplyRuleFixes is the same pure fixer
-	// the CLI uses (cmd.go applyFixPass), but here the result stays in-memory in
+	// the CLI uses through applyFixPass, but here the result stays in-memory in
 	// Output — the JS side persists it via Rslint.outputFixes. Single pass over
 	// each file's fixes (non-overlapping applied, overlapping left for a later
 	// lint); no cross-pass re-lint cascade (P1, see design §8).
@@ -801,241 +697,6 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	return response, nil
 }
 
-func addEquivalentFileContentPaths(fileContents map[string]string, configDirectory string, currentDirectory string, fs vfs.FS) {
-	if len(fileContents) == 0 || fs == nil {
-		return
-	}
-
-	type fileContentEntry struct {
-		path    string
-		content string
-	}
-	entries := make([]fileContentEntry, 0, len(fileContents))
-	for filePath, content := range fileContents {
-		entries = append(entries, fileContentEntry{path: filePath, content: content})
-	}
-
-	comparePathOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          currentDirectory,
-		UseCaseSensitiveFileNames: true,
-	}
-	addAlias := func(alias string, content string) {
-		if alias == "" {
-			return
-		}
-		if _, exists := fileContents[alias]; exists {
-			return
-		}
-		fileContents[alias] = content
-	}
-	addDirectoryAlias := func(fromDir string, toDir string, filePath string, content string) {
-		if fromDir == "" || toDir == "" || !tspath.ContainsPath(fromDir, filePath, comparePathOptions) {
-			return
-		}
-		relativePath := tspath.GetRelativePathFromDirectory(fromDir, filePath, comparePathOptions)
-		if relativePath == "" {
-			return
-		}
-		addAlias(tspath.ResolvePath(toDir, relativePath), content)
-	}
-
-	realConfigDirectory := fs.Realpath(configDirectory)
-	for _, entry := range entries {
-		if realPath := fs.Realpath(entry.path); realPath != "" && realPath != entry.path {
-			addAlias(realPath, entry.content)
-		}
-		if realConfigDirectory != "" && tspath.ComparePaths(configDirectory, realConfigDirectory, comparePathOptions) != 0 {
-			addDirectoryAlias(configDirectory, realConfigDirectory, entry.path, entry.content)
-			addDirectoryAlias(realConfigDirectory, configDirectory, entry.path, entry.content)
-		}
-	}
-}
-
-// HandleGetAstInfo handles get AST info requests in IPC mode
-func (h *IPCHandler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoResponse, error) {
-	// Fixed user file name for program creation
-	const userFileName = "/index.ts"
-
-	// Serialize compiler options for comparison
-	compilerOptionsJSON := "{}"
-	if req.CompilerOptions != nil {
-		jsonBytes, err := json.Marshal(req.CompilerOptions)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal compiler options: %w", err)
-		}
-		compilerOptionsJSON = string(jsonBytes)
-	}
-
-	// Check if we can use cached program
-	program, userSourceFile := getCachedProgram(req.FileContent, compilerOptionsJSON)
-	if program == nil || userSourceFile == nil {
-		// Cache miss - create new program
-		var err error
-		program, userSourceFile, err = createAndCacheProgram(userFileName, req.FileContent, compilerOptionsJSON, req.CompilerOptions)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Get type checker
-	typeChecker, done := program.GetTypeChecker(context.Background())
-	defer done()
-
-	// Determine which source file to query
-	// If FileName is set to an external file, query that file (e.g., lib.d.ts)
-	// Otherwise, query the user's source file
-	var targetSourceFile *ast.SourceFile
-	if req.FileName != "" && req.FileName != userFileName {
-		targetSourceFile = program.GetSourceFile(req.FileName)
-		if targetSourceFile == nil {
-			return &api.GetAstInfoResponse{}, nil
-		}
-	} else {
-		targetSourceFile = userSourceFile
-	}
-
-	isExternalFile := targetSourceFile != userSourceFile
-
-	// Build the response
-	// Use userSourceFile as the "current" file for the builder
-	// This determines which files are considered "external" (fileName will be set for nodes not in userSourceFile)
-	builder := api.NewAstInfoBuilder(typeChecker, userSourceFile)
-	response := &api.GetAstInfoResponse{}
-
-	// Special case: if requesting SourceFile by kind, build it directly without Node conversion
-	if req.Kind > 0 && ast.Kind(req.Kind) == ast.KindSourceFile {
-		response.Node = builder.BuildSourceFileNodeInfo(targetSourceFile)
-		// SourceFile doesn't have type/symbol/signature/flow, so return early
-		return response, nil
-	}
-
-	// Find the node at the specified position (with optional end for exact matching)
-	node := inspector.FindNodeAtPosition(targetSourceFile, req.Position, req.End, req.Kind)
-	if node == nil {
-		return &api.GetAstInfoResponse{}, nil
-	}
-
-	// Build node info
-	response.Node = builder.BuildNodeInfo(node)
-
-	// Build type info
-	t := inspector.GetTypeAtNode(typeChecker, node)
-	if t != nil {
-		response.Type = builder.BuildTypeInfo(t)
-	}
-
-	// Build symbol info
-	// First try to get symbol directly from node
-	symbol := typeChecker.GetSymbolAtLocation(node)
-	// If no symbol at node, try to get it from the type
-	if symbol == nil && t != nil {
-		symbol = t.Symbol()
-	}
-	if symbol != nil {
-		response.Symbol = builder.BuildSymbolInfo(symbol)
-	}
-
-	// Build signature info
-	sig := inspector.GetSignatureOfNode(typeChecker, node)
-	if sig != nil {
-		response.Signature = builder.BuildSignatureInfo(sig)
-	}
-
-	// Build flow info (only for nodes in user's source file)
-	if !isExternalFile {
-		flowNode := inspector.GetFlowNodeOfNode(node)
-		if flowNode != nil {
-			response.Flow = builder.BuildFlowInfo(flowNode)
-		}
-	}
-
-	return response, nil
-}
-
-// getCachedProgram returns the cached program if it matches the current request
-func getCachedProgram(fileContent, compilerOptionsJSON string) (*compiler.Program, *ast.SourceFile) {
-	astInfoProgramCache.mu.RLock()
-	defer astInfoProgramCache.mu.RUnlock()
-
-	if astInfoProgramCache.program == nil {
-		return nil, nil
-	}
-
-	// Check if cache is valid (only fileContent and compilerOptions matter)
-	if astInfoProgramCache.fileContent == fileContent &&
-		astInfoProgramCache.compilerOptions == compilerOptionsJSON {
-		return astInfoProgramCache.program, astInfoProgramCache.sourceFile
-	}
-
-	return nil, nil
-}
-
-// createAndCacheProgram creates a new program and caches it
-func createAndCacheProgram(fileName, fileContent, compilerOptionsJSON string, compilerOptions map[string]any) (*compiler.Program, *ast.SourceFile, error) {
-	// Create a virtual filesystem with the provided file content
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-
-	fileContents := map[string]string{
-		fileName: fileContent,
-	}
-	fs = utils.NewOverlayVFS(fs, fileContents)
-
-	// Build tsconfig from request options or use defaults
-	tsconfigContent := buildTsConfigContent(fileName, compilerOptions)
-	tsconfigPath := "/tsconfig.json"
-	fs = utils.NewOverlayVFS(fs, map[string]string{
-		tsconfigPath: tsconfigContent,
-	})
-
-	// Create compiler host and program
-	host := utils.CreateCompilerHost("/", fs)
-	program, err := utils.CreateProgram(false, fs, "/", tsconfigPath, host)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create program: %w", err)
-	}
-
-	// Get the source file
-	sourceFile := program.GetSourceFile(fileName)
-	if sourceFile == nil {
-		return nil, nil, errors.New("failed to get source file")
-	}
-
-	// Update cache
-	astInfoProgramCache.mu.Lock()
-	astInfoProgramCache.fileContent = fileContent
-	astInfoProgramCache.compilerOptions = compilerOptionsJSON
-	astInfoProgramCache.program = program
-	astInfoProgramCache.sourceFile = sourceFile
-	astInfoProgramCache.mu.Unlock()
-
-	return program, sourceFile, nil
-}
-
-// buildTsConfigContent creates a tsconfig.json content string from compiler options
-func buildTsConfigContent(fileName string, compilerOptions map[string]any) string {
-	// Default compiler options
-	opts := map[string]any{
-		"target":           "ESNext",
-		"module":           "ESNext",
-		"strict":           true,
-		"strictNullChecks": true,
-	}
-
-	// Merge with provided options (provided options override defaults)
-	for k, v := range compilerOptions {
-		opts[k] = v
-	}
-
-	// Serialize compiler options to JSON
-	optsJSON, err := json.Marshal(opts)
-	if err != nil {
-		// Fallback to minimal config on error
-		return fmt.Sprintf(`{"compilerOptions":{"target":"ESNext","module":"ESNext","strict":true},"files":["%s"]}`, fileName)
-	}
-
-	return fmt.Sprintf(`{"compilerOptions":%s,"files":["%s"]}`, string(optsJSON), fileName)
-}
-
 // byteOffsetToUTF16 converts a byte offset within text to a flat UTF-16 code
 // unit offset — the unit ESLint uses for fix / suggestion ranges. This is a
 // DIFFERENT conversion than line/column (scanner.GetECMALineAndUTF16CharacterOfPosition,
@@ -1055,16 +716,4 @@ func byteOffsetToUTF16(text string, byteOffset int) int {
 		return int(core.UTF16Len(text))
 	}
 	return int(core.UTF16Len(text[:byteOffset]))
-}
-
-// runAPI runs the linter in IPC mode
-func runAPI() int {
-	handler := &IPCHandler{}
-	service := api.NewService(os.Stdin, os.Stdout, handler)
-
-	if err := service.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "error in IPC mode: %v\n", err)
-		return 1
-	}
-	return 0
 }

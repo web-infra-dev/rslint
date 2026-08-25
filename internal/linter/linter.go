@@ -222,11 +222,15 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// for all comments unless that inline directive is possible.
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
 		inlineExported, inlineExportedDeclarations := rule.ParseInlineExported(file, comments)
+		var environment rule.RuleEnvironment
+		if filePlan.environment != nil {
+			environment = *filePlan.environment
+		}
 
 		// Resolve immutable language initialization once per file. Globals and
 		// RefStore receive their own concrete data and never inspect the current
 		// selection input (the file extension) themselves.
-		globalsInit, refsInit := rule.ResolveLanguageDefaults(file.FileName())
+		globalsInit, refsInit, languageOptions := rule.ResolveLanguageDefaults(file.FileName(), environment.LanguageOptions)
 
 		fileChecker := chk
 
@@ -242,15 +246,11 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
 		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
-		var environment rule.RuleEnvironment
-		if filePlan.environment != nil {
-			environment = *filePlan.environment
-		}
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
 			Settings:        environment.Settings,
-			LanguageOptions: environment.LanguageOptions,
-			Globals:         rule.NewGlobals(environment.LanguageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
+			LanguageOptions: languageOptions,
+			Globals:         rule.NewGlobals(languageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
 			Exported:        rule.NewExported(inlineExported, inlineExportedDeclarations),
 			Comments:        comments,
 			Refs:            refs,

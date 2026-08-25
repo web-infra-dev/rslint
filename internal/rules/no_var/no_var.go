@@ -273,9 +273,9 @@ func isFunctionNode(node *ast.Node) bool {
 // Condition 3: isGlobalVar checks if a variable is in the global scope (script mode).
 func isGlobalVar(nameNode *ast.Node, ctx *rule.RuleContext) bool {
 	// A syntactic module or a file with module/CommonJS language defaults has a
-	// non-global top-level scope. Plain .js files get ESLint's module default
-	// even when they contain no import/export marker.
-	if ast.IsExternalModule(ctx.SourceFile) || ctx.Refs.HasNonGlobalTopLevelScope() {
+	// non-global top-level scope. Omitted sourceType gets ESLint's module default
+	// even when the file contains no import/export marker.
+	if ctx.Refs.HasNonGlobalProgramScope() {
 		return false
 	}
 	// Check if the declaration is at the source file top level (no enclosing function)

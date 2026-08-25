@@ -1,0 +1,667 @@
+// Rstest Snapshot v1
+
+exports[`sort-vars > invalid 1`] = `
+{
+  "code": "var b, a",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 2`] = `
+{
+  "code": "var b , a",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 3`] = `
+{
+  "code": "var b,
+    a;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 4`] = `
+{
+  "code": "var b=10, a=20;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 5`] = `
+{
+  "code": "var b=10, a=20, c=30;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 6`] = `
+{
+  "code": "var all=10, a = 1",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 7`] = `
+{
+  "code": "var b, c, a, d",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 8`] = `
+{
+  "code": "var c, d, a, b",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 9`] = `
+{
+  "code": "var a, A;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 10`] = `
+{
+  "code": "var a, B;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 11`] = `
+{
+  "code": "var a, B, c;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 12`] = `
+{
+  "code": "var B, a;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 13`] = `
+{
+  "code": "var B, A, c;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 14`] = `
+{
+  "code": "var d, a, [b, c] = {};",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 15`] = `
+{
+  "code": "var d, a, [b, {x: {c, e}}] = {};",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 16`] = `
+{
+  "code": "var {} = 1, b, a",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 17`] = `
+{
+  "code": "var b=10, a=f();",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 18`] = `
+{
+  "code": "var b=10, a=b;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 19`] = `
+{
+  "code": "var b = 0, a = \`\${b}\`;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 20`] = `
+{
+  "code": "var b = 0, a = \`\${f()}\`",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 21`] = `
+{
+  "code": "var b = 0, c = b, a;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 22`] = `
+{
+  "code": "var b = 0, c = 0, a = b + c;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 23`] = `
+{
+  "code": "var b = f(), c, d, a;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 24`] = `
+{
+  "code": "var b = \`\${f()}\`, c, d, a;",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-vars > invalid 25`] = `
+{
+  "code": "var c, a = b = 0",
+  "diagnostics": [
+    {
+      "message": "Variables within the same declaration block should be sorted alphabetically.",
+      "messageId": "sortVars",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

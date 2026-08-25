@@ -39,7 +39,7 @@ type DiagnosticConsumer struct {
 type RuleContext struct {
 	SourceFile *ast.SourceFile
 	Settings   map[string]interface{}
-	// LanguageOptions is the normalized per-file language config.
+	// LanguageOptions is the normalized, effective per-file language config.
 	// Rules should use its Effective methods when they need ESLint defaults.
 	LanguageOptions LanguageOptions
 	fileCache       *FileCache

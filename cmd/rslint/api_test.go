@@ -81,7 +81,7 @@ func TestCanonicalPathVFS_UsesRequestHintBeforeBaseFilesystem(t *testing.T) {
 	base := &canonicalPathBaseFS{FS: osvfs.FS()}
 	fsys := &canonicalPathVFS{
 		FS:             base,
-		canonicalPaths: map[string]string{exactFilesystemPathID("/lexical/a.ts"): "/physical/a.ts"},
+		canonicalPaths: map[string]string{rslintconfig.ExactPathID("/lexical/a.ts"): "/physical/a.ts"},
 	}
 	if got := fsys.Realpath("/lexical/a.ts"); got != "/physical/a.ts" {
 		t.Fatalf("Realpath returned %q, want request hint", got)
@@ -1318,7 +1318,7 @@ func TestHandleLint_SuggestionsConverted(t *testing.T) {
 	}
 }
 
-// F2: pins the suggestion `data` conversion (api.go: Data: sug.Message.Data).
+// F2: pins the suggestion `data` conversion (api_lint.go: Data: sug.Message.Data).
 // no-explicit-any's suggestions carry no data, so use no-restricted-types whose
 // suggestion carries {name, replacement}.
 func TestHandleLint_SuggestionDataConverted(t *testing.T) {
