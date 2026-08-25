@@ -20,10 +20,12 @@ import (
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -62,8 +64,8 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	for index, canonicalPath := range req.CanonicalFiles {
 		filePath := resolveRequestPath(req.Files[index])
 		canonicalPath = resolveRequestPath(canonicalPath)
-		canonicalPaths[exactFilesystemPathID(filePath)] = canonicalPath
-		canonicalPaths[exactFilesystemPathID(canonicalPath)] = canonicalPath
+		canonicalPaths[rslintconfig.ExactPathID(filePath)] = canonicalPath
+		canonicalPaths[rslintconfig.ExactPathID(canonicalPath)] = canonicalPath
 	}
 
 	addAllowedFile := func(filePath string) string {
@@ -137,11 +139,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	fs = programSession.FS()
 
 	var (
-		configMap              map[string]rslintconfig.RslintConfig
-		configTargetScopes     map[string]target.OwnerScope
-		catalogPlugins         []rslintconfig.EslintPluginEntry
-		pluginConfigDirByOwner map[string]string
-		configGitignoreFrozen  bool
+		configMap                    map[string]rslintconfig.RslintConfig
+		configTargetScopes           map[string]target.OwnerScope
+		catalogPlugins               []rslintconfig.EslintPluginEntry
+		pluginConfigDirectoryByOwner map[string]string
+		configGitignoreFrozen        bool
 	)
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
@@ -199,7 +201,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				for _, filePath := range allowedFiles {
 					targetFiles = append(targetFiles, discovery.DiscoveryFile{
 						Path:          filePath,
-						CanonicalPath: canonicalPaths[exactFilesystemPathID(filePath)],
+						CanonicalPath: canonicalPaths[rslintconfig.ExactPathID(filePath)],
 					})
 				}
 			}
@@ -240,18 +242,18 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				// the selected module governs the complete supplied target set.
 				configDirectory = configDirectories[0]
 				rslintConfig = append(rslintconfig.RslintConfig(nil), configCatalog.Configs[configDirectory]...)
-				pluginConfigDirByOwner = map[string]string{configDirectory: configDirectory}
+				pluginConfigDirectoryByOwner = map[string]string{configDirectory: configDirectory}
 				configGitignoreFrozen = true
 			} else {
 				configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
-				pluginConfigDirByOwner = make(map[string]string, len(configCatalog.Configs))
+				pluginConfigDirectoryByOwner = make(map[string]string, len(configCatalog.Configs))
 			}
 			for ownerDirectory, entries := range configCatalog.Configs {
 				if configMap == nil {
 					continue
 				}
 				configMap[ownerDirectory] = append(rslintconfig.RslintConfig(nil), entries...)
-				pluginConfigDirByOwner[ownerDirectory] = ownerDirectory
+				pluginConfigDirectoryByOwner[ownerDirectory] = ownerDirectory
 			}
 			if configMap != nil {
 				configTargetScopes = configCatalog.Scopes
@@ -283,11 +285,15 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			RuleNames: append([]string(nil), plugin.RuleNames...),
 		})
 	}
-	ruleCatalog, shadowedPluginRules := deriveRuleCatalog(pluginEntries)
-	var optionsMessages []string
-	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig, ruleCatalog)
-	if len(optionsMessages) > 0 {
-		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(optionsMessages, "\n"))
+	ruleCatalog, shadowedPluginRules := rules.All().ForESLintPlugins(pluginEntries)
+	var optionErrors []rslintconfig.ResolvedRuleOptionsError
+	configMap, rslintConfig, optionErrors = rslintconfig.ValidateResolvedRuleOptions(configMap, rslintConfig, ruleCatalog)
+	if len(optionErrors) > 0 {
+		messages := make([]string, len(optionErrors))
+		for index, optionError := range optionErrors {
+			messages[index] = optionError.Error()
+		}
+		return nil, fmt.Errorf("invalid rule options:\n%s", strings.Join(messages, "\n"))
 	}
 	reportShadowedPluginRules(shadowedPluginRules)
 
@@ -330,7 +336,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	if len(targetPlan.Files) > 0 {
 		if configMap != nil {
 			projectSet, err = programSession.BuildTargetProjects(
-				configsForOwners(configMap, targetPlan.ActiveOwners()),
+				configMap,
 				targetPlan,
 				false,
 			)
@@ -352,19 +358,19 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	}
 	programs := binding.Programs
 	targetsByProgram := binding.TargetsByProgram
-	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap:               configMap,
-		Config:                  rslintConfig,
-		CurrentDirectory:        configDirectory,
-		RuleCatalog:             ruleCatalog,
-		EnforcePlugins:          true,
-		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
-		SourceMappingsCanonical: true,
-		PathSpaces:              targetPlan.PathSpaces(),
-		FS:                      fs,
+	fileConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
+		ConfigsByOwner:                      configMap,
+		Config:                              rslintConfig,
+		ConfigDirectory:                     configDirectory,
+		Catalog:                             ruleCatalog,
+		EnforcePlugins:                      true,
+		TargetsBySourcePath:                 binding.LintTargetBySourcePath,
+		SourceMappingsIncludeCanonicalPaths: true,
+		PathSpaces:                          targetPlan.PathSpaces(),
+		FS:                                  fs,
 	})
 	targetPathForSourcePath := func(sourcePath string) string {
-		if target, bound := fileConfigResolver.targetForFile(sourcePath); bound {
+		if target, bound := fileConfigResolver.TargetForSourcePath(sourcePath); bound {
 			return target.Path
 		}
 		return sourcePath
@@ -498,7 +504,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 
 	// Every selected target is parsed even when no config entry contributes
 	// rules. Global ignores were already removed during target discovery.
-	syntaxDiagnostics := collectTargetSyntacticDiagnostics(programs, targetsByProgram, false, false)
+	syntaxDiagnostics := linter.CollectTargetSyntacticDiagnostics(programs, targetsByProgram, false)
 	for _, diagnostic := range syntaxDiagnostics {
 		diagnosticCollector(diagnostic)
 	}
@@ -527,7 +533,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			// so a rule carrying a plugin prefix runs only when its plugin is
 			// declared in the config's `plugins` — matching CLI and ESLint
 			// semantics (a rule whose plugin is not declared is skipped).
-			return fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
+			return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
 		},
 		// The API returns concrete fixes, suggestions, and fixable counts
 		// independently of whether req.Fix later applies autofixes.
@@ -548,7 +554,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	var pluginCh <-chan []rule.RuleDiagnostic
 	var cancelPlugin context.CancelFunc
 	if len(pluginEntries) > 0 {
-		if pluginConfigDirByOwner == nil {
+		if pluginConfigDirectoryByOwner == nil {
 			wireConfigDirectory := req.PluginConfigDirectory
 			if wireConfigDirectory == "" {
 				wireConfigDirectory = req.ConfigDirectory
@@ -556,12 +562,12 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			if wireConfigDirectory == "" {
 				wireConfigDirectory = configDirectory
 			}
-			pluginConfigDirByOwner = map[string]string{configDirectory: wireConfigDirectory}
+			pluginConfigDirectoryByOwner = map[string]string{configDirectory: wireConfigDirectory}
 		}
-		pluginInputs := buildPluginFileInputs(runOpts.PreparedPlan, pluginConfigResolver{
-			lintResolver:           fileConfigResolver,
-			pluginConfigDirByOwner: pluginConfigDirByOwner,
-		})
+		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, eslintPluginConfigResolver{
+			lintResolver:                 fileConfigResolver,
+			pluginConfigDirectoryByOwner: pluginConfigDirectoryByOwner,
+		}.resolve)
 		for i := range pluginInputs {
 			// Programmatic lint supports in-memory overlays. Always send the exact
 			// parsed source frame instead of asking the host to re-read disk.
@@ -578,7 +584,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 					return nil, errors.New("bidirectional pluginLint transport is unavailable")
 				}
 			}
-			pluginCh = dispatchPluginLintAsync(pluginCtx, dispatch, pluginInputs, req.Fix, pluginSuggestionsMode(req.Fix), nil)
+			suggestionsMode := linter.SuggestionsModeOff
+			if req.Fix {
+				suggestionsMode = linter.SuggestionsModeEager
+			}
+			pluginCh = dispatchEslintPluginRulesAsync(pluginCtx, dispatch, pluginInputs, req.Fix, suggestionsMode, nil)
 		}
 	}
 	if cancelPlugin != nil {

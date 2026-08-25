@@ -1939,10 +1939,14 @@ func coreTypeDeclarationSelfReferenceCounts(definition *ast.Node) bool {
 }
 
 // isScriptGlobalDefinition models ESLint's global scope for vars:"local".
+// RefStore carries sourceType overrides; parser module syntax is only a
+// fallback for callers that do not provide one.
 // `var` uses its enclosing variable scope even when nested in a block or loop;
 // lexical declarations use tsgo's block-scope container.
-func isScriptGlobalDefinition(sourceFile *ast.SourceFile, definition *ast.Node) bool {
-	if sourceFile == nil || definition == nil || ast.IsExternalModule(sourceFile) {
+func isScriptGlobalDefinition(sourceFile *ast.SourceFile, refs *rule.RefStore, definition *ast.Node) bool {
+	if sourceFile == nil || definition == nil ||
+		(refs != nil && refs.HasNonGlobalProgramScope()) ||
+		(refs == nil && ast.IsExternalModule(sourceFile)) {
 		return false
 	}
 	root := ast.GetRootDeclaration(definition)
@@ -2067,7 +2071,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		return
 	}
 
-	scriptGlobal := isScriptGlobalDefinition(ctx.SourceFile, definition)
+	scriptGlobal := isScriptGlobalDefinition(ctx.SourceFile, ctx.Refs, definition)
 	// vars: "local" skips only the script global scope. ES module top-level
 	// bindings live in a module scope and must still be checked.
 	if opts.Vars == "local" && scriptGlobal {
