@@ -7,7 +7,7 @@ import (
 
 // IsInStrictMode checks whether a node is in strict mode code.
 // Strict mode is active when:
-//   - The file is an ES module (has import/export)
+//   - The file is an ES module
 //   - The file or an enclosing function has a "use strict" directive
 //   - The node is inside a class body (class bodies are implicitly strict in ES2015+)
 //   - The node is inside a TypeScript namespace/module or enum scope
@@ -16,13 +16,21 @@ import (
 // outside the class scope, so they take their strictness from whatever encloses
 // the class.
 func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
-	// ES modules are always strict. ast.IsExternalModule also reports true for
-	// a .cjs file with no import/export at all: TS forces its
-	// ExternalModuleIndicator so it gets its own (non-global) top-level scope,
-	// but it is still CommonJS — sloppy mode by default — not a real ES module.
-	// Such a file is strict only once it uses module syntax itself.
-	if ast.IsExternalModule(sourceFile) &&
-		(HasModuleSyntax(sourceFile) || !IsCommonJSFileExtension(sourceFile.FileName())) {
+	sourceType := "script"
+	if tspath.GetAnyExtensionFromPath(sourceFile.FileName(), nil, false) == tspath.ExtensionCjs {
+		sourceType = "commonjs"
+	} else if ast.IsExternalModule(sourceFile) {
+		sourceType = "module"
+	}
+	return IsInStrictModeWithSourceType(node, sourceFile, sourceType)
+}
+
+// IsInStrictModeWithSourceType is IsInStrictMode with the normalized source
+// goal selected by the caller. CommonJS stays sloppy even when the parser
+// accepts import/export syntax, while an explicitly selected module is strict
+// regardless of syntax or file extension.
+func IsInStrictModeWithSourceType(node *ast.Node, sourceFile *ast.SourceFile, sourceType string) bool {
+	if sourceType == "module" {
 		return true
 	}
 
@@ -64,27 +72,6 @@ func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	}
 
 	return false
-}
-
-// HasModuleSyntax reports whether sourceFile is an external module because of
-// what it contains — an import/export statement, `import.meta`, or a JSX tag
-// under the JSX module detection — rather than because TypeScript forced an
-// ExternalModuleIndicator on it for its file extension alone. TS marks the
-// forced case by pointing the indicator at the source file itself, so an
-// extension-driven module is exactly the one whose indicator is that sentinel.
-func HasModuleSyntax(sourceFile *ast.SourceFile) bool {
-	indicator := sourceFile.ExternalModuleIndicator
-	return indicator != nil && indicator != sourceFile.AsNode()
-}
-
-// IsCommonJSFileExtension reports whether fileName's extension makes the file
-// CommonJS rather than an ES module. ESLint's default language selection picks
-// CommonJS for exactly one extension, .cjs; every other name, .cts included,
-// falls back to the module default. A .cjs file still gets its own (non-global)
-// top-level scope, so callers deriving module-ness from scoping need this to
-// tell that wrapper scope apart from a real ES module's.
-func IsCommonJSFileExtension(fileName string) bool {
-	return tspath.GetAnyExtensionFromPath(fileName, nil, false) == tspath.ExtensionCjs
 }
 
 // HasUseStrictDirective checks if a block or source file starts with a "use strict" directive.

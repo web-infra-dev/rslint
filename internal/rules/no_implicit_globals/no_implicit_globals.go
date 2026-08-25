@@ -57,15 +57,10 @@ var globalVariableLeakMessage = rule.RuleMessage{
 // the global scope, assignments to undeclared (implicit global) variables, and
 // redeclarations of or assignments to read-only global variables.
 //
-// NOTE: Unlike ESLint, rslint does not expose languageOptions.sourceType or
-// parserOptions.ecmaFeatures.globalReturn (see PORT_RULE.md's framework-gap
-// list). "Is this the global scope" is instead derived from the file's actual
-// module-ness: ast.IsExternalModule (module syntax, or an extension TypeScript
-// forces module-ness on) combined with the resolved language defaults for the
-// file extension (ctx.Refs.HasNonGlobalTopLevelScope, which covers .cjs's
-// CommonJS wrapper and .js/.mjs's default module treatment) — the same
-// combination no_redeclare already uses for its own "is this the Program's
-// global scope" check.
+// NOTE: rslint does not expose parserOptions.ecmaFeatures.globalReturn. Whether
+// this is a global program scope comes from the normalized sourceType and the
+// matching RefStore initialization; this is the same answer no_redeclare uses
+// for its own Program-scope check.
 var NoImplicitGlobalsRule = rule.Rule{
 	Name:   "no-implicit-globals",
 	Schema: rule.NewSchema(schemaJSON),
@@ -75,25 +70,19 @@ var NoImplicitGlobalsRule = rule.Rule{
 		}
 		opts := parseOptions(rawOptions)
 
-		hasNonGlobalTopLevelScope := ast.IsExternalModule(ctx.SourceFile) ||
-			(ctx.Refs != nil && ctx.Refs.HasNonGlobalTopLevelScope())
+		hasNonGlobalProgramScope := ctx.Refs != nil && ctx.Refs.HasNonGlobalProgramScope()
 
 		// ESLint records an implicit global only for a write in sloppy-mode
 		// code, so top-level strictness decides whether a leak is reportable.
-		// It comes from the same module-ness the declaration checks use, minus
-		// CommonJS: a .cjs file has its own top-level scope without being an ES
-		// module, so its top level stays sloppy until it uses module syntax
-		// itself.
-		strictTopLevel := hasNonGlobalTopLevelScope &&
-			(utils.HasModuleSyntax(ctx.SourceFile) || !utils.IsCommonJSFileExtension(ctx.SourceFile.FileName()))
-
+		// It comes from the resolved source goal rather than syntax alone:
+		// CommonJS stays sloppy even when the parser accepts import/export.
 		listeners := rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				checkImplicitGlobalWrite(ctx, node, strictTopLevel)
+				checkImplicitGlobalWrite(ctx, node)
 			},
 		}
 
-		if hasNonGlobalTopLevelScope {
+		if hasNonGlobalProgramScope {
 			return listeners
 		}
 
@@ -275,15 +264,16 @@ func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode 
 // Inner scopes hold separate variables that a value reference never resolves
 // to, so the same declaration inside a function or namespace leaves the name
 // global — the distinction IsGlobalNameReference draws.
-func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLevel bool) {
+func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node) {
 	root, writes := findPureAssignmentRoot(node)
 	if root == nil {
 		return
 	}
 	name := node.Text()
-	syntheticPatternName := isSyntheticPatternName(node)
-	if ctx.Refs != nil && !syntheticPatternName &&
-		!ctx.Refs.IsGlobalNameReference(node, name, ast.SymbolFlagsValue) {
+	// PatternVisitor records every target write in the scope containing the
+	// outer assignment, even when the identifier is syntactically inside an
+	// arrow, function, or class expression. Resolve from that same location.
+	if ctx.Refs != nil && !ctx.Refs.IsGlobalNameReference(root, name, ast.SymbolFlagsValue) {
 		return
 	}
 	switch ctx.Globals.Access(name) {
@@ -297,34 +287,12 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, strictTopLev
 	case utils.GlobalAccessWritable:
 		// Writable globals may be freely assigned.
 	default:
-		strictnessNode := node
-		if syntheticPatternName {
-			// PatternVisitor's synthetic write belongs to the containing
-			// assignment, outside a function/class expression's own scope.
-			strictnessNode = root
-		}
-		if !strictTopLevel && !utils.IsInStrictMode(strictnessNode, ctx.SourceFile) {
+		if !utils.IsInStrictModeWithSourceType(root, ctx.SourceFile, ctx.LanguageOptions.EffectiveSourceType()) {
 			for range writes {
 				ctx.ReportNode(root, globalVariableLeakMessage)
 			}
 		}
 	}
-}
-
-// isSyntheticPatternName reports a function/class expression name that
-// PatternVisitor reaches as an assignment target while traversing a
-// parser-accepted expression-shaped pattern. The ordinary reference index
-// correctly resolves such a name to its expression-local self-binding, but
-// scope-manager's synthetic pattern traversal records a separate global write.
-func isSyntheticPatternName(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-	parent := node.Parent
-	if parent.Kind != ast.KindFunctionExpression && parent.Kind != ast.KindClassExpression {
-		return false
-	}
-	return parent.Name() == node && utils.IsInDestructuringAssignment(parent)
 }
 
 // findPureAssignmentRoot walks from a candidate write-target identifier up
@@ -455,6 +423,10 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 
 		case ast.KindParenthesizedExpression:
 			current = parent
+
+		case ast.KindDecorator:
+			// PatternVisitor deliberately skips decorator subtrees.
+			return nil, 0
 
 		case ast.KindCallExpression:
 			// PatternVisitor treats call arguments as right-hand reads, but

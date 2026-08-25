@@ -54,23 +54,26 @@ func TestIsInStrictMode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		code     string
-		kind     ast.Kind
-		expected bool
+		name       string
+		code       string
+		kind       ast.Kind
+		sourceType string
+		expected   bool
 	}{
 		// === ES Module (import/export) → strict ===
 		{
-			name:     "ES module with export",
-			code:     `export {}; if (true) function f() {}`,
-			kind:     ast.KindFunctionDeclaration,
-			expected: true,
+			name:       "ES module with export",
+			code:       `export {}; if (true) function f() {}`,
+			kind:       ast.KindFunctionDeclaration,
+			sourceType: "module",
+			expected:   true,
 		},
 		{
-			name:     "ES module with import",
-			code:     `import "foo"; if (true) function f() {}`,
-			kind:     ast.KindFunctionDeclaration,
-			expected: true,
+			name:       "ES module with import",
+			code:       `import "foo"; if (true) function f() {}`,
+			kind:       ast.KindFunctionDeclaration,
+			sourceType: "module",
+			expected:   true,
 		},
 
 		// === "use strict" at file level → strict ===
@@ -188,7 +191,11 @@ func TestIsInStrictMode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			node, sourceFile := parseAndFindNode(t, tt.code, tt.kind)
-			result := IsInStrictMode(node, sourceFile)
+			sourceType := tt.sourceType
+			if sourceType == "" {
+				sourceType = "script"
+			}
+			result := IsInStrictModeWithSourceType(node, sourceFile, sourceType)
 			assert.Equal(t, result, tt.expected, "IsInStrictMode mismatch for: %s", tt.code)
 		})
 	}
@@ -196,54 +203,68 @@ func TestIsInStrictMode(t *testing.T) {
 
 // TestIsInStrictModeByFileExtension covers the extensions TypeScript hands an
 // ExternalModuleIndicator on the strength of the name alone. .cjs gets one so
-// it receives its own top-level scope, but it stays CommonJS — sloppy mode —
-// until it uses module syntax itself. .mjs/.mts are genuine ESM either way, and
-// so is .cts: ESLint's default language selection picks CommonJS for .cjs
-// alone.
+// it receives its own top-level scope, but its default source goal stays
+// CommonJS — sloppy mode — even when the parser accepts module syntax.
+// .mjs/.mts are genuine ESM either way, and so is .cts: ESLint's default
+// language selection picks CommonJS for .cjs alone.
 func TestIsInStrictModeByFileExtension(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		code     string
-		fileName string
-		tsconfig string
-		expected bool
+		name       string
+		code       string
+		fileName   string
+		tsconfig   string
+		sourceType string
+		expected   bool
 	}{
 		{
-			name:     "cts without module syntax",
-			code:     `if (true) function f() {}`,
-			fileName: "commonjs.cts",
-			tsconfig: "tsconfig.json",
-			expected: true,
+			name:       "cts without module syntax",
+			code:       `if (true) function f() {}`,
+			fileName:   "commonjs.cts",
+			tsconfig:   "tsconfig.json",
+			sourceType: "module",
+			expected:   true,
 		},
 		{
-			name:     "cts with export",
-			code:     `export {}; if (true) function f() {}`,
-			fileName: "module.cts",
-			tsconfig: "tsconfig.json",
-			expected: true,
+			name:       "cts with export",
+			code:       `export {}; if (true) function f() {}`,
+			fileName:   "module.cts",
+			tsconfig:   "tsconfig.json",
+			sourceType: "module",
+			expected:   true,
 		},
 		{
-			name:     "mts without module syntax",
-			code:     `if (true) function f() {}`,
-			fileName: "module.mts",
-			tsconfig: "tsconfig.json",
-			expected: true,
+			name:       "mts without module syntax",
+			code:       `if (true) function f() {}`,
+			fileName:   "module.mts",
+			tsconfig:   "tsconfig.json",
+			sourceType: "module",
+			expected:   true,
 		},
 		{
-			name:     "cjs without module syntax",
-			code:     `if (true) function f() {}`,
-			fileName: "commonjs.cjs",
-			tsconfig: "tsconfig.allow-js.json",
-			expected: false,
+			name:       "cjs without module syntax",
+			code:       `if (true) function f() {}`,
+			fileName:   "commonjs.cjs",
+			tsconfig:   "tsconfig.allow-js.json",
+			sourceType: "commonjs",
+			expected:   false,
 		},
 		{
-			name:     "mjs without module syntax",
-			code:     `if (true) function f() {}`,
-			fileName: "module.mjs",
-			tsconfig: "tsconfig.allow-js.json",
-			expected: true,
+			name:       "cjs with module syntax",
+			code:       `export {}; if (true) function f() {}`,
+			fileName:   "commonjs-module-syntax.cjs",
+			tsconfig:   "tsconfig.allow-js.json",
+			sourceType: "commonjs",
+			expected:   false,
+		},
+		{
+			name:       "mjs without module syntax",
+			code:       `if (true) function f() {}`,
+			fileName:   "module.mjs",
+			tsconfig:   "tsconfig.allow-js.json",
+			sourceType: "module",
+			expected:   true,
 		},
 	}
 
@@ -251,7 +272,7 @@ func TestIsInStrictModeByFileExtension(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			node, sourceFile := parseFileAndFindNode(t, tt.code, ast.KindFunctionDeclaration, tt.fileName, tt.tsconfig)
-			result := IsInStrictMode(node, sourceFile)
+			result := IsInStrictModeWithSourceType(node, sourceFile, tt.sourceType)
 			assert.Equal(t, result, tt.expected, "IsInStrictMode mismatch for: %s", tt.fileName)
 		})
 	}

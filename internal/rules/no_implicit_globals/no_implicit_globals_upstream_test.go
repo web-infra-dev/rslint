@@ -36,7 +36,7 @@ func TestNoImplicitGlobalsUpstream(t *testing.T) {
 		"tsconfig.json",
 		t,
 		&NoImplicitGlobalsRule,
-		[]rule_tester.ValidTestCase{
+		withScriptDefaults([]rule_tester.ValidTestCase{
 			// ---- General ----
 
 			// Recommended way to create a global variable in the browser
@@ -226,8 +226,8 @@ func TestNoImplicitGlobalsUpstream(t *testing.T) {
 			{Code: `/* exported a, b, C */ const a = 1; let b; class C {}`, Options: lexical},
 			{Code: `/* exported a, b, c */ const [a, b, ...c] = [];`, Options: lexical},
 			{Code: `/* exported a, b, c */ let { a, foo: b, bar: { c } } = {};`, Options: lexical},
-		},
-		[]rule_tester.InvalidTestCase{
+		}),
+		withScriptDefaults([]rule_tester.InvalidTestCase{
 			// ---- `var` and function declarations ----
 
 			{
@@ -856,6 +856,6 @@ func TestNoImplicitGlobalsUpstream(t *testing.T) {
 				Code:   `/* exported foo */ for (foo of []);`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: globalVariableLeak, Message: leakMessage}},
 			},
-		},
+		}),
 	)
 }

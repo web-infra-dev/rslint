@@ -22,7 +22,7 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 		"tsconfig.json",
 		t,
 		&NoImplicitGlobalsRule,
-		[]rule_tester.ValidTestCase{
+		withScriptDefaults([]rule_tester.ValidTestCase{
 			// ---- Dimension 4: receiver wrappers, opaque TS wrappers ----
 
 			// The single unwrap an AssignmentExpression's Left gets sheds an
@@ -116,7 +116,10 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// The directive is read from the shared inline-directive view, so it
 			// still applies where this rule's declaration checks are switched
 			// off — a module file keeps its readonly-global protection.
-			{Code: "/* exported Array */\nexport {};\nArray = 1;"},
+			{
+				Code:            "/* exported Array */\nexport {};\nArray = 1;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			},
 
 			// ---- A global script's top-level declarations all define the
 			// global-scope variable, type-only ones included ----
@@ -149,6 +152,10 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// identifier inside it is itself a write target.
 			{Code: `[foo.bar] = arr;`},
 
+			// PatternVisitor skips decorator subtrees even when the decorated
+			// class appears inside an expression-shaped assignment pattern.
+			{Code: `[@foo class {}] = arr;`},
+
 			// Within an expression-shaped pattern element, the right side of a
 			// compound assignment stays a read. A writable left side therefore
 			// leaves no implicit write to report for `bar`.
@@ -162,8 +169,8 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// ---- Block scopes exist from ES2015 on ----
 			{Code: `{ function foo() {} }`},
 			{Code: `if (true) { function foo() {} }`},
-		},
-		[]rule_tester.InvalidTestCase{
+		}),
+		withScriptDefaults([]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: receiver wrappers on the leak/readonly identifier ----
 
 			// Locks in: parenthesized assignment target is still a pure write —
@@ -275,6 +282,25 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{
 				Code:   `[class C {}] = arr;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			// The decorator's callee and arguments stay reads, while the class
+			// name outside that subtree remains a synthetic pattern write.
+			{
+				Code:   `[@dec(foo) class C {}] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			// Every identifier PatternVisitor visits is resolved from the scope
+			// containing the outer assignment. Arrow parameters therefore become
+			// synthetic writes, while a real outer binding still suppresses one.
+			{
+				Code:   `[(foo => 0)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code: `var C; [class C {}] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalNonLexicalBinding"},
+				},
 			},
 
 			// A default under object rest still contributes an extra write, and
@@ -503,6 +529,12 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				TSConfig: "tsconfig.allow-js.json",
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
+			{
+				Code:     `export {}; foo = 1;`,
+				FileName: "cjs/commonjs-module-syntax-leak.cjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
 
 			// ---- Dimension 4: `satisfies` inside a real pattern ----
 			//
@@ -591,6 +623,22 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Code:   "/* exported foo */\nfoo = 1;",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
-		},
+		}),
 	)
+}
+
+func withScriptDefaults[T rule_tester.ValidTestCase | rule_tester.InvalidTestCase](cases []T) []T {
+	for i := range cases {
+		switch testCase := any(&cases[i]).(type) {
+		case *rule_tester.ValidTestCase:
+			if testCase.FileName == "" && testCase.LanguageOptions.SourceType == "" {
+				testCase.LanguageOptions.SourceType = "script"
+			}
+		case *rule_tester.InvalidTestCase:
+			if testCase.FileName == "" && testCase.LanguageOptions.SourceType == "" {
+				testCase.LanguageOptions.SourceType = "script"
+			}
+		}
+	}
+	return cases
 }
