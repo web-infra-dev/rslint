@@ -1,33 +1,19 @@
 # Rslint
 
-🚀 Rocket Speed Linter - A high-performance TypeScript/JavaScript linter written in Go.
+<p>
+  <a href="https://npmjs.com/package/@rslint/core?activeTab=readme"><img src="https://img.shields.io/npm/v/@rslint/core?style=flat-square&colorA=564341&colorB=EDED91" alt="npm version" /></a>
+  <a href="https://npmcharts.com/compare/@rslint/core?minimal=true"><img src="https://img.shields.io/npm/dm/@rslint/core.svg?style=flat-square&colorA=564341&colorB=EDED91" alt="downloads" /></a>
+  <a href="https://github.com/web-infra-dev/rslint/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square&colorA=564341&colorB=EDED91" alt="license" /></a>
+</p>
 
-## Features
+Rslint is a high-performance, ESLint-compatible linter for JavaScript and TypeScript.
 
-- ⚡ **Ultra-fast**: 10x+ faster than ESLint through Go-powered parallel processing
-- 🎯 **Typed linting first**: Enables typed linting by default for advanced semantic analysis
-- 🔧 **Easy migration**: Compatible with ESLint and TypeScript-ESLint rule configurations
-- 🏗️ **Project-level analysis**: Performs cross-module analysis for better linting results
-- 📦 **Monorepo support**: First-class support for large-scale TypeScript monorepos
-- 🔋 **Batteries included**: Ships with all TypeScript-ESLint rules out of the box
-
-## Installation
-
-```bash
-npm install -D @rslint/core
-```
-
-## Quick Start
-
-```bash
-
-# Lint your project
-npx rslint
-
-# See available options
-npx rslint --help
-```
+Powered by [TypeScript's native compiler](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/), it delivers a faster drop-in experience with type-aware rules and optional type checking in the same run.
 
 ## Documentation
 
-See the [main repository](https://github.com/web-infra-dev/rslint) for complete documentation and examples.
+Visit <https://rslint.rs/> to view the full documentation.
+
+## License
+
+MIT License.
