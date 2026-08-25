@@ -52,7 +52,7 @@ import type { GlobalsConfig } from '../types.js';
  * The forwarded subset of ESLint flat-config `languageOptions` exposed
  * to plugin rules as `context.languageOptions`. Plugin rules read it
  * to branch on `languageOptions.parserOptions.ecmaFeatures.jsx`,
- * `parserOptions.sourceType`, or `languageOptions.globals`.
+ * `languageOptions.sourceType`, or `languageOptions.globals`.
  *
  * Field set matches what the wire payload from Go carries in each file's
  * `languageOptions` (computed by Go via `GetConfigForFile`); out-of-band
@@ -119,7 +119,7 @@ export interface CreateContextOptions {
    * Forwarded `languageOptions` for this file. Read by plugin rules
    * via `context.languageOptions`. Many real-world plugins branch on
    * `languageOptions.parserOptions.ecmaFeatures.jsx`,
-   * `parserOptions.sourceType`, or `languageOptions.globals` — passing
+   * `languageOptions.sourceType`, or `languageOptions.globals` — passing
    * undefined here is acceptable but loses that compatibility surface.
    */
   languageOptions?: LanguageOptions;

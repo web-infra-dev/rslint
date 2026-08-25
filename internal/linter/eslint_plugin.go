@@ -132,7 +132,11 @@ type EslintPluginFileInput struct {
 // or text (LSP — the overlay the worker lints); see EslintPluginFileInput.
 func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.ConfiguredRule, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) (EslintPluginFileInput, bool) {
 	var pluginRules []rule.ConfiguredRule
+	var normalizedLanguageOptions rule.LanguageOptions
 	for _, r := range rules {
+		if r.Environment != nil {
+			normalizedLanguageOptions = r.Environment.LanguageOptions
+		}
 		if r.IsEslintPluginRule {
 			pluginRules = append(pluginRules, r)
 		}
@@ -140,12 +144,19 @@ func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.Configu
 	if len(pluginRules) == 0 {
 		return EslintPluginFileInput{}, false
 	}
+	_, _, normalizedLanguageOptions = rule.ResolveLanguageDefaults(filePath, normalizedLanguageOptions)
+	effectiveLanguageOptions := make(map[string]any, len(languageOptions)+2)
+	for name, value := range languageOptions {
+		effectiveLanguageOptions[name] = value
+	}
+	effectiveLanguageOptions["ecmaVersion"] = normalizedLanguageOptions.EffectiveECMAVersion()
+	effectiveLanguageOptions["sourceType"] = normalizedLanguageOptions.EffectiveSourceType()
 	return EslintPluginFileInput{
 		Path:            filePath,
 		Text:            text,
 		SourceFile:      sourceFile,
 		ConfigKey:       configKey,
-		LanguageOptions: languageOptions,
+		LanguageOptions: effectiveLanguageOptions,
 		Settings:        settings,
 		Rules:           pluginRules,
 	}, true

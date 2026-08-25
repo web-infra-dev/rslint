@@ -577,6 +577,18 @@ func TestPreferHooksInOrderRule(t *testing.T) {
 					{MessageId: "reorderHooks", Line: 38, Column: 13},
 				},
 			},
+			{
+				Code: `
+        afterAll(() => {
+          beforeEach(() => {});
+          doSomething();
+        });
+        beforeAll(() => {});
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "reorderHooks", Line: 6, Column: 9},
+				},
+			},
 		},
 	)
 }

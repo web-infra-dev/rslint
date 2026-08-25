@@ -144,33 +144,10 @@ func convertToRegExp(term, location, escapedDecoration string) *esregexp.RegExp 
 // doesn't accidentally trip its own configured terms.
 var selfConfigRegex = esregexp.MustCompile(`\bno-warning-comments\b`, "u")
 
-// eslintDirectivePattern ports astUtils.ESLINT_DIRECTIVE_PATTERN, used to
-// recognize block-comment directives (`/*eslint ...*/`, `/*global ...*/`,
-// `/*exported ...*/`) by their leading text.
-var eslintDirectivePattern = esregexp.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`, "u")
-
-// isDirectiveComment ports astUtils.isDirectiveComment: a Line comment is a
-// directive if its trimmed text starts with "eslint-"; a Block comment is a
-// directive if its trimmed text matches eslintDirectivePattern. Both forms
-// also accept the "rslint-" prefix this linter recognizes alongside "eslint-".
-func isDirectiveComment(kind ast.Kind, trimmedValue string) bool {
-	isLintDirective := strings.HasPrefix(trimmedValue, "eslint-") ||
-		strings.HasPrefix(trimmedValue, "rslint-")
-
-	switch kind {
-	case ast.KindSingleLineCommentTrivia:
-		return isLintDirective
-	case ast.KindMultiLineCommentTrivia:
-		return isLintDirective || eslintDirectivePattern.Test(trimmedValue)
-	default:
-		return false
-	}
-}
-
 func checkComment(ctx rule.RuleContext, text string, comment *ast.CommentRange, terms []string, warningRegExps []*esregexp.RegExp) {
 	value := utils.CommentValue(text, comment)
 
-	if isDirectiveComment(comment.Kind, ecmascript.StringTrim(value)) && selfConfigRegex.Test(value) {
+	if utils.IsDirectiveComment(comment.Kind, ecmascript.StringTrim(value)) && selfConfigRegex.Test(value) {
 		return
 	}
 

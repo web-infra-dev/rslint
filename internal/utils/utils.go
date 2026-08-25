@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -77,6 +76,23 @@ func GetVarDeclListKind(node *ast.Node) string {
 func TrimmedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	r := TrimNodeTextRange(sourceFile, node)
 	return sourceFile.Text()[r.Pos():r.End()]
+}
+
+// IsESTreeLiteralKind reports whether kind maps to ESTree's Literal node.
+// Template literals are intentionally excluded: ESTree represents them with
+// TemplateLiteral even when they contain no substitutions.
+func IsESTreeLiteralKind(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindStringLiteral,
+		ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword:
+		return true
+	}
+	return false
 }
 
 // RangeEnclosingDelimiters widens the inner range [start, end) outward to the
@@ -603,7 +619,10 @@ func NaturalCompare(a, b string) int {
 	if a == b {
 		return 0
 	}
-	left, right := codeUnits(a), codeUnits(b)
+	// natural-compare walks the string by the code units JavaScript indexes it
+	// by, so a character outside the basic plane compares as the first of the
+	// two it is written with.
+	left, right := ecmascript.StringCodeUnits(a), ecmascript.StringCodeUnits(b)
 	positionA, positionB := 0, 0
 	// The walk runs until b is spent, which only happens with a spent as
 	// well: any earlier difference has already been answered.
@@ -679,20 +698,4 @@ func naturalNumber(units []uint16, position int) (float64, int) {
 		return 0, end
 	}
 	return value, end
-}
-
-// codeUnits reads s as the UTF-16 code units JavaScript indexes a string by,
-// which is what natural-compare walks: a character outside the basic plane is
-// two of them, and compares as the first of the two.
-func codeUnits(s string) []uint16 {
-	units := make([]uint16, 0, len(s))
-	for _, r := range s {
-		if r > 0xFFFF {
-			high, low := utf16.EncodeRune(r)
-			units = append(units, uint16(high), uint16(low))
-			continue
-		}
-		units = append(units, uint16(r))
-	}
-	return units
 }

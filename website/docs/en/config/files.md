@@ -42,4 +42,4 @@ File selection is independent of a tsconfig's `include`. A file in tsconfig but 
 Selected files not covered by a tsconfig declared by their governing config automatically receive a reduced rule set: only rules that do not require type information run. To enable type-aware rules, add the file to one of that config's tsconfigs. See [`languageOptions.parserOptions.project`](/config/language-options#languageoptionsparseroptionsproject).
 :::
 
-Relative patterns are resolved from the config file's directory for automatically discovered configs, or from the current working directory when the config is supplied with `--config`.
+Relative patterns in a config file are resolved from that file's directory. Relative patterns in the JavaScript API's inline `overrideConfig` are resolved from the API `cwd`.
