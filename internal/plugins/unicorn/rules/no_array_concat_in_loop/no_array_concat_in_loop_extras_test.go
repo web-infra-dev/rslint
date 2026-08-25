@@ -19,7 +19,7 @@ func TestNoArrayConcatInLoopExtras(t *testing.T) {
 		t,
 		&no_array_concat_in_loop.NoArrayConcatInLoopRule,
 		[]rule_tester.ValidTestCase{
-			// Locks in isReassignableEmptyArrayVariable: top-level let/var declarations
+			// Locks in isGlobalScopeVariable: top-level let/var declarations
 			// belong to ESLint's global scope in script files and are excluded.
 			{
 				Code:            `let result = []; for (const chunk of chunks) { result = result.concat(chunk); }`,
