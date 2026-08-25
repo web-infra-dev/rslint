@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -12,10 +12,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
-// eslintPluginConfigResolver projects the CLI-selected config into the plugin
-// worker's owner-directory routing identity and serializable config maps.
+// eslintPluginConfigResolver projects the API-selected config into the plugin
+// host's opaque routing identity and serializable config maps.
 type eslintPluginConfigResolver struct {
-	lintResolver *configLint.Resolver
+	lintResolver           *configLint.Resolver
+	pluginConfigKeyByOwner map[string]string
 }
 
 func (resolver eslintPluginConfigResolver) resolve(filePath string) linter.EslintPluginFileConfig {
@@ -26,9 +27,13 @@ func (resolver eslintPluginConfigResolver) resolve(filePath string) linter.Eslin
 	if !ok {
 		return linter.EslintPluginFileConfig{}
 	}
+	configKey := ownerDirectory
+	if pluginConfigKey, ok := resolver.pluginConfigKeyByOwner[ownerDirectory]; ok {
+		configKey = pluginConfigKey
+	}
 	languageOptions, settings := rslintconfig.PluginMergedMaps(resolved.MergedConfig)
 	return linter.EslintPluginFileConfig{
-		ConfigKey:       ownerDirectory,
+		ConfigKey:       configKey,
 		LanguageOptions: languageOptions,
 		Settings:        settings,
 	}

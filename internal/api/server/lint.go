@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispatch linter.EslintPluginDispatcher, requester api.Requester) (*api.LintResponse, error) {
+func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch linter.EslintPluginDispatcher, requester api.Requester) (*api.LintResponse, error) {
 
 	// Resolve the working directory WITHOUT os.Chdir: this is a long-lived,
 	// reused --api process, so mutating the process-global cwd would leak
@@ -139,11 +139,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	fs = programSession.FS()
 
 	var (
-		configMap                    map[string]rslintconfig.RslintConfig
-		configTargetScopes           map[string]target.OwnerScope
-		catalogPlugins               []rslintconfig.EslintPluginEntry
-		pluginConfigDirectoryByOwner map[string]string
-		configGitignoreFrozen        bool
+		configMap              map[string]rslintconfig.RslintConfig
+		configTargetScopes     map[string]target.OwnerScope
+		catalogPlugins         []rslintconfig.EslintPluginEntry
+		pluginConfigKeyByOwner map[string]string
+		configGitignoreFrozen  bool
 	)
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
@@ -242,18 +242,18 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 				// the selected module governs the complete supplied target set.
 				configDirectory = configDirectories[0]
 				rslintConfig = append(rslintconfig.RslintConfig(nil), configCatalog.Configs[configDirectory]...)
-				pluginConfigDirectoryByOwner = map[string]string{configDirectory: configDirectory}
+				pluginConfigKeyByOwner = map[string]string{configDirectory: configDirectory}
 				configGitignoreFrozen = true
 			} else {
 				configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
-				pluginConfigDirectoryByOwner = make(map[string]string, len(configCatalog.Configs))
+				pluginConfigKeyByOwner = make(map[string]string, len(configCatalog.Configs))
 			}
 			for ownerDirectory, entries := range configCatalog.Configs {
 				if configMap == nil {
 					continue
 				}
 				configMap[ownerDirectory] = append(rslintconfig.RslintConfig(nil), entries...)
-				pluginConfigDirectoryByOwner[ownerDirectory] = ownerDirectory
+				pluginConfigKeyByOwner[ownerDirectory] = ownerDirectory
 			}
 			if configMap != nil {
 				configTargetScopes = configCatalog.Scopes
@@ -551,10 +551,10 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 	// Metadata is the feature gate: without it there is no plugin target walk,
 	// goroutine, or reverse request. With metadata, dispatch starts before the
 	// native pass and runs in parallel, matching the CLI pipeline.
-	var pluginCh <-chan []rule.RuleDiagnostic
+	var pluginCh <-chan linter.EslintPluginDispatchOutcome
 	var cancelPlugin context.CancelFunc
 	if len(pluginEntries) > 0 {
-		if pluginConfigDirectoryByOwner == nil {
+		if pluginConfigKeyByOwner == nil {
 			wireConfigDirectory := req.PluginConfigDirectory
 			if wireConfigDirectory == "" {
 				wireConfigDirectory = req.ConfigDirectory
@@ -562,11 +562,11 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			if wireConfigDirectory == "" {
 				wireConfigDirectory = configDirectory
 			}
-			pluginConfigDirectoryByOwner = map[string]string{configDirectory: wireConfigDirectory}
+			pluginConfigKeyByOwner = map[string]string{configDirectory: wireConfigDirectory}
 		}
 		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, eslintPluginConfigResolver{
-			lintResolver:                 fileConfigResolver,
-			pluginConfigDirectoryByOwner: pluginConfigDirectoryByOwner,
+			lintResolver:           fileConfigResolver,
+			pluginConfigKeyByOwner: pluginConfigKeyByOwner,
 		}.resolve)
 		for i := range pluginInputs {
 			// Programmatic lint supports in-memory overlays. Always send the exact
@@ -588,7 +588,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 			if req.Fix {
 				suggestionsMode = linter.SuggestionsModeEager
 			}
-			pluginCh = dispatchEslintPluginRulesAsync(pluginCtx, dispatch, pluginInputs, req.Fix, suggestionsMode, nil)
+			pluginCh = linter.DispatchEslintPluginRulesAsync(pluginCtx, dispatch, pluginInputs, req.Fix, suggestionsMode, nil, reportEslintPluginDispatchOutcome)
 		}
 	}
 	if cancelPlugin != nil {
@@ -601,7 +601,7 @@ func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispat
 		return nil, fmt.Errorf("error running linter: %w", err)
 	}
 	if pluginCh != nil {
-		for _, diagnostic := range <-pluginCh {
+		for _, diagnostic := range (<-pluginCh).Diagnostics {
 			diagnosticCollector(diagnostic)
 		}
 	}

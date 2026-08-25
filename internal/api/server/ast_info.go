@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -30,7 +30,7 @@ type programCache struct {
 var astInfoProgramCache = &programCache{}
 
 // HandleGetAstInfo handles get AST info requests in IPC mode
-func (h *IPCHandler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoResponse, error) {
+func (h *Handler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoResponse, error) {
 	// Fixed user file name for program creation
 	const userFileName = "/index.ts"
 
