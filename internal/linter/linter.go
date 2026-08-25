@@ -310,7 +310,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		var childVisitor ast.Visitor
 		var patternVisitor func(node *ast.Node)
 		patternVisitor = func(node *ast.Node) {
-			if expression := utils.JSDocTypeAssertionExpression(node); expression != nil {
+			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
 				patternVisitor(expression)
 				return
 			}
@@ -350,7 +350,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			runListeners(rule.ListenerOnExit(node.Kind), node)
 		}
 		childVisitor = func(node *ast.Node) bool {
-			if expression := utils.JSDocTypeAssertionExpression(node); expression != nil {
+			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
 				childVisitor(expression)
 				return false
 			}

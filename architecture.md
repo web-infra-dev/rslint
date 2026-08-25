@@ -232,7 +232,9 @@ Important characteristics:
 - **Traversal Style**: `ForEachChild(...)` with depth-first recursion
 - **JSDoc Boundary**: synthetic syntax reparsed from JSDoc is excluded from
   rule-listener traversal; comment-aware rules use the shared comment store or
-  TypeScript-Go's explicit JSDoc APIs
+  TypeScript-Go's explicit JSDoc APIs. Hosted tags can also populate fields on
+  ordinary source nodes, so syntax-sensitive rules use authored-only AST views
+  without removing JSDoc semantics from the type checker.
 - **Source Locations**: node ranges and source-file-aware line/column conversion via scanner helpers
 - **Comments**: exposed through one lazy per-file store for directives and comment-based rules
 

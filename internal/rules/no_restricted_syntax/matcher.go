@@ -618,7 +618,7 @@ func hasMatching(node *ast.Node, sel selector, mc *matchContext) bool {
 		matched := false
 		var visitDirect func(child *ast.Node) bool
 		visitDirect = func(child *ast.Node) bool {
-			if expression := utils.JSDocTypeAssertionExpression(child); expression != nil {
+			if expression := utils.JSDocTypeCastExpression(child); expression != nil {
 				return visitDirect(expression)
 			}
 			if utils.IsJSDocSyntaxNode(child) {
@@ -647,7 +647,7 @@ func hasDescendantMatching(node *ast.Node, sel selector, mc *matchContext) bool 
 		if found {
 			return true
 		}
-		if expression := utils.JSDocTypeAssertionExpression(n); expression != nil {
+		if expression := utils.JSDocTypeCastExpression(n); expression != nil {
 			return visit(expression)
 		}
 		if utils.IsJSDocSyntaxNode(n) {
@@ -1125,7 +1125,7 @@ func unwrapExpression(node *ast.Node) *ast.Node {
 
 func unwrapEstreeNode(node *ast.Node) *ast.Node {
 	for node != nil {
-		if expression := utils.JSDocTypeAssertionExpression(node); expression != nil {
+		if expression := utils.JSDocTypeCastExpression(node); expression != nil {
 			node = expression
 			continue
 		}
@@ -1156,7 +1156,7 @@ func estreeParent(node *ast.Node) *ast.Node {
 	}
 	parent := node.Parent
 	for parent != nil {
-		if utils.IsJSDocTypeAssertionWrapper(parent) {
+		if utils.IsJSDocTypeCastWrapper(parent) {
 			parent = parent.Parent
 			continue
 		}
@@ -2197,7 +2197,7 @@ func readParamsAttr(node *ast.Node) (interface{}, bool) {
 	if !isFunctionLikeForParams(node) {
 		return nil, false
 	}
-	params := node.Parameters()
+	params := utils.ESTreeParameters(node)
 	// Treat nil and empty as the same — `[params.length=0]` should
 	// match a function-like with no parameters regardless of whether
 	// the underlying NodeList was allocated.

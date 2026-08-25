@@ -90,8 +90,20 @@ function generic(value) { return value; }
 /** @typedef {{ value: Missing }} Thing */
 const typedefHost = 1;
 
+/** @callback Handler
+ * @param {string} value
+ * @returns {number}
+ */
+const callbackHost = 1;
+
 /** @import { Imported } from "pkg" */
 const importHost = 1;
+
+/** @overload
+ * @param {string} value
+ * @returns {string}
+ */
+function overloaded(value) { return value; }
 
 const runtime = null;`,
 	}, `{"allowJs":true,"checkJs":false}`)
@@ -103,6 +115,7 @@ const runtime = null;`,
 	var typeParameters int
 	var jsTypeAliases int
 	var jsImports int
+	var functionDeclarations int
 	var nullEntries int
 	var nullExits int
 	_, err := RunLinter(RunLinterOptions{
@@ -138,6 +151,9 @@ const runtime = null;`,
 						ast.KindJSImportDeclaration: func(*ast.Node) {
 							jsImports++
 						},
+						ast.KindFunctionDeclaration: func(*ast.Node) {
+							functionDeclarations++
+						},
 						ast.KindNullKeyword: func(*ast.Node) {
 							nullEntries++
 						},
@@ -170,6 +186,9 @@ const runtime = null;`,
 			jsTypeAliases,
 			jsImports,
 		)
+	}
+	if functionDeclarations != 2 {
+		t.Fatalf("function declaration listener calls = %d, want 2 authored declarations", functionDeclarations)
 	}
 	if nullEntries != 1 || nullExits != 1 {
 		t.Fatalf("runtime null listener calls = (%d enter, %d exit), want (1, 1)", nullEntries, nullExits)
