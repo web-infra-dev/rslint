@@ -1,6 +1,6 @@
 import type { RSLintService } from '@rslint/core/service';
 
-export const MINIMUM_WASM_VERSION = '0.8.0';
+const MINIMUM_WASM_VERSION = '0.8.0';
 
 const NPM_REGISTRY_URL = 'https://registry.npmjs.org/@rslint%2Fwasm';
 const UNPKG_BASE_URL = 'https://unpkg.com/@rslint/wasm';

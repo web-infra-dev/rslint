@@ -11,11 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/theme/components/ui/select';
-import {
-  ensureWasmService,
-  fetchWasmVersions,
-  MINIMUM_WASM_VERSION,
-} from './wasm';
+import { ensureWasmService, fetchWasmVersions } from './wasm';
 
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorTabsRef | null>(null);
@@ -360,9 +356,7 @@ const Playground: React.FC = () => {
                       aria-label="Select @rslint/wasm version"
                       disabled={wasmVersions.length === 0}
                     >
-                      <SelectValue
-                        placeholder={`Loading versions >= ${MINIMUM_WASM_VERSION}…`}
-                      />
+                      <SelectValue placeholder="Loading..." />
                     </SelectTrigger>
                     <SelectContent>
                       {wasmVersions.map((version) => (
