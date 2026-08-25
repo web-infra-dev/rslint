@@ -30,6 +30,7 @@ func TestReviewComments(t *testing.T) {
 			{Code: "/** \ufeff@this */ function g(){ this; }"},
 			{Code: `/** @this */ const x = [function(){ this; }];`},
 			{Code: `/** @this */ const x = !function(){ this; };`},
+			{Code: `/** @this */ const [x = function(){ this; }] = [];`},
 			{Code: `Uint8Array.from([], function () { this; }, obj);`},
 			{Code: `BigInt64Array['from']([], function () { this; }, obj);`},
 			{Code: `class C { accessor x = function(){ this; } }`},
@@ -56,6 +57,16 @@ const x = [function(){ this; }];`,
 			{
 				Code:   `function outer() { class C { @dec((@d(this) class I {})) m(){} } }`,
 				Errors: unexpected(1, 39),
+			},
+			{
+				Code:            `enum E { X = (function(){ this; }, 1) }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          unexpected(1, 27),
+			},
+			{
+				Code:            `class C { @dec(function(){ this; }) m(){} }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          unexpected(1, 28),
 			},
 		},
 	)

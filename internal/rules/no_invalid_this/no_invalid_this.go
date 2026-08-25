@@ -305,8 +305,9 @@ func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, comments []*ast.Co
 // mirrors ESLint's `sourceCode.getScope(node).isStrict` for a function node.
 // True when an enclosing scope is already strict (ES module, ancestor
 // "use strict", or a class body), OR the function declares its own "use
-// strict" directive. Decorators are evaluated outside their decorated class
-// body, so that class boundary is skipped while walking outward.
+// strict" directive. Class decorators are evaluated outside their decorated
+// class body, so that class boundary is skipped while walking outward; member
+// decorators remain inside the class's strict scope.
 func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int, isModule bool) bool {
 	// Modules, classes, and TypeScript namespaces impose strict mode
 	// independently of directive prologues and therefore remain strict even
@@ -318,11 +319,11 @@ func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int, isModul
 	for current := fn.Parent; current != nil; current = current.Parent {
 		if current.Kind == ast.KindDecorator {
 			host := current.Parent
-			if host != nil && (ast.IsClassLike(host) || isDecoratedClassMember(host)) {
+			if host != nil && ast.IsClassLike(host) {
 				skipDecoratedClassBody = true
 			}
 		}
-		if current.Kind == ast.KindModuleDeclaration {
+		if current.Kind == ast.KindModuleDeclaration || current.Kind == ast.KindEnumDeclaration {
 			return true
 		}
 		if ast.IsClassLike(current) {
@@ -514,8 +515,12 @@ func isJSDocLookupBoundary(node *ast.Node) bool {
 	case ast.KindMethodDeclaration, ast.KindConstructor,
 		ast.KindGetAccessor, ast.KindSetAccessor,
 		ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
-		ast.KindPropertyDeclaration, ast.KindBindingElement:
+		ast.KindPropertyDeclaration:
 		return true
+	case ast.KindBindingElement:
+		// ESTree object-pattern properties are JSDoc lookup boundaries, but
+		// array-pattern AssignmentPattern elements are transparent.
+		return node.Parent != nil && node.Parent.Kind == ast.KindObjectBindingPattern
 	}
 	return false
 }

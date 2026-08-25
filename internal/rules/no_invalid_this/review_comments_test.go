@@ -44,6 +44,7 @@ func TestReviewComments(t *testing.T) {
 			// Declaration-level JSDoc applies through expression containers.
 			{Code: `export {}; /** @this */ const x = [function(){ this; }];`},
 			{Code: `export {}; /** @this */ const x = !function(){ this; };`},
+			{Code: `export {}; /** @this */ const [x = function(){ this; }] = [];`},
 			// Array.from recognition includes TypedArray constructor names.
 			{Code: `export {}; Uint8Array.from([], function () { this; }, obj);`},
 			{Code: `export {}; BigInt64Array['from']([], function () { this; }, obj);`},
@@ -86,6 +87,18 @@ const x = [function(){ this; }];`,
 				Code:            `class C { m(){ function foo(){ this; } } }`,
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3},
 				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedThis", Line: 1, Column: 32}},
+			},
+			// TypeScript enum initializers are strict even in script source type.
+			{
+				Code:            `enum E { X = (function(){ this; }, 1) }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          unexpected(1, 27),
+			},
+			// Member decorators execute in the enclosing class's strict scope.
+			{
+				Code:            `class C { @dec(function(){ this; }) m(){} }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          unexpected(1, 28),
 			},
 		},
 	)
