@@ -1,26 +1,25 @@
-package main
+package server
 
 import (
 	"context"
 	"fmt"
-	"os"
 
 	api "github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
-// IPCHandler implements the ipc.Handler interface
-type IPCHandler struct{}
+// Handler implements rslint's concrete API requests.
+type Handler struct{}
 
 // HandleLint handles lint requests in IPC mode
-func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
+func (h *Handler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
 	return h.handleLint(context.Background(), req, nil, nil)
 }
 
-// HandleLintWithContext enables reverse pluginLint requests when IPCHandler is
+// HandleLintWithContext enables reverse pluginLint requests when Handler is
 // hosted by the bidirectional API service. HandleLint remains available for
 // direct callers that do not need community plugin execution.
-func (h *IPCHandler) HandleLintWithContext(ctx context.Context, req api.LintRequest, requester api.Requester) (*api.LintResponse, error) {
+func (h *Handler) HandleLintWithContext(ctx context.Context, req api.LintRequest, requester api.Requester) (*api.LintResponse, error) {
 	var dispatch linter.EslintPluginDispatcher
 	if requester != nil {
 		dispatch = func(reqCtx context.Context, pluginReq linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
@@ -36,16 +35,4 @@ func (h *IPCHandler) HandleLintWithContext(ctx context.Context, req api.LintRequ
 		}
 	}
 	return h.handleLint(ctx, req, dispatch, requester)
-}
-
-// runAPI runs the linter in IPC mode
-func runAPI() int {
-	handler := &IPCHandler{}
-	service := api.NewService(os.Stdin, os.Stdout, handler)
-
-	if err := service.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "error in IPC mode: %v\n", err)
-		return 1
-	}
-	return 0
 }

@@ -19,6 +19,68 @@ func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) Configured
 	return ConfiguredRule{Name: name, Options: opts, Severity: sev, IsEslintPluginRule: true}
 }
 
+func TestDispatchEslintPluginRulesAsyncPublishesAfterCompletionObserver(t *testing.T) {
+	dispatchError := errors.New("transport closed")
+	observerStarted := make(chan EslintPluginDispatchOutcome, 1)
+	releaseObserver := make(chan struct{})
+	defer func() {
+		select {
+		case <-releaseObserver:
+		default:
+			close(releaseObserver)
+		}
+	}()
+	receiveOutcome := func(name string, ch <-chan EslintPluginDispatchOutcome) EslintPluginDispatchOutcome {
+		t.Helper()
+		select {
+		case outcome := <-ch:
+			return outcome
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for %s", name)
+			return EslintPluginDispatchOutcome{}
+		}
+	}
+	outcomeCh := DispatchEslintPluginRulesAsync(
+		context.Background(),
+		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			return nil, dispatchError
+		},
+		[]EslintPluginFileInput{{
+			Path: "/repo/a.ts",
+			Rules: []rule.ConfiguredRule{{
+				Name:               "external/rule",
+				Severity:           rule.SeverityError,
+				IsEslintPluginRule: true,
+			}},
+		}},
+		false,
+		SuggestionsModeOff,
+		nil,
+		func(outcome EslintPluginDispatchOutcome) {
+			observerStarted <- outcome
+			<-releaseObserver
+		},
+	)
+
+	observed := receiveOutcome("completion observer", observerStarted)
+	if !errors.Is(observed.DispatchError, dispatchError) {
+		t.Fatalf("observer error = %v, want %v", observed.DispatchError, dispatchError)
+	}
+	select {
+	case <-outcomeCh:
+		t.Fatal("outcome was published before the completion observer returned")
+	default:
+	}
+	close(releaseObserver)
+	outcome := receiveOutcome("published outcome", outcomeCh)
+	if !errors.Is(outcome.DispatchError, dispatchError) {
+		t.Fatalf("published error = %v, want %v", outcome.DispatchError, dispatchError)
+	}
+	if len(outcome.Diagnostics) != 1 || outcome.Diagnostics[0].RuleName != "rslint/plugin-lint-error" {
+		t.Fatalf("diagnostics = %v, want dispatch failure diagnostic", outcome.Diagnostics)
+	}
+}
+
 func TestBuildEslintPluginFileInput_EffectiveLanguageOptions(t *testing.T) {
 	raw := map[string]any{
 		"parserOptions": map[string]any{"ecmaFeatures": map[string]any{"jsx": true}},

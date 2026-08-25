@@ -163,6 +163,7 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-mutable-exports.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
+    './tests/eslint-plugin-import/rules/order.test.ts',
 
     // eslint-plugin-react
     './tests/eslint-plugin-react/rules/destructuring-assignment.test.ts',
@@ -456,6 +457,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-regex-literals.test.ts',
     './tests/eslint/rules/preserve-caught-error.test.ts',
     './tests/eslint/rules/no-new-symbol.test.ts',
+    './tests/eslint/rules/no-restricted-exports.test.ts',
     './tests/eslint/rules/no-restricted-globals.test.ts',
     './tests/eslint/rules/no-restricted-imports.test.ts',
     './tests/eslint/rules/no-restricted-properties.test.ts',
