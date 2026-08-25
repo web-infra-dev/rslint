@@ -117,6 +117,15 @@ func TestYodaExtras(t *testing.T) {
 			// lexicographically and the range is ascending ----
 			{Code: `if (/a/ <= x && x < /b/) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 
+			// ---- Bug fix: JavaScript orders strings by UTF-16 code units. An astral
+			// character's leading surrogate sorts before U+E000 even though its UTF-8
+			// encoding sorts after U+E000 ----
+			{Code: `if ("\ud83d\ude00" <= x && x < "\ue000") {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
+			// ---- Bug fix: RegExp.prototype.toString canonicalizes flags, so source
+			// spellings with the same flags in different orders are equal bounds ----
+			{Code: `if (/a/mi <= x && x < /a/im) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
 			// ---- Bug fix: a string range bound is coerced by JS's ToNumber, which
 			// reads an unsigned `0x`/`0o`/`0b` integer, unlike Go's own float parsing ----
 			{Code: `if ('0x10' <= x && x < 20) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
@@ -219,6 +228,30 @@ func TestYodaExtras(t *testing.T) {
 				Output:  []string{"if (x >=\n  0) {}"},
 				Options: "never",
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 2, EndColumn: 4}},
+			},
+
+			// ---- Bug fix: a swapped regexp operand must remain separated from a
+			// following `instanceof` or `in` token so the fix still parses ----
+			{
+				Code:    `/a/ < x++instanceof C`,
+				Output:  []string{`x++ > /a/ instanceof C`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `/a/ < f()in obj`,
+				Output:  []string{`f() > /a/ in obj`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 1}},
+			},
+
+			// ---- Bug fix: reversing the UTF-16 bounds makes the range descend, so
+			// exceptRange must not suppress the first Yoda comparison ----
+			{
+				Code:    `if ("\ue000" <= x && x < "\ud83d\ude00") {}`,
+				Output:  []string{`if (x >= "\ue000" && x < "\ud83d\ude00") {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5}},
 			},
 
 			// ---- Bug fix: mixed BigInt/Number range bounds must compare exactly, not

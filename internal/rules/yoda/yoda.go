@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -148,7 +149,7 @@ type literalValue struct {
 // behavior built in, so no special case is needed here.
 func (v literalValue) lessOrEqual(other literalValue) bool {
 	if v.kind == "string" && other.kind == "string" {
-		return v.str <= other.str
+		return ecmascript.CompareStrings(v.str, other.str) <= 0
 	}
 	if v.kind == "bigint" && other.kind == "bigint" {
 		return v.big.Cmp(other.big) <= 0
@@ -287,7 +288,10 @@ func normalizedLiteralValue(node *ast.Node) (literalValue, bool) {
 		// then coerces a RegExp operand via ToPrimitive, which falls back to
 		// RegExp.prototype.toString() (there is no valueOf override), i.e.
 		// its source text. Treat it as a string bound for the same reason.
-		return literalValue{kind: "string", str: node.Text()}, true
+		pattern, flags := utils.ExtractRegexPatternAndFlags(node.Text())
+		canonicalFlags := []byte(flags)
+		slices.Sort(canonicalFlags)
+		return literalValue{kind: "string", str: "/" + pattern + "/" + string(canonicalFlags)}, true
 	case ast.KindPrefixUnaryExpression:
 		unary := node.AsPrefixUnaryExpression()
 		if unary.Operator != ast.KindMinusToken {
@@ -436,7 +440,17 @@ func buildFlippedText(sf *ast.SourceFile, node *ast.Node) string {
 	flippedOperator := scanner.TokenToString(flipOperatorKind(bin.OperatorToken.Kind))
 
 	flipped := rightText + textBeforeOperator + flippedOperator + textAfterOperator + leftText
-	return utils.SafeReplacementText(sf, node, flipped)
+	flipped = utils.SafeReplacementText(sf, node, flipped)
+	if bin.Left.Kind == ast.KindRegularExpressionLiteral {
+		nodeRange := utils.TrimNodeTextRange(sf, node)
+		if after, ok := utils.TokenAtOrAfter(sf, nodeRange.End()); ok &&
+			after.Start == nodeRange.End() &&
+			(after.Kind == ast.KindInKeyword || after.Kind == ast.KindInstanceOfKeyword) &&
+			flipped[len(flipped)-1] != ' ' {
+			flipped += " "
+		}
+	}
+	return flipped
 }
 
 // YodaRule requires or disallows "Yoda" conditions.
