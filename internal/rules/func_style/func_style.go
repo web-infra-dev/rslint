@@ -50,6 +50,16 @@ var FuncStyleRule = rule.Rule{
 			// ParenthesizedExpression, so the declarator has to be found by
 			// walking back up through any such wrapper(s) first.
 			declarator := ast.WalkUpParenthesizedExpressions(node.Parent)
+			// In JavaScript, a leading JSDoc `@type` cast is represented by
+			// tsgo as a reparsed AsExpression inside a ParenthesizedExpression.
+			// ESTree keeps the annotation as a comment, so this wrapper is
+			// transparent to upstream's direct VariableDeclarator check. Do not
+			// unwrap ordinary TypeScript assertions: those remain real ESTree
+			// nodes and intentionally stop the check.
+			for declarator != nil && declarator.Kind == ast.KindAsExpression &&
+				declarator.Parent != nil && ast.IsJSDocTypeAssertion(declarator.Parent) {
+				declarator = ast.WalkUpParenthesizedExpressions(declarator.Parent)
+			}
 			if declarator == nil || declarator.Kind != ast.KindVariableDeclaration {
 				return
 			}
@@ -63,6 +73,12 @@ var FuncStyleRule = rule.Rule{
 			}
 			if isNamed && opts.namedExports == "declaration" {
 				reportDeclaration(declarator)
+			}
+		}
+
+		markThisOrSuper := func(node *ast.Node) {
+			if len(stack) > 0 {
+				stack[len(stack)-1] = true
 			}
 		}
 
@@ -93,14 +109,14 @@ var FuncStyleRule = rule.Rule{
 				stack = stack[:len(stack)-1]
 			},
 
-			ast.KindThisKeyword: func(node *ast.Node) {
-				if len(stack) > 0 {
-					stack[len(stack)-1] = true
-				}
-			},
-			ast.KindSuperKeyword: func(node *ast.Node) {
-				if len(stack) > 0 {
-					stack[len(stack)-1] = true
+			ast.KindThisKeyword:  markThisOrSuper,
+			ast.KindSuperKeyword: markThisOrSuper,
+			ast.KindIdentifier: func(node *ast.Node) {
+				// typescript-eslint exposes `this` in `typeof this` as a
+				// ThisExpression. tsgo instead uses an Identifier under TypeQuery,
+				// so include that one AST-only spelling in the same frame tracking.
+				if node.Text() == "this" && node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery {
+					markThisOrSuper(node)
 				}
 			},
 		}

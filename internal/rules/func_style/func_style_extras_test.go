@@ -94,6 +94,11 @@ export default function test(a: unknown) { return a; }
 			// *not* push a frame for ast.KindClassStaticBlockDeclaration ----
 			{Code: "var foo = () => { class C { static { this.x = 1; } } };", Options: []any{"declaration"}},
 
+			// ---- tsgo represents `this` inside a type query as a plain
+			// Identifier, while typescript-eslint exposes a ThisExpression. It
+			// still marks the enclosing arrow as depending on `this` upstream ----
+			{Code: "const foo = (): typeof this => ({});", Options: []any{"declaration"}},
+
 			// ---- Dimension 2 nesting: a member's decorators and computed name
 			// live inside the member node in tsgo, but hang off
 			// MethodDefinition/Property — outside the FunctionExpression value
@@ -148,6 +153,19 @@ export default function test(a: unknown) { return a; }
 				Options: []any{"declaration"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "declaration", Line: 1, Column: 5, EndLine: 1, EndColumn: 23},
+				},
+			},
+			// ---- In checked JavaScript, tsgo materializes a JSDoc `@type`
+			// cast as an AsExpression around the initializer. ESTree treats that
+			// cast as transparent, so the arrow remains directly assigned to the
+			// VariableDeclarator and must be declaration-checked ----
+			{
+				Code:     "const foo = /** @type {Function} */ (() => 1);",
+				FileName: "jsdoc-cast.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{"declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "declaration"},
 				},
 			},
 
