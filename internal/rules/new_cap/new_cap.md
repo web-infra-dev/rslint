@@ -44,6 +44,14 @@ const value = library.Factory();
 const widget = new library.widget();
 ```
 
+## Differences from ESLint
+
+ESLint's exception lookup also accepts names inherited from
+`Object.prototype`, such as `constructor` and `toString`, because its exception
+map is a plain JavaScript object. This is an upstream implementation accident.
+rslint uses an explicit string set, so lowercase constructor names are reported
+unless they are configured in `newIsCapExceptions`.
+
 ## Original Documentation
 
 - [ESLint: new-cap](https://eslint.org/docs/latest/rules/new-cap)

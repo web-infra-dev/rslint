@@ -120,6 +120,10 @@ func TestNewCapExtras(t *testing.T) {
 		// lowercase arm under an explicit true option.
 		{Code: "new factory();", Options: map[string]any{"newIsCap": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lower", Line: 1, Column: 5, EndLine: 1, EndColumn: 12}}},
 
+		// rslint intentionally uses a true string set for exceptions instead of
+		// inheriting accidental exception names from Object.prototype upstream.
+		{Code: "new constructor();", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lower", Line: 1, Column: 5, EndLine: 1, EndColumn: 16}}},
+
 		// Locks in getCap() uppercase arm under an explicit true option.
 		{Code: "Factory();", Options: map[string]any{"capIsNew": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "upper", Line: 1, Column: 1, EndLine: 1, EndColumn: 8}}},
 
