@@ -1,4 +1,4 @@
-// cspell:ignore languageoptionsecmaversion languageoptionsglobals languageoptionsparseroptionsproject languageoptionsparseroptionsprojectservice
+// cspell:ignore languageoptionsecmaversion languageoptionssourcetype languageoptionsglobals languageoptionsparseroptionsproject languageoptionsparseroptionsprojectservice
 import { Link } from '@rspress/core/theme';
 import type { RslintConfigEntry } from '@rslint/core';
 import {
@@ -49,6 +49,8 @@ const CONFIG_OPTION_LINKS = {
   settings: '/config/settings',
   'languageOptions.ecmaVersion':
     '/config/language-options#languageoptionsecmaversion',
+  'languageOptions.sourceType':
+    '/config/language-options#languageoptionssourcetype',
   'languageOptions.parserOptions.projectService':
     '/config/language-options#languageoptionsparseroptionsprojectservice',
   'languageOptions.parserOptions.project':
@@ -78,6 +80,7 @@ const OVERVIEW_GROUPS: Group[] = [
     wide: true,
     items: [
       option('languageOptions.ecmaVersion'),
+      option('languageOptions.sourceType'),
       option('languageOptions.parserOptions.projectService'),
       option('languageOptions.parserOptions.project'),
       option('languageOptions.globals'),
