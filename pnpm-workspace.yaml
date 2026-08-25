@@ -15,14 +15,14 @@ allowBuilds:
 
 catalog:
   '@microsoft/api-extractor': ^7.58.12
-  '@napi-rs/cli': ^3.8.2
-  '@rslib/core': 1.0.0-beta.3
+  '@napi-rs/cli': ^3.8.6
+  '@rslib/core': 1.0.0-rc.1
   '@types/picomatch': ^4.0.3
-  esbuild: ^0.28.1
+  esbuild: ^0.28.2
   fast-glob: ^3.3.3
   jiti: ^2.7.0
   json-schema-to-typescript: ^15.0.4
-  picomatch: ^4.0.5
+  picomatch: ^4.0.7
   rimraf: ^6.1.3
   tinyglobby: ^0.2.17
   '@eslint-community/eslint-plugin-eslint-comments': ^4.7.2
@@ -32,7 +32,7 @@ catalog:
   '@typescript-eslint/scope-manager': ^8.65.0
   '@typescript-eslint/visitor-keys': ^8.65.0
   eslint: ^10.9.0
-  eslint-plugin-cypress: ^6.4.3
+  eslint-plugin-cypress: ^6.4.4
   eslint-plugin-es-x: ^9.7.0
   eslint-plugin-playwright: ^2.11.0
   eslint-plugin-promise: 7.3.0
@@ -47,8 +47,8 @@ catalog:
   # Public API data shipped by @rslint/core; review the catalog diff before updating.
   globals: 17.11.0
   '@codspeed/tinybench-plugin': ^5.7.1
-  '@rstest/core': ^0.11.3
-  tinybench: ^6.1.1
+  '@rstest/core': ^0.11.9
+  tinybench: ^6.1.3
   ajv: ^6.15.0
   husky: ^9.1.7
   lint-staged: ^16.4.0
@@ -56,9 +56,9 @@ catalog:
   zx: ^8.8.5
   '@types/mocha': ^10.0.10
   '@types/node': ^26.2.0
-  '@types/react': ^19.2.17
+  '@types/react': ^19.2.18
   '@types/vscode': ^1.125.0
-  '@typescript/native-preview': 7.0.0-dev.20250904.1
+  '@typescript/native-preview': 7.0.0-dev.20260707.2
   typescript: 5.9.3
   '@vscode/test-cli': ^0.0.15
   '@vscode/test-electron': ^2.5.2
@@ -72,21 +72,21 @@ catalog:
   buffer: ^6.0.3
   cross-env: ^10.1.0
   esbuild-plugin-polyfill-node: ^0.3.0
-  memfs: ^4.68.0
+  memfs: ^4.68.1
   prebundle: ^1.6.5
-  '@radix-ui/react-label': ^2.1.13
-  '@radix-ui/react-select': ^2.3.5
-  '@radix-ui/react-slot': ^1.3.1
-  '@radix-ui/react-toggle': ^1.1.16
-  '@radix-ui/react-toggle-group': ^1.1.17
+  '@radix-ui/react-label': ^2.1.15
+  '@radix-ui/react-select': ^2.3.7
+  '@radix-ui/react-slot': ^1.3.3
+  '@radix-ui/react-toggle': ^1.1.18
+  '@radix-ui/react-toggle-group': ^1.1.19
   '@rsbuild/plugin-node-polyfill': ^1.4.6
   '@rsbuild/plugin-sass': ^1.5.3
-  '@rspress/core': ^2.0.18
-  '@rspress/plugin-sitemap': ^2.0.18
-  '@rstack-dev/doc-ui': ^1.14.7
+  '@rspress/core': ^2.0.20
+  '@rspress/plugin-sitemap': ^2.0.20
+  '@rstack-dev/doc-ui': ^1.14.8
   '@tailwindcss/postcss': ^4.3.3
   '@types/dagre': ^0.7.54
-  '@types/react-dom': ^19.2.3
+  '@types/react-dom': ^19.2.5
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
   dagre: ^0.8.5
@@ -98,7 +98,7 @@ catalog:
   rsbuild-plugin-google-analytics: ^1.0.6
   rsbuild-plugin-open-graph: ^1.1.3
   rspress-plugin-font-open-sans: ^1.0.4
-  swr: ^2.5.0
+  swr: ^2.5.1
   tailwind-merge: ^3.6.0
   tailwindcss: ^4.3.3
   tw-animate-css: ^1.4.0
