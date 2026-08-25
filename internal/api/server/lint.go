@@ -84,8 +84,8 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	// Apply file contents if provided
 	var fileContents map[string]string
-	if len(req.FileContents) > 0 {
-		if allowedFiles == nil {
+	if len(req.FileContents) > 0 || req.Fix {
+		if len(req.FileContents) > 0 && allowedFiles == nil {
 			allowedFiles = make([]string, 0, len(req.FileContents))
 		}
 		fileContents = make(map[string]string, len(req.FileContents))
@@ -123,7 +123,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		configDirectory = currentDirectory
 	}
 	configDirectory = tspath.NormalizePath(configDirectory)
-	if len(fileContents) > 0 {
+	if fileContents != nil {
 		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs)
 		fs = utils.NewOverlayVFS(fs, fileContents)
 	}
@@ -327,227 +327,281 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
 	}
-	// A plain API lint only needs type information when at least one target is
-	// selected. Resolve the target plan before project paths so an ignored or
-	// empty request cannot fail on an inactive project declaration.
-	var projectSet loader.ProjectSet
-	if len(targetPlan.Files) > 0 {
-		if configMap != nil {
-			projectSet, err = programSession.BuildTargetProjects(
-				configMap,
-				targetPlan,
-				false,
-			)
-		} else {
-			projectSet, err = programSession.BuildTargetProject(
-				configDirectory,
-				rslintConfig,
-				targetPlan,
-				false,
-			)
+	// Target discovery and config ownership are request-scoped and remain stable
+	// across fix generations. Programs, source mappings, resolvers, prepared
+	// plans, and plugin inputs are generation-scoped and rebuilt after each
+	// in-memory write.
+	loadGeneration := func() (loader.LoadResult, error) {
+		var projectSet loader.ProjectSet
+		var loadErr error
+		if len(targetPlan.Files) > 0 {
+			if configMap != nil {
+				projectSet, loadErr = programSession.BuildTargetProjects(configMap, targetPlan, false)
+			} else {
+				projectSet, loadErr = programSession.BuildTargetProject(configDirectory, rslintConfig, targetPlan, false)
+			}
+			if loadErr != nil {
+				return loader.LoadResult{}, loadErr
+			}
 		}
+		return programSession.LoadAPI(projectSet, targetPlan, configDirectory, false)
+	}
+
+	type lintGeneration struct {
+		diagnostics       []rule.RuleDiagnostic
+		diagnosticsByFile map[string][]rule.RuleDiagnostic
+		sourceFiles       map[string]*ast.SourceFile
+		executedRules     map[string]struct{}
+	}
+
+	runGeneration := func(binding loader.LoadResult) (lintGeneration, error) {
+		generation := lintGeneration{
+			diagnosticsByFile: make(map[string][]rule.RuleDiagnostic),
+			sourceFiles:       make(map[string]*ast.SourceFile),
+			executedRules:     make(map[string]struct{}),
+		}
+		fileConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
+			ConfigsByOwner:                      configMap,
+			Config:                              rslintConfig,
+			ConfigDirectory:                     configDirectory,
+			Catalog:                             ruleCatalog,
+			EnforcePlugins:                      true,
+			TargetsBySourcePath:                 binding.LintTargetBySourcePath,
+			SourceMappingsIncludeCanonicalPaths: true,
+			PathSpaces:                          targetPlan.PathSpaces(),
+			FS:                                  fs,
+		})
+		targetPathForSourcePath := func(sourcePath string) string {
+			if lintTarget, bound := fileConfigResolver.TargetForSourcePath(sourcePath); bound {
+				return lintTarget.Path
+			}
+			return sourcePath
+		}
+		responsePathForSourcePath := func(sourcePath string) string {
+			return tspath.ConvertToRelativePath(targetPathForSourcePath(sourcePath), comparePathOptions)
+		}
+
+		var generationLock sync.Mutex
+		diagnosticCollector := func(diagnostic rule.RuleDiagnostic) {
+			targetPath := targetPathForSourcePath(diagnostic.FilePath)
+			responsePath := tspath.ConvertToRelativePath(targetPath, comparePathOptions)
+			generationLock.Lock()
+			defer generationLock.Unlock()
+			if sourceFile, ok := diagnostic.SourceFile.(*ast.SourceFile); ok {
+				generation.sourceFiles[responsePath] = sourceFile
+			}
+			if req.Fix && diagnostic.FixesPtr != nil && len(*diagnostic.FixesPtr) > 0 {
+				generation.diagnosticsByFile[targetPath] = append(generation.diagnosticsByFile[targetPath], diagnostic)
+			}
+			diagnostic.FilePath = responsePath
+			generation.diagnostics = append(generation.diagnostics, diagnostic)
+		}
+
+		for _, diagnostic := range linter.CollectTargetSyntacticDiagnostics(binding.Programs, binding.TargetsByProgram, false) {
+			diagnosticCollector(diagnostic)
+		}
+
+		runOpts := linter.RunLinterOptions{
+			Programs:       binding.Programs,
+			SingleThreaded: false,
+			Cwd:            currentDirectory,
+			Scope:          linter.FileScope{Files: allowedFiles},
+			TargetFiles:    binding.TargetsByProgram,
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+				generationLock.Lock()
+				generation.sourceFiles[responsePathForSourcePath(sourceFile.FileName())] = sourceFile
+				generationLock.Unlock()
+				return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
+			},
+			// Final diagnostics still need their concrete edits after fixing, so
+			// every generation collects the complete diagnostic model.
+			Consumer: rule.DiagnosticConsumer{
+				Demand: rule.EditDemandAll,
+				Report: diagnosticCollector,
+			},
+		}
+		preparedPlan, prepareErr := linter.PrepareLintPlan(runOpts)
+		if prepareErr != nil {
+			return lintGeneration{}, fmt.Errorf("error preparing lint plan: %w", prepareErr)
+		}
+		runOpts.PreparedPlan = preparedPlan
+
+		var pluginCh <-chan linter.EslintPluginDispatchOutcome
+		var cancelPlugin context.CancelFunc
+		if len(pluginEntries) > 0 {
+			if pluginConfigKeyByOwner == nil {
+				wireConfigDirectory := req.PluginConfigDirectory
+				if wireConfigDirectory == "" {
+					wireConfigDirectory = req.ConfigDirectory
+				}
+				if wireConfigDirectory == "" {
+					wireConfigDirectory = configDirectory
+				}
+				pluginConfigKeyByOwner = map[string]string{configDirectory: wireConfigDirectory}
+			}
+			pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, eslintPluginConfigResolver{
+				lintResolver:           fileConfigResolver,
+				pluginConfigKeyByOwner: pluginConfigKeyByOwner,
+			}.resolve)
+			for index := range pluginInputs {
+				if pluginInputs[index].SourceFile != nil {
+					text := pluginInputs[index].SourceFile.Text()
+					// ts-go's SourceFile text is BOM-free, but the Node worker needs
+					// the mark on its wire input to preserve SourceCode.hasBOM. The
+					// worker strips it before parsing, so native and plugin offsets
+					// remain in the same BOM-free coordinate space.
+					if utils.SourceHasBOM(programSession.FS(), pluginInputs[index].Path) {
+						text = utils.BOM + text
+					}
+					pluginInputs[index].Text = &text
+				}
+			}
+			if len(pluginInputs) > 0 {
+				pluginCtx := ctx
+				pluginCtx, cancelPlugin = context.WithCancel(pluginCtx)
+				pluginDispatch := dispatch
+				if pluginDispatch == nil {
+					pluginDispatch = func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+						return nil, errors.New("bidirectional pluginLint transport is unavailable")
+					}
+				}
+				// The programmatic API always returns the complete diagnostic edit
+				// model, just like the native-rule path's EditDemandAll. These wire
+				// flags only materialize plugin fixes/suggestions; the outer req.Fix
+				// gate remains solely responsible for applying autofixes.
+				pluginCh = linter.DispatchEslintPluginRulesAsync(
+					pluginCtx,
+					pluginDispatch,
+					pluginInputs,
+					true,
+					linter.SuggestionsModeEager,
+					nil,
+					reportEslintPluginDispatchOutcome,
+				)
+			}
+		}
+
+		lintResult, lintErr := linter.RunLinter(runOpts)
+		if lintErr != nil && cancelPlugin != nil {
+			cancelPlugin()
+		}
+		var pluginDiagnostics []rule.RuleDiagnostic
+		if pluginCh != nil {
+			pluginDiagnostics = (<-pluginCh).Diagnostics
+		}
+		if cancelPlugin != nil {
+			cancelPlugin()
+		}
+		if lintErr != nil {
+			return lintGeneration{}, fmt.Errorf("error running linter: %w", lintErr)
+		}
+		for _, diagnostic := range pluginDiagnostics {
+			diagnosticCollector(diagnostic)
+		}
+		if lintResult != nil {
+			for ruleName := range lintResult.ExecutedRules {
+				generation.executedRules[ruleName] = struct{}{}
+			}
+		}
+		return generation, nil
+	}
+
+	targetAliases := make(map[string][]string, len(targetPlan.Files))
+	for _, lintTarget := range targetPlan.Files {
+		targetAliases[rslintconfig.ExactPathID(lintTarget.Path)] = []string{lintTarget.Path, lintTarget.CanonicalPath}
+	}
+	executedRules := make(map[string]struct{})
+	mergeExecutedRules := func(generation lintGeneration) {
+		for ruleName := range generation.executedRules {
+			executedRules[ruleName] = struct{}{}
+		}
+	}
+
+	var finalGeneration lintGeneration
+	var outputByTarget map[string]string
+	if req.Fix {
+		err = linter.RunAutofixLoop(
+			linter.AutofixLoopOptions{VerifyAfterLimit: true},
+			func(pass linter.AutofixPass) (linter.AutofixPassResult, error) {
+				binding, loadErr := loadGeneration()
+				if loadErr != nil {
+					return linter.AutofixPassResult{}, loadErr
+				}
+				generation, lintErr := runGeneration(binding)
+				if lintErr != nil {
+					return linter.AutofixPassResult{}, lintErr
+				}
+				finalGeneration = generation
+				mergeExecutedRules(generation)
+				if !pass.AllowApply {
+					return linter.AutofixPassResult{}, nil
+				}
+
+				applied := false
+				var overlayUpdates []equivalentFileContentUpdate
+				for filePath, fileDiagnostics := range generation.diagnosticsByFile {
+					if len(fileDiagnostics) == 0 {
+						continue
+					}
+					sourceFile, ok := fileDiagnostics[0].SourceFile.(*ast.SourceFile)
+					if !ok || sourceFile == nil {
+						continue
+					}
+					originalContent := sourceFile.Text()
+					if utils.SourceHasBOM(programSession.FS(), filePath) {
+						originalContent = utils.BOM + originalContent
+					}
+					fixedContent, _, didFix := linter.ApplyRuleFixes(originalContent, fileDiagnostics)
+					if !didFix {
+						continue
+					}
+					applied = true
+					if outputByTarget == nil {
+						outputByTarget = make(map[string]string)
+					}
+					outputByTarget[filePath] = fixedContent
+					aliases := append([]string(nil), targetAliases[rslintconfig.ExactPathID(filePath)]...)
+					aliases = append(aliases, filePath, sourceFile.FileName())
+					for _, diagnostic := range fileDiagnostics {
+						aliases = append(aliases, diagnostic.FilePath)
+						if diagnosticSource, ok := diagnostic.SourceFile.(*ast.SourceFile); ok {
+							aliases = append(aliases, diagnosticSource.FileName())
+						}
+					}
+					overlayUpdates = append(overlayUpdates, equivalentFileContentUpdate{
+						content: fixedContent,
+						paths:   aliases,
+					})
+				}
+				if applied {
+					setEquivalentFileContents(fileContents, programSession.FS(), overlayUpdates)
+					programSession.InvalidateSourceSnapshots()
+				}
+				return linter.AutofixPassResult{Applied: applied}, nil
+			},
+		)
 		if err != nil {
 			return nil, err
 		}
-	}
-	binding, err := programSession.LoadAPI(projectSet, targetPlan, configDirectory, false)
-	if err != nil {
-		return nil, err
-	}
-	programs := binding.Programs
-	targetsByProgram := binding.TargetsByProgram
-	fileConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
-		ConfigsByOwner:                      configMap,
-		Config:                              rslintConfig,
-		ConfigDirectory:                     configDirectory,
-		Catalog:                             ruleCatalog,
-		EnforcePlugins:                      true,
-		TargetsBySourcePath:                 binding.LintTargetBySourcePath,
-		SourceMappingsIncludeCanonicalPaths: true,
-		PathSpaces:                          targetPlan.PathSpaces(),
-		FS:                                  fs,
-	})
-	targetPathForSourcePath := func(sourcePath string) string {
-		if target, bound := fileConfigResolver.TargetForSourcePath(sourcePath); bound {
-			return target.Path
+	} else {
+		binding, loadErr := loadGeneration()
+		if loadErr != nil {
+			return nil, loadErr
 		}
-		return sourcePath
-	}
-	responsePathForSourcePath := func(sourcePath string) string {
-		return tspath.ConvertToRelativePath(targetPathForSourcePath(sourcePath), comparePathOptions)
-	}
-
-	// Collect diagnostics in the shared internal model. Each diagnostic is
-	// copied into the API's caller-visible path space before the completed set
-	// is sorted and projected to wire fields below.
-	var diagnostics []rule.RuleDiagnostic
-	var diagnosticsLock sync.Mutex
-	// When Fix is requested, the original RuleDiagnostics (byte-offset fixes +
-	// their SourceFile) are retained per file for the in-band fix pass below.
-	var diagnosticsByFile map[string][]rule.RuleDiagnostic
-	if req.Fix {
-		diagnosticsByFile = make(map[string][]rule.RuleDiagnostic)
-	}
-
-	// Track source files for encoding
-	sourceFiles := make(map[string]*ast.SourceFile)
-	var sourceFilesLock sync.Mutex
-
-	// Create collector function
-	diagnosticCollector := func(d rule.RuleDiagnostic) {
-		diagnosticsLock.Lock()
-		defer diagnosticsLock.Unlock()
-		responsePath := responsePathForSourcePath(d.FilePath)
-		if d.SourceFile != nil {
-			sourceFilesLock.Lock()
-			if sf, ok := d.SourceFile.(*ast.SourceFile); ok {
-				sourceFiles[responsePath] = sf
-			}
-			sourceFilesLock.Unlock()
+		finalGeneration, err = runGeneration(binding)
+		if err != nil {
+			return nil, err
 		}
-
-		hasFix := d.FixesPtr != nil && len(*d.FixesPtr) > 0
-		// Retain the original diagnostic (byte-offset fixes + SourceFile) for the
-		// in-band fix pass, grouped by the caller-visible target path.
-		if req.Fix && hasFix {
-			targetPath := targetPathForSourcePath(d.FilePath)
-			diagnosticsByFile[targetPath] = append(diagnosticsByFile[targetPath], d)
-		}
-
-		d.FilePath = responsePath
-		diagnostics = append(diagnostics, d)
+		mergeExecutedRules(finalGeneration)
 	}
 
-	// Every selected target is parsed even when no config entry contributes
-	// rules. Global ignores were already removed during target discovery.
-	syntaxDiagnostics := linter.CollectTargetSyntacticDiagnostics(programs, targetsByProgram, false)
-	for _, diagnostic := range syntaxDiagnostics {
-		diagnosticCollector(diagnostic)
-	}
-
-	// Build one run descriptor and prepared plan shared by native lint and
-	// plugin dispatch, keeping both paths on the exact same file/rule selection.
-	runOpts := linter.RunLinterOptions{
-		Programs:       programs,
-		SingleThreaded: false, // Don't use single-threaded mode for IPC
-		Cwd:            currentDirectory,
-		Scope:          linter.FileScope{Files: allowedFiles},
-		TargetFiles:    targetsByProgram,
-		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-			// Track source file for encoding
-			sourceFilesLock.Lock()
-			filePath := responsePathForSourcePath(sourceFile.FileName())
-			sourceFiles[filePath] = sourceFile
-			sourceFilesLock.Unlock()
-
-			// Rules come solely from the resolved config object (config.rules).
-			// Program capability filtering happens once while PrepareLintPlan
-			// freezes the shared native/plugin execution plan.
-			//
-			// enforcePlugins=true: the --api config is a resolved JS-style flat
-			// config (plugins + rules), exactly like the CLI's JS/TS config path,
-			// so a rule carrying a plugin prefix runs only when its plugin is
-			// declared in the config's `plugins` — matching CLI and ESLint
-			// semantics (a rule whose plugin is not declared is skipped).
-			return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
-		},
-		// The API returns concrete fixes, suggestions, and fixable counts
-		// independently of whether req.Fix later applies autofixes.
-		Consumer: rule.DiagnosticConsumer{
-			Demand: rule.EditDemandAll,
-			Report: diagnosticCollector,
-		},
-	}
-	preparedPlan, err := linter.PrepareLintPlan(runOpts)
-	if err != nil {
-		return nil, fmt.Errorf("error preparing lint plan: %w", err)
-	}
-	runOpts.PreparedPlan = preparedPlan
-
-	// Metadata is the feature gate: without it there is no plugin target walk,
-	// goroutine, or reverse request. With metadata, dispatch starts before the
-	// native pass and runs in parallel, matching the CLI pipeline.
-	var pluginCh <-chan linter.EslintPluginDispatchOutcome
-	var cancelPlugin context.CancelFunc
-	if len(pluginEntries) > 0 {
-		if pluginConfigKeyByOwner == nil {
-			wireConfigDirectory := req.PluginConfigDirectory
-			if wireConfigDirectory == "" {
-				wireConfigDirectory = req.ConfigDirectory
-			}
-			if wireConfigDirectory == "" {
-				wireConfigDirectory = configDirectory
-			}
-			pluginConfigKeyByOwner = map[string]string{configDirectory: wireConfigDirectory}
-		}
-		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, eslintPluginConfigResolver{
-			lintResolver:           fileConfigResolver,
-			pluginConfigKeyByOwner: pluginConfigKeyByOwner,
-		}.resolve)
-		for i := range pluginInputs {
-			// Programmatic lint supports in-memory overlays. Always send the exact
-			// parsed source frame instead of asking the host to re-read disk.
-			if pluginInputs[i].SourceFile != nil {
-				text := pluginInputs[i].SourceFile.Text()
-				pluginInputs[i].Text = &text
-			}
-		}
-		if len(pluginInputs) > 0 {
-			pluginCtx := ctx
-			pluginCtx, cancelPlugin = context.WithCancel(pluginCtx)
-			if dispatch == nil {
-				dispatch = func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-					return nil, errors.New("bidirectional pluginLint transport is unavailable")
-				}
-			}
-			suggestionsMode := linter.SuggestionsModeOff
-			if req.Fix {
-				suggestionsMode = linter.SuggestionsModeEager
-			}
-			pluginCh = linter.DispatchEslintPluginRulesAsync(pluginCtx, dispatch, pluginInputs, req.Fix, suggestionsMode, nil, reportEslintPluginDispatchOutcome)
-		}
-	}
-	if cancelPlugin != nil {
-		defer cancelPlugin()
-	}
-
-	// Run native rules while community plugin batches execute in the host.
-	lintResult, err := linter.RunLinter(runOpts)
-	if err != nil {
-		return nil, fmt.Errorf("error running linter: %w", err)
-	}
-	if pluginCh != nil {
-		for _, diagnostic := range (<-pluginCh).Diagnostics {
-			diagnosticCollector(diagnostic)
-		}
-	}
-
-	linter.StableSortDiagnosticsByFileAndStart(diagnostics)
-	diagnosticProjection := projectLintDiagnostics(diagnostics)
-
-	// Apply fixes in-band when requested. ApplyRuleFixes is the same pure fixer
-	// the CLI uses through applyFixPass, but here the result stays in-memory in
-	// Output — the JS side persists it via Rslint.outputFixes. Single pass over
-	// each file's fixes (non-overlapping applied, overlapping left for a later
-	// lint); no cross-pass re-lint cascade (P1, see design §8).
+	linter.StableSortDiagnosticsByFileAndStart(finalGeneration.diagnostics)
+	diagnosticProjection := projectLintDiagnostics(finalGeneration.diagnostics)
 	var output map[string]string
-	if req.Fix && len(diagnosticsByFile) > 0 {
-		output = make(map[string]string)
-		for filePath, fileDiags := range diagnosticsByFile {
-			// The parsed text has no byte order mark — reading the file
-			// consumed it — so put it back before fixing. Output is what the
-			// JS side writes to disk, and it has to be the whole file.
-			originalContent := fileDiags[0].SourceFile.Text()
-			if utils.SourceHasBOM(programSession.FS(), filePath) {
-				originalContent = utils.BOM + originalContent
-			}
-			fixedContent, _, didFix := linter.ApplyRuleFixes(originalContent, fileDiags)
-			if didFix {
-				output[tspath.ConvertToRelativePath(filePath, comparePathOptions)] = fixedContent
-			}
-		}
-		if len(output) == 0 {
-			output = nil
+	if len(outputByTarget) > 0 {
+		output = make(map[string]string, len(outputByTarget))
+		for filePath, content := range outputByTarget {
+			output[tspath.ConvertToRelativePath(filePath, comparePathOptions)] = content
 		}
 	}
 
@@ -558,8 +612,8 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// Diagnostic.FilePath, LintedFiles, Output, and EncodedSourceFiles in one path
 	// space even when a Program represents a requested symlink target by a
 	// different source-file path. Sorted for a deterministic response.
-	lintedFiles := make([]string, 0, len(sourceFiles))
-	for filePath := range sourceFiles {
+	lintedFiles := make([]string, 0, len(finalGeneration.sourceFiles))
+	for filePath := range finalGeneration.sourceFiles {
 		lintedFiles = append(lintedFiles, filePath)
 	}
 	sort.Strings(lintedFiles)
@@ -573,14 +627,14 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		FixableWarningCount: diagnosticProjection.fixableWarningCount,
 		// FileCount mirrors the unique caller-visible LintedFiles result set.
 		FileCount:   len(lintedFiles),
-		RuleCount:   len(lintResult.ExecutedRules),
+		RuleCount:   len(executedRules),
 		LintedFiles: lintedFiles,
 		Output:      output,
 	}
 	// Only include encoded source files if requested
 	if req.IncludeEncodedSourceFiles {
 		encodedSourceFiles := make(map[string]api.ByteArray)
-		for filePath, sourceFile := range sourceFiles {
+		for filePath, sourceFile := range finalGeneration.sourceFiles {
 			encoded, err := api.EncodeAST(sourceFile, filePath)
 
 			if err != nil {

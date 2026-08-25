@@ -168,7 +168,7 @@ func (c *buildContext) retainOnlySourceFiles(programs []*compiler.Program) {
 
 // invalidateSourceSnapshots begins a fresh source generation before Programs
 // are rebuilt after a fix write. Metadata generations are independent because
-// CLI fixes never target package.json or tsconfig files.
+// CLI and API fixes never target package.json or tsconfig files.
 func (c *buildContext) invalidateSourceSnapshots() {
 	c.parseCache.InvalidateSourceSnapshots()
 }

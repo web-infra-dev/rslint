@@ -105,22 +105,14 @@ func isFixAllRequest(ctx *lsproto.CodeActionContext) bool {
 	return false
 }
 
-// maxFixPasses is the maximum number of lint-fix cycles to prevent infinite loops
-// when two rules produce fixes that undo each other.
-const maxFixPasses = 10
-
 // handleFixAllCodeAction computes all auto-fixes for the given URI using
 // multi-pass fixing: each pass lints and applies fixes to an isolated overlay,
-// repeating until no more fixes are found or maxFixPasses is reached.
+// repeating until no more fixes are found or the shared autofix limit is reached.
 // This handles cascading fixes (e.g. no-wrapper-object-types fix triggers no-inferrable-types).
 // It does NOT push diagnostics or update s.diagnostics — that is left to the
 // subsequent didSave handler in the normal save flow.
 func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.DocumentUri) (lsproto.CodeActionResponse, error) {
 	empty := lsproto.CodeActionResponse{CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{}}
-
-	// Clear pending debounce for this URI — we are about to lint it fresh,
-	// so any scheduled debounce lint for the same content is redundant.
-	delete(s.pendingLintURIs, uri)
 
 	if s.session == nil {
 		return empty, nil
@@ -128,13 +120,19 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 	if !isLintableScriptFile(uri) {
 		return empty, nil
 	}
+	originalContent, open := s.documents[uri]
+	if !open {
+		return empty, nil
+	}
 	snapshot := s.documentLintSnapshot(uri)
 	if snapshot.unavailable {
 		return empty, nil
 	}
-	originalContent := s.documents[uri]
 
-	currentContent := s.computeFixAllContent(ctx, uri, originalContent, snapshot)
+	currentContent, err := s.computeFixAllContent(ctx, uri, originalContent, snapshot)
+	if err != nil {
+		return empty, err
+	}
 
 	if currentContent == originalContent {
 		return empty, nil
@@ -181,7 +179,7 @@ func (s *Server) computeFixAllContent(
 	uri lsproto.DocumentUri,
 	originalContent string,
 	snapshot documentLintSnapshot,
-) string {
+) (string, error) {
 	nativeLint := s.fixAllNativeLint
 	if nativeLint == nil {
 		nativeLint = s.defaultFixAllNativeLint
@@ -190,7 +188,7 @@ func (s *Server) computeFixAllContent(
 	// Bound the eslint-plugin reverse requests across the WHOLE fixAll, not per
 	// pass: source.fixAll runs inline on the dispatch loop, so a wedged or
 	// mid-rebuild client that never answers rslint/pluginLint must not
-	// freeze editor interaction — nor multiply the stall by maxFixPasses. Only
+	// freeze editor interaction — nor multiply the stall by the autofix limit. Only
 	// the plugin pass gets this deadline; the native pass keeps the original ctx
 	// (it is in-process and does not depend on a client reply). Once the budget
 	// expires lintPluginRulesSync returns nil and the remaining passes fold
@@ -203,14 +201,19 @@ func (s *Server) computeFixAllContent(
 	defer cancelPlugin()
 
 	currentContent := originalContent
-	for pass := range maxFixPasses {
-		lintResult, err := nativeLint(ctx, uri, pass, currentContent, snapshot)
+	err := linter.RunAutofixLoop(linter.AutofixLoopOptions{}, func(pass linter.AutofixPass) (linter.AutofixPassResult, error) {
+		if err := ctx.Err(); err != nil {
+			return linter.AutofixPassResult{}, err
+		}
+		lintResult, err := nativeLint(ctx, uri, pass.Index, currentContent, snapshot)
 		if err != nil {
-			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
-			break
+			return linter.AutofixPassResult{}, fmt.Errorf("running lint for fixAll pass %d: %w", pass.Index, err)
+		}
+		if err := ctx.Err(); err != nil {
+			return linter.AutofixPassResult{}, err
 		}
 		if lintResult.HasSyntaxErrors {
-			break
+			return linter.AutofixPassResult{}, nil
 		}
 		ruleDiags := lintResult.Diagnostics
 
@@ -233,17 +236,30 @@ func (s *Server) computeFixAllContent(
 				ruleDiags = append(ruleDiags, pluginDiags...)
 			}
 		}
+		// A plugin timeout intentionally degrades to native-only fixes. Parent
+		// request cancellation, however, must discard speculative edits instead of
+		// returning a partial code action.
+		if err := ctx.Err(); err != nil {
+			return linter.AutofixPassResult{}, err
+		}
 
 		fixedContent, _, wasFixed := linter.ApplyRuleFixes(currentContent, ruleDiags)
 		if !wasFixed {
-			break
+			return linter.AutofixPassResult{}, nil
 		}
 		currentContent = fixedContent
 		if currentContent == originalContent {
-			break // cycle detected — fixes reverted to original content
+			return linter.AutofixPassResult{}, nil // cycle returned to its initial bytes
 		}
+		return linter.AutofixPassResult{Applied: true}, nil
+	})
+	if err != nil {
+		return originalContent, err
 	}
-	return currentContent
+	if err := ctx.Err(); err != nil {
+		return originalContent, err
+	}
+	return currentContent, nil
 }
 
 // defaultFixAllNativeLint builds each pass from an isolated editor overlay.

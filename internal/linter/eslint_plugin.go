@@ -39,18 +39,21 @@ type EslintPluginLintFile struct {
 }
 
 type EslintPluginLintRequest struct {
-	Generation      string                            `json:"generation,omitempty"`
-	Files           []EslintPluginLintFile            `json:"files"`
-	Rules           map[string]EslintPluginRuleConfig `json:"rules"`
-	Fix             bool                              `json:"fix"`
-	SuggestionsMode string                            `json:"suggestionsMode"`
-	CollectTiming   bool                              `json:"collectTiming,omitempty"`
+	Generation string                            `json:"generation,omitempty"`
+	Files      []EslintPluginLintFile            `json:"files"`
+	Rules      map[string]EslintPluginRuleConfig `json:"rules"`
+	// Fix asks the worker to materialize autofix edits; the host integration
+	// independently decides whether to apply them.
+	Fix             bool   `json:"fix"`
+	SuggestionsMode string `json:"suggestionsMode"`
+	CollectTiming   bool   `json:"collectTiming,omitempty"`
 }
 
 // SuggestionsMode values for EslintPluginLintRequest.SuggestionsMode — the wire
 // contract the Node worker interprets. "eager" materializes each suggestion's
-// fix (the CLI/LSP --fix path applies them like fixes); "off" records only the
-// suggestion descriptors without running their fixers.
+// fix; "off" records only the suggestion descriptors without running their
+// fixers. The host integration independently decides whether suggestions are
+// surfaced or applied.
 const (
 	SuggestionsModeOff   = "off"
 	SuggestionsModeEager = "eager"
@@ -100,18 +103,18 @@ type EslintPluginLintResult struct {
 // channel; the LSP server over an `rslint/pluginLint` request.
 type EslintPluginDispatcher func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error)
 
-// EslintPluginFileInput is one file's plugin-lint input as the caller
-// (CLI/LSP) assembles it before dispatch.
+// EslintPluginFileInput is one file's plugin-lint input as its integration
+// assembles it before dispatch.
 type EslintPluginFileInput struct {
 	Path string
-	// Text is the overlay source SENT TO THE WORKER on the wire. The LSP sets
-	// it to the unsaved-buffer content; the CLI leaves it nil so the worker
-	// reads disk itself (avoids the ~60MB structuredClone of shipping every
-	// file's text across the worker_threads boundary).
+	// Text is the overlay source SENT TO THE WORKER on the wire. API and LSP
+	// set it to their request/editor generation; the command-mode CLI leaves it
+	// nil so the worker reads disk itself (avoids the ~60MB structuredClone of
+	// shipping every file's text across the worker_threads boundary).
 	Text *string
 	// SourceFile is the frame Go REBUILDS diagnostics against (Go-local; never
-	// sent on the wire). The CLI sets it to the ts-go *ast.SourceFile the native
-	// pass already loaded (decoded + BOM-stripped), so Go reuses that frame
+	// sent on the wire). CLI and API set it to the ts-go *ast.SourceFile the
+	// native pass already loaded (decoded + BOM-stripped), so Go reuses that frame
 	// instead of re-reading/re-decoding the file — and plugin diagnostics share
 	// the exact frame as native ones. nil for the LSP, which rebuilds against
 	// the overlay Text (the worker linted that same string).
@@ -125,11 +128,11 @@ type EslintPluginFileInput struct {
 }
 
 // BuildEslintPluginFileInput assembles one file's plugin-lint input from its
-// enabled rules + per-file languageOptions/settings. Shared by the CLI and LSP
-// hosts (F1): both filter the IsEslintPluginRule subset and assemble the input;
+// enabled rules + per-file languageOptions/settings. Shared by CLI, API, and
+// LSP: each filters the IsEslintPluginRule subset and assembles the input;
 // it returns ok=false when the file has no plugin rules (caller skips dispatch).
-// The caller supplies the frame: sourceFile (CLI — the native ts-go SourceFile)
-// or text (LSP — the overlay the worker lints); see EslintPluginFileInput.
+// The caller supplies sourceFile (CLI/API — the native ts-go SourceFile), text
+// (API/LSP — the overlay the worker lints), or both; see EslintPluginFileInput.
 func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.ConfiguredRule, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) (EslintPluginFileInput, bool) {
 	var pluginRules []rule.ConfiguredRule
 	var normalizedLanguageOptions rule.LanguageOptions
@@ -555,6 +558,22 @@ func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLi
 			}
 			return p
 		}
+		// ESLint reserves position -1 for the byte order mark. Diagnostics
+		// cannot point there, but a fixer may remove it with range [-1, 0].
+		// Preserve exactly that extra position while still bounding malformed
+		// plugin results to the source frame.
+		clampFix := func(p int) int {
+			if p == -1 {
+				return -1
+			}
+			if p < 0 {
+				return 0
+			}
+			if p > len(text) {
+				return len(text)
+			}
+			return p
+		}
 
 		// Surface every worker failure. oxc recovers from syntax errors and
 		// returns a best-effort AST, so a parseError is never an ordinary
@@ -594,8 +613,8 @@ func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLi
 				SourceFile:  tsf,
 				FilePath:    f.Path,
 				Severity:    sev,
-				FixesPtr:    rebuildEslintPluginFixes(d.Fixes, clamp),
-				Suggestions: rebuildEslintPluginSuggestions(d.Suggestions, clamp),
+				FixesPtr:    rebuildEslintPluginFixes(d.Fixes, clampFix),
+				Suggestions: rebuildEslintPluginSuggestions(d.Suggestions, clampFix),
 			}
 			onDiagnostic(rd)
 		}

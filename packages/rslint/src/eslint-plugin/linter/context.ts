@@ -145,10 +145,9 @@ export interface CreateContextOptions {
   /**
    * Whether to materialise `descriptor.fix(fixer)` into the diagnostic's
    * `fixes` payload. The runner never applies fixes — application is the
-   * caller's job (CLI fix-loop, LSP code-action). CLI sets this when
-   * `--fix` is on; LSP sets it unconditionally so Quick Fix /
-   * source.fixAll see plugin-rule fixes the same way they see native-rule
-   * ones.
+   * caller's job (CLI fix-loop, API overlay, or LSP code-action). CLI sets
+   * this for `--fix`; API sets it so programmatic diagnostics always expose
+   * fixes; LSP sets it when its edit surfaces need plugin-rule fixes.
    */
   collectFixes: boolean;
   /** Suggestion handling: 'off' skips fix(fixer); 'eager' invokes it. */

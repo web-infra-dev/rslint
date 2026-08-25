@@ -2635,7 +2635,7 @@ func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	uri := documentURIFromPath(filePath)
 	s.documents[uri] = source
-	got := s.computeFixAllContent(
+	got, err := s.computeFixAllContent(
 		context.Background(),
 		uri,
 		source,
@@ -2648,6 +2648,9 @@ func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 			nil,
 		),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got != source {
 		t.Fatalf("fixAll modified a default-excluded file: %q", got)
 	}
@@ -2681,12 +2684,15 @@ func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
 	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-var" {
 		t.Fatalf("lint without tsconfig lost native diagnostics: %+v", result.Diagnostics)
 	}
-	got := s.computeFixAllContent(
+	got, err := s.computeFixAllContent(
 		context.Background(),
 		uri,
 		source,
 		documentLintSnapshotForTest(s, uri, cfg, configDir, true, nil),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	const want = "export const orphan = (() => { let output = 1; return output; })();\n"
 	if got != want {
 		t.Fatalf("fixAll without tsconfig = %q, want %q", got, want)

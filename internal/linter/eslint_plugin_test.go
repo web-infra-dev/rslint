@@ -653,6 +653,67 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 	}
 }
 
+func TestDispatchEslintPlugin_PreservesBOMFixPosition(t *testing.T) {
+	const code = "const value = 1;"
+	withBOM := "\ufeff" + code
+	files := []EslintPluginFileInput{{
+		Path:      "/bom.ts",
+		ConfigKey: "/cfg",
+		Text:      &withBOM,
+		Rules:     []ConfiguredRule{pluginRule("community/bom", nil, rule.SeverityError)},
+	}}
+	dispatch := func(_ context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		removeBOM := EslintPluginFix{Range: [2]int{-1, 0}}
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+			FilePath: "/bom.ts",
+			Diagnostics: []EslintPluginDiagnostic{
+				{
+					RuleName: "community/bom",
+					Message:  "remove BOM",
+					Fixes:    []EslintPluginFix{removeBOM},
+					Suggestions: []EslintPluginSuggestion{{
+						Desc:  "remove BOM",
+						Fixes: []EslintPluginFix{removeBOM},
+					}},
+				},
+				{
+					RuleName: "community/bom",
+					Message:  "malformed negative range",
+					Fixes:    []EslintPluginFix{{Range: [2]int{-2, 0}}},
+				},
+			},
+		}}}, nil
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, true, SuggestionsModeEager, nil, func(d rule.RuleDiagnostic) {
+		diagnostics = append(diagnostics, d)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(diagnostics) != 2 {
+		t.Fatalf("diagnostics = %d, want 2", len(diagnostics))
+	}
+	fixes := diagnostics[0].Fixes()
+	if len(fixes) != 1 || fixes[0].Range.Pos() != -1 || fixes[0].Range.End() != 0 {
+		t.Fatalf("BOM fix = %+v, want range [-1,0]", fixes)
+	}
+	if diagnostics[0].Suggestions == nil || len(*diagnostics[0].Suggestions) != 1 {
+		t.Fatalf("suggestions = %+v, want one", diagnostics[0].Suggestions)
+	}
+	suggestionFixes := (*diagnostics[0].Suggestions)[0].Fixes()
+	if len(suggestionFixes) != 1 || suggestionFixes[0].Range.Pos() != -1 || suggestionFixes[0].Range.End() != 0 {
+		t.Fatalf("BOM suggestion fix = %+v, want range [-1,0]", suggestionFixes)
+	}
+	malformedFixes := diagnostics[1].Fixes()
+	if len(malformedFixes) != 1 || malformedFixes[0].Range.Pos() != 0 || malformedFixes[0].Range.End() != 0 {
+		t.Fatalf("malformed negative fix = %+v, want bounded range [0,0]", malformedFixes)
+	}
+	if fixed, _, applied := ApplyRuleFixes(withBOM, diagnostics); !applied || fixed != code {
+		t.Fatalf("applied BOM fix = %q (applied=%v), want %q", fixed, applied, code)
+	}
+}
+
 // TestEslintPluginWire_RoundTrip pins the wire JSON keys against the Node
 // worker's plugin-lint-protocol.ts. A silent key drift (e.g. startPos →
 // start) would drop data on the wire without a compile error, so assert every

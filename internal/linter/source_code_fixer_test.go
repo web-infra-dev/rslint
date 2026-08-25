@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/core"
@@ -253,8 +254,8 @@ func TestApplyRuleFixes(t *testing.T) {
 			name: "insertion followed by replacement starting at same position - should skip replacement",
 			code: "ABCDEFGHIJ",
 			diagnostics: []mockDiagnostic{
-				newMockDiagnostic(newInsertFix(0, "XXX")),      // Insert at 0
-				newMockDiagnostic(newReplaceFix(0, 3, "YYY")),  // Replace ABC with YYY
+				newMockDiagnostic(newInsertFix(0, "XXX")),     // Insert at 0
+				newMockDiagnostic(newReplaceFix(0, 3, "YYY")), // Replace ABC with YYY
 			},
 			expectedCode:        "XXXABCDEFGHIJ",
 			expectedUnapplied:   1,
@@ -352,6 +353,27 @@ func TestApplyRuleFixes_UnsortedDiagnostics(t *testing.T) {
 	}
 	if !fixed {
 		t.Error("expected fixed = true")
+	}
+}
+
+func TestApplyRuleFixes_EqualRangesPreserveDiagnosticOrder(t *testing.T) {
+	code := "abc"
+	diagnostics := []mockDiagnostic{newMockDiagnostic(newReplaceFix(2, 3, "R"))}
+	for index := range 32 {
+		replacement := fmt.Sprintf("loser-%d", index)
+		if index == 0 {
+			replacement = "first"
+		}
+		diagnostics = append(diagnostics, newMockDiagnostic(newReplaceFix(1, 2, replacement)))
+	}
+	diagnostics = append(diagnostics, newMockDiagnostic(newReplaceFix(0, 1, "L")))
+
+	result, unapplied, fixed := ApplyRuleFixes(code, diagnostics)
+	if result != "LfirstR" {
+		t.Fatalf("equal-range winner = %q, want the first diagnostic", result)
+	}
+	if len(unapplied) != 31 || !fixed {
+		t.Fatalf("unapplied = %d, fixed = %v; want later equal-range diagnostics to conflict", len(unapplied), fixed)
 	}
 }
 

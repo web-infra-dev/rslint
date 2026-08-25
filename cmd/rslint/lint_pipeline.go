@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -583,147 +584,127 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Uses multi-pass fixing: after applying fixes, rebuild programs and re-lint
 	// to catch cascading issues (e.g. no-wrapper-object-types fix triggers no-inferrable-types).
 	// After fixing, allDiags is replaced with remaining (unfixed) diagnostics.
-	const maxFixPasses = 10
 	if fix && len(allDiags) > 0 {
-		diagnosticsByFile := groupDiagsByFile(allDiags)
-		passFixed, fixErr := applyFixPass(diagnosticsByFile, fs)
-		// Replace the entire source generation after every write attempt and
-		// before any Program rebuild. os.WriteFile may truncate or partially
-		// mutate a file even when it ultimately returns an error, and whole-
-		// generation invalidation also covers caller/source/symlink aliases.
-		programSession.InvalidateSourceSnapshots()
-		if fixErr != nil {
-			fmt.Fprintf(os.Stderr, "error applying fixes: %v\n", fixErr)
+		fixLoopErr := linter.RunAutofixLoop(
+			linter.AutofixLoopOptions{VerifyAfterLimit: true},
+			func(pass linter.AutofixPass) (linter.AutofixPassResult, error) {
+				if pass.Index > 0 {
+					newBinding, err := createPrograms()
+					if err != nil {
+						return linter.AutofixPassResult{}, fmt.Errorf("rebuilding Programs after fixes: %w", err)
+					}
+					if len(newBinding.Programs) == 0 {
+						return linter.AutofixPassResult{}, errors.New("rebuilding Programs after fixes: no Program returned")
+					}
+
+					// Re-lint using the fresh binding derived from the stable target plan.
+					fixTargetsByProgram := newBinding.TargetsByProgram
+					fixConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
+						ConfigsByOwner:                      configMap,
+						Config:                              rslintConfig,
+						ConfigDirectory:                     currentDirectory,
+						Catalog:                             ruleCatalog,
+						EnforcePlugins:                      enforcePlugins,
+						TargetsBySourcePath:                 newBinding.LintTargetBySourcePath,
+						SourceMappingsIncludeCanonicalPaths: true,
+						PathSpaces:                          targetPlan.PathSpaces(),
+						FS:                                  fs,
+					})
+					fixGetRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
+						return fixConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
+					}
+					var fixRulesForFile linter.RuleHandler
+					if !typeCheckOnly {
+						fixRulesForFile = fixGetRulesForFile
+					}
+					passEditDemand := rule.EditDemandAutofix
+					if !pass.AllowApply {
+						passEditDemand = rule.EditDemandNone
+					}
+					var passDiags []rule.RuleDiagnostic
+					fixSyntaxDiagnostics := linter.CollectTargetSyntacticDiagnostics(
+						newBinding.Programs,
+						fixTargetsByProgram,
+						typeCheck,
+					)
+					passDiags = append(passDiags, fixSyntaxDiagnostics...)
+					fixRunOpts := linter.RunLinterOptions{
+						Programs:        newBinding.Programs,
+						SingleThreaded:  singleThreaded,
+						Cwd:             cwd,
+						Scope:           linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+						TargetFiles:     fixTargetsByProgram,
+						GetRulesForFile: fixRulesForFile,
+						TypeCheck:       typeCheck,
+						Timing:          timingCollector,
+						Consumer: rule.DiagnosticConsumer{
+							Demand: passEditDemand,
+							Report: func(d rule.RuleDiagnostic) {
+								diagsMu.Lock()
+								passDiags = append(passDiags, d)
+								diagsMu.Unlock()
+							},
+						},
+					}
+					fixPreparedPlan, planErr := linter.PrepareLintPlan(fixRunOpts)
+					if planErr != nil {
+						return linter.AutofixPassResult{}, fmt.Errorf("preparing lint plan after fixes: %w", planErr)
+					}
+					fixRunOpts.PreparedPlan = fixPreparedPlan
+					// Re-dispatch plugin rules each pass (only when configured): the
+					// worker re-reads the post-fix file content, and merging here keeps
+					// plugin diagnostics from being lost when allDiags is replaced.
+					// Each pass prepares a fresh plan for the rebuilt target binding.
+					var fixPluginCh <-chan linter.EslintPluginDispatchOutcome
+					if hasEslintPlugins {
+						fixPluginInputs := linter.BuildEslintPluginFileInputs(fixRunOpts.PreparedPlan, eslintPluginConfigResolver{
+							lintResolver: fixConfigResolver,
+						}.resolve)
+						suggestionsMode := linter.SuggestionsModeOff
+						if fix {
+							suggestionsMode = linter.SuggestionsModeEager
+						}
+						fixPluginCh = linter.DispatchEslintPluginRulesAsync(ctx, dispatch, fixPluginInputs, fix, suggestionsMode, timingCollector, reportEslintPluginDispatchOutcome)
+					}
+					passResult, passErr := linter.RunLinter(fixRunOpts)
+					var fixPluginDiags []rule.RuleDiagnostic
+					if fixPluginCh != nil {
+						fixPluginDiags = (<-fixPluginCh).Diagnostics
+					}
+					if passErr != nil {
+						return linter.AutofixPassResult{}, fmt.Errorf("running linter after fixes: %w", passErr)
+					}
+					if passResult != nil {
+						for name := range passResult.ExecutedRules {
+							lintResult.ExecutedRules[name] = struct{}{}
+						}
+					}
+					// Merge this pass's plugin diagnostics before applying fixes so
+					// plugin fixes participate and plugin diagnostics survive.
+					passDiags = append(passDiags, fixPluginDiags...)
+					remapDiagnosticTargetPaths(passDiags, newBinding.LintTargetBySourcePath, fs)
+					allDiags = passDiags
+				}
+
+				if !pass.AllowApply {
+					return linter.AutofixPassResult{}, nil
+				}
+				passFixed, fixErr := applyFixPass(groupDiagsByFile(allDiags), fs)
+				// Replace the entire source generation after every write attempt and
+				// before any Program rebuild. os.WriteFile may truncate or partially
+				// mutate a file even when it ultimately returns an error, and whole-
+				// generation invalidation also covers caller/source/symlink aliases.
+				programSession.InvalidateSourceSnapshots()
+				if fixErr != nil {
+					return linter.AutofixPassResult{}, fmt.Errorf("applying fixes: %w", fixErr)
+				}
+				fixedCount += passFixed
+				return linter.AutofixPassResult{Applied: passFixed > 0}, nil
+			},
+		)
+		if fixLoopErr != nil {
+			fmt.Fprintf(os.Stderr, "error %v\n", fixLoopErr)
 			return 1
-		}
-		fixedCount += passFixed
-
-		// Re-lint → fix → re-lint → fix → ... until stable or maxFixPasses.
-		// Skip if nothing was fixed in the first pass (no need to re-lint).
-		for pass := 1; pass <= maxFixPasses && fixedCount > 0; pass++ {
-			newBinding, err := createPrograms()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error rebuilding Programs after fixes: %v\n", err)
-				return 1
-			}
-			if len(newBinding.Programs) == 0 {
-				fmt.Fprintln(os.Stderr, "error rebuilding Programs after fixes: no Program returned")
-				return 1
-			}
-
-			// Re-lint using the fresh binding derived from the stable target plan.
-			fixTargetsByProgram := newBinding.TargetsByProgram
-			fixLintTargetBySourcePath := newBinding.LintTargetBySourcePath
-			fixConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
-				ConfigsByOwner:                      configMap,
-				Config:                              rslintConfig,
-				ConfigDirectory:                     currentDirectory,
-				Catalog:                             ruleCatalog,
-				EnforcePlugins:                      enforcePlugins,
-				TargetsBySourcePath:                 newBinding.LintTargetBySourcePath,
-				SourceMappingsIncludeCanonicalPaths: true,
-				PathSpaces:                          targetPlan.PathSpaces(),
-				FS:                                  fs,
-			})
-			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				return fixConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
-			}
-			var fixRulesForFile linter.RuleHandler
-			if !typeCheckOnly {
-				fixRulesForFile = fixGetRulesForFile
-			}
-			passEditDemand := rule.EditDemandAutofix
-			if pass == maxFixPasses {
-				// This pass only verifies the bytes written by the final
-				// allowed write pass; no further fixes can be applied.
-				passEditDemand = rule.EditDemandNone
-			}
-			var passDiags []rule.RuleDiagnostic
-			fixSyntaxDiagnostics := linter.CollectTargetSyntacticDiagnostics(
-				newBinding.Programs,
-				fixTargetsByProgram,
-				typeCheck,
-			)
-			passDiags = append(passDiags, fixSyntaxDiagnostics...)
-			fixRunOpts := linter.RunLinterOptions{
-				Programs:        newBinding.Programs,
-				SingleThreaded:  singleThreaded,
-				Cwd:             cwd,
-				Scope:           linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-				TargetFiles:     fixTargetsByProgram,
-				GetRulesForFile: fixRulesForFile,
-				TypeCheck:       typeCheck,
-				Timing:          timingCollector,
-				Consumer: rule.DiagnosticConsumer{
-					Demand: passEditDemand,
-					Report: func(d rule.RuleDiagnostic) {
-						diagsMu.Lock()
-						passDiags = append(passDiags, d)
-						diagsMu.Unlock()
-					},
-				},
-			}
-			fixPreparedPlan, planErr := linter.PrepareLintPlan(fixRunOpts)
-			if planErr != nil {
-				fmt.Fprintf(os.Stderr, "error preparing lint plan after fixes: %v\n", planErr)
-				return 1
-			}
-			fixRunOpts.PreparedPlan = fixPreparedPlan
-			// Re-dispatch plugin rules each pass (only when configured): the
-			// worker re-reads the post-fix file content, and merging here keeps
-			// plugin diagnostics from being lost when allDiags is replaced.
-			// Each pass prepares a fresh plan for the rebuilt target binding.
-			var fixPluginCh <-chan linter.EslintPluginDispatchOutcome
-			if hasEslintPlugins {
-				fixPluginInputs := linter.BuildEslintPluginFileInputs(fixRunOpts.PreparedPlan, eslintPluginConfigResolver{
-					lintResolver: fixConfigResolver,
-				}.resolve)
-				suggestionsMode := linter.SuggestionsModeOff
-				if fix {
-					suggestionsMode = linter.SuggestionsModeEager
-				}
-				fixPluginCh = linter.DispatchEslintPluginRulesAsync(ctx, dispatch, fixPluginInputs, fix, suggestionsMode, timingCollector, reportEslintPluginDispatchOutcome)
-			}
-			passResult, passErr := linter.RunLinter(fixRunOpts)
-			var fixPluginDiags []rule.RuleDiagnostic
-			if fixPluginCh != nil {
-				fixPluginDiags = (<-fixPluginCh).Diagnostics
-			}
-			if passErr != nil {
-				fmt.Fprintf(os.Stderr, "error running linter after fixes: %v\n", passErr)
-				return 1
-			}
-			if passResult != nil {
-				for name := range passResult.ExecutedRules {
-					lintResult.ExecutedRules[name] = struct{}{}
-				}
-			}
-			// Merge this pass's plugin diagnostics before applying fixes so
-			// plugin fixes participate and plugin diagnostics survive.
-			passDiags = append(passDiags, fixPluginDiags...)
-			remapDiagnosticTargetPaths(passDiags, fixLintTargetBySourcePath, fs)
-
-			// Replace allDiags with latest post-fix diagnostics.
-			allDiags = passDiags
-			if pass == maxFixPasses {
-				// The maximum number of write passes has already run (the initial
-				// pass plus maxFixPasses-1 loop passes). This extra pass is the
-				// required final verification of the bytes written by pass 10.
-				break
-			}
-
-			passFixed, fixErr := applyFixPass(groupDiagsByFile(passDiags), fs)
-			// See the first fix pass above: invalidate before inspecting the
-			// result so a partially successful write can never feed a rebuild.
-			programSession.InvalidateSourceSnapshots()
-			if fixErr != nil {
-				fmt.Fprintf(os.Stderr, "error applying fixes: %v\n", fixErr)
-				return 1
-			}
-			if passFixed == 0 {
-				break // Stable — allDiags reflect final state
-			}
-			fixedCount += passFixed
 		}
 	}
 

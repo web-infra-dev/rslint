@@ -38,11 +38,10 @@ export interface EslintPluginLintRequest {
   files: ReadonlyArray<{
     path: string;
     /**
-     * Optional file content override. The CLI host leaves it absent —
-     * the worker reads from disk via `readFileSync` (and re-reads
-     * post-fix content across `--fix` passes). The LSP host sends it so
-     * an unsaved editor buffer's overlay text is linted instead of the
-     * stale on-disk copy. Also used by in-process test harnesses.
+     * Optional file content override. Command-mode CLI passes leave it absent,
+     * so the worker reads each post-fix generation from disk. API passes send
+     * their request-local overlay generation, and LSP passes send the unsaved
+     * editor buffer. Also used by in-process test harnesses.
      */
     text?: string;
     /**
@@ -61,7 +60,7 @@ export interface EslintPluginLintRequest {
     configKey?: string;
   }>;
   rules?: Record<string, { options?: readonly unknown[] }>;
-  /** Collect autofixes (driven by Go's `--fix`). */
+  /** Materialize autofix edits; the Go integration independently applies them. */
   fix?: boolean;
   suggestionsMode?: 'off' | 'eager';
   /** Collect per-rule execution times (driven by Go's `--timing`). */

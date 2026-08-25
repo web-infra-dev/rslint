@@ -587,3 +587,13 @@ func TestSessionRecordsEmptyInitialCompilerGeneration(t *testing.T) {
 		t.Fatal("empty initial compiler generation was not recorded")
 	}
 }
+
+func TestLoadAPIRetainsItsCompilerGeneration(t *testing.T) {
+	session := NewSession(bundled.WrapFS(osvfs.FS()))
+	if _, err := session.LoadAPI(ProjectSet{}, target.Plan{}, t.TempDir(), true); err != nil {
+		t.Fatal(err)
+	}
+	if !session.initialProgramsSet {
+		t.Fatal("LoadAPI did not retain its initial compiler generation")
+	}
+}

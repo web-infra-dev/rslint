@@ -35,7 +35,7 @@ func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, b
 
 	for _, diagnostic := range diagnostics {
 		if len(diagnostic.Fixes()) > 0 {
-			slices.SortFunc(diagnostic.Fixes(), func(a rule.RuleFix, b rule.RuleFix) int {
+			slices.SortStableFunc(diagnostic.Fixes(), func(a rule.RuleFix, b rule.RuleFix) int {
 				start := a.Range.Pos() - b.Range.Pos()
 				if start == 0 {
 					return a.Range.End() - b.Range.End()
@@ -48,7 +48,7 @@ func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, b
 		}
 	}
 
-	slices.SortFunc(withFixes, func(a M, b M) int {
+	slices.SortStableFunc(withFixes, func(a M, b M) int {
 		aFixes, bFixes := a.Fixes(), b.Fixes()
 
 		start := aFixes[0].Range.Pos() - bFixes[0].Range.Pos()

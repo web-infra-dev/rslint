@@ -96,6 +96,8 @@ const [result] = await rslint.lintText(
 
 Pass `fix: true`. A result whose file a fix changed then carries an `output` string — the full fixed source; results with no applied fix have no `output`.
 
+Rslint repeats linting and fixing until the source is stable, with at most ten writable passes. `messages` and all diagnostic counts describe the final source in `output`, so successfully fixed findings are no longer reported. If the pass limit leaves a fixable finding, its `message.fix` range also targets that final source.
+
 **Write fixes to disk** with the static [`Rslint.outputFixes`](/api/rslint#outputfixes):
 
 ```ts

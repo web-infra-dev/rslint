@@ -2,12 +2,15 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -166,7 +169,7 @@ func TestHandleFixAllCodeAction_GitignoredFile(t *testing.T) {
 	}
 }
 
-func TestHandleFixAllCodeAction_ClearsPendingLintURI(t *testing.T) {
+func TestHandleFixAllCodeAction_PreservesPendingLintURI(t *testing.T) {
 	s := newTestServer()
 	uri := lsproto.DocumentUri("file:///project/test.ts")
 	s.documents[uri] = "const x = 1;"
@@ -174,8 +177,8 @@ func TestHandleFixAllCodeAction_ClearsPendingLintURI(t *testing.T) {
 
 	_, _ = s.handleFixAllCodeAction(context.Background(), uri)
 
-	if _, ok := s.pendingLintURIs[uri]; ok {
-		t.Error("fixAll should clear pendingLintURIs for the target URI")
+	if _, ok := s.pendingLintURIs[uri]; !ok {
+		t.Error("fixAll should leave scheduled diagnostics pending")
 	}
 }
 
@@ -195,7 +198,7 @@ func TestHandleFixAllCodeAction_DoesNotUpdateDiagnosticsCache(t *testing.T) {
 	}
 }
 
-func TestHandleFixAllCodeAction_OtherPendingURIsPreserved(t *testing.T) {
+func TestHandleFixAllCodeAction_AllPendingURIsPreserved(t *testing.T) {
 	s := newTestServer()
 	uriA := lsproto.DocumentUri("file:///project/a.ts")
 	uriB := lsproto.DocumentUri("file:///project/b.ts")
@@ -205,8 +208,8 @@ func TestHandleFixAllCodeAction_OtherPendingURIsPreserved(t *testing.T) {
 
 	_, _ = s.handleFixAllCodeAction(context.Background(), uriA)
 
-	if _, ok := s.pendingLintURIs[uriA]; ok {
-		t.Error("fixAll target URI should be cleared from pendingLintURIs")
+	if _, ok := s.pendingLintURIs[uriA]; !ok {
+		t.Error("fixAll target URI should remain in pendingLintURIs")
 	}
 	if _, ok := s.pendingLintURIs[uriB]; !ok {
 		t.Error("other URIs in pendingLintURIs should be preserved")
@@ -537,23 +540,110 @@ func TestComputeEndPosition_MultipleEmoji(t *testing.T) {
 
 func TestHandleFixAllCodeAction_DocumentNotInMap(t *testing.T) {
 	s := newTestServer()
+	s.session = &project.Session{}
 	uri := lsproto.DocumentUri("file:///project/unknown.ts")
-	// uri is NOT in s.documents — s.documents[uri] returns ""
+	// uri is NOT in s.documents.
 
 	resp, err := s.handleFixAllCodeAction(context.Background(), uri)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Session is nil, so it returns empty without panicking
 	if resp.CommandOrCodeActionArray == nil || len(*resp.CommandOrCodeActionArray) != 0 {
 		t.Error("expected empty code actions for document not in map")
 	}
 }
 
-// ======== maxFixPasses constant test ========
+func TestComputeFixAllContent_DiscardsPartialContentOnNativeError(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///project/test.ts")
+	const original = "var value = 1;"
+	wantErr := errors.New("native lint failed")
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, pass int, content string, _ documentLintSnapshot) (lintPassResult, error) {
+		if pass > 0 {
+			return lintPassResult{}, wantErr
+		}
+		fixes := []rule.RuleFix{{Text: "let", Range: core.NewTextRange(0, 3)}}
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
+			SourceFile: textOnlySourceFile{text: content},
+			FixesPtr:   &fixes,
+		}}}, nil
+	}
 
-func TestMaxFixPasses_IsReasonable(t *testing.T) {
-	if maxFixPasses < 1 || maxFixPasses > 100 {
-		t.Errorf("maxFixPasses = %d, should be between 1 and 100", maxFixPasses)
+	got, err := s.computeFixAllContent(
+		context.Background(),
+		uri,
+		original,
+		documentLintSnapshotForTest(s, uri, config.RslintConfig{}, "", true, nil),
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want %v", err, wantErr)
+	}
+	if got != original {
+		t.Fatalf("content = %q, want original content after error", got)
+	}
+}
+
+func TestComputeFixAllContent_DiscardsPartialContentWhenNativeLintCancels(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///project/test.ts")
+	const original = "var value = 1;"
+	ctx, cancel := context.WithCancel(context.Background())
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, pass int, content string, _ documentLintSnapshot) (lintPassResult, error) {
+		if pass > 0 {
+			cancel()
+			return lintPassResult{HasSyntaxErrors: true}, nil
+		}
+		fixes := []rule.RuleFix{{Text: "let", Range: core.NewTextRange(0, 3)}}
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
+			SourceFile: textOnlySourceFile{text: content},
+			FixesPtr:   &fixes,
+		}}}, nil
+	}
+
+	got, err := s.computeFixAllContent(
+		ctx,
+		uri,
+		original,
+		documentLintSnapshotForTest(s, uri, config.RslintConfig{}, "", true, nil),
+	)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+	if got != original {
+		t.Fatalf("content = %q, want original content after cancellation", got)
+	}
+}
+
+func TestComputeFixAllContent_StopsAfterTenWritablePasses(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///project/test.ts")
+	const original = "x"
+	passes := 0
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, pass int, content string, _ documentLintSnapshot) (lintPassResult, error) {
+		passes++
+		if pass != passes-1 {
+			t.Fatalf("pass index = %d, want %d", pass, passes-1)
+		}
+		fixes := []rule.RuleFix{{Text: "!", Range: core.NewTextRange(len(content), len(content))}}
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
+			SourceFile: textOnlySourceFile{text: content},
+			FixesPtr:   &fixes,
+		}}}, nil
+	}
+
+	got, err := s.computeFixAllContent(
+		context.Background(),
+		uri,
+		original,
+		documentLintSnapshotForTest(s, uri, config.RslintConfig{}, "", true, nil),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if passes != 10 {
+		t.Fatalf("passes = %d, want ten and no diagnostic-only verification", passes)
+	}
+	if want := original + strings.Repeat("!", 10); got != want {
+		t.Fatalf("content = %q, want %q", got, want)
 	}
 }

@@ -93,22 +93,22 @@ export interface RuleConfig {
 
 /** Per-file lint request input (called by Worker dispatcher per task).
  *
- * The Worker reads source text from disk via `fs.readFileSync(filePath)`
- * by default — text is intentionally NOT carried over IPC. This drops
- * the structuredClone cost of shipping every file's contents across
- * the worker_threads boundary (~60 MB on a 5000-file repo).
+ * The Worker reads source text from disk via `fs.readFileSync(filePath)` by
+ * default. Command-mode CLI passes omit `text`, avoiding the structuredClone
+ * cost of shipping every file's contents across the worker_threads boundary
+ * (~60 MB on a 5000-file repo). API and LSP passes provide `text` when the
+ * authoritative generation lives in a request/editor overlay.
  *
  * Multi-pass --fix coherence is preserved because cmd/rslint's
  * applyFixPass writes fixes to disk BEFORE re-dispatching the next
  * lint pass — the worker reads the post-fix contents.
  *
- * `text` here is an in-process override for unit tests that want to
- * exercise `lintFile` against an in-memory source. The wire shape
- * (engine.ts → worker postMessage) NEVER carries text.
+ * `text` is also available to in-process unit tests that exercise `lintFile`
+ * against an in-memory source.
  */
 export interface LintFileRequest {
   filePath: string;
-  /** In-process override for tests. The IPC wire shape never carries this. */
+  /** Authoritative overlay content; omitted when the worker should read disk. */
   text?: string;
   /**
    * Forwarded subset of user `languageOptions`. Only the fields the
@@ -144,10 +144,9 @@ export interface LintFileRequest {
   /**
    * Whether to materialise plugin `descriptor.fix(fixer)` into the
    * diagnostic's `fixes` payload. The runner never APPLIES fixes —
-   * application is the caller's job (CLI fix-loop, LSP code-action /
-   * fixAll). CLI sets this whenever `--fix` is on; LSP always sets it so
-   * Quick Fix / source.fixAll see plugin-rule fixes the same way they
-   * see native-rule ones.
+   * application is the caller's job (CLI fix-loop, API overlay, or LSP
+   * code-action/fixAll). Integrations may also materialise fixes purely as
+   * programmatic diagnostic metadata.
    */
   collectFixes: boolean;
   suggestionsMode: SuggestionsMode;
@@ -633,12 +632,17 @@ export function lintFile(
       return Math.trunc(pos);
     };
     const toByte = (pos: number): number => u16ToByte[clamp(pos)];
+    // ESLint exposes the leading byte order mark at the sentinel position -1
+    // to fixers (not to diagnostic locations). Preserve exactly that legal
+    // sentinel so rules such as unicode-bom can remove it with [-1, 0]; every
+    // other malformed negative value still takes the ordinary bounded path.
+    const fixToByte = (pos: number): number => (pos === -1 ? -1 : toByte(pos));
     for (const d of filteredDiagnostics) {
       d.startPos = toByte(d.startPos);
       d.endPos = toByte(d.endPos);
       if (d.fixes && d.fixes.length > 0) {
         for (const f of d.fixes) {
-          f.range = [toByte(f.range[0]), toByte(f.range[1])];
+          f.range = [fixToByte(f.range[0]), fixToByte(f.range[1])];
           result.fixes.push(f);
         }
       }
@@ -646,7 +650,7 @@ export function lintFile(
         for (const s of d.suggestions) {
           if (s.fixes) {
             for (const f of s.fixes) {
-              f.range = [toByte(f.range[0]), toByte(f.range[1])];
+              f.range = [fixToByte(f.range[0]), fixToByte(f.range[1])];
             }
           }
         }

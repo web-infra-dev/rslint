@@ -478,6 +478,7 @@ func (s *Session) LoadAPI(
 	if err := s.appendCompatibilityPrograms(&binding, unbound, currentDirectory, singleThreaded); err != nil {
 		return LoadResult{}, err
 	}
+	s.retainCompilerPrograms(binding.compilerPrograms)
 	finalizeResult(&binding)
 	return binding, nil
 }

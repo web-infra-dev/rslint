@@ -742,7 +742,10 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 		}}}, nil
 	}
 
-	got := s.computeFixAllContent(context.Background(), uri, original, s.documentLintSnapshot(uri))
+	got, err := s.computeFixAllContent(context.Background(), uri, original, s.documentLintSnapshot(uri))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Both fixes applied (native "1"→"2" AND plugin "bar"→"baz") proves the
 	// fold: the plugin fix survived alongside the native one in the same pass.
@@ -954,7 +957,11 @@ func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T)
 		}}}, nil
 	}
 
-	if got := s.computeFixAllContent(context.Background(), uri, source, snapshot); got != source {
+	got, err := s.computeFixAllContent(context.Background(), uri, source, snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != source {
 		t.Fatalf("fixAll changed source without fixes: %q", got)
 	}
 	if nativeCalls != 1 || pluginCalls != 1 {
@@ -1007,7 +1014,10 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	}
 
 	start := time.Now()
-	got := s.computeFixAllContent(context.Background(), uri, original, s.documentLintSnapshot(uri))
+	got, err := s.computeFixAllContent(context.Background(), uri, original, s.documentLintSnapshot(uri))
+	if err != nil {
+		t.Fatal(err)
+	}
 	elapsed := time.Since(start)
 
 	// Native fix applied; the wedged plugin pass timed out and was dropped
@@ -1044,12 +1054,15 @@ func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
 		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}, HasSyntaxErrors: true}, nil
 	}
 
-	got := s.computeFixAllContent(
+	got, err := s.computeFixAllContent(
 		context.Background(),
 		uri,
 		malformed,
 		documentLintSnapshotForTest(s, uri, config.RslintConfig{}, "", true, nil),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got != malformed {
 		t.Fatalf("syntax-error fixAll changed content to %q", got)
 	}

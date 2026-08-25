@@ -229,14 +229,158 @@ describe('Rslint class', () => {
         'const found = [1].filter(Boolean);\n',
         { filePath: 'probe.ts' },
       );
-      expect(result.messages.map((message) => message.ruleId).sort()).toEqual([
-        'local/prefer-array-some',
+      expect(result.messages.map((message) => message.ruleId)).toEqual([
         'local/program-listener',
       ]);
-      expect(result.fixableErrorCount).toBe(1);
+      expect(result.fixableErrorCount).toBe(0);
       expect(result.output).toBe('const found = [1].some(Boolean);\n');
     } finally {
       await rslint.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('remaining multi-edit fix is merged against final output generation', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-fix-limit-'));
+    const pluginPath = path.join(tmp, 'blocking-plugin.mjs');
+    await writeFile(
+      pluginPath,
+      `export default {
+				rules: {
+					block: {
+						meta: { fixable: 'code', schema: [], messages: { block: 'block' } },
+						create(context) {
+							return { Program(node) {
+								context.report({
+									node,
+									messageId: 'block',
+									fix(fixer) {
+										const text = context.sourceCode.text;
+										const offset = text.indexOf('if (value)');
+										return fixer.replaceTextRange(
+											[0, text.length],
+											text.slice(0, offset) + ' ' + text.slice(offset),
+										);
+									},
+								});
+							} };
+						},
+					},
+				},
+			};\n`,
+    );
+    await writeFile(
+      path.join(tmp, 'rslint.config.mjs'),
+      `import blocking from ${JSON.stringify(pathToFileURL(pluginPath).href)};
+			export default [{
+				plugins: { blocking },
+				rules: { 'blocking/block': 'error', 'no-else-return': 'error' },
+			}];\n`,
+    );
+
+    const rslint = new Rslint({ cwd: tmp, fix: true });
+    const nativeFixer = new Rslint({
+      cwd: tmp,
+      overrideConfigFile: true,
+      overrideConfig: [{ rules: { 'no-else-return': 'error' } }],
+      fix: true,
+    });
+    const source = `const prefix = 0;
+function f(value) {
+  if (value) {
+    return 1;
+  } else {
+    return 2;
+  }
+}\n`;
+    try {
+      const [result] = await rslint.lintText(source, { filePath: 'probe.js' });
+      let finalSource = source;
+      for (let pass = 0; pass < 10; pass++) {
+        finalSource = finalSource.replace('if (value)', ' if (value)');
+      }
+      expect(result.output).toBe(finalSource);
+      const message = result.messages.find(
+        (candidate) => candidate.ruleId === 'no-else-return',
+      );
+      expect(message).toBeDefined();
+      const fix = message.fix;
+      expect(fix).toBeDefined();
+      const [expected] = await nativeFixer.lintText(finalSource, {
+        filePath: 'expected.js',
+      });
+      const applied =
+        finalSource.slice(0, fix.range[0]) +
+        fix.text +
+        finalSource.slice(fix.range[1]);
+      expect(applied).toBe(expected.output);
+    } finally {
+      await Promise.all([rslint.close(), nativeFixer.close()]);
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('community plugin BOM edits survive the complete API fix path', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-plugin-bom-'));
+    const pluginPath = path.join(tmp, 'bom-plugin.mjs');
+    await writeFile(
+      pluginPath,
+      `export default {
+				rules: {
+					remove: {
+						meta: {
+							fixable: 'code',
+							hasSuggestions: true,
+							schema: [],
+							messages: { remove: 'remove BOM', suggest: 'remove BOM' },
+						},
+						create(context) {
+							return { Program(node) {
+								if (!context.sourceCode.hasBOM) return;
+								context.report({
+									node,
+									messageId: 'remove',
+									fix: (fixer) => fixer.removeRange([-1, 0]),
+									suggest: [{
+										messageId: 'suggest',
+										fix: (fixer) => fixer.removeRange([-1, 0]),
+									}],
+								});
+							} };
+						},
+					},
+				},
+			};\n`,
+    );
+    await writeFile(
+      path.join(tmp, 'rslint.config.mjs'),
+      `import bom from ${JSON.stringify(pathToFileURL(pluginPath).href)};
+			export default [{ plugins: { bom }, rules: { 'bom/remove': 'error' } }];\n`,
+    );
+
+    const inspector = new Rslint({ cwd: tmp });
+    const fixer = new Rslint({ cwd: tmp, fix: true });
+    const BOM = String.fromCharCode(0xfeff);
+    const source = BOM + 'const value = 1;\n';
+    try {
+      const [before] = await inspector.lintText(source, {
+        filePath: 'probe.js',
+      });
+      expect(before.output).toBeUndefined();
+      expect(before.fixableErrorCount).toBe(1);
+      expect(before.messages).toHaveLength(1);
+      expect(before.messages[0].fix).toEqual({ range: [-1, 0], text: '' });
+      expect(before.messages[0].suggestions?.[0].fix).toEqual({
+        range: [-1, 0],
+        text: '',
+      });
+
+      const [after] = await fixer.lintText(source, { filePath: 'probe.js' });
+      expect(after.output).toBe('const value = 1;\n');
+      expect(after.messages).toEqual([]);
+      expect(after.errorCount).toBe(0);
+    } finally {
+      await Promise.all([inspector.close(), fixer.close()]);
       await rm(tmp, { recursive: true, force: true });
     }
   });
@@ -371,7 +515,7 @@ describe('Rslint class', () => {
     }
   });
 
-  test('fix:true returns per-result output + fixable count', async () => {
+  test('fix:true returns output with final post-fix diagnostics', async () => {
     const rslint = new Rslint({
       cwd: fixturesDir,
       overrideConfigFile: true,
@@ -384,12 +528,9 @@ describe('Rslint class', () => {
       });
       const r = results[0];
       expect(r.output).toBe('let a: string[] = [];');
-      expect(r.fixableErrorCount).toBe(1);
-      // Single-pass (design §8): messages still report the pre-fix diagnostics
-      // — the fixable error is in `output` AND still listed, unlike ESLint's
-      // post-fix re-lint. Pinned so this reverse-of-ESLint behavior is explicit.
-      expect(r.messages).toHaveLength(1);
-      expect(r.errorCount).toBe(1);
+      expect(r.fixableErrorCount).toBe(0);
+      expect(r.messages).toHaveLength(0);
+      expect(r.errorCount).toBe(0);
     } finally {
       await rslint.close();
     }
@@ -1962,7 +2103,7 @@ module.exports = config;`
     // the source must equal Go's in-band output — exercises both the multi-edit
     // merge branch and JS↔Go fix agreement.
     const code = 'const f = (function () { return 1; }).bind(this);';
-    const rslint = new Rslint({
+    const options = {
       cwd: fixturesDir,
       overrideConfigFile: true,
       overrideConfig: [
@@ -1972,20 +2113,24 @@ module.exports = config;`
           rules: { 'no-extra-bind': 'error' },
         },
       ],
-      fix: true,
-    });
+    };
+    const inspector = new Rslint(options);
+    const fixer = new Rslint({ ...options, fix: true });
     try {
-      const results = await rslint.lintText(code, { filePath: 'gap-bind.ts' });
-      const r = results[0];
-      const m = r.messages.find((x) => x.ruleId === 'no-extra-bind');
+      const [inspected] = await inspector.lintText(code, {
+        filePath: 'gap-bind.ts',
+      });
+      const [fixed] = await fixer.lintText(code, { filePath: 'gap-bind.ts' });
+      const m = inspected.messages.find((x) => x.ruleId === 'no-extra-bind');
       expect(m).toBeDefined();
       expect(m.fix).toBeDefined();
       expect(m.fix.range).toHaveLength(2);
       const applied =
         code.slice(0, m.fix.range[0]) + m.fix.text + code.slice(m.fix.range[1]);
-      expect(applied).toBe(r.output);
+      expect(applied).toBe(fixed.output);
+      expect(fixed.messages).toEqual([]);
     } finally {
-      await rslint.close();
+      await Promise.all([inspector.close(), fixer.close()]);
     }
   });
 
@@ -2039,10 +2184,8 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles keeps fix.range BOM-stripped and keeps the BOM in output', async () => {
-    // A BOM is never part of the text a fix range indexes, so fix.range stays
-    // BOM-stripped — matching ESLint v10 and the message column. `output` is
-    // the whole file, so it keeps the mark a fix did not ask to remove.
+  test('lintFiles keeps the BOM in fixed output', async () => {
+    // `output` is the whole file, so it keeps a mark the fix did not remove.
     const BOM = String.fromCharCode(0xfeff);
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-bom-'));
     try {
@@ -2060,11 +2203,7 @@ module.exports = config;`
       try {
         const results = await rslint.lintFiles('bom.ts');
         expect(results).toHaveLength(1);
-        const m = results[0].messages[0];
-        // Identical to the no-BOM lintText case (line 47): BOM-stripped [7, 20].
-        expect(m.fix.range).toEqual([7, 20]);
-        expect(m.fix.text).toBe('string[]');
-        // Only output carries the BOM.
+        expect(results[0].messages).toEqual([]);
         expect(results[0].output).toBe(BOM + 'let a: string[] = [];\n');
       } finally {
         await rslint.close();
@@ -2074,11 +2213,8 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles multi-edit fix on a BOM-prefixed file: merged range BOM-stripped, output keeps BOM', async () => {
-    // no-extra-bind emits a multi-edit fix; on a BOM-prefixed disk file the
-    // merged range must stay BOM-stripped (Go's coordinate space) so applying it
-    // to the BOM-stripped body reproduces output minus its BOM. Exercises the
-    // multi-edit merge branch on a file that carries a mark.
+  test('lintFiles multi-edit fix on a BOM-prefixed file keeps BOM', async () => {
+    // no-extra-bind emits a multi-edit fix; final output keeps the mark.
     const BOM = String.fromCharCode(0xfeff);
     const body = 'const f = (function () { return 1; }).bind(this);\n';
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-bom-multi-'));
@@ -2101,16 +2237,10 @@ module.exports = config;`
       });
       try {
         const results = await rslint.lintFiles('bind.ts');
-        const m = results[0].messages.find((x) => x.ruleId === 'no-extra-bind');
-        expect(m).toBeDefined();
-        expect(m.fix).toBeDefined();
-        // BOM-stripped range: applying it to the BOM-stripped body equals output
-        // minus its re-prepended BOM.
-        const applied =
-          body.slice(0, m.fix.range[0]) +
-          m.fix.text +
-          body.slice(m.fix.range[1]);
-        expect(results[0].output).toBe(BOM + applied);
+        expect(results[0].messages).toEqual([]);
+        expect(results[0].output).toBe(
+          BOM + 'const f = (function () { return 1; });\n',
+        );
       } finally {
         await rslint.close();
       }
@@ -2138,9 +2268,7 @@ module.exports = config;`
       });
       try {
         const results = await rslint.lintFiles('bom.ts');
-        expect(results[0].messages[0].ruleId).toBe('unicode-bom');
-        expect(results[0].messages[0].fix.range).toEqual([-1, 0]);
-        expect(results[0].messages[0].fix.text).toBe('');
+        expect(results[0].messages).toEqual([]);
         expect(results[0].output).toBe('let a = 1;\n');
       } finally {
         await rslint.close();
@@ -2170,10 +2298,7 @@ module.exports = config;`
         const results = await rslint.lintText(BOM + 'let a = 1;\n', {
           filePath: path.join(tmp, 'buffer.ts'),
         });
-        expect(results[0].messages[0].ruleId).toBe('unicode-bom');
-        // Line 1, column 1 — the mark's own position, as ESLint reports it.
-        expect(results[0].messages[0].line).toBe(1);
-        expect(results[0].messages[0].column).toBe(1);
+        expect(results[0].messages).toEqual([]);
         expect(results[0].output).toBe('let a = 1;\n');
       } finally {
         await rslint.close();

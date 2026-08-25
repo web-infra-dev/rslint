@@ -108,9 +108,10 @@ export interface LintOptions {
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
   includeEncodedSourceFiles?: boolean; // Whether to include encoded source files in response
   // Apply rule auto-fixes in-band (ESLint's `fix: true`); the fixed source per
-  // file is returned in LintResponse.output and is NOT written to disk. Rules
-  // and languageOptions live in the config entries — there is no separate
-  // ruleOptions / languageOptions override surface.
+  // file is returned in LintResponse.output and is NOT written to disk.
+  // Diagnostics and encoded sources describe the final post-fix generation.
+  // Rules and languageOptions live in the config entries — there is no
+  // separate ruleOptions / languageOptions override surface.
   fix?: boolean;
 }
 

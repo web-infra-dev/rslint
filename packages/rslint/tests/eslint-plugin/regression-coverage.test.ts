@@ -412,6 +412,60 @@ describe('diagnostic wire-conversion clamp produces integer byte offsets', () =>
     expect(Number.isInteger(d.startPos)).toBe(true);
     expect(d.startPos).toBe(2);
   });
+
+  test('BOM fix and suggestion preserve ESLint sentinel range [-1, 0]', () => {
+    const loaded: LoadedPlugins = {
+      plugins: [],
+      rules: new Map<string, unknown>([
+        [
+          'stub/remove-bom',
+          {
+            meta: {
+              name: 'remove-bom',
+              fixable: 'code',
+              hasSuggestions: true,
+              messages: { remove: 'remove BOM', suggest: 'remove BOM' },
+            },
+            create(ctx: RuleContext) {
+              return {
+                Program(node: unknown) {
+                  ctx.report({
+                    node: node as never,
+                    messageId: 'remove',
+                    fix: (fixer) => fixer.removeRange([-1, 0]),
+                    suggest: [
+                      {
+                        messageId: 'suggest',
+                        fix: (fixer) => fixer.removeRange([-1, 0]),
+                      },
+                    ],
+                  });
+                },
+              };
+            },
+          },
+        ],
+      ]),
+    };
+    const result = lintFile(
+      {
+        filePath: 'bom.ts',
+        text: '\ufeffconst value = 1;\n',
+        rules: { 'stub/remove-bom': { options: [] } },
+        collectFixes: true,
+        suggestionsMode: 'eager',
+      },
+      loaded,
+    );
+
+    expect(result.parseError).toBeUndefined();
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0].fixes).toEqual([{ range: [-1, 0], text: '' }]);
+    expect(result.diagnostics[0].suggestions?.[0].fixes).toEqual([
+      { range: [-1, 0], text: '' },
+    ]);
+    expect(result.fixes).toEqual([{ range: [-1, 0], text: '' }]);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────

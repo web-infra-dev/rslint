@@ -643,10 +643,20 @@ export class Rslint {
     // in-hand). Only diagnosed files are read; a lint with no findings reads
     // nothing.
     const contents: Record<string, string> = {};
+    const outputPaths = new Set(
+      Object.keys(response.output ?? {}).map((filePath) =>
+        nativePathIdentity.key(
+          path.isAbsolute(filePath)
+            ? path.normalize(filePath)
+            : path.resolve(configDirectory, filePath),
+        ),
+      ),
+    );
     for (const d of response.diagnostics ?? []) {
       const abs = path.isAbsolute(d.filePath)
         ? path.normalize(d.filePath)
         : path.resolve(configDirectory, d.filePath);
+      if (outputPaths.has(nativePathIdentity.key(abs))) continue;
       if (!(abs in contents)) {
         try {
           // A BOM is never part of the text a fix range indexes — Go strips it
@@ -675,6 +685,16 @@ export class Rslint {
       contentByPath.set(nativePathIdentity.key(filePath), source);
     }
 
+    // Wire `output` is keyed by relative path. Remaining diagnostics after a
+    // multi-pass fix refer to this final source generation, so it must also be
+    // the source used to merge their multi-edit fixes.
+    const outputByPath = new Map<string, string>();
+    for (const [rel, fixed] of Object.entries(response.output ?? {})) {
+      const key = nativePathIdentity.key(toAbs(rel));
+      outputByPath.set(key, fixed);
+      contentByPath.set(key, stripBOM(fixed));
+    }
+
     // Every linted file gets a result, even with zero messages (ESLint shape).
     // Identity keys coalesce path-casing variants on case-insensitive hosts.
     const byFile = new Map<
@@ -696,12 +716,6 @@ export class Rslint {
         byFile.set(key, bucket);
       }
       bucket.messages.push(toLintMessage(d, contentByPath.get(key)));
-    }
-
-    // Wire `output` is keyed by relative path; remap to absolute.
-    const outputByPath = new Map<string, string>();
-    for (const [rel, fixed] of Object.entries(response.output ?? {})) {
-      outputByPath.set(nativePathIdentity.key(toAbs(rel)), fixed);
     }
 
     const results: LintResult[] = [];
