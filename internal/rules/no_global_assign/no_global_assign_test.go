@@ -625,6 +625,24 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				},
 			},
 			{
+				Code: `[(Object!! = 0)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `({x: (Object!! = 0)} = src);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 7},
+				},
+			},
+			{
+				Code: `for ([(Object!! = 0)] of rows) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
+				},
+			},
+			{
 				Code: `(Object as any) += 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},

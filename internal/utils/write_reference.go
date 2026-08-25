@@ -251,7 +251,12 @@ func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 	if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
 		return false
 	}
-	parent := node.Parent
+	current := node
+	parent := current.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		current = parent
+		parent = parent.Parent
+	}
 	if parent == nil {
 		return false
 	}
@@ -261,7 +266,7 @@ func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 	case ast.KindPropertyAssignment:
 		assignment := parent.AsPropertyAssignment()
 		return assignment != nil &&
-			assignment.Initializer == node &&
+			assignment.Initializer == current &&
 			isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
 	case ast.KindSpreadElement:
 		return isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
