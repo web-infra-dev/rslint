@@ -45,6 +45,17 @@ func TestIdMatchExtrasNoProject(t *testing.T) {
 			options: []any{`^x$`},
 		},
 		{
+			// ---- A qualified member is still an authored name ----
+			name:    "library names as qualified type members",
+			code:    "type X = Foo.Record<string> | Foo.Array<string> | Foo.Partial<string>;",
+			options: []any{`^(X|Foo|string)$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^(X|Foo|string)$'.",
+				"Identifier 'Array' does not match the pattern '^(X|Foo|string)$'.",
+				"Identifier 'Partial' does not match the pattern '^(X|Foo|string)$'.",
+			},
+		},
+		{
 			// ---- A name the file declares itself is the author's ----
 			name:    "shadowed library type",
 			code:    "type Record = 1;\nlet x: Record;",

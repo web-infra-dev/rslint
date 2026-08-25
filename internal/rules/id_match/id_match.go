@@ -353,7 +353,8 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 	// tsconfig owns and stays quiet in one a tsconfig does. This list is the
 	// type-capable global scope typescript-eslint seeds, which is where its
 	// own scope model finds these names.
-	if rule.IsDefaultTypeScriptTypeGlobal(name) && !r.isDeclaredInFile(node, name) {
+	if rule.IsDefaultTypeScriptTypeGlobal(name) && !isQualifiedTypeMember(node) &&
+		!r.isDeclaredInFile(node, name) {
 		return true
 	}
 	symbol := r.ctx.Refs.Resolve(node)
@@ -362,6 +363,16 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 		return false
 	}
 	return !utils.IsSymbolDeclaredInFile(symbol, r.ctx.SourceFile)
+}
+
+// isQualifiedTypeMember reports whether node is the authored member on the
+// right of a dotted type name. A spelling such as `Record` is seeded in the
+// TypeScript global scope, but `Record` in `Foo.Record` belongs to `Foo` and
+// must not inherit the global name's exemption.
+func isQualifiedTypeMember(node *ast.Node) bool {
+	parent := node.Parent
+	return parent != nil && parent.Kind == ast.KindQualifiedName &&
+		parent.AsQualifiedName().Right == node
 }
 
 // checkConstructor reports a class constructor. tsgo spells its name with a
