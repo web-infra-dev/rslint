@@ -33,6 +33,19 @@ func TestCompiledModuleSettingsCacheKeyIncludesInternalRegex(t *testing.T) {
 	}
 }
 
+func TestCompiledModuleSettingsCacheKeyIncludesCoreModules(t *testing.T) {
+	t.Parallel()
+
+	left := map[string]interface{}{"import/core-modules": []interface{}{"left"}}
+	right := map[string]interface{}{"import/core-modules": []interface{}{"right"}}
+	if moduleSettingsKey(left) != moduleSettingsKey(right) {
+		t.Fatal("module-index key should ignore classification-only settings")
+	}
+	if compiledModuleSettingsCacheKey(left) == compiledModuleSettingsCacheKey(right) {
+		t.Fatal("compiled settings cache reused different core modules")
+	}
+}
+
 func TestModuleSettingsKeySeparatesDefaultAndExplicitEmptyFolders(t *testing.T) {
 	t.Parallel()
 

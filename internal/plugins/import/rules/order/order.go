@@ -4,10 +4,10 @@
 package order
 
 import (
+	"cmp"
 	_ "embed"
 	"fmt"
 	"math"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -563,11 +563,6 @@ func onlyHorizontalWhitespace(text string, start, end int) bool {
 // Module classification
 // ---------------------------------------------------------------------------
 
-var (
-	scopedModulePattern = regexp.MustCompile(`^@[^/]+/?[^/]+`)
-	bareModulePattern   = regexp.MustCompile(`^\w`)
-)
-
 type importClassifier struct {
 	ctx               rule.RuleContext
 	settings          *import_utils.ModuleSettings
@@ -602,7 +597,7 @@ func (classifier *importClassifier) classify(name string, specifier *ast.Node) s
 	// Relative spellings have a fixed public group and normally need no module
 	// resolution. A deliberately configured core-module name is the exception:
 	// a successful resolution suppresses builtin classification.
-	builtinCandidate := isBuiltinModuleName(name, classifier.ctx.Settings)
+	builtinCandidate := classifier.settings.IsCoreModuleSpecifier(name)
 	if !builtinCandidate {
 		if relativeType, ok := relativeImportType(name); ok {
 			return relativeType
@@ -673,46 +668,13 @@ func (classifier *importClassifier) contextPackagePath() string {
 	return classifier.packagePath
 }
 
-func isBuiltinModuleName(name string, settings map[string]interface{}) bool {
+func isExternalLookingName(name string) bool {
 	if name == "" {
 		return false
 	}
-	base := baseModule(name)
-	if core.NodeCoreModules()[base] {
-		return true
-	}
-	if settings == nil {
-		return false
-	}
-	switch extras := settings["import/core-modules"].(type) {
-	case []string:
-		return slices.Contains(extras, base)
-	case []any:
-		for _, extra := range extras {
-			if value, ok := extra.(string); ok && value == base {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func baseModule(name string) string {
-	if scopedModulePattern.MatchString(name) {
-		parts := strings.Split(name, "/")
-		if len(parts) >= 2 {
-			return parts[0] + "/" + parts[1]
-		}
-		return parts[0] + "/undefined"
-	}
-	if slash := strings.IndexByte(name, '/'); slash >= 0 {
-		return name[:slash]
-	}
-	return name
-}
-
-func isExternalLookingName(name string) bool {
-	return name != "" && (bareModulePattern.MatchString(name) || scopedModulePattern.MatchString(name))
+	first := name[0]
+	isASCIIWord := first == '_' || first >= '0' && first <= '9' || first >= 'A' && first <= 'Z' || first >= 'a' && first <= 'z'
+	return isASCIIWord || import_utils.IsScopedModuleSpecifier(name)
 }
 
 func computeRank(entry *importEntry, opts options) float64 {
@@ -1510,7 +1472,7 @@ func compareAlphaValues(a, b alphabetizeEntry) int {
 		if segment == 0 && isRelativeRoot(aPart) && isRelativeRoot(bPart) && aPart != bPart {
 			// The upstream comparator stops at different relative roots, then
 			// still uses segment count as its fallback.
-			return compareInts(a.segmentCount, b.segmentCount)
+			return cmp.Compare(a.segmentCount, b.segmentCount)
 		}
 		if result := ecmascript.CompareStrings(aPart, bPart); result != 0 {
 			return result
@@ -1533,17 +1495,6 @@ func compareAlphaValues(a, b alphabetizeEntry) int {
 
 func isRelativeRoot(part string) bool {
 	return part == "." || part == ".."
-}
-
-func compareInts(a, b int) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	default:
-		return 0
-	}
 }
 
 // ---------------------------------------------------------------------------

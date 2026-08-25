@@ -167,6 +167,62 @@ func TestModuleSettingsIsInternalSpecifier(t *testing.T) {
 	}
 }
 
+func TestModuleSettingsIsCoreModuleSpecifier(t *testing.T) {
+	t.Parallel()
+
+	compiled := import_utils.CompileModuleSettings(map[string]interface{}{
+		"import/core-modules": []interface{}{"virtual", "@scope/pkg", "..", "@broken/undefined", 42},
+	})
+	tests := []struct {
+		specifier string
+		want      bool
+	}{
+		{specifier: "fs/promises", want: true},
+		{specifier: "node:sqlite/database", want: true},
+		{specifier: "virtual/subpath", want: true},
+		{specifier: "@scope/pkg/subpath", want: true},
+		{specifier: "../missing", want: true},
+		{specifier: "@broken", want: true},
+		{specifier: "external-package"},
+		{specifier: ""},
+	}
+
+	for _, test := range tests {
+		if got := compiled.IsCoreModuleSpecifier(test.specifier); got != test.want {
+			t.Errorf("IsCoreModuleSpecifier(%q) = %v, want %v", test.specifier, got, test.want)
+		}
+	}
+}
+
+func TestIsScopedModuleSpecifier(t *testing.T) {
+	t.Parallel()
+
+	loneSurrogate := string([]byte{0xED, 0xA0, 0x80})
+	tests := []struct {
+		specifier string
+		want      bool
+	}{
+		{specifier: "@scope/pkg", want: true},
+		{specifier: "@scope", want: true},
+		{specifier: "@a/pkg", want: true},
+		{specifier: "@😀", want: true},
+		{specifier: "@a"},
+		{specifier: "@é"},
+		{specifier: "@a/"},
+		{specifier: "@a//pkg"},
+		{specifier: "package"},
+		{specifier: "@" + loneSurrogate},
+		{specifier: "@" + loneSurrogate + loneSurrogate, want: true},
+		{specifier: "@" + loneSurrogate + "/pkg", want: true},
+	}
+
+	for _, test := range tests {
+		if got := import_utils.IsScopedModuleSpecifier(test.specifier); got != test.want {
+			t.Errorf("IsScopedModuleSpecifier(%q) = %v, want %v", test.specifier, got, test.want)
+		}
+	}
+}
+
 func TestModuleSettingsIsExternalPathFromPackage(t *testing.T) {
 	t.Parallel()
 

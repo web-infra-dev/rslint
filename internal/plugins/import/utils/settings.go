@@ -4,8 +4,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -16,6 +18,7 @@ import (
 type ModuleSettings struct {
 	ignore          []*esregexp.RegExp
 	internalRegex   *esregexp.RegExp
+	coreModules     map[string]struct{}
 	externalFolders []string
 	key             string
 }
@@ -44,6 +47,12 @@ func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
 		externalFolders: externalModuleFolders(settings),
 		key:             moduleSettingsKey(settings),
 	}
+	if names := settingsStringList(settings, "import/core-modules"); len(names) != 0 {
+		compiled.coreModules = make(map[string]struct{}, len(names))
+		for _, name := range names {
+			compiled.coreModules[name] = struct{}{}
+		}
+	}
 	for _, pattern := range settingsStringList(settings, "import/ignore") {
 		if expression, err := esregexp.Compile(pattern, ""); err == nil {
 			compiled.ignore = append(compiled.ignore, expression)
@@ -58,9 +67,9 @@ func compileModuleSettings(settings map[string]interface{}) *ModuleSettings {
 }
 
 // moduleSettingsKey encodes the settings used by shared module indexes. Every
-// element is quoted so list boundaries survive the encoding. Internal-regex
-// classification is intentionally excluded because it does not change those
-// indexes; compiledModuleSettingsCacheKey adds it for SettingsFor's cache.
+// element is quoted so list boundaries survive the encoding. Classification-
+// only settings are intentionally excluded because they do not change those
+// indexes; compiledModuleSettingsCacheKey adds them for SettingsFor's cache.
 func moduleSettingsKey(settings map[string]interface{}) string {
 	var key strings.Builder
 	for _, pattern := range settingsStringList(settings, "import/ignore") {
@@ -74,11 +83,17 @@ func moduleSettingsKey(settings map[string]interface{}) string {
 }
 
 func compiledModuleSettingsCacheKey(settings map[string]interface{}) string {
-	key := moduleSettingsKey(settings)
-	if pattern, ok := settingString(settings, "import/internal-regex"); ok {
-		key += "\x00" + strconv.Quote(pattern)
+	var key strings.Builder
+	key.WriteString(moduleSettingsKey(settings))
+	key.WriteByte('\x00')
+	for _, name := range settingsStringList(settings, "import/core-modules") {
+		key.WriteString(strconv.Quote(name))
 	}
-	return key
+	key.WriteByte('\x00')
+	if pattern, ok := settingString(settings, "import/internal-regex"); ok {
+		key.WriteString(strconv.Quote(pattern))
+	}
+	return key.String()
 }
 
 // Key identifies the settings these were compiled from, for callers that key
@@ -108,6 +123,43 @@ func (compiled *ModuleSettings) IsIgnoredPath(fileName string) bool {
 // written module specifier as internal.
 func (compiled *ModuleSettings) IsInternalSpecifier(specifier string) bool {
 	return compiled != nil && compiled.internalRegex != nil && compiled.internalRegex.TestOrTimeout(specifier)
+}
+
+// IsCoreModuleSpecifier reports whether the specifier's package root is a
+// Node.js builtin or is listed by `import/core-modules`. Resolution remains a
+// caller concern because a resolved project module can override this lexical
+// classification.
+func (compiled *ModuleSettings) IsCoreModuleSpecifier(specifier string) bool {
+	if specifier == "" {
+		return false
+	}
+	base := baseModuleName(specifier)
+	if core.NodeCoreModules()[base] {
+		return true
+	}
+	if compiled == nil {
+		return false
+	}
+	_, configured := compiled.coreModules[base]
+	return configured
+}
+
+// IsScopedModuleSpecifier mirrors eslint-plugin-import's lexical scoped-name
+// check. It counts UTF-16 code units, as JavaScript RegExp does without the
+// Unicode flag; this matters for an astral character immediately after `@`.
+func IsScopedModuleSpecifier(specifier string) bool {
+	if len(specifier) < 2 || specifier[0] != '@' {
+		return false
+	}
+
+	afterAt := specifier[1:]
+	slash := strings.IndexByte(afterAt, '/')
+	segment := afterAt
+	if slash >= 0 {
+		segment = afterAt[:slash]
+	}
+	segmentUnits := ecmascript.StringCodeUnitCount(segment)
+	return segmentUnits >= 2 || segmentUnits == 1 && slash >= 0 && slash+1 < len(afterAt) && afterAt[slash+1] != '/'
 }
 
 // IsExternalPath reports whether a resolved path or unresolved bare specifier
@@ -216,6 +268,25 @@ func settingString(settings map[string]interface{}, name string) (string, bool) 
 	}
 	value, ok := settings[name].(string)
 	return value, ok
+}
+
+// baseModuleName mirrors eslint-plugin-import's package-root extraction,
+// including its treatment of malformed scoped names such as `@scope`.
+func baseModuleName(name string) string {
+	if IsScopedModuleSpecifier(name) {
+		firstSlash := strings.IndexByte(name, '/')
+		if firstSlash < 0 {
+			return name + "/undefined"
+		}
+		if nextSlash := strings.IndexByte(name[firstSlash+1:], '/'); nextSlash >= 0 {
+			return name[:firstSlash+1+nextSlash]
+		}
+		return name
+	}
+	if slash := strings.IndexByte(name, '/'); slash >= 0 {
+		return name[:slash]
+	}
+	return name
 }
 
 func pathContainsSegment(fileName string, segment string) bool {
