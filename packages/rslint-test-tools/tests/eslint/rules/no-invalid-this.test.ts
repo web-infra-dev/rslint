@@ -1,6 +1,7 @@
 import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
+const scriptLanguageOptions = { sourceType: 'script' as const };
 
 ruleTester.run('no-invalid-this', {
   valid: [
@@ -8,8 +9,11 @@ ruleTester.run('no-invalid-this', {
     // Sloppy-mode script: rule never fires (default `this` binding is
     // the global object, not undefined)
     // ================================================================
-    'console.log(this);',
-    'function foo() { console.log(this); }',
+    { code: 'console.log(this);', languageOptions: scriptLanguageOptions },
+    {
+      code: 'function foo() { console.log(this); }',
+      languageOptions: scriptLanguageOptions,
+    },
 
     // ================================================================
     // Constructors
@@ -60,7 +64,7 @@ ruleTester.run('no-invalid-this', {
     // ================================================================
     // Top-level `this` in a script is always valid
     // ================================================================
-    'this.a = 0;',
+    { code: 'this.a = 0;', languageOptions: scriptLanguageOptions },
 
     // ================================================================
     // TypeScript: explicit `this` parameter
