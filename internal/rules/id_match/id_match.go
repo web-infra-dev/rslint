@@ -124,7 +124,7 @@ func (r *idMatch) checkPrivateIdentifier(node *ast.Node) {
 	// An auto-accessor (`accessor #x = 1`) is not a class field; it is always
 	// checked, as ESLint checks its `AccessorProperty`.
 	isClassField := parent != nil && parent.Kind == ast.KindPropertyDeclaration &&
-		!ast.HasAccessorModifier(parent)
+		!ast.HasAccessorModifier(parent) && !ast.HasAbstractModifier(parent)
 	if isClassField && !r.opts.classFields {
 		return
 	}
@@ -193,7 +193,8 @@ func (r *idMatch) checkIdentifier(node *ast.Node) {
 			local.Text() == name {
 			r.reportIfInvalid(node, name)
 		}
-	case parent.Kind == ast.KindPropertyDeclaration && !ast.HasAccessorModifier(parent):
+	case parent.Kind == ast.KindPropertyDeclaration && !ast.HasAccessorModifier(parent) &&
+		!ast.HasAbstractModifier(parent):
 		if r.opts.classFields && r.isInvalid(name) {
 			r.report(node, name)
 		}
@@ -214,6 +215,12 @@ func (r *idMatch) checkMemberAccess(node *ast.Node, name string, member *ast.Nod
 	if object := ast.SkipParentheses(member.Expression()); object.Kind == ast.KindIdentifier &&
 		object.Text() == name {
 		r.reportIfInvalid(node, name)
+		return
+	}
+	// ESTree wraps the complete optional chain in ChainExpression. Its member
+	// therefore is not the assignment target even when tsgo places the access
+	// directly under the assignment after flattening that wrapper.
+	if ast.IsOptionalChain(member) {
 		return
 	}
 
@@ -466,7 +473,11 @@ func classifyParent(node *ast.Node, parent *ast.Node) parentKind {
 		}
 		return parentVariableDeclarator
 	case ast.KindFunctionDeclaration:
-		return parentFunctionDeclaration
+		// A bodyless TypeScript signature is a TSDeclareFunction in ESTree,
+		// not one of the declarations onlyDeclarations admits.
+		if parent.AsFunctionDeclaration().Body != nil {
+			return parentFunctionDeclaration
+		}
 	case ast.KindParameter:
 		// A plain parameter has no node of its own in ESTree; its name sits
 		// directly among the function's parameters.

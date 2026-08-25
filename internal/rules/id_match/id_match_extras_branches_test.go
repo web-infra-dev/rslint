@@ -703,6 +703,36 @@ export { a_1 as b_1 };`,
 					},
 				},
 			},
+			// ---- Locks in upstream Identifier() TSAbstractPropertyDefinition arm ----
+			{
+				Code:    `abstract class C { abstract a_1: string; }`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    29,
+						EndLine:   1,
+						EndColumn: 32,
+					},
+				},
+			},
+			// ---- Locks in upstream PrivateIdentifier() TSAbstractPropertyDefinition arm ----
+			{
+				Code:    `abstract class C { abstract #a_1: string; }`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatchPrivate",
+						Message:   `Identifier '#a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    29,
+						EndLine:   1,
+						EndColumn: 33,
+					},
+				},
+			},
 			// ---- Locks in upstream shouldReport() arm 1: onlyDeclarations keeps declarations ----
 			{
 				Code: `var a_1 = 1;

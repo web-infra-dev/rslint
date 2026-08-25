@@ -49,6 +49,11 @@ func TestIdMatchExtrasDim4(t *testing.T) {
 				Code:    `x = a?.b_1;`,
 				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
 			},
+			// ---- Dimension 4: body-absent members under onlyDeclarations ----
+			{
+				Code:    `function f_1(): void;`,
+				Options: []any{`^[^_]+$`, map[string]any{"onlyDeclarations": true}},
+			},
 			// ---- Dimension 4: key forms ----
 			{
 				Code:    `const o = { 'a_1': 1 };`,
@@ -236,6 +241,83 @@ func TestIdMatchExtrasDim4(t *testing.T) {
 						Column:    1,
 						EndLine:   1,
 						EndColumn: 4,
+					},
+				},
+			},
+			// ---- Dimension 4: optional-chain assignment preserves its ChainExpression boundary ----
+			{
+				Code:    `a_1?.b_1 = a_2;`,
+				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    1,
+						EndLine:   1,
+						EndColumn: 4,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_2' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    12,
+						EndLine:   1,
+						EndColumn: 15,
+					},
+				},
+			},
+			// ---- Dimension 4: nested optional chain remains inside ChainExpression ----
+			{
+				Code:    `a_1?.b_1.c_1 = a_2;`,
+				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    1,
+						EndLine:   1,
+						EndColumn: 4,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_2' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    16,
+						EndLine:   1,
+						EndColumn: 19,
+					},
+				},
+			},
+			// ---- Dimension 4: parentheses terminate ChainExpression ----
+			{
+				Code:    `(a_1?.b_1).c_1 = a_2;`,
+				Options: []any{`^[^_]+$`, map[string]any{"properties": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    2,
+						EndLine:   1,
+						EndColumn: 5,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'c_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    12,
+						EndLine:   1,
+						EndColumn: 15,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_2' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    18,
+						EndLine:   1,
+						EndColumn: 21,
 					},
 				},
 			},
@@ -664,6 +746,23 @@ function o_1(a: any): void {}`,
 						EndLine:   2,
 						EndColumn: 13,
 					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'o_1' does not match the pattern '^[^_]+$'.`,
+						Line:      3,
+						Column:    10,
+						EndLine:   3,
+						EndColumn: 13,
+					},
+				},
+			},
+			// ---- Dimension 4: body-absent overloads are TSDeclareFunction under onlyDeclarations ----
+			{
+				Code: `function o_1(a: string): void;
+function o_1(a: number): void;
+function o_1(a: any): void {}`,
+				Options: []any{`^[^_]+$`, map[string]any{"onlyDeclarations": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "notMatch",
 						Message:   `Identifier 'o_1' does not match the pattern '^[^_]+$'.`,
