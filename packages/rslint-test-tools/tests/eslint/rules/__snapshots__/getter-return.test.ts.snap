@@ -5,11 +5,11 @@ exports[`getter-return > invalid 1`] = `
   "code": "var foo = { get bar() {} };",
   "diagnostics": [
     {
-      "message": "Expected to return a value in getter.",
+      "message": "Expected to return a value in getter 'bar'.",
       "messageId": "expected",
       "range": {
         "end": {
-          "column": 25,
+          "column": 20,
           "line": 1,
         },
         "start": {
@@ -31,11 +31,11 @@ exports[`getter-return > invalid 2`] = `
   "code": "var foo = { get bar(){if(baz) {return true;}} };",
   "diagnostics": [
     {
-      "message": "Expected getter to always return a value.",
+      "message": "Expected getter 'bar' to always return a value.",
       "messageId": "expectedAlways",
       "range": {
         "end": {
-          "column": 46,
+          "column": 20,
           "line": 1,
         },
         "start": {
@@ -57,15 +57,15 @@ exports[`getter-return > invalid 3`] = `
   "code": "var foo = { get bar() { return; } };",
   "diagnostics": [
     {
-      "message": "Expected to return a value in getter.",
+      "message": "Expected to return a value in getter 'bar'.",
       "messageId": "expected",
       "range": {
         "end": {
-          "column": 34,
+          "column": 32,
           "line": 1,
         },
         "start": {
-          "column": 13,
+          "column": 25,
           "line": 1,
         },
       },
@@ -80,14 +80,14 @@ exports[`getter-return > invalid 3`] = `
 
 exports[`getter-return > invalid 4`] = `
 {
-  "code": "class foo { get bar(){} }",
+  "code": "var foo = { get bar() { if (condition) return; } };",
   "diagnostics": [
     {
-      "message": "Expected to return a value in getter.",
-      "messageId": "expected",
+      "message": "Expected getter 'bar' to always return a value.",
+      "messageId": "expectedAlways",
       "range": {
         "end": {
-          "column": 24,
+          "column": 20,
           "line": 1,
         },
         "start": {
@@ -97,8 +97,23 @@ exports[`getter-return > invalid 4`] = `
       },
       "ruleName": "getter-return",
     },
+    {
+      "message": "Expected to return a value in getter 'bar'.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "getter-return",
+    },
   ],
-  "errorCount": 1,
+  "errorCount": 2,
   "fileCount": 1,
   "ruleCount": 1,
 }
@@ -106,14 +121,14 @@ exports[`getter-return > invalid 4`] = `
 
 exports[`getter-return > invalid 5`] = `
 {
-  "code": "class foo { get bar(){ if (baz) { return true; }}}",
+  "code": "var foo = { get bar() {} };",
   "diagnostics": [
     {
-      "message": "Expected getter to always return a value.",
-      "messageId": "expectedAlways",
+      "message": "Expected to return a value in getter 'bar'.",
+      "messageId": "expected",
       "range": {
         "end": {
-          "column": 50,
+          "column": 20,
           "line": 1,
         },
         "start": {
@@ -132,18 +147,18 @@ exports[`getter-return > invalid 5`] = `
 
 exports[`getter-return > invalid 6`] = `
 {
-  "code": "Object.defineProperty(foo, 'bar', { get: function (){}});",
+  "code": "var foo = { get bar() { if (baz) return; } };",
   "diagnostics": [
     {
-      "message": "Expected to return a value in getter.",
-      "messageId": "expected",
+      "message": "Expected getter 'bar' to always return a value.",
+      "messageId": "expectedAlways",
       "range": {
         "end": {
-          "column": 40,
+          "column": 20,
           "line": 1,
         },
         "start": {
-          "column": 37,
+          "column": 13,
           "line": 1,
         },
       },
@@ -158,10 +173,88 @@ exports[`getter-return > invalid 6`] = `
 
 exports[`getter-return > invalid 7`] = `
 {
+  "code": "class foo { get bar(){} }",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value in getter 'bar'.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "getter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`getter-return > invalid 8`] = `
+{
+  "code": "class foo { get bar(){ if (baz) { return true; }}}",
+  "diagnostics": [
+    {
+      "message": "Expected getter 'bar' to always return a value.",
+      "messageId": "expectedAlways",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "getter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`getter-return > invalid 9`] = `
+{
+  "code": "Object.defineProperty(foo, 'bar', { get: function (){}});",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value in method 'get'.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "getter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`getter-return > invalid 10`] = `
+{
   "code": "Object.defineProperty(foo, 'bar', { get(){} });",
   "diagnostics": [
     {
-      "message": "Expected to return a value in getter.",
+      "message": "Expected to return a value in method 'get'.",
       "messageId": "expected",
       "range": {
         "end": {
@@ -182,16 +275,42 @@ exports[`getter-return > invalid 7`] = `
 }
 `;
 
-exports[`getter-return > invalid 8`] = `
+exports[`getter-return > invalid 11`] = `
+{
+  "code": "Object.defineProperty(foo, 'bar', { get: () => {} });",
+  "diagnostics": [
+    {
+      "message": "Expected to return a value in method 'get'.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "getter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`getter-return > invalid 12`] = `
 {
   "code": "Object?.defineProperty(foo, 'bar', { get: function (){} });",
   "diagnostics": [
     {
-      "message": "Expected to return a value in getter.",
+      "message": "Expected to return a value in method 'get'.",
       "messageId": "expected",
       "range": {
         "end": {
-          "column": 41,
+          "column": 52,
           "line": 1,
         },
         "start": {
@@ -208,16 +327,16 @@ exports[`getter-return > invalid 8`] = `
 }
 `;
 
-exports[`getter-return > invalid 9`] = `
+exports[`getter-return > invalid 13`] = `
 {
   "code": "(Object?.defineProperty)(foo, 'bar', { get: function (){} });",
   "diagnostics": [
     {
-      "message": "Expected to return a value in getter.",
+      "message": "Expected to return a value in method 'get'.",
       "messageId": "expected",
       "range": {
         "end": {
-          "column": 43,
+          "column": 54,
           "line": 1,
         },
         "start": {
@@ -234,16 +353,16 @@ exports[`getter-return > invalid 9`] = `
 }
 `;
 
-exports[`getter-return > invalid 10`] = `
+exports[`getter-return > invalid 14`] = `
 {
   "code": "class foo { get bar(){ if(baz) { throw new Error(); } } }",
   "diagnostics": [
     {
-      "message": "Expected to return a value in getter.",
+      "message": "Expected to return a value in getter 'bar'.",
       "messageId": "expected",
       "range": {
         "end": {
-          "column": 56,
+          "column": 20,
           "line": 1,
         },
         "start": {
@@ -260,16 +379,16 @@ exports[`getter-return > invalid 10`] = `
 }
 `;
 
-exports[`getter-return > invalid 11`] = `
+exports[`getter-return > invalid 15`] = `
 {
   "code": "class foo { get bar(){ switch(x) { case 1: return 1; } } }",
   "diagnostics": [
     {
-      "message": "Expected getter to always return a value.",
+      "message": "Expected getter 'bar' to always return a value.",
       "messageId": "expectedAlways",
       "range": {
         "end": {
-          "column": 57,
+          "column": 20,
           "line": 1,
         },
         "start": {
@@ -286,16 +405,16 @@ exports[`getter-return > invalid 11`] = `
 }
 `;
 
-exports[`getter-return > invalid 12`] = `
+exports[`getter-return > invalid 16`] = `
 {
-  "code": "class foo { get bar(){ try { return 1; } catch(e) { } } }",
+  "code": "class foo { get bar(){ try { return value; } catch(e) { } } }",
   "diagnostics": [
     {
-      "message": "Expected getter to always return a value.",
+      "message": "Expected getter 'bar' to always return a value.",
       "messageId": "expectedAlways",
       "range": {
         "end": {
-          "column": 56,
+          "column": 20,
           "line": 1,
         },
         "start": {
@@ -312,20 +431,20 @@ exports[`getter-return > invalid 12`] = `
 }
 `;
 
-exports[`getter-return > invalid 13`] = `
+exports[`getter-return > invalid 17`] = `
 {
   "code": "class foo { get bar(){ try { return 1; } finally { return; } } }",
   "diagnostics": [
     {
-      "message": "Expected getter to always return a value.",
-      "messageId": "expectedAlways",
+      "message": "Expected to return a value in getter 'bar'.",
+      "messageId": "expected",
       "range": {
         "end": {
-          "column": 63,
+          "column": 59,
           "line": 1,
         },
         "start": {
-          "column": 13,
+          "column": 52,
           "line": 1,
         },
       },

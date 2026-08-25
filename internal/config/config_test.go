@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -110,6 +109,25 @@ func TestParserOptionsUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestParserOptionsProjectEmptyArraySurvivesJSONRoundTrip(t *testing.T) {
+	before := ParserOptions{Project: ProjectPaths{}}
+	encoded, err := json.Marshal(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != `{"project":[]}` {
+		t.Fatalf("MarshalJSON = %s, want explicit empty project", encoded)
+	}
+
+	var after ParserOptions
+	if err := json.Unmarshal(encoded, &after); err != nil {
+		t.Fatal(err)
+	}
+	if after.Project == nil || len(after.Project) != 0 {
+		t.Fatalf("round-trip project = %#v, want non-nil empty slice", after.Project)
+	}
+}
+
 func TestParserOptionsProjectServicePtr(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -157,27 +175,6 @@ func TestParserOptionsProjectServicePtr(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// TestRegisterAllRules_ConcurrentSafe verifies that RegisterAllRules can be
-// called from multiple goroutines without panicking (concurrent map writes).
-// Run with -race to detect data races: go test -race ./internal/config/...
-func TestRegisterAllRules_ConcurrentSafe(t *testing.T) {
-	var wg sync.WaitGroup
-	for range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			RegisterAllRules()
-		}()
-	}
-	wg.Wait()
-
-	// Verify rules were actually registered
-	rules := GlobalRuleRegistry.GetAllRules()
-	if len(rules) == 0 {
-		t.Error("Expected rules to be registered after concurrent calls")
 	}
 }
 
@@ -511,6 +508,19 @@ func TestExtractLanguageOptions(t *testing.T) {
 			raw:  map[string]any{"ecmaVersion": float64(2020)},
 			want: rule.LanguageOptions{ECMAVersion: 2020},
 		},
+		{
+			name: "source type",
+			raw:  map[string]any{"sourceType": "commonjs"},
+			want: rule.LanguageOptions{SourceType: "commonjs"},
+		},
+		{
+			name: "legacy parserOptions source type is ignored",
+			raw:  map[string]any{"parserOptions": map[string]any{"sourceType": "script"}},
+		},
+		{
+			name: "invalid source type is dropped when validation is skipped",
+			raw:  map[string]any{"sourceType": "esm"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -561,21 +571,21 @@ func TestValidateConfigECMAVersion(t *testing.T) {
 	}
 }
 
-func TestRuleRegistryPropagatesLanguageOptions(t *testing.T) {
+func TestConfiguredRulesPropagatesLanguageOptions(t *testing.T) {
 	t.Parallel()
 
-	registry := NewRuleRegistry()
-	registry.Register("probe", rule.Rule{Name: "probe"})
-	configured, _ := registry.GetEnabledRules(RslintConfig{{
+	catalog := rule.NewCatalog(rule.Rule{Name: "probe"})
+	configured, _ := ResolveEnabledRules(catalog, RslintConfig{{
 		LanguageOptions: &LanguageOptions{Raw: map[string]any{
 			"ecmaVersion": float64(16),
+			"sourceType":  "script",
 		}},
 		Rules: Rules{"probe": "error"},
 	}}, "file.js", "", false)
 	if len(configured) != 1 {
 		t.Fatalf("configured rules = %d, want 1", len(configured))
 	}
-	want := rule.LanguageOptions{ECMAVersion: 2025}
+	want := rule.LanguageOptions{ECMAVersion: 2025, SourceType: "script"}
 	if got := configured[0].Environment.LanguageOptions; got != want {
 		t.Fatalf("configured language options = %+v, want %+v", got, want)
 	}

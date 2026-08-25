@@ -9,16 +9,29 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// newOptionsTestRegistry builds a registry with a representative mix of
+type ruleCatalogBuilder struct {
+	rules []rule.Rule
+}
+
+func (b *ruleCatalogBuilder) Add(name string, ruleImpl rule.Rule) {
+	ruleImpl.Name = name
+	b.rules = append(b.rules, ruleImpl)
+}
+
+func (b *ruleCatalogBuilder) Catalog() *rule.Catalog {
+	return rule.NewCatalog(b.rules...)
+}
+
+// newOptionsTestCatalog builds a catalog with a representative mix of
 // schema situations: a rule with a real options schema, a no-options rule on
 // the shared EmptyArraySchema, a not-yet-migrated rule without a schema, and
 // a rule whose schema JSON is broken (an authoring bug).
-func newOptionsTestRegistry() *RuleRegistry {
-	registry := NewRuleRegistry()
+func newOptionsTestCatalog() *rule.Catalog {
+	catalog := &ruleCatalogBuilder{}
 	noopRun := func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	}
-	registry.Register("with-schema", rule.Rule{
+	catalog.Add("with-schema", rule.Rule{
 		Name: "with-schema",
 		Schema: rule.NewSchema([]byte(`{
 			"type": "array",
@@ -36,29 +49,29 @@ func newOptionsTestRegistry() *RuleRegistry {
 		}`)),
 		Run: noopRun,
 	})
-	registry.Register("no-options", rule.Rule{
+	catalog.Add("no-options", rule.Rule{
 		Name:   "no-options",
 		Schema: rule.EmptyArraySchema,
 		Run:    noopRun,
 	})
-	registry.Register("unmigrated", rule.Rule{
+	catalog.Add("unmigrated", rule.Rule{
 		Name: "unmigrated",
 		Run:  noopRun,
 	})
-	registry.Register("broken-schema", rule.Rule{
+	catalog.Add("broken-schema", rule.Rule{
 		Name:   "broken-schema",
 		Schema: rule.NewSchema([]byte(`not json`)),
 		Run:    noopRun,
 	})
-	return registry
+	return catalog.Catalog()
 }
 
-func newDefaultsOptionsTestRegistry() *RuleRegistry {
-	registry := NewRuleRegistry()
+func newDefaultsOptionsTestCatalog() *rule.Catalog {
+	catalog := &ruleCatalogBuilder{}
 	noopRun := func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	}
-	registry.Register("with-defaults", rule.Rule{
+	catalog.Add("with-defaults", rule.Rule{
 		Name: "with-defaults",
 		Schema: rule.NewSchema([]byte(`{
 			"type": "array",
@@ -77,7 +90,7 @@ func newDefaultsOptionsTestRegistry() *RuleRegistry {
 		}`)),
 		Run: noopRun,
 	})
-	registry.Register("with-nested-defaults", rule.Rule{
+	catalog.Add("with-nested-defaults", rule.Rule{
 		Name: "with-nested-defaults",
 		Schema: rule.NewSchema([]byte(`{
 			"type": "array",
@@ -101,7 +114,7 @@ func newDefaultsOptionsTestRegistry() *RuleRegistry {
 		}`)),
 		Run: noopRun,
 	})
-	registry.Register("with-tuple-defaults", rule.Rule{
+	catalog.Add("with-tuple-defaults", rule.Rule{
 		Name: "with-tuple-defaults",
 		Schema: rule.NewSchema([]byte(`{
 			"type": "array",
@@ -125,34 +138,124 @@ func newDefaultsOptionsTestRegistry() *RuleRegistry {
 		}`)),
 		Run: noopRun,
 	})
-	return registry
+	return catalog.Catalog()
 }
 
 func configWithRules(rules Rules) RslintConfig {
 	return RslintConfig{ConfigEntry{Rules: rules}}
 }
 
+func TestValidateResolvedRuleOptionsPreservesSingleConfigMode(t *testing.T) {
+	inputOptions := map[string]any{"values": []any{"original"}}
+	input := configWithRules(Rules{
+		"unknown-rule": []any{"error", inputOptions},
+	})
+
+	normalizedMap, normalized, errs := ValidateResolvedRuleOptions(
+		nil,
+		input,
+		newOptionsTestCatalog(),
+	)
+	if normalizedMap != nil {
+		t.Fatalf("single-config mode returned a non-nil config map: %#v", normalizedMap)
+	}
+	if len(errs) != 0 {
+		t.Fatalf("unexpected validation errors: %v", errs)
+	}
+
+	normalizedOptions := normalized[0].Rules["unknown-rule"].([]any)[1].(map[string]any)
+	normalizedOptions["values"].([]any)[0] = "changed"
+	if got := inputOptions["values"].([]any)[0]; got != "original" {
+		t.Fatalf("normalized config aliases its input: %#v", got)
+	}
+}
+
+func TestValidateResolvedRuleOptionsPreservesMultiConfigMode(t *testing.T) {
+	singleConfig := configWithRules(Rules{"unused": "error"})
+	normalizedMap, normalizedSingle, errs := ValidateResolvedRuleOptions(
+		map[string]RslintConfig{},
+		singleConfig,
+		newOptionsTestCatalog(),
+	)
+	if normalizedMap == nil || len(normalizedMap) != 0 {
+		t.Fatalf("non-nil empty config map changed mode: %#v", normalizedMap)
+	}
+	if !reflect.DeepEqual(normalizedSingle, singleConfig) {
+		t.Fatalf("inactive single config changed in multi-config mode: %#v", normalizedSingle)
+	}
+	if len(errs) != 0 {
+		t.Fatalf("unexpected validation errors: %v", errs)
+	}
+
+	inputOptions := map[string]any{"values": []any{"original"}}
+	inputMap := map[string]RslintConfig{
+		"/workspace/a": configWithRules(Rules{
+			"unknown-rule": []any{"error", inputOptions},
+		}),
+	}
+	normalizedMap, _, errs = ValidateResolvedRuleOptions(
+		inputMap,
+		nil,
+		newOptionsTestCatalog(),
+	)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected validation errors: %v", errs)
+	}
+	normalizedOptions := normalizedMap["/workspace/a"][0].Rules["unknown-rule"].([]any)[1].(map[string]any)
+	normalizedOptions["values"].([]any)[0] = "changed"
+	if got := inputOptions["values"].([]any)[0]; got != "original" {
+		t.Fatalf("normalized config map aliases its input: %#v", got)
+	}
+}
+
+func TestValidateResolvedRuleOptionsReportsOwnersInOrder(t *testing.T) {
+	invalid := func(value any) RslintConfig {
+		return configWithRules(Rules{
+			"with-schema": []any{"error", map[string]any{"allow": value}},
+		})
+	}
+	_, _, errs := ValidateResolvedRuleOptions(
+		map[string]RslintConfig{
+			"/workspace/z": invalid("not-an-array"),
+			"/workspace/a": invalid(42),
+		},
+		nil,
+		newOptionsTestCatalog(),
+	)
+	if len(errs) != 2 {
+		t.Fatalf("validation errors = %d, want 2: %v", len(errs), errs)
+	}
+	if errs[0].ConfigDirectory != "/workspace/a" || errs[1].ConfigDirectory != "/workspace/z" {
+		t.Fatalf("owner order = %q, %q", errs[0].ConfigDirectory, errs[1].ConfigDirectory)
+	}
+	for _, err := range errs {
+		if !strings.Contains(err.Error(), "(config at "+err.ConfigDirectory+")") {
+			t.Errorf("error does not identify owner: %q", err.Error())
+		}
+	}
+}
+
 func TestValidateRuleOptionsAcceptsValidConfig(t *testing.T) {
-	registry := newOptionsTestRegistry()
+	catalog := newOptionsTestCatalog()
 	config := configWithRules(Rules{
 		"with-schema": []any{"error", map[string]any{"allow": []any{"warn"}}},
 		"no-options":  "error",
 		"unmigrated":  []any{"warn", map[string]any{"whatever": true}},
 	})
-	if _, errs := ValidateRuleOptions(config, registry); len(errs) != 0 {
+	if _, errs := ValidateRuleOptions(config, catalog); len(errs) != 0 {
 		t.Errorf("expected no errors, got: %v", errs)
 	}
 }
 
 func TestValidateRuleOptionsReportsEveryFailure(t *testing.T) {
-	registry := newOptionsTestRegistry()
+	catalog := newOptionsTestCatalog()
 	config := configWithRules(Rules{
 		// `allow` must be an array of strings.
 		"with-schema": []any{"error", map[string]any{"allow": "warn"}},
 		// A no-options rule given an option.
 		"no-options": []any{"error", map[string]any{"unexpected": true}},
 	})
-	_, errs := ValidateRuleOptions(config, registry)
+	_, errs := ValidateRuleOptions(config, catalog)
 	if len(errs) != 2 {
 		t.Fatalf("expected 2 errors, got %d: %v", len(errs), errs)
 	}
@@ -166,7 +269,7 @@ func TestValidateRuleOptionsReportsEveryFailure(t *testing.T) {
 }
 
 func TestValidateRuleOptionsSkipsDisabledUnknownAndUnmigrated(t *testing.T) {
-	registry := newOptionsTestRegistry()
+	catalog := newOptionsTestCatalog()
 	config := configWithRules(Rules{
 		// Disabled: options would be invalid, but the rule never runs.
 		"with-schema": []any{"off", map[string]any{"allow": "warn"}},
@@ -175,13 +278,13 @@ func TestValidateRuleOptionsSkipsDisabledUnknownAndUnmigrated(t *testing.T) {
 		// No schema declared yet: passes through unvalidated.
 		"unmigrated": []any{"error", map[string]any{"whatever": true}},
 	})
-	if _, errs := ValidateRuleOptions(config, registry); len(errs) != 0 {
+	if _, errs := ValidateRuleOptions(config, catalog); len(errs) != 0 {
 		t.Errorf("expected no errors, got: %v", errs)
 	}
 }
 
 func TestValidateRuleOptionsDetachesSkippedRuleValues(t *testing.T) {
-	registry := newOptionsTestRegistry()
+	catalog := newOptionsTestCatalog()
 	sharedOptions := map[string]any{"nested": []any{"original"}}
 	config := configWithRules(Rules{
 		"with-schema": []any{"off", sharedOptions},
@@ -192,7 +295,7 @@ func TestValidateRuleOptionsDetachesSkippedRuleValues(t *testing.T) {
 		"unmigrated": []any{"error", sharedOptions},
 	})
 
-	normalized, errs := ValidateRuleOptions(config, registry)
+	normalized, errs := ValidateRuleOptions(config, catalog)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got: %v", errs)
 	}
@@ -218,9 +321,9 @@ func TestValidateRuleOptionsDetachesSkippedRuleValues(t *testing.T) {
 }
 
 func TestValidateRuleOptionsSurfacesSchemaCompileError(t *testing.T) {
-	registry := newOptionsTestRegistry()
+	catalog := newOptionsTestCatalog()
 	config := configWithRules(Rules{"broken-schema": "error"})
-	_, errs := ValidateRuleOptions(config, registry)
+	_, errs := ValidateRuleOptions(config, catalog)
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error, got %d: %v", len(errs), errs)
 	}
@@ -230,13 +333,13 @@ func TestValidateRuleOptionsSurfacesSchemaCompileError(t *testing.T) {
 }
 
 func TestValidateRuleOptionsReportsSharedSchemaCompileErrorPerRule(t *testing.T) {
-	registry := NewRuleRegistry()
+	catalog := &ruleCatalogBuilder{}
 	sharedBrokenSchema := rule.NewSchema([]byte(`not json`))
 	noopRun := func(rule.RuleContext, []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	}
 	for _, ruleName := range []string{"alpha", "beta"} {
-		registry.Register(ruleName, rule.Rule{
+		catalog.Add(ruleName, rule.Rule{
 			Name:   ruleName,
 			Schema: sharedBrokenSchema,
 			Run:    noopRun,
@@ -246,7 +349,7 @@ func TestValidateRuleOptionsReportsSharedSchemaCompileErrorPerRule(t *testing.T)
 	_, errs := ValidateRuleOptions(configWithRules(Rules{
 		"beta":  "error",
 		"alpha": "error",
-	}), registry)
+	}), catalog.Catalog())
 	if len(errs) != 2 {
 		t.Fatalf("expected one compile error per rule, got %d: %v", len(errs), errs)
 	}
@@ -256,7 +359,7 @@ func TestValidateRuleOptionsReportsSharedSchemaCompileErrorPerRule(t *testing.T)
 }
 
 func TestValidateRuleOptionsReportsSharedEmptyOptionsErrorPerRule(t *testing.T) {
-	registry := NewRuleRegistry()
+	catalog := &ruleCatalogBuilder{}
 	sharedSchema := rule.NewSchema([]byte(`{
 		"type": "array",
 		"items": [{ "type": "string" }],
@@ -267,7 +370,7 @@ func TestValidateRuleOptionsReportsSharedEmptyOptionsErrorPerRule(t *testing.T) 
 		return rule.RuleListeners{}
 	}
 	for _, ruleName := range []string{"alpha", "beta"} {
-		registry.Register(ruleName, rule.Rule{
+		catalog.Add(ruleName, rule.Rule{
 			Name:   ruleName,
 			Schema: sharedSchema,
 			Run:    noopRun,
@@ -277,7 +380,7 @@ func TestValidateRuleOptionsReportsSharedEmptyOptionsErrorPerRule(t *testing.T) 
 	_, errs := ValidateRuleOptions(RslintConfig{
 		{Rules: Rules{"alpha": "error", "beta": []any{"error"}}},
 		{Rules: Rules{"alpha": "error", "beta": []any{"error"}}},
-	}, registry)
+	}, catalog.Catalog())
 	if len(errs) != 2 {
 		t.Fatalf("expected one empty-options error per rule, got %d: %v", len(errs), errs)
 	}
@@ -287,7 +390,7 @@ func TestValidateRuleOptionsReportsSharedEmptyOptionsErrorPerRule(t *testing.T) 
 }
 
 func TestValidateRuleOptionsValidatesEachEntryAndDeduplicates(t *testing.T) {
-	registry := newOptionsTestRegistry()
+	catalog := newOptionsTestCatalog()
 	badOptions := []any{"error", map[string]any{"allow": "warn"}}
 	config := RslintConfig{
 		// The identical bad entry twice: reported once.
@@ -298,7 +401,7 @@ func TestValidateRuleOptionsValidatesEachEntryAndDeduplicates(t *testing.T) {
 		// A valid entry for the same rule doesn't mask the bad ones.
 		ConfigEntry{Rules: Rules{"with-schema": []any{"error", map[string]any{"allow": []any{"warn"}}}}},
 	}
-	_, errs := ValidateRuleOptions(config, registry)
+	_, errs := ValidateRuleOptions(config, catalog)
 	if len(errs) != 2 {
 		t.Fatalf("expected 2 errors (duplicate collapsed, distinct kept), got %d: %v", len(errs), errs)
 	}
@@ -310,11 +413,11 @@ func TestValidateRuleOptionsValidatesEachEntryAndDeduplicates(t *testing.T) {
 }
 
 func TestValidateRuleOptionsFillsSchemaDefaultsIntoConfig(t *testing.T) {
-	registry := newDefaultsOptionsTestRegistry()
+	catalog := newDefaultsOptionsTestCatalog()
 
 	options := map[string]any{"strict": false}
 	config := configWithRules(Rules{"with-defaults": []any{"error", options}})
-	normalized, errs := ValidateRuleOptions(config, registry)
+	normalized, errs := ValidateRuleOptions(config, catalog)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got: %v", errs)
 	}
@@ -334,7 +437,7 @@ func TestValidateRuleOptionsFillsSchemaDefaultsIntoConfig(t *testing.T) {
 }
 
 func TestValidateRuleOptionsPreservesTopLevelShapeAndNestedTupleDefaults(t *testing.T) {
-	registry := newDefaultsOptionsTestRegistry()
+	catalog := newDefaultsOptionsTestCatalog()
 	nestedValues := []any{}
 	config := RslintConfig{
 		{Rules: Rules{"with-tuple-defaults": "error"}},
@@ -347,7 +450,7 @@ func TestValidateRuleOptionsPreservesTopLevelShapeAndNestedTupleDefaults(t *test
 		}},
 	}
 
-	normalized, errs := ValidateRuleOptions(config, registry)
+	normalized, errs := ValidateRuleOptions(config, catalog)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got: %v", errs)
 	}
@@ -373,7 +476,7 @@ func TestValidateRuleOptionsPreservesTopLevelShapeAndNestedTupleDefaults(t *test
 }
 
 func TestValidateRuleOptionsIsolatesNestedAliases(t *testing.T) {
-	registry := newDefaultsOptionsTestRegistry()
+	catalog := newDefaultsOptionsTestCatalog()
 	sharedNested := map[string]any{}
 	config := RslintConfig{
 		{Rules: Rules{
@@ -384,7 +487,7 @@ func TestValidateRuleOptionsIsolatesNestedAliases(t *testing.T) {
 		}},
 	}
 
-	normalized, errs := ValidateRuleOptions(config, registry)
+	normalized, errs := ValidateRuleOptions(config, catalog)
 	if len(errs) != 0 {
 		t.Fatalf("expected no errors, got: %v", errs)
 	}
@@ -411,13 +514,13 @@ func TestValidateRuleOptionsIsolatesNestedAliases(t *testing.T) {
 }
 
 func TestValidateRuleOptionsDoesNotPublishPartialDefaultsOnError(t *testing.T) {
-	registry := newDefaultsOptionsTestRegistry()
+	catalog := newDefaultsOptionsTestCatalog()
 	options := map[string]any{"strict": "invalid"}
 	config := configWithRules(Rules{
 		"with-defaults": []any{"error", options},
 	})
 
-	normalized, errs := ValidateRuleOptions(config, registry)
+	normalized, errs := ValidateRuleOptions(config, catalog)
 	if len(errs) != 1 {
 		t.Fatalf("expected one validation error, got %d: %v", len(errs), errs)
 	}
@@ -436,7 +539,7 @@ func TestValidateRuleOptionsDoesNotPublishPartialDefaultsOnError(t *testing.T) {
 }
 
 func TestValidateRuleOptionsConcurrentCallsShareInputSafely(t *testing.T) {
-	registry := newDefaultsOptionsTestRegistry()
+	catalog := newDefaultsOptionsTestCatalog()
 	shared := map[string]any{"strict": false}
 	ruleValue := []any{"error", shared}
 	config := RslintConfig{
@@ -449,7 +552,7 @@ func TestValidateRuleOptionsConcurrentCallsShareInputSafely(t *testing.T) {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			normalized, errs := ValidateRuleOptions(config, registry)
+			normalized, errs := ValidateRuleOptions(config, catalog)
 			if len(errs) != 0 {
 				t.Errorf("call %d: expected no errors, got: %v", call, errs)
 				return
@@ -475,14 +578,14 @@ func TestValidateRuleOptionsConcurrentCallsShareInputSafely(t *testing.T) {
 }
 
 func TestValidateRuleOptionsAcceptsSeverityOnlyAndEmptyOptions(t *testing.T) {
-	registry := newOptionsTestRegistry()
+	catalog := newOptionsTestCatalog()
 	config := configWithRules(Rules{
 		// Bare severity string: options are nil → validated as [].
 		"with-schema": "error",
 		// Array form with severity only.
 		"no-options": []any{"warn"},
 	})
-	if _, errs := ValidateRuleOptions(config, registry); len(errs) != 0 {
+	if _, errs := ValidateRuleOptions(config, catalog); len(errs) != 0 {
 		t.Errorf("expected no errors, got: %v", errs)
 	}
 }

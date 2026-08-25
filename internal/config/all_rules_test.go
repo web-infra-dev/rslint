@@ -56,13 +56,12 @@ import (
 // var-name-based scan would collapse those into one entry and silently miss
 // regressions in one of the two packages.
 func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T) {
-	RegisterAllRules()
-	registry := GlobalRuleRegistry.GetAllRules()
+	catalog := baseRuleCatalog().AllRules()
 
 	// Iterate keys in sorted order so failure output is stable, which keeps
 	// CI logs and `go test -run` rerun targets deterministic.
-	keys := make([]string, 0, len(registry))
-	for k := range registry {
+	keys := make([]string, 0, len(catalog))
+	for k := range catalog {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -70,7 +69,7 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 	parser := newRuleSourceParser()
 	var failures []string
 	for _, key := range keys {
-		impl := registry[key]
+		impl := catalog[key]
 		if impl.RequiresTypeInfo {
 			continue
 		}
@@ -334,8 +333,7 @@ func returnsEmptyListeners(body *ast.BlockStmt) bool {
 // ESLint-plugin placeholder rules run without one — the Node worker's own
 // ESLint validates their options.
 func TestAllRules_DeclaredSchemasCompile(t *testing.T) {
-	RegisterAllRules()
-	for name, ruleImpl := range GlobalRuleRegistry.GetAllRules() {
+	for name, ruleImpl := range baseRuleCatalog().AllRules() {
 		if ruleImpl.IsEslintPluginRule {
 			continue
 		}
@@ -375,8 +373,7 @@ func TestAllRules_DeclaredSchemasCompile(t *testing.T) {
 // rule whose logic is meaningless without a TypeChecker, this test forces you
 // to declare the flag.
 func TestAllRules_SilentOnNilTypeCheckerImpliesRequiresTypeInfo(t *testing.T) {
-	RegisterAllRules()
-	registry := GlobalRuleRegistry.GetAllRules()
+	catalog := baseRuleCatalog().AllRules()
 
 	cases := []struct {
 		ruleKey  string
@@ -427,7 +424,7 @@ func TestAllRules_SilentOnNilTypeCheckerImpliesRequiresTypeInfo(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.ruleKey, func(t *testing.T) {
-			impl, ok := registry[tc.ruleKey]
+			impl, ok := catalog[tc.ruleKey]
 			if !ok {
 				t.Fatalf("rule %q is not registered", tc.ruleKey)
 			}
@@ -584,7 +581,6 @@ var gapFileFixtureSources = map[string]string{
 // did hand the rules a nil TypeChecker, guarding against future linter
 // changes that might silently skip gap files.
 func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
-	RegisterAllRules()
 
 	program := createGapFileProgram(t, gapFileFixtureSources)
 
@@ -595,7 +591,7 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 
 	sweep := collectNonTypeAwareRules(t)
 	if len(sweep) == 0 {
-		t.Fatal("expected at least one non-type-aware rule; registry looks empty")
+		t.Fatal("expected at least one non-type-aware rule; catalog looks empty")
 	}
 
 	var sawNilChecker, sawAnyListener bool
@@ -636,7 +632,7 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 // not to test correctness of the report payloads.
 func collectNonTypeAwareRules(t *testing.T) []linter.ConfiguredRule {
 	t.Helper()
-	all := GlobalRuleRegistry.GetAllRules()
+	all := baseRuleCatalog().AllRules()
 	out := make([]linter.ConfiguredRule, 0, len(all))
 	for name, impl := range all {
 		if impl.RequiresTypeInfo {

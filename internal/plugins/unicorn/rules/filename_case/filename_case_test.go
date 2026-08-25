@@ -46,7 +46,7 @@ func withIgnore(base map[string]interface{}, patterns ...string) map[string]inte
 	return out
 }
 
-// All upstream `valid` / `invalid` cases are migrated below in the same
+// The original upstream `valid` / `invalid` cases are migrated below in the same
 // declaration order. Cases that the rule_tester cannot exercise (TypeScript's
 // program builder skips files whose extension or basename it does not
 // recognize, leaving us with a nil source file) are kept as `Skip: true`
@@ -62,7 +62,7 @@ func TestFilenameCase(t *testing.T) {
 		t,
 		&filename_case.FilenameCaseRule,
 		[]rule_tester.ValidTestCase{
-			// ---- Single `case` option, all four styles ----
+			// ---- Single `case` option, original four styles ----
 			{Code: `// camel`, FileName: "src/foo/bar.js", Options: caseOpt("camelCase")},
 			{Code: `// camel`, FileName: "src/foo/fooBar.js", Options: caseOpt("camelCase")},
 			{Code: `// camel`, FileName: "src/foo/bar.test.js", Options: caseOpt("camelCase")},
@@ -352,11 +352,11 @@ func TestFilenameCase(t *testing.T) {
 
 			// ---- Snapshot-block valid cases (basename-only handling) ----
 			{Code: `// snap-undef`}, /* upstream `undefined` filename — defaults to `file.ts`, valid for kebab */
-			{Code: `// snap-dir-uppercase-ext`, FileName: "src/foo.JS/bar.js"},
-			{Code: `// snap-dir-uppercase-ext`, FileName: "src/foo.JS/bar.spec.js"},
-			{Code: `// snap-dir-uppercase-ext`, FileName: "src/foo.JS/.spec.js",
+			{Code: `// snap-dir-uppercase-ext`, FileName: "src/foo-js/bar.js"},
+			{Code: `// snap-dir-uppercase-ext`, FileName: "src/foo-js/bar.spec.js"},
+			{Code: `// snap-dir-uppercase-ext`, FileName: "src/foo-js/.spec.js",
 				Skip: true /* SKIP: dot-prefixed basename */},
-			{Code: `// snap-dir-no-ext`, FileName: "src/foo.JS/bar",
+			{Code: `// snap-dir-no-ext`, FileName: "src/foo-js/bar",
 				Skip: true /* SKIP: TS program does not pick up extensionless files */},
 			{Code: `// snap-dotted-uppercase-middle`, FileName: "foo.SPEC.js"},
 			{Code: `// snap-leading-dot`, FileName: ".SPEC.js",
@@ -372,17 +372,14 @@ func TestFilenameCase(t *testing.T) {
 			// behaviour. Here we lock the equivalent already-camel form.
 			{Code: `// lock-in: digit-prefixed second word`, FileName: "src/foo/iss_47Spec.js", Options: caseOpt("camelCase")},
 
-			// Locks in: non-string `ignore` entries don't poison the array —
-			// the valid string pattern still ignores its target. Companion
-			// to the invalid-list case above; together they prove non-string
-			// items are dropped silently and the rest of the array still
-			// applies normally.
+			// A RegExp literal arrives as an object over the JSON bridge. It does
+			// not poison the array; the valid string pattern still applies.
 			{
-				Code: `// lock-in: non-string ignore entries silently dropped, valid sibling still ignores`,
+				Code: `// lock-in: object ignore entry silently dropped, valid sibling still ignores`,
 				FileName: "src/foo/FOOBAR.js",
 				Options: map[string]interface{}{
 					"case":   "kebabCase",
-					"ignore": []interface{}{nil, 42, map[string]interface{}{}, `FOOBAR\.js`},
+					"ignore": []interface{}{map[string]interface{}{}, `FOOBAR\.js`},
 				},
 			},
 			// Locks in: an empty `ignore` array works the same as omitting
@@ -393,13 +390,10 @@ func TestFilenameCase(t *testing.T) {
 				Options: map[string]interface{}{"case": "kebabCase", "ignore": []interface{}{}},
 			},
 
-			// Locks in `splitWords` Pass 2 multi-fire end-to-end: an
-			// XMLHttp-style basename in pascalCase splits into ALL-CAPS +
-			// Title chunks (`XML/Http/Request`) and pascal-reassembles
-			// each word with non-first letters lowered (`Xml/Http/
-			// Request` → `XmlHttpRequest`). This proves Pass 2 fired AND
-			// pascalCase honoured the per-word lowercasing — both could
-			// regress independently. (See moved-to-invalid block below.)
+			// Latest upstream preserves a leading acronym when the remainder
+			// is already PascalCase.
+			{Code: `// leading acronym preserved`, FileName: "src/foo/XMLHttpRequest.js", Options: caseOpt("pascalCase")},
+			{Code: `// leading acronym preserved`, FileName: "src/foo/HTTPSConnection.js", Options: caseOpt("pascalCase")},
 
 			// (fixFilename dedupe is already locked in by `1_.js` invalid
 			// test above, where camel/pascal/kebab all collapse to `1`.)
@@ -427,7 +421,7 @@ func TestFilenameCase(t *testing.T) {
 				FileName: "src/foo/foo_bar.js",
 				Options:  caseOpt("kebabCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 				}},
 			},
@@ -437,7 +431,7 @@ func TestFilenameCase(t *testing.T) {
 				Code:     `// k`,
 				FileName: "src/foo/foo_bar.js",
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 					Line:      1, Column: 1, EndLine: 1, EndColumn: 1,
 				}},
@@ -448,21 +442,21 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// c`, FileName: "src/foo/foo_bar.JS", Options: caseOpt("camelCase"),
 				Skip: true, /* SKIP: TS program rejects `.JS`; covered in JS test set */
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `fooBar.js`.",
 				}},
 			},
 			{
 				Code: `// c`, FileName: "src/foo/foo_bar.test.js", Options: caseOpt("camelCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `fooBar.test.js`.",
 				}},
 			},
 			{
 				Code: `// c`, FileName: "test/foo/foo_bar.test_utils.js", Options: caseOpt("camelCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `fooBar.test_utils.js`.",
 				}},
 			},
@@ -471,21 +465,21 @@ func TestFilenameCase(t *testing.T) {
 			{
 				Code: `// s`, FileName: "test/foo/fooBar.js", Options: caseOpt("snakeCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in snake case. Rename it to `foo_bar.js`.",
 				}},
 			},
 			{
 				Code: `// s`, FileName: "test/foo/fooBar.test.js", Options: caseOpt("snakeCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in snake case. Rename it to `foo_bar.test.js`.",
 				}},
 			},
 			{
 				Code: `// s`, FileName: "test/foo/fooBar.testUtils.js", Options: caseOpt("snakeCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in snake case. Rename it to `foo_bar.testUtils.js`.",
 				}},
 			},
@@ -494,21 +488,21 @@ func TestFilenameCase(t *testing.T) {
 			{
 				Code: `// k`, FileName: "test/foo/fooBar.js", Options: caseOpt("kebabCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 				}},
 			},
 			{
 				Code: `// k`, FileName: "test/foo/fooBar.test.js", Options: caseOpt("kebabCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.test.js`.",
 				}},
 			},
 			{
 				Code: `// k`, FileName: "test/foo/fooBar.testUtils.js", Options: caseOpt("kebabCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.testUtils.js`.",
 				}},
 			},
@@ -517,21 +511,21 @@ func TestFilenameCase(t *testing.T) {
 			{
 				Code: `// p`, FileName: "test/foo/fooBar.js", Options: caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `FooBar.js`.",
 				}},
 			},
 			{
 				Code: `// p`, FileName: "test/foo/foo_bar.test.js", Options: caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `FooBar.test.js`.",
 				}},
 			},
 			{
 				Code: `// p`, FileName: "test/foo/foo-bar.test-utils.js", Options: caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `FooBar.test-utils.js`.",
 				}},
 			},
@@ -540,56 +534,56 @@ func TestFilenameCase(t *testing.T) {
 			{
 				Code: `// _c`, FileName: "src/foo/_FOO-BAR.js", Options: caseOpt("camelCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `_fooBar.js`.",
 				}},
 			},
 			{
 				Code: `// _c`, FileName: "src/foo/___FOO-BAR.js", Options: caseOpt("camelCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `___fooBar.js`.",
 				}},
 			},
 			{
 				Code: `// _s`, FileName: "src/foo/_FOO-BAR.js", Options: caseOpt("snakeCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in snake case. Rename it to `_foo_bar.js`.",
 				}},
 			},
 			{
 				Code: `// _s`, FileName: "src/foo/___FOO-BAR.js", Options: caseOpt("snakeCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in snake case. Rename it to `___foo_bar.js`.",
 				}},
 			},
 			{
 				Code: `// _k`, FileName: "src/foo/_FOO-BAR.js", Options: caseOpt("kebabCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `_foo-bar.js`.",
 				}},
 			},
 			{
 				Code: `// _k`, FileName: "src/foo/___FOO-BAR.js", Options: caseOpt("kebabCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `___foo-bar.js`.",
 				}},
 			},
 			{
 				Code: `// _p`, FileName: "src/foo/_FOO-BAR.js", Options: caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `_FooBar.js`.",
 				}},
 			},
 			{
 				Code: `// _p`, FileName: "src/foo/___FOO-BAR.js", Options: caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `___FooBar.js`.",
 				}},
 			},
@@ -598,7 +592,7 @@ func TestFilenameCase(t *testing.T) {
 			{
 				Code: `// many-default-kebab`, FileName: "src/foo/foo_bar.js", Options: casesOpt(nil),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 				}},
 			},
@@ -606,7 +600,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// many-c+p`, FileName: "src/foo/foo-bar.js",
 				Options: casesOpt(map[string]bool{"camelCase": true, "pascalCase": true}),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case or pascal case. Rename it to `fooBar.js` or `FooBar.js`.",
 				}},
 			},
@@ -614,7 +608,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// many-c+p+k`, FileName: "src/foo/_foo_bar.js",
 				Options: casesOpt(map[string]bool{"camelCase": true, "pascalCase": true, "kebabCase": true}),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case, kebab case, or pascal case. Rename it to `_fooBar.js`, `_foo-bar.js`, or `_FooBar.js`.",
 				}},
 			},
@@ -622,7 +616,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// many-snake`, FileName: "src/foo/_FOO-BAR.js",
 				Options: casesOpt(map[string]bool{"snakeCase": true}),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in snake case. Rename it to `_foo_bar.js`.",
 				}},
 			},
@@ -631,29 +625,22 @@ func TestFilenameCase(t *testing.T) {
 			{
 				Code: `// dec`, FileName: "src/foo/[foo_bar].js",
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `[foo-bar].js`.",
 				}},
 			},
 			{
-				Code: `// dec`, FileName: "src/foo/$foo_bar.js",
+				Code: `// dec`, FileName: "src/foo/foo$Bar.js",
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in kebab case. Rename it to `$foo-bar.js`.",
-				}},
-			},
-			{
-				Code: `// dec`, FileName: "src/foo/$fooBar.js",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in kebab case. Rename it to `$foo-bar.js`.",
+					MessageId: "filename-case",
+					Message:   "Filename is not in kebab case. Rename it to `foo$bar.js`.",
 				}},
 			},
 			{
 				Code: `// dec-many`, FileName: "src/foo/{foo_bar}.js",
 				Options: casesOpt(map[string]bool{"camelCase": true, "pascalCase": true, "kebabCase": true}),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case, kebab case, or pascal case. Rename it to `{fooBar}.js`, `{foo-bar}.js`, or `{FooBar}.js`.",
 				}},
 			},
@@ -663,7 +650,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// ignore-miss`, FileName: "src/foo/barBaz.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `bar-baz.js`.",
 				}},
 			},
@@ -674,7 +661,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// ignore-miss-slashes`, FileName: "src/foo/barBaz.js",
 				Options: withIgnore(caseOpt("kebabCase"), `/FOOBAR\.js/`),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `bar-baz.js`.",
 				}},
 			},
@@ -682,7 +669,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// ignore-miss`, FileName: "src/foo/fooBar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 				}},
 			},
@@ -690,7 +677,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// ignore-miss-multi`, FileName: "src/foo/fooBar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`, `foobar\.js`),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 				}},
 			},
@@ -702,7 +689,7 @@ func TestFilenameCase(t *testing.T) {
 					"ignore": []interface{}{`FOOBAR\.js`},
 				},
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.",
 				}},
 			},
@@ -713,7 +700,7 @@ func TestFilenameCase(t *testing.T) {
 					"ignore": []interface{}{`BaRbAz\.js`},
 				},
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.",
 				}},
 			},
@@ -724,7 +711,7 @@ func TestFilenameCase(t *testing.T) {
 					"ignore": []interface{}{`^foo`},
 				},
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.",
 				}},
 			},
@@ -735,7 +722,7 @@ func TestFilenameCase(t *testing.T) {
 					"ignore": []interface{}{`^foo`, `^bar`},
 				},
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.",
 				}},
 			},
@@ -745,7 +732,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// 1_-multi`, FileName: "src/foo/1_.js",
 				Options: casesOpt(map[string]bool{"camelCase": true, "pascalCase": true, "kebabCase": true}),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case, kebab case, or pascal case. Rename it to `1.js`.",
 				}},
 			},
@@ -754,56 +741,56 @@ func TestFilenameCase(t *testing.T) {
 			{
 				Code: `// mfe-false`, FileName: "src/foo/foo_bar.test.js", Options: withMfe(caseOpt("camelCase"), false),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `fooBar.test.js`.",
 				}},
 			},
 			{
 				Code: `// mfe-false`, FileName: "test/foo/foo_bar.test_utils.js", Options: withMfe(caseOpt("camelCase"), false),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `fooBar.testUtils.js`.",
 				}},
 			},
 			{
 				Code: `// mfe-false`, FileName: "test/foo/fooBar.test.js", Options: withMfe(caseOpt("snakeCase"), false),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in snake case. Rename it to `foo_bar.test.js`.",
 				}},
 			},
 			{
 				Code: `// mfe-false`, FileName: "test/foo/fooBar.testUtils.js", Options: withMfe(caseOpt("snakeCase"), false),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in snake case. Rename it to `foo_bar.test_utils.js`.",
 				}},
 			},
 			{
 				Code: `// mfe-false`, FileName: "test/foo/fooBar.test.js", Options: withMfe(caseOpt("kebabCase"), false),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.test.js`.",
 				}},
 			},
 			{
 				Code: `// mfe-false`, FileName: "test/foo/fooBar.testUtils.js", Options: withMfe(caseOpt("kebabCase"), false),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.test-utils.js`.",
 				}},
 			},
 			{
 				Code: `// mfe-false`, FileName: "test/foo/foo_bar.test.js", Options: withMfe(caseOpt("pascalCase"), false),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `FooBar.Test.js`.",
 				}},
 			},
 			{
 				Code: `// mfe-false`, FileName: "test/foo/foo-bar.test-utils.js", Options: withMfe(caseOpt("pascalCase"), false),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `FooBar.TestUtils.js`.",
 				}},
 			},
@@ -814,7 +801,7 @@ func TestFilenameCase(t *testing.T) {
 				Options: casesOpt(map[string]bool{"camelCase": true, "kebabCase": true}),
 				Skip:    true, /* SKIP: TS program rejects `.mJS`; covered in JS tests */
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case or kebab case. Rename it to `fooBar.mjs` or `foo-bar.mjs`.",
 				}},
 			},
@@ -822,7 +809,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// snap-foo.JS`, FileName: "foo.JS",
 				Skip: true, /* SKIP: TS program rejects `.JS` */
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameExtension",
+					MessageId: "filename-extension",
 					Message:   "File extension `.JS` is not in lowercase. Rename it to `foo.js`.",
 				}},
 			},
@@ -830,7 +817,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// snap-foo.Js`, FileName: "foo.Js",
 				Skip: true, /* SKIP: TS program rejects `.Js` */
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameExtension",
+					MessageId: "filename-extension",
 					Message:   "File extension `.Js` is not in lowercase. Rename it to `foo.js`.",
 				}},
 			},
@@ -838,7 +825,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// snap-foo.jS`, FileName: "foo.jS",
 				Skip: true, /* SKIP: TS program rejects `.jS` */
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameExtension",
+					MessageId: "filename-extension",
 					Message:   "File extension `.jS` is not in lowercase. Rename it to `foo.js`.",
 				}},
 			},
@@ -846,7 +833,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// snap-index.JS`, FileName: "index.JS",
 				Skip: true, /* SKIP: TS program rejects `.JS` */
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameExtension",
+					MessageId: "filename-extension",
 					Message:   "File extension `.JS` is not in lowercase. Rename it to `index.js`.",
 				}},
 			},
@@ -854,7 +841,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// snap-foo..JS`, FileName: "foo..JS",
 				Skip: true, /* SKIP: TS program rejects `.JS` */
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameExtension",
+					MessageId: "filename-extension",
 					Message:   "File extension `.JS` is not in lowercase. Rename it to `foo..js`.",
 				}},
 			},
@@ -869,7 +856,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// lock-in: digit-prefixed second word (camel)`, FileName: "src/foo/iss-47-spec.js",
 				Options: caseOpt("camelCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `iss_47Spec.js`.",
 				}},
 			},
@@ -877,7 +864,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// lock-in: digit-prefixed second word (pascal)`, FileName: "src/foo/iss-47-spec.js",
 				Options: caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `Iss_47Spec.js`.",
 				}},
 			},
@@ -887,7 +874,7 @@ func TestFilenameCase(t *testing.T) {
 				Code: `// lock-in: canonical case-name ordering`, FileName: "src/foo/foo-bar.js",
 				Options: casesOpt(map[string]bool{"pascalCase": true, "camelCase": true}),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case or pascal case. Rename it to `fooBar.js` or `FooBar.js`.",
 				}},
 			},
@@ -935,7 +922,7 @@ func TestFilenameCase(t *testing.T) {
 			},
 			// Locks in: a malformed ignore pattern fires the configuration
 			// diagnostic even when the basename would have passed case
-			// validation (i.e. NO `filenameCase` would have been reported
+			// validation (i.e. NO `filename-case` would have been reported
 			// either way). This proves the short-circuit isn't masking a
 			// case error — it's a deliberate "fix your config first" gate
 			// even on otherwise-clean files.
@@ -995,38 +982,28 @@ func TestFilenameCase(t *testing.T) {
 					Message:   "Invalid regular expression in `ignore` option: `*invalid`: error parsing regexp: missing argument to repetition operator in `*invalid`",
 				}},
 			},
-			// Locks in: non-string entries (`null`, numbers, objects) in the
-			// `ignore` array are silently skipped — they are NOT treated as
-			// malformed patterns. Without this, a JSON-stringified RegExp
-			// object (which lands as `{}` on the Go side) or any other
-			// stray non-string would fire spurious `invalidIgnorePattern`
-			// diagnostics. Here the only valid string pattern doesn't match
-			// `foo_bar.js`, so we get a normal case-violation report — the
-			// crucial assertion is that we do NOT see any
-			// `invalidIgnorePattern` diagnostic alongside it.
+			// A JSON-stringified RegExp object is skipped and does not become
+			// an invalid pattern. The valid sibling does not match this file.
 			{
-				Code: `// lock-in: non-string ignore entries do not fire invalidIgnorePattern`,
+				Code: `// lock-in: object ignore entry does not fire invalidIgnorePattern`,
 				FileName: "src/foo/foo_bar.js",
 				Options: map[string]interface{}{
 					"case":   "kebabCase",
-					"ignore": []interface{}{nil, 42, map[string]interface{}{}, `FOOBAR\.js`},
+					"ignore": []interface{}{map[string]interface{}{}, `FOOBAR\.js`},
 				},
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
 				}},
 			},
-			// Locks in: when non-string + valid string + invalid string ignore
-			// entries co-exist, the invalid string still wins (fatal short-
-			// circuit), the valid string never gets to apply, and the
-			// non-string is silently dropped. End-to-end coverage of all
-			// three ignore-entry classes interacting.
+			// When object + valid string + invalid string entries coexist, the
+			// invalid string still wins and aborts filename checking.
 			{
-				Code: `// lock-in: non-string + valid + invalid ignore entries together`,
+				Code: `// lock-in: object + valid + invalid ignore entries together`,
 				FileName: "src/foo/FOOBAR.js",
 				Options: map[string]interface{}{
 					"case":   "kebabCase",
-					"ignore": []interface{}{nil, `FOOBAR\.js`, `[unclosed`},
+					"ignore": []interface{}{map[string]interface{}{}, `FOOBAR\.js`, `[unclosed`},
 				},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
@@ -1034,21 +1011,21 @@ func TestFilenameCase(t *testing.T) {
 				}},
 			},
 			// Locks in `englishishJoin` 4-item oxford comma + `or` end-to-end:
-			// all four `cases` enabled + a basename violating all four of
-			// them yields `camel case, snake case, kebab case, or pascal
+			// the four legacy `cases` enabled + a basename violating all four of
+			// them yields `camel case, kebab case, snake case, or pascal
 			// case` and four rename suggestions in canonical order. (Unit
 			// test in splitwords_test.go locks the formatter directly; this
 			// proves the rule produces it via the real diagnostic path.)
 			{
-				Code: `// lock-in: oxford-comma 4-item, all four cases enabled`,
+				Code: `// lock-in: oxford-comma 4-item, four legacy cases enabled`,
 				FileName: "src/foo/FOO_BAR.js",
 				Options: casesOpt(map[string]bool{
 					"camelCase": true, "snakeCase": true,
 					"kebabCase": true, "pascalCase": true,
 				}),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in camel case, snake case, kebab case, or pascal case. Rename it to `fooBar.js`, `foo_bar.js`, `foo-bar.js`, or `FooBar.js`.",
+					MessageId: "filename-case",
+					Message:   "Filename is not in camel case, kebab case, snake case, or pascal case. Rename it to `fooBar.js`, `foo-bar.js`, `foo_bar.js`, or `FooBar.js`.",
 				}},
 			},
 			// Locks in `pascalLikeTransform` first-word-digit branch end-to-
@@ -1060,7 +1037,7 @@ func TestFilenameCase(t *testing.T) {
 				FileName: "src/foo/123-foo.js",
 				Options:  caseOpt("camelCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in camel case. Rename it to `123Foo.js`.",
 				}},
 			},
@@ -1072,31 +1049,28 @@ func TestFilenameCase(t *testing.T) {
 				FileName: "src/foo/123-foo.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
+					MessageId: "filename-case",
 					Message:   "Filename is not in pascal case. Rename it to `123Foo.js`.",
 				}},
 			},
-			// Locks in `splitWords` Pass 2 multi-fire end-to-end: pascalCase
-			// applied to `XMLHttpRequest` splits into 3 words and rejoins
-			// with per-word lowercasing → `XmlHttpRequest`. Proves both
-			// the ALL-CAPS+Title boundary cut AND the non-first-letter
-			// lowering pipeline.
+			// Leading acronyms are preserved only when the suffix is already
+			// PascalCase; these latest-upstream counterexamples are normalized.
 			{
-				Code: `// lock-in: Pass 2 multi-fire (pascal lowers non-first letters)`,
-				FileName: "src/foo/XMLHttpRequest.js",
+				Code: `// leading acronym followed by invalid suffix`,
+				FileName: "src/foo/FAQPageFOO.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in pascal case. Rename it to `XmlHttpRequest.js`.",
+					MessageId: "filename-case",
+					Message:   "Filename is not in pascal case. Rename it to `FaqPageFoo.js`.",
 				}},
 			},
 			{
-				Code: `// lock-in: Pass 2 single-fire (pascal lowers non-first letters)`,
-				FileName: "src/foo/HTTPSConnection.js",
+				Code: `// two-letter prefix is not a preserved acronym`,
+				FileName: "src/foo/UIPath.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in pascal case. Rename it to `HttpsConnection.js`.",
+					MessageId: "filename-case",
+					Message:   "Filename is not in pascal case. Rename it to `UiPath.js`.",
 				}},
 			},
 			// Locks in Node `path.extname` parity for an all-dots basename.
