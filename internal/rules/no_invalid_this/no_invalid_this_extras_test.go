@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -281,7 +282,7 @@ function foo() {
     console.log(this);
   };
 }
-    `},
+    `, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 
 			// ---- Real-user (eslint/eslint#14534): typed arrow class field, private/public modifiers ----
 			// https://github.com/eslint/eslint/issues/14534

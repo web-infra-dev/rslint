@@ -19,12 +19,35 @@
 package no_invalid_this
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+// runCoreUpstreamRuleTester preserves the source goals authored by ESLint's
+// pattern generator. This port used `export {};` as its module marker before
+// RuleContext exposed sourceType; all other generated patterns are scripts.
+func runCoreUpstreamRuleTester(root rule_tester.Root, tsconfigPath string, t *testing.T, r *rule.Rule, valid []rule_tester.ValidTestCase, invalid []rule_tester.InvalidTestCase) {
+	setSourceType := func(code string, options *rule.LanguageOptions) {
+		if options.SourceType != "" {
+			return
+		}
+		options.SourceType = "script"
+		if strings.Contains(code, "export {};") {
+			options.SourceType = "module"
+		}
+	}
+	for i := range valid {
+		setSourceType(valid[i].Code, &valid[i].LanguageOptions)
+	}
+	for i := range invalid {
+		setSourceType(invalid[i].Code, &invalid[i].LanguageOptions)
+	}
+	rule_tester.RunRuleTester(root, tsconfigPath, t, r, valid, invalid)
+}
 
 // objectOption produces the array-wrapped option shape that exercises the
 // rule's own options-array parsing.
@@ -33,7 +56,7 @@ func objectOption(opts map[string]interface{}) []interface{} {
 }
 
 func TestNoInvalidThisUpstream(t *testing.T) {
-	rule_tester.RunRuleTester(
+	runCoreUpstreamRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
 		t,

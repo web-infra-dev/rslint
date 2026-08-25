@@ -222,7 +222,7 @@ obj.Foo = function Foo() {
 
 ## Differences from ESLint
 
-- rslint determines whether code is an ES module purely from the presence of `import` / `export` syntax in the file. ESLint additionally lets `languageOptions.sourceType` and `parserOptions.ecmaFeatures.globalReturn` override this independently of file content; rslint does not expose either setting, so top-level `this` validity always follows the file's actual module-ness.
+- rslint does not expose ESLint's legacy `parserOptions.ecmaFeatures.globalReturn` escape hatch.
 
 ## When Not To Use It
 

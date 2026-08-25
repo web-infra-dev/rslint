@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -21,12 +22,8 @@ var schemaJSON []byte
 // under strict mode.
 //
 // NOTE: Unlike ESLint, rslint does not expose `languageOptions.parserOptions`
-// (`ecmaFeatures.globalReturn`, `ecmaFeatures.impliedStrict`). Consequently:
-//   - Top-level `this` validity is derived solely from
-//     `ast.IsExternalModule` (presence of import/export): scripts are always
-//     valid, ES modules are always invalid. ESLint's `ecmaFeatures.globalReturn`
-//     escape hatch (Node.js CommonJS-style top-level `return`) has no rslint
-//     equivalent and is therefore unreachable.
+// (`ecmaFeatures.globalReturn`, `ecmaFeatures.impliedStrict`). ESLint's
+// `ecmaFeatures.globalReturn` escape hatch therefore has no rslint equivalent.
 //
 // https://eslint.org/docs/latest/rules/no-invalid-this
 var NoInvalidThisRule = rule.Rule{
@@ -60,8 +57,8 @@ func ParseOptions(options []any) Options {
 	return opts
 }
 
-// EngineOptions configures BuildListeners with the three policy points
-// that genuinely differ between `no-invalid-this` and
+// EngineOptions configures BuildListeners with the policy point
+// that genuinely differs between `no-invalid-this` and
 // `@typescript-eslint/no-invalid-this` (see BuildListeners doc comment).
 // Everything else — the parent-chain walker, JSDoc/this-param recognition,
 // computed-key deferral, method-decorator handling — is identical between
@@ -93,18 +90,38 @@ type EngineOptions struct {
 	IsStrict func(fn *ast.Node, sf *ast.SourceFile) bool
 }
 
+// CoreEngineOptions returns the ESLint-core policy for the effective language
+// options on ctx. The TypeScript wrapper reuses this policy and changes only
+// the field-frame boundary that its upstream wrapper adds.
+func CoreEngineOptions(ctx rule.RuleContext, opts Options) EngineOptions {
+	sourceType := ctx.LanguageOptions.SourceType
+	if sourceType == "" {
+		// Production contexts are normalized before rule execution. Keep the
+		// zero-value context useful to direct unit harnesses by falling back to
+		// the parsed source shape, matching this rule's historical behavior.
+		if ast.IsExternalModule(ctx.SourceFile) {
+			sourceType = "module"
+		} else {
+			sourceType = "script"
+		}
+	}
+	ecmaVersion := ctx.LanguageOptions.EffectiveECMAVersion()
+	return EngineOptions{
+		CapIsConstructor: opts.CapIsConstructor,
+		TopLevelValid:    sourceType != "module",
+		IsStrict: func(fn *ast.Node, sf *ast.SourceFile) bool {
+			return isStrictFunction(fn, sf, ecmaVersion, sourceType == "module")
+		},
+		FieldFrameScopedToValue: true,
+	}
+}
+
 // BuildListeners is the shared `this`-validity walker behind both
 // `no-invalid-this` (this package) and `@typescript-eslint/no-invalid-this`
 // (internal/plugins/typescript/rules/no_invalid_this), which wraps this
-// function directly rather than duplicating it. The two rules differ in
-// exactly two respects, captured by EngineOptions:
-//   - `no-invalid-this` gates function frames on real strict-mode detection
-//     and derives top-level validity from `ast.IsExternalModule`.
-//   - `@typescript-eslint/no-invalid-this` assumes `sourceType: "module"`
-//     (typescript-eslint's RuleTester default), so every function frame is
-//     always strict and top-level `this` is always invalid.
-//   - The two also disagree on how much of a class field the field's own
-//     frame covers (see `FieldFrameScopedToValue`).
+// function directly rather than duplicating it. The rules disagree only on
+// how much of a class field the field's own frame covers (see
+// `FieldFrameScopedToValue`).
 //
 // Everything else — the AST shapes recognized, the order branches are
 // checked in, computed-key and decorator handling — is identical, since
@@ -250,18 +267,7 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := ParseOptions(options)
-	ecmaVersion := ctx.Globals.EffectiveECMAVersion()
-	return BuildListeners(ctx, EngineOptions{
-		CapIsConstructor: opts.CapIsConstructor,
-		// Top-level `this` refers to the global object in scripts (always
-		// valid) and is `undefined` in ES modules (always invalid) —
-		// independent of strict mode.
-		TopLevelValid: !ast.IsExternalModule(ctx.SourceFile),
-		IsStrict: func(fn *ast.Node, sf *ast.SourceFile) bool {
-			return isStrictFunction(fn, sf, ecmaVersion)
-		},
-		FieldFrameScopedToValue: true,
-	})
+	return BuildListeners(ctx, CoreEngineOptions(ctx, opts))
 }
 
 // computeFunctionValid produces the `this`-validity flag pushed when a
@@ -286,7 +292,7 @@ func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, comments []*ast.Co
 	if hasThisParameter(node) {
 		return true
 	}
-	if hasJSDocThisTag(node, comments, sf.Text()) {
+	if hasJSDocThisTag(node, comments, sf) {
 		return true
 	}
 	if capIsConstructor && utils.IsES5Constructor(node) {
@@ -298,18 +304,39 @@ func computeFunctionValid(node *ast.Node, sf *ast.SourceFile, comments []*ast.Co
 // isStrictFunction reports whether `fn`'s own body scope is strict-mode —
 // mirrors ESLint's `sourceCode.getScope(node).isStrict` for a function node.
 // True when an enclosing scope is already strict (ES module, ancestor
-// "use strict", or a class body — see utils.IsInStrictMode), OR the function
-// declares its own "use strict" directive.
-func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int) bool {
+// "use strict", or a class body), OR the function declares its own "use
+// strict" directive. Decorators are evaluated outside their decorated class
+// body, so that class boundary is skipped while walking outward.
+func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int, isModule bool) bool {
 	// Modules, classes, and TypeScript namespaces impose strict mode
 	// independently of directive prologues and therefore remain strict even
 	// when the configured language version is ES3.
-	if ast.IsExternalModule(sf) {
+	if isModule {
 		return true
 	}
+	skipDecoratedClassBody := false
 	for current := fn.Parent; current != nil; current = current.Parent {
-		if current.Kind == ast.KindModuleDeclaration || ast.IsClassLike(current) {
+		if current.Kind == ast.KindDecorator {
+			host := current.Parent
+			if host != nil && (ast.IsClassLike(host) || isDecoratedClassMember(host)) {
+				skipDecoratedClassBody = true
+			}
+		}
+		if current.Kind == ast.KindModuleDeclaration {
 			return true
+		}
+		if ast.IsClassLike(current) {
+			if skipDecoratedClassBody {
+				skipDecoratedClassBody = false
+				continue
+			}
+			return true
+		}
+		if ecmaVersion != 3 && ast.IsFunctionLike(current) && !skipDecoratedClassBody {
+			body := current.Body()
+			if body != nil && body.Kind == ast.KindBlock && utils.HasUseStrictDirective(body) {
+				return true
+			}
 		}
 	}
 
@@ -318,7 +345,7 @@ func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int) bool {
 	if ecmaVersion == 3 {
 		return false
 	}
-	if utils.IsInStrictMode(fn, sf) {
+	if utils.HasUseStrictDirective(sf.AsNode()) {
 		return true
 	}
 	body := fn.Body()
@@ -405,7 +432,8 @@ func matchesThisTagPattern(value string) bool {
 // — the JSDoc here belongs to the enclosing CallExpression, not the function
 // argument; ESLint's `getJSDocComment` stops walking at CallExpression
 // parents, so we do too.
-func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, text string) bool {
+func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) bool {
+	text := sf.Text()
 	if hasThisTagInLeadingComments(fn, comments, text) {
 		return true
 	}
@@ -430,7 +458,7 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, text string) bo
 	// intentionally broader than a hand-picked expression list: arrays,
 	// unary expressions, nested calls, and other containers are transparent.
 	for parent != nil && parent.Kind != ast.KindSourceFile {
-		hasComments, hasTag := leadingCommentSummary(parent, comments, text)
+		hasComments, hasTag := ancestorJSDocSummary(parent, comments, sf)
 		if hasComments {
 			return hasTag
 		}
@@ -441,6 +469,41 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, text string) bo
 		parent = current.Parent
 	}
 	return false
+}
+
+// ancestorJSDocSummary mirrors findJSDocComment after getJSDocComment has
+// climbed to a declaration or statement. Any leading comment stops the climb,
+// but only the closest adjacent `/** ... */` block can carry the JSDoc tag.
+func ancestorJSDocSummary(node *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) (hasComments, hasTag bool) {
+	if node == nil {
+		return false, false
+	}
+	text := sf.Text()
+	pos := node.Pos()
+	idx := sort.Search(len(comments), func(i int) bool { return comments[i].Pos() >= pos })
+	var closest *ast.CommentRange
+	for i := idx; i < len(comments); i++ {
+		comment := comments[i]
+		if !ecmascript.IsBlank(text[pos:comment.Pos()]) {
+			break
+		}
+		hasComments = true
+		closest = comment
+		pos = comment.End()
+	}
+	if closest == nil || closest.Kind != ast.KindMultiLineCommentTrivia {
+		return hasComments, false
+	}
+	raw := text[closest.Pos():closest.End()]
+	if !strings.HasPrefix(raw, "/**") {
+		return hasComments, false
+	}
+	tokenStart := scanner.SkipTrivia(text, node.Pos())
+	lineMap := sf.ECMALineMap()
+	if scanner.ComputeLineOfPosition(lineMap, tokenStart)-scanner.ComputeLineOfPosition(lineMap, closest.End()) > 1 {
+		return hasComments, false
+	}
+	return hasComments, matchesThisTagPattern(stripCommentMarkers(raw, closest.Kind))
 }
 
 func isJSDocLookupBoundary(node *ast.Node) bool {
@@ -650,17 +713,9 @@ func isDefaultThisBinding(node *ast.Node, capIsConstructor bool) bool {
 			if pd.Initializer != current {
 				return true
 			}
-			// ESLint's walker has explicit cases for `Property` /
-			// `PropertyDefinition` / `MethodDefinition` but NOT for
-			// `AccessorProperty`. tsgo collapses both ESTree kinds onto
-			// KindPropertyDeclaration; we re-introduce the distinction here
-			// by checking `ModifierFlagsAccessor`. For auto-accessors a
-			// function-expression initializer falls through to the walker's
-			// default branch (default-bound), matching how upstream's
-			// baseRule walker treats `AccessorProperty` parents.
-			if parent.ModifierFlags()&ast.ModifierFlagsAccessor != 0 {
-				return true
-			}
+			// Both regular fields and auto-accessors give their initializer
+			// value an always-valid field frame. tsgo collapses both ESTree
+			// node kinds onto PropertyDeclaration, so they share this branch.
 			return false
 
 		case ast.KindVariableDeclaration:
@@ -838,6 +893,12 @@ func decoratorFrameSkip(thisNode *ast.Node, fieldFrameScopedToValue bool) int {
 		switch current.Kind {
 		case ast.KindDecorator:
 			member := current.Parent
+			if member != nil && ast.IsClassLike(member) {
+				// A class decorator owns no validity frame. Keep walking so a
+				// surrounding member decorator can select its enclosing frame.
+				prev, current = member, member.Parent
+				continue
+			}
 			if member == nil || !isDecoratedClassMember(member) {
 				return skip
 			}

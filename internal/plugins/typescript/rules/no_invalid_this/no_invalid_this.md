@@ -29,10 +29,7 @@ Otherwise, this rule warns on `this` keywords. It also reports `this` at the top
 
 ## Differences from ESLint
 
-Top-level `this` is always reported, independently of
-`languageOptions.sourceType`; setting it to `'script'` or `'commonjs'` does not
-change that behavior. The
-`parserOptions.ecmaFeatures.globalReturn` option is also not supported.
+The `parserOptions.ecmaFeatures.globalReturn` option is not supported.
 
 Examples of **incorrect** code for this rule:
 
@@ -196,10 +193,6 @@ class Foo {
   }
 }
 ```
-
-## Differences from ESLint
-
-- rslint treats every file as an ES module, so top-level `this` is always reported and every function body is checked as strict-mode code. `@typescript-eslint/no-invalid-this` derives both from `languageOptions.sourceType`, which rslint does not expose.
 
 ## When Not To Use It
 

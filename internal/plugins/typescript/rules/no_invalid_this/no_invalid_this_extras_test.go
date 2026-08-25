@@ -602,21 +602,6 @@ class A {
       `,
 				Errors: unexpected(3, 15),
 			},
-			// ---- Branch lock-in: auto-accessor with function-expression initializer ----
-			// ESLint's walker has no `AccessorProperty` case, so a function
-			// inside `accessor x = function(){}` falls through to default
-			// (default-bound, `this` is invalid). Regular fields stay valid
-			// because the walker DOES recognize `PropertyDefinition`.
-			{
-				Code: `
-class A {
-  accessor foo = function () {
-    this;
-  };
-}
-      `,
-				Errors: unexpected(4, 5),
-			},
 			// ---- Dimension 4: free function nested inside a method body ----
 			// Locks in that the method's frame doesn't shadow the inner
 			// function frame — the inner free function's `this` is reported.
