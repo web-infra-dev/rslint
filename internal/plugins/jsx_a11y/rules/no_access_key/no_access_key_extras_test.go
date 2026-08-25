@@ -326,23 +326,23 @@ func TestNoAccessKeyExtras(t *testing.T) {
 		// .map() callbacks, fragment + conditional, ternary-rendered
 		// element, hooks consumers.
 		{
-			Code: `function SubmitButton() { return <button accessKey="s" type="submit">Submit</button>; }`,
-			Tsx:  true,
+			Code:   `function SubmitButton() { return <button accessKey="s" type="submit">Submit</button>; }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		{
-			Code: `function HomeLink() { return <a href="/home" accessKey="h" target="_blank">Home</a>; }`,
-			Tsx:  true,
+			Code:   `function HomeLink() { return <a href="/home" accessKey="h" target="_blank">Home</a>; }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		{
-			Code: `function NameField() { return <input type="text" accessKey="n" placeholder="name" />; }`,
-			Tsx:  true,
+			Code:   `function NameField() { return <input type="text" accessKey="n" placeholder="name" />; }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		{
-			Code: `function ToolbarBtn() { return <div role="button" tabIndex={0} accessKey="t" onClick={fn} />; }`,
-			Tsx:  true,
+			Code:   `function ToolbarBtn() { return <div role="button" tabIndex={0} accessKey="t" onClick={fn} />; }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		// Fragment + conditional rendering.
@@ -366,8 +366,8 @@ func TestNoAccessKeyExtras(t *testing.T) {
 		// Class component render with multiple offending children — each
 		// reports independently.
 		{
-			Code: "class MyForm { render() { return <form><input accessKey=\"u\" name=\"username\" /><input accessKey=\"p\" name=\"password\" type=\"password\" /></form>; } }",
-			Tsx:  true,
+			Code:   "class MyForm { render() { return <form><input accessKey=\"u\" name=\"username\" /><input accessKey=\"p\" name=\"password\" type=\"password\" /></form>; } }",
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError, expectedError},
 		},
 		// Hooks pattern.

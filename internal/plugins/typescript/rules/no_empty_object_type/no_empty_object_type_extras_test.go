@@ -932,7 +932,7 @@ declare namespace N {
 		// ---- Branch lock-in: > 2 extends behaves identically to 2 extends
 		// (arm D triggers on `extend.length > 1`, not `=== 2`) ----
 		{
-			Code: `interface Foo extends A, B, C { x: number }`,
+			Code:   `interface Foo extends A, B, C { x: number }`,
 			Errors: []rule_tester.InvalidTestCaseError{},
 		},
 

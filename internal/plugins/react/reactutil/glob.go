@@ -20,7 +20,7 @@ import (
 //   - `+(a|b)`        — one or more of alternatives (extglob)
 //   - `@(a|b)`        — exactly one of alternatives (extglob)
 //   - `!(a|b)`        — extglob negation (RE2 lacks lookarounds; approximated
-//                       as "zero or one" — exact-match semantics not supported)
+//     as "zero or one" — exact-match semantics not supported)
 //   - `\X`            — literal X
 //
 // Leading `!` (whole-pattern negation) is intentionally NOT handled here:

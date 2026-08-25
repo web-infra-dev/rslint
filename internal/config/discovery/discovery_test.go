@@ -2818,7 +2818,6 @@ func TestConfigDiscoveryReusesNativeCaseAliasAcrossLoadFrontiers(t *testing.T) {
 	lowerState := coordinator.modules.state(lowerConfig)
 	if upperState == nil || upperState != lowerState {
 		t.Fatal("case aliases did not resolve to the same representative load state")
-		return
 	}
 	if got := lowerState.candidate.path; got != upperConfig {
 		t.Fatalf("representative config path = %q, want %q", got, upperConfig)

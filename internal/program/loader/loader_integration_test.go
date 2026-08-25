@@ -749,7 +749,7 @@ func TestLoadProgramsDoesNotBorrowParentConfigProgram(t *testing.T) {
 	buildContext := newBuildContext(fsys)
 	configMap := map[string]rslintconfig.RslintConfig{
 		tspath.NormalizePath(rootDir):  projectConfig("./tsconfig.json"),
-		tspath.NormalizePath(childDir): rslintconfig.RslintConfig{{}},
+		tspath.NormalizePath(childDir): {{}},
 	}
 	set, err := buildProjectsForConfigs(configMap, true, buildContext)
 	if err != nil {
@@ -790,7 +790,7 @@ func TestTypeCheckDeduplicatesSyntaxFromSourceOnlyAndParentProgram(t *testing.T)
 	childDir = tspath.NormalizePath(childDir)
 	configMap := map[string]rslintconfig.RslintConfig{
 		rootDir:  projectConfig("./tsconfig.json"),
-		childDir: rslintconfig.RslintConfig{{}},
+		childDir: {{}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	buildContext := newBuildContext(fsys)

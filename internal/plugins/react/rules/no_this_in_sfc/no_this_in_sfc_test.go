@@ -273,7 +273,6 @@ func TestNoThisInSfcRule(t *testing.T) {
           return "hi";
         }
       `, Tsx: true},
-
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: `const { foo } = this.props` in SFC ----
 		{

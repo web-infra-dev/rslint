@@ -13,77 +13,77 @@ import (
 // suite — they will be re-enabled if rslint's parser ever supports Flow.
 
 var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
-		// ---- Upstream: Components and hooks may call hooks ----
-		{Code: `
+	// ---- Upstream: Components and hooks may call hooks ----
+	{Code: `
 			function ComponentWithHook() {
 				useHook();
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component Button() {
 				useHook();
 				return <div>Button!</div>;
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `hook` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `hook` syntax.
+	{Skip: true, Code: `
 			hook useSampleHook() {
 				useHook();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function createComponentWithHook() {
 				return function ComponentWithHook() {
 					useHook();
 				};
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function useHookWithHook() {
 				useHook();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function createHook() {
 				return function useHookWithHook() {
 					useHook();
 				}
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function ComponentWithNormalFunction() {
 				doSomething();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function normalFunctionWithNormalFunction() {
 				doSomething();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function normalFunctionWithConditionalFunction() {
 				if (cond) {
 					doSomething();
 				}
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function functionThatStartsWithUseButIsntAHook() {
 				if (cond) {
 					userFetch();
 				}
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function useUnreachable() {
 				return;
 				useHook();
 			}
 		`, Tsx: true},
 
-		// ---- Upstream: Various binding shapes for hooks ----
-		{Code: `
+	// ---- Upstream: Various binding shapes for hooks ----
+	{Code: `
 			function useHook() { useState(); }
 			const whatever = function useHook() { useState(); };
 			const useHook1 = () => { useState(); };
@@ -95,13 +95,13 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 			({useHook = () => { useState(); }} = {});
 			Namespace.useHook = () => { useState(); };
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function useHook() {
 				useHook1();
 				useHook2();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function createHook() {
 				return function useHook() {
 					useHook1();
@@ -109,56 +109,56 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				};
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function useHook() {
 				useState() && a;
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function useHook() {
 				return useHook1() + useHook2();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function useHook() {
 				return useHook1(useHook2());
 			}
 		`, Tsx: true},
 
-		// ---- Upstream: forwardRef / memo callbacks ----
-		{Code: `
+	// ---- Upstream: forwardRef / memo callbacks ----
+	{Code: `
 			const FancyButton = React.forwardRef((props, ref) => {
 				useHook();
 				return <button {...props} ref={ref} />
 			});
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			const FancyButton = React.forwardRef(function (props, ref) {
 				useHook();
 				return <button {...props} ref={ref} />
 			});
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			const FancyButton = forwardRef(function (props, ref) {
 				useHook();
 				return <button {...props} ref={ref} />
 			});
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			const MemoizedFunction = React.memo(props => {
 				useHook();
 				return <button {...props} />
 			});
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			const MemoizedFunction = memo(function (props) {
 				useHook();
 				return <button {...props} />
 			});
 		`, Tsx: true},
 
-		// ---- Upstream: classes calling functions are not hooks ----
-		{Code: `
+	// ---- Upstream: classes calling functions are not hooks ----
+	{Code: `
 			class C {
 				m() {
 					this.useHook();
@@ -167,14 +167,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 			}
 		`, Tsx: true},
 
-		// ---- Upstream: jest.useFakeTimers etc are not React hooks ----
-		{Code: `
+	// ---- Upstream: jest.useFakeTimers etc are not React hooks ----
+	{Code: `
 			jest.useFakeTimers();
 			beforeEach(() => {
 				jest.useRealTimers();
 			})
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			fooState();
 			_use();
 			_useState();
@@ -182,8 +182,8 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 			jest.useFakeTimer()
 		`, Tsx: true},
 
-		// ---- Upstream: "use"-prefixed callbacks in unnamed function args ----
-		{Code: `
+	// ---- Upstream: "use"-prefixed callbacks in unnamed function args ----
+	{Code: `
 			function makeListener(instance) {
 				each(pixelsWithInferredEvents, pixel => {
 					if (useExtendedSelector(pixel.id) && extendedButton) {
@@ -192,14 +192,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			React.unknownFunction((foo, bar) => {
 				if (foo) {
 					useNotAHook(bar)
 				}
 			});
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			unknownFunction(function(foo, bar) {
 				if (foo) {
 					useNotAHook(bar)
@@ -207,14 +207,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 			});
 		`, Tsx: true},
 
-		// ---- Upstream: regression cases ----
-		{Code: `
+	// ---- Upstream: regression cases ----
+	{Code: `
 			function RegressionTest() {
 				const foo = cond ? a : b;
 				useState();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function RegressionTest() {
 				if (page == null) {
 					throw new Error('oh no!');
@@ -222,7 +222,7 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				useState();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function RegressionTest() {
 				const res = [];
 				const additionalCond = true;
@@ -232,7 +232,7 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				React.useLayoutEffect(() => {});
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function MyComponent() {
 				if (c) {} else {}
 				if (c) {} else {}
@@ -256,7 +256,7 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				useHook();
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			const useSomeHook = () => {};
 			const SomeName = () => {
 				const filler = FILLER ?? FILLER ?? FILLER;
@@ -268,7 +268,7 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				return null;
 			};
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function App(props) {
 				const someObject = {propA: true};
 				for (const propName in someObject) {
@@ -280,14 +280,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 			}
 		`, Tsx: true},
 
-		// ---- Upstream: React `use()` may be called conditionally / in loops ----
-		{Code: `
+	// ---- Upstream: React `use()` may be called conditionally / in loops ----
+	{Code: `
 			function App() {
 				const text = use(Promise.resolve('A'));
 				return <Text text={text} />
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			import * as React from 'react';
 			function App() {
 				if (shouldShowText) {
@@ -299,7 +299,7 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				return <Text text={shouldFetchBackupText ? use(backupQuery) : "Nothing to see here"} />
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function App() {
 				let data = [];
 				for (const query of queries) {
@@ -309,29 +309,29 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				return <Child data={data} />
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function App() {
 				const data = someCallback((x) => use(x));
 				return <Child data={data} />
 			}
 		`, Tsx: true},
 
-		// ---- Upstream: TODO-style false-negatives upstream documents ----
-		{Code: `
+	// ---- Upstream: TODO-style false-negatives upstream documents ----
+	{Code: `
 			export const notAComponent = () => {
 				return () => {
 					useState();
 				}
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			export default () => {
 				if (isVal) {
 					useState(0);
 				}
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function notAComponent() {
 				return new Promise.then(() => {
 					useState();
@@ -339,8 +339,8 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 			}
 		`, Tsx: true},
 
-		// ---- Upstream: hook outside loop ----
-		{Code: `
+	// ---- Upstream: hook outside loop ----
+	{Code: `
 			const Component = () => {
 				const [state, setState] = useState(0);
 				for (let i = 0; i < 10; i++) {
@@ -350,8 +350,8 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 			};
 		`, Tsx: true},
 
-		// ---- Upstream: useEffectEvent valid ----
-		{Code: `
+	// ---- Upstream: useEffectEvent valid ----
+	{Code: `
 			function MyComponent({ theme }) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -364,13 +364,13 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true, Settings: map[string]interface{}{
-			"react-hooks": map[string]interface{}{
-				"additionalEffectHooks": "(useMyEffect|useServerEffect)",
-			},
-		}},
-		// Valid: useEffectEvent can be called in custom effect hooks
-		// configured via rule options (facebook/react#37085).
-		{Code: `
+		"react-hooks": map[string]interface{}{
+			"additionalEffectHooks": "(useMyEffect|useServerEffect)",
+		},
+	}},
+	// Valid: useEffectEvent can be called in custom effect hooks
+	// configured via rule options (facebook/react#37085).
+	{Code: `
 			function MyComponent({ theme }) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -383,10 +383,10 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true, Options: map[string]interface{}{
-			"additionalHooks": "(useMyEffect|useServerEffect)",
-		}},
-		// Valid: rule-level additionalHooks takes precedence over settings.
-		{Code: `
+		"additionalHooks": "(useMyEffect|useServerEffect)",
+	}},
+	// Valid: rule-level additionalHooks takes precedence over settings.
+	{Code: `
 			function MyComponent({ theme }) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -396,14 +396,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true, Options: map[string]interface{}{
-			"additionalHooks": "useMyEffect",
-		}, Settings: map[string]interface{}{
-			"react-hooks": map[string]interface{}{
-				"additionalEffectHooks": "useServerEffect",
-			},
-		}},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+		"additionalHooks": "useMyEffect",
+	}, Settings: map[string]interface{}{
+		"react-hooks": map[string]interface{}{
+			"additionalEffectHooks": "useServerEffect",
+		},
+	}},
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -413,7 +413,7 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function MyComponent({ theme }) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -426,8 +426,8 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -437,7 +437,7 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function MyComponent({ theme }) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -459,15 +459,15 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				return null;
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {});
 				useEffect(() => { onClick() });
 				return null;
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function MyComponent({ theme }) {
 				useEffect(() => {
 					onClick();
@@ -477,14 +477,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				useEffect(() => { onClick() });
 				const onClick = useEffectEvent(() => {});
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function MyComponent({ theme }) {
 				const onEvent = useEffectEvent((text) => {
 					console.log(text);
@@ -497,14 +497,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onEvent = useEffectEvent((text) => {});
 				useEffect(() => { onEvent('Hello world'); });
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function MyComponent({ theme }) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -517,14 +517,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {});
 				useLayoutEffect(() => { onClick() });
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function MyComponent({ theme }) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -537,14 +537,14 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				});
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme) {
 				const onClick = useEffectEvent(() => {});
 				useInsertionEffect(() => { onClick() });
 			}
 		`, Tsx: true},
-		{Code: `
+	{Code: `
 			function MyComponent({ theme }) {
 				const onClick = useEffectEvent(() => {
 					showNotification(theme);
@@ -574,8 +574,8 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 				return null;
 			}
 		`, Tsx: true},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {});
 				useLayoutEffect(() => { onClick(); }, []);
@@ -586,65 +586,65 @@ var rulesOfHooksUpstreamValid = []rule_tester.ValidTestCase{
 }
 
 var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
-		// ---- Upstream: SKIP'd flow invalid tests ----
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	// ---- Upstream: SKIP'd flow invalid tests ----
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component Button(cond: boolean) {
 				if (cond) {
 					useConditionalHook();
 				}
 			}
 		`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`},
-		}},
-		// SKIP: rslint does not parse Flow `hook` syntax.
-		{Skip: true, Code: `
+		{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`},
+	}},
+	// SKIP: rslint does not parse Flow `hook` syntax.
+	{Skip: true, Code: `
 			hook useTest(cond: boolean) {
 				if (cond) {
 					useConditionalHook();
 				}
 			}
 		`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`},
-		}},
+		{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`},
+	}},
 
-		// ---- Upstream: conditional hooks ----
-		// Lock the full range (Line+Column+EndLine+EndColumn) on the
-		// representative conditional case so a refactor that drifts the
-		// reported node (e.g. switching from callee Identifier to whole
-		// CallExpression) immediately fails. Other conditional cases
-		// elsewhere in this file omit EndLine/EndColumn for brevity but
-		// rely on this anchor + Message text for semantic equivalence.
-		{
-			Code: `
+	// ---- Upstream: conditional hooks ----
+	// Lock the full range (Line+Column+EndLine+EndColumn) on the
+	// representative conditional case so a refactor that drifts the
+	// reported node (e.g. switching from callee Identifier to whole
+	// CallExpression) immediately fails. Other conditional cases
+	// elsewhere in this file omit EndLine/EndColumn for brevity but
+	// rely on this anchor + Message text for semantic equivalence.
+	{
+		Code: `
 				function ComponentWithConditionalHook() {
 					if (cond) {
 						useConditionalHook();
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7, EndLine: 4, EndColumn: 25},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7, EndLine: 4, EndColumn: 25},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				Hook.useState();
 				Hook._useState();
 				Hook.use42();
 				Hook.useHook();
 				Hook.use_hook();
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "Hook.useState" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 5},
-				{Message: `React Hook "Hook.use42" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 5},
-				{Message: `React Hook "Hook.useHook" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 5},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "Hook.useState" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 5},
+			{Message: `React Hook "Hook.use42" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 5},
+			{Message: `React Hook "Hook.useHook" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 5},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				class C {
 					m() {
 						This.useHook();
@@ -652,16 +652,16 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				// Range covers the full PropertyAccessExpression callee
-				// (`This.useHook`), 12 chars long.
-				{Message: `React Hook "This.useHook" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7, EndLine: 4, EndColumn: 19},
-				{Message: `React Hook "Super.useHook" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 7, EndLine: 5, EndColumn: 20},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			// Range covers the full PropertyAccessExpression callee
+			// (`This.useHook`), 12 chars long.
+			{Message: `React Hook "This.useHook" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7, EndLine: 4, EndColumn: 19},
+			{Message: `React Hook "Super.useHook" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 7, EndLine: 5, EndColumn: 20},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				class Foo extends Component {
 					render() {
 						if (cond) {
@@ -670,26 +670,26 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "FooStore.useFeatureFlag" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 8},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "FooStore.useFeatureFlag" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 8},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function ComponentWithConditionalHook() {
 					if (cond) {
 						Namespace.useConditionalHook();
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "Namespace.useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "Namespace.useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function createComponent() {
 					return function ComponentWithConditionalHook() {
 						if (cond) {
@@ -698,26 +698,26 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 8},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 8},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function useHookWithConditionalHook() {
 					if (cond) {
 						useConditionalHook();
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function createHook() {
 					return function useHookWithConditionalHook() {
 						if (cond) {
@@ -726,37 +726,37 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 8},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 8},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function ComponentWithTernaryHook() {
 					cond ? useTernaryHook() : null;
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useTernaryHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 3, Column: 13},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useTernaryHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 3, Column: 13},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function ComponentWithHookInsideCallback() {
 					useEffect(() => {
 						useHookInsideCallback();
 					});
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideCallback" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideCallback" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function createComponent() {
 					return function ComponentWithHookInsideCallback() {
 						useEffect(() => {
@@ -765,13 +765,13 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideCallback" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 8},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideCallback" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 8},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				const ComponentWithHookInsideCallback = React.forwardRef((props, ref) => {
 					useEffect(() => {
 						useHookInsideCallback();
@@ -779,13 +779,13 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <button {...props} ref={ref} />
 				});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideCallback" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideCallback" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				const ComponentWithHookInsideCallback = React.memo(props => {
 					useEffect(() => {
 						useHookInsideCallback();
@@ -793,26 +793,26 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <button {...props} />
 				});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideCallback" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideCallback" cannot be called inside a callback. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function ComponentWithHookInsideCallback() {
 					function handleClick() {
 						useState();
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called in function "handleClick" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called in function "handleClick" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function createComponent() {
 					return function ComponentWithHookInsideCallback() {
 						function handleClick() {
@@ -821,55 +821,55 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called in function "handleClick" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 5, Column: 8},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called in function "handleClick" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 5, Column: 8},
 		},
+	},
 
-		// ---- Upstream: loop hooks ----
-		// Anchor full range here for the loop diagnostic family.
-		{
-			Code: `
+	// ---- Upstream: loop hooks ----
+	// Anchor full range here for the loop diagnostic family.
+	{
+		Code: `
 				function ComponentWithHookInsideLoop() {
 					while (cond) {
 						useHookInsideLoop();
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideLoop" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7, EndLine: 4, EndColumn: 24},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideLoop" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7, EndLine: 4, EndColumn: 24},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function ComponentWithHookInsideLoop() {
 					do {
 						useHookInsideLoop();
 					} while (cond);
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideLoop" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideLoop" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function ComponentWithHookInsideLoop() {
 					do {
 						foo();
 					} while (useHookInsideLoop());
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideLoop" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 15},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideLoop" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 15},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function renderItem() {
 					useState();
 				}
@@ -877,24 +877,24 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return props.items.map(renderItem);
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called in function "renderItem" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called in function "renderItem" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function normalFunctionWithHook() {
 					useHookInsideNormalFunction();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideNormalFunction" is called in function "normalFunctionWithHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideNormalFunction" is called in function "normalFunctionWithHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function _normalFunctionWithHook() {
 					useHookInsideNormalFunction();
 				}
@@ -902,29 +902,29 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					useHookInsideNormalFunction();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideNormalFunction" is called in function "_normalFunctionWithHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
-				{Message: `React Hook "useHookInsideNormalFunction" is called in function "_useNotAHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 6, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideNormalFunction" is called in function "_normalFunctionWithHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
+			{Message: `React Hook "useHookInsideNormalFunction" is called in function "_useNotAHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 6, Column: 6},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function normalFunctionWithConditionalHook() {
 					if (cond) {
 						useHookInsideNormalFunction();
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHookInsideNormalFunction" is called in function "normalFunctionWithConditionalHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHookInsideNormalFunction" is called in function "normalFunctionWithConditionalHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 4, Column: 7},
 		},
+	},
 
-		// ---- Upstream: useHookInLoops with various return / continue ----
-		{
-			Code: `
+	// ---- Upstream: useHookInLoops with various return / continue ----
+	{
+		Code: `
 				function useHookInLoops() {
 					while (a) {
 						useHook1();
@@ -938,16 +938,16 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHook1" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-				{Message: `React Hook "useHook2" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 6, Column: 7},
-				{Message: `React Hook "useHook3" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 9, Column: 7},
-				{Message: `React Hook "useHook4" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 11, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHook1" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
+			{Message: `React Hook "useHook2" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 6, Column: 7},
+			{Message: `React Hook "useHook3" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 9, Column: 7},
+			{Message: `React Hook "useHook4" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 11, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function useHookInLoops() {
 					while (a) {
 						useHook1();
@@ -956,14 +956,14 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHook1" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-				{Message: `React Hook "useHook2" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 6, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHook1" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
+			{Message: `React Hook "useHook2" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 6, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function useHookInLoops() {
 					do {
 						useHook1();
@@ -978,16 +978,16 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					} while (d)
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHook1" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-				{Message: `React Hook "useHook2" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 6, Column: 7},
-				{Message: `React Hook "useHook3" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 10, Column: 7},
-				{Message: `React Hook "useHook4" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 12, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHook1" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
+			{Message: `React Hook "useHook2" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 6, Column: 7},
+			{Message: `React Hook "useHook3" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 10, Column: 7},
+			{Message: `React Hook "useHook4" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 12, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function useHookInLoops() {
 					do {
 						useHook1();
@@ -996,16 +996,16 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					} while (b);
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHook1" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-				{Message: `React Hook "useHook2" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 6, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHook1" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
+			{Message: `React Hook "useHook2" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`, Line: 6, Column: 7},
 		},
+	},
 
-		// ---- Upstream: labeled break ----
-		{
-			Code: `
+	// ---- Upstream: labeled break ----
+	{
+		Code: `
 				function useLabeledBlock() {
 					label: {
 						if (a) break label;
@@ -1013,15 +1013,15 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 7},
 		},
+	},
 
-		// ---- Upstream: lowercase / non-component / non-hook function names ----
-		{
-			Code: `
+	// ---- Upstream: lowercase / non-component / non-hook function names ----
+	{
+		Code: `
 				function a() { useState(); }
 				const whatever = function b() { useState(); };
 				const c = () => { useState(); };
@@ -1032,36 +1032,36 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 				const {j = () => { useState(); }} = {};
 				({k = () => { useState(); }} = {});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called in function "a" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-				{Message: `React Hook "useState" is called in function "b" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-				{Message: `React Hook "useState" is called in function "c" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-				{Message: `React Hook "useState" is called in function "d" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-				{Message: `React Hook "useState" is called in function "e" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-				{Message: `React Hook "useState" is called in function "f" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-				{Message: `React Hook "useState" is called in function "g" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-				{Message: `React Hook "useState" is called in function "j" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-				{Message: `React Hook "useState" is called in function "k" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called in function "a" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
+			{Message: `React Hook "useState" is called in function "b" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
+			{Message: `React Hook "useState" is called in function "c" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
+			{Message: `React Hook "useState" is called in function "d" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
+			{Message: `React Hook "useState" is called in function "e" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
+			{Message: `React Hook "useState" is called in function "f" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
+			{Message: `React Hook "useState" is called in function "g" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
+			{Message: `React Hook "useState" is called in function "j" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
+			{Message: `React Hook "useState" is called in function "k" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`},
 		},
+	},
 
-		// ---- Upstream: early-return variants ----
-		// Anchor full range here for the early-return suffix variant.
-		{
-			Code: `
+	// ---- Upstream: early-return variants ----
+	// Anchor full range here for the early-return suffix variant.
+	{
+		Code: `
 				function useHook() {
 					if (a) return;
 					useState();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`, Line: 4, Column: 6, EndLine: 4, EndColumn: 14},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`, Line: 4, Column: 6, EndLine: 4, EndColumn: 14},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function useHook() {
 					if (a) return;
 					if (b) {
@@ -1072,13 +1072,13 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					useState();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`, Line: 9, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`, Line: 9, Column: 6},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function useHook() {
 					if (b) {
 						console.log('true');
@@ -1089,28 +1089,28 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					useState();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`, Line: 9, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`, Line: 9, Column: 6},
 		},
+	},
 
-		// ---- Upstream: short-circuit variants ----
-		{
-			Code: `
+	// ---- Upstream: short-circuit variants ----
+	{
+		Code: `
 				function useHook() {
 					a && useHook1();
 					b && useHook2();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useHook1" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 3, Column: 11},
-				{Message: `React Hook "useHook2" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 11},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useHook1" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 3, Column: 11},
+			{Message: `React Hook "useHook2" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 11},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function useHook() {
 					try {
 						f();
@@ -1118,30 +1118,30 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					} catch {}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function useHook({ bar }) {
 					let foo1 = bar && useState();
 					let foo2 = bar || useState();
 					let foo3 = bar ?? useState();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 3, Column: 24},
-				{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 24},
-				{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 24},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 3, Column: 24},
+			{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 24},
+			{Message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 5, Column: 24},
 		},
+	},
 
-		// ---- Upstream: forwardRef / memo with cond ----
-		{
-			Code: `
+	// ---- Upstream: forwardRef / memo with cond ----
+	{
+		Code: `
 				const FancyButton = React.forwardRef((props, ref) => {
 					if (props.fancy) {
 						useCustomHook();
@@ -1149,13 +1149,13 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <button ref={ref}>{props.children}</button>;
 				});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useCustomHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useCustomHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				const FancyButton = forwardRef(function(props, ref) {
 					if (props.fancy) {
 						useCustomHook();
@@ -1163,13 +1163,13 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <button ref={ref}>{props.children}</button>;
 				});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useCustomHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useCustomHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				const MemoizedButton = memo(function(props) {
 					if (props.fancy) {
 						useCustomHook();
@@ -1177,55 +1177,55 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <button>{props.children}</button>;
 				});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useCustomHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useCustomHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				React.unknownFunction(function notAComponent(foo, bar) {
 					useProbablyAHook(bar)
 				});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useProbablyAHook" is called in function "notAComponent" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useProbablyAHook" is called in function "notAComponent" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
 		},
+	},
 
-		// ---- Upstream: top-level hooks ----
-		{
-			Code: `
+	// ---- Upstream: top-level hooks ----
+	{
+		Code: `
 				useState();
 				if (foo) {
 					const foo = React.useCallback(() => {});
 				}
 				useCustomHook();
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 5},
-				{Message: `React Hook "React.useCallback" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 18},
-				{Message: `React Hook "useCustomHook" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 6, Column: 5},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 5},
+			{Message: `React Hook "React.useCallback" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 18},
+			{Message: `React Hook "useCustomHook" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 6, Column: 5},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				const {createHistory, useBasename} = require('history-2.1.2');
 				const browserHistory = useBasename(createHistory)({
 					basename: '/',
 				});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useBasename" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 3, Column: 28},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useBasename" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 3, Column: 28},
 		},
+	},
 
-		// ---- Upstream: class components ----
-		{
-			Code: `
+	// ---- Upstream: class components ----
+	{
+		Code: `
 				class ClassComponentWithFeatureFlag extends React.Component {
 					render() {
 						if (foo) {
@@ -1234,125 +1234,125 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useFeatureFlag" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 8},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useFeatureFlag" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 5, Column: 8},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				class ClassComponentWithHook extends React.Component {
 					render() {
 						React.useState();
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "React.useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "React.useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				(class {useHook = () => { useState(); }});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 31},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 31},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				(class {useHook() { useState(); }});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 25},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 25},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				(class {h = () => { useState(); }});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 25},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 25},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				(class {i() { useState(); }});
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 19},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 19},
 		},
+	},
 
-		// ---- Upstream: async function ----
-		// Anchor full range here; remaining async cases below stay
-		// Line+Column-only.
-		{
-			Code: `
+	// ---- Upstream: async function ----
+	// Anchor full range here; remaining async cases below stay
+	// Line+Column-only.
+	{
+		Code: `
 				async function AsyncComponent() {
 					useState();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" cannot be called in an async function.`, Line: 3, Column: 6, EndLine: 3, EndColumn: 14},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" cannot be called in an async function.`, Line: 3, Column: 6, EndLine: 3, EndColumn: 14},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				async function useAsyncHook() {
 					useState();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useState" cannot be called in an async function.`, Line: 3, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useState" cannot be called in an async function.`, Line: 3, Column: 6},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				async function Page() {
 					useId();
 					React.useId();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useId" cannot be called in an async function.`, Line: 3, Column: 6},
-				{Message: `React Hook "React.useId" cannot be called in an async function.`, Line: 4, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useId" cannot be called in an async function.`, Line: 3, Column: 6},
+			{Message: `React Hook "React.useId" cannot be called in an async function.`, Line: 4, Column: 6},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				async function useAsyncHook() {
 					useId();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useId" cannot be called in an async function.`, Line: 3, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useId" cannot be called in an async function.`, Line: 3, Column: 6},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				async function notAHook() {
 					useId();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useId" is called in function "notAHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useId" is called in function "notAHook" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
 		},
+	},
 
-		// ---- Upstream: use() specifics ----
-		{
-			Code: `
+	// ---- Upstream: use() specifics ----
+	{
+		Code: `
 				Hook.use();
 				Hook._use();
 				Hook.useState();
@@ -1361,64 +1361,64 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 				Hook.useHook();
 				Hook.use_hook();
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "Hook.use" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 5},
-				{Message: `React Hook "Hook.useState" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 5},
-				{Message: `React Hook "Hook.use42" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 6, Column: 5},
-				{Message: `React Hook "Hook.useHook" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 7, Column: 5},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "Hook.use" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 5},
+			{Message: `React Hook "Hook.useState" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 5},
+			{Message: `React Hook "Hook.use42" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 6, Column: 5},
+			{Message: `React Hook "Hook.useHook" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 7, Column: 5},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function notAComponent() {
 					use(promise);
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "use" is called in function "notAComponent" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "use" is called in function "notAComponent" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".`, Line: 3, Column: 6},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				const text = use(promise);
 				function App() {
 					return <Text text={text} />
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "use" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 18},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "use" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 2, Column: 18},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				class C {
 					m() {
 						use(promise);
 					}
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "use" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "use" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`, Line: 4, Column: 7},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				async function AsyncComponent() {
 					use();
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "use" cannot be called in an async function.`, Line: 3, Column: 6},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "use" cannot be called in an async function.`, Line: 3, Column: 6},
 		},
-		// Anchor full range for the tryCatchUseError diagnostic family.
-		{
-			Code: `
+	},
+	// Anchor full range for the tryCatchUseError diagnostic family.
+	{
+		Code: `
 				function App({p1, p2}) {
 					try {
 						use(p1);
@@ -1429,13 +1429,13 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <div>App</div>;
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "use" cannot be called in a try/catch block.`, Line: 4, Column: 7, EndLine: 4, EndColumn: 10},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "use" cannot be called in a try/catch block.`, Line: 4, Column: 7, EndLine: 4, EndColumn: 10},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function App({p1, p2}) {
 					try {
 						doSomething();
@@ -1446,15 +1446,15 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <div>App</div>;
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "use" cannot be called in a try/catch block.`, Line: 6, Column: 7},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "use" cannot be called in a try/catch block.`, Line: 6, Column: 7},
 		},
+	},
 
-		// ---- Upstream: useEffectEvent invalid usages ----
-		{
-			Code: `
+	// ---- Upstream: useEffectEvent invalid usages ----
+	{
+		Code: `
 				function MyComponent({ theme }) {
 					const onClick = useEffectEvent(() => {
 						showNotification(theme);
@@ -1464,22 +1464,45 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					});
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
 		},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	},
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent() {
 				const onClick = useEffectEvent(() => {});
 				useCustomHook(() => { onClick(); });
 			}
 		`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
+		{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
+	}},
+	{
+		Code: `
+				function MyComponent({ theme }) {
+					const onClick = useEffectEvent(() => {
+						showNotification(theme);
+					});
+					useWrongHook(() => {
+						onClick();
+					});
+				}
+			`,
+		Tsx: true,
+		Settings: map[string]interface{}{
+			"react-hooks": map[string]interface{}{
+				"additionalEffectHooks": "useMyEffect",
+			},
+		},
+		Errors: []rule_tester.InvalidTestCaseError{
 			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
-		}},
-		{
-			Code: `
+		},
+	},
+	// Invalid: useEffectEvent should not be callable in hooks not
+	// matching the options regex (facebook/react#37085).
+	{
+		Code: `
 				function MyComponent({ theme }) {
 					const onClick = useEffectEvent(() => {
 						showNotification(theme);
@@ -1489,20 +1512,16 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					});
 				}
 			`,
-			Tsx: true,
-			Settings: map[string]interface{}{
-				"react-hooks": map[string]interface{}{
-					"additionalEffectHooks": "useMyEffect",
-				},
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
-			},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useMyEffect"},
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
 		},
-		// Invalid: useEffectEvent should not be callable in hooks not
-		// matching the options regex (facebook/react#37085).
-		{
-			Code: `
+	},
+	// Invalid: rule-level additionalHooks takes precedence over settings,
+	// so a hook matched only by the settings regex is not an effect hook.
+	{
+		Code: `
 				function MyComponent({ theme }) {
 					const onClick = useEffectEvent(() => {
 						showNotification(theme);
@@ -1512,49 +1531,30 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					});
 				}
 			`,
-			Tsx:     true,
-			Options: map[string]interface{}{"additionalHooks": "useMyEffect"},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useMyEffect"},
+		Settings: map[string]interface{}{
+			"react-hooks": map[string]interface{}{
+				"additionalEffectHooks": "useWrongHook",
 			},
 		},
-		// Invalid: rule-level additionalHooks takes precedence over settings,
-		// so a hook matched only by the settings regex is not an effect hook.
-		{
-			Code: `
-				function MyComponent({ theme }) {
-					const onClick = useEffectEvent(() => {
-						showNotification(theme);
-					});
-					useWrongHook(() => {
-						onClick();
-					});
-				}
-			`,
-			Tsx:     true,
-			Options: map[string]interface{}{"additionalHooks": "useMyEffect"},
-			Settings: map[string]interface{}{
-				"react-hooks": map[string]interface{}{
-					"additionalEffectHooks": "useWrongHook",
-				},
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
-			},
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
 		},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	},
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {});
 				useWrongHook(() => { onClick(); });
 			}
 		`, Tsx: true, Settings: map[string]interface{}{
-			"react-hooks": map[string]interface{}{"additionalEffectHooks": "useMyEffect"},
-		}, Errors: []rule_tester.InvalidTestCaseError{
-			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
-		}},
-		{
-			Code: `
+		"react-hooks": map[string]interface{}{"additionalEffectHooks": "useMyEffect"},
+	}, Errors: []rule_tester.InvalidTestCaseError{
+		{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component."},
+	}},
+	{
+		Code: `
 				function MyComponent({ theme }) {
 					const onClick = useEffectEvent(() => {
 						showNotification(theme);
@@ -1562,43 +1562,43 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <Child onClick={onClick}></Child>;
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
 		},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	},
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {});
 				return <Child onClick={onClick}></Child>;
 			}
 		`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
-		}},
-		{
-			Code: `
+		{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
+	}},
+	{
+		Code: `
 				function MyComponent({ theme }) {
 					return <Child onClick={useEffectEvent(() => {
 						showNotification(theme);
 					})} />;
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: `React Hook "useEffectEvent" can only be called at the top level of your component. It cannot be passed down.`, Line: 3, Column: 29},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: `React Hook "useEffectEvent" can only be called at the top level of your component. It cannot be passed down.`, Line: 3, Column: 29},
 		},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	},
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				return <Child onClick={useEffectEvent(() => {})} />;
 			}
 		`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{Message: `React Hook "useEffectEvent" can only be called at the top level of your component. It cannot be passed down.`},
-		}},
-		{
-			Code: `
+		{Message: `React Hook "useEffectEvent" can only be called at the top level of your component. It cannot be passed down.`},
+	}},
+	{
+		Code: `
 				const MyComponent = ({ theme }) => {
 					const onClick = useEffectEvent(() => {
 						showNotification(theme);
@@ -1606,13 +1606,13 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <Child onClick={onClick}></Child>;
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
 		},
-		{
-			Code: `
+	},
+	{
+		Code: `
 				function MyComponent({ theme }) {
 					const onClick = useEffectEvent(() => {
 						showNotification(theme);
@@ -1621,23 +1621,23 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <Bar onClick={foo} />
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
 		},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	},
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {});
 				let foo = onClick;
 				return <Bar onClick={foo} />
 			}
 		`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
-		}},
-		{
-			Code: `
+		{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
+	}},
+	{
+		Code: `
 				function MyComponent({ theme }) {
 					const onClick = useEffectEvent(() => {
 						showNotification(them);
@@ -1648,21 +1648,21 @@ var rulesOfHooksUpstreamInvalid = []rule_tester.InvalidTestCase{
 					return <Child onClick={onClick} />
 				}
 			`,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
-			},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
 		},
-		// SKIP: rslint does not parse Flow `component` syntax.
-		{Skip: true, Code: `
+	},
+	// SKIP: rslint does not parse Flow `component` syntax.
+	{Skip: true, Code: `
 			component MyComponent(theme: any) {
 				const onClick = useEffectEvent(() => {});
 				useEffect(() => { setTimeout(onClick, 100); });
 				return <Child onClick={onClick} />
 			}
 		`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
-			{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
-		}},
+		{Message: "`onClick` is a function created with React Hook \"useEffectEvent\", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down."},
+	}},
 }
 
 func TestRulesOfHooksRule_Upstream(t *testing.T) {

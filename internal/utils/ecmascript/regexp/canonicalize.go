@@ -5,8 +5,6 @@ import (
 	"sync"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 // Canonicalize maps a character to the one JavaScript compares it as when case
@@ -37,11 +35,6 @@ func Canonicalize(r rune, unicodeMode bool) rune {
 	if r > 0xFFFF || expandsOnUppercase(r) {
 		return r
 	}
-	// Go's tables are an older edition of Unicode than the one JavaScript
-	// reads; see [unicode17].
-	if upper, ok := unicode17.ToUpper(r); ok {
-		return upper
-	}
 	upper := unicode.ToUpper(r)
 	if r >= utf8.RuneSelf && upper < utf8.RuneSelf {
 		return r
@@ -60,13 +53,22 @@ func simpleFold(r rune) rune {
 			least = folded
 		}
 	}
-	// A pair [unicode17] carries folds together, so the lower of the two is the
-	// canonical form for both.
-	if other, ok := unicode17.Fold(r); ok && other < least {
-		least = other
-	}
 	return least
 }
+
+// caseRanges is unicode.CaseRanges with the characters it leaves out written
+// back in. A character whose only uppercase is a sequence — ΐ, ΰ, ﬅ and ﬆ —
+// has no case mapping to state, so the standard library's table skips it, and
+// yet simple case folding still brings each of them together with another
+// character. The entries added here map onto themselves, which is the answer
+// unicode.ToUpper gives for those characters anyway.
+var caseRanges = sync.OnceValue(func() []unicode.CaseRange {
+	ranges := slices.Clone(unicode.CaseRanges)
+	for _, r := range [...]rune{0x0390, 0x03B0, 0x1FD3, 0x1FE3, 0xFB05, 0xFB06} {
+		ranges = append(ranges, unicode.CaseRange{Lo: uint32(r), Hi: uint32(r)})
+	}
+	return ranges
+})
 
 // expandsOnUppercase reports the characters whose simple uppercase is one
 // character but whose full uppercase is several.
@@ -127,12 +129,12 @@ func buildCaseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 			grouped[canonical] = append(grouped[canonical], r)
 		}
 	}
-	// Every character that canonicalizes onto another one has a case mapping,
-	// so the case ranges name them all. Folding reaches further than
-	// the uppercase mapping does, though — U+212A KELVIN SIGN joins `k` and
-	// `K` without any of the three having the other as its uppercase — so each
-	// orbit is walked out rather than assumed to be a pair.
-	for _, caseRange := range unicode.CaseRanges {
+	// Every character that canonicalizes onto another one is named by
+	// [caseRanges]. Folding reaches further than the uppercase mapping does,
+	// though — U+212A KELVIN SIGN joins `k` and `K` without any of the three
+	// having the other as its uppercase — so each orbit is walked out rather
+	// than assumed to be a pair.
+	for _, caseRange := range caseRanges() {
 		for r := rune(caseRange.Lo); r <= rune(caseRange.Hi); r++ {
 			record(r)
 			record(Canonicalize(r, unicodeMode))
@@ -143,15 +145,6 @@ func buildCaseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 			}
 		}
 	}
-	// Except the ones Go has no case mapping for at all, and the ones it folds
-	// together with no case mapping between them.
-	for _, r := range unicode17.CaseAdditions() {
-		record(r)
-	}
-	for _, r := range unicode17.FoldAdditions() {
-		record(r)
-	}
-
 	byMember := map[rune][]rune{}
 	groups := [][]rune{}
 	for _, members := range grouped {

@@ -1120,7 +1120,7 @@ func TestNoMultiCompRule(t *testing.T) {
         class B extends React.Component { render() { return <div /> } }
         class C extends React.Component { render() { return <div /> } }
       `,
-			Tsx: true,
+			Tsx:     true,
 			Options: map[string]interface{}{"ignoreStateless": true},
 			Settings: map[string]interface{}{
 				"componentWrapperFunctions": []interface{}{"myObserver"},

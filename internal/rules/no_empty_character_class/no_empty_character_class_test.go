@@ -55,22 +55,22 @@ func TestHasEmptyCharacterClassLegacy(t *testing.T) {
 		{"double caret", `[^^]`, false},
 
 		// ── Escaped characters outside class ──
-		{"escaped [ outside", `\[]`, false},           // \[ is literal [, ] is literal ]
-		{"escaped \\ then [", `\\[]`, true},           // \\ is literal \, then [] is empty class
-		{"escaped [ then empty class", `\[[]`, true},    // \[ literal [, then [] is empty class
-		{"escaped [ escaped ]", `\[\]`, false},        // \[ and \] are both literals
+		{"escaped [ outside", `\[]`, false},          // \[ is literal [, ] is literal ]
+		{"escaped \\ then [", `\\[]`, true},          // \\ is literal \, then [] is empty class
+		{"escaped [ then empty class", `\[[]`, true}, // \[ literal [, then [] is empty class
+		{"escaped [ escaped ]", `\[\]`, false},       // \[ and \] are both literals
 
 		// ── Escaped characters inside class ──
-		{"escaped ] inside class", `[\]]`, false},     // class contains literal ]
-		{"escaped [ inside class", `[\[]`, false},     // class contains literal [
-		{"escaped \\ inside class", `[\\]`, false},    // class contains literal \.
-		{"escaped a inside class", `[\a]`, false},     // class contains literal a
+		{"escaped ] inside class", `[\]]`, false},  // class contains literal ]
+		{"escaped [ inside class", `[\[]`, false},  // class contains literal [
+		{"escaped \\ inside class", `[\\]`, false}, // class contains literal \.
+		{"escaped a inside class", `[\a]`, false},  // class contains literal a
 		{"backslash at class start then ]", `[\]]`, false},
 
 		// ── [ as literal inside class (legacy: no nesting) ──
-		{"[ inside class", `[[]`, false},              // class contains [
-		{"[ then a inside class", `[[a]`, false},      // class contains [ and a
-		{"[ ] outside after class", `[a]]`, false},    // class [a], then literal ]
+		{"[ inside class", `[[]`, false},           // class contains [
+		{"[ then a inside class", `[[a]`, false},   // class contains [ and a
+		{"[ ] outside after class", `[a]]`, false}, // class [a], then literal ]
 
 		// ── Multiple classes ──
 		{"two non-empty classes", `[a][b]`, false},

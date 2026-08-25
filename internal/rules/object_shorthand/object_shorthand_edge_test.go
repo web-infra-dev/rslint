@@ -101,7 +101,7 @@ func TestObjectShorthandRuleEdgeCases(t *testing.T) {
 
 			// --- TypeScript-specific valid syntax ---
 			{Code: `let x = {foo: (a: number): string => 'x'}`, Options: []any{"always", map[string]any{"avoidExplicitReturnArrows": true}}}, // expression body
-			{Code: `let x = {foo: (a: number): string => { return 'x' }}`},                                                                  // avoidExplicitReturnArrows not set
+			{Code: `let x = {foo: (a: number): string => { return 'x' }}`},                                                                   // avoidExplicitReturnArrows not set
 		},
 		[]rule_tester.InvalidTestCase{
 			// --- Deeply nested object: innermost property reports ---

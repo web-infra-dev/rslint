@@ -245,8 +245,8 @@ func TestJsxIndentPropsRule(t *testing.T) {
 		// `Attributes.Properties.Nodes`, so prop processing must ignore
 		// them and treat the multi-line props normally.
 		{
-			Code:    "\n        <Foo<string>\n            a\n            b\n        />\n      ",
-			Tsx:     true,
+			Code: "\n        <Foo<string>\n            a\n            b\n        />\n      ",
+			Tsx:  true,
 		},
 
 		// Member-expression tag `<Foo.Bar>` — the dotted name must not

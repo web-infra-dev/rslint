@@ -10,23 +10,23 @@ import (
 // TestExhaustiveDeps_UpstreamFlow ports the small "upstream_flow_test" upstream group.
 
 var upstreamFlowValid = []rule_tester.ValidTestCase{
-// SKIP: rslint does not parse Flow
-{
-	Skip: true,
-	Code: `
+	// SKIP: rslint does not parse Flow
+	{
+		Skip: true,
+		Code: `
 function Example({ prop }) {
   const bar = useEffect(<T>(a: T): Hello => {
     prop();
   }, [prop]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-// SKIP: rslint does not parse Flow
-{
-	Skip: true,
-	Code: `
+	// SKIP: rslint does not parse Flow
+	{
+		Skip: true,
+		Code: `
 function MyComponent() {
   type ColumnKey = 'id' | 'name';
   type Item = {id: string, name: string};
@@ -42,37 +42,37 @@ function MyComponent() {
   );
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 }
 
 var upstreamFlowInvalid = []rule_tester.InvalidTestCase{
-// SKIP: rslint does not parse Flow
-{
-	Skip: true,
-	Code: `
+	// SKIP: rslint does not parse Flow
+	{
+		Skip: true,
+		Code: `
 hook useExample(a) {
   useEffect(() => {
     console.log(a);
   }, []);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "React Hook useEffect has a missing dependency: 'a'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'a'. Either include it or remove the dependency array.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 hook useExample(a) {
   useEffect(() => {
     console.log(a);
   }, [a]);
 }
 `}}},
+		},
 	},
-},
 
-// SKIP: rslint does not parse Flow
-{
-	Skip: true,
-	Code: `
+	// SKIP: rslint does not parse Flow
+	{
+		Skip: true,
+		Code: `
 function Foo() {
   const foo = ({}: any);
   useMemo(() => {
@@ -80,11 +80,11 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_UpstreamFlow(t *testing.T) {

@@ -794,4 +794,3 @@ func TestInteractiveSupportsFocusExtras(t *testing.T) {
 		},
 	)
 }
-

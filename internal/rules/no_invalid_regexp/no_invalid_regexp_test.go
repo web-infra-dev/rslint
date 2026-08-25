@@ -36,29 +36,29 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// closes stands for itself.
 			{Code: `RegExp('(?=a)*')`},
 			{Code: `RegExp('^{')`},
-			{Code: `new RegExp('.', 'v')`},     // v flag alone is valid
-			{Code: `new RegExp('.', 'u')`},     // u flag alone is valid
+			{Code: `new RegExp('.', 'v')`}, // v flag alone is valid
+			{Code: `new RegExp('.', 'u')`}, // u flag alone is valid
 			// No arguments
 			{Code: `RegExp()`},
 			{Code: `new RegExp`},
 			// Non-string pattern types — skip pattern validation
-			{Code: "RegExp(`pattern`)"},             // template literal
-			{Code: `RegExp(pattern)`},               // variable
-			{Code: `RegExp('[' + '')`},              // binary expression
-			{Code: `RegExp(cond ? '[' : '.')`},      // conditional
-			{Code: `RegExp(123)`},                   // number
-			{Code: `RegExp(null)`},                  // null
-			{Code: `RegExp(undefined)`},             // undefined
-			{Code: `RegExp(/abc/)`},                 // regex literal
+			{Code: "RegExp(`pattern`)"},        // template literal
+			{Code: `RegExp(pattern)`},          // variable
+			{Code: `RegExp('[' + '')`},         // binary expression
+			{Code: `RegExp(cond ? '[' : '.')`}, // conditional
+			{Code: `RegExp(123)`},              // number
+			{Code: `RegExp(null)`},             // null
+			{Code: `RegExp(undefined)`},        // undefined
+			{Code: `RegExp(/abc/)`},            // regex literal
 			// Non-RegExp callee — should not match
-			{Code: `global.RegExp('.', 'z')`},       // member expression
-			{Code: `window.RegExp('.', 'z')`},       // member expression
-			{Code: `this.RegExp('.', 'z')`},         // member expression
-			{Code: `foo.RegExp('.', 'z')`},          // member expression
-			{Code: `regexp('.', 'z')`},              // case sensitivity
+			{Code: `global.RegExp('.', 'z')`}, // member expression
+			{Code: `window.RegExp('.', 'z')`}, // member expression
+			{Code: `this.RegExp('.', 'z')`},   // member expression
+			{Code: `foo.RegExp('.', 'z')`},    // member expression
+			{Code: `regexp('.', 'z')`},        // case sensitivity
 			// Non-literal flags — skip flag validation
-			{Code: "new RegExp('.', `g`)"},           // template literal flags
-			{Code: `new RegExp('.', 'g' + 'i')`},    // binary expression flags
+			{Code: "new RegExp('.', `g`)"},       // template literal flags
+			{Code: `new RegExp('.', 'g' + 'i')`}, // binary expression flags
 			// Non-literal pattern + non-literal flags — skip both
 			{Code: `new RegExp(pattern, flags)`},
 			// Non-literal pattern + valid flags

@@ -383,7 +383,7 @@ func TestNoUnusedExpressionsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedExpression", Line: 1, Column: 1}},
 		},
 		{
-			Code: "a() &&\n  function namedFunctionInExpressionContext() {\n    f();\n  };",
+			Code:   "a() &&\n  function namedFunctionInExpressionContext() {\n    f();\n  };",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedExpression", Line: 1, Column: 1}},
 		},
 		{

@@ -210,7 +210,6 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
 		// component reference per JSX semantics; not in lowercase dom map.
 		// ============================================================
 		{Code: `<DIV aria-activedescendant={x} />;`, Tsx: true},
-
 	}, []rule_tester.InvalidTestCase{
 		// TSNonNullExpression on tabIndex — jsx-ast-utils' TSNonNullExpression
 		// extractor stringifies (`0!` → "0!", `(0)!` → "0!", `(5)!` → "5!").

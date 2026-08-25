@@ -286,4 +286,3 @@ func generateValidBaseCases(opts baseCaseOptions) []rule_tester.ValidTestCase {
 
 	return result
 }
-

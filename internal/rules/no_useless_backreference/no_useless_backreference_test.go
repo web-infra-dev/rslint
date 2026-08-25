@@ -667,7 +667,6 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	sourceFile := program.GetSourceFile("file.ts")
 	if sourceFile == nil {
 		t.Fatal("file.ts was not loaded")
-		return
 	}
 
 	var diagnostics []rule.RuleDiagnostic
@@ -857,7 +856,6 @@ enum Pattern {
 	sourceFile := program.GetSourceFile(filePath)
 	if sourceFile == nil {
 		t.Fatalf("%s was not loaded", filePath)
-		return
 	}
 	typeChecker, done := program.GetTypeChecker(t.Context())
 	defer done()

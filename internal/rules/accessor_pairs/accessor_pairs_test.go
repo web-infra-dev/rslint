@@ -272,7 +272,6 @@ func TestAccessorPairsRule(t *testing.T) {
 
 			// `[/a/]` and string `'/a/'` both normalize to static name "/a/".
 			{Code: `var o = { get '/a/'() {}, set [/a/](v) {} };`, Options: bothOpts},
-
 		},
 		[]rule_tester.InvalidTestCase{
 			// Default — setter without getter
@@ -899,7 +898,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			// Spread in descriptor: treated syntactically, only named properties are
 			// considered — so {...d, set: ...} still counts as "set without get".
 			{
-				Code:    `Object.defineProperty(o, 'k', {...d, set: function(v) {}});`,
+				Code: `Object.defineProperty(o, 'k', {...d, set: function(v) {}});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInPropertyDescriptor"},
 				},
@@ -915,7 +914,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			},
 			// Parenthesized Object.defineProperties callee with optional chain.
 			{
-				Code:    `(Object?.defineProperties)(obj, {foo: {set: function(v){}}});`,
+				Code: `(Object?.defineProperties)(obj, {foo: {set: function(v){}}});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInPropertyDescriptor"},
 				},

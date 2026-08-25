@@ -1130,8 +1130,8 @@ func TestNoNoninteractiveElementToInteractiveRoleAllowListMultiTag(t *testing.T)
 			// reporting.
 			{
 				Code: "<>\n" +
-					"  <ul role=\"menu\" />\n" +     // exempted by allow-list
-					"  <ol role=\"menu\" />\n" +     // NOT in ol's allow-list (which has "menubar")
+					"  <ul role=\"menu\" />\n" + // exempted by allow-list
+					"  <ol role=\"menu\" />\n" + // NOT in ol's allow-list (which has "menubar")
 					"  <li role=\"menuitem\" />\n" + // exempted
 					"  <table role=\"button\" />\n" + // NOT in table's allow-list (which has "grid")
 					"</>",

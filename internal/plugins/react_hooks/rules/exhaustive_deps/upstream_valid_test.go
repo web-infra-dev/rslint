@@ -16,8 +16,8 @@ import (
 // the impact is contained to a single file.
 
 var upstreamValidValid = []rule_tester.ValidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = {};
   useEffect(() => {
@@ -25,11 +25,11 @@ function MyComponent() {
   });
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   useEffect(() => {
     const local = {};
@@ -37,11 +37,11 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = someFunc();
   useEffect(() => {
@@ -49,22 +49,22 @@ function MyComponent() {
   }, [local]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   useEffect(() => {
     console.log(props.foo);
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = {};
   {
@@ -76,11 +76,11 @@ function MyComponent() {
   }
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = someFunc();
   {
@@ -92,11 +92,11 @@ function MyComponent() {
   }
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = someFunc();
   function MyNestedComponent() {
@@ -108,11 +108,11 @@ function MyComponent() {
   }
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = someFunc();
   useEffect(() => {
@@ -121,22 +121,22 @@ function MyComponent() {
   }, [local]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   useEffect(() => {
     console.log(unresolved);
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = someFunc();
   useEffect(() => {
@@ -144,22 +144,22 @@ function MyComponent() {
   }, [,,,local,,,]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ foo }) {
   useEffect(() => {
     console.log(foo.length);
   }, [foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ foo }) {
   useEffect(() => {
     console.log(foo.length);
@@ -167,44 +167,44 @@ function MyComponent({ foo }) {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ history }) {
   useEffect(() => {
     return history.listen();
   }, [history]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {});
   useLayoutEffect(() => {});
   useImperativeHandle(props.innerRef, () => {});
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
   }, [props.foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -212,11 +212,11 @@ function MyComponent(props) {
   }, [props.bar, props.foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -224,11 +224,11 @@ function MyComponent(props) {
   }, [props.foo, props.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const local = someFunc();
   useEffect(() => {
@@ -238,11 +238,11 @@ function MyComponent(props) {
   }, [props.foo, props.bar, local]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const local = {};
   useEffect(() => {
@@ -257,55 +257,55 @@ function MyComponent(props) {
   }, [props.foo, props.foo.bar.baz, color]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo?.bar?.baz ?? null);
   }, [props.foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo?.bar);
   }, [props.foo?.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo?.bar);
   }, [props.foo.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo.bar);
   }, [props.foo?.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo.bar);
@@ -313,11 +313,11 @@ function MyComponent(props) {
   }, [props.foo?.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo.bar);
@@ -325,11 +325,11 @@ function MyComponent(props) {
   }, [props.foo.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo);
@@ -337,88 +337,88 @@ function MyComponent(props) {
   }, [props.foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo?.toString());
   }, [props.foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useMemo(() => {
     console.log(props.foo?.toString());
   }, [props.foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.toString());
   }, [props.foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo.bar?.toString());
   }, [props.foo.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.bar?.toString());
   }, [props.foo.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo.bar.toString());
   }, [props?.foo?.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCallback(() => {
     console.log(props.foo?.bar?.baz);
   }, [props?.foo.bar?.baz]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const myEffect = () => {
     // Doesn't use anything
@@ -426,11 +426,11 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 const local = {};
 function MyComponent() {
   const myEffect = () => {
@@ -439,11 +439,11 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 const local = {};
 function MyComponent() {
   function myEffect() {
@@ -452,11 +452,11 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local = someFunc();
   function myEffect() {
@@ -465,11 +465,11 @@ function MyComponent() {
   useEffect(myEffect, [local]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   function myEffect() {
     console.log(global);
@@ -477,11 +477,11 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 const local = {};
 function MyComponent() {
   const myEffect = () => {
@@ -493,11 +493,11 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({delay}) {
   const local = {};
   const myEffect = debounce(() => {
@@ -506,29 +506,29 @@ function MyComponent({delay}) {
   useEffect(myEffect, [myEffect]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({myEffect}) {
   useEffect(myEffect, [,myEffect]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({myEffect}) {
   useEffect(myEffect, [,myEffect,,]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 let local = {};
 function myEffect() {
   console.log(local);
@@ -537,109 +537,109 @@ function MyComponent() {
   useEffect(myEffect, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({myEffect}) {
   useEffect(myEffect, [myEffect]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({myEffect}) {
   useEffect(myEffect);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
   });
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useCustomEffect"},
-},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useCustomEffect"},
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useSpecialEffect(() => {
     console.log(props.foo);
   }, null);
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useSpecialEffect", "experimental_autoDependenciesHooks": []interface{}{"useSpecialEffect"}},
-},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useSpecialEffect", "experimental_autoDependenciesHooks": []interface{}{"useSpecialEffect"}},
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
   }, [props.foo]);
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useCustomEffect"},
-},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useCustomEffect"},
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
   }, []);
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useAnotherEffect"},
-},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useAnotherEffect"},
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useWithoutEffectSuffix(() => {
     console.log(props.foo);
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   return renderHelperConfusedWithEffect(() => {
     console.log(props.foo);
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 const local = {};
 useEffect(() => {
   console.log(local);
 }, []);
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 const local1 = {};
 {
   const local2 = {};
@@ -649,11 +649,11 @@ const local1 = {};
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const ref = useRef();
   useEffect(() => {
@@ -661,11 +661,11 @@ function MyComponent() {
   }, [ref]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const ref = useRef();
   useEffect(() => {
@@ -673,11 +673,11 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ maybeRef2, foo }) {
   const definitelyRef1 = useRef();
   const definitelyRef2 = useRef();
@@ -744,11 +744,11 @@ function MyComponent({ maybeRef2, foo }) {
   ]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ maybeRef2 }) {
   const definitelyRef1 = useRef();
   const definitelyRef2 = useRef();
@@ -804,11 +804,11 @@ function MyComponent({ maybeRef2 }) {
   ]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 const MyComponent = forwardRef((props, ref) => {
   useImperativeHandle(ref, () => ({
     focus() {
@@ -817,11 +817,11 @@ const MyComponent = forwardRef((props, ref) => {
   }))
 });
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 const MyComponent = forwardRef((props, ref) => {
   useImperativeHandle(ref, () => ({
     focus() {
@@ -830,11 +830,11 @@ const MyComponent = forwardRef((props, ref) => {
   }), [props.hello])
 });
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let obj = someFunc();
   useEffect(() => {
@@ -842,11 +842,11 @@ function MyComponent(props) {
   }, [obj]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let foo = {}
   useEffect(() => {
@@ -854,11 +854,11 @@ function MyComponent(props) {
   }, [foo.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const myRef = useRef();
   useEffect(() => {
@@ -871,11 +871,11 @@ function MyComponent() {
   return <div />;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const myRef = useRef();
   useEffect(() => {
@@ -888,11 +888,11 @@ function MyComponent() {
   return <div />;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing(myRef) {
   useEffect(() => {
     const handleMove = () => {};
@@ -903,11 +903,11 @@ function useMyThing(myRef) {
   }, [myRef]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const myRef = useRef();
   useEffect(() => {
@@ -919,11 +919,11 @@ function MyComponent() {
   return <div ref={myRef} />;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing(myRef) {
   useEffect(() => {
     const handleMove = () => {};
@@ -934,11 +934,11 @@ function useMyThing(myRef) {
   return <div ref={myRef} />;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing(myRef) {
   useCallback(() => {
     const handleMouse = () => {};
@@ -953,11 +953,11 @@ function useMyThing(myRef) {
   }, [myRef]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing() {
   const myRef = useRef();
   useEffect(() => {
@@ -970,11 +970,11 @@ function useMyThing() {
   return <div ref={myRef} />;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useMyThing() {
   const myRef = useRef();
   useEffect(() => {
@@ -987,11 +987,11 @@ function useMyThing() {
   return <div ref={myRef} />;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = 42;
   const local2 = '42';
@@ -1003,11 +1003,11 @@ function MyComponent() {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const local1 = 42;
   const local2 = '42';
@@ -1019,32 +1019,32 @@ function MyComponent() {
   }, [local1, local2, local3]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const local = props.local;
   useEffect(() => {}, [local]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo({ activeTab }) {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [activeTab]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   useEffect(() => {
     console.log(props.foo.bar.baz);
@@ -1060,11 +1060,11 @@ function MyComponent(props) {
   }, [props.foo.bar.baz]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const fn = useCallback(() => {
     console.log(props.foo.bar.baz);
@@ -1080,11 +1080,11 @@ function MyComponent(props) {
   }, [props.foo.bar.baz]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   function handleNext1() {
     console.log('hello');
@@ -1106,11 +1106,11 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   function handleNext() {
     console.log('hello');
@@ -1126,11 +1126,11 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let [, setState] = useState();
   let [, dispatch] = React.useReducer();
@@ -1159,11 +1159,11 @@ function MyComponent(props) {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useInterval(callback, delay) {
   const savedCallback = useRef();
   useEffect(() => {
@@ -1180,11 +1180,11 @@ function useInterval(callback, delay) {
   }, [delay]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   const [count, setCount] = useState(0);
 
@@ -1198,11 +1198,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter(unstableProp) {
   let [count, setCount] = useState(0);
   setCount = unstableProp
@@ -1216,11 +1216,11 @@ function Counter(unstableProp) {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   const [count, setCount] = useState(0);
 
@@ -1238,11 +1238,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   const [count, dispatch] = useReducer((state, action) => {
     if (action === 'inc') {
@@ -1260,11 +1260,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   const [count, dispatch] = useReducer((state, action) => {
     if (action === 'inc') {
@@ -1284,11 +1284,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Podcasts() {
   useEffect(() => {
     setPodcasts([]);
@@ -1296,11 +1296,11 @@ function Podcasts() {
   let [podcasts, setPodcasts] = useState(null);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function withFetch(fetchPodcasts) {
   return function Podcasts({ id }) {
     let [podcasts, setPodcasts] = useState(null);
@@ -1310,11 +1310,11 @@ function withFetch(fetchPodcasts) {
   }
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Podcasts({ id }) {
   let [podcasts, setPodcasts] = useState(null);
   useEffect(() => {
@@ -1325,11 +1325,11 @@ function Podcasts({ id }) {
   }, [id]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   let [count, setCount] = useState(0);
 
@@ -1347,11 +1347,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter() {
   let [count, setCount] = useState(0);
 
@@ -1369,11 +1369,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 import increment from './increment';
 function Counter() {
   let [count, setCount] = useState(0);
@@ -1388,11 +1388,11 @@ function Counter() {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function withStuff(increment) {
   return function Counter() {
     let [count, setCount] = useState(0);
@@ -1408,11 +1408,11 @@ function withStuff(increment) {
   }
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function App() {
   const [query, setQuery] = useState('react');
   const [state, setState] = useState(null);
@@ -1433,22 +1433,22 @@ function App() {
   );
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Example() {
   const foo = useCallback(() => {
     foo();
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Example({ prop }) {
   const foo = useCallback(() => {
     if (prop) {
@@ -1457,11 +1457,11 @@ function Example({ prop }) {
   }, [prop]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Hello() {
   const [state, setState] = useState(0);
   useEffect(() => {
@@ -1471,22 +1471,22 @@ function Hello() {
   });
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Example() {
   useEffect(() => {
     arguments
   }, [])
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Example() {
   useEffect(() => {
     const bar = () => {
@@ -1496,11 +1496,11 @@ function Example() {
   }, [])
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Example(props) {
   useEffect(() => {
     let topHeight = 0;
@@ -1508,11 +1508,11 @@ function Example(props) {
   }, [props.upperViewHeight]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Example(props) {
   useEffect(() => {
     let topHeight = 0;
@@ -1520,11 +1520,11 @@ function Example(props) {
   }, [props?.upperViewHeight]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function Example(props) {
   useEffect(() => {
     let topHeight = 0;
@@ -1532,50 +1532,50 @@ function Example(props) {
   }, [props]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useFoo(foo){
   return useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useFoo(){
   const foo = "hi!";
   return useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useFoo(){
   let {foo} = {foo: 1};
   return useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useFoo(){
   let [foo] = [1];
   return useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function useFoo() {
   const foo = "fine";
   if (true) {
@@ -1585,83 +1585,83 @@ function useFoo() {
   return useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({foo}) {
   return useMemo(() => foo, [foo])
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   const foo = true ? "fine" : "also fine";
   return useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent() {
   useEffect(() => {
     console.log('banana banana banana');
   }, undefined);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-// SKIP: unsupported settings shape
-{
-	Skip: true,
-	Code: `
+	// SKIP: unsupported settings shape
+	{
+		Skip: true,
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
   });
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-// SKIP: unsupported settings shape
-{
-	Skip: true,
-	Code: `
+	// SKIP: unsupported settings shape
+	{
+		Skip: true,
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
   }, [props.foo]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-// SKIP: unsupported settings shape
-{
-	Skip: true,
-	Code: `
+	// SKIP: unsupported settings shape
+	{
+		Skip: true,
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
   }, []);
 }
 `,
-	Tsx:  true,
-	Options: map[string]interface{}{"additionalHooks": "useAnotherEffect"},
-},
+		Tsx:     true,
+		Options: map[string]interface{}{"additionalHooks": "useAnotherEffect"},
+	},
 
-// SKIP: unsupported settings shape
-{
-	Skip: true,
-	Code: `
+	// SKIP: unsupported settings shape
+	{
+		Skip: true,
+		Code: `
 function MyComponent(props) {
   useCustomEffect(() => {
     console.log(props.foo);
@@ -1671,11 +1671,11 @@ function MyComponent(props) {
   }, [props.bar]);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent({ theme }) {
   const onStuff = useEffectEvent(() => {
     showNotification(theme);
@@ -1688,13 +1688,11 @@ function MyComponent({ theme }) {
   }, []);
 }
 `,
-	Tsx:  true,
-},
+		Tsx: true,
+	},
 }
 
-var upstreamValidInvalid = []rule_tester.InvalidTestCase{
-
-}
+var upstreamValidInvalid = []rule_tester.InvalidTestCase{}
 
 func TestExhaustiveDeps_Upstream_Valid(t *testing.T) {
 	rule_tester.RunRuleTester(

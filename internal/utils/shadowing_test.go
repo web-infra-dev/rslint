@@ -171,10 +171,10 @@ try {} catch (caught) {
 // decorated function drops out of the chain entirely.
 func TestShadowingScopeModels(t *testing.T) {
 	tests := []struct {
-		name                 string
-		code                 string
-		shadowed             bool
-		fromParameterInit    bool
+		name                   string
+		code                   string
+		shadowed               bool
+		fromParameterInit      bool
 		enclosingTypeParameter bool
 	}{
 		// A namespace body is a scope of its own.
@@ -253,8 +253,8 @@ func TestShadowingScopeModels(t *testing.T) {
 			shadowed: true,
 		},
 		{
-			name:                 "parameter decorator, method type parameter",
-			code:                 `class C { m<Target>(@dec(Target()) x: number) { } }`,
+			name:                   "parameter decorator, method type parameter",
+			code:                   `class C { m<Target>(@dec(Target()) x: number) { } }`,
 			enclosingTypeParameter: true,
 		},
 
@@ -278,8 +278,8 @@ func TestShadowingScopeModels(t *testing.T) {
 			shadowed: true,
 		},
 		{
-			name:                 "nested scope in a parameter decorator, class type parameter",
-			code:                 `class C<Target> { m(@dec(() => Target()) x: number) { } }`,
+			name:                   "nested scope in a parameter decorator, class type parameter",
+			code:                   `class C<Target> { m(@dec(() => Target()) x: number) { } }`,
 			enclosingTypeParameter: true,
 		},
 
@@ -298,8 +298,8 @@ func TestShadowingScopeModels(t *testing.T) {
 			code: `class C { @dec(Target()) m<Target>() { } }`,
 		},
 		{
-			name:                 "method decorator, class type parameter",
-			code:                 `class C<Target> { @dec(Target()) m() { } }`,
+			name:                   "method decorator, class type parameter",
+			code:                   `class C<Target> { @dec(Target()) m() { } }`,
 			enclosingTypeParameter: true,
 		},
 		{
@@ -319,8 +319,8 @@ func TestShadowingScopeModels(t *testing.T) {
 			code: `class C { [Target()]<Target>() { } }`,
 		},
 		{
-			name:                 "computed method name, class type parameter",
-			code:                 `class C<Target> { [Target()]() { } }`,
+			name:                   "computed method name, class type parameter",
+			code:                   `class C<Target> { [Target()]() { } }`,
 			enclosingTypeParameter: true,
 		},
 		{

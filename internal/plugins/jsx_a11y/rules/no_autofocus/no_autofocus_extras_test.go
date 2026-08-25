@@ -52,7 +52,7 @@ var emptyJsxA11ySettings = map[string]interface{}{
 // for ignoreNonDOM resolution.
 var polymorphicAllowListSettings = map[string]interface{}{
 	"jsx-a11y": map[string]interface{}{
-		"polymorphicPropName": "as",
+		"polymorphicPropName":  "as",
 		"polymorphicAllowList": []interface{}{"Box"},
 	},
 }
@@ -568,8 +568,8 @@ func TestNoAutofocusExtras(t *testing.T) {
 		// Class component render with multiple offending children — each
 		// reports independently.
 		{
-			Code: "class MyForm { render() { return <form><input autoFocus name=\"a\" /><input autoFocus name=\"b\" /></form>; } }",
-			Tsx:  true,
+			Code:   "class MyForm { render() { return <form><input autoFocus name=\"a\" /><input autoFocus name=\"b\" /></form>; } }",
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError, expectedError},
 		},
 		// Fragment + conditional rendering.
@@ -748,8 +748,8 @@ func TestNoAutofocusExtras(t *testing.T) {
 		// Group 27: Switch-case rendering
 		// ============================================================
 		{
-			Code: `function Foo({type}) { switch(type) { case 'input': return <input autoFocus />; default: return null; } }`,
-			Tsx:  true,
+			Code:   `function Foo({type}) { switch(type) { case 'input': return <input autoFocus />; default: return null; } }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -763,8 +763,8 @@ func TestNoAutofocusExtras(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		{
-			Code: `const items = arr.filter(Boolean).flatMap(x => [<li autoFocus key={x.a}>{x.a}</li>, <li key={x.b}>{x.b}</li>]);`,
-			Tsx:  true,
+			Code:   `const items = arr.filter(Boolean).flatMap(x => [<li autoFocus key={x.a}>{x.a}</li>, <li key={x.b}>{x.b}</li>]);`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -783,8 +783,8 @@ func TestNoAutofocusExtras(t *testing.T) {
 		// Group 30: Class component with state-driven JSX
 		// ============================================================
 		{
-			Code: `class Form extends React.Component { state = {ready: true}; render() { return this.state.ready ? <input autoFocus /> : <div />; } }`,
-			Tsx:  true,
+			Code:   `class Form extends React.Component { state = {ready: true}; render() { return this.state.ready ? <input autoFocus /> : <div />; } }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -813,8 +813,8 @@ func TestNoAutofocusExtras(t *testing.T) {
 		// Group 32: Object destructuring + JSX returning element
 		// ============================================================
 		{
-			Code: `function Form({ initial: { autoFocus = true } }) { return <input autoFocus={autoFocus} />; }`,
-			Tsx:  true,
+			Code:   `function Form({ initial: { autoFocus = true } }) { return <input autoFocus={autoFocus} />; }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 	})

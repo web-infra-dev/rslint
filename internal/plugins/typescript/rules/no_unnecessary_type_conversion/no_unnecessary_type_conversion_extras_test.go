@@ -1236,7 +1236,6 @@ func TestNoUnnecessaryTypeConversionEditDemand(t *testing.T) {
 		allEdits := diagnostics[rule.EditDemandAll][index].Suggestions
 		if suggestionOnly == nil || !reflect.DeepEqual(suggestionOnly, allEdits) {
 			t.Fatalf("diagnostic %d suggestions differ between suggestion and all-edits demand", index)
-			return
 		}
 		if len(*suggestionOnly) != 2 {
 			t.Fatalf("diagnostic %d suggestions = %#v, want 2", index, *suggestionOnly)

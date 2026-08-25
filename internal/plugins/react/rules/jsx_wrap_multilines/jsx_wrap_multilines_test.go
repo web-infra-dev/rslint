@@ -155,7 +155,7 @@ func TestJsxWrapMultilinesRule(t *testing.T) {
 		// --- Logical context ---
 		{
 			// Single-line logical: no wrapping needed
-			Code: `var x = flag && <div />`,
+			Code:    `var x = flag && <div />`,
 			Tsx:     true,
 			Options: map[string]interface{}{"logical": "parens"},
 		},

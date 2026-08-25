@@ -15,13 +15,11 @@ import (
 // it easier to locate a regression: when one diagnostic path drifts,
 // the impact is contained to a single file.
 
-var upstreamConstructionValid = []rule_tester.ValidTestCase{
-
-}
+var upstreamConstructionValid = []rule_tester.ValidTestCase{}
 
 var upstreamConstructionInvalid = []rule_tester.InvalidTestCase{
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let [, setState] = useState();
 
@@ -34,14 +32,14 @@ function MyComponent(props) {
   }, [handleNext]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 11) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext' in its own useCallback() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 11) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let [, setState] = useState();
 
@@ -54,14 +52,14 @@ function MyComponent(props) {
   }, [handleNext]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 11) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext' in its own useCallback() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 11) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let [, setState] = useState();
 
@@ -76,9 +74,9 @@ function MyComponent(props) {
   return <div onClick={handleNext} />;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 11) change on every render. To fix this, wrap the definition of 'handleNext' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 11) change on every render. To fix this, wrap the definition of 'handleNext' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let [, setState] = useState();
 
@@ -93,11 +91,11 @@ function MyComponent(props) {
   return <div onClick={handleNext} />;
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   function handleNext1() {
     console.log('hello');
@@ -119,16 +117,16 @@ function MyComponent(props) {
   }, [handleNext3]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 14) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext1' in its own useCallback() Hook."},
-		{Message: "The 'handleNext2' function makes the dependencies of useLayoutEffect Hook (at line 17) change on every render. Move it inside the useLayoutEffect callback. Alternatively, wrap the definition of 'handleNext2' in its own useCallback() Hook."},
-		{Message: "The 'handleNext3' function makes the dependencies of useMemo Hook (at line 20) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleNext3' in its own useCallback() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 14) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext1' in its own useCallback() Hook."},
+			{Message: "The 'handleNext2' function makes the dependencies of useLayoutEffect Hook (at line 17) change on every render. Move it inside the useLayoutEffect callback. Alternatively, wrap the definition of 'handleNext2' in its own useCallback() Hook."},
+			{Message: "The 'handleNext3' function makes the dependencies of useMemo Hook (at line 20) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleNext3' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   function handleNext1() {
     console.log('hello');
@@ -153,16 +151,16 @@ function MyComponent(props) {
   }, [handleNext3]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 15) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext1' in its own useCallback() Hook."},
-		{Message: "The 'handleNext2' function makes the dependencies of useLayoutEffect Hook (at line 19) change on every render. Move it inside the useLayoutEffect callback. Alternatively, wrap the definition of 'handleNext2' in its own useCallback() Hook."},
-		{Message: "The 'handleNext3' function makes the dependencies of useMemo Hook (at line 23) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleNext3' in its own useCallback() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 15) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext1' in its own useCallback() Hook."},
+			{Message: "The 'handleNext2' function makes the dependencies of useLayoutEffect Hook (at line 19) change on every render. Move it inside the useLayoutEffect callback. Alternatively, wrap the definition of 'handleNext2' in its own useCallback() Hook."},
+			{Message: "The 'handleNext3' function makes the dependencies of useMemo Hook (at line 23) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'handleNext3' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   function handleNext1() {
     console.log('hello');
@@ -198,10 +196,10 @@ function MyComponent(props) {
   );
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 15) change on every render. To fix this, wrap the definition of 'handleNext1' in its own useCallback() Hook."},
-		{Message: "The 'handleNext2' function makes the dependencies of useLayoutEffect Hook (at line 19) change on every render. To fix this, wrap the definition of 'handleNext2' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 15) change on every render. To fix this, wrap the definition of 'handleNext1' in its own useCallback() Hook."},
+			{Message: "The 'handleNext2' function makes the dependencies of useLayoutEffect Hook (at line 19) change on every render. To fix this, wrap the definition of 'handleNext2' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   function handleNext1() {
     console.log('hello');
@@ -237,7 +235,7 @@ function MyComponent(props) {
   );
 }
 `}}},
-		{Message: "The 'handleNext3' function makes the dependencies of useMemo Hook (at line 23) change on every render. To fix this, wrap the definition of 'handleNext3' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "The 'handleNext3' function makes the dependencies of useMemo Hook (at line 23) change on every render. To fix this, wrap the definition of 'handleNext3' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   function handleNext1() {
     console.log('hello');
@@ -273,11 +271,11 @@ function MyComponent(props) {
   );
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   const handleNext1 = () => {
     console.log('hello');
@@ -295,9 +293,9 @@ function MyComponent(props) {
   }, [handleNext1, handleNext2]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 12) change on every render. To fix this, wrap the definition of 'handleNext1' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 12) change on every render. To fix this, wrap the definition of 'handleNext1' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const handleNext1 = useCallback(() => {
     console.log('hello');
@@ -315,8 +313,8 @@ function MyComponent(props) {
   }, [handleNext1, handleNext2]);
 }
 `}}},
-		{Message: "The 'handleNext2' function makes the dependencies of useEffect Hook (at line 12) change on every render. To fix this, wrap the definition of 'handleNext2' in its own useCallback() Hook."},
-		{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 16) change on every render. To fix this, wrap the definition of 'handleNext1' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+			{Message: "The 'handleNext2' function makes the dependencies of useEffect Hook (at line 12) change on every render. To fix this, wrap the definition of 'handleNext2' in its own useCallback() Hook."},
+			{Message: "The 'handleNext1' function makes the dependencies of useEffect Hook (at line 16) change on every render. To fix this, wrap the definition of 'handleNext1' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   const handleNext1 = useCallback(() => {
     console.log('hello');
@@ -334,12 +332,12 @@ function MyComponent(props) {
   }, [handleNext1, handleNext2]);
 }
 `}}},
-		{Message: "The 'handleNext2' function makes the dependencies of useEffect Hook (at line 16) change on every render. To fix this, wrap the definition of 'handleNext2' in its own useCallback() Hook."},
+			{Message: "The 'handleNext2' function makes the dependencies of useEffect Hook (at line 16) change on every render. To fix this, wrap the definition of 'handleNext2' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let handleNext = () => {
     console.log('hello');
@@ -354,9 +352,9 @@ function MyComponent(props) {
   }, [handleNext]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 13) change on every render. To fix this, wrap the definition of 'handleNext' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 13) change on every render. To fix this, wrap the definition of 'handleNext' in its own useCallback() Hook.", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 function MyComponent(props) {
   let handleNext = useCallback(() => {
     console.log('hello');
@@ -371,11 +369,11 @@ function MyComponent(props) {
   }, [handleNext]);
 }
 `}}},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function MyComponent(props) {
   let [, setState] = useState();
   let taint = props.foo;
@@ -391,14 +389,14 @@ function MyComponent(props) {
   }, [handleNext]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 14) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext' in its own useCallback() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'handleNext' function makes the dependencies of useEffect Hook (at line 14) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'handleNext' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Counter({ step }) {
   let [count, setCount] = useState(0);
 
@@ -416,170 +414,170 @@ function Counter({ step }) {
   return <h1>{count}</h1>;
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'increment' function makes the dependencies of useEffect Hook (at line 14) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'increment' in its own useCallback() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'increment' function makes the dependencies of useEffect Hook (at line 14) change on every render. Move it inside the useEffect callback. Alternatively, wrap the definition of 'increment' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = {};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = [];
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' array makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' array makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = () => {};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' function makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'foo' in its own useCallback() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' function makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'foo' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = function bar(){};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' function makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'foo' in its own useCallback() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' function makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'foo' in its own useCallback() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = class {};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' class makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' class makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = true ? {} : "fine";
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' conditional could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' conditional could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = bar || {};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' logical expression could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' logical expression could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = bar ?? {};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' logical expression could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' logical expression could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = bar && {};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' logical expression could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' logical expression could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = bar ? baz ? {} : null : null;
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' conditional could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' conditional could make the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   let foo = {};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   var foo = {};
   useMemo(() => foo, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 4) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = {};
   useCallback(() => {
@@ -587,14 +585,14 @@ function Component() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useCallback Hook (at line 6) change on every render. Move it inside the useCallback callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useCallback Hook (at line 6) change on every render. Move it inside the useCallback callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = {};
   useEffect(() => {
@@ -602,14 +600,14 @@ function Component() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useEffect Hook (at line 6) change on every render. Move it inside the useEffect callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useEffect Hook (at line 6) change on every render. Move it inside the useEffect callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = {};
   useLayoutEffect(() => {
@@ -617,14 +615,14 @@ function Component() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useLayoutEffect Hook (at line 6) change on every render. Move it inside the useLayoutEffect callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useLayoutEffect Hook (at line 6) change on every render. Move it inside the useLayoutEffect callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Component() {
   const foo = {};
   useImperativeHandle(
@@ -636,14 +634,14 @@ function Component() {
   );
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useImperativeHandle Hook (at line 9) change on every render. Move it inside the useImperativeHandle callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useImperativeHandle Hook (at line 9) change on every render. Move it inside the useImperativeHandle callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo(section) {
   const foo = section.section_components?.edges ?? [];
   useEffect(() => {
@@ -651,14 +649,14 @@ function Foo(section) {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' logical expression could make the dependencies of useEffect Hook (at line 6) change on every render. Move it inside the useEffect callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' logical expression could make the dependencies of useEffect Hook (at line 6) change on every render. Move it inside the useEffect callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo(section) {
   const foo = {};
   console.log(foo);
@@ -667,14 +665,14 @@ function Foo(section) {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 7) change on every render. To fix this, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useMemo Hook (at line 7) change on every render. To fix this, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   const foo = <>Hi!</>;
   useMemo(() => {
@@ -682,14 +680,14 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' JSX fragment makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' JSX fragment makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   const foo = <div>Hi!</div>;
   useMemo(() => {
@@ -697,14 +695,14 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' JSX element makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' JSX element makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   const foo = bar = {};
   useMemo(() => {
@@ -712,14 +710,14 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' assignment expression makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' assignment expression makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   const foo = new String('foo'); // Note 'foo' will be boxed, and thus an object and thus compared by reference.
   useMemo(() => {
@@ -727,14 +725,14 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object construction makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object construction makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   const foo = new Map([]);
   useMemo(() => {
@@ -742,14 +740,14 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object construction makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object construction makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   const foo = /reg/;
   useMemo(() => {
@@ -757,14 +755,14 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' regular expression makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' regular expression makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   class Bar {};
   useMemo(() => {
@@ -772,14 +770,14 @@ function Foo() {
   }, [Bar]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'Bar' class makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'Bar' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'Bar' class makes the dependencies of useMemo Hook (at line 6) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'Bar' in its own useMemo() Hook."},
+		},
 	},
-},
 
-{
-	Code: `
+	{
+		Code: `
 function Foo() {
   const foo = {};
   useLayoutEffect(() => {
@@ -790,12 +788,12 @@ function Foo() {
   }, [foo]);
 }
 `,
-	Tsx:  true,
-	Errors: []rule_tester.InvalidTestCaseError{
-		{Message: "The 'foo' object makes the dependencies of useLayoutEffect Hook (at line 6) change on every render. To fix this, wrap the initialization of 'foo' in its own useMemo() Hook."},
-		{Message: "The 'foo' object makes the dependencies of useEffect Hook (at line 9) change on every render. To fix this, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "The 'foo' object makes the dependencies of useLayoutEffect Hook (at line 6) change on every render. To fix this, wrap the initialization of 'foo' in its own useMemo() Hook."},
+			{Message: "The 'foo' object makes the dependencies of useEffect Hook (at line 9) change on every render. To fix this, wrap the initialization of 'foo' in its own useMemo() Hook."},
+		},
 	},
-},
 }
 
 func TestExhaustiveDeps_Upstream_Construction(t *testing.T) {
