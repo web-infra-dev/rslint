@@ -164,8 +164,8 @@ func (r *listenerRegistry) reset() {
 	r.activeKinds = r.activeKinds[:0]
 }
 
-// isJSDocSyntaxNode identifies syntax that TypeScript-Go synthesized while
-// reparsing a JSDoc comment. Reparsed roots such as JSTypeAliasDeclaration and
+// isJSDocSyntaxNode identifies syntax that TypeScript-Go synthesized from a
+// JSDoc comment. Reparsed roots such as JSTypeAliasDeclaration and
 // their JSDoc-flagged descendants are both absent from ESLint-compatible rule
 // AST traversal; comment and TypeScript compiler APIs expose the authored
 // metadata separately. The DFS prunes at the first such node, so checking the

@@ -22,7 +22,7 @@ func TestNoCycleExtras(t *testing.T) {
 			// ---- JSDoc import types are comments, not module-graph edges ----
 			// @typescript-eslint/parser exposes these through comments / parser
 			// services rather than ESTree import nodes, so import/no-cycle ignores
-			// them even though TypeScript-Go reparses them into synthetic syntax.
+			// them even though TypeScript-Go parses them again into synthetic syntax.
 			{
 				Code:     `/** @type {import("./no-cycle/depth-one").depthOne} */ const value = {}; export const rootValue = 1;`,
 				FileName: "file.js",
