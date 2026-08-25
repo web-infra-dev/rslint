@@ -89,6 +89,12 @@ func getInferrableTypeAnnotation(typeNode *ast.Node) inferrableType {
 	if typeNode == nil {
 		return inferrableTypeNone
 	}
+	if typeNode.Kind == ast.KindParenthesizedType {
+		typeNode = ast.SkipTypeParentheses(typeNode)
+		if typeNode == nil {
+			return inferrableTypeNone
+		}
+	}
 
 	switch typeNode.Kind {
 	case ast.KindBigIntKeyword:
@@ -141,12 +147,33 @@ func isNumberConstant(node *ast.Node) bool {
 	return name == "Infinity" || name == "NaN"
 }
 
+// isESTreeLiteral covers the tsgo kinds represented by a TSESTree Literal.
+func isESTreeLiteral(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	return node.Kind == ast.KindBigIntLiteral ||
+		node.Kind == ast.KindFalseKeyword ||
+		node.Kind == ast.KindNullKeyword ||
+		node.Kind == ast.KindNumericLiteral ||
+		node.Kind == ast.KindRegularExpressionLiteral ||
+		node.Kind == ast.KindStringLiteral ||
+		node.Kind == ast.KindTrueKeyword
+}
+
+func skipParentheses(node *ast.Node) *ast.Node {
+	if node != nil && node.Kind == ast.KindParenthesizedExpression {
+		return ast.SkipParentheses(node)
+	}
+	return node
+}
+
 func isCallTo(node *ast.Node, name string) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
 	call := node.AsCallExpression()
-	return call != nil && isIdentifierNamed(call.Expression, name)
+	return call != nil && isIdentifierNamed(skipParentheses(call.Expression), name)
 }
 
 func isNewRegExp(node *ast.Node) bool {
@@ -154,7 +181,7 @@ func isNewRegExp(node *ast.Node) bool {
 		return false
 	}
 	newExpression := node.AsNewExpression()
-	return newExpression != nil && isIdentifierNamed(newExpression.Expression, "RegExp")
+	return newExpression != nil && isIdentifierNamed(skipParentheses(newExpression.Expression), "RegExp")
 }
 
 // isInferrableInitializer is deliberately keyed by the annotation first. Most
@@ -164,18 +191,22 @@ func isInferrableInitializer(init *ast.Node, expectedType inferrableType) bool {
 	if init == nil {
 		return false
 	}
+	init = skipParentheses(init)
 
 	switch expectedType {
 	case inferrableTypeBigInt:
-		if init.Kind == ast.KindBigIntLiteral || isCallTo(init, "BigInt") {
+		if isESTreeLiteral(init) || isCallTo(init, "BigInt") {
 			return true
 		}
 		if init.Kind == ast.KindPrefixUnaryExpression {
 			unary := init.AsPrefixUnaryExpression()
-			return unary != nil &&
-				unary.Operand != nil &&
-				(unary.Operator == ast.KindPlusToken || unary.Operator == ast.KindMinusToken) &&
-				(unary.Operand.Kind == ast.KindBigIntLiteral || isCallTo(unary.Operand, "BigInt"))
+			if unary == nil {
+				return false
+			}
+			operand := skipParentheses(unary.Operand)
+			return operand != nil &&
+				unary.Operator == ast.KindMinusToken &&
+				(isESTreeLiteral(operand) || isCallTo(operand, "BigInt"))
 		}
 
 	case inferrableTypeBoolean:
@@ -195,17 +226,21 @@ func isInferrableInitializer(init *ast.Node, expectedType inferrableType) bool {
 		}
 		if init.Kind == ast.KindPrefixUnaryExpression {
 			unary := init.AsPrefixUnaryExpression()
-			return unary != nil &&
-				unary.Operand != nil &&
+			if unary == nil {
+				return false
+			}
+			operand := skipParentheses(unary.Operand)
+			return operand != nil &&
 				(unary.Operator == ast.KindPlusToken || unary.Operator == ast.KindMinusToken) &&
-				(unary.Operand.Kind == ast.KindNumericLiteral ||
-					isNumberConstant(unary.Operand) ||
-					isCallTo(unary.Operand, "Number"))
+				(operand.Kind == ast.KindNumericLiteral ||
+					isNumberConstant(operand) ||
+					isCallTo(operand, "Number"))
 		}
 
 	case inferrableTypeString:
 		return init.Kind == ast.KindStringLiteral ||
 			init.Kind == ast.KindNoSubstitutionTemplateLiteral ||
+			init.Kind == ast.KindTemplateExpression ||
 			isCallTo(init, "String")
 
 	case inferrableTypeNull:
@@ -264,8 +299,8 @@ var NoInferrableTypesRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 		sourceText := ctx.SourceFile.Text()
 
-		checkDeclaration := func(reportNode *ast.Node, typeAnnotation *ast.Node, initializer *ast.Node, postfixToken *ast.Node) {
-			if typeAnnotation == nil || initializer == nil {
+		checkDeclaration := func(reportStartNode *ast.Node, reportEndNode *ast.Node, typeAnnotation *ast.Node, initializer *ast.Node, postfixToken *ast.Node) {
+			if reportStartNode == nil || reportEndNode == nil || typeAnnotation == nil || initializer == nil {
 				return
 			}
 
@@ -274,10 +309,10 @@ var NoInferrableTypesRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			// Report range spans from the first declaration token to the end of
-			// the initializer, matching typescript-eslint without allocating a
-			// scanner for every diagnostic.
-			reportRange := core.NewTextRange(scanner.SkipTrivia(sourceText, reportNode.Pos()), initializer.End())
+			reportRange := core.NewTextRange(
+				scanner.SkipTrivia(sourceText, reportStartNode.Pos()),
+				reportEndNode.End(),
+			)
 			ctx.ReportRangeWithDeferredFixes(
 				reportRange,
 				noInferrableTypesMessages[inferrableType],
@@ -298,7 +333,7 @@ var NoInferrableTypesRule = rule.CreateRule(rule.Rule{
 				if reportNode == nil {
 					reportNode = node
 				}
-				checkDeclaration(reportNode, varDecl.Type, varDecl.Initializer, nil)
+				checkDeclaration(reportNode, varDecl.Initializer, varDecl.Type, varDecl.Initializer, nil)
 			},
 		}
 
@@ -313,7 +348,7 @@ var NoInferrableTypesRule = rule.CreateRule(rule.Rule{
 				if reportNode == nil {
 					reportNode = node
 				}
-				checkDeclaration(reportNode, param.Type, param.Initializer, param.QuestionToken)
+				checkDeclaration(reportNode, param.Initializer, param.Type, param.Initializer, param.QuestionToken)
 			}
 		}
 
@@ -334,19 +369,9 @@ var NoInferrableTypesRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				// For auto-accessor properties, report from the accessor keyword (full node)
-				// For regular properties, report from the name node
-				var reportNode *ast.Node
-				if modifierFlags&ast.ModifierFlagsAccessor != 0 {
-					// Use the full property declaration node for auto-accessors
-					reportNode = node
-				} else {
-					reportNode = prop.Name()
-					if reportNode == nil {
-						reportNode = node
-					}
-				}
-				checkDeclaration(reportNode, prop.Type, prop.Initializer, prop.PostfixToken)
+				// Upstream reports the complete property definition, including
+				// decorators, modifiers, and a trailing semicolon.
+				checkDeclaration(node, node, prop.Type, prop.Initializer, prop.PostfixToken)
 			}
 		}
 

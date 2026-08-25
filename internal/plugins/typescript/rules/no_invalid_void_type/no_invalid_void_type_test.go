@@ -96,17 +96,6 @@ interface Foo extends Deep<Map<string, void>> {}
 			{Code: `type promiseVoidUnion = Promise<void> | void;`, Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Promise"}}},
 			{Code: `type promiseNeverUnion = Promise<void> | never;`, Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Promise"}}},
 			{Code: `type voidPromiseNeverUnion = void | Promise<void> | never;`, Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Promise"}}},
-			// Heritage clause with whitelist - in whitelist
-			{Code: `
-interface Base<T> {}
-interface Foo extends Base<void> {}
-`, Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Base"}}},
-			{Code: `
-interface A<T> {}
-interface B<T> {}
-interface Foo extends A<void>, B<void> {}
-`, Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"A", "B"}}},
-
 			// === allowAsThisParameter: true ===
 			{Code: `function f(this: void) {}`, Options: map[string]interface{}{"allowAsThisParameter": true}},
 			{Code: `
@@ -486,17 +475,26 @@ class ClassName {
 					{MessageId: "invalidVoidNotReturnOrGeneric"},
 				},
 			},
-			// Heritage clause with whitelist - not in whitelist
+			// A whitelist applies only to type references upstream. Heritage type
+			// arguments use the ordinary not-return-or-generic diagnostic.
+			{
+				Code: `
+interface Base<T> {}
+interface Foo extends Base<void> {}`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Base"}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalidVoidNotReturnOrGeneric"},
+				},
+			},
 			{
 				Code: `
 interface Base<T> {}
 interface Foo extends Base<void> {}`,
 				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Allowed"}},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "invalidVoidForGeneric"},
+					{MessageId: "invalidVoidNotReturnOrGeneric"},
 				},
 			},
-			// Heritage clause with whitelist - multiple extends, one allowed one not
 			{
 				Code: `
 interface Allowed<T> {}
@@ -504,7 +502,19 @@ interface Banned<T> {}
 interface Foo extends Allowed<void>, Banned<void> {}`,
 				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Allowed"}},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "invalidVoidForGeneric"},
+					{MessageId: "invalidVoidNotReturnOrGeneric"},
+					{MessageId: "invalidVoidNotReturnOrGeneric"},
+				},
+			},
+			{
+				Code: `
+interface A<T> {}
+interface B<T> {}
+interface Foo extends A<void>, B<void> {}`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"A", "B"}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalidVoidNotReturnOrGeneric"},
+					{MessageId: "invalidVoidNotReturnOrGeneric"},
 				},
 			},
 
@@ -717,6 +727,160 @@ class SomeClass {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "invalidVoidForGeneric"},
 				},
+			},
+		},
+	)
+}
+
+func TestNoInvalidVoidTypeLatestUpstreamParity(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoInvalidVoidTypeRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+function overloaded(value: string): string;
+function overloaded(value: string | void): string {
+  return String(value);
+}`},
+			{Code: `
+const Overloaded = class {
+  method(): void;
+  method(value: string): string;
+  method(value?: string): string | void {
+    return value;
+  }
+};`},
+			{Code: "tag<void>`value`;"},
+			{Code: `type Imported = import("mod").Foo<void>;`},
+			{Code: `type Queried = typeof Foo<void>;`},
+			{Code: `const element = <Component<void> />;`, Tsx: true},
+			{Code: `interface Indexed { [key: string]: void }`},
+			{Code: `function predicate(value: unknown): value is void { return false; }`},
+			{Code: `const {}: void = undefined;`},
+			{Code: `const []: void = undefined;`},
+			{Code: `function objectPattern({}: void) {}`},
+			{Code: `function arrayPattern([]: void) {}`},
+			{Code: `function rest(...args: void) {}`},
+			{Code: `class Setter { set value(input: string): void {} }`},
+			{Code: `class Constructor { constructor(): void {} }`},
+			{Code: "// eslint-disable-next-line test\ntype Disabled = string | void;"},
+			{Code: "/* eslint-disable test */\ntype Disabled = string | void;\n/* eslint-enable test */"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `export type GetContext = () => ExtraData | void;`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidUnionConstituent",
+					Message:   "void is not valid as a constituent in a union type",
+					Line:      1,
+					Column:    44,
+					EndLine:   1,
+					EndColumn: 48,
+				}},
+			},
+			{
+				Code:    `type Value = void;`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": false},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidNotReturn",
+					Message:   "void is only valid as a return type.",
+				}},
+			},
+			{
+				Code: `type Value = void;`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidNotReturnOrGeneric",
+					Message:   "void is only valid as a return type or generic type argument.",
+				}},
+			},
+			{
+				Code:    `type BannedVoid = Banned<void>;`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Allowed"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidForGeneric",
+					Message:   "Banned may not have void as a type argument.",
+				}},
+			},
+			{
+				Code:    `type Value = void;`,
+				Options: map[string]interface{}{"allowAsThisParameter": true, "allowInGenericTypeArguments": false},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidNotReturnOrThisParam",
+					Message:   "void is only valid as return type or type of `this` parameter.",
+				}},
+			},
+			{
+				Code:    `type Value = string | void;`,
+				Options: map[string]interface{}{"allowAsThisParameter": true, "allowInGenericTypeArguments": true},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidNotReturnOrThisParamOrGeneric",
+					Message:   "void is only valid as a return type or generic type argument or the type of a `this` parameter.",
+				}},
+			},
+			{
+				Code:    `type Value = void | Promise<void>;`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": false},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidNotReturn",
+					Message:   "void is only valid as a return type.",
+				}},
+			},
+			{
+				Code:    `type Value = void | Banned<void>;`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Allowed"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidForGeneric",
+					Message:   "Banned may not have void as a type argument.",
+				}},
+			},
+			{
+				Code:    `interface Base<T> {} interface Derived extends Base<void> {}`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Base"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidVoidNotReturnOrGeneric"}},
+			},
+			{
+				Code:    `new Promise<void>(() => {});`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Promise"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidVoidNotReturnOrGeneric"}},
+			},
+			{
+				Code:    "tag<void>`value`;",
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"tag"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidVoidNotReturnOrGeneric"}},
+			},
+			{
+				Code:    `type Imported = import("mod").Foo<void>;`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Foo"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidVoidNotReturnOrGeneric"}},
+			},
+			{
+				Code:    `type Queried = typeof Foo<void>;`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Foo"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidVoidNotReturnOrGeneric"}},
+			},
+			{
+				Code:    `const element = <Component<void> />;`,
+				Tsx:     true,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Component"}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidVoidNotReturnOrGeneric"}},
+			},
+			{
+				Code:    `type Commented = Ex /* keep */ . Mx<void>;`,
+				Options: map[string]interface{}{"allowInGenericTypeArguments": []interface{}{"Ex.Mx"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidForGeneric",
+					Message:   "Ex/*keep*/.Mx may not have void as a type argument.",
+				}},
+			},
+			{
+				Code:    `type Value<T extends void = void> = T;`,
+				Options: map[string]interface{}{"allowAsThisParameter": true, "allowInGenericTypeArguments": true},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidVoidNotReturnOrGeneric",
+					Message:   "void is only valid as a return type or generic type argument.",
+				}},
 			},
 		},
 	)

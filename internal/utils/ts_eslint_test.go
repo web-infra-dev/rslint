@@ -8,6 +8,99 @@ import (
 	"github.com/microsoft/typescript-go/shim/parser"
 )
 
+func TestGetStaticPropertyNameNumericLiteral(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want string
+	}{
+		{
+			name: "hexadecimal above 2^53",
+			code: "({ 0x1000000000000281: 0 })",
+			want: "1152921504606847500",
+		},
+		{
+			name: "binary above 2^53",
+			code: "({ 0b1000000000000000000000000000000000000000000000000001010000001: 0 })",
+			want: "1152921504606847500",
+		},
+		{
+			name: "octal above 2^53",
+			code: "({ 0o100000000000000001201: 0 })",
+			want: "1152921504606847500",
+		},
+		{
+			name: "uppercase prefix and numeric separators",
+			code: "({ 0X1_0000_0000_0000_281: 0 })",
+			want: "1152921504606847500",
+		},
+		{
+			name: "parenthesized computed literal",
+			code: "({ [(0x1000000000000281)]: 0 })",
+			want: "1152921504606847500",
+		},
+		{
+			name: "small radix literal",
+			code: "({ 0xff: 0 })",
+			want: "255",
+		},
+		{
+			name: "decimal literal keeps normal normalization",
+			code: "({ 1e21: 0 })",
+			want: "1e+21",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}, tt.code, core.ScriptKindTS)
+			property := findFirstNodeOfKind(t, sourceFile, ast.KindPropertyAssignment)
+			nameNode := property.Name()
+			if nameNode == nil {
+				t.Fatal("property has no name")
+			}
+			got, ok := GetStaticPropertyName(nameNode)
+			if !ok || got != tt.want {
+				t.Fatalf("GetStaticPropertyName() = (%q, %v), want (%q, true)", got, ok, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetStaticPropertyNameDetachedNumericLiteral(t *testing.T) {
+	factory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
+	node := factory.NewNumericLiteral("255", ast.TokenFlagsHexSpecifier)
+
+	got, ok := GetStaticPropertyName(node)
+	if !ok || got != "255" {
+		t.Fatalf("GetStaticPropertyName() = (%q, %v), want (%q, true)", got, ok, "255")
+	}
+}
+
+func TestRadixLiteralValueRejectsMalformedText(t *testing.T) {
+	for _, raw := range []string{
+		"",
+		"123",
+		"0q1",
+		"0x",
+		"0x_1",
+		"0x1_",
+		"0x1__0",
+		"0b2",
+		"0o8",
+		"0x1n",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			if _, ok := radixLiteralValue(raw); ok {
+				t.Fatalf("radixLiteralValue(%q) unexpectedly succeeded", raw)
+			}
+		})
+	}
+}
+
 func TestGetFunctionNameWithKindCore(t *testing.T) {
 	tests := []struct {
 		name string

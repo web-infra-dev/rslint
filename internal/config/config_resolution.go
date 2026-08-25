@@ -25,16 +25,6 @@ func (key configMatchKey) contains(index int) bool {
 	return key.tail[tailIndex/8]&byte(1<<(tailIndex%8)) != 0
 }
 
-func parseEntryIgnorePatterns(config RslintConfig) [][]IgnorePattern {
-	patterns := make([][]IgnorePattern, len(config))
-	for index, entry := range config {
-		if !isGlobalIgnoreEntry(entry) {
-			patterns[index] = ParseIgnorePatterns(entry.Ignores)
-		}
-	}
-	return patterns
-}
-
 // matchConfigEntries applies the flat-config selection policy once and returns
 // the exact set of contributing entries. A nil entryIgnorePatterns asks the
 // direct compatibility path to parse entry ignores on demand; run-scoped

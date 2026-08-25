@@ -51,6 +51,26 @@ async function buildConfigForSettings(
   return { config: merged, configDirectory: path.dirname(baseConfigPath) };
 }
 
+function mergeLanguageOptions(
+  defaults: RuleTesterOptions['languageOptions'],
+  override: RuleTesterOptions['languageOptions'] | undefined,
+): RuleTesterOptions['languageOptions'] {
+  if (!override) {
+    return defaults;
+  }
+  if (!defaults) {
+    return override;
+  }
+  return {
+    ...defaults,
+    ...override,
+    parserOptions: {
+      ...defaults.parserOptions,
+      ...override.parserOptions,
+    },
+  };
+}
+
 // Fold the rule-under-test (its options) and the per-case languageOptions into
 // the resolved base config as one appended entry. The Go `--api` reads rules and
 // languageOptions solely from the config object — there is no separate
@@ -87,9 +107,9 @@ function withRuleAndLanguageOptions(
   };
   // Declare the rule-under-test's plugin so the `--api` plugin gate
   // (enforcePlugins) keeps the rule enabled. The prefix is everything before
-  // the rule name's last "/" — matching Go's RulePluginPrefix; core rules have
+  // the rule name's last "/" — matching Go's rule.Namespace; core rules have
   // no "/" and need no declaration. A bare prefix (e.g. "@typescript-eslint",
-  // "unicorn") is a valid native-plugin declaration name.
+  // "unicorn") is a valid bundled-plugin declaration name.
   const slash = ruleName.lastIndexOf('/');
   if (slash > 0) entry.plugins = [ruleName.slice(0, slash)];
   if (languageOptions) entry.languageOptions = languageOptions;
@@ -161,6 +181,7 @@ function checkDiagnosticEqual(
 
 interface RuleTesterOptions {
   languageOptions?: {
+    sourceType?: 'module' | 'script' | 'commonjs';
     globals?: any;
     parser?: any;
     parserOptions?: {
@@ -274,10 +295,12 @@ export class RuleTester {
           }
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
-          const languageOptions =
+          const languageOptions = mergeLanguageOptions(
+            this.options.languageOptions,
             typeof validCase === 'string'
-              ? this.options.languageOptions
-              : (validCase.languageOptions ?? this.options.languageOptions);
+              ? undefined
+              : validCase.languageOptions,
+          );
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
 
           const options =
@@ -339,8 +362,10 @@ export class RuleTester {
           if (hasOnly && !only) {
             continue;
           }
-          const languageOptions =
-            item.languageOptions ?? this.options.languageOptions;
+          const languageOptions = mergeLanguageOptions(
+            this.options.languageOptions,
+            item.languageOptions,
+          );
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
           const isDts = item.filename && item.filename.endsWith('.d.ts');
           const test_virtual_entry = path.resolve(

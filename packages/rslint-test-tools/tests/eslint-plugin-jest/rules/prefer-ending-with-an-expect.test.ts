@@ -1,0 +1,541 @@
+import { RuleTester } from '../rule-tester';
+
+const ruleTester = new RuleTester();
+
+ruleTester.run('prefer-ending-with-an-expect', {} as never, {
+  valid: [
+    'it.todo("will test something eventually")',
+    'test.todo("will test something eventually")',
+    "['x']();",
+    'it("is weird", "because this should be a function")',
+    'it("is weird", "because this should be a function", () => {})',
+    'it("should pass", () => expect(true).toBeDefined())',
+    'test("should pass", () => expect(true).toBeDefined())',
+    'it("should pass", myTest); function myTest() { expect(true).toBeDefined() }',
+    {
+      code: `
+        test('should pass', () => {
+          expect(true).toBeDefined();
+          foo(true).toBe(true);
+        });
+      `,
+      options: [{ assertFunctionNames: ['expect', 'foo'] }],
+    },
+    {
+      code: 'it("should return undefined",() => expectSaga(mySaga).returns());',
+      options: [{ assertFunctionNames: ['expectSaga'] }],
+    },
+    {
+      code: "test('verifies expect method call', () => expect$(123));",
+      options: [{ assertFunctionNames: ['expect\\$'] }],
+    },
+    {
+      code: "test('verifies expect method call', () => new Foo().expect(123));",
+      options: [{ assertFunctionNames: ['Foo.expect'] }],
+    },
+    {
+      code: `
+        test('verifies deep expect method call', () => {
+          tester.foo().expect(123);
+        });
+      `,
+      options: [{ assertFunctionNames: ['tester.foo.expect'] }],
+    },
+    {
+      code: `
+        test('verifies chained expect method call', () => {
+          doSomething();
+
+          tester
+            .foo()
+            .bar()
+            .expect(456);
+        });
+      `,
+      options: [{ assertFunctionNames: ['tester.foo.bar.expect'] }],
+    },
+    {
+      code: `
+        test("verifies the function call", () => {
+          td.verify(someFunctionCall())
+        })
+      `,
+      options: [{ assertFunctionNames: ['td.verify'] }],
+    },
+    {
+      code: 'it("should pass", async () => expect(true).toBeDefined())',
+    },
+    {
+      code: 'it("should pass", () => expect(true).toBeDefined())',
+      options: [
+        {
+          assertFunctionNames: undefined,
+          additionalTestBlockFunctions: undefined,
+        },
+      ],
+    },
+    'it("should pass", () => { expect(true).toBeDefined() })',
+    'it("should pass", function () { expect(true).toBeDefined() })',
+    `
+      it('is a complete test', () => {
+        const container = render(Greeter);
+
+        expect(container).toBeDefined();
+
+        container.setProp('name', 'Bob');
+
+        expect(container.toHTML()).toContain('Hello Bob!');
+      });
+    `,
+    {
+      code: `
+        it('is a complete test', async () => {
+          const container = render(Greeter);
+
+          expect(container).toBeDefined();
+
+          container.setProp('name', 'Bob');
+
+          await expect(container.toHTML()).resolve.toContain('Hello Bob!');
+        });
+      `,
+    },
+    {
+      code: `
+        it('is a complete test', async function () {
+          const container = render(Greeter);
+
+          expect(container).toBeDefined();
+
+          container.setProp('name', 'Bob');
+
+          await expect(container.toHTML()).resolve.toContain('Hello Bob!');
+        });
+      `,
+    },
+    {
+      code: `
+        describe('GET /user', function () {
+          it('responds with json', function (done) {
+            doSomething();
+            request(app).get('/user').expect('Content-Type', /json/).expect(200, done);
+          });
+        });
+      `,
+      options: [{ assertFunctionNames: ['expect', 'request.**.expect'] }],
+    },
+    {
+      code: `
+        each([
+          [2, 3],
+          [1, 3],
+        ]).test(
+          'the selection can change from %d to %d',
+          (firstSelection, secondSelection) => {
+            const container = render(MySelect, {
+              props: { options: [1, 2, 3], selected: firstSelection },
+            });
+
+            expect(container).toBeDefined();
+            expect(container.toHTML()).toContain(
+              \`<option value="$\{firstSelection}" selected>\`
+            );
+
+            container.setProp('selected', secondSelection);
+
+            expect(container.toHTML()).not.toContain(
+              \`<option value="$\{firstSelection}" selected>\`
+            );
+            expect(container.toHTML()).toContain(
+              \`<option value="$\{secondSelection}" selected>\`
+            );
+          }
+        );
+      `,
+      options: [{ additionalTestBlockFunctions: ['each.test'] }],
+    },
+
+    {
+      code: "test('should pass *', () => expect404ToBeLoaded());",
+      options: [{ assertFunctionNames: ['expect*'] }],
+    },
+    {
+      code: "test('should pass *', () => expect.toHaveStatus404());",
+      options: [{ assertFunctionNames: ['expect.**'] }],
+    },
+    {
+      code: "test('should pass', () => tester.foo().expect(123));",
+      options: [{ assertFunctionNames: ['tester.*.expect'] }],
+    },
+    {
+      code: "test('should pass **', () => tester.foo().expect(123));",
+      options: [{ assertFunctionNames: ['**'] }],
+    },
+    {
+      code: "test('should pass *', () => tester.foo().expect(123));",
+      options: [{ assertFunctionNames: ['*'] }],
+    },
+    {
+      code: "test('should pass', () => tester.foo().expect(123));",
+      options: [{ assertFunctionNames: ['tester.**'] }],
+    },
+    {
+      code: "test('should pass', () => tester.foo().expect(123));",
+      options: [{ assertFunctionNames: ['tester.*'] }],
+    },
+    {
+      code: "test('should pass', () => tester.foo().bar().expectIt(456));",
+      options: [{ assertFunctionNames: ['tester.**.expect*'] }],
+    },
+    {
+      code: "test('should pass', () => request.get().foo().expect(456));",
+      options: [{ assertFunctionNames: ['request.**.expect'] }],
+    },
+    {
+      code: "test('should pass', () => request.get().foo().expect(456));",
+      options: [{ assertFunctionNames: ['request.**.e*e*t'] }],
+    },
+
+    {
+      code: `
+        import { test } from '@jest/globals';
+
+        test('should pass', () => {
+          expect(true).toBeDefined();
+          foo(true).toBe(true);
+        });
+      `,
+      options: [{ assertFunctionNames: ['expect', 'foo'] }],
+    },
+    {
+      code: `
+        import { test as checkThat } from '@jest/globals';
+
+        checkThat('this passes', () => {
+          expect(true).toBeDefined();
+          foo(true).toBe(true);
+        });
+      `,
+      options: [{ assertFunctionNames: ['expect', 'foo'] }],
+    },
+    {
+      code: `
+        const { test } = require('@jest/globals');
+
+        test('verifies chained expect method call', () => {
+          tester
+            .foo()
+            .bar()
+            .expect(456);
+        });
+      `,
+      options: [{ assertFunctionNames: ['tester.foo.bar.expect'] }],
+    },
+  ],
+  invalid: [
+    {
+      code: 'it("should fail", () => {});',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'test("should fail", () => {});',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: 'test.skip("should fail", () => {});',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: 'it("should fail", () => { somePromise.then(() => {}); });',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'test("should fail", () => { foo(true).toBe(true); })',
+      options: [{ assertFunctionNames: ['expect'] }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: 'it("should also fail",() => expectSaga(mySaga).returns());',
+      options: [{ assertFunctionNames: ['expect'] }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'it("should pass", () => somePromise().then(() => expect(true).toBeDefined()))',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'it("should pass", () => render(Greeter))',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'it("should pass", () => { render(Greeter) })',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'it("should pass", function () { render(Greeter) })',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'it("should not pass", () => class {})',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'it("should not pass", () => ([]))',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'it("should not pass", () => { const x = []; })',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'it("should not pass", function () { class Mx {} })',
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: `it('is a complete test', () => {
+  const container = render(Greeter);
+
+  expect(container).toBeDefined();
+
+  container.setProp('name', 'Bob');
+});`,
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: `it('is a complete test', async () => {
+  const container = render(Greeter);
+
+  await expect(container).toBeDefined();
+
+  await container.setProp('name', 'Bob');
+});`,
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: "test('should fail', () => request.get().foo().expect(456));",
+      options: [{ assertFunctionNames: ['request.*.expect'] }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: "test('should fail', () => request.get().foo().bar().expect(456));",
+      options: [{ assertFunctionNames: ['request.foo**.expect'] }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: "test('should fail', () => tester.request(123));",
+      options: [{ assertFunctionNames: ['request.*'] }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: "test('should fail', () => request(123));",
+      options: [{ assertFunctionNames: ['request.*'] }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: "test('should fail', () => request(123));",
+      options: [{ assertFunctionNames: ['request.**'] }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: `import { test as checkThat } from '@jest/globals';
+
+checkThat('this passes', () => {
+  // ...
+});`,
+      options: [{ assertFunctionNames: ['expect', 'foo'] }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: `import { test as checkThat } from '@jest/globals';
+
+checkThat.skip('this passes', () => {
+  // ...
+});`,
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 15,
+        },
+      ],
+    },
+  ],
+});

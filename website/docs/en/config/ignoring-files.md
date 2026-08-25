@@ -100,11 +100,12 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 
 ## .gitignore integration
 
-The CLI, JavaScript API, and LSP automatically read `.gitignore` files and treat their patterns as additional global ignores. Collection starts at the directory of the governing rslint config and never searches its parents. In a multi-config repository, a child config starts a new `.gitignore` scope, so put package-specific ignores beside that package's config. In the editor, saved `.gitignore` changes refresh diagnostics for open files.
+The CLI, JavaScript API, and LSP automatically read `.gitignore` files and treat their patterns as additional global ignores. Automatically discovered configs and ordinary LSP files start collection at the governing config directory. An explicitly selected invocation-wide config (`--config`, API `overrideConfigFile`, or the LSP `configPath` setting) starts at the invocation or workspace-folder `cwd`, even when the config file is elsewhere. A requested directory outside `cwd` gets its own independent Git scope. Collection never searches a scope's parents. In the editor, saved `.gitignore` changes refresh diagnostics for open files.
 
-- **Nested `.gitignore` files** inside one config-owned tree are supported — each one only affects its own directory subtree
-- **Parent patterns cascade** to child directories within that tree (e.g., root `dist/` also ignores `packages/app/dist/` when both use the root config)
+- **Nested `.gitignore` files** inside one Git scope are supported — each one only affects its own directory subtree
+- **Parent patterns cascade** to child directories within that scope (e.g., root `dist/` also ignores `packages/app/dist/`)
 - **Child `.gitignore` can override** parent patterns with `!` negation
+- **Multiple requested directory scopes stay independent** — patterns from one sibling directory never apply to another, including through filesystem aliases
 - **Child configs are boundaries** — they do not inherit `.gitignore` files from a parent config directory
 - Config `!` negation can also override `.gitignore` patterns (they are evaluated sequentially in the same global ignores list)
 

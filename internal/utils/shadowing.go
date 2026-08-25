@@ -485,6 +485,16 @@ func IsShadowed(node *ast.Node, name string) bool {
 				return true
 			}
 
+		// A class static block is a variable environment of its own: a `var`
+		// inside it hoists to the block rather than out of it, so it shadows
+		// the outer binding for the whole block. The static block is not a
+		// function-like declaration, so the arm below never reaches its body.
+		case ast.KindClassStaticBlockDeclaration:
+			if body := current.AsClassStaticBlockDeclaration().Body; body != nil &&
+				HasHoistedVarDeclaration(body, name) {
+				return true
+			}
+
 		case ast.KindCaseBlock:
 			if HasShadowingDeclarationInCaseBlock(current, name) || hasHoistedFunctionDeclaration(current, name) {
 				return true

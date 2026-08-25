@@ -310,6 +310,9 @@ func isChainPrefix(prefix *ast.Node, chain *ast.Node) bool {
 			if ast.IsPrivateIdentifier(prop.Name()) {
 				return false
 			}
+			if isParenthesizedOptionalChain(prop.Expression) {
+				return false
+			}
 			if compareNodesUncached(p, prop.Expression) == NodeComparisonEqual {
 				return true
 			}
@@ -318,6 +321,9 @@ func isChainPrefix(prefix *ast.Node, chain *ast.Node) bool {
 
 		case ast.KindElementAccessExpression:
 			elem := c.AsElementAccessExpression()
+			if isParenthesizedOptionalChain(elem.Expression) {
+				return false
+			}
 			if compareNodesUncached(p, elem.Expression) == NodeComparisonEqual {
 				return true
 			}
@@ -326,6 +332,9 @@ func isChainPrefix(prefix *ast.Node, chain *ast.Node) bool {
 
 		case ast.KindCallExpression:
 			call := c.AsCallExpression()
+			if isParenthesizedOptionalChain(call.Expression) {
+				return false
+			}
 			if compareNodesUncached(p, call.Expression) == NodeComparisonEqual {
 				return true
 			}
@@ -345,14 +354,6 @@ func isParenthesizedOptionalChain(node *ast.Node) bool {
 	if !ast.IsParenthesizedExpression(node) {
 		return false
 	}
-	inner := node.Expression()
-	switch inner.Kind {
-	case ast.KindPropertyAccessExpression:
-		return inner.AsPropertyAccessExpression().QuestionDotToken != nil
-	case ast.KindElementAccessExpression:
-		return inner.AsElementAccessExpression().QuestionDotToken != nil
-	case ast.KindCallExpression:
-		return inner.AsCallExpression().QuestionDotToken != nil
-	}
-	return false
+	inner := ast.SkipParentheses(node)
+	return ast.IsOptionalChain(inner) && ast.IsOutermostOptionalChain(inner)
 }

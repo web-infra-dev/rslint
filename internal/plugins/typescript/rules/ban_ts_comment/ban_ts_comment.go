@@ -8,8 +8,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/rivo/uniseg"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
@@ -360,7 +360,7 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 	trimmedDescription := ecmascript.StringTrim(rawDescription)
 
 	// Check minimum length using grapheme cluster count on the trimmed description
-	descLength := graphemeLength(trimmedDescription)
+	descLength := utils.GraphemeCount(trimmedDescription)
 	if descLength < minDescLength {
 		ctx.ReportRange(
 			commentRange,
@@ -412,10 +412,4 @@ func directiveCommentMessage(directive directiveKind) rule.RuleMessage {
 	default:
 		return rule.RuleMessage{Id: "tsDirectiveComment"}
 	}
-}
-
-// graphemeLength returns the number of grapheme clusters in a string.
-// Uses proper Unicode grapheme cluster segmentation (UAX#29) via rivo/uniseg.
-func graphemeLength(s string) int {
-	return uniseg.GraphemeClusterCount(s)
 }

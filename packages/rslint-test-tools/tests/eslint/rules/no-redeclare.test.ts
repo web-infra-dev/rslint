@@ -1,6 +1,7 @@
 import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
+const scriptLanguageOptions = { sourceType: 'script' as const };
 
 ruleTester.run('no-redeclare', {
   valid: [
@@ -112,11 +113,13 @@ ruleTester.run('no-redeclare', {
     },
     {
       code: 'var Object = 0;',
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 1, column: 5 }],
     },
     {
       code: 'var a;\nvar {a = 0, b: Object = 0} = {};',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [
         { messageId: 'redeclared', line: 2, column: 6 },
         { messageId: 'redeclaredAsBuiltin', line: 2, column: 16 },
@@ -130,11 +133,13 @@ ruleTester.run('no-redeclare', {
     {
       code: 'var globalThis = 0;',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 1, column: 5 }],
     },
     {
       code: 'var a;\nvar {a = 0, b: globalThis = 0} = {};',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [
         { messageId: 'redeclared', line: 2, column: 6 },
         { messageId: 'redeclaredAsBuiltin', line: 2, column: 16 },
@@ -143,64 +148,76 @@ ruleTester.run('no-redeclare', {
     {
       code: '/*global b:false*/ var b = 1;',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredBySyntax', line: 1, column: 10 }],
     },
     {
       code: '/*global b:true*/ var b = 1;',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredBySyntax', line: 1, column: 10 }],
     },
     {
       code: '/*globals Array */',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 1, column: 11 }],
     },
     {
       code: '/*globals parseInt */',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 1, column: 11 }],
     },
     {
       code: '/*globals foo, Array */',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 1, column: 16 }],
     },
     {
       code: '/*globals a:readonly, Array:writable */',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 1, column: 23 }],
     },
     {
       code: '/*globals\nArray */',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 2, column: 1 }],
     },
     {
       code: '/*globals foo,\n    Array */',
       options: { builtinGlobals: true },
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 2, column: 5 }],
     },
     {
       code: '/*globals a */ /*globals a */',
+      languageOptions: scriptLanguageOptions,
       errors: [{ messageId: 'redeclared', line: 1, column: 26 }],
     },
     {
       code: '/*globals a */',
       options: { builtinGlobals: true },
+      languageOptions: { ...scriptLanguageOptions, globals: { a: 'readonly' } },
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 1, column: 11 }],
-      languageOptions: { globals: { a: 'readonly' } },
     },
     {
       code: 'var configured = 1;',
       options: { builtinGlobals: true },
+      languageOptions: {
+        ...scriptLanguageOptions,
+        globals: { configured: 'readonly' },
+      },
       errors: [{ messageId: 'redeclaredAsBuiltin', line: 1, column: 5 }],
-      languageOptions: { globals: { configured: 'readonly' } },
     },
     {
       code: '/*globals Object */ var Object = 0;',
       options: { builtinGlobals: true },
+      languageOptions: { ...scriptLanguageOptions, globals: { Object: 'off' } },
       errors: [{ messageId: 'redeclaredBySyntax', line: 1, column: 11 }],
-      languageOptions: { globals: { Object: 'off' } },
     },
     {
       code: 'export {};\n/*globals Array */',
