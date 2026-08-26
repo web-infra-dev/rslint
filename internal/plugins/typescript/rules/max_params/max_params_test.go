@@ -1012,3 +1012,62 @@ declare class Foo {
 		},
 	)
 }
+
+func TestMaxParamsIgnoresHostedJSDocSyntax(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&MaxParamsRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:     "/** @this {Foo} */\nfunction f(value) {}",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  objectOption(map[string]interface{}{"max": 1}),
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:     "/** @this {void} */\nfunction f(value) {}",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  objectOption(map[string]interface{}{"max": 0}),
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Function 'f' has too many parameters (1). Maximum allowed is 0.",
+					},
+				},
+			},
+			{
+				Code:     "const value = { callback: /** @type {Function} */ ((arg) => {}) };",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  objectOption(map[string]interface{}{"max": 0}),
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Arrow function 'callback' has too many parameters (1). Maximum allowed is 0.",
+						Line:      1,
+						Column:    17,
+					},
+				},
+			},
+			{
+				Code:     "class C { static #callback = /** @type {Function} */ ((arg) => {}); }",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  objectOption(map[string]interface{}{"max": 0}),
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Static private arrow function '#callback' has too many parameters (1). Maximum allowed is 0.",
+						Line:      1,
+						Column:    11,
+					},
+				},
+			},
+		},
+	)
+}
