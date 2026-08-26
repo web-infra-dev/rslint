@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"runtime/pprof"
 	"runtime/trace"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -731,21 +729,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	allDiags = deduplicateTypeScriptDiagnostics(allDiags, fs, targetPlan.PreferredCallerPaths())
 
-	// Diagnostics arrive in completion order — programs and, within a
-	// program, file shards run in parallel — so impose a deterministic
-	// order before printing. The key is (file, start position) only,
-	// deliberately with NO end/rule tie-break: ESLint orders same-start
-	// diagnostics by emission order (parent reported before nested child),
-	// and a file's diagnostics are all emitted by a single worker, so under
-	// a STABLE sort this key is already fully deterministic. Keep this
-	// comparator in sync with the --api one in internal/api/server/lint.go (same policy over
-	// api.Diagnostic).
-	slices.SortStableFunc(allDiags, func(a, b rule.RuleDiagnostic) int {
-		if c := strings.Compare(a.FilePath, b.FilePath); c != 0 {
-			return c
-		}
-		return cmp.Compare(a.Range.Pos(), b.Range.Pos())
-	})
+	// Paths have already been remapped into the caller-visible target space.
+	// Sort the completed set before rendering; same-start diagnostics retain
+	// emission order.
+	linter.StableSortDiagnosticsByFileAndStart(allDiags)
 
 	// Phase 3: Build one report from the final post-fix diagnostics, then let
 	// the CLI output subsystem own format dispatch, colors, and summary text.
