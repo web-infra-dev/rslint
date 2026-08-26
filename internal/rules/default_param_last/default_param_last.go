@@ -17,6 +17,9 @@ var DefaultParamLastRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
+			if node.Body() == nil {
+				return
+			}
 			params := utils.ESTreeParameters(node)
 			isRequiredParameter := func(current *ast.Node) bool {
 				if current == nil {

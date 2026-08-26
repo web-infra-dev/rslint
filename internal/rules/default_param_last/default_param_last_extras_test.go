@@ -38,7 +38,10 @@ func TestDefaultParamLastExtras(t *testing.T) {
 			{Code: "function empty() {}"},
 			{Code: "function destructured({value}, [fallback] = []) {}"},
 			{Code: "function rest(defaulted = 1, ...values) {}"},
-			{Code: "abstract class C { abstract method(required: number, optional?: number): void; }"},
+			// typescript-eslint exposes bodyless declarations as nodes outside the upstream listeners.
+			{Code: "declare function overloaded(optional?: number, required: number): void;"},
+			{Code: "abstract class C { abstract method(optional?: number, required: number): void; }"},
+			{Code: "class C { constructor(optional?: number, required: number); constructor(required: number) {} }"},
 			{Code: "interface I { method(optional?: number, required?: number): void; }"},
 			// N/A: spread assignments and standalone rest binding elements cannot occur as function-list members.
 
@@ -95,12 +98,6 @@ func TestDefaultParamLastExtras(t *testing.T) {
 					{MessageId: "shouldBeLast", Line: 1, Column: 16, EndLine: 1, EndColumn: 29},
 					{MessageId: "shouldBeLast", Line: 2, Column: 18, EndLine: 2, EndColumn: 34},
 				},
-			},
-
-			// ---- Dimension 4: graceful degradation ----
-			{
-				Code:   "declare function overloaded(optional?: number, required: number): void;",
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "shouldBeLast", Line: 1, Column: 29, EndLine: 1, EndColumn: 46}},
 			},
 
 			// Locks in upstream isRequiredParameter() AssignmentPattern arm and handleFunction() report-true arm.
