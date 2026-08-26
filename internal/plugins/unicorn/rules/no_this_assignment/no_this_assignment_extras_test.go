@@ -50,6 +50,12 @@ func TestNoThisAssignmentExtras(t *testing.T) {
 			// Locks in the AssignmentExpression listener gate.
 			{Code: `self === this;`},
 			{Code: `self + this;`},
+
+			// ---- Review regression: destructuring defaults are ESTree AssignmentPattern nodes ----
+			{Code: `[foo = this] = array;`},
+			{Code: `({foo: bar = this} = object);`},
+			{Code: `for ([foo = this] of array) {}`},
+			{Code: `[[foo = this] = fallback] = array;`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: ESTree erases parenthesized expressions ----

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const messageID = "no-this-assignment"
@@ -45,6 +46,9 @@ var NoThisAssignmentRule = rule.Rule{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if binary.OperatorToken == nil || !ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+					return
+				}
+				if utils.IsDefaultValueInDestructuringAssignment(node) {
 					return
 				}
 
