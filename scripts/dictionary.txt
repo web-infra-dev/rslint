@@ -63,6 +63,7 @@ bivariance
 bizz
 bleh
 Blis
+blockignore
 bmatcuk
 bodyless
 braillelabel
@@ -90,6 +91,7 @@ cdylib
 centralising
 CHARCLASS
 checkerpool
+Citi
 classnames
 CLASSSET
 clazz
@@ -269,6 +271,8 @@ Isnt
 jakebailey
 jiti
 Jpan
+Jscs
+jscs
 jsnum
 jsonc
 jsonline
@@ -344,6 +348,7 @@ mousein
 mouseout
 mousemove
 msvc
+Mtavruli
 multibyte
 multifile
 multilines
@@ -422,6 +427,7 @@ pagefooter
 pageheader
 pagelist
 parenless
+parenthesization
 parsecache
 pendings
 perr
@@ -611,6 +617,8 @@ txtar
 txtarfs
 typeparam
 typescriptutil
+Über
+über
 unaliased
 unbnound
 uncast
@@ -666,6 +674,7 @@ vitest
 vname
 Värde
 walltime
+Warang
 wasi
 wasmer
 wasmfs

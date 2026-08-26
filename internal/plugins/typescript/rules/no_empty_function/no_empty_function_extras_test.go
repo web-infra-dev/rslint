@@ -64,6 +64,50 @@ func TestNoEmptyFunctionAllowKindsStayIsolated(t *testing.T) {
 	)
 }
 
+func TestNoEmptyFunctionIgnoresHostedJSDocSyntax(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoEmptyFunctionRule,
+		nil,
+		[]rule_tester.InvalidTestCase{
+			hostedJSDocNoEmptyPayloadCase(
+				"class C {\n  /** @override */\n  method() {}\n}",
+				"method 'method'",
+				noEmptyAllow("overrideMethods"),
+			),
+			hostedJSDocNoEmptyPayloadCase(
+				"class C {\n  /** @private */\n  constructor() {}\n}",
+				"constructor",
+				noEmptyAllow("private-constructors"),
+			),
+			hostedJSDocNoEmptyPayloadCase(
+				"class C {\n  /** @protected */\n  constructor() {}\n}",
+				"constructor",
+				noEmptyAllow("protected-constructors"),
+			),
+			hostedJSDocNoEmptyPayloadCase(
+				"const value = { callback: /** @type {Function} */ (() => {}) };",
+				"method 'callback'",
+				nil,
+			),
+			hostedJSDocNoEmptyPayloadCase(
+				"class C { static #callback = /** @type {Function} */ (() => {}); }",
+				"static private method #callback",
+				nil,
+			),
+		},
+	)
+}
+
+func hostedJSDocNoEmptyPayloadCase(code, name string, options any) rule_tester.InvalidTestCase {
+	testCase := noEmptyPayloadCase(code, name, options)
+	testCase.FileName = "file.mjs"
+	testCase.TSConfig = "tsconfig.allow-js.json"
+	return testCase
+}
+
 func TestNormalizeConstructorOptions(t *testing.T) {
 	options := []any{map[string]any{
 		"allow": []any{"functions", "private-constructors", "protected-constructors"},

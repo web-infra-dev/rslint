@@ -112,6 +112,15 @@ interface FooInterface {
 		{Code: "let a: readonly Array<number>[] = [[]];", Options: map[string]interface{}{"default": "generic", "readonly": "array"}},
 		{Code: "let a: Readonly = [];", Options: map[string]interface{}{"default": "generic", "readonly": "array"}},
 		{Code: "const x: Readonly<string> = 'a';", Options: map[string]interface{}{"default": "array"}},
+
+		// jsdoc is skipped
+		{
+			Code: `/** @type {Array<{ size: number, unpackedSize: number; files: Array<{ path: string; size: number; }>; }>} */
+const [before, after] = JSON.parse(output);`,
+			FileName: "checkPackageSize.mjs",
+			Options:  map[string]interface{}{"default": "array"},
+			TSConfig: "tsconfig.allow-js.json",
+		},
 	}, []rule_tester.InvalidTestCase{
 		// Base cases - errors with array option
 		{

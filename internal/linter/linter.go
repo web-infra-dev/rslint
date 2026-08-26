@@ -312,6 +312,13 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		var childVisitor ast.Visitor
 		var patternVisitor func(node *ast.Node)
 		patternVisitor = func(node *ast.Node) {
+			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+				patternVisitor(expression)
+				return
+			}
+			if utils.IsJSDocSyntaxNode(node) {
+				return
+			}
 			runListeners(node.Kind, node)
 			kind := rule.ListenerOnAllowPattern(node.Kind)
 			runListeners(kind, node)
@@ -345,6 +352,13 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			runListeners(rule.ListenerOnExit(node.Kind), node)
 		}
 		childVisitor = func(node *ast.Node) bool {
+			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+				childVisitor(expression)
+				return false
+			}
+			if utils.IsJSDocSyntaxNode(node) {
+				return false
+			}
 			runListeners(node.Kind, node)
 
 			switch node.Kind {

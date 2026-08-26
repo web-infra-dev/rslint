@@ -1,0 +1,65 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["always", "never"]
+    },
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ignorePattern": {
+              "type": "string"
+            },
+            "ignoreInlineComments": {
+              "type": "boolean"
+            },
+            "ignoreConsecutiveComments": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "line": {
+              "type": "object",
+              "properties": {
+                "ignorePattern": {
+                  "type": "string"
+                },
+                "ignoreInlineComments": {
+                  "type": "boolean"
+                },
+                "ignoreConsecutiveComments": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "block": {
+              "type": "object",
+              "properties": {
+                "ignorePattern": {
+                  "type": "string"
+                },
+                "ignoreInlineComments": {
+                  "type": "boolean"
+                },
+                "ignoreConsecutiveComments": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 2
+}

@@ -197,7 +197,7 @@ and cannot observe which construction path supplied it.
 3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes. Source-only roots additionally run the ts-go binder so syntax-only rules retain symbols and lexical scopes before their rslint Program is published.
 4. **Semantic Analysis**: The lint plan reads each Program's per-file checker capability once, freezes that result with the file's configured rules, and acquires a checker only for eligible files. LSP can additionally narrow rule eligibility for a request before planning. Program capability, configured-rule eligibility, actual checker delivery, and program-wide diagnostics remain separate decisions.
 5. **Rule Registration**: Enabled rules register listeners keyed by AST kind.
-6. **AST Traversal**: The linter traverses each file once using a DFS walk.
+6. **AST Traversal**: The linter traverses each file once using a DFS walk. It prunes syntax that TypeScript-Go synthesized from JSDoc comments; ESLint-compatible parsers expose that text through comment APIs rather than rule AST listeners.
 7. **Rule Execution**: Listener callbacks inspect nodes and may use syntax only or syntax plus type information.
 8. **Diagnostic Collection**: Findings are reported as `RuleDiagnostic` values, with optional fixes or suggestions.
 9. **Output Generation**: CLI builds one report from the final post-fix diagnostics and passes it to `internal/output`; API returns structured data, and LSP converts diagnostics to LSP diagnostics/code actions.
@@ -230,6 +230,11 @@ Important characteristics:
 - **Node Types**: ts-go `ast.Kind` values
 - **Node Objects**: `*ast.Node` and `*ast.SourceFile`
 - **Traversal Style**: `ForEachChild(...)` with depth-first recursion
+- **JSDoc Boundary**: synthetic syntax reparsed from JSDoc is excluded from
+  rule-listener traversal; comment-aware rules use the shared comment store or
+  TypeScript-Go's explicit JSDoc APIs. Hosted tags can also populate fields on
+  ordinary source nodes, so syntax-sensitive rules use authored-only AST views
+  without removing JSDoc semantics from the type checker.
 - **Source Locations**: node ranges and source-file-aware line/column conversion via scanner helpers
 - **Comments**: exposed through one lazy per-file store for directives and comment-based rules
 

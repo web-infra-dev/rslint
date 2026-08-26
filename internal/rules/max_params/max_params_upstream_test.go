@@ -17,6 +17,12 @@ func TestMaxParamsUpstream(t *testing.T) {
 		t,
 		&MaxParamsRule,
 		[]rule_tester.ValidTestCase{
+			{
+				Code:     "/** @this {HTMLElement} */\nfunction handle(event) {}",
+				FileName: "file.mjs",
+				Options:  option(1),
+				TSConfig: "tsconfig.allow-js.json",
+			},
 			// ---- ESLint core valid ----
 			{Code: "function test(d, e, f) {}"},
 			{Code: "var test = function(a, b, c) {};", Options: option(3)},
