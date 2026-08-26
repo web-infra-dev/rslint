@@ -482,6 +482,7 @@ export default defineConfig({
     './tests/eslint/rules/use-isnan.test.ts',
     './tests/eslint/rules/eqeqeq.test.ts',
     './tests/eslint/rules/valid-typeof.test.ts',
+    './tests/eslint/rules/vars-on-top.test.ts',
     './tests/eslint/rules/no-unmodified-loop-condition.test.ts',
     './tests/eslint/rules/no-alert.test.ts',
     './tests/eslint/rules/no-bitwise.test.ts',
