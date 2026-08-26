@@ -45,6 +45,12 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// `[foo]` is no longer a destructuring pattern once an assertion
 			// wraps it.
 			{Code: `([foo] as any) = arr;`},
+			// Parentheses around the destructuring container survive as a
+			// recovery-only invalid target; unlike parentheses around a bare
+			// identifier, they must not make the inner names writable.
+			{Code: `([foo]) = arr;`},
+			{Code: `(({foo})) = obj;`},
+			{Code: `(([foo, bar])) = arr;`},
 
 			// ---- Dimension 4: declaration vs expression forms ----
 
@@ -476,6 +482,12 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{
 				Code:   `[foo satisfies any] = arr;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 26}},
+			},
+			// An instantiation expression erases to its runtime expression, so
+			// its expression child remains a real assignment-pattern target.
+			{
+				Code:   `[foo<string>] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 			{
 				Code:   `[[foo satisfies any]] = arr;`,

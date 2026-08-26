@@ -372,9 +372,10 @@ func isThisReferringToGlobal(thisNode *ast.Node, sourceFile *ast.SourceFile, sou
 
 	switch container.Kind {
 	case ast.KindSourceFile:
-		// Top level of script — 'this' is always global (even in strict mode).
-		// In modules it is undefined, and in CommonJS it is module.exports.
-		return sourceType == "script"
+		// ESLint's no-eval rule treats every non-module Program scope as the
+		// top level of a script. That includes CommonJS even though its runtime
+		// `this` value is module.exports rather than the global object.
+		return sourceType != "module"
 
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
 		// In strict mode, 'this' is undefined — not global.

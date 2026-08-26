@@ -139,11 +139,13 @@ new Promise(r => 1)`,
 			{
 				Code: `interface Promise {}
 new Promise(r => 1)`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 			},
 			// Locks in upstream isPromiseExecutor() arm 5: same for a type alias.
 			{
 				Code: `type Promise = any;
 new Promise(r => 1)`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 			},
 			// Locks in upstream isPromiseExecutor() arm 5: a type-only import binds the
 			// name, so the callee is no longer the global.

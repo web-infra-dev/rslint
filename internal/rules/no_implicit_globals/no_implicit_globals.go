@@ -402,6 +402,27 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 			current = parent
 
 		case ast.KindParenthesizedExpression:
+			// ESTree erases parentheses around an identifier, but preserves
+			// parentheses around an array/object target as a recovered invalid
+			// assignment. Do not turn that recovered container into a pattern.
+			if current.Kind == ast.KindArrayLiteralExpression || current.Kind == ast.KindObjectLiteralExpression {
+				return nil, 0
+			}
+			current = parent
+
+		case ast.KindExpressionWithTypeArguments:
+			instantiation := parent.AsExpressionWithTypeArguments()
+			if instantiation != nil && instantiation.Expression == current {
+				// TypeScript erases the type arguments, leaving this runtime
+				// expression as the assignment-pattern target.
+				current = parent
+				continue
+			}
+			// Preserve PatternVisitor's existing traversal into type arguments.
+			if (!ast.IsPartOfTypeNode(current) && !ast.IsPartOfTypeNode(parent)) ||
+				!utils.IsInDestructuringAssignment(parent) {
+				return nil, 0
+			}
 			current = parent
 
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
