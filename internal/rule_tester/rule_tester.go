@@ -180,6 +180,13 @@ func resolveTestCaseGlobals(t *testing.T, rawGlobals map[string]any) map[string]
 	return globals
 }
 
+func resolveTestCaseLanguageOptions(t *testing.T, languageOptions rule.LanguageOptions) rule.LanguageOptions {
+	if languageOptions.SourceType != "" && !rule.IsValidSourceType(languageOptions.SourceType) {
+		t.Fatalf("test case sourceType %q is invalid; expected module, script, or commonjs", languageOptions.SourceType)
+	}
+	return languageOptions
+}
+
 func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
 	t.Parallel()
 
@@ -189,6 +196,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, languageOptions rule.LanguageOptions, rawGlobals map[string]any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
 		options := ResolveTestCaseOptions(t, r, rawOptions)
 		globals := resolveTestCaseGlobals(t, rawGlobals)
+		languageOptions = resolveTestCaseLanguageOptions(t, languageOptions)
 
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)

@@ -118,6 +118,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redeclare"
 	"github.com/web-infra-dev/rslint/internal/rules/no_regex_spaces"
+	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_exports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_globals"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_syntax"
@@ -187,6 +188,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/require_await"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
 	"github.com/web-infra-dev/rslint/internal/rules/sort_keys"
+	"github.com/web-infra-dev/rslint/internal/rules/sort_vars"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
 	"github.com/web-infra-dev/rslint/internal/rules/symbol_description"
 	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
@@ -302,6 +304,7 @@ func coreRules() []rule.Rule {
 		no_new_native_nonconstructor.NoNewNativeNonconstructorRule,
 		no_new_wrappers.NoNewWrappersRule,
 		no_object_constructor.NoObjectConstructorRule,
+		no_restricted_exports.NoRestrictedExportsRule,
 		no_restricted_globals.NoRestrictedGlobalsRule,
 		no_restricted_imports.NoRestrictedImportsRule,
 		no_restricted_syntax.NoRestrictedSyntaxRule,
@@ -400,5 +403,6 @@ func coreRules() []rule.Rule {
 		unicode_bom.UnicodeBomRule,
 		operator_assignment.OperatorAssignmentRule,
 		sort_keys.SortKeysRule,
+		sort_vars.SortVarsRule,
 	}
 }
