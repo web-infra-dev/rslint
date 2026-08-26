@@ -216,6 +216,23 @@ interface I {
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "singleParameterDifference", Line: 4, Column: 9}},
 		},
+		// Upstream groups non-literal computed keys by its absent Literal.raw value.
+		{
+			Code: `declare const key: unique symbol;
+interface I {
+  [+key](x: string): void;
+  [-key](x: number): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "singleParameterDifference", Line: 4, Column: 10, EndLine: 4, EndColumn: 19}},
+		},
+		{
+			Code: `declare const E: any;
+interface I {
+  [E.key](x: string): void;
+  [E["key"]](x: number): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "singleParameterDifference", Line: 4, Column: 14, EndLine: 4, EndColumn: 23}},
+		},
 		// Locks in upstream call- and construct-signature keys as separate groups.
 		{
 			Code: `interface I {

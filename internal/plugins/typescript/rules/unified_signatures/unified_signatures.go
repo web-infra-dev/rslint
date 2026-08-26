@@ -196,7 +196,8 @@ func (a *overloadAnalyzer) methodOverloadKey(node *ast.Node) (string, bool) {
 		return "", false
 	}
 	prefix := "11"
-	if name.Kind == ast.KindComputedPropertyName {
+	computed := name.Kind == ast.KindComputedPropertyName
+	if computed {
 		prefix = "01"
 		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
 	}
@@ -209,6 +210,11 @@ func (a *overloadAnalyzer) methodOverloadKey(node *ast.Node) (string, bool) {
 	case ast.KindIdentifier:
 		return prefix + "identifier_" + name.Text(), true
 	default:
+		if computed && !utils.IsESTreeLiteralKind(name.Kind) {
+			// Upstream reads Literal.raw for every other computed key. Non-literal
+			// expressions have no raw value and therefore share one overload group.
+			return prefix + "undefined", true
+		}
 		return prefix + utils.TrimmedNodeText(a.ctx.SourceFile, name), true
 	}
 }
