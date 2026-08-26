@@ -202,21 +202,16 @@ func checkFunctionDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNo
 	if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 		return
 	}
-	if functionDeclarationScope(ctx, node) != sourceFileNode {
+	if functionDeclarationScope(node) != sourceFileNode {
 		return
 	}
 	reportDeclaration(ctx, node, nameNode.Text(), "function", false)
 }
 
-// functionDeclarationScope returns the scope a function declaration binds its
-// name in. eslint-scope only creates block scopes from ES2015 on, so under
-// `languageOptions.ecmaVersion` 3 or 5 a block-level function declaration binds
-// in the enclosing variable scope instead, and `{ function foo() {} }` is a
-// global declaration.
-func functionDeclarationScope(ctx rule.RuleContext, node *ast.Node) *ast.Node {
-	if ctx.LanguageOptions.EffectiveECMAVersion() < 2015 {
-		return utils.FindEnclosingScope(node)
-	}
+// functionDeclarationScope returns the scope supplied by the TypeScript
+// parser used by rslint. Its scope manager retains block-level function scope
+// even when languageOptions.ecmaVersion is 3 or 5.
+func functionDeclarationScope(node *ast.Node) *ast.Node {
 	return ast.GetEnclosingBlockScopeContainer(node)
 }
 
@@ -324,9 +319,6 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node) {
 // however deeply it is nested, `satisfies` included: `[foo satisfies any] = arr`
 // is a write.
 func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
-	if ast.IsPartOfTypeNode(node) {
-		return nil, 0
-	}
 	current := node
 	writes := 1
 	// wrappers counts the TS expression wrappers the walk has climbed since the
@@ -427,6 +419,16 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 		case ast.KindDecorator:
 			// PatternVisitor deliberately skips decorator subtrees.
 			return nil, 0
+
+		case ast.KindMethodDeclaration:
+			// PatternVisitor's object-property handling skips a method's key,
+			// while its ordinary visitor keys still traverse parameters, return
+			// types, and the body of parser-accepted expression patterns.
+			method := parent.AsMethodDeclaration()
+			if method == nil || method.Name() == current || !utils.IsInDestructuringAssignment(parent) {
+				return nil, 0
+			}
+			current = parent
 
 		case ast.KindCallExpression:
 			// PatternVisitor treats call arguments as right-hand reads, but

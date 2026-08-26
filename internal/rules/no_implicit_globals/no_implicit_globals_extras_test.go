@@ -155,6 +155,8 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// PatternVisitor skips decorator subtrees even when the decorated
 			// class appears inside an expression-shaped assignment pattern.
 			{Code: `[@foo class {}] = arr;`},
+			// Object-method keys are not assignment targets.
+			{Code: `[({foo(){}})] = arr;`},
 
 			// Within an expression-shaped pattern element, the right side of a
 			// compound assignment stays a read. A writable left side therefore
@@ -169,6 +171,10 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// ---- Block scopes exist from ES2015 on ----
 			{Code: `{ function foo() {} }`},
 			{Code: `if (true) { function foo() {} }`},
+			// @typescript-eslint/parser retains block scope semantics even when
+			// the configured ECMAScript edition predates ES2015.
+			{Code: `{ function foo() {} }`, LanguageOptions: es5},
+			{Code: `if (true) { function foo() {} }`, LanguageOptions: es5},
 		}),
 		withScriptDefaults([]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: receiver wrappers on the leak/readonly identifier ----
@@ -566,6 +572,31 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
 			},
 
+			// PatternVisitor traverses identifiers in TypeScript type positions
+			// when the containing expression is used as a synthetic pattern.
+			{
+				Code:    `[foo as T] = arr;`,
+				Globals: map[string]any{"foo": "writable", "T": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:    `[foo<T>] = arr;`,
+				Globals: map[string]any{"foo": "writable", "T": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:    `[foo satisfies T] = arr;`,
+				Globals: map[string]any{"foo": "writable", "T": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+
+			// Object-method keys are skipped by PatternVisitor, while identifiers
+			// reached through the method body keep its ordinary visitor traversal.
+			{
+				Code:   `[({foo(){return bar}})] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+
 			// ---- Only a global script's own top level defines the
 			// global-scope variable ----
 			//
@@ -595,20 +626,8 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 
-			// ---- ES3/ES5 have no block scopes, so a block-level function
-			// declaration binds in the global scope ----
-			{
-				Code:            `{ function foo() {} }`,
-				LanguageOptions: es5,
-				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "globalNonLexicalBinding", Line: 1, Column: 3, EndLine: 1, EndColumn: 20}},
-			},
-			{
-				Code:            `if (true) { function foo() {} }`,
-				LanguageOptions: es5,
-				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "globalNonLexicalBinding"}},
-			},
-			// It binds in the enclosing variable scope, not always the global
-			// one: only `outer` is a global declaration here.
+			// The outer declaration remains global at ES5; the nested declaration
+			// stays in its parser-provided block scope.
 			{
 				Code:            `function outer() { { function foo() {} } }`,
 				LanguageOptions: es5,

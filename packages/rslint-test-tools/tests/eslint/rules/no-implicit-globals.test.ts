@@ -1,9 +1,29 @@
-import { RuleTester } from '../rule-tester';
+import {
+  RuleTester,
+  type InvalidTestCase,
+  type ValidTestCase,
+} from '../rule-tester';
 
 const ruleTester = new RuleTester();
 
+function withScriptDefaults<T extends ValidTestCase | InvalidTestCase>(
+  cases: T[],
+): T[] {
+  return cases.map((testCase) =>
+    typeof testCase === 'string'
+      ? ({ code: testCase, languageOptions: { sourceType: 'script' } } as T)
+      : ({
+          ...testCase,
+          languageOptions: {
+            sourceType: 'script',
+            ...testCase.languageOptions,
+          },
+        } as T),
+  );
+}
+
 ruleTester.run('no-implicit-globals', {
-  valid: [
+  valid: withScriptDefaults([
     // Recommended way to create a global variable in the browser
     {
       code: 'window.foo = 1;',
@@ -87,8 +107,8 @@ ruleTester.run('no-implicit-globals', {
       code: '/* exported a */ const a = 1;',
       options: { lexicalBindings: true },
     },
-  ],
-  invalid: [
+  ]),
+  invalid: withScriptDefaults([
     // `var` and function declarations
     {
       code: 'var foo = 1;',
@@ -172,5 +192,5 @@ ruleTester.run('no-implicit-globals', {
       code: '/* exported foo */ foo = 1',
       errors: [{ messageId: 'globalVariableLeak' }],
     },
-  ],
+  ]),
 });

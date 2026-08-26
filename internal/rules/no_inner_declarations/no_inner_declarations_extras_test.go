@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -58,7 +59,11 @@ func TestNoInnerDeclarationsExtras(t *testing.T) {
 			// Locks in upstream FunctionDeclaration() arm 1: strict ES2015+ scopes
 			// suppress the report, including implicit class and module strictness.
 			noInnerValid(`class C { method() { if (test) { function nested() {} } } }`, []any{"functions", map[string]any{"blockScopedFunctions": "allow"}}, 2015),
-			noInnerValid(`export {}; function outer() { if (test) { function nested() {} } }`, []any{"functions", map[string]any{"blockScopedFunctions": "allow"}}, 2015),
+			{
+				Code:            `export {}; function outer() { if (test) { function nested() {} } }`,
+				Options:         []any{"functions", map[string]any{"blockScopedFunctions": "allow"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, SourceType: "module"},
+			},
 
 			// ---- Real-user: eslint/eslint#14821 TypeScript namespace behavior ----
 			// @typescript-eslint/scope-manager marks namespace/module scopes as
