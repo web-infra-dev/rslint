@@ -33,6 +33,10 @@ func TestConsistentTypeImportsUpstream(t *testing.T) {
 		{Code: `import { type A, B } from 'foo'; type T = A; const b = B();`},
 		{Code: `import { type A } from 'foo';`},
 
+		// ---- computed type-key wrapper boundaries ----
+		{Code: `import * as key from 'foo'; type T = { [key?.name]: string };`},
+		{Code: `import * as key from 'foo'; type T = { [key?.['name']]: string };`},
+
 		// ---- options ----
 		{Code: `import Foo from 'foo'; type T = Foo;`, Options: map[string]interface{}{"prefer": "no-type-imports"}},
 		{Code: `let foo: import('foo').Foo;`, Options: map[string]interface{}{"disallowTypeAnnotations": false}},
@@ -135,6 +139,10 @@ import { B } from 'foo'; const b = B; type T = A;`},
 			Options: map[string]interface{}{"disallowTypeAnnotations": true},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noImportTypeAnnotations", Message: "`import()` type annotations are forbidden.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27}},
 		},
+		{
+			Code:   `type T = typeof import('foo').Foo;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportTypeAnnotations", Line: 1, Column: 17, EndLine: 1, EndColumn: 34}},
+		},
 
 		// ---- type queries, computed type keys and type-only exports ----
 		{
@@ -148,9 +156,33 @@ import { B } from 'foo'; const b = B; type T = A;`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
 		},
 		{
+			Code:   `import * as key from 'foo'; type T = { [(key).name]: string };`,
+			Output: []string{`import type * as key from 'foo'; type T = { [(key).name]: string };`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
+		{
+			Code:   `import * as key from 'foo'; type T = { [key['name']]: string };`,
+			Output: []string{`import type * as key from 'foo'; type T = { [key['name']]: string };`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
+		{
 			Code:   `import Type from 'foo'; export type { Type };`,
 			Output: []string{`import type Type from 'foo'; export type { Type };`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
+
+		// ---- comments retained while splitting default imports ----
+		{
+			Code: `import Default /* c1 */, /* c2 */ { Data } from 'foo'; type T = Default; Data();`,
+			Output: []string{`import type Default /* c1 */ from 'foo';
+import /* c2 */ { Data } from 'foo'; type T = Default; Data();`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "someImportsAreOnlyTypes", Line: 1, Column: 1}},
+		},
+		{
+			Code: `import Default, /* keep */ * as Rest from 'foo'; type T = Default; Rest.run();`,
+			Output: []string{`import type Default from 'foo';
+import /* keep */ * as Rest from 'foo'; type T = Default; Rest.run();`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "someImportsAreOnlyTypes", Line: 1, Column: 1}},
 		},
 	})
 }

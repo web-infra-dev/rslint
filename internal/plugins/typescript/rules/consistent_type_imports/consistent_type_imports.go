@@ -121,7 +121,16 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 	if opts.disallowTypeAnnotations {
 		listeners[ast.KindImportType] = func(node *ast.Node) {
-			ctx.ReportNode(node, messageNoImportTypeAnnotations())
+			reportRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+			if importType := node.AsImportTypeNode(); importType != nil && importType.IsTypeOf {
+				for _, token := range utils.TokensOfNode(ctx.SourceFile, node) {
+					if token.Kind == ast.KindImportKeyword {
+						reportRange = core.NewTextRange(token.Start, reportRange.End())
+						break
+					}
+				}
+			}
+			ctx.ReportRange(reportRange, messageNoImportTypeAnnotations())
 		}
 	}
 
@@ -362,8 +371,17 @@ func isTypeOnlyReference(reference *ast.Node, importIsTypeOnly bool) bool {
 			continue
 		}
 		if parent.Kind == ast.KindPropertyAccessExpression && parent.AsPropertyAccessExpression().Expression == entity {
+			if ast.IsOptionalChain(parent) {
+				return false
+			}
 			entity = parent
 			continue
+		}
+		if parent.Kind == ast.KindElementAccessExpression && parent.AsElementAccessExpression().Expression == entity {
+			if ast.IsOptionalChain(parent) {
+				return false
+			}
+			break
 		}
 		break
 	}
@@ -377,13 +395,21 @@ func isTypeOnlyReference(reference *ast.Node, importIsTypeOnly bool) bool {
 	for current.Parent != nil {
 		parent := current.Parent
 		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			current = parent
 		case ast.KindPropertyAccessExpression:
 			if parent.AsPropertyAccessExpression().Expression != current {
+				return false
+			}
+			if ast.IsOptionalChain(parent) {
 				return false
 			}
 			current = parent
 		case ast.KindElementAccessExpression:
 			if parent.AsElementAccessExpression().Expression != current {
+				return false
+			}
+			if ast.IsOptionalChain(parent) {
 				return false
 			}
 			current = parent
@@ -484,12 +510,15 @@ func fixesToTypeImport(ctx rule.RuleContext, fixStyle string, report *reportValu
 		} else {
 			sourceText := utils.TrimmedNodeText(ctx.SourceFile, report.node.AsImportDeclaration().ModuleSpecifier)
 			position := utils.TrimNodeTextRange(ctx.SourceFile, report.node).Pos()
-			fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(position, position), "import type "+utils.TrimmedNodeText(ctx.SourceFile, defaultSpecifier.node.AsImportClause().Name())+" from "+sourceText+";\n"))
-			comma, ok := utils.TokenAtOrAfter(ctx.SourceFile, utils.TrimNodeTextRange(ctx.SourceFile, defaultSpecifier.name).End())
+			defaultRange := utils.TrimNodeTextRange(ctx.SourceFile, defaultSpecifier.name)
+			comma, ok := utils.TokenAtOrAfter(ctx.SourceFile, defaultRange.End())
 			if ok && comma.Kind == ast.KindCommaToken {
+				defaultText := strings.TrimSpace(ctx.SourceFile.Text()[defaultRange.Pos():comma.Start])
+				fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(position, position), "import type "+defaultText+" from "+sourceText+";\n"))
 				after, ok := utils.TokenAtOrAfter(ctx.SourceFile, comma.End)
 				if ok {
-					fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(utils.TrimNodeTextRange(ctx.SourceFile, defaultSpecifier.name).Pos(), after.Start)))
+					removeEnd := firstCommentOrPosition(ctx.SourceFile.Text(), comma.End, after.Start)
+					fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(defaultRange.Pos(), removeEnd)))
 				}
 			}
 		}
