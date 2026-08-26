@@ -42,6 +42,15 @@ func isAtTopOfAllowedScope(statement *ast.Node) bool {
 	switch container.Kind {
 	case ast.KindSourceFile:
 		return isVarOnTop(statement, container.AsSourceFile().Statements.Nodes, true)
+	case ast.KindModuleBlock:
+		if !ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport) {
+			return false
+		}
+		moduleBlock := container.AsModuleBlock()
+		if moduleBlock == nil || moduleBlock.Statements == nil {
+			return false
+		}
+		return isVarOnTop(statement, moduleBlock.Statements.Nodes, true)
 	case ast.KindBlock:
 		block := container.AsBlock()
 		if block == nil || block.Statements == nil {
