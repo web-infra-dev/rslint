@@ -598,6 +598,7 @@ export default defineConfig({
     './tests/rstest/rules/no-standalone-expect.test.ts',
     './tests/rstest/rules/prefer-called-exactly-once-with.test.ts',
     './tests/rstest/rules/prefer-each.test.ts',
+    './tests/rstest/rules/prefer-expect-type-of.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
     './tests/rstest/rules/valid-expect-in-promise.test.ts',
