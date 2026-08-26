@@ -131,6 +131,27 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{Code: `Array = 1; interface Array {}`},
 			{Code: `Array = 1; type Array<T> = T;`},
 			{Code: `foo = 1; namespace foo {}`},
+			// The configured source goal, rather than parsed module syntax,
+			// decides whether top-level declarations populate the global scope.
+			{Code: `export {}; foo = 1; interface foo {}`},
+			{Code: `export {}; foo = 1; type foo = number;`},
+			{Code: `export {}; foo = 1; namespace foo {}`},
+
+			// Import aliases are local definitions even though their symbols need
+			// alias resolution before they expose a value meaning.
+			{
+				Code:            `import { Array } from "foo"; Array = 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			},
+			{
+				Code:            `import Array = require("foo"); Array = 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			},
+			{
+				Code:            `import { custom } from "foo"; custom = 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Globals:         map[string]any{"custom": "readonly"},
+			},
 
 			// ---- Strictness comes from the scope the write is evaluated in ----
 			//
@@ -151,17 +172,6 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			// A member expression names the property being assigned; neither
 			// identifier inside it is itself a write target.
 			{Code: `[foo.bar] = arr;`},
-
-			// PatternVisitor skips decorator subtrees even when the decorated
-			// class appears inside an expression-shaped assignment pattern.
-			{Code: `[@foo class {}] = arr;`},
-			// Object-method keys are not assignment targets.
-			{Code: `[({foo(){}})] = arr;`},
-
-			// Within an expression-shaped pattern element, the right side of a
-			// compound assignment stays a read. A writable left side therefore
-			// leaves no implicit write to report for `bar`.
-			{Code: `[foo += bar] = arr;`, Globals: map[string]any{"foo": "writable"}},
 
 			// Unlike plugin-kit's ordinary JavaScript object, the shared exported
 			// directive view has no inherited __proto__ setter: the name is kept
@@ -234,90 +244,6 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 
-			// PatternVisitor traverses parser-accepted expression-shaped pattern
-			// elements. It visits ordinary expression children, but treats call
-			// arguments as reads and continues only through the callee.
-			{
-				Code: `[foo + bar] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 18},
-					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 18},
-				},
-			},
-			{
-				Code:   `[fn(arg)] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
-			},
-			{
-				Code: `[foo ? bar : baz] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "globalVariableLeak"},
-					{MessageId: "globalVariableLeak"},
-					{MessageId: "globalVariableLeak"},
-				},
-			},
-			// PatternVisitor treats a compound assignment's left side as an
-			// assignment pattern and records both the compound write and the
-			// containing destructuring write. Its right side remains a read.
-			{
-				Code:    `[foo += bar] = arr;`,
-				Globals: map[string]any{"bar": "writable"},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 19},
-					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 19},
-				},
-			},
-			// An equals expression nested in another expression-shaped pattern
-			// element is another assignment-pattern write; both reports use the
-			// containing destructuring assignment's range.
-			{
-				Code:    `[(foo = bar) + baz] = arr;`,
-				Globals: map[string]any{"baz": "writable"},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
-					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
-				},
-			},
-			// Function and class names reached through PatternVisitor's synthetic
-			// expression traversal are assignment targets, not ordinary lexical
-			// references to their expression-local bindings.
-			{
-				Code:   `[function foo(){}] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
-			},
-			{
-				Code:   `[class C {}] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
-			},
-			// The decorator's callee and arguments stay reads, while the class
-			// name outside that subtree remains a synthetic pattern write.
-			{
-				Code:   `[@dec(foo) class C {}] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
-			},
-			// Every identifier PatternVisitor visits is resolved from the scope
-			// containing the outer assignment. Arrow parameters therefore become
-			// synthetic writes, while a real outer binding still suppresses one.
-			{
-				Code:   `[(foo => 0)] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
-			},
-			{
-				Code: `var C; [class C {}] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "globalNonLexicalBinding"},
-				},
-			},
-
-			// A default under object rest still contributes an extra write, and
-			// both diagnostics use the range of the outer assignment.
-			{
-				Code: `[{...foo = bar}] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 23},
-					{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 23},
-				},
-			},
 			{
 				Code: `[foo! = 1] = arr;`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -573,7 +499,7 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			},
 
 			// PatternVisitor traverses identifiers in TypeScript type positions
-			// when the containing expression is used as a synthetic pattern.
+			// when a runnable assignment target uses an assertion wrapper.
 			{
 				Code:    `[foo as T] = arr;`,
 				Globals: map[string]any{"foo": "writable", "T": "readonly"},
@@ -589,14 +515,6 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Globals: map[string]any{"foo": "writable", "T": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
 			},
-
-			// Object-method keys are skipped by PatternVisitor, while identifiers
-			// reached through the method body keep its ordinary visitor traversal.
-			{
-				Code:   `[({foo(){return bar}})] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
-			},
-
 			// ---- Only a global script's own top level defines the
 			// global-scope variable ----
 			//

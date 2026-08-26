@@ -265,10 +265,10 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node) {
 		return
 	}
 	name := node.Text()
-	// PatternVisitor records every target write in the scope containing the
-	// outer assignment, even when the identifier is syntactically inside an
-	// arrow, function, or class expression. Resolve from that same location.
-	if ctx.Refs != nil && !ctx.Refs.IsGlobalNameReference(root, name, ast.SymbolFlagsValue) {
+	// PatternVisitor records target writes in the scope containing the outer
+	// assignment, including identifiers reached through TypeScript wrappers.
+	// Resolve from that same location.
+	if ctx.Refs != nil && !ctx.Refs.IsGlobalNameReference(root, name, ast.SymbolFlagsValue|ast.SymbolFlagsAlias) {
 		return
 	}
 	switch ctx.Globals.Access(name) {
@@ -302,9 +302,7 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node) {
 // times over the whole assignment. It returns nil for anything that isn't a pure
 // write target: compound/logical assignment operators and update expressions
 // read as well as write, so ESLint's ordinary reference analysis does not treat
-// them as leak/readonly-assignment candidates. PatternVisitor is the exception:
-// a compound assignment inside an expression-shaped pattern contributes one
-// write for its left side before the containing pattern contributes another.
+// them as leak/readonly-assignment candidates.
 //
 // TypeScript expression wrappers are where the walk stops mirroring the AST and
 // starts mirroring the scope manager. An AssignmentExpression's Left is
@@ -344,17 +342,7 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 				return nil, 0
 			}
 			if binary.OperatorToken.Kind != ast.KindEqualsToken {
-				if !utils.IsInDestructuringAssignment(parent) {
-					return nil, 0
-				}
-				if ast.IsCompoundAssignmentOperator(binary.OperatorToken.Kind) {
-					if binary.Left != current {
-						return nil, 0
-					}
-					writes++
-				}
-				current = parent
-				continue
+				return nil, 0
 			}
 			if binary.Left != current {
 				return nil, 0
@@ -416,42 +404,18 @@ func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
 		case ast.KindParenthesizedExpression:
 			current = parent
 
-		case ast.KindDecorator:
-			// PatternVisitor deliberately skips decorator subtrees.
-			return nil, 0
-
-		case ast.KindMethodDeclaration:
-			// PatternVisitor's object-property handling skips a method's key,
-			// while its ordinary visitor keys still traverse parameters, return
-			// types, and the body of parser-accepted expression patterns.
-			method := parent.AsMethodDeclaration()
-			if method == nil || method.Name() == current || !utils.IsInDestructuringAssignment(parent) {
-				return nil, 0
-			}
-			current = parent
-
-		case ast.KindCallExpression:
-			// PatternVisitor treats call arguments as right-hand reads, but
-			// continues through the callee. This makes `[fn(arg)] = value`
-			// a write to `fn` only, despite the unusual parser-accepted target.
-			call := parent.AsCallExpression()
-			if call == nil || call.Expression != current || !utils.IsInDestructuringAssignment(parent) {
-				return nil, 0
-			}
-			current = parent
-
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 			// A member expression writes its property, not either identifier
 			// inside the expression. PatternVisitor records both as reads.
 			return nil, 0
 
 		default:
-			// @typescript-eslint's PatternVisitor falls back to ordinary child
-			// traversal for parser-accepted expression-shaped pattern elements.
-			// Keep climbing while this expression remains inside the assignment
-			// pattern; IsInDestructuringAssignment excludes default RHS values
-			// and computed property keys.
-			if !utils.IsInDestructuringAssignment(parent) {
+			// TypeScript assertion and satisfies wrappers expose their type syntax
+			// to PatternVisitor. Preserve that traversal for otherwise valid
+			// assignment targets, but do not emulate recovery-only expression
+			// targets whose emitted JavaScript is not executable.
+			if (!ast.IsPartOfTypeNode(current) && !ast.IsPartOfTypeNode(parent)) ||
+				!utils.IsInDestructuringAssignment(parent) {
 				return nil, 0
 			}
 			current = parent

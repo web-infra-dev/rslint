@@ -134,6 +134,7 @@ Examples of **correct** code for this rule with `{ "lexicalBindings": true }`:
 - ESLint's `env` config (which supplies environment globals such as `browser`'s `window`) is not supported. Declare the same names through `languageOptions.globals` or a `/*global */` comment instead.
 - TypeScript declaration forms that bind no runtime variable of their own are not reported: ambient declarations (`declare var foo: number;`, `declare function foo(): void;`, `declare class Foo {}`) and overload signatures. ESLint reports the ambient forms, and counts one declaration per overload signature, so it reports an overload pair twice where this rule reports only the implementation.
 - `/* exported __proto__ */` treats `__proto__` like any other exported name. ESLint 10.8.1 accidentally loses that entry because its directive parser stores names in an ordinary JavaScript object, where assigning `__proto__` invokes the inherited prototype setter instead of creating an own property.
+- Rslint does not reproduce `@typescript-eslint/parser`'s recovered `PatternVisitor` diagnostics for assignment targets that remain invalid after TypeScript syntax is erased, such as `[foo + bar] = value`. This rule limits assignment-target parity to code whose generated JavaScript is executable.
 
 ## Original Documentation
 

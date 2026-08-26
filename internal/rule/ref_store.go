@@ -516,17 +516,19 @@ func functionExpressionSelfBinding(fn *ast.Node, name string, meaning ast.Symbol
 // environment global rather than to a declaration in this file, mirroring
 // ESLint's sourceCode.isGlobalReference for the given declaration spaces.
 //
-// A global script file needs its own answer: ESLint keeps that file's top-level
-// declarations and the configured globals in one global-scope variable, so any
-// definition of the name there — a type-only `interface` or `type` included —
-// clears the global reference. Inner scopes hold separate variables, and a
-// value reference only resolves to one declared in a requested space, so a
-// type-only declaration inside a namespace or function leaves it global.
+// A configured global script needs its own answer: ESLint keeps that file's
+// top-level declarations and the configured globals in one global-scope
+// variable, so any definition of the name there — a type-only `interface` or
+// `type` included — clears the global reference. The configured source goal is
+// authoritative even when the parser sees module syntax. Inner scopes hold
+// separate variables, and a value reference only resolves to one declared in a
+// requested space, so a type-only declaration inside a namespace or function
+// leaves it global.
 func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meaning ast.SymbolFlags) bool {
 	if s == nil || location == nil || name == "" {
 		return false
 	}
-	if s.sourceFile != nil && ast.IsGlobalSourceFile(s.sourceFile.AsNode()) &&
+	if s.sourceFile != nil && s.init.globalTopLevelScope &&
 		hasAuthoredDeclaration(s.sourceFile.Locals[name]) {
 		return false
 	}
