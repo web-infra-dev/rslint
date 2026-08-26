@@ -6,7 +6,7 @@ Requires call-count assertions to be spelled `expect(fn).toHaveBeenCalledTimes(1
 
 The matcher has to be called. `expect(fn).toHaveBeenCalledOnce` asserts nothing, so it is left alone, and so is `expect.toHaveBeenCalledOnce()`, which never received a value to count calls on. A matcher named by a computed key, `expect(fn)[matcherName]()`, is not reported either, because which assertion runs is only known at runtime. Chai's `calledOnce` is a property rather than a matcher call, and the assertion that takes a count in that style is `callCount(1)`, so `expect(fn).to.have.been.calledOnce` is outside this rule.
 
-Every `expect` source is recognized: globals, named and renamed imports, `require` destructuring, namespace imports, whole-module `require`, `import.meta.rstest`, Playwright integrations, and the `expect` a test callback receives through its test context. An `expect` from another assertion library, or a local variable that shadows `expect`, is not reported.
+Every `expect` source is recognized: globals, named and renamed imports, `require` destructuring, namespace imports, whole-module `require`, `import.meta.rstest`, Playwright integrations, and the `expect` a test callback receives through its [TestContext](https://rstest.rs/api/runtime-api/test-api/test#testcontext). An `expect` from another assertion library, or a local variable that shadows `expect`, is not reported.
 
 ## Incorrect
 
