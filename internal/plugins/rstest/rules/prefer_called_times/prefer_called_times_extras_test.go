@@ -34,6 +34,9 @@ func TestPreferCalledTimesExtras(t *testing.T) {
 			// written between the parentheses is a different assertion.
 			{Code: `expect(fn).toHaveBeenCalledOnce(1);`},
 			{Code: `expect(fn).toHaveBeenCalledOnce(...args);`},
+			// The argument check reads the matcher's own call, so a trailing
+			// call on the assertion's result cannot hide it.
+			{Code: `expect(fn).toHaveBeenCalledOnce(1)();`},
 			// Chai's call-count property. Its `toHaveBeenCalledTimes(1)`
 			// equivalent is `callCount(1)`, so this rule leaves it alone.
 			{Code: `expect(fn).calledOnce;`},
@@ -120,6 +123,51 @@ expect(fn)[toHaveBeenCalledOnce]();`},
 			{
 				Code:   `(expect(fn)).toHaveBeenCalledOnce();`,
 				Output: []string{`(expect(fn)).toHaveBeenCalledTimes(1);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledTimes", Line: 1, Column: 14}},
+			},
+
+			// ---- E. Trailing calls on the assertion's result ----
+			// The count belongs to the matcher's own argument list, not to
+			// whichever call happens to enclose the assertion.
+			{
+				Code:   `expect(fn).toHaveBeenCalledOnce()();`,
+				Output: []string{`expect(fn).toHaveBeenCalledTimes(1)();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledTimes", Line: 1, Column: 12}},
+			},
+			{
+				Code:   `expect(fn).toHaveBeenCalledOnce()()();`,
+				Output: []string{`expect(fn).toHaveBeenCalledTimes(1)()();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledTimes", Line: 1, Column: 12}},
+			},
+			{
+				Code:   `expect(fn).toHaveBeenCalledOnce()(1);`,
+				Output: []string{`expect(fn).toHaveBeenCalledTimes(1)(1);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledTimes", Line: 1, Column: 12}},
+			},
+			{
+				Code:   `expect(fn)['toHaveBeenCalledOnce']()();`,
+				Output: []string{`expect(fn)['toHaveBeenCalledTimes'](1)();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledTimes", Line: 1, Column: 12}},
+			},
+
+			// ---- E. A parenthesized optional chain is still an assertion ----
+			// ESTree wraps an optional chain in a ChainExpression, which
+			// upstream's chain walk does not enter, so upstream misses these.
+			// The matcher and its receiver are unambiguous here and the
+			// rewrite is exact, so this port reports them.
+			{
+				Code:   `(expect(fn)?.toHaveBeenCalledOnce)();`,
+				Output: []string{`(expect(fn)?.toHaveBeenCalledTimes)(1);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledTimes", Line: 1, Column: 14}},
+			},
+			{
+				Code:   `((expect(fn)?.toHaveBeenCalledOnce))();`,
+				Output: []string{`((expect(fn)?.toHaveBeenCalledTimes))(1);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledTimes", Line: 1, Column: 15}},
+			},
+			{
+				Code:   `(expect(fn)?.toHaveBeenCalledOnce)?.();`,
+				Output: []string{`(expect(fn)?.toHaveBeenCalledTimes)?.(1);`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledTimes", Line: 1, Column: 14}},
 			},
 

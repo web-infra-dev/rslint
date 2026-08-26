@@ -43,6 +43,9 @@ call, and the assertion that takes a count in that style is `callCount(1)`, so
 A matcher named by a computed key, `expect(fn)[matcherName]()`, is not
 reported: which assertion runs is only known at runtime.
 
+Parentheses around the assertion are transparent, including around an optional
+chain: `(expect(fn)?.toHaveBeenCalledOnce)()` is reported and fixed.
+
 Every expect source is covered: globals, `@rstest/core` named imports and
 renamed imports, `require('@rstest/core')` destructuring, namespace imports,
 whole-module `require`, `import.meta.rstest`, `@rstest/playwright`, and the
@@ -67,6 +70,10 @@ expect.soft(fn, 'called once')['toHaveBeenCalledTimes'](1);
 An assertion split across lines, or written with a comment between the matcher
 and its parentheses, is fixed as written. A comment already sitting between the
 parentheses is kept, with the `1` inserted before it.
+
+The count goes into the matcher's own argument list, never into a call that
+merely encloses the assertion, so `expect(fn).toHaveBeenCalledOnce()()` becomes
+`expect(fn).toHaveBeenCalledTimes(1)()`.
 
 ## Conflicting rules
 

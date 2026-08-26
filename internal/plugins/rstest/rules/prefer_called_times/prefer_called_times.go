@@ -34,7 +34,7 @@ var PreferCalledTimesRule = rule.Rule{
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				matcher, ok := calledOnceMatcherEntry(analysis.ParseExpectCall(node))
+				matcher, matcherCall, ok := calledOnceMatcherEntry(analysis.ParseExpectCall(node))
 				if !ok {
 					return
 				}
@@ -49,7 +49,7 @@ var PreferCalledTimesRule = rule.Rule{
 						return nil
 					}
 
-					argumentStart, ok := argumentListStart(ctx.SourceFile, matcher.Call)
+					argumentStart, ok := argumentListStart(ctx.SourceFile, matcherCall)
 					if !ok {
 						return nil
 					}
@@ -65,7 +65,7 @@ var PreferCalledTimesRule = rule.Rule{
 }
 
 // calledOnceMatcherEntry returns the matcher entry of a `toHaveBeenCalledOnce()`
-// assertion.
+// assertion together with the call expression that invokes that matcher.
 //
 // The matcher must be invoked: `expect(fn).toHaveBeenCalledOnce` asserts
 // nothing, and Chai's `calledOnce` is a property getter whose call-count
@@ -76,7 +76,9 @@ var PreferCalledTimesRule = rule.Rule{
 // and friends, where the author never passed a value to assert on; the
 // assertion is broken whichever call-count matcher it names, so rewriting the
 // matcher would only make a wrong assertion look right.
-func calledOnceMatcherEntry(parsed *rstestUtils.ParsedRstestExpectCall) (rstestUtils.ParsedRstestFnMemberEntry, bool) {
+func calledOnceMatcherEntry(
+	parsed *rstestUtils.ParsedRstestExpectCall,
+) (rstestUtils.ParsedRstestFnMemberEntry, *ast.Node, bool) {
 	if parsed == nil ||
 		parsed.Reason != rstestUtils.RstestExpectParseReasonNone ||
 		parsed.Head == nil ||
@@ -84,21 +86,54 @@ func calledOnceMatcherEntry(parsed *rstestUtils.ParsedRstestExpectCall) (rstestU
 		parsed.Matcher != calledOnceMatcher ||
 		len(parsed.Matchers) == 0 ||
 		parsed.Matchers[0].Kind != rstestUtils.RstestExpectMatcherCall {
-		return rstestUtils.ParsedRstestFnMemberEntry{}, false
+		return rstestUtils.ParsedRstestFnMemberEntry{}, nil, false
 	}
 
-	call := parsed.MatcherEntry.Call
-	if call == nil || call.Kind != ast.KindCallExpression {
-		return rstestUtils.ParsedRstestFnMemberEntry{}, false
+	call := matcherCall(parsed.MatcherEntry)
+	if call == nil {
+		return rstestUtils.ParsedRstestFnMemberEntry{}, nil, false
 	}
 	// `toHaveBeenCalledOnce` takes no arguments, so anything already written
 	// between the parentheses means the assertion is not the shape this rule
 	// rewrites.
 	if arguments := call.AsCallExpression().Arguments; arguments != nil && len(arguments.Nodes) > 0 {
-		return rstestUtils.ParsedRstestFnMemberEntry{}, false
+		return rstestUtils.ParsedRstestFnMemberEntry{}, nil, false
 	}
 
-	return *parsed.MatcherEntry, true
+	return *parsed.MatcherEntry, call, true
+}
+
+// matcherCall returns the call expression that directly invokes entry's
+// accessor.
+//
+// MemberEntry.Call cannot be used for this. GetMemberEntries marks the last
+// entry of a callee chain as invoked, so each enclosing call overwrites the
+// field: for `expect(fn).toHaveBeenCalledOnce()()` the matcher entry ends up
+// carrying the outer call, whose parentheses hold no matcher argument list at
+// all. Inserting the count there produces
+// `expect(fn).toHaveBeenCalledTimes()(1)`, which asserts something else
+// entirely. Walking up from the accessor instead always lands on the call the
+// matcher name is the callee of, and stops at it. Parentheses around the
+// callee are transparent, matching how the chain was parsed in the first
+// place.
+func matcherCall(entry *rstestUtils.ParsedRstestFnMemberEntry) *ast.Node {
+	_, accessor := testFramework.AccessorReceiverAndParent(entry)
+	if accessor == nil {
+		return nil
+	}
+
+	child := accessor
+	parent := accessor.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		child = parent
+		parent = parent.Parent
+	}
+	if parent == nil ||
+		parent.Kind != ast.KindCallExpression ||
+		parent.AsCallExpression().Expression != child {
+		return nil
+	}
+	return parent
 }
 
 // argumentListStart returns the offset just after the matcher call's opening
