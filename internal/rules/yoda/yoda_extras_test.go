@@ -277,6 +277,15 @@ func TestYodaExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
 			},
 
+			// ---- Bug fix: explicit-radix numeric member keys must use JavaScript's
+			// per-operation Number rounding before static-reference comparison ----
+			{
+				Code:    `if (0 <= a[0x10000000000000801] && a["18446744073709556000"] < 1) {}`,
+				Output:  []string{`if (a[0x10000000000000801] >= 0 && a["18446744073709556000"] < 1) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5}},
+			},
+
 			// ---- Bug fix: reversing the UTF-16 bounds makes the range descend, so
 			// exceptRange must not suppress the first Yoda comparison ----
 			{
