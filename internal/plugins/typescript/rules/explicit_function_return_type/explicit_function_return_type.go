@@ -90,7 +90,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 	enterFunction := func(node *ast.Node) {
 		functionStack = append(functionStack, functionInfo{
 			needsReturnType: node.Body() != nil &&
-				node.Type() == nil &&
+				utils.ESTreeType(node) == nil &&
 				node.Kind != ast.KindConstructor &&
 				node.Kind != ast.KindSetAccessor,
 			returnsOnlyFunctions: true,
@@ -184,7 +184,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		if isAllowedFunction(node) {
 			return
 		}
-		if opts.allowTypedFunctionExpressions && node.Type() != nil {
+		if opts.allowTypedFunctionExpressions && utils.ESTreeType(node) != nil {
 			return
 		}
 		if !checkFunctionReturnType(node, info) {

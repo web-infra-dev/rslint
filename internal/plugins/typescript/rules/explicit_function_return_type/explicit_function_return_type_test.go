@@ -574,6 +574,14 @@ const f = (gotcha: ObjectWithCallback = { callback: () => {} }): void => {};
 			Options: map[string]interface{}{"allowTypedFunctionExpressions": true},
 		},
 	}, []rule_tester.InvalidTestCase{
+		{
+			Code:     "/** @returns {number} */\nfunction value() { return 1; }",
+			FileName: "file.mjs",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingReturnType", Line: 2, Column: 1},
+			},
+		},
 		// Basic missing return types
 		{
 			Code: `

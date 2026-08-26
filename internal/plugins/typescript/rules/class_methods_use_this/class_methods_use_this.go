@@ -135,15 +135,19 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			return false
 		}
 		for _, clause := range hc.Nodes {
-			if clause == nil {
+			if clause == nil || utils.IsJSDocSyntaxNode(clause) {
 				continue
 			}
 			hcNode := clause.AsHeritageClause()
 			if hcNode == nil {
 				continue
 			}
-			if hcNode.Token == ast.KindImplementsKeyword && hcNode.Types != nil && len(hcNode.Types.Nodes) > 0 {
-				return true
+			if hcNode.Token == ast.KindImplementsKeyword && hcNode.Types != nil {
+				for _, heritageType := range hcNode.Types.Nodes {
+					if !utils.IsJSDocSyntaxNode(heritageType) {
+						return true
+					}
+				}
 			}
 		}
 		return false
@@ -159,7 +163,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	// are *skipped* (treated as public). This is upstream's intentional
 	// behaviour — the rule keys off the modifier, not the `#` prefix.
 	isPublicField := func(member *ast.Node) bool {
-		flags := member.ModifierFlags()
+		flags := utils.ESTreeModifierFlags(member)
 		return flags&(ast.ModifierFlagsPrivate|ast.ModifierFlagsProtected) == 0
 	}
 
@@ -253,7 +257,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if frame == nil || frame.member == nil || frame.usesThis {
 			return
 		}
-		if opts.ignoreOverrideMethods && frame.member.ModifierFlags()&ast.ModifierFlagsOverride != 0 {
+		if opts.ignoreOverrideMethods && utils.ESTreeModifierFlags(frame.member)&ast.ModifierFlagsOverride != 0 {
 			return
 		}
 		if opts.ignoreClasses != ignoreClassesOff && classImplementsInterface(frame.classNode) {
