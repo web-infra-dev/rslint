@@ -162,9 +162,9 @@ func collectProgramTypeDiagnostics(
 
 	var diags []rule.RuleDiagnostic
 	_, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:       programs,
-		SingleThreaded: true,
-		TypeCheck:      true,
+		TypeCheckOnlyPrograms: programs,
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				diags = append(diags, d)

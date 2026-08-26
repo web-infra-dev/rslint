@@ -455,9 +455,8 @@ const array = ([source]) as Array<number>;`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			ExcludePaths: []string{},
+			Program: lintprogram.NewFromCompiler(program),
+			File:    sourceFile.FileName(),
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{{
 					Name:     ConsistentTypeAssertionsRule.Name,

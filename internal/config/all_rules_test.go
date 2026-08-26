@@ -27,6 +27,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -490,17 +491,17 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 	}
 
 	count := 0
-	linter.RunLinterInProgram(sourceProgram, nil, nil, utils.ExcludePaths,
-		func(sf *tsast.SourceFile) []linter.ConfiguredRule {
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                sourceProgram,
+		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+		GetRulesForFile: func(sf *tsast.SourceFile) []linter.ConfiguredRule {
 			if sf.FileName() != filePath {
 				return nil
 			}
 			return []linter.ConfiguredRule{configured}
 		},
-		false,
-		func(d rule.RuleDiagnostic) { count++ },
-		nil,
-	)
+		OnDiagnostic: func(d rule.RuleDiagnostic) { count++ },
+	})
 	return count
 }
 
@@ -611,12 +612,12 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 	}
 	configured := append(sweep, probe)
 
-	linter.RunLinterInProgram(sourceProgram, nil, nil, utils.ExcludePaths,
-		func(sf *tsast.SourceFile) []linter.ConfiguredRule { return configured },
-		false,
-		func(d rule.RuleDiagnostic) {},
-		nil,
-	)
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                sourceProgram,
+		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+		GetRulesForFile:        func(sf *tsast.SourceFile) []linter.ConfiguredRule { return configured },
+		OnDiagnostic:           func(d rule.RuleDiagnostic) {},
+	})
 
 	if !sawAnyListener {
 		t.Fatal("probe listener never fired; test fixture is not being traversed")

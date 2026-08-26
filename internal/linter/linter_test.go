@@ -118,10 +118,11 @@ const runtime = null;`,
 	var functionDeclarations int
 	var nullEntries int
 	var nullExits int
-	_, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["input.mjs"]}},
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{paths["input.mjs"]}},
+		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
 				Name:     "jsdoc-traversal-boundary",
@@ -165,6 +166,10 @@ const runtime = null;`,
 			}}
 		},
 	})
+	_, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+	})
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)
 	}
@@ -207,7 +212,7 @@ func TestRunLinter_ExecutedRules(t *testing.T) {
 		"b.ts": "const b = 2;",
 	})
 
-	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{
 				{Name: "rule-a", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners { return nil }},
@@ -236,11 +241,11 @@ func TestRunLinter_DoesNotExecutePluginPlaceholderInNativePass(t *testing.T) {
 		"a.ts": "const a = 1;",
 	})
 	pluginRunCalled := false
-
-	result, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["a.ts"]}},
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{{paths["a.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
 				Name:               "community/example",
@@ -251,6 +256,10 @@ func TestRunLinter_DoesNotExecutePluginPlaceholderInNativePass(t *testing.T) {
 				},
 			}}
 		},
+	})
+	result, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 	})
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)
@@ -278,7 +287,7 @@ func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 	languageOptions := rule.LanguageOptions{ECMAVersion: 2020}
 
 	var captured *rule.RuleContext
-	result, err := runLinterPositional([]*compiler.Program{program}, true, []string{paths["globals.ts"]}, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, []string{paths["globals.ts"]}, nil, legacyDefaultExcludedPathSubstrings,
 		func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
 				Name: "capture-globals",
@@ -365,7 +374,7 @@ func TestRunLinter_ExecutedRulesPerFile(t *testing.T) {
 	})
 
 	// Different files get different rules — ExecutedRules should be the union.
-	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			if sf.FileName() == paths["a.ts"] {
 				return []ConfiguredRule{
@@ -408,15 +417,19 @@ func TestRunLinter_ExecutedRulesAcrossPrograms(t *testing.T) {
 			Run:      func(rule.RuleContext) rule.RuleListeners { return nil },
 		}
 	}
-	result, err := RunLinter(RunLinterOptions{
-		Programs:    wrapTestPrograms(programA, programB),
-		TargetFiles: [][]string{{pathsA["a.ts"]}, {pathsB["b.ts"]}},
+	programs := wrapTestPrograms(programA, programB)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{pathsA["a.ts"]}, {pathsB["b.ts"]}},
 		GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
 			if file.FileName() == pathsA["a.ts"] {
 				return []ConfiguredRule{configuredRule("shared"), configuredRule("only-a")}
 			}
 			return []ConfiguredRule{configuredRule("shared"), configuredRule("only-b")}
 		},
+	})
+	result, err := RunLinter(RunLinterOptions{
+		LintPlan: lintPlan,
 	})
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)
@@ -440,7 +453,7 @@ func TestRunLinter_ExecutedRulesEmpty(t *testing.T) {
 	})
 
 	// No rules returned → ExecutedRules should be empty.
-	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		false, func(d rule.RuleDiagnostic) {}, nil, nil,
 	)
@@ -517,10 +530,11 @@ func TestListenerRegistryIsolationAndRuleOrderAcrossFiles(t *testing.T) {
 	}
 
 	var diagnostics []rule.RuleDiagnostic
-	_, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["a.ts"], paths["b.ts"]}},
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"]}},
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []ConfiguredRule {
 			if sourceFile.FileName() == paths["a.ts"] {
 				return []ConfiguredRule{
@@ -533,6 +547,10 @@ func TestListenerRegistryIsolationAndRuleOrderAcrossFiles(t *testing.T) {
 				configuredListenerRule(ast.KindNumericLiteral, "b-second", rule.SeverityWarning),
 			}
 		},
+	})
+	_, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(diagnostic rule.RuleDiagnostic) {
 				diagnostics = append(diagnostics, diagnostic)
@@ -595,10 +613,11 @@ func TestRuleContextReporterPreservesDiagnosticSemantics(t *testing.T) {
 	}
 
 	var diagnostics []rule.RuleDiagnostic
-	result, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["reporter.ts"]}},
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{{paths["reporter.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
 				Name:     "reporter-semantics",
@@ -618,6 +637,10 @@ func TestRuleContextReporterPreservesDiagnosticSemantics(t *testing.T) {
 				},
 			}}
 		},
+	})
+	result, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -710,17 +733,22 @@ func TestRunLinterCachesOncePerFileAcrossRules(t *testing.T) {
 		}
 	}
 
-	_, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:       programs,
 		SingleThreaded: true,
-		TargetFiles: [][]string{{
+		TargetsByProgram: [][]string{{
 			paths["first.test.ts"],
 			paths["second.test.ts"],
 		}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{makeRule("first-rule"), makeRule("second-rule")}
 		},
-		Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
+	})
+	_, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		Consumer:       rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)

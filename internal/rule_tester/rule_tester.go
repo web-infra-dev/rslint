@@ -214,12 +214,11 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 
 		sourceFile := program.GetSourceFile(fileName)
 		allowedFiles := []string{sourceFile.FileName()}
-
-		_, err = linter.RunLinter(linter.RunLinterOptions{
-			Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-			SingleThreaded: true,
-			Scope:          linter.FileScope{Files: allowedFiles},
-			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
+		programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+		lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+			Programs:         programs,
+			TargetsByProgram: [][]string{allowedFiles},
+			SingleThreaded:   true,
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{
 					{
@@ -236,6 +235,12 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 					},
 				}
 			},
+		})
+		assert.NilError(t, err, "error preparing lint plan. code:\n", code)
+
+		_, err = linter.RunLinter(linter.RunLinterOptions{
+			SingleThreaded: true,
+			LintPlan:       lintPlan,
 			Consumer: rule.DiagnosticConsumer{
 				Demand: rule.EditDemandAll,
 				Report: func(diagnostic rule.RuleDiagnostic) {

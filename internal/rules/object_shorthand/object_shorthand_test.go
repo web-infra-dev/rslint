@@ -250,9 +250,8 @@ const second = {arrow: () => { return 2; }};`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			ExcludePaths: []string{},
+			Program: lintprogram.NewFromCompiler(program),
+			File:    sourceFile.FileName(),
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{{
 					Name:     ObjectShorthandRule.Name,
