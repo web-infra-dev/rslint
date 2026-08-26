@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ignoreStatic": {
+          "type": "boolean",
+          "description": "Whether to skip checking whether `static` methods are correctly bound."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

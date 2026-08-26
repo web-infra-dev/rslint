@@ -71,4 +71,5 @@ Examples of **correct** code with this configuration:
 
 ## Original Documentation
 
-- [react/button-has-type](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/button-has-type.md)
+- [eslint-plugin-react: button-has-type](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/button-has-type.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/button-has-type.js)

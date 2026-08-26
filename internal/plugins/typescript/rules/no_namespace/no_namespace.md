@@ -38,4 +38,5 @@ declare namespace MyLib {
 
 ## Original Documentation
 
-- [typescript-eslint no-namespace](https://typescript-eslint.io/rules/no-namespace)
+- [typescript-eslint: no-namespace](https://typescript-eslint.io/rules/no-namespace)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-namespace.ts)

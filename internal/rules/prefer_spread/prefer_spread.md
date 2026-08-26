@@ -46,4 +46,5 @@ obj.foo(...args);
 
 ## Original Documentation
 
-- [ESLint prefer-spread](https://eslint.org/docs/latest/rules/prefer-spread)
+- [ESLint: prefer-spread](https://eslint.org/docs/latest/rules/prefer-spread)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-spread.js)

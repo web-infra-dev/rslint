@@ -51,24 +51,24 @@ func TestNoSelfAssignRule(t *testing.T) {
 			{Code: `({a: b} = {a: c})`},
 
 			// Member expressions with props:true (default)
-			{Code: `a.b = a.c`, Options: map[string]interface{}{"props": true}},
-			{Code: `a.b = c.b`, Options: map[string]interface{}{"props": true}},
-			{Code: `a.b = a[b]`, Options: map[string]interface{}{"props": true}},
-			{Code: `a[b] = a.b`, Options: map[string]interface{}{"props": true}},
-			{Code: `a.b().c = a.b().c`, Options: map[string]interface{}{"props": true}},
-			{Code: `b().c = b().c`, Options: map[string]interface{}{"props": true}},
-			{Code: `a[b + 1] = a[b + 1]`, Options: map[string]interface{}{"props": true}},
-			{Code: "a.null = a[/(?<zero>0)/]", Options: map[string]interface{}{"props": true}},
-			{Code: `this.x = this.y`, Options: map[string]interface{}{"props": true}},
+			{Code: `a.b = a.c`, Options: []interface{}{map[string]interface{}{"props": true}}},
+			{Code: `a.b = c.b`, Options: []interface{}{map[string]interface{}{"props": true}}},
+			{Code: `a.b = a[b]`, Options: []interface{}{map[string]interface{}{"props": true}}},
+			{Code: `a[b] = a.b`, Options: []interface{}{map[string]interface{}{"props": true}}},
+			{Code: `a.b().c = a.b().c`, Options: []interface{}{map[string]interface{}{"props": true}}},
+			{Code: `b().c = b().c`, Options: []interface{}{map[string]interface{}{"props": true}}},
+			{Code: `a[b + 1] = a[b + 1]`, Options: []interface{}{map[string]interface{}{"props": true}}},
+			{Code: "a.null = a[/(?<zero>0)/]", Options: []interface{}{map[string]interface{}{"props": true}}},
+			{Code: `this.x = this.y`, Options: []interface{}{map[string]interface{}{"props": true}}},
 			{Code: `a[0] = a[1]`},
 
 			// Member expressions with props:false
-			{Code: `a.b = a.b`, Options: map[string]interface{}{"props": false}},
-			{Code: `a.b.c = a.b.c`, Options: map[string]interface{}{"props": false}},
-			{Code: `a[b] = a[b]`, Options: map[string]interface{}{"props": false}},
-			{Code: `a['b'] = a['b']`, Options: map[string]interface{}{"props": false}},
-			{Code: `this.x = this.x`, Options: map[string]interface{}{"props": false}},
-			{Code: `a[0] = a[0]`, Options: map[string]interface{}{"props": false}},
+			{Code: `a.b = a.b`, Options: []interface{}{map[string]interface{}{"props": false}}},
+			{Code: `a.b.c = a.b.c`, Options: []interface{}{map[string]interface{}{"props": false}}},
+			{Code: `a[b] = a[b]`, Options: []interface{}{map[string]interface{}{"props": false}}},
+			{Code: `a['b'] = a['b']`, Options: []interface{}{map[string]interface{}{"props": false}}},
+			{Code: `this.x = this.x`, Options: []interface{}{map[string]interface{}{"props": false}}},
+			{Code: `a[0] = a[0]`, Options: []interface{}{map[string]interface{}{"props": false}}},
 
 			// Spread copy
 			{Code: `a = {...a}`},
@@ -304,43 +304,60 @@ func TestNoSelfAssignRule(t *testing.T) {
 					{MessageId: "selfAssignment", Line: 1, Column: 8},
 				},
 			},
+			// rslint-specific: a TS non-null assertion has no runtime effect,
+			// so `a!.b` and `a.b` reference the same value. This is unreachable
+			// upstream (ESLint has no TS syntax); locks in utils.IsSameReference
+			// unwrapping `!` via ast.OEKAssertions.
+			{
+				Code: `a!.b = a.b`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Line: 1, Column: 8},
+				},
+			},
 			{
 				Code: `a['b'] = a['b']`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 10},
 				},
 			},
+			// `super` is a same-reference base case upstream, exactly like `this`.
+			{
+				Code: `class B { x: any } class C extends B { m() { super.x = super.x; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "selfAssignment", Line: 1, Column: 56},
+				},
+			},
 			{
 				Code:    `a.b = a.b`,
-				Options: map[string]interface{}{"props": true},
+				Options: []interface{}{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 7},
 				},
 			},
 			{
 				Code:    `a.b.c = a.b.c`,
-				Options: map[string]interface{}{"props": true},
+				Options: []interface{}{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 9},
 				},
 			},
 			{
 				Code:    `a[b] = a[b]`,
-				Options: map[string]interface{}{"props": true},
+				Options: []interface{}{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 8},
 				},
 			},
 			{
 				Code:    `a['b'] = a['b']`,
-				Options: map[string]interface{}{"props": true},
+				Options: []interface{}{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 10},
 				},
 			},
 			{
 				Code:    `this.x = this.x`,
-				Options: map[string]interface{}{"props": true},
+				Options: []interface{}{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 10},
 				},
@@ -393,7 +410,7 @@ func TestNoSelfAssignRule(t *testing.T) {
 			// Regex literal vs string literal
 			{
 				Code:    "a['/(?<zero>0)/'] = a[/(?<zero>0)/]",
-				Options: map[string]interface{}{"props": true},
+				Options: []interface{}{map[string]interface{}{"props": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "selfAssignment", Line: 1, Column: 21},
 				},

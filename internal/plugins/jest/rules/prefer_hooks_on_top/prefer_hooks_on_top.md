@@ -119,4 +119,5 @@ describe('foo', () => {
 
 ## Original Documentation
 
-- [jest/prefer-hooks-on-top](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-hooks-on-top.md)
+- [eslint-plugin-jest: prefer-hooks-on-top](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-hooks-on-top.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-hooks-on-top.ts)

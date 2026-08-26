@@ -33,4 +33,5 @@ function baz() {
 
 ## Original Documentation
 
-- [typescript-eslint require-await](https://typescript-eslint.io/rules/require-await)
+- [typescript-eslint: require-await](https://typescript-eslint.io/rules/require-await)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/require-await.ts)

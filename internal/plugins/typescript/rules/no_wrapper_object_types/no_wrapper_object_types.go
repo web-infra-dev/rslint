@@ -1,11 +1,10 @@
 package no_wrapper_object_types
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // classNames mirrors the upstream `classNames` Set verbatim. Order is
@@ -33,6 +32,7 @@ func buildBannedClassTypeMessage(typeName, preferred string) rule.RuleMessage {
 
 var NoWrapperObjectTypesRule = rule.CreateRule(rule.Rule{
 	Name:             "no-wrapper-object-types",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// checkBannedTypes mirrors upstream's local `checkBannedTypes` —
@@ -50,7 +50,7 @@ var NoWrapperObjectTypesRule = rule.CreateRule(rule.Rule{
 			if !typescriptutil.IsReferenceToGlobalIdentifier(ctx, node) {
 				return
 			}
-			preferred := strings.ToLower(typeName)
+			preferred := ecmascript.StringToLowerCase(typeName)
 			msg := buildBannedClassTypeMessage(typeName, preferred)
 			if includeFix {
 				ctx.ReportNodeWithFixes(node, msg, rule.RuleFixReplace(ctx.SourceFile, node, preferred))

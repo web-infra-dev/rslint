@@ -43,4 +43,5 @@ enum Color {
 
 ## Original Documentation
 
-- [typescript-eslint no-duplicate-enum-values](https://typescript-eslint.io/rules/no-duplicate-enum-values)
+- [typescript-eslint: no-duplicate-enum-values](https://typescript-eslint.io/rules/no-duplicate-enum-values)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-duplicate-enum-values.ts)

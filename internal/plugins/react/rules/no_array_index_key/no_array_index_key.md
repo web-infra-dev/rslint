@@ -67,5 +67,5 @@ If you have a stable list of items that will never be reordered, inserted into, 
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-array-index-key](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-array-index-key.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/no-array-index-key.js)
+- [eslint-plugin-react: no-array-index-key](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-array-index-key.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-array-index-key.js)

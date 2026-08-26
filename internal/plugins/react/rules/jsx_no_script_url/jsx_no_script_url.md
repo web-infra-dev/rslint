@@ -64,4 +64,5 @@ If only settings should be used, the array option can be omitted:
 
 ## Original Documentation
 
-- [eslint-plugin-react/jsx-no-script-url](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-script-url.md)
+- [eslint-plugin-react: jsx-no-script-url](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-no-script-url.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-no-script-url.js)

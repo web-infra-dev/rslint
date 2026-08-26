@@ -4,7 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -296,20 +300,20 @@ foo(x?: any) { return x; }
 				Code: `abstract class A {
 abstract foo(): void;
 }`,
-				Options: 0, // Abstract method has no body → not visited.
+				Options: map[string]interface{}{"max": 0}, // Abstract method has no body → not visited.
 			},
 			{
 				Code: `declare class A {
 foo(): void;
 }`,
-				Options: 0,
+				Options: map[string]interface{}{"max": 0},
 			},
 			{
 				Code: `interface I {
 foo(): void;
 bar(x: string): void;
 }`,
-				Options: 0, // MethodSignature isn't in our listeners at all.
+				Options: map[string]interface{}{"max": 0}, // MethodSignature isn't in our listeners at all.
 			},
 
 			// --- Class static blocks are NOT visited (ESLint also doesn't).
@@ -322,7 +326,7 @@ let z = 3;
 let w = 4;
 }
 }`,
-				Options: 0,
+				Options: map[string]interface{}{"max": 0},
 			},
 
 			// --- Generator method (non-async)
@@ -737,7 +741,7 @@ return this;
 				Code: `interface I {
 foo?(): void;
 }`,
-				Options: 0,
+				Options: map[string]interface{}{"max": 0},
 			},
 
 			// --- Function expression with own id matching outer var name (the
@@ -793,28 +797,28 @@ build() { return 1; },
 				},
 			},
 
-			// Test anonymous function assigned to variable is recognized — name
-			// resolved via parent VariableDeclaration to match ESLint's getName.
+			// Test anonymous function assigned to variable is recognized. Core
+			// ESLint does not infer the enclosing variable name.
 			{
 				Code:    "var func = function() {\n}",
 				Options: 1,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Function 'func' has too many lines (2). Maximum allowed is 1.",
+						Message:   "Function has too many lines (2). Maximum allowed is 1.",
 					},
 				},
 			},
 
-			// Test arrow functions are recognized — name resolved via parent
-			// VariableDeclaration to match ESLint's getName.
+			// Test arrow functions are recognized without inferring the enclosing
+			// variable name.
 			{
 				Code:    "const bar = () => {\nconst x = 2 + 1;\nreturn x;\n}",
 				Options: 3,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'bar' has too many lines (4). Maximum allowed is 3.",
+						Message:   "Arrow function has too many lines (4). Maximum allowed is 3.",
 					},
 				},
 			},
@@ -826,7 +830,7 @@ build() { return 1; },
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'bar' has too many lines (2). Maximum allowed is 1.",
+						Message:   "Arrow function has too many lines (2). Maximum allowed is 1.",
 					},
 				},
 			},
@@ -1182,8 +1186,8 @@ return 1;
 			// 2. Additional edge cases — TS-specific syntax + position assertions
 			// ============================================================
 
-			// Position assertions: function declaration spans 2 lines, max=1.
-			// Range: from `f` (col 1, line 1) through the closing `}` (col 1, line 2).
+			// Position assertions: reports the function head through the opening
+			// parameter parenthesis, excluding the body.
 			{
 				Code:    "function f() {\n}",
 				Options: 1,
@@ -1193,36 +1197,37 @@ return 1;
 						Message:   "Function 'f' has too many lines (2). Maximum allowed is 1.",
 						Line:      1,
 						Column:    1,
-						EndLine:   2,
-						EndColumn: 2,
+						EndLine:   1,
+						EndColumn: 11,
 					},
 				},
 			},
 
-			// Position assertions: arrow function in const decl. Range covers `() => { ... }`.
+			// Position assertions: a standalone arrow reports only the `=>` token.
 			{
 				Code:    "const bar = () => {\nreturn 1;\n}",
 				Options: 1,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'bar' has too many lines (3). Maximum allowed is 1.",
+						Message:   "Arrow function has too many lines (3). Maximum allowed is 1.",
 						Line:      1,
-						Column:    13,
-						EndLine:   3,
-						EndColumn: 2,
+						Column:    16,
+						EndLine:   1,
+						EndColumn: 18,
 					},
 				},
 			},
 
-			// Async arrow function — description includes "async" + parent-walked name
+			// Async arrow function — description includes "async" without a
+			// variable-inferred name.
 			{
 				Code:    "const bar = async () => {\nawait g();\nreturn 1;\n}",
 				Options: 2,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Async arrow function 'bar' has too many lines (4). Maximum allowed is 2.",
+						Message:   "Async arrow function has too many lines (4). Maximum allowed is 2.",
 					},
 				},
 			},
@@ -1278,7 +1283,7 @@ return 1;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Private method '#foo' has too many lines (3). Maximum allowed is 2.",
+						Message:   "Private method #foo has too many lines (3). Maximum allowed is 2.",
 					},
 				},
 			},
@@ -1329,10 +1334,8 @@ return 2;
 				},
 			},
 
-			// Class field arrow — counts as arrow function (parent is
-			// PropertyDeclaration, not a method); name is resolved from the
-			// property key, matching ESLint's getName which inspects
-			// PropertyDefinition.key.
+			// Class field arrow — core ESLint classifies a function-valued
+			// PropertyDefinition as a method named from the field key.
 			{
 				Code: `class A {
 foo = () => {
@@ -1344,19 +1347,20 @@ return 2;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'foo' has too many lines (4). Maximum allowed is 2.",
+						Message:   "Method 'foo' has too many lines (4). Maximum allowed is 2.",
 					},
 				},
 			},
 
-			// Object literal arrow assignment — name resolved from property key.
+			// Object literal arrow assignment — core ESLint classifies the
+			// function-valued Property as a method named from its key.
 			{
 				Code:    "var o = { foo: () => {\nreturn 1;\nreturn 2;\n} }",
 				Options: 2,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'foo' has too many lines (4). Maximum allowed is 2.",
+						Message:   "Method 'foo' has too many lines (4). Maximum allowed is 2.",
 					},
 				},
 			},
@@ -1504,7 +1508,7 @@ return 2;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Private getter '#x' has too many lines (4). Maximum allowed is 2.",
+						Message:   "Private getter #x has too many lines (4). Maximum allowed is 2.",
 					},
 				},
 			},
@@ -1548,9 +1552,8 @@ let b = 2;
 				},
 			},
 
-			// Triple-nested arrow chain — each arrow gets its own visit. The
-			// outermost spans 4 lines; max=1 should report all three. Only the
-			// outermost is bound to a variable, so only it carries a name.
+			// Triple-nested arrow chain — each arrow gets its own visit. Core
+			// ESLint does not infer a name for the outer variable-bound arrow.
 			{
 				Code: `var f = () =>
 () =>
@@ -1560,7 +1563,7 @@ let b = 2;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'f' has too many lines (4). Maximum allowed is 1.",
+						Message:   "Arrow function has too many lines (4). Maximum allowed is 1.",
 					},
 					{
 						MessageId: "exceed",
@@ -1836,25 +1839,11 @@ class A { method() { return 1; } }
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'f' has too many lines (3). Maximum allowed is 0.",
+						Message:   "Arrow function has too many lines (3). Maximum allowed is 0.",
 					},
 					{
 						MessageId: "exceed",
 						Message:   "Method 'method' has too many lines (1). Maximum allowed is 0.",
-					},
-				},
-			},
-
-			// Negative max fires on everything (defensive — ESLint's schema
-			// rejects this, but our parser accepts the value, fires on >= 0).
-			// Ports of similar guard rails in max-lines.
-			{
-				Code:    "function f() {\nreturn 1;\n}",
-				Options: map[string]interface{}{"max": -1},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "exceed",
-						Message:   "Function 'f' has too many lines (3). Maximum allowed is -1.",
 					},
 				},
 			},
@@ -1879,7 +1868,7 @@ let b = 2;
 			// when max=0 the lineCount=1 still exceeds.
 			{
 				Code:    "class A { method() { return 1; } }",
-				Options: 0,
+				Options: map[string]interface{}{"max": 0},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
@@ -1901,21 +1890,19 @@ let b = 2;
 				},
 			},
 
-			// Position assertions: multi-line arrow with type annotation on
-			// param (TS-only). Range starts at `(` (with leading paren), not
-			// at the type. Catches accidental inclusion of the type-only
-			// position.
+			// Position assertions: a typed arrow still reports only its `=>`
+			// token, after the return annotation.
 			{
 				Code:    "const f = (x: number): number => {\nreturn x;\nreturn x + 1;\n};",
 				Options: 2,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'f' has too many lines (4). Maximum allowed is 2.",
+						Message:   "Arrow function has too many lines (4). Maximum allowed is 2.",
 						Line:      1,
-						Column:    11,
-						EndLine:   4,
-						EndColumn: 2,
+						Column:    31,
+						EndLine:   1,
+						EndColumn: 33,
 					},
 				},
 			},
@@ -1935,14 +1922,14 @@ return 2;
 						Message:   "Function 'f' has too many lines (4). Maximum allowed is 2.",
 						Line:      2,
 						Column:    1,
-						EndLine:   5,
-						EndColumn: 2,
+						EndLine:   2,
+						EndColumn: 11,
 					},
 				},
 			},
 
 			// Class expression with private static method (both modifiers):
-			// "Static private method '#priv'". Verifies inClassBody works for
+			// "Static private method #priv". Verifies inClassBody works for
 			// ClassExpression too, not just ClassDeclaration.
 			{
 				Code: `var A = class {
@@ -1955,7 +1942,7 @@ return 2;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Static private method '#priv' has too many lines (4). Maximum allowed is 2.",
+						Message:   "Static private method #priv has too many lines (4). Maximum allowed is 2.",
 					},
 				},
 			},
@@ -1974,11 +1961,11 @@ console.log('thrice');
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'Button' has too many lines (5). Maximum allowed is 2.",
+						Message:   "Arrow function has too many lines (5). Maximum allowed is 2.",
 					},
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function 'onClick' has too many lines (5). Maximum allowed is 2.",
+						Message:   "Method 'onClick' has too many lines (5). Maximum allowed is 2.",
 					},
 				},
 			},
@@ -2061,4 +2048,334 @@ return x + y;
 			},
 		},
 	)
+}
+
+func TestMaxLinesPerFunctionLatestFunctionHeads(t *testing.T) {
+	options := map[string]interface{}{"max": 0, "IIFEs": true}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&MaxLinesPerFunctionRule,
+		nil,
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    "export function named() {}",
+				Options: options,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   "Function 'named' has too many lines (1). Maximum allowed is 0.",
+					Line:      1,
+					Column:    8,
+					EndLine:   1,
+					EndColumn: 22,
+				}},
+			},
+			{
+				Code:    "const value = function named() {};",
+				Options: options,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   "Function 'named' has too many lines (1). Maximum allowed is 0.",
+					Line:      1,
+					Column:    15,
+					EndLine:   1,
+					EndColumn: 29,
+				}},
+			},
+			{
+				Code:    "const value = () => {};",
+				Options: options,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   "Arrow function has too many lines (1). Maximum allowed is 0.",
+					Line:      1,
+					Column:    18,
+					EndLine:   1,
+					EndColumn: 20,
+				}},
+			},
+			{
+				Code:    "const object = { field: value => value };",
+				Options: options,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   "Method 'field' has too many lines (1). Maximum allowed is 0.",
+					Line:      1,
+					Column:    18,
+					EndLine:   1,
+					EndColumn: 25,
+				}},
+			},
+			{
+				Code:    "class C { field = value => value }",
+				Options: options,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   "Method 'field' has too many lines (1). Maximum allowed is 0.",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 19,
+				}},
+			},
+			{
+				Code:    "class C {\n  @dec\n  method() {}\n}",
+				Options: options,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   "Method 'method' has too many lines (2). Maximum allowed is 0.",
+					Line:      2,
+					Column:    3,
+					EndLine:   3,
+					EndColumn: 9,
+				}},
+			},
+			{
+				Code:    "class C {\n  @dec\n  field = value => value\n}",
+				Options: options,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   "Method 'field' has too many lines (1). Maximum allowed is 0.",
+					Line:      2,
+					Column:    3,
+					EndLine:   3,
+					EndColumn: 11,
+				}},
+			},
+			{
+				Code:    "class C {\n  @dec()\n  static #field = (value) => value\n}",
+				Options: options,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   "Static private method #field has too many lines (1). Maximum allowed is 0.",
+					Line:      2,
+					Column:    3,
+					EndLine:   3,
+					EndColumn: 19,
+				}},
+			},
+		},
+	)
+}
+
+func TestMaxLinesPerFunctionLazyLineStateParity(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&MaxLinesPerFunctionRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `declare function signature(): void;
+(function () { return 1; })();`,
+				Options: map[string]interface{}{"max": 0, "IIFEs": false},
+			},
+			{
+				Code: "function singleLine() { return 1; }",
+				Options: map[string]interface{}{
+					"max":            1,
+					"skipBlankLines": true,
+					"skipComments":   true,
+				},
+			},
+			{
+				Code:    "function split() {\u2028return 1;\u2029}",
+				Options: 3,
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `/** docs */
+function one() { return 1; }`,
+				Options: map[string]interface{}{
+					"max":            0,
+					"skipBlankLines": true,
+					"skipComments":   true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Function 'one' has too many lines (1). Maximum allowed is 0.",
+						Line:      2,
+						Column:    1,
+						EndLine:   2,
+						EndColumn: 13,
+					},
+				},
+			},
+			{
+				Code: `declare function signature(): void;
+(function () { return 0; })();
+function short() { return 1; }
+function long() {
+// comment
+
+return 1;
+}`,
+				Options: map[string]interface{}{
+					"max":            2,
+					"IIFEs":          false,
+					"skipBlankLines": true,
+					"skipComments":   true,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Function 'long' has too many lines (3). Maximum allowed is 2.",
+						Line:      4,
+						Column:    1,
+						EndLine:   4,
+						EndColumn: 14,
+					},
+				},
+			},
+			{
+				Code:    "function split() {\u2028return 1;\u2029}",
+				Options: 2,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "exceed",
+						Message:   "Function 'split' has too many lines (3). Maximum allowed is 2.",
+					},
+				},
+			},
+		},
+	)
+}
+
+func TestMaxLinesPerFunctionDisableDirectives(t *testing.T) {
+	for _, testCase := range []struct {
+		name            string
+		code            string
+		wantDiagnostics int
+	}{
+		{
+			name: "scoped block",
+			code: `/* rslint-disable max-lines-per-function */
+function blockDisabled() {}
+/* rslint-enable max-lines-per-function */`,
+		},
+		{
+			name: "next line",
+			code: `/* eslint-disable-next-line max-lines-per-function */
+function lineDisabled() {}`,
+		},
+		{
+			name: "different rule",
+			code: `/* eslint-disable-next-line another-rule */
+function enabled() {}`,
+			wantDiagnostics: 1,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/disable-directive.ts",
+				Path:     "/disable-directive.ts",
+			}, testCase.code, core.ScriptKindTS)
+			node := sourceFile.Statements.Nodes[0]
+			comments := rule.NewCommentStore(sourceFile)
+			diagnostics := 0
+			ctx := rule.RuleContext{
+				SourceFile:     sourceFile,
+				Comments:       comments,
+				DisableManager: rule.NewDisableManager(sourceFile, comments),
+			}.WithDiagnosticConsumer(
+				MaxLinesPerFunctionRule.Name,
+				rule.SeverityWarning,
+				rule.DiagnosticConsumer{
+					Report: func(rule.RuleDiagnostic) {
+						diagnostics++
+					},
+				},
+			)
+
+			listener := MaxLinesPerFunctionRule.Run(ctx, []any{0})[node.Kind]
+			listener(node)
+			if diagnostics != testCase.wantDiagnostics {
+				t.Fatalf("diagnostics = %d, want %d", diagnostics, testCase.wantDiagnostics)
+			}
+		})
+	}
+}
+
+func TestMaxLinesPerFunctionEditDemandParity(t *testing.T) {
+	const code = "function one() { return 1; }"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, code, core.ScriptKindTS)
+	node := sourceFile.Statements.Nodes[0]
+
+	for _, testCase := range []struct {
+		name   string
+		demand rule.EditDemand
+	}{
+		{name: "diagnostics only", demand: rule.EditDemandNone},
+		{name: "autofix", demand: rule.EditDemandAutofix},
+		{name: "suggestions", demand: rule.EditDemandSuggestion},
+		{name: "all edits", demand: rule.EditDemandAll},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			comments := rule.NewCommentStore(sourceFile)
+			var diagnostics []rule.RuleDiagnostic
+			ctx := rule.RuleContext{
+				SourceFile:     sourceFile,
+				Comments:       comments,
+				DisableManager: rule.NewDisableManager(sourceFile, comments),
+			}.WithDiagnosticConsumer(
+				MaxLinesPerFunctionRule.Name,
+				rule.SeverityWarning,
+				rule.DiagnosticConsumer{
+					Demand: testCase.demand,
+					Report: func(diagnostic rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, diagnostic)
+					},
+				},
+			)
+
+			listener := MaxLinesPerFunctionRule.Run(ctx, []any{0})[node.Kind]
+			listener(node)
+
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+			}
+			diagnostic := diagnostics[0]
+			if diagnostic.Range != core.NewTextRange(0, 12) {
+				t.Fatalf("range = %v, want [0,12)", diagnostic.Range)
+			}
+			if diagnostic.Message.Description != "Function 'one' has too many lines (1). Maximum allowed is 0." {
+				t.Fatalf("message = %q", diagnostic.Message.Description)
+			}
+			if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+				t.Fatalf("unexpected edit artifacts: fixes=%v suggestions=%v", diagnostic.FixesPtr, diagnostic.Suggestions)
+			}
+		})
+	}
+}
+
+func TestIsSingleLineRange(t *testing.T) {
+	for _, testCase := range []struct {
+		name             string
+		text             string
+		startPos, endPos int
+		want             bool
+	}{
+		{name: "ASCII", text: "function f() {}", startPos: 0, endPos: 15, want: true},
+		{name: "range after line break", text: "before\nfunction f() {}", startPos: 7, endPos: 22, want: true},
+		{name: "LF", text: "a\nb", startPos: 0, endPos: 3},
+		{name: "CR", text: "a\rb", startPos: 0, endPos: 3},
+		{name: "line separator", text: "a\u2028b", startPos: 0, endPos: 5},
+		{name: "paragraph separator", text: "a\u2029b", startPos: 0, endPos: 5},
+		{name: "empty", text: "abc", startPos: 1, endPos: 1, want: true},
+		{name: "synthetic start", text: "abc", startPos: -1, endPos: 3},
+		{name: "end past source", text: "abc", startPos: 0, endPos: 4},
+		{name: "reversed", text: "abc", startPos: 2, endPos: 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := isSingleLineRange(testCase.text, testCase.startPos, testCase.endPos); got != testCase.want {
+				t.Fatalf("isSingleLineRange(%q, %d, %d) = %v, want %v", testCase.text, testCase.startPos, testCase.endPos, got, testCase.want)
+			}
+		})
+	}
 }

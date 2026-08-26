@@ -26,23 +26,34 @@ The rule accepts either an array of strings/objects or an object with `paths` an
 ### String format
 
 ```json
-"no-restricted-imports": ["error", "fs", "path"]
+{
+  "no-restricted-imports": ["error", "fs", "path"]
+}
 ```
 
 ### Object format with paths and patterns
 
 ```json
-"no-restricted-imports": ["error", {
-  "paths": [{
-    "name": "import-foo",
-    "importNames": ["Bar"],
-    "message": "Please use Bar from /import-bar/ instead."
-  }],
-  "patterns": [{
-    "group": ["import1/private/*"],
-    "message": "usage of import1 private modules not allowed."
-  }]
-}]
+{
+  "no-restricted-imports": [
+    "error",
+    {
+      "paths": [
+        {
+          "name": "import-foo",
+          "importNames": ["Bar"],
+          "message": "Please use Bar from /import-bar/ instead."
+        }
+      ],
+      "patterns": [
+        {
+          "group": ["import1/private/*"],
+          "message": "usage of import1 private modules not allowed."
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ### Path options
@@ -67,4 +78,5 @@ The rule accepts either an array of strings/objects or an object with `paths` an
 
 ## Original Documentation
 
-[ESLint: no-restricted-imports](https://eslint.org/docs/latest/rules/no-restricted-imports)
+- [ESLint: no-restricted-imports](https://eslint.org/docs/latest/rules/no-restricted-imports)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-restricted-imports.js)

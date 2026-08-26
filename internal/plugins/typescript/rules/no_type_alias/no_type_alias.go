@@ -1,11 +1,15 @@
 package no_type_alias
 
 import (
-	"strings"
+	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+//go:embed no_type_alias.schema.json
+var schemaJSON []byte
 
 type optionValue string
 
@@ -51,7 +55,7 @@ func parseCompositionOption(val string) optionValue {
 	return optionNever
 }
 
-func parseOptions(options any) NoTypeAliasOptions {
+func parseOptions(options []any) NoTypeAliasOptions {
 	opts := NoTypeAliasOptions{
 		AllowAliases:          optionNever,
 		AllowCallbacks:        optionNever,
@@ -62,18 +66,10 @@ func parseOptions(options any) NoTypeAliasOptions {
 		AllowMappedTypes:      optionNever,
 		AllowTupleTypes:       optionNever,
 	}
-	if options == nil {
+	if len(options) == 0 {
 		return opts
 	}
-	var optsMap map[string]interface{}
-	if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-		optsMap, _ = arr[0].(map[string]interface{})
-	} else {
-		optsMap, _ = options.(map[string]interface{})
-	}
-	if optsMap == nil {
-		return opts
-	}
+	optsMap, _ := options[0].(map[string]interface{})
 	if v, ok := optsMap["allowAliases"].(string); ok {
 		opts.AllowAliases = parseCompositionOption(v)
 	}
@@ -104,7 +100,7 @@ func parseOptions(options any) NoTypeAliasOptions {
 func buildNoTypeAliasMessage(alias string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "noTypeAlias",
-		Description: "Type " + strings.ToLower(alias) + " are not allowed.",
+		Description: "Type " + ecmascript.StringToLowerCase(alias) + " are not allowed.",
 	}
 }
 
@@ -132,9 +128,9 @@ func unwrapParenthesized(node *ast.Node) *ast.Node {
 }
 
 var NoTypeAliasRule = rule.CreateRule(rule.Rule{
-	Name: "no-type-alias",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-type-alias",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		isSupportedComposition := func(isTopLevel bool, composition compositionType, allowed optionValue) bool {

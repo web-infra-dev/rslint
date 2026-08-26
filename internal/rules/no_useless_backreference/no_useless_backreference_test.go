@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -51,9 +52,19 @@ RegExp(new String('\\1(a)'));`},
 			{Code: `function foo(RegExp) { new RegExp('\\1(a)'); }`},
 			{Code: `if (foo) { const RegExp = bar; RegExp('\\1(a)'); }`},
 			{Code: `namespace RegExp {} RegExp('\\1(a)');`},
-			// SKIP: rslint does not support ESLint's /*globals*/ directive comments
-			// `/* globals RegExp:off */ new RegExp('\\1(a)');`
-			// `RegExp('\\1(a)');` with languageOptions.globals { RegExp: "off" }
+			{Code: `/* globals RegExp:off */ new RegExp('\\1(a)');`},
+			{Code: `new RegExp('(\\1)')`, Globals: map[string]any{"RegExp": "off"}},
+			{Code: `const R = RegExp; R('(\\1)')`, Globals: map[string]any{"RegExp": "off"}},
+			{Code: `window.RegExp('(\\1)')`},
+			{Code: `window.RegExp('(\\1)')`, Globals: map[string]any{"window": "off"}},
+			{Code: `const R = window.RegExp; R('(\\1)')`},
+			{Code: `const root = window; root.RegExp('(\\1)')`},
+			{Code: `globalThis.RegExp('(\\1)')`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019}},
+			{Code: `const R = globalThis.RegExp; R('(\\1)')`, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2019}},
+			{Code: `const R = globalThis.RegExp; R('(\\1)')`, Globals: map[string]any{"globalThis": "off"}},
+			{Code: `RegExp = custom; RegExp('(\\1)')`, Globals: map[string]any{"RegExp": "writable"}},
+			{Code: `const R = globalThis.RegExp; globalThis = custom; R('(\\1)')`, Globals: map[string]any{"globalThis": "writable"}},
+			{Code: `const window = { RegExp }; window.RegExp('(\\1)')`, Globals: map[string]any{"window": "readonly"}},
 
 			// ---- no capturing groups ----
 			{Code: `/(?:)/`},
@@ -230,6 +241,71 @@ RegExp(new String('\\1(a)'));`},
 
 			// ---- nested ----
 			{Code: `new RegExp('(\\1)')`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}}},
+			{
+				Code:     `new RegExp('(\\1)')`,
+				TSConfig: "tsconfig.noLib.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `globalThis.RegExp('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `window.RegExp('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off", "window": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `window['RegExp']('(\\1)')`,
+				Globals: map[string]any{"window": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}},
+			},
+			{
+				Code:    `const R = globalThis.RegExp; R('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
+			{
+				Code:    `const root = globalThis; const R = root.RegExp; R('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
+			{
+				Code:    `const root = globalThis; root.RegExp('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
+			{
+				Code:    `let R; R = globalThis.RegExp; R('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
+			{
+				Code:    `let R; ({ RegExp: R } = globalThis); R('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
+			{
+				Code:    `const { RegExp: R } = globalThis; R('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
+			{
+				Code:    `const { RegExp } = globalThis; RegExp('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
+			{
+				Code:    `const R = window.RegExp; R('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off", "window": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
+			{
+				Code:    `declare const R: RegExpConstructor; R('(\\1)')`,
+				Globals: map[string]any{"RegExp": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "nested"}},
+			},
 			{Code: `/^(a\1)$/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}}},
 			{Code: `/^((a)\1)$/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}}},
 			{Code: `new RegExp('^(a\\1b)$')`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "nested", Line: 1, Column: 1}}},
@@ -596,7 +672,7 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 
 	var diagnostics []rule.RuleDiagnostic
 	linter.RunLinterInProgram(
-		program,
+		lintprogram.NewFromCompiler(program),
 		[]string{sourceFile.FileName()},
 		nil,
 		nil,
@@ -614,7 +690,6 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
 		nil,
-		nil,
 	)
 	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
 		t.Fatalf("diagnostics = %#v; want one forward report", diagnostics)
@@ -627,6 +702,17 @@ func TestRegExpResolutionWithoutTypeInfo(t *testing.T) {
 	fs := utils.NewOverlayVFS(rootDir.FS, map[string]string{
 		filePath: `
 RegExp("\\1(a)");
+const R = globalThis.RegExp;
+R("\\1(a)");
+const root = globalThis;
+root.RegExp("\\1(a)");
+let reassigned = globalThis.RegExp;
+reassigned = custom;
+reassigned("\\1(a)");
+let first = second;
+let second = first || globalThis.RegExp;
+second("\\1(a)");
+first("\\1(a)");
 {
 	const RegExp = (pattern: string) => pattern;
 	RegExp("\\1(a)");
@@ -643,8 +729,12 @@ RegExp("\\1(a)");
 	}
 
 	var diagnostics []rule.RuleDiagnostic
+	sourceProgram, err := lintprogram.NewFromBoundSources(program, program.SourceFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
 	linter.RunLinterInProgram(
-		program,
+		sourceProgram,
 		[]string{sourceFile.FileName()},
 		nil,
 		nil,
@@ -661,11 +751,15 @@ RegExp("\\1(a)");
 		func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		map[string]struct{}{}, // Keep the Program/RefStore but withhold the checker.
 		nil,
 	)
-	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
-		t.Fatalf("diagnostics = %#v; want one forward report", diagnostics)
+	if len(diagnostics) != 6 {
+		t.Fatalf("diagnostics = %#v; want six forward reports", diagnostics)
+	}
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Message.Id != "forward" {
+			t.Fatalf("diagnostics = %#v; want only forward reports", diagnostics)
+		}
 	}
 }
 

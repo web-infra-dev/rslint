@@ -1,16 +1,20 @@
 package prefer_readonly
 
 import (
+	_ "embed"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+//go:embed prefer_readonly.schema.json
+var schemaJSON []byte
 
 func messagePreferReadonly(name string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -23,23 +27,15 @@ type options struct {
 	onlyInlineLambdas bool
 }
 
-func parseOptions(rawOpts any) options {
+func parseOptions(rawOpts []any) options {
 	opts := options{onlyInlineLambdas: false}
-	if rawOpts == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
 
-	var optsMap map[string]interface{}
-	if arr, ok := rawOpts.([]interface{}); ok && len(arr) > 0 {
-		optsMap, _ = arr[0].(map[string]interface{})
-	} else {
-		optsMap, _ = rawOpts.(map[string]interface{})
-	}
-
-	if optsMap != nil {
-		if v, ok := optsMap["onlyInlineLambdas"].(bool); ok {
-			opts.onlyInlineLambdas = v
-		}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
+	if v, ok := optsMap["onlyInlineLambdas"].(bool); ok {
+		opts.onlyInlineLambdas = v
 	}
 	return opts
 }
@@ -358,7 +354,7 @@ func getNameDisplayText(ctx rule.RuleContext, nameNode *ast.Node) string {
 	if nameNode == nil {
 		return ""
 	}
-	text := strings.TrimSpace(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
+	text := ecmascript.StringTrim(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
 	return text
 }
 
@@ -401,9 +397,9 @@ func isDestructuringAssignment(node *ast.Node) bool {
 
 var PreferReadonlyRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-readonly",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _rawOpts []any) rule.RuleListeners {
-		rawOpts := rule.LegacyUnwrapOptions(_rawOpts)
+	Run: func(ctx rule.RuleContext, rawOpts []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}

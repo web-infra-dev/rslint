@@ -89,4 +89,5 @@ class Hello extends React.Component {
 
 ## Original Documentation
 
-- [eslint-plugin-react / require-render-return](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/require-render-return.md)
+- [eslint-plugin-react: require-render-return](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/require-render-return.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/require-render-return.js)

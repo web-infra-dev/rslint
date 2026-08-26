@@ -54,13 +54,8 @@ func ParseSeverity(level string) DiagnosticSeverity {
 }
 
 // NormalizeOptions returns a rule's options in ESLint context.options form
-// ([]any). config.parseArrayRuleConfig never collapses RuleConfig.Options, but
-// LegacyUnwrapOptions (the compatibility shim for pre-migration `parseOptions
-// any` bodies) does — a rule that round-trips through it and then wants the
-// eslint-format array back (e.g. reads optArray[0]) would silently miss a
-// single-option config otherwise. Re-wrapping a bare value lets every caller
-// read options[0] uniformly, whether the option arrived wrapped (multi-option
-// or an explicit array) or unwrapped (a single option).
+// ([]any): an array value passes through as-is, and a bare value is wrapped
+// as a single-element array so every caller reads options[0] uniformly.
 //
 // It returns an empty (non-nil) slice when no options were configured, so both
 // native rules (which key on `len == 0 → defaults`) and the eslint-plugin host
@@ -74,24 +69,6 @@ func NormalizeOptions(raw any) []any {
 		return arr
 	}
 	return []any{raw}
-}
-
-// LegacyUnwrapOptions is NormalizeOptions' inverse: it collapses a rule's options
-// array (Run's []any parameter — ESLint's context.options, the config array
-// after the severity level) back to the single bare value most existing rule
-// implementations parse. Empty → nil; a single element → that element;
-// otherwise the slice itself. This is the compatibility shim old
-// `parseOptions(options any)` bodies call so they don't need to change beyond
-// their Run signature.
-func LegacyUnwrapOptions(options []any) any {
-	switch len(options) {
-	case 0:
-		return nil
-	case 1:
-		return options[0]
-	default:
-		return options
-	}
 }
 
 const (
@@ -130,9 +107,9 @@ type Rule struct {
 	// linting starts, filling schema-declared `default` values into the
 	// options in place the way ajv's `useDefaults` does for ESLint (see
 	// [Schema.Validate]). Rules that take no options should set it to the
-	// shared [EmptyArraySchema]. nil means the rule has not declared a schema
-	// yet (most rules, until migrated one-by-one): its options pass through
-	// unvalidated, exactly as before the schema framework existed.
+	// shared [EmptyArraySchema]. Every registered rule must declare a schema;
+	// only ESLint-plugin placeholder rules (whose options the Node worker's
+	// own ESLint validates) leave it nil.
 	Schema *Schema
 	Run    func(ctx RuleContext, options []any) RuleListeners
 }

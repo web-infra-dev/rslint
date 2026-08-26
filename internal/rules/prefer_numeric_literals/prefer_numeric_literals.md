@@ -27,4 +27,5 @@ Number.parseInt("11", 36);
 
 ## Original Documentation
 
-- [ESLint prefer-numeric-literals](https://eslint.org/docs/latest/rules/prefer-numeric-literals)
+- [ESLint: prefer-numeric-literals](https://eslint.org/docs/latest/rules/prefer-numeric-literals)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/prefer-numeric-literals.js)

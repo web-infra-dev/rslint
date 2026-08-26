@@ -34,4 +34,5 @@ declare const val: number | bigint;
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-unary-minus](https://typescript-eslint.io/rules/no-unsafe-unary-minus)
+- [typescript-eslint: no-unsafe-unary-minus](https://typescript-eslint.io/rules/no-unsafe-unary-minus)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unsafe-unary-minus.ts)

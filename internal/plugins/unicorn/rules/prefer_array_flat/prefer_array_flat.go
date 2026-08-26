@@ -3,14 +3,14 @@ package prefer_array_flat
 import (
 	_ "embed"
 	"fmt"
-	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 const messageID = "prefer-array-flat"
@@ -250,7 +250,7 @@ func matchFlattenFunction(node *ast.Node, functions []string) (flattenMatch, boo
 		if unicornutil.NodeMatchesPath(callee, function) {
 			return flattenMatch{
 				array:       arguments[0],
-				description: strings.TrimSpace(function) + "()",
+				description: ecmascript.StringTrim(function) + "()",
 			}, true
 		}
 	}
@@ -265,7 +265,7 @@ func isPascalCaseIdentifier(node *ast.Node) bool {
 		return false
 	}
 	first, _ := utf8.DecodeRuneInString(node.AsIdentifier().Text)
-	return first != utf8.RuneError && unicode.Is(unicode.Lu, first)
+	return first != utf8.RuneError && unicode17.IsUpper(first)
 }
 
 func isDefinitelyArrayExpression(node *ast.Node) bool {
@@ -363,7 +363,8 @@ func buildFixes(node *ast.Node, match flattenMatch, ctx rule.RuleContext) []rule
 
 func parseFunctions(options []any) []string {
 	functions := make([]string, 0, len(lodashFlattenFunctions))
-	if optionsMap := utils.GetOptionsMap(options); optionsMap != nil {
+	if len(options) > 0 {
+		optionsMap, _ := options[0].(map[string]any)
 		functions = append(functions, utils.ToStringSlice(optionsMap["functions"])...)
 	}
 	return append(functions, lodashFlattenFunctions...)

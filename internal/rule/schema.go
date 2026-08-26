@@ -7,9 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dlclark/regexp2"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // Schema is a rule's options JSON Schema, compiled lazily on first use. By
@@ -62,6 +61,15 @@ func NewSchema(rawJSON []byte) *Schema {
 // schema.json; the lazy once in [Schema.Compile] means it compiles a single
 // time process-wide regardless of how many rules use it.
 var EmptyArraySchema = NewSchema([]byte(`{"type": "array", "maxItems": 0}`))
+
+// RawJSON returns the schema's original, not-yet-compiled JSON — the same bytes
+// passed to NewSchema. Exposed for tooling that needs the schema text
+// itself rather than a compiled validator (e.g. tools/dump_rule_schemas, which
+// dumps every registered rule's schema for the TypeScript rule-options
+// generator).
+func (s *Schema) RawJSON() []byte {
+	return s.rawJSON
+}
 
 // Compile compiles the schema's raw JSON exactly once and returns the
 // memoized result; every subsequent call — from any goroutine — returns the
@@ -434,35 +442,34 @@ func resolveRef(s *jsonschema.Schema) *jsonschema.Schema {
 // library's own default engine wraps Go's regexp package (RE2), which
 // rejects JavaScript-only regex features such as lookbehind
 // (`(?<=...)`/`(?<!...)`) that ajv, backed by JS's native RegExp, accepts —
-// silently rejecting an otherwise-legal ESLint config. internal/utils
-// already wraps dlclark/regexp2 in ECMAScript mode for exactly this purpose
-// (see [utils.JSRegexOptions]: "for ESLint rule options that model
-// JavaScript RegExp patterns"), so this reuses it rather than introducing a
-// second regex engine.
+// silently rejecting an otherwise-legal ESLint config. internal/utils/ecmascript/regexp
+// reads a pattern the way JavaScript reads it, so this reuses it rather than
+// introducing a second regex engine.
 func jsRegexpEngine(pattern string) (jsonschema.Regexp, error) {
-	re, err := utils.CompileRegexp2(pattern, utils.JSRegexOptions)
+	re, err := esregexp.Compile(pattern, "")
 	if err != nil {
 		return nil, err
 	}
 	return jsRegexp{re}, nil
 }
 
-// jsRegexp adapts *regexp2.Regexp to satisfy jsonschema.Regexp, whose
-// MatchString returns a bare bool. regexp2.Regexp.MatchString instead
-// returns (bool, error) — the error is reserved for runtime failures (e.g. a
-// MatchTimeout) rather than compile-time invalidity (already surfaced by
-// jsRegexpEngine above), so this treats one the same way every other
-// rslint caller of regexp2 does: as no match, via [utils.Regexp2MatchString].
+// jsRegexp adapts *esregexp.RegExp to satisfy jsonschema.Regexp, which asks
+// for the pattern back as a bare string and for a match as a bare bool. A
+// match that runs into the bound counts as no match, which is what Test
+// already answers; compile-time invalidity is surfaced by jsRegexpEngine
+// above instead.
 type jsRegexp struct {
-	re *regexp2.Regexp
+	re *esregexp.RegExp
 }
 
+// String returns the pattern as its author wrote it. jsonschema puts it back
+// into a validation error, where the rewritten form would be unreadable.
 func (r jsRegexp) String() string {
-	return r.re.String()
+	return r.re.Source()
 }
 
 func (r jsRegexp) MatchString(s string) bool {
-	return utils.Regexp2MatchString(r.re, s)
+	return r.re.Test(s)
 }
 
 // DeepCopyJSON returns a copy of v in which every nested map[string]any and

@@ -4,74 +4,99 @@ const ruleTester = new RuleTester();
 
 ruleTester.run('no-unmodified-loop-condition', {
   valid: [
-    // Basic modifications
     'var foo = 0; while (foo) { ++foo; }',
+    'let foo = 0; while (foo) { ++foo; }',
     'var foo = 0; while (foo) { foo += 1; }',
-    'var foo = 0; while (foo < 10) { foo++; }',
-
-    // Dynamic expressions in condition — skip check
-    'while (ok(foo)) { }',
-    'while (foo.ok) { }',
-    'while (foo[0]) { }',
-
-    // Comparison group: a < b is one group, a modified → OK
-    'var a = 0, b = 10; while (a < b) { a++; }',
-
-    // Modification via function call
-    'var x = 0; function inc() { x++; } while (x < 10) { inc(); }',
-
-    // Destructuring write
-    'var x = 0; while (x < 10) { ({x} = {x: 1}); }',
-    'var x = 0; while (x < 10) { [x] = [1]; }',
-
-    // Arrow function in condition: not "dynamic"
-    'var x = 0; while (x || (() => foo())) { x++; }',
-
-    // Modification inside nested function DOES count (ESLint range-based)
-    'var foo = 0; while (foo) { function f() { foo = 1; } }',
-    'var foo = 0; while (foo) { var f = () => { foo = 1; }; }',
-
-    // Modification in nested blocks (not function boundaries)
-    'var x = 0; while (x < 10) { if (true) { x++; } }',
-    'var x = 0; while (x < 10) { for (var i = 0; i < 1; i++) { x++; } }',
-
-    // For-in/for-of as write target
-    'var x = ""; while (x) { for (x in {a: 1}) {} }',
-
-    // ConditionalExpression (ternary) as group
-    'var a = 0, b = 0; while (a ? b : 0) { a++; }',
+    'var foo = 0; while (foo++) { }',
+    'var foo = 0; while (foo = next()) { }',
+    'var foo = 0; while (ok(foo)) { }',
+    'var foo = 0, bar = 0; while (++foo < bar) { }',
+    'var foo = 0, obj = {}; while (foo === obj.bar) { }',
+    'var foo = 0, f = {}, bar = {}; while (foo === f(bar)) { }',
+    'var foo = 0, f = {}; while (foo === f()) { }',
+    'var foo = 0, tag = 0; while (foo === tag`abc`) { }',
+    'function* foo() { var foo = 0; while (yield foo) { } }',
+    'function* foo() { var foo = 0; while (foo === (yield)) { } }',
+    'var foo = 0; while (foo.ok) { }',
+    'var foo = 0; while (foo) { update(); } function update() { ++foo; }',
+    'var foo = 0, bar = 9; while (foo < bar) { foo += 1; }',
+    'var foo = 0, bar = 1, baz = 2; while (foo ? bar : baz) { foo += 1; }',
+    'var foo = 0, bar = 0; while (foo && bar) { ++foo; ++bar; }',
+    'var foo = 0, bar = 0; while (foo || bar) { ++foo; ++bar; }',
+    'var foo = 0; do { ++foo; } while (foo);',
+    'var foo = 0; do { } while (foo++);',
+    'for (var foo = 0; foo; ++foo) { }',
+    'for (var foo = 0; foo;) { ++foo }',
+    'var foo = 0, bar = 0; for (bar; foo;) { ++foo }',
+    'var foo; if (foo) { }',
+    'var a = [1, 2, 3]; var len = a.length; for (var i = 0; i < len - 1; i++) {}',
+    {
+      code: 'let foo = 0, bar = 1, baz = 2; while (foo ? bar : baz) { foo += 1; bar += 1; baz += 1; }',
+      options: { checkConditionalExpressions: true },
+    },
   ],
   invalid: [
     {
-      code: 'var foo = 0; while (foo) { }',
+      code: 'var foo = 0; while (foo) { } foo = 1;',
       errors: [{ messageId: 'loopConditionNotModified' }],
     },
-    // Both unmodified in comparison group
     {
-      code: 'var a = 0, b = 0; while (a < b) { }',
+      code: 'var foo = 0; while (!foo) { } foo = 1;',
+      errors: [{ messageId: 'loopConditionNotModified' }],
+    },
+    {
+      code: 'var foo = 0; while (foo != null) { } foo = 1;',
+      errors: [{ messageId: 'loopConditionNotModified' }],
+    },
+    {
+      code: 'var foo = 0, bar = 9; while (foo < bar) { } foo = 1;',
       errors: [
         { messageId: 'loopConditionNotModified' },
         { messageId: 'loopConditionNotModified' },
       ],
     },
-    // Variable shadowing
     {
-      code: 'var foo = 0; while (foo) { let foo = 1; foo++; }',
+      code: 'var foo = 0, bar = 0; while (foo && bar) { ++bar; } foo = 1;',
       errors: [{ messageId: 'loopConditionNotModified' }],
     },
-    // && — operands independent
     {
-      code: 'var a = 0, b = 10; while (a && b) { a++; }',
+      code: 'var foo = 0, bar = 0; while (foo && bar) { ++foo; } foo = 1;',
       errors: [{ messageId: 'loopConditionNotModified' }],
     },
-    // || partial — only a modified
     {
-      code: 'var a = 0, b = 0; while (a || b) { a++; }',
+      code: 'var a, b, c; while (a < c && b < c) { ++a; } foo = 1;',
+      errors: [
+        { messageId: 'loopConditionNotModified' },
+        { messageId: 'loopConditionNotModified' },
+      ],
+    },
+    {
+      code: 'var foo = 0; while (foo ? 1 : 0) { } foo = 1;',
       errors: [{ messageId: 'loopConditionNotModified' }],
     },
-    // Function declared but NOT called in loop
     {
-      code: 'var x = 0; function inc() { x++; } while (x < 10) { }',
+      code: 'var foo = 0; while (foo) { update(); } function update(foo) { ++foo; }',
+      errors: [{ messageId: 'loopConditionNotModified' }],
+    },
+    {
+      code: 'var foo; do { } while (foo);',
+      errors: [{ messageId: 'loopConditionNotModified' }],
+    },
+    {
+      code: 'for (var foo = 0; foo < 10; ) { } foo = 1;',
+      errors: [{ messageId: 'loopConditionNotModified' }],
+    },
+    {
+      code: 'let foo = 0, bar = 1, baz = 2; while (foo ? bar : baz) { foo += 1; }',
+      options: { checkConditionalExpressions: true },
+      errors: [
+        { messageId: 'loopConditionNotModified' },
+        { messageId: 'loopConditionNotModified' },
+      ],
+    },
+    {
+      code: 'let chunk = true, done = false; while (chunk ? !done : false) { chunk = nextOrNull(); }',
+      options: { checkConditionalExpressions: true },
       errors: [{ messageId: 'loopConditionNotModified' }],
     },
   ],

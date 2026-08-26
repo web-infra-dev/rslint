@@ -78,4 +78,5 @@ async function foo() {
 
 ## Original Documentation
 
-https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/prefer-await-to-then.md
+- [eslint-plugin-promise: prefer-await-to-then](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/prefer-await-to-then.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/prefer-await-to-then.js)

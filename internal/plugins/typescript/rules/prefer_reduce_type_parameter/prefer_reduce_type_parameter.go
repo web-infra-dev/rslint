@@ -16,6 +16,7 @@ func buildPreferTypeParameterMessage() rule.RuleMessage {
 
 var PreferReduceTypeParameterRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-reduce-type-parameter",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{

@@ -42,4 +42,4 @@ foo?.();
 ## Original Documentation
 
 - [typescript-eslint: no-unused-expressions](https://typescript-eslint.io/rules/no-unused-expressions)
-- [ESLint: no-unused-expressions](https://eslint.org/docs/latest/rules/no-unused-expressions)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unused-expressions.ts)

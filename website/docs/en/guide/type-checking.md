@@ -28,7 +28,7 @@ rslint --type-check .         # lint + type-check
 rslint --type-check-only .    # type-check only
 ```
 
-When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
+When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. Set `project: []` to disable that fallback explicitly. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
 
 ## What gets type-checked
 
@@ -57,7 +57,7 @@ If a file is included by tsconfig but matched by rslint `ignores`, lint rules do
 
 ### Gap files
 
-Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. They receive a non-project-backed fallback Program, so rules that do not require type information still run while type-aware rules do not. The program-wide type-check phase also skips the fallback. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
+Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. CLI lint parses and binds them as standalone source files without creating a synthetic Program or TypeChecker, so rules that do not require type information still run while type-aware rules do not. Gap files never enter the program-wide type-check phase. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
 
 ## Output
 

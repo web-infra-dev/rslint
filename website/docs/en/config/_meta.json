@@ -1,8 +1,17 @@
 [
   {
+    "type": "section-header",
+    "label": "Basics"
+  },
+  {
     "type": "file",
     "name": "index",
     "label": "Overview"
+  },
+  {
+    "type": "file",
+    "name": "configuration-file",
+    "label": "Configuration File"
   },
   {
     "type": "file",
@@ -10,8 +19,37 @@
     "label": "Rules & Presets"
   },
   {
+    "type": "section-header",
+    "label": "Configuration Options"
+  },
+  {
+    "type": "file",
+    "name": "files",
+    "label": "files"
+  },
+  {
     "type": "file",
     "name": "ignoring-files",
-    "label": "Ignoring Files"
+    "label": "ignores"
+  },
+  {
+    "type": "file",
+    "name": "rules",
+    "label": "rules"
+  },
+  {
+    "type": "file",
+    "name": "plugins",
+    "label": "plugins"
+  },
+  {
+    "type": "file",
+    "name": "language-options",
+    "label": "languageOptions"
+  },
+  {
+    "type": "file",
+    "name": "settings",
+    "label": "settings"
   }
 ]

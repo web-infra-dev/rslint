@@ -126,6 +126,152 @@ func TestNoFocusedTests(t *testing.T) {
 				},
 			},
 			{
+				Code: "describe[\n  \"only\"\n]()",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `describe?.["only"]()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe?.()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `describe?.only()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe?.()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `describe?.["only"]?.()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe?.()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `describe["only"]?.()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe?.()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `describe[/* keep */ "only"]()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe/* keep */ ()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `describe[("only")]()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `(describe?.["only"])()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "focusedTest"},
+				},
+			},
+			{
+				Code: `describe?.only /* before */ ?. /* after */ each()()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "describe?. /* before */  /* after */ each()()",
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `describe?.only["each"]()()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    `describe?.["each"]()()`,
+							},
+						},
+					},
+				},
+			},
+			{
+				Code: `test?.concurrent.only.each()()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveFocus",
+								Output:    "test?.concurrent.each()()",
+							},
+						},
+					},
+				},
+			},
+			{
 				Code: "it.only()",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -342,14 +488,14 @@ func TestNoFocusedTests(t *testing.T) {
 				},
 			},
 			{
-			Code: "fit.each()()",
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "focusedTest",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 4,
+				Code: "fit.each()()",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Line:      1,
+						Column:    1,
+						EndLine:   1,
+						EndColumn: 4,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
 								MessageId: "suggestRemoveFocus",
@@ -360,14 +506,14 @@ func TestNoFocusedTests(t *testing.T) {
 				},
 			},
 			{
-			Code: "fit.each`table`()",
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "focusedTest",
-					Line:      1,
-					Column:    1,
-					EndLine:   1,
-					EndColumn: 4,
+				Code: "fit.each`table`()",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "focusedTest",
+						Line:      1,
+						Column:    1,
+						EndLine:   1,
+						EndColumn: 4,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
 								MessageId: "suggestRemoveFocus",

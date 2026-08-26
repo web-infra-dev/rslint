@@ -1,0 +1,2245 @@
+// Rstest Snapshot v1
+
+exports[`id-length > invalid 1`] = `
+{
+  "code": "var x = 1;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 2`] = `
+{
+  "code": "var x;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 3`] = `
+{
+  "code": "obj.e = document.body;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'e' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 4`] = `
+{
+  "code": "function x() {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 5`] = `
+{
+  "code": "function xyz(a) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 6`] = `
+{
+  "code": "var obj = { a: 1, bc: 2 };",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 7`] = `
+{
+  "code": "try { blah(); } catch (e) { /* pass */ }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'e' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 8`] = `
+{
+  "code": "var handler = function (e) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'e' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 9`] = `
+{
+  "code": "for (var i=0; i < 10; i++) { console.log(i); }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'i' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 10`] = `
+{
+  "code": "var j=0; while (j > -10) { console.log(--j); }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'j' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 11`] = `
+{
+  "code": "var [i] = arr;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'i' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 12`] = `
+{
+  "code": "var [,i,a] = arr;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'i' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 13`] = `
+{
+  "code": "function foo([a]) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 14`] = `
+{
+  "code": "import x from 'module';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 15`] = `
+{
+  "code": "import { x as z } from 'module';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'z' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 16`] = `
+{
+  "code": "import { foo as z } from 'module';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'z' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 17`] = `
+{
+  "code": "import { 'foo' as z } from 'module';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'z' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 18`] = `
+{
+  "code": "import * as x from 'module';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 19`] = `
+{
+  "code": "import longName from 'module';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'longName' is too long (> 5).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 20`] = `
+{
+  "code": "import * as longName from 'module';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'longName' is too long (> 5).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 21`] = `
+{
+  "code": "import { foo as longName } from 'module';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'longName' is too long (> 5).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 22`] = `
+{
+  "code": "var _$xt_$ = Foo(42)",
+  "diagnostics": [
+    {
+      "message": "Identifier name '_$xt_$' is too long (> 4).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 23`] = `
+{
+  "code": "var _$x$_t$ = Foo(42)",
+  "diagnostics": [
+    {
+      "message": "Identifier name '_$x$_t$' is too long (> 4).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 24`] = `
+{
+  "code": "var toString;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'toString' is too long (> 5).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 25`] = `
+{
+  "code": "(a) => { a * a };",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 26`] = `
+{
+  "code": "function foo(x = 0) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 27`] = `
+{
+  "code": "class x { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 28`] = `
+{
+  "code": "class Foo { x() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 29`] = `
+{
+  "code": "function foo(...x) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 30`] = `
+{
+  "code": "function foo({x}) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 31`] = `
+{
+  "code": "function foo({x: a}) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 32`] = `
+{
+  "code": "function foo({x: a, longName}) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 33`] = `
+{
+  "code": "function foo({ longName: a }) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 3).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 34`] = `
+{
+  "code": "function foo({ prop: longName }) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'longName' is too long (> 5).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 35`] = `
+{
+  "code": "function foo({ a: b }) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'b' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 36`] = `
+{
+  "code": "var hasOwnProperty;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'hasOwnProperty' is too long (> 10).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 37`] = `
+{
+  "code": "function foo({ a: { b: { c: d, e } } }) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'd' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+    {
+      "message": "Identifier name 'e' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 38`] = `
+{
+  "code": "var { x} = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 39`] = `
+{
+  "code": "var { x: a} = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 40`] = `
+{
+  "code": "var { a: a} = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 41`] = `
+{
+  "code": "var { prop: a } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 42`] = `
+{
+  "code": "var { longName: a } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 3).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 43`] = `
+{
+  "code": "var { prop: [x] } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 44`] = `
+{
+  "code": "var { prop: [[x]] } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 45`] = `
+{
+  "code": "var { prop: longName } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'longName' is too long (> 5).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 46`] = `
+{
+  "code": "var { x: a} = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 47`] = `
+{
+  "code": "var { a: { b: { c: d } } } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'd' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 48`] = `
+{
+  "code": "var { a: { b: { c: d, e } } } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'd' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+    {
+      "message": "Identifier name 'e' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 49`] = `
+{
+  "code": "var { a: { b: { c, e: longName } } } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'c' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 50`] = `
+{
+  "code": "var { a: { b: { c: d, e: longName } } } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'd' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 51`] = `
+{
+  "code": "var { a, b: { c: d, e: longName } } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'a' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+    {
+      "message": "Identifier name 'd' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 52`] = `
+{
+  "code": "import x from 'y';",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 53`] = `
+{
+  "code": "export var x = 0;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 54`] = `
+{
+  "code": "({ a: obj.x.y.z } = {});",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'z' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 55`] = `
+{
+  "code": "({ prop: obj.x } = {});",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 56`] = `
+{
+  "code": "var x = 1;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 57`] = `
+{
+  "code": "var {prop: x} = foo;",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 58`] = `
+{
+  "code": "var foo = {x: prop};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 59`] = `
+{
+  "code": "function BEFORE_send() {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'BEFORE_send' is too long (> 5).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 60`] = `
+{
+  "code": "function NOTMATCHED_send() {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'NOTMATCHED_send' is too long (> 5).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 61`] = `
+{
+  "code": "function N() {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'N' is too short (< 3).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 62`] = `
+{
+  "code": "class Foo { #x() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '#x' is too short (< 2).",
+      "messageId": "tooShortPrivate",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 63`] = `
+{
+  "code": "class Foo { x = 1 }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'x' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 64`] = `
+{
+  "code": "class Foo { #x = 1 }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '#x' is too short (< 2).",
+      "messageId": "tooShortPrivate",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 65`] = `
+{
+  "code": "class Foo { #abcdefg() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier name #'abcdefg' is too long (> 3).",
+      "messageId": "tooLongPrivate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 66`] = `
+{
+  "code": "class Foo { abcdefg = 1 }",
+  "diagnostics": [
+    {
+      "message": "Identifier name 'abcdefg' is too long (> 3).",
+      "messageId": "tooLong",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 67`] = `
+{
+  "code": "class Foo { #abcdefg = 1 }",
+  "diagnostics": [
+    {
+      "message": "Identifier name #'abcdefg' is too long (> 3).",
+      "messageId": "tooLongPrivate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 68`] = `
+{
+  "code": "var 𠮟 = 2",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𠮟' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 69`] = `
+{
+  "code": "var 葛󠄀 = 2",
+  "diagnostics": [
+    {
+      "message": "Identifier name '葛󠄀' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 70`] = `
+{
+  "code": "var myObj = { 𐌘: 1 };",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 71`] = `
+{
+  "code": "(𐌘) => { 𐌘 * 𐌘 };",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 72`] = `
+{
+  "code": "class 𠮟 { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𠮟' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 73`] = `
+{
+  "code": "class Foo { 𐌘() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 74`] = `
+{
+  "code": "class Foo1 { #𐌘() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '#𐌘' is too short (< 2).",
+      "messageId": "tooShortPrivate",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 75`] = `
+{
+  "code": "class Foo2 { 𐌘 = 1 }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 76`] = `
+{
+  "code": "class Foo3 { #𐌘 = 1 }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '#𐌘' is too short (< 2).",
+      "messageId": "tooShortPrivate",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 77`] = `
+{
+  "code": "function foo1(...𐌘) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 78`] = `
+{
+  "code": "function foo([𐌘]) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 79`] = `
+{
+  "code": "var [ 𐌘 ] = arr;",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 80`] = `
+{
+  "code": "var { prop: [𐌘]} = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 81`] = `
+{
+  "code": "function foo({𐌘}) { }",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 82`] = `
+{
+  "code": "var { 𐌘 } = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 83`] = `
+{
+  "code": "var { prop: 𐌘} = {};",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-length > invalid 84`] = `
+{
+  "code": "({ prop: obj.𐌘 } = {});",
+  "diagnostics": [
+    {
+      "message": "Identifier name '𐌘' is too short (< 2).",
+      "messageId": "tooShort",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-length",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

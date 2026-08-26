@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // tslint regex
@@ -17,8 +18,9 @@ var enableDisableRegex = regexp.MustCompile(`^\s*tslint:(enable|disable)(?:-(lin
 // BanTslintCommentRule implements the ban-tslint-comment rule.
 // Disallows tslint directive comments like // tslint:disable
 var BanTslintCommentRule = rule.CreateRule(rule.Rule{
-	Name: "ban-tslint-comment",
-	Run:  run,
+	Name:   "ban-tslint-comment",
+	Schema: rule.EmptyArraySchema,
+	Run:    run,
 })
 
 func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
@@ -81,7 +83,7 @@ func extractCommentText(text string, comment *ast.CommentRange) string {
 	if comment.Pos() < 0 || comment.End() > len(text) {
 		return ""
 	}
-	return strings.TrimSpace(text[comment.Pos():comment.End()])
+	return ecmascript.StringTrim(text[comment.Pos():comment.End()])
 }
 
 func buildFix(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int) rule.RuleFix {

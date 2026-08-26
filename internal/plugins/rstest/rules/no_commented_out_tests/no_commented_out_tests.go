@@ -2,12 +2,12 @@ package no_commented_out_tests
 
 import (
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 type commentBlockSegment struct {
@@ -18,6 +18,158 @@ type commentBlockSegment struct {
 type commentBlock struct {
 	text     string
 	segments []commentBlockSegment
+}
+
+func startsRstestTypeOperator(text, operator string) bool {
+	if !strings.HasPrefix(text, operator) {
+		return false
+	}
+	return len(text) == len(operator) ||
+		text[len(operator)] == ' ' ||
+		text[len(operator)] == '\t' ||
+		text[len(operator)] == '\v' ||
+		text[len(operator)] == '\f' ||
+		text[len(operator)] >= utf8.RuneSelf ||
+		text[len(operator)] == '/'
+}
+
+func skipRstestHorizontalWhitespace(text string, offset int) int {
+	for offset < len(text) {
+		switch text[offset] {
+		case ' ', '\t', '\v', '\f':
+			offset++
+			continue
+		}
+		if text[offset] < utf8.RuneSelf {
+			break
+		}
+		char, size := utf8.DecodeRuneInString(text[offset:])
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(char) {
+			break
+		}
+		offset += size
+	}
+	return offset
+}
+
+func startsRstestRootCandidate(text string) bool {
+	offset := 0
+	for offset < len(text) && (text[offset] == ' ' || text[offset] == '\t') {
+		offset++
+	}
+	for offset < len(text) && (text[offset] == ';' || text[offset] == '(') {
+		offset++
+		for offset < len(text) && (text[offset] == ' ' || text[offset] == '\t') {
+			offset++
+		}
+	}
+	for _, root := range [...]string{"test", "it", "describe"} {
+		if !strings.HasPrefix(text[offset:], root) {
+			continue
+		}
+		end := offset + len(root)
+		if end < len(text) {
+			next := text[end]
+			if next == '_' || next == '$' ||
+				(next >= '0' && next <= '9') ||
+				(next >= 'A' && next <= 'Z') ||
+				(next >= 'a' && next <= 'z') {
+				continue
+			}
+		}
+		end = skipRstestHorizontalWhitespace(text, end)
+		for end < len(text) && text[end] == ')' {
+			end++
+			end = skipRstestHorizontalWhitespace(text, end)
+		}
+		if end == len(text) {
+			// A root at physical line end may continue in the next adjacent
+			// comment, e.g. `// test` followed by `//   .only(...)`.
+			return true
+		}
+		switch text[end] {
+		case '(', '.', '[', '?', '!', '/':
+			return true
+		}
+		if startsRstestTypeOperator(text[end:], "as") ||
+			startsRstestTypeOperator(text[end:], "satisfies") {
+			return true
+		}
+	}
+	return false
+}
+
+func blockBodyMayContainRstestRoot(body string) bool {
+	for {
+		lineEnd := len(body)
+		if index := strings.IndexAny(body, "\r\n\u2028\u2029"); index >= 0 {
+			lineEnd = index
+		}
+		line := body[:lineEnd]
+		offset := 0
+		for offset < len(line) && (line[offset] == ' ' || line[offset] == '\t') {
+			offset++
+		}
+		if offset < len(line) && line[offset] == '*' {
+			offset++
+			if offset < len(line) && (line[offset] == ' ' || line[offset] == '\t') {
+				offset++
+			}
+		}
+		if startsRstestRootCandidate(line[offset:]) {
+			return true
+		}
+		if lineEnd == len(body) {
+			return false
+		}
+		body = body[lineEnd+lineTerminatorLength(body, lineEnd):]
+	}
+}
+
+// mayContainCommentedRstestRoot is a conservative byte-level gate before the
+// expensive canonical comment collection and candidate parsing. It may return
+// true for comment-like text inside strings or templates, but every real line
+// or block comment whose normalized logical line starts with a supported root
+// returns true and proceeds through the existing exact analyzer.
+func mayContainCommentedRstestRoot(sourceText string) bool {
+	for searchStart := 0; searchStart < len(sourceText); {
+		relativeSlash := strings.IndexByte(sourceText[searchStart:], '/')
+		if relativeSlash < 0 {
+			return false
+		}
+		slash := searchStart + relativeSlash
+		if slash+1 >= len(sourceText) {
+			return false
+		}
+		switch sourceText[slash+1] {
+		case '/':
+			end := len(sourceText)
+			if index := strings.IndexAny(sourceText[slash+2:], "\r\n\u2028\u2029"); index >= 0 {
+				end = slash + 2 + index
+			}
+			if startsRstestRootCandidate(sourceText[slash+2 : end]) {
+				return true
+			}
+			// This byte pair may live inside a string or template. Keep
+			// searching from the second slash so a later real comment on the
+			// same physical line cannot be skipped.
+			searchStart = slash + 1
+		case '*':
+			end := len(sourceText)
+			if index := strings.Index(sourceText[slash+2:], "*/"); index >= 0 {
+				end = slash + 2 + index
+			}
+			if blockBodyMayContainRstestRoot(sourceText[slash+2 : end]) {
+				return true
+			}
+			// As above, do not trust that this is lexically a comment. A later
+			// real comment may begin before the apparent closing delimiter.
+			searchStart = slash + 1
+		default:
+			searchStart = slash + 1
+		}
+	}
+	return false
 }
 
 func lineTerminatorLength(text string, offset int) int {
@@ -128,7 +280,7 @@ func containsExactlyOneLineTerminator(text string) bool {
 		}
 
 		r, size := utf8.DecodeRuneInString(text[offset:])
-		if r == utf8.RuneError && size == 1 || !unicode.IsSpace(r) {
+		if r == utf8.RuneError && size == 1 || !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			return false
 		}
 		offset += size
@@ -213,6 +365,9 @@ var NoCommentedOutTestsRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		sourceText := ctx.SourceFile.Text()
+		if !mayContainCommentedRstestRoot(sourceText) {
+			return nil
+		}
 		for _, block := range buildCommentBlocks(sourceText, ctx.Comments.All()) {
 			reportedComments := make(map[*ast.CommentRange]struct{})
 			for _, offset := range findCommentedRstestRegistrations(block.text, ctx.SourceFile.ScriptKind) {
@@ -230,6 +385,6 @@ var NoCommentedOutTestsRule = rule.Rule{
 				)
 			}
 		}
-		return rule.RuleListeners{}
+		return nil
 	},
 }

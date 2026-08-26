@@ -1,10 +1,15 @@
 package no_constant_binary_expression
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_constant_binary_expression.schema.json
+var schemaJSON []byte
 
 // Message builders
 func buildConstantBinaryOperandMessage() rule.RuleMessage {
@@ -74,8 +79,10 @@ func isCompoundAssignmentOperator(op ast.Kind) bool {
 
 // --- Core helpers ---
 
-// isNullOrUndefined checks if a node represents null or undefined
-func isNullOrUndefined(node *ast.Node) bool {
+// isNullOrUndefined checks if a node represents null or the effective global
+// undefined binding. A same-file declaration or an authored `off` setting
+// makes an identifier named undefined an ordinary, unknown value.
+func isNullOrUndefined(ctx *rule.RuleContext, node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
@@ -83,58 +90,35 @@ func isNullOrUndefined(node *ast.Node) bool {
 	case ast.KindNullKeyword:
 		return true
 	case ast.KindIdentifier:
-		return node.Text() == "undefined"
+		return node.Text() == "undefined" && isGlobalBuiltin(ctx, node)
 	case ast.KindVoidExpression:
 		return true
 	case ast.KindParenthesizedExpression:
 		paren := node.AsParenthesizedExpression()
-		return paren != nil && isNullOrUndefined(paren.Expression)
+		return paren != nil && isNullOrUndefined(ctx, paren.Expression)
 	}
 	return false
 }
 
-// isGlobalBuiltin checks if an identifier refers to a global built-in (not shadowed)
+// isGlobalBuiltin mirrors ESLint's ECMASCRIPT_GLOBALS membership plus its
+// global-reference check. The candidate-name set is edition-independent;
+// Globals.Access then applies ecmaVersion and authored overrides for this file.
 func isGlobalBuiltin(ctx *rule.RuleContext, node *ast.Node) bool {
-	if ctx == nil || ctx.TypeChecker == nil || ctx.Program == nil || ctx.SourceFile == nil {
+	if ctx == nil || node == nil || node.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-	if symbol == nil {
+	name := node.AsIdentifier().Text
+	if !ctx.Globals.IsECMAScriptGlobalName(name) || !ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
-	// Check if any declaration is from the current source file (locally shadowed)
-	for _, declaration := range symbol.Declarations {
-		declarationSourceFile := ast.GetSourceFileOfNode(declaration)
-		if declarationSourceFile != nil && declarationSourceFile == ctx.SourceFile {
-			return false
+	if ctx.Refs != nil {
+		if symbol := ctx.Refs.Resolve(node); symbol != nil {
+			return !utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
 		}
 	}
-	// TypeScript-Go's checker may merge function declarations with same-named global
-	// interfaces, causing the symbol to resolve to the global even when shadowed.
-	// Manually check for top-level function declarations with the same name.
-	if node.Kind == ast.KindIdentifier {
-		if hasTopLevelFunctionDeclaration(ctx.SourceFile, node.Text()) {
-			return false
-		}
-	}
-	return utils.IsSymbolFromDefaultLibrary(ctx.Program, symbol)
-}
-
-// hasTopLevelFunctionDeclaration checks if the source file has a top-level function
-// declaration with the given name (used to detect shadowing of global built-ins).
-func hasTopLevelFunctionDeclaration(sf *ast.SourceFile, name string) bool {
-	if sf == nil || sf.Statements == nil {
-		return false
-	}
-	for _, stmt := range sf.Statements.Nodes {
-		if stmt.Kind == ast.KindFunctionDeclaration {
-			nameNode := stmt.Name()
-			if nameNode != nil && nameNode.Text() == name {
-				return true
-			}
-		}
-	}
-	return false
+	// Retain the syntactic fallback for unresolved configured globals and
+	// direct/unit callers that do not provide a RefStore.
+	return !utils.IsShadowed(node, name)
 }
 
 // getBooleanValue returns the boolean value of a literal, or nil if unknown
@@ -169,11 +153,6 @@ func getBooleanValue(node *ast.Node) *bool {
 		}
 		t := true
 		return &t
-	case ast.KindIdentifier:
-		if node.Text() == "undefined" {
-			f := false
-			return &f
-		}
 	}
 	return nil
 }
@@ -259,7 +238,7 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 		return true
 
 	case ast.KindIdentifier:
-		return node.Text() == "undefined"
+		return node.Text() == "undefined" && isGlobalBuiltin(ctx, node)
 
 	case ast.KindArrowFunction, ast.KindFunctionExpression,
 		ast.KindClassExpression, ast.KindObjectLiteralExpression:
@@ -561,7 +540,7 @@ func hasConstantNullishness(ctx *rule.RuleContext, node *ast.Node, nonNullish bo
 		return false
 	}
 
-	if nonNullish && isNullOrUndefined(node) {
+	if nonNullish && isNullOrUndefined(ctx, node) {
 		return false
 	}
 
@@ -583,7 +562,7 @@ func hasConstantNullishness(ctx *rule.RuleContext, node *ast.Node, nonNullish bo
 		return true // strings are never nullish
 
 	case ast.KindIdentifier:
-		return node.Text() == "undefined"
+		return node.Text() == "undefined" && isGlobalBuiltin(ctx, node)
 
 	case ast.KindVoidExpression:
 		return true // always undefined (nullish, but constantly so)
@@ -726,7 +705,7 @@ func hasConstantLooseBooleanComparison(ctx *rule.RuleContext, node *ast.Node) bo
 		return true
 
 	case ast.KindIdentifier:
-		return node.Text() == "undefined"
+		return node.Text() == "undefined" && isGlobalBuiltin(ctx, node)
 
 	case ast.KindParenthesizedExpression:
 		paren := node.AsParenthesizedExpression()
@@ -887,12 +866,12 @@ func hasConstantStrictBooleanComparison(ctx *rule.RuleContext, node *ast.Node) b
 func findBinaryExpressionConstantOperand(ctx *rule.RuleContext, a, b *ast.Node, operator ast.Kind) *ast.Node {
 	switch operator {
 	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken:
-		if (isNullOrUndefined(a) && hasConstantNullishness(ctx, b, false)) ||
+		if (isNullOrUndefined(ctx, a) && hasConstantNullishness(ctx, b, false)) ||
 			(isStaticBoolean(ctx, a) && hasConstantLooseBooleanComparison(ctx, b)) {
 			return b
 		}
 	case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
-		if (isNullOrUndefined(a) && hasConstantNullishness(ctx, b, false)) ||
+		if (isNullOrUndefined(ctx, a) && hasConstantNullishness(ctx, b, false)) ||
 			(isStaticBoolean(ctx, a) && hasConstantStrictBooleanComparison(ctx, b)) {
 			return b
 		}
@@ -902,7 +881,8 @@ func findBinaryExpressionConstantOperand(ctx *rule.RuleContext, a, b *ast.Node, 
 
 // NoConstantBinaryExpressionRule detects constant binary expressions
 var NoConstantBinaryExpressionRule = rule.Rule{
-	Name: "no-constant-binary-expression",
+	Name:   "no-constant-binary-expression",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {

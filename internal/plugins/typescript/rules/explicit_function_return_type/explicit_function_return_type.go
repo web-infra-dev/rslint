@@ -1,11 +1,16 @@
 package explicit_function_return_type
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed explicit_function_return_type.schema.json
+var schemaJSON []byte
 
 type options struct {
 	allowConciseArrowFunctionExpressionsStartingWithVoid bool
@@ -18,7 +23,7 @@ type options struct {
 	allowTypedFunctionExpressions                        bool
 }
 
-func parseOptions(rawOpts any) options {
+func parseOptions(rawOpts []any) options {
 	opts := options{
 		allowConciseArrowFunctionExpressionsStartingWithVoid: false,
 		allowDirectConstAssertionInArrowFunctions:            true,
@@ -30,10 +35,11 @@ func parseOptions(rawOpts any) options {
 		allowTypedFunctionExpressions:       true,
 	}
 
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
+	if len(rawOpts) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOpts[0].(map[string]interface{})
+
 	if v, ok := optsMap["allowConciseArrowFunctionExpressionsStartingWithVoid"].(bool); ok {
 		opts.allowConciseArrowFunctionExpressionsStartingWithVoid = v
 	}
@@ -66,31 +72,39 @@ func parseOptions(rawOpts any) options {
 }
 
 type functionInfo struct {
-	node    *ast.Node
-	returns []*ast.Node
+	needsReturnType      bool
+	hasReturn            bool
+	returnsOnlyFunctions bool
 }
 
 var ExplicitFunctionReturnTypeRule = rule.CreateRule(rule.Rule{
-	Name: "explicit-function-return-type",
-	Run:  run,
+	Name:   "explicit-function-return-type",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
-func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-	rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 	opts := parseOptions(rawOptions)
-	functionStack := make([]*functionInfo, 0)
+	var functionStack []functionInfo
 
 	enterFunction := func(node *ast.Node) {
-		functionStack = append(functionStack, &functionInfo{node: node})
+		functionStack = append(functionStack, functionInfo{
+			needsReturnType: node.Body() != nil &&
+				node.Type() == nil &&
+				node.Kind != ast.KindConstructor &&
+				node.Kind != ast.KindSetAccessor,
+			returnsOnlyFunctions: true,
+		})
 	}
 
-	popFunctionInfo := func() *functionInfo {
+	popFunctionInfo := func() (functionInfo, bool) {
 		if len(functionStack) == 0 {
-			return nil
+			return functionInfo{}, false
 		}
-		info := functionStack[len(functionStack)-1]
-		functionStack = functionStack[:len(functionStack)-1]
-		return info
+		last := len(functionStack) - 1
+		info := functionStack[last]
+		functionStack = functionStack[:last]
+		return info, true
 	}
 
 	report := func(node *ast.Node) {
@@ -101,29 +115,14 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 		})
 	}
 
-	// checkFunctionReturnType checks the common validity conditions:
-	// - allowHigherOrderFunctions + doesImmediatelyReturnFunctionExpression
-	// - has explicit return type
-	// - is constructor or setter
+	// checkFunctionReturnType checks whether the function needs a return type,
+	// including the allowHigherOrderFunctions exemption.
 	// Returns true if the function is valid (no error should be reported).
-	checkFunctionReturnType := func(info *functionInfo) bool {
-		node := info.node
-		// Skip bodyless functions: declare functions, abstract methods, overload signatures.
-		// ESLint models these as TSDeclareFunction / TSAbstractMethodDefinition which are
-		// separate node types not visited by the rule. In tsgo they share the same Kind.
-		if node.Body() == nil {
+	checkFunctionReturnType := func(node *ast.Node, info functionInfo) bool {
+		if !info.needsReturnType {
 			return true
 		}
-		if opts.allowHigherOrderFunctions && typescriptutil.DoesImmediatelyReturnFunctionExpression(node, info.returns) {
-			return true
-		}
-		if node.Type() != nil {
-			return true
-		}
-		if node.Kind == ast.KindConstructor || node.Kind == ast.KindSetAccessor {
-			return true
-		}
-		return false
+		return opts.allowHigherOrderFunctions && doesImmediatelyReturnFunctionExpression(node, info)
 	}
 
 	isAllowedFunction := func(node *ast.Node) bool {
@@ -141,8 +140,8 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 
 	// exitFunctionExpression handles ArrowFunction and FunctionExpression exit
 	exitFunctionExpression := func(node *ast.Node) {
-		info := popFunctionInfo()
-		if info == nil {
+		info, ok := popFunctionInfo()
+		if !ok {
 			return
 		}
 
@@ -171,15 +170,15 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 			return
 		}
 
-		if !checkFunctionReturnType(info) {
+		if !checkFunctionReturnType(node, info) {
 			report(node)
 		}
 	}
 
 	// exitFunctionDeclaration handles FunctionDeclaration exit
 	exitFunctionDeclaration := func(node *ast.Node) {
-		info := popFunctionInfo()
-		if info == nil {
+		info, ok := popFunctionInfo()
+		if !ok {
 			return
 		}
 		if isAllowedFunction(node) {
@@ -188,15 +187,15 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 		if opts.allowTypedFunctionExpressions && node.Type() != nil {
 			return
 		}
-		if !checkFunctionReturnType(info) {
+		if !checkFunctionReturnType(node, info) {
 			report(node)
 		}
 	}
 
 	// exitMethodOrAccessor handles MethodDeclaration and GetAccessor exit
 	exitMethodOrAccessor := func(node *ast.Node) {
-		info := popFunctionInfo()
-		if info == nil {
+		info, ok := popFunctionInfo()
+		if !ok {
 			return
 		}
 		if isAllowedFunction(node) {
@@ -213,7 +212,7 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 			}
 		}
 
-		if !checkFunctionReturnType(info) {
+		if !checkFunctionReturnType(node, info) {
 			report(node)
 		}
 	}
@@ -244,12 +243,31 @@ func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
 
 		// Return statement listener
 		ast.KindReturnStatement: func(node *ast.Node) {
-			if len(functionStack) > 0 {
-				info := functionStack[len(functionStack)-1]
-				info.returns = append(info.returns, node)
+			if len(functionStack) == 0 || !opts.allowHigherOrderFunctions {
+				return
+			}
+			info := &functionStack[len(functionStack)-1]
+			if !info.needsReturnType {
+				return
+			}
+			info.hasReturn = true
+			if info.returnsOnlyFunctions {
+				argument := node.Expression()
+				info.returnsOnlyFunctions = argument != nil &&
+					typescriptutil.IsFunction(ast.SkipParentheses(argument))
 			}
 		},
 	}
+}
+
+func doesImmediatelyReturnFunctionExpression(node *ast.Node, info functionInfo) bool {
+	if node.Kind == ast.KindArrowFunction {
+		body := node.AsArrowFunction().Body
+		if body != nil && body.Kind != ast.KindBlock {
+			return typescriptutil.IsFunction(ast.SkipParentheses(body))
+		}
+	}
+	return info.hasReturn && info.returnsOnlyFunctions
 }
 
 // isIIFE checks if a function node is the callee of an immediately invoked call expression.

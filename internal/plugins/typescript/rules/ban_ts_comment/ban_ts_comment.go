@@ -1,22 +1,27 @@
 package ban_ts_comment
 
 import (
-	"regexp"
+	_ "embed"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/rivo/uniseg"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
+
+//go:embed ban_ts_comment.schema.json
+var schemaJSON []byte
 
 type DirectiveConfig struct {
 	Enabled              bool   // Whether the directive is enabled (true means banned)
 	AllowWithDescription bool   // Whether to allow with description
 	DescriptionFormat    string // Regex pattern for description format
-	descriptionRegex     *regexp.Regexp
+	descriptionRegex     *esregexp.RegExp
 }
 
 type BanTsCommentOptions struct {
@@ -53,8 +58,9 @@ var (
 // BanTsCommentRule implements the ban-ts-comment rule
 // Bans @ts-<directive> comments or requires descriptions after directive
 var BanTsCommentRule = rule.CreateRule(rule.Rule{
-	Name: "ban-ts-comment",
-	Run:  run,
+	Name:   "ban-ts-comment",
+	Schema: rule.NewSchema(schemaJSON),
+	Run:    run,
 })
 
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
@@ -100,18 +106,7 @@ func parseOptions(options []any) BanTsCommentOptions {
 		return opts
 	}
 
-	option := rule.LegacyUnwrapOptions(options)
-	// Preserve compatibility with callers that still pass the old nested
-	// array shape after the shared legacy-options shim has unwrapped Run's
-	// ESLint-style context.options.
-	if optionArray, ok := option.([]interface{}); ok && len(optionArray) > 0 {
-		option = optionArray[0]
-	}
-	optsMap, ok := option.(map[string]interface{})
-	if !ok {
-		return opts
-	}
-
+	optsMap, _ := options[0].(map[string]interface{})
 	if val, exists := optsMap["ts-expect-error"]; exists {
 		opts.TsExpectError = val
 	}
@@ -154,7 +149,7 @@ func parseDirectiveConfig(value interface{}) DirectiveConfig {
 		}
 	}
 	if config.DescriptionFormat != "" {
-		config.descriptionRegex, _ = regexp.Compile(config.DescriptionFormat)
+		config.descriptionRegex, _ = esregexp.Compile(config.DescriptionFormat, "")
 	}
 
 	return config
@@ -362,10 +357,10 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 	fullDirectiveName := directiveName(directive)
 
 	// Trimmed description for length check; raw description for format check
-	trimmedDescription := strings.TrimSpace(rawDescription)
+	trimmedDescription := ecmascript.StringTrim(rawDescription)
 
 	// Check minimum length using grapheme cluster count on the trimmed description
-	descLength := graphemeLength(trimmedDescription)
+	descLength := utils.GraphemeCount(trimmedDescription)
 	if descLength < minDescLength {
 		ctx.ReportRange(
 			commentRange,
@@ -378,7 +373,7 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 	}
 
 	// Check description format against raw (untrimmed) description
-	if config.descriptionRegex != nil && !config.descriptionRegex.MatchString(rawDescription) {
+	if config.descriptionRegex != nil && !config.descriptionRegex.TestOrTimeout(rawDescription) {
 		ctx.ReportRange(
 			commentRange,
 			rule.RuleMessage{
@@ -417,10 +412,4 @@ func directiveCommentMessage(directive directiveKind) rule.RuleMessage {
 	default:
 		return rule.RuleMessage{Id: "tsDirectiveComment"}
 	}
-}
-
-// graphemeLength returns the number of grapheme clusters in a string.
-// Uses proper Unicode grapheme cluster segmentation (UAX#29) via rivo/uniseg.
-func graphemeLength(s string) int {
-	return uniseg.GraphemeClusterCount(s)
 }

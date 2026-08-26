@@ -872,7 +872,8 @@ func switchHasSuper(switchStmt *ast.Node) bool {
 
 // ConstructorSuperRule enforces proper super() calls in constructors
 var ConstructorSuperRule = rule.Rule{
-	Name: "constructor-super",
+	Name:   "constructor-super",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindConstructor: func(node *ast.Node) {

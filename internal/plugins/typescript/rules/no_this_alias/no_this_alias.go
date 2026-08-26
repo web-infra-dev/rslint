@@ -1,10 +1,15 @@
 package no_this_alias
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_this_alias.schema.json
+var schemaJSON []byte
 
 type NoThisAliasOptions struct {
 	AllowDestructuring bool     `json:"allowDestructuring"`
@@ -14,11 +19,11 @@ type NoThisAliasOptions struct {
 var (
 	thisAssignmentMessage = rule.RuleMessage{
 		Id:          "thisAssignment",
-		Description: "Unexpected aliasing of `this` to local variable.",
+		Description: "Unexpected aliasing of 'this' to local variable.",
 	}
 	thisDestructureMessage = rule.RuleMessage{
 		Id:          "thisDestructure",
-		Description: "Destructuring `this` is not allowed.",
+		Description: "Unexpected aliasing of members of 'this' to local variables.",
 	}
 )
 
@@ -62,17 +67,7 @@ func parseOptions(options []any) NoThisAliasOptions {
 		return opts
 	}
 
-	// A real config supplies context.options directly. Retain the old nested
-	// array compatibility for direct callers that still pass [[{...}]].
-	option := options[0]
-	if nested, ok := option.([]interface{}); ok {
-		if len(nested) == 0 {
-			return opts
-		}
-		option = nested[0]
-	}
-
-	optsMap, ok := option.(map[string]interface{})
+	optsMap, ok := options[0].(map[string]interface{})
 	if !ok {
 		return opts
 	}
@@ -91,10 +86,21 @@ func parseOptions(options []any) NoThisAliasOptions {
 }
 
 func reportTarget(ctx *rule.RuleContext, target *ast.Node, message rule.RuleMessage) {
-	ctx.ReportRange(
-		target.Loc.WithPos(scanner.SkipTrivia(ctx.SourceFile.Text(), target.Pos())),
-		message,
-	)
+	targetRange := target.Loc.WithPos(scanner.SkipTrivia(ctx.SourceFile.Text(), target.Pos()))
+	// TSESTree includes a variable declarator's definite-assignment marker and
+	// type annotation in the id range, including for binding patterns.
+	if target.Parent != nil && target.Parent.Kind == ast.KindVariableDeclaration {
+		declaration := target.Parent.AsVariableDeclaration()
+		if declaration.Name() == target {
+			if declaration.ExclamationToken != nil && declaration.ExclamationToken.End() > targetRange.End() {
+				targetRange = targetRange.WithEnd(declaration.ExclamationToken.End())
+			}
+			if declaration.Type != nil && declaration.Type.End() > targetRange.End() {
+				targetRange = targetRange.WithEnd(declaration.Type.End())
+			}
+		}
+	}
+	ctx.ReportRange(targetRange, message)
 }
 
 func defaultThisListener(ctx *rule.RuleContext) func(node *ast.Node) {
@@ -132,7 +138,8 @@ func configuredThisListener(ctx *rule.RuleContext, opts NoThisAliasOptions) func
 }
 
 var NoThisAliasRule = rule.CreateRule(rule.Rule{
-	Name: "no-this-alias",
+	Name:   "no-this-alias",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if len(options) == 0 {
 			return rule.RuleListeners{ast.KindThisKeyword: defaultThisListener(&ctx)}

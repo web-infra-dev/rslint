@@ -96,7 +96,11 @@ var PreferEqualityMatcherRule = rule.Rule{
 				}
 
 				matcherEntry := jestFnCall.MatcherEntry
-				if matcherEntry.Node == nil || matcherEntry.Node.Parent == nil {
+				// The accessor, not the entry's direct parent, ends the modifier
+				// range: a parenthesized key such as `[("toBe")]` parents the
+				// literal to the parentheses rather than the element access.
+				_, matcherAccessor := utils.GetAccessorReceiverAndParent(matcherEntry)
+				if matcherAccessor == nil {
 					return
 				}
 
@@ -107,7 +111,7 @@ var PreferEqualityMatcherRule = rule.Rule{
 				rightText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(right), false)
 				replaceComparison := rule.RuleFixReplace(ctx.SourceFile, comparison, leftText)
 				replaceMatcherArg := rule.RuleFixReplace(ctx.SourceFile, utils.UnwrapBasicTypeAssertions(matcherArg), rightText)
-				modifierRange := core.NewTextRange(expectCall.End(), matcherEntry.Node.Parent.End())
+				modifierRange := core.NewTextRange(expectCall.End(), matcherAccessor.End())
 
 				suggestions := make([]rule.RuleSuggestion, len(suggestedEqualityMatchers))
 				for i, equalityMatcher := range suggestedEqualityMatchers {

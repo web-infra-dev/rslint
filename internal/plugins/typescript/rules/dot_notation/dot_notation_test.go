@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -160,7 +161,14 @@ func TestDotNotationRule(t *testing.T) {
 		{
 			Code:   "a['b'];",
 			Output: []string{"a.b;"},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot", Line: 1, Column: 3}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useDot",
+				Message:   `["b"] is better written in dot notation.`,
+				Line:      1,
+				Column:    3,
+				EndLine:   1,
+				EndColumn: 6,
+			}},
 		},
 		{
 			Code:   "a['test'];",
@@ -221,7 +229,10 @@ func TestDotNotationRule(t *testing.T) {
 			Code:    "a?.while;",
 			Options: map[string]interface{}{"allowKeywords": false},
 			Output:  []string{"a?.[\"while\"];"},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useBrackets"}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useBrackets",
+				Message:   ".while is a syntax error.",
+			}},
 		},
 		// Parenthesized literal key is still a literal key.
 		{
@@ -229,14 +240,10 @@ func TestDotNotationRule(t *testing.T) {
 			Output: []string{"a.b;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot"}},
 		},
-		// Chained bracket access: three separate reports, three fix passes.
+		// Chained bracket access: all non-overlapping bracket ranges fix in one pass.
 		{
-			Code: "a['b']['c']['d'];",
-			Output: []string{
-				"a.b['c']['d'];",
-				"a.b.c['d'];",
-				"a.b.c.d;",
-			},
+			Code:   "a['b']['c']['d'];",
+			Output: []string{"a.b.c.d;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "useDot"},
 				{MessageId: "useDot"},
@@ -249,7 +256,73 @@ func TestDotNotationRule(t *testing.T) {
 		{
 			Code:   "a['\\u0062'];",
 			Output: []string{"a.b;"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useDot",
+				Message:   `["b"] is better written in dot notation.`,
+			}},
+		},
+
+		// Static template and keyword literals preserve upstream message data formatting.
+		{
+			Code:   "a[`time`];",
+			Output: []string{"a.time;"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useDot",
+				Message:   "[`time`] is better written in dot notation.",
+			}},
+		},
+		{
+			Code:   "a[null];",
+			Output: []string{"a.null;"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useDot",
+				Message:   "[null] is better written in dot notation.",
+			}},
+		},
+		{
+			Code:   "a[true];",
+			Output: []string{"a.true;"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useDot",
+				Message:   "[true] is better written in dot notation.",
+			}},
+		},
+
+		// Base-rule fixer boundaries inherited by the TypeScript extension.
+		{
+			Code:   "obj?.['prop'];",
+			Output: []string{"obj?.prop;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot"}},
+		},
+		{
+			Code:   "1['toString'];",
+			Output: []string{"1 .toString;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot"}},
+		},
+		{
+			Code:   "foo['bar']instanceof baz;",
+			Output: []string{"foo.bar instanceof baz;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot"}},
+		},
+		{
+			Code:   "foo /* [ */ ['bar'];",
+			Output: []string{"foo /* [ */ .bar;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useDot"}},
+		},
+		{
+			Code:    "foo /* ? */ .while;",
+			Options: map[string]interface{}{"allowKeywords": false},
+			Output:  []string{`foo /* ? */ ["while"];`},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useBrackets"}},
+		},
+		{
+			Code:    "a.if.while;",
+			Options: map[string]interface{}{"allowKeywords": false},
+			Output:  []string{`a["if"]["while"];`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useBrackets"},
+				{MessageId: "useBrackets"},
+			},
 		},
 
 		// --- #6 allowKeywords:false + dot access to null/true/false ---
@@ -347,7 +420,7 @@ func TestDotNotationEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			HasTypeInfo:  true,
 			ExcludePaths: []string{},
@@ -399,10 +472,24 @@ func TestDotNotationEditDemand(t *testing.T) {
 	}
 
 	wantFix := []bool{true, false, true, false, false}
-	wantText := []string{"object.property", "", "object?.[\"while\"]", "", ""}
+	wantText := []string{".property", "", "?.[\"while\"]", "", ""}
+	wantMessage := []string{
+		`["property"] is better written in dot notation.`,
+		`["commented"] is better written in dot notation.`,
+		`.while is a syntax error.`,
+		`.while is a syntax error.`,
+		`.if is a syntax error.`,
+	}
+	wantKey := []string{`"property"`, `"commented"`, "while", "while", "if"}
 	for index, shouldFix := range wantFix {
 		autofix := diagnostics[rule.EditDemandAutofix][index].FixesPtr
 		allEdits := diagnostics[rule.EditDemandAll][index].FixesPtr
+		if got := diagnostics[rule.EditDemandNone][index].Message.Description; got != wantMessage[index] {
+			t.Errorf("diagnostic %d message = %q, want %q", index, got, wantMessage[index])
+		}
+		if got := diagnostics[rule.EditDemandNone][index].Message.Data["key"]; got != wantKey[index] {
+			t.Errorf("diagnostic %d key data = %q, want %q", index, got, wantKey[index])
+		}
 		if (autofix != nil) != shouldFix {
 			t.Errorf("diagnostic %d fix presence = %v, want %v", index, autofix != nil, shouldFix)
 		}
@@ -418,5 +505,25 @@ func TestDotNotationEditDemand(t *testing.T) {
 			diagnostics[rule.EditDemandSuggestion][index].FixesPtr != nil {
 			t.Errorf("diagnostic %d attached fixes without autofix demand", index)
 		}
+	}
+}
+
+// TestDotNotationAllowPatternSchema locks in the fail-fast behavior for an
+// invalid allowPattern. The rule compiles `allowPattern` as an ECMAScript
+// regex, so an unparsable pattern would otherwise be dropped and the rule
+// would silently lint as if no pattern were configured. Marking it
+// `format: "regex"` moves the failure to config validation, matching what
+// ESLint core's dot-notation schema does — upstream's typescript-eslint
+// schema declares a bare string.
+func TestDotNotationAllowPatternSchema(t *testing.T) {
+	invalid := []any{map[string]any{"allowPattern": "("}}
+	if err := DotNotationRule.Schema.Validate(invalid); err == nil {
+		t.Error("expected an invalid allowPattern regex to fail schema validation")
+	}
+	// Lookbehind is JS-legal but RE2-illegal; it must still validate, proving
+	// the schema checks patterns with the ECMAScript engine, not Go's regexp.
+	valid := []any{map[string]any{"allowPattern": "(?<=a)b"}}
+	if err := DotNotationRule.Schema.Validate(valid); err != nil {
+		t.Errorf("expected a valid allowPattern regex to pass schema validation, got: %v", err)
 	}
 }

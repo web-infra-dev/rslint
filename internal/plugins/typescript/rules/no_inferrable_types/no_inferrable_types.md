@@ -95,4 +95,5 @@ When set to `true`, ignores explicit type annotations on class properties with i
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/no-inferrable-types
+- [typescript-eslint: no-inferrable-types](https://typescript-eslint.io/rules/no-inferrable-types)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-inferrable-types.ts)

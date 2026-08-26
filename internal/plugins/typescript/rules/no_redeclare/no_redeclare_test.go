@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
 func TestNoRedeclareRule(t *testing.T) {
+	scriptLanguageOptions := rule.LanguageOptions{SourceType: "script"}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRedeclareRule,
 		[]rule_tester.ValidTestCase{
 			// ====================================================================
@@ -57,10 +59,10 @@ func TestNoRedeclareRule(t *testing.T) {
 			// ====================================================================
 			// builtinGlobals option.
 			// ====================================================================
-			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": false}},
+			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": false}, LanguageOptions: scriptLanguageOptions},
 			// Disabling builtin globals also accepts host-lib names.
-			{Code: "var self = 1;", Options: map[string]interface{}{"builtinGlobals": false}},
-			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": false}},
+			{Code: "var self = 1;", Options: map[string]interface{}{"builtinGlobals": false}, LanguageOptions: scriptLanguageOptions},
+			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": false}, LanguageOptions: scriptLanguageOptions},
 			// Shadowing a builtin inside a function scope is fine: the function
 			// introduces a new scope, and builtinGlobals only applies to the
 			// global scope.
@@ -74,19 +76,24 @@ func TestNoRedeclareRule(t *testing.T) {
 			// Value-only lib globals can be turned off. Names that also exist in
 			// TypeScript's type space (such as Object) remain implicit variables;
 			// their lock-ins live with the invalid builtin cases below.
-			{Code: "var document = 0;", Globals: map[string]any{"document": "off"}},
-			{Code: "/* globals top:off */ var top = 0;"},
+			{Code: "var document = 0;", Globals: map[string]any{"document": "off"}, LanguageOptions: scriptLanguageOptions},
+			{Code: "/* globals top:off */ var top = 0;", LanguageOptions: scriptLanguageOptions},
 			// TypeScript scope-manager does not turn pure value declarations from
 			// lib.dom into implicit globals. They only participate when configured.
-			{Code: "var top = 0;"},
-			{Code: "var self = 0;"},
-			{Code: "var console = 0;"},
-			{Code: "var document = 0;"},
+			{Code: "var top = 0;", LanguageOptions: scriptLanguageOptions},
+			{Code: "var self = 0;", LanguageOptions: scriptLanguageOptions},
+			{Code: "var console = 0;", LanguageOptions: scriptLanguageOptions},
+			{Code: "var document = 0;", LanguageOptions: scriptLanguageOptions},
+			// Host-library declarations are not part of scope-manager's default
+			// esnext globals. Supporting parserOptions.lib is a separate feature.
+			{Code: "var AbortController = 0;", LanguageOptions: scriptLanguageOptions},
+			{Code: "type NodeListOf = 1;", LanguageOptions: scriptLanguageOptions},
+			{Code: "type HTMLElement = 1;", LanguageOptions: scriptLanguageOptions},
 			// In a module the directive remains in the outer global scope while
 			// the syntax declaration is module-local; neither declaration repeats.
 			{Code: "export {};\n/*globals top */ var top = 0;"},
 			// A final inline `off` wins over a config-declared global.
-			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]any{"a": "readonly"}},
+			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]any{"a": "readonly"}, LanguageOptions: scriptLanguageOptions},
 
 			// ====================================================================
 			// TypeScript declaration merging (default ignoreDeclarationMerge: true).
@@ -488,7 +495,8 @@ func TestNoRedeclareRule(t *testing.T) {
 			// Builtin globals — unique coverage from lib.*.d.ts.
 			// ====================================================================
 			{
-				Code: "var Object = 0;",
+				Code:            "var Object = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Message: "'Object' is already defined as a built-in global variable.", Line: 1, Column: 5},
 				},
@@ -496,21 +504,24 @@ func TestNoRedeclareRule(t *testing.T) {
 			},
 			// Default options already enable builtinGlobals.
 			{
-				Code: "var Number = 0;",
+				Code:            "var Number = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
 				},
 			},
 			// eval is in the shared ECMAScript built-in table.
 			{
-				Code: "var eval = 0;",
+				Code:            "var eval = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
 				},
 			},
 			// `Promise` lives in lib.es2015.promise — covered by TS lib detection.
 			{
-				Code: "var Promise = 0;",
+				Code:            "var Promise = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
 				},
@@ -531,8 +542,9 @@ func TestNoRedeclareRule(t *testing.T) {
 			},
 			// ctx.Globals: a config-declared global collides like a builtin.
 			{
-				Code:    "var app = 0;",
-				Globals: map[string]any{"app": "readonly"},
+				Code:            "var app = 0;",
+				Globals:         map[string]any{"app": "readonly"},
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Message: "'app' is already defined as a built-in global variable.", Line: 1, Column: 5},
 				},
@@ -540,8 +552,9 @@ func TestNoRedeclareRule(t *testing.T) {
 			// ctx.Globals: an inline comment re-declares a builtin the config
 			// turned off — the comment then collides with the declaration.
 			{
-				Code:    "/* globals Object */ var Object = 0;",
-				Globals: map[string]any{"Object": "off"},
+				Code:            "/* globals Object */ var Object = 0;",
+				Globals:         map[string]any{"Object": "off"},
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredBySyntax", Message: "'Object' is already defined by a variable declaration.", Line: 1, Column: 26, EndLine: 1, EndColumn: 32},
 				},
@@ -549,20 +562,23 @@ func TestNoRedeclareRule(t *testing.T) {
 			// The extension iterates directive comments before syntax identifiers,
 			// unlike ESLint core. Lock both the selected declaration and message.
 			{
-				Code: "/* globals a */ var a = 0;",
+				Code:            "/* globals a */ var a = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredBySyntax", Message: "'a' is already defined by a variable declaration.", Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
 				},
 			},
 			{
-				Code: "/* globals a */ /* globals a */ var a = 0;",
+				Code:            "/* globals a */ /* globals a */ var a = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclared", Message: "'a' is already defined.", Line: 1, Column: 28, EndLine: 1, EndColumn: 29},
 					{MessageId: "redeclaredBySyntax", Message: "'a' is already defined by a variable declaration.", Line: 1, Column: 37, EndLine: 1, EndColumn: 38},
 				},
 			},
 			{
-				Code: "/* globals a */ var a = 0; var a = 1;",
+				Code:            "/* globals a */ var a = 0; var a = 1;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredBySyntax", Message: "'a' is already defined by a variable declaration.", Line: 1, Column: 21, EndLine: 1, EndColumn: 22},
 					{MessageId: "redeclaredBySyntax", Message: "'a' is already defined by a variable declaration.", Line: 1, Column: 32, EndLine: 1, EndColumn: 33},
@@ -570,14 +586,16 @@ func TestNoRedeclareRule(t *testing.T) {
 			},
 			// Type-space lib variables survive value-global `off` settings.
 			{
-				Code:    "var Object = 0;",
-				Globals: map[string]any{"Object": "off"},
+				Code:            "var Object = 0;",
+				Globals:         map[string]any{"Object": "off"},
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5, EndLine: 1, EndColumn: 11},
 				},
 			},
 			{
-				Code: "/* globals Object:off */ var Object = 0;",
+				Code:            "/* globals Object:off */ var Object = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 30, EndLine: 1, EndColumn: 36},
 				},
@@ -585,60 +603,61 @@ func TestNoRedeclareRule(t *testing.T) {
 			// Pure value declarations from lib.dom participate only through an
 			// explicit globals setting or directive, matching scope-manager.
 			{
-				Code:    "var document = 0;",
-				Globals: map[string]any{"document": "readonly"},
+				Code:            "var document = 0;",
+				Globals:         map[string]any{"document": "readonly"},
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Message: "'document' is already defined as a built-in global variable.", Line: 1, Column: 5, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
-				Code: "/* globals document */ var document = 0;",
+				Code:            "/* globals document */ var document = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredBySyntax", Message: "'document' is already defined by a variable declaration.", Line: 1, Column: 28, EndLine: 1, EndColumn: 36},
 				},
 			},
-			// DOM TYPE_VALUE names do remain implicit lib variables.
+			// Name-level parity includes scope-manager's default esnext type
+			// globals and legal interface augmentations.
 			{
-				Code: "var AbortController = 0;",
+				Code:            "type Record = 1;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Message: "'AbortController' is already defined as a built-in global variable.", Line: 1, Column: 5, EndLine: 1, EndColumn: 20},
-				},
-			},
-			// Name-level parity includes pure type globals and legal interface
-			// augmentations, just as typescript-eslint's scope manager does.
-			{
-				Code: "type NodeListOf = 1;",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 16},
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 12},
 				},
 			},
 			{
-				Code: "type HTMLElement = 1;",
+				Code:            "type IteratorObjectConstructor = 1;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 17},
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 31},
 				},
 			},
 			{
-				Code: "type Array = 1;",
+				Code:            "type Array = 1;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 6, EndLine: 1, EndColumn: 11},
 				},
 			},
 			{
-				Code: "interface ImportMeta { foo: 1; }",
+				Code:            "interface ImportMeta { foo: 1; }",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 11, EndLine: 1, EndColumn: 21},
 				},
 			},
 			{
-				Code: "interface Array<T> { custom(): T; }",
+				Code:            "interface Array<T> { custom(): T; }",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 11, EndLine: 1, EndColumn: 16},
 				},
 			},
 			// Destructuring — one user+user conflict and one user+builtin.
 			{
-				Code: "var a;\nvar { a = 0, b: Object = 0 } = {};",
+				Code:            "var a;\nvar { a = 0, b: Object = 0 } = {};",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclared", Line: 2, Column: 7},
 					{MessageId: "redeclaredAsBuiltin", Line: 2, Column: 17},
@@ -965,7 +984,8 @@ func TestNoRedeclareRule(t *testing.T) {
 				},
 			},
 			{
-				Code: "var Object = 0;",
+				Code:            "var Object = 0;",
+				LanguageOptions: scriptLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5, EndLine: 1, EndColumn: 11},
 				},

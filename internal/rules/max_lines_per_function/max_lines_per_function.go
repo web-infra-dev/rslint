@@ -1,28 +1,31 @@
 package max_lines_per_function
 
 import (
+	_ "embed"
 	"fmt"
-	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+//go:embed max_lines_per_function.schema.json
+var schemaJSON []byte
 
 // MaxLinesPerFunctionRule enforces a maximum number of lines per function.
 // https://eslint.org/docs/latest/rules/max-lines-per-function
 var MaxLinesPerFunctionRule = rule.Rule{
-	Name: "max-lines-per-function",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "max-lines-per-function",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-		var comments []*ast.CommentRange
-		if opts.skipComments {
-			comments = ctx.Comments.All()
-		}
-		state := newLineState(ctx.SourceFile, comments, opts.skipComments, opts.skipBlankLines)
+		sourceFile := ctx.SourceFile
+		text := sourceFile.Text()
+		state := &lineState{}
+		headLocator := utils.NewFunctionHeadRangeLocator(sourceFile)
 
 		process := func(node *ast.Node) {
 			// Overload signatures, abstract / declare members, and TS interface
@@ -36,12 +39,26 @@ var MaxLinesPerFunctionRule = rule.Rule{
 				return
 			}
 
-			textRange, startLine, endLine := state.nodeLineRange(node)
-			lineCount := state.countLines(startLine, endLine)
+			startPos := scanner.GetTokenPosOfNode(node, sourceFile, false)
+			endPos := node.End()
+			lineCount := 0
+			if len(state.lineStarts) == 0 && opts.max >= 1 && isSingleLineRange(text, startPos, endPos) {
+				lineCount = 1
+			} else {
+				if len(state.lineStarts) == 0 {
+					var comments []*ast.CommentRange
+					if opts.skipComments {
+						comments = ctx.Comments.All()
+					}
+					state.initialize(sourceFile, comments, opts.skipComments, opts.skipBlankLines)
+				}
+				startLine, endLine := state.lineRange(startPos, endPos)
+				lineCount = state.countLines(startLine, endLine)
+			}
 
 			if lineCount > opts.max {
-				name := upperCaseFirst(utils.GetFunctionNameWithKind(node))
-				ctx.ReportRange(textRange, rule.RuleMessage{
+				name := utils.UpperCaseFirstASCII(utils.GetFunctionNameWithKindCore(node))
+				ctx.ReportRange(headLocator.Range(node), rule.RuleMessage{
 					Id: "exceed",
 					Description: fmt.Sprintf(
 						"%s has too many lines (%d). Maximum allowed is %d.",
@@ -63,6 +80,16 @@ var MaxLinesPerFunctionRule = rule.Rule{
 	},
 }
 
+// isSingleLineRange reports whether a validated source range contains no
+// ECMAScript line terminator. A single-line function always counts as exactly
+// one line, even when comment or blank-line skipping is enabled, so callers can
+// avoid materializing the source file's line map and comment table entirely.
+// Synthetic or otherwise unusual ranges retain the established line-map path.
+func isSingleLineRange(text string, startPos, endPos int) bool {
+	return startPos >= 0 && endPos >= startPos && endPos <= len(text) &&
+		!ecmascript.ContainsLineTerminator(text, startPos, endPos)
+}
+
 type maxLinesPerFunctionOptions struct {
 	max            int
 	skipComments   bool
@@ -70,51 +97,25 @@ type maxLinesPerFunctionOptions struct {
 	iifes          bool
 }
 
-func parseOptions(opts any) maxLinesPerFunctionOptions {
+// parseOptions reads the single option, which is either a bare maximum
+// (`["error", 50]`) or an object (`["error", { max: 50, ... }]`).
+func parseOptions(options []any) maxLinesPerFunctionOptions {
 	result := maxLinesPerFunctionOptions{max: 50}
-	if opts == nil {
+	if len(options) == 0 {
 		return result
 	}
-	// JS tests pass options as [50] or [{ max: 50, ... }]; the CLI may pass a
-	// bare number, bare object, or array-wrapped value.
-	if arr, ok := opts.([]interface{}); ok {
-		if len(arr) == 0 {
-			return result
-		}
-		opts = arr[0]
+	result.max = utils.ResolveLegacyMaxOption(options[0], 50)
+	m, _ := options[0].(map[string]interface{})
+	if v, ok := m["skipComments"].(bool); ok {
+		result.skipComments = v
 	}
-	if n, ok := utils.CoerceInt(opts); ok {
-		result.max = n
-		return result
+	if v, ok := m["skipBlankLines"].(bool); ok {
+		result.skipBlankLines = v
 	}
-	if m, ok := opts.(map[string]interface{}); ok {
-		if v, ok := m["max"]; ok {
-			if n, ok := utils.CoerceInt(v); ok {
-				result.max = n
-			}
-		}
-		if v, ok := m["skipComments"].(bool); ok {
-			result.skipComments = v
-		}
-		if v, ok := m["skipBlankLines"].(bool); ok {
-			result.skipBlankLines = v
-		}
-		if v, ok := m["IIFEs"].(bool); ok {
-			result.iifes = v
-		}
+	if v, ok := m["IIFEs"].(bool); ok {
+		result.iifes = v
 	}
 	return result
-}
-
-// upperCaseFirst mirrors ESLint's shared/string-utils upperCaseFirst — used to
-// capitalize the leading word of `getFunctionNameWithKind`'s output before
-// embedding it into the diagnostic message ("function 'foo'" → "Function
-// 'foo'", "arrow function" → "Arrow function").
-func upperCaseFirst(s string) string {
-	for i, r := range s {
-		return string(unicode.ToUpper(r)) + s[i+len(string(r)):]
-	}
-	return s
 }
 
 // isIIFE reports whether the given function-like node is the callee of a call
@@ -145,7 +146,6 @@ func isIIFE(node *ast.Node) bool {
 // each function's line count into a pair of indexed lookups. This is especially
 // important for nested functions, whose source ranges overlap.
 type lineState struct {
-	sourceFile        *ast.SourceFile
 	text              string
 	lineStarts        []core.TextPos
 	nLines            int
@@ -156,27 +156,24 @@ type lineState struct {
 	countedLinePrefix []int
 }
 
-func newLineState(
+func (s *lineState) initialize(
 	sourceFile *ast.SourceFile,
 	sourceComments []*ast.CommentRange,
 	skipComments bool,
 	skipBlankLines bool,
-) *lineState {
+) {
 	text := sourceFile.Text()
 	lineStarts := scanner.GetECMALineStarts(sourceFile)
 	if len(lineStarts) == 0 {
 		lineStarts = []core.TextPos{0}
 	}
 	nLines := len(lineStarts)
-	state := &lineState{
-		sourceFile:     sourceFile,
-		text:           text,
-		lineStarts:     lineStarts,
-		nLines:         nLines,
-		skipBlankLines: skipBlankLines,
-	}
+	s.text = text
+	s.lineStarts = lineStarts
+	s.nLines = nLines
+	s.skipBlankLines = skipBlankLines
 	if !skipComments && !skipBlankLines {
-		return state
+		return
 	}
 
 	if skipComments {
@@ -192,7 +189,7 @@ func newLineState(
 		}
 		comments = append(comments, sourceComments...)
 		if len(comments) == 0 {
-			return state
+			return
 		}
 
 		fullLineComment := make([]bool, nLines)
@@ -207,7 +204,7 @@ func newLineState(
 			startLine := scanner.ComputeLineOfPosition(lineStarts, cmt.Pos())
 			endLine := scanner.ComputeLineOfPosition(lineStarts, cmt.End()-1)
 			for line := max(startLine, 0); line <= endLine && line < nLines; line++ {
-				coversWholeLine := state.commentCoversWholeLine(cmt, startLine, endLine, line)
+				coversWholeLine := s.commentCoversWholeLine(cmt, startLine, endLine, line)
 				if coversWholeLine != fullLineComment[line] {
 					if coversWholeLine {
 						fullLineCommentCount++
@@ -219,26 +216,21 @@ func newLineState(
 			}
 		}
 		if fullLineCommentCount > 0 {
-			state.fullLineComment = fullLineComment
+			s.fullLineComment = fullLineComment
 		}
 	}
-	return state
 }
 
-// nodeLineRange returns the inclusive 0-indexed line range of the node,
-// excluding any leading trivia. Mirrors ESLint's `node.loc.start.line` /
-// `node.loc.end.line` (which are based on the first / last source token of
-// the node).
-func (s *lineState) nodeLineRange(node *ast.Node) (core.TextRange, int, int) {
-	startPos := scanner.GetTokenPosOfNode(node, s.sourceFile, false)
-	endPos := node.End()
+// lineRange returns the inclusive 0-indexed line range for an already-trimmed
+// source range. Mirrors ESLint's `node.loc.start.line` / `node.loc.end.line`.
+func (s *lineState) lineRange(startPos, endPos int) (int, int) {
 	startLine := scanner.ComputeLineOfPosition(s.lineStarts, startPos)
 	endLineIdx := endPos - 1
 	if endLineIdx < startPos {
 		endLineIdx = startPos
 	}
 	endLine := scanner.ComputeLineOfPosition(s.lineStarts, endLineIdx)
-	return core.NewTextRange(startPos, endPos), startLine, endLine
+	return startLine, endLine
 }
 
 func (s *lineState) countLines(startLine, endLine int) int {
@@ -319,7 +311,7 @@ func (s *lineState) lineIsCounted(line int) bool {
 	if len(s.fullLineComment) > 0 && s.fullLineComment[line] {
 		return false
 	}
-	return !s.skipBlankLines || !utils.IsECMABlankLine(s.lineContent(line))
+	return !s.skipBlankLines || !ecmascript.IsBlank(s.lineContent(line))
 }
 
 // lineContent returns the content of the i-th 0-indexed line, without its
@@ -348,7 +340,7 @@ func (s *lineState) commentCoversWholeLine(cmt *ast.CommentRange, startLine, end
 	startOK := startLine < lineIndex
 	if !startOK && startLine == lineIndex {
 		col := cmt.Pos() - int(s.lineStarts[lineIndex])
-		if col >= 0 && col <= len(line) && utils.IsECMABlankLine(line[:col]) {
+		if col >= 0 && col <= len(line) && ecmascript.IsBlank(line[:col]) {
 			startOK = true
 		}
 	}
@@ -361,7 +353,7 @@ func (s *lineState) commentCoversWholeLine(cmt *ast.CommentRange, startLine, end
 	}
 	if endLine == lineIndex {
 		col := cmt.End() - int(s.lineStarts[lineIndex])
-		if col >= 0 && col <= len(line) && utils.IsECMABlankLine(line[col:]) {
+		if col >= 0 && col <= len(line) && ecmascript.IsBlank(line[col:]) {
 			return true
 		}
 	}

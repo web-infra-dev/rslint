@@ -1,11 +1,16 @@
 package require_array_sort_compare
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed require_array_sort_compare.schema.json
+var schemaJSON []byte
 
 func buildRequireCompareMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -15,21 +20,29 @@ func buildRequireCompareMessage() rule.RuleMessage {
 }
 
 type RequireArraySortCompareOptions struct {
-	IgnoreStringArrays *bool
+	IgnoreStringArrays bool
+}
+
+func parseOptions(options []any) RequireArraySortCompareOptions {
+	opts := RequireArraySortCompareOptions{
+		IgnoreStringArrays: true,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["ignoreStringArrays"].(bool); ok {
+		opts.IgnoreStringArrays = value
+	}
+	return opts
 }
 
 var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
 	Name:             "require-array-sort-compare",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(RequireArraySortCompareOptions)
-		if !ok {
-			opts = RequireArraySortCompareOptions{}
-		}
-		if opts.IgnoreStringArrays == nil {
-			opts.IgnoreStringArrays = utils.Ref(true)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -49,7 +62,7 @@ var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
 
 				calleeObjType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, callee.Expression())
 
-				if *opts.IgnoreStringArrays && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, calleeObjType) {
+				if opts.IgnoreStringArrays && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, calleeObjType) {
 					if utils.Every(checker.Checker_getTypeArguments(ctx.TypeChecker, calleeObjType), func(t *checker.Type) bool {
 						return utils.IsTypeFlagSet(t, checker.TypeFlagsString)
 					}) {

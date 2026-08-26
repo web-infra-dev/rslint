@@ -1,0 +1,57 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "oneOf": [
+        {
+          "enum": ["all", "local"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "vars": {
+              "enum": ["all", "local"]
+            },
+            "varsIgnorePattern": {
+              "type": "string",
+              "format": "regex"
+            },
+            "args": {
+              "enum": ["all", "after-used", "none"]
+            },
+            "ignoreRestSiblings": {
+              "type": "boolean"
+            },
+            "argsIgnorePattern": {
+              "type": "string",
+              "format": "regex"
+            },
+            "caughtErrors": {
+              "enum": ["all", "none"]
+            },
+            "caughtErrorsIgnorePattern": {
+              "type": "string",
+              "format": "regex"
+            },
+            "destructuredArrayIgnorePattern": {
+              "type": "string",
+              "format": "regex"
+            },
+            "ignoreClassWithStaticInitBlock": {
+              "type": "boolean"
+            },
+            "ignoreUsingDeclarations": {
+              "type": "boolean"
+            },
+            "reportUsedIgnorePattern": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

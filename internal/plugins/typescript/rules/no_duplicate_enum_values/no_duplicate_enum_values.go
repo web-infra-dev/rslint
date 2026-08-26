@@ -1,8 +1,11 @@
 package no_duplicate_enum_values
 
 import (
+	"math"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 type enumValueKind uint8
@@ -11,6 +14,7 @@ const (
 	enumValueString enumValueKind = 1 << iota
 	enumValueNumber
 	enumValueNegativeNumber
+	enumValueNegativeZero
 )
 
 type enumValue struct {
@@ -73,22 +77,70 @@ func (seen *seenEnumValues) add(value enumValue, capacity int) bool {
 }
 
 func getEnumValue(initializer *ast.Node) (enumValue, bool) {
+	if initializer.Kind == ast.KindParenthesizedExpression {
+		initializer = ast.SkipParentheses(initializer)
+	}
 	switch initializer.Kind {
 	case ast.KindNumericLiteral:
 		return enumValue{text: initializer.AsNumericLiteral().Text, kind: enumValueNumber}, true
 	case ast.KindStringLiteral:
 		return enumValue{text: initializer.AsStringLiteral().Text, kind: enumValueString}, true
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return enumValue{text: initializer.AsNoSubstitutionTemplateLiteral().Text, kind: enumValueString}, true
-	case ast.KindPrefixUnaryExpression:
-		unaryExpression := initializer.AsPrefixUnaryExpression()
-		if unaryExpression.Operator != ast.KindMinusToken || unaryExpression.Operand.Kind != ast.KindNumericLiteral {
+		template := initializer.AsNoSubstitutionTemplateLiteral()
+		if template.TemplateFlags&ast.TokenFlagsContainsInvalidEscape != 0 {
 			return enumValue{}, false
 		}
-		return enumValue{text: unaryExpression.Operand.AsNumericLiteral().Text, kind: enumValueNegativeNumber}, true
+		return enumValue{text: template.Text, kind: enumValueString}, true
+	case ast.KindPrefixUnaryExpression:
+		unaryExpression := initializer.AsPrefixUnaryExpression()
+		if unaryExpression.Operator != ast.KindMinusToken && unaryExpression.Operator != ast.KindPlusToken {
+			return enumValue{}, false
+		}
+		value, ok := getEnumValue(unaryExpression.Operand)
+		if !ok {
+			return enumValue{}, false
+		}
+		return applyUnaryOperator(value, unaryExpression.Operator)
 	default:
 		return enumValue{}, false
 	}
+}
+
+func applyUnaryOperator(value enumValue, operator ast.Kind) (enumValue, bool) {
+	if value.kind == enumValueString {
+		number, ok := ecmascript.StringToNumber(value.text)
+		if !ok {
+			return enumValue{}, false
+		}
+		if operator == ast.KindMinusToken {
+			number = -number
+		}
+		return numberEnumValue(number), true
+	}
+
+	if operator == ast.KindPlusToken {
+		return value, true
+	}
+	if value.kind == enumValueNegativeZero {
+		return enumValue{text: "0", kind: enumValueNumber}, true
+	}
+	if value.kind == enumValueNegativeNumber {
+		return enumValue{text: value.text, kind: enumValueNumber}, true
+	}
+	if value.text == "0" {
+		return enumValue{text: "0", kind: enumValueNegativeZero}, true
+	}
+	return enumValue{text: value.text, kind: enumValueNegativeNumber}, true
+}
+
+func numberEnumValue(number float64) enumValue {
+	if number == 0 && math.Signbit(number) {
+		return enumValue{text: "0", kind: enumValueNegativeZero}
+	}
+	if number < 0 {
+		return enumValue{text: ecmascript.NumberToString(-number), kind: enumValueNegativeNumber}
+	}
+	return enumValue{text: ecmascript.NumberToString(number), kind: enumValueNumber}
 }
 
 func duplicateValueMessage(value enumValue) rule.RuleMessage {
@@ -99,7 +151,8 @@ func duplicateValueMessage(value enumValue) rule.RuleMessage {
 }
 
 var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
-	Name: "no-duplicate-enum-values",
+	Name:   "no-duplicate-enum-values",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
@@ -123,7 +176,7 @@ var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
 					}
 
 					if seenValues.add(value, len(enumDecl.Members.Nodes)) {
-						ctx.ReportNode(member.Name(), duplicateValueMessage(value))
+						ctx.ReportNode(memberNode, duplicateValueMessage(value))
 					}
 				}
 			},

@@ -99,4 +99,5 @@ A few upstream implementation details deserve a note:
 
 ## Original Documentation
 
-- [eslint-plugin-react docs](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-target-blank.md)
+- [eslint-plugin-react: jsx-no-target-blank](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-no-target-blank.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-no-target-blank.js)

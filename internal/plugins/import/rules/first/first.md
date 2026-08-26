@@ -47,4 +47,5 @@ import { x } from './foo';
 
 ## Original Documentation
 
-https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/first.md
+- [eslint-plugin-import: first](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/first.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/first.js)

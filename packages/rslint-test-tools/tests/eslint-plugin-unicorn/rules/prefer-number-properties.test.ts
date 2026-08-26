@@ -6,6 +6,10 @@ const valid = (code: string, options?: unknown[]) =>
   options === undefined ? { code } : { code, options };
 const invalid = (code: string, errors = 1, options?: unknown[]) =>
   options === undefined ? { code, errors } : { code, errors, options };
+const invalidWithGlobal = (code: string, name: string) => ({
+  ...invalid(code),
+  languageOptions: { globals: { [name]: 'readonly' } },
+});
 const checkInfinity = [{ checkInfinity: true }];
 const checkNaNFalse = [{ checkNaN: false }];
 
@@ -180,13 +184,13 @@ ruleTester.run('prefer-number-properties', null as never, {
     invalid('function foo([a = NaN]) {}'),
     invalid('function foo() {return-Infinity}', 1, checkInfinity),
     invalid('globalThis.isNaN(foo);'),
-    invalid('global.isNaN(foo);'),
-    invalid('window.isNaN(foo);'),
-    invalid('self.isNaN(foo);'),
+    invalidWithGlobal('global.isNaN(foo);', 'global'),
+    invalidWithGlobal('window.isNaN(foo);', 'window'),
+    invalidWithGlobal('self.isNaN(foo);', 'self'),
     invalid('globalThis.parseFloat(foo);'),
-    invalid('global.parseFloat(foo);'),
-    invalid('window.parseFloat(foo);'),
-    invalid('self.parseFloat(foo);'),
+    invalidWithGlobal('global.parseFloat(foo);', 'global'),
+    invalidWithGlobal('window.parseFloat(foo);', 'window'),
+    invalidWithGlobal('self.parseFloat(foo);', 'self'),
     invalid('globalThis.NaN'),
     invalid('-globalThis.Infinity', 1, checkInfinity),
     invalid(

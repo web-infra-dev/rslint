@@ -126,17 +126,10 @@ func createFixerImports(isModule bool, names string) string {
 }
 
 // preferModuleImport mirrors upstream's
-// `parserOptions/languageOptions.sourceType === 'module'` check, with a
-// structural ESM fallback when sourceType is unset (rslint default).
+// `parserOptions/languageOptions.sourceType === 'module'` check. The linter
+// resolves the flat-config filename default before constructing the context.
 func preferModuleImport(ctx rule.RuleContext) bool {
-	switch ctx.SourceType {
-	case "module":
-		return true
-	case "script", "commonjs":
-		return false
-	default:
-		return ctx.SourceFile != nil && ast.IsExternalModule(ctx.SourceFile)
-	}
+	return ctx.LanguageOptions.EffectiveSourceType() == "module"
 }
 
 // accessorValue mirrors eslint-plugin-jest's isSupportedAccessor + getAccessorValue.

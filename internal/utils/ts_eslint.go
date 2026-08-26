@@ -7,12 +7,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 type ConstraintTypeInfo struct {
@@ -192,7 +193,9 @@ func GetForStatementHeadLoc(
  * - `export default function() {}` → `function`
  */
 func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
-	parent := node.Parent
+	// ESTree exposes no node for parentheses, so a parenthesized function
+	// value still has the property that holds it as its parent.
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
 
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
@@ -213,24 +216,16 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 		return start
 
 	case ast.KindArrowFunction:
-		if parent != nil && (parent.Kind == ast.KindPropertyDeclaration || parent.Kind == ast.KindPropertyAssignment) {
+		if holdsFunctionValue(parent) {
 			start := nodeStartSkippingDecorators(sourceFile, parent)
-			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
-				return start.WithEnd(parenPos)
-			}
-			af := node.AsArrowFunction()
-			if af.Parameters != nil && len(af.Parameters.Nodes) > 0 {
-				paramStart := scanner.GetRangeOfTokenAtPosition(sourceFile, af.Parameters.Nodes[0].Pos())
-				return start.WithEnd(paramStart.Pos())
-			}
-			return start.WithEnd(af.EqualsGreaterThanToken.Pos())
+			return start.WithEnd(openingParenOfParamsPos(sourceFile, node))
 		}
 		af := node.AsArrowFunction()
 		arrowRange := scanner.GetRangeOfTokenAtPosition(sourceFile, af.EqualsGreaterThanToken.Pos())
 		return core.NewTextRange(arrowRange.Pos(), arrowRange.End())
 
 	case ast.KindFunctionExpression:
-		if parent != nil && (parent.Kind == ast.KindPropertyAssignment || parent.Kind == ast.KindPropertyDeclaration) {
+		if holdsFunctionValue(parent) {
 			start := nodeStartSkippingDecorators(sourceFile, parent)
 			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
 				return start.WithEnd(parenPos)
@@ -346,24 +341,178 @@ func IsStartOfExpressionStatement(sourceFile *ast.SourceFile, node *ast.Node) bo
 	return false
 }
 
-// NeedsPrecedingSemicolon mirrors ESLint's common ASI check for fixes that
-// make an expression-starter token begin a statement on a new line.
+// needsPrecedingSemicolonExemptPunctuator reports whether kind is one of the
+// punctuators that can never expect a semicolon before an opening
+// parenthesis/bracket — inserting one there would count as an empty
+// statement (`:`, `;`, `{`, `=>`), or the punctuator itself already forces
+// ASI regardless of what follows (postfix `++`, `--`).
+func needsPrecedingSemicolonExemptPunctuator(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindColonToken, ast.KindSemicolonToken, ast.KindOpenBraceToken,
+		ast.KindEqualsGreaterThanToken, ast.KindPlusPlusToken, ast.KindMinusMinusToken:
+		return true
+	}
+	return false
+}
+
+// needsPrecedingSemicolonAfterCloseParen mirrors ESLint's ast-utils STATEMENTS
+// set: the header of these statements always requires a fresh Statement as
+// what follows (the body), so nothing there can extend the header into a call
+// — safe without an explicit semicolon. do-while is included even though its
+// parenthesized condition trails the body, since ASI always fires right after
+// it by grammar rule.
+func needsPrecedingSemicolonAfterCloseParen(prevNode *ast.Node) bool {
+	switch prevNode.Kind {
+	case ast.KindDoStatement, ast.KindForInStatement, ast.KindForOfStatement, ast.KindForStatement,
+		ast.KindIfStatement, ast.KindWhileStatement, ast.KindWithStatement:
+		return false
+	}
+	return true
+}
+
+// needsPrecedingSemicolonAfterCloseBrace mirrors ESLint's ast-utils check for
+// a closing `}`: only a brace ending an (anonymous) function-expression body,
+// a class expression, or an object literal is risky — each of those is a
+// value that a following `(` could attach to as a call, changing what the
+// code means. Every other `}` (block statement, function/class declaration
+// body, method body, import/export specifier list, ...) is safe.
+func needsPrecedingSemicolonAfterCloseBrace(prevNode *ast.Node) bool {
+	switch prevNode.Kind {
+	case ast.KindBlock:
+		return prevNode.Parent != nil && prevNode.Parent.Kind == ast.KindFunctionExpression
+	case ast.KindClassExpression, ast.KindObjectLiteralExpression:
+		return true
+	}
+	return false
+}
+
+// isNodeOrParentKind reports whether node itself, or its immediate parent, has
+// one of the given kinds. GetNodeAtPosition sometimes descends all the way to
+// a leaf child (whose parent is the construct of interest) and sometimes
+// stops at the construct itself — e.g. when a trailing leaf's range reaches
+// exactly to the end of its parent's range — so callers that care about a
+// specific enclosing construct must check both positions.
+func isNodeOrParentKind(node *ast.Node, kinds ...ast.Kind) bool {
+	for _, kind := range kinds {
+		if node.Kind == kind {
+			return true
+		}
+	}
+	if parent := node.Parent; parent != nil {
+		for _, kind := range kinds {
+			if parent.Kind == kind {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// needsPrecedingSemicolonAfterStringLiteral mirrors ESLint's DECLARATIONS
+// set: a module specifier string ending an import/export declaration can
+// never be continued by a punctuator, so it's safe without a semicolon.
+func needsPrecedingSemicolonAfterStringLiteral(prevNode *ast.Node) bool {
+	return !isNodeOrParentKind(prevNode, ast.KindExportDeclaration, ast.KindImportDeclaration)
+}
+
+// keywordStatementKind maps the reserved-word spelling of prevKind to the
+// node kind ESLint's NODE_TYPES_BY_KEYWORD associates with it. ok is false
+// for every other identifier/keyword.
+func keywordStatementKind(prevKind ast.Kind) (kind ast.Kind, ok bool) {
+	switch prevKind {
+	case ast.KindBreakKeyword:
+		return ast.KindBreakStatement, true
+	case ast.KindContinueKeyword:
+		return ast.KindContinueStatement, true
+	case ast.KindDebuggerKeyword:
+		return ast.KindDebuggerStatement, true
+	case ast.KindDoKeyword:
+		return ast.KindDoStatement, true
+	case ast.KindElseKeyword:
+		return ast.KindIfStatement, true
+	case ast.KindReturnKeyword:
+		return ast.KindReturnStatement, true
+	case ast.KindYieldKeyword:
+		return ast.KindYieldExpression, true
+	}
+	return ast.KindUnknown, false
+}
+
+// needsPrecedingSemicolonAfterIdentifierOrKeyword mirrors ESLint's
+// IDENTIFIER_OR_KEYWORD branch: an uninitialized variable-declarator name and
+// a break/continue label are always safe (nothing meaningful can attach to
+// them); a keyword whose associated statement/expression kind matches
+// prevNode (e.g. a bare `return` / `yield` / `debugger` / `do` / `else` /
+// `break` / `continue`, where ASI or the grammar already ends the construct
+// there) is also safe. Everything else — an ordinary identifier, or one of
+// these keyword spellings reused as a property/member name, whose prevNode is
+// therefore not the matching statement kind — defaults to needing one.
+func needsPrecedingSemicolonAfterIdentifierOrKeyword(prevKind ast.Kind, prevNode *ast.Node) bool {
+	declarator := prevNode
+	if prevNode.Kind != ast.KindVariableDeclaration && prevNode.Parent != nil {
+		declarator = prevNode.Parent
+	}
+	if declarator.Kind == ast.KindVariableDeclaration {
+		if vd := declarator.AsVariableDeclaration(); vd != nil && vd.Initializer == nil {
+			return false
+		}
+	}
+	if isNodeOrParentKind(prevNode, ast.KindBreakStatement, ast.KindContinueStatement) {
+		return false
+	}
+	if expected, ok := keywordStatementKind(prevKind); ok {
+		return prevNode.Kind != expected
+	}
+	return true
+}
+
+// NeedsPrecedingSemicolon mirrors ESLint's ast-utils `needsPrecedingSemicolon`:
+// whether a fix that makes an expression-starter token (an opening
+// parenthesis/bracket) begin a statement on a new line is safe without an
+// explicit leading `;`. A leading `(` can always continue certain preceding
+// constructs (e.g. a preceding function/class expression or object literal
+// becomes the callee of a new CallExpression) even across a line break, which
+// would silently change what the code means — this reports true whenever
+// that hazard exists.
+//
+// This omits ESLint's TypeScript-only exemptions (TSDeclareFunction,
+// TSImportEqualsDeclaration, ancestor type positions) and the uninitialized
+// class-field case: none of node's callers ever produce those shapes, and the
+// unhandled fallback (report true, prefer a semicolon) is always safe, only
+// ever adding a redundant character rather than producing wrong output.
 func NeedsPrecedingSemicolon(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	nodeStart := TrimNodeTextRange(sourceFile, node).Pos()
 
 	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
 	prevKind := ast.KindUnknown
+	prevStart := -1
 	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < nodeStart {
 		prevKind = scan.Token()
+		prevStart = scan.TokenStart()
 		scan.Scan()
 	}
 	if prevKind == ast.KindUnknown || scan.TokenStart() != nodeStart || !scan.HasPrecedingLineBreak() {
 		return false
 	}
+	if needsPrecedingSemicolonExemptPunctuator(prevKind) {
+		return false
+	}
+
+	prevNode := ast.GetNodeAtPosition(sourceFile, prevStart, false)
+	if prevNode == nil {
+		return true
+	}
 
 	switch prevKind {
-	case ast.KindSemicolonToken, ast.KindCloseBraceToken:
-		return false
+	case ast.KindCloseParenToken:
+		return needsPrecedingSemicolonAfterCloseParen(prevNode)
+	case ast.KindCloseBraceToken:
+		return needsPrecedingSemicolonAfterCloseBrace(prevNode)
+	case ast.KindStringLiteral:
+		return needsPrecedingSemicolonAfterStringLiteral(prevNode)
+	case ast.KindIdentifier, ast.KindBreakKeyword, ast.KindContinueKeyword, ast.KindDebuggerKeyword,
+		ast.KindDoKeyword, ast.KindElseKeyword, ast.KindReturnKeyword, ast.KindYieldKeyword:
+		return needsPrecedingSemicolonAfterIdentifierOrKeyword(prevKind, prevNode)
 	}
 	return true
 }
@@ -415,7 +564,8 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 	// private-key live on the surrounding PropertyDeclaration. Mirrors ESLint
 	// v9's `parent.type === "PropertyDefinition" && parent.value === node`
 	// branch in `astUtils.getFunctionNameWithKind`.
-	if parent != nil && parent.Kind == ast.KindPropertyDeclaration {
+	if parent != nil && parent.Kind == ast.KindPropertyDeclaration &&
+		!ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
 		if grandparent := parent.Parent; grandparent != nil &&
 			(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression) {
 			switch node.Kind {
@@ -463,11 +613,59 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 		tokens = append(tokens, "function")
 	}
 
-	if name := getFunctionDisplayName(node); name != "" {
+	// Upstream reads the key of a `Property` / `MethodDefinition` /
+	// `PropertyDefinition` parent, but has no `AccessorProperty` case, so an
+	// auto-accessor's initializer is named only by whatever name it carries
+	// itself.
+	name := ""
+	if parent != nil && parent.Kind == ast.KindPropertyDeclaration &&
+		ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
+		if n := node.Name(); n != nil && n.Kind == ast.KindIdentifier {
+			name = n.AsIdentifier().Text
+		}
+	} else {
+		name = getFunctionDisplayName(node)
+	}
+	if name != "" {
 		tokens = append(tokens, fmt.Sprintf("'%s'", name))
 	}
 
 	return strings.Join(tokens, " ")
+}
+
+// IsES5Constructor mirrors ESLint's `astUtils.isES5Constructor`: a function
+// with a name of its own whose first character differs from its own lowercase
+// form is treated as an ES5-style constructor. Only a function declaration or
+// function expression can carry such a name; every other function-like node
+// (arrow, method, accessor) reports false.
+func IsES5Constructor(node *ast.Node) bool {
+	var name *ast.Node
+	switch node.Kind {
+	case ast.KindFunctionDeclaration:
+		name = node.AsFunctionDeclaration().Name()
+	case ast.KindFunctionExpression:
+		name = node.AsFunctionExpression().Name()
+	default:
+		return false
+	}
+	if name == nil || !ast.IsIdentifier(name) {
+		return false
+	}
+	return StartsWithUpperCase(name.AsIdentifier().Text)
+}
+
+// StartsWithUpperCase mirrors ESLint's `s[0] !== s[0].toLocaleLowerCase()`,
+// which reads the first UTF-16 code unit. A character counts when it has a
+// distinct lowercase form, so `Á` and the Roman numeral `Ⅰ` qualify while
+// `_` and `$` do not. A character outside the BMP is read as a lone surrogate,
+// which is its own lowercase form, so `𐐀` does not qualify.
+func StartsWithUpperCase(s string) bool {
+	r, size := utf8.DecodeRuneInString(s)
+	if r > 0xFFFF {
+		return false
+	}
+	first := s[:size]
+	return ecmascript.StringToLocaleLowerCase(first) != first
 }
 
 // GetFunctionNameWithKindCore mirrors ESLint core's astUtils.getFunctionNameWithKind.
@@ -476,10 +674,24 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 // as complexity and max-params rely on that narrower behavior for message text.
 func GetFunctionNameWithKindCore(node *ast.Node) string {
 	if node.Kind == ast.KindConstructor {
-		return "constructor"
+		if !ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+			return "constructor"
+		}
+		// tsgo parses a `static` member named `constructor` as a
+		// ConstructorDeclaration too, which every JS parser reads as an
+		// ordinary static method keyed `constructor`. A constructor's
+		// modifiers are not what ast.GetFunctionFlags looks at, so `async` is
+		// read here; `*constructor` parses as a method and never lands here.
+		tokens := []string{"static"}
+		if ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync) {
+			tokens = append(tokens, "async")
+		}
+		return strings.Join(append(tokens, "method", "'constructor'"), " ")
 	}
 
-	parent := node.Parent
+	// ESTree does not expose parentheses as nodes, so a function value wrapped
+	// only in parentheses still has the surrounding property as its parent.
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
 	if parent == nil {
 		return "function"
 	}
@@ -487,7 +699,7 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 	tokens := []string{}
 
 	isClassMember := isCoreDirectClassMember(node)
-	isClassFieldValue := isCoreClassFieldInitializer(node)
+	isClassFieldValue := isCoreClassFieldInitializer(node, parent)
 	if isClassMember || isClassFieldValue {
 		owner := node
 		if isClassFieldValue {
@@ -547,7 +759,7 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 func appendCoreFunctionNameFromOwner(tokens *[]string, owner *ast.Node, node *ast.Node) {
 	if name := owner.Name(); name != nil {
 		if name.Kind == ast.KindPrivateIdentifier {
-			*tokens = append(*tokens, fmt.Sprintf("'%s'", name.AsPrivateIdentifier().Text))
+			*tokens = append(*tokens, name.AsPrivateIdentifier().Text)
 			return
 		}
 		if s, ok := GetStaticPropertyName(name); ok {
@@ -586,14 +798,16 @@ func isCoreDirectClassMember(node *ast.Node) bool {
 	return false
 }
 
-func isCoreClassFieldInitializer(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
+func isCoreClassFieldInitializer(node *ast.Node, parent *ast.Node) bool {
+	if parent == nil ||
+		parent.Kind != ast.KindPropertyDeclaration ||
+		ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) {
 		return false
 	}
 	switch node.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
-		return parent.AsPropertyDeclaration().Initializer == node
+		initializer := parent.AsPropertyDeclaration().Initializer
+		return initializer != nil && ast.SkipParentheses(initializer) == node
 	}
 	return false
 }
@@ -683,6 +897,50 @@ func nodeStartSkippingDecorators(sourceFile *ast.SourceFile, node *ast.Node) cor
 	return core.NewTextRange(tokenAfter.Pos(), fallback.End())
 }
 
+// holdsFunctionValue reports whether parent is the ESTree `Property` /
+// `PropertyDefinition` that holds the function as its value, i.e. one of the
+// node kinds upstream's getFunctionHeadLoc reports from the member's own start
+// rather than from the function. An auto-accessor is excluded: upstream models
+// it as `AccessorProperty`, a kind getFunctionHeadLoc has no case for, so its
+// initializer is reported as a plain function.
+func holdsFunctionValue(parent *ast.Node) bool {
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindPropertyAssignment:
+		return true
+	case ast.KindPropertyDeclaration:
+		return !ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor)
+	}
+	return false
+}
+
+// openingParenOfParamsPos mirrors ESLint's astUtils.getOpeningParenOfParams for
+// arrow functions: the first `(` of the arrow, except that a single-parameter
+// arrow takes the token immediately before that parameter instead — the `(`
+// that opens the list, or, for the parenless `x => …` form, whatever precedes
+// the arrow, so a wrapping `(` still counts while `async` leaves the parameter
+// itself as the boundary.
+func openingParenOfParamsPos(sourceFile *ast.SourceFile, node *ast.Node) int {
+	af := node.AsArrowFunction()
+	if af.Parameters == nil || len(af.Parameters.Nodes) != 1 {
+		// A type parameter constraint can hold the first `(`, as upstream's
+		// unfiltered token scan does too.
+		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+			return parenPos
+		}
+		return af.EqualsGreaterThanToken.Pos()
+	}
+
+	paramStart := TrimNodeTextRange(sourceFile, af.Parameters.Nodes[0]).Pos()
+	if before, ok := TokenBeforePosition(sourceFile, paramStart); ok &&
+		before.Kind == ast.KindOpenParenToken {
+		return before.Start
+	}
+	return paramStart
+}
+
 // findOpenParenPos finds the position of the first '(' token in a function node.
 func findOpenParenPos(sourceFile *ast.SourceFile, node *ast.Node) int {
 	return findOpenParenPosFrom(sourceFile, node.Pos(), node.End())
@@ -746,9 +1004,8 @@ func IsRestParameterDeclaration(decl *ast.Declaration) bool {
 // GetDeclaration returns the first declaration of the symbol at `node`.
 //
 // Returns nil when `typeChecker` or `node` is nil. Rules with optional
-// type info (those that do not set `RequiresTypeInfo: true`) are scheduled
-// with a nil TypeChecker on "gap files" — files in the program but not in
-// `typeInfoFiles` (see internal/linter/linter.go). Rather than requiring
+// type info (those that do not set `RequiresTypeInfo: true`) may run in a
+// source generation that cannot provide a TypeChecker. Rather than requiring
 // every caller to nil-guard manually, this helper degrades gracefully:
 // no checker → no declaration → caller falls back to structural checks.
 // The `node == nil` guard mirrors the same convention already used by
@@ -846,7 +1103,7 @@ func isUnsafeAssignmentWorker(
 		visited[t] = NewSetFromItems(receiver)
 	}
 
-	if checker.IsNonDeferredTypeReference(t) && checker.IsNonDeferredTypeReference(receiver) {
+	if IsTypeReference(t) && IsTypeReference(receiver) {
 		// TODO - figure out how to handle cases like this,
 		// where the types are assignable, but not the same type
 		/*
@@ -1025,16 +1282,14 @@ const (
 func DiscriminateAnyType(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
 	node *ast.Node,
 ) DiscriminatedAnyType {
-	return discriminateAnyTypeWorker(t, typeChecker, program, node, NewSetFromItems[*checker.Type]())
+	return discriminateAnyTypeWorker(t, typeChecker, node, NewSetFromItems[*checker.Type]())
 }
 
 func discriminateAnyTypeWorker(
 	t *checker.Type,
 	typeChecker *checker.Checker,
-	program *compiler.Program,
 	node *ast.Node,
 	// TODO(port): do we really need visited here?
 	visited *Set[*checker.Type],
@@ -1058,7 +1313,7 @@ func discriminateAnyTypeWorker(
 		if awaitedType == nil {
 			return false
 		}
-		awaitedAnyType := discriminateAnyTypeWorker(awaitedType, typeChecker, program, node, visited)
+		awaitedAnyType := discriminateAnyTypeWorker(awaitedType, typeChecker, node, visited)
 		return awaitedAnyType == DiscriminatedAnyTypeAny
 	})
 
@@ -1122,42 +1377,7 @@ func EslintLikePrecedence(node *ast.Node) int {
 		if bin.OperatorToken == nil {
 			return -1
 		}
-		op := bin.OperatorToken.Kind
-		if op == ast.KindCommaToken {
-			return 0
-		}
-		if ast.IsAssignmentOperator(op) {
-			return 1
-		}
-		switch op {
-		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			return 4
-		case ast.KindAmpersandAmpersandToken:
-			return 5
-		case ast.KindBarToken:
-			return 6
-		case ast.KindCaretToken:
-			return 7
-		case ast.KindAmpersandToken:
-			return 8
-		case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken,
-			ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
-			return 9
-		case ast.KindLessThanToken, ast.KindLessThanEqualsToken,
-			ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken,
-			ast.KindInKeyword, ast.KindInstanceOfKeyword:
-			return 10
-		case ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
-			ast.KindGreaterThanGreaterThanGreaterThanToken:
-			return 11
-		case ast.KindPlusToken, ast.KindMinusToken:
-			return 12
-		case ast.KindAsteriskToken, ast.KindSlashToken, ast.KindPercentToken:
-			return 13
-		case ast.KindAsteriskAsteriskToken:
-			return 15
-		}
-		return 20
+		return EslintLikeBinaryOperatorPrecedence(bin.OperatorToken.Kind)
 	case ast.KindPrefixUnaryExpression:
 		op := node.AsPrefixUnaryExpression().Operator
 		if op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
@@ -1190,6 +1410,55 @@ func EslintLikePrecedence(node *ast.Node) int {
 	// TypeAssertionExpression, ...) and any other kind ESLint does not
 	// classify: return -1 to force wrapping for safety.
 	return -1
+}
+
+// EslintLikeBinaryOperatorPrecedence returns the precedence ESLint's
+// astUtils.getPrecedence assigns to a binary expression with the given operator
+// token, on the same scale as [EslintLikePrecedence]. Fixers that need the
+// precedence of an operator they are about to write — rather than of an
+// existing node — call this with the new operator, mirroring upstream's
+// `getPrecedence({ type: "BinaryExpression", operator })`.
+//
+// tsgo also models comma expressions and assignments as BinaryExpression; those
+// map to ESTree's SequenceExpression (0) and AssignmentExpression (1).
+func EslintLikeBinaryOperatorPrecedence(operator ast.Kind) int {
+	if operator == ast.KindCommaToken {
+		return 0
+	}
+	if ast.IsAssignmentOperator(operator) {
+		return 1
+	}
+	switch operator {
+	case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+		return 4
+	case ast.KindAmpersandAmpersandToken:
+		return 5
+	case ast.KindBarToken:
+		return 6
+	case ast.KindCaretToken:
+		return 7
+	case ast.KindAmpersandToken:
+		return 8
+	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken,
+		ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+		return 9
+	case ast.KindLessThanToken, ast.KindLessThanEqualsToken,
+		ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken,
+		ast.KindInKeyword, ast.KindInstanceOfKeyword:
+		return 10
+	case ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
+		ast.KindGreaterThanGreaterThanGreaterThanToken:
+		return 11
+	case ast.KindPlusToken, ast.KindMinusToken:
+		return 12
+	case ast.KindAsteriskToken, ast.KindSlashToken, ast.KindPercentToken:
+		return 13
+	case ast.KindAsteriskAsteriskToken:
+		return 15
+	}
+	// Upstream's switch has no case for the remaining operators, so it falls
+	// through to the UnaryExpression case.
+	return 16
 }
 
 func IsStrongPrecedenceNode(innerNode *ast.Node) bool {
@@ -1400,6 +1669,8 @@ func isInAmbientAugmentation(node *ast.Node) bool {
 // GetStaticPropertyName extracts the static name from a property name node.
 // It handles Identifier, StringLiteral, NumericLiteral, and ComputedPropertyName
 // (with static string, numeric, BigInt, or template literal expressions).
+// Explicit-radix numeric literals use their source token when available because
+// tsgo's normalized NumericLiteral.Text no longer retains the digit sequence.
 // Returns the name and whether it's a static (non-computed or statically-computable) name.
 func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 	switch nameNode.Kind {
@@ -1408,7 +1679,9 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 	case ast.KindStringLiteral:
 		return nameNode.AsStringLiteral().Text, true
 	case ast.KindNumericLiteral:
-		return NormalizeNumericLiteral(nameNode.AsNumericLiteral().Text), true
+		return numericLiteralPropertyName(nameNode), true
+	case ast.KindBigIntLiteral:
+		return NormalizeBigIntLiteral(nameNode.AsBigIntLiteral().Text), true
 	case ast.KindComputedPropertyName:
 		// ESLint's AST has no parenthesized-expression node, so `[('a')]`
 		// names the same static property as `['a']`.
@@ -1417,7 +1690,7 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 		case ast.KindStringLiteral:
 			return expr.AsStringLiteral().Text, true
 		case ast.KindNumericLiteral:
-			return NormalizeNumericLiteral(expr.AsNumericLiteral().Text), true
+			return numericLiteralPropertyName(expr), true
 		case ast.KindBigIntLiteral:
 			return NormalizeBigIntLiteral(expr.AsBigIntLiteral().Text), true
 		case ast.KindNoSubstitutionTemplateLiteral:
@@ -1437,9 +1710,87 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 	}
 }
 
+// numericLiteralPropertyName returns the static property name represented by a
+// tsgo NumericLiteral. NumericLiteral.Text is already normalized, so explicit
+// radix literals have lost the source digit sequence needed to reproduce the
+// property-name rounding above 2^53. TokenFlags let us recover the raw token
+// only for those literals; detached or synthesized nodes retain the existing
+// Text-based fallback.
+func numericLiteralPropertyName(node *ast.Node) string {
+	literal := node.AsNumericLiteral()
+	explicitRadix := literal.TokenFlags & (ast.TokenFlagsBinarySpecifier |
+		ast.TokenFlagsOctalSpecifier |
+		ast.TokenFlagsHexSpecifier)
+	if explicitRadix != 0 {
+		sourceFile := ast.GetSourceFileOfNode(node)
+		if sourceFile != nil && node.Pos() >= 0 && node.Pos() < node.End() && node.End() <= len(sourceFile.Text()) {
+			raw := scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false)
+			if value, ok := radixLiteralValue(raw); ok {
+				return ecmascript.NumberToString(value)
+			}
+		}
+	}
+	return NormalizeNumericLiteral(literal.Text)
+}
+
+// radixLiteralValue accumulates an explicit binary, octal, or hexadecimal
+// literal into a float64 one source digit at a time. Numeric separators do not
+// contribute to the value.
+func radixLiteralValue(raw string) (float64, bool) {
+	if len(raw) < 3 || raw[0] != '0' {
+		return 0, false
+	}
+
+	var radix int
+	switch raw[1] {
+	case 'b', 'B':
+		radix = 2
+	case 'o', 'O':
+		radix = 8
+	case 'x', 'X':
+		radix = 16
+	default:
+		return 0, false
+	}
+
+	value := 0.0
+	digits := 0
+	previousSeparator := false
+	for i := 2; i < len(raw); i++ {
+		if raw[i] == '_' {
+			if digits == 0 || previousSeparator {
+				return 0, false
+			}
+			previousSeparator = true
+			continue
+		}
+		digit := radixDigitValue(raw[i])
+		if digit < 0 || digit >= radix {
+			return 0, false
+		}
+		value = value*float64(radix) + float64(digit)
+		digits++
+		previousSeparator = false
+	}
+	return value, digits > 0 && !previousSeparator
+}
+
+func radixDigitValue(ch byte) int {
+	switch {
+	case ch >= '0' && ch <= '9':
+		return int(ch - '0')
+	case ch >= 'a' && ch <= 'f':
+		return int(ch-'a') + 10
+	case ch >= 'A' && ch <= 'F':
+		return int(ch-'A') + 10
+	default:
+		return -1
+	}
+}
+
 // NormalizeNumericLiteral parses a numeric literal text and returns its
-// normalized string representation, matching ESLint's String(node.value) behavior.
-// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
+// ECMAScript Number string representation.
+// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100", "1e-7" -> "1e-7"
 func NormalizeNumericLiteral(text string) string {
 	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
 	// Use big.Int to handle arbitrary precision, then convert to float64
@@ -1447,7 +1798,7 @@ func NormalizeNumericLiteral(text string) string {
 	if len(text) > 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
 		if n, ok := new(big.Int).SetString(text, 0); ok {
 			f, _ := new(big.Float).SetInt(n).Float64()
-			return strconv.FormatFloat(f, 'f', -1, 64)
+			return ecmascript.NumberToString(f)
 		}
 		return text
 	}
@@ -1459,13 +1810,7 @@ func NormalizeNumericLiteral(text string) string {
 			return text
 		}
 	}
-	if math.IsInf(f, 1) {
-		return "Infinity"
-	}
-	if math.IsInf(f, -1) {
-		return "-Infinity"
-	}
-	return strconv.FormatFloat(f, 'f', -1, 64)
+	return ecmascript.NumberToString(f)
 }
 
 // NormalizeBigIntLiteral normalizes a BigInt literal to its decimal string
@@ -1533,58 +1878,130 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 // It recursively compares member expression chains (PropertyAccessExpression,
 // ElementAccessExpression), walking through the object/property structure.
 //
+// disableStaticComputedKey mirrors ESLint's astUtils.isSameReference parameter
+// of the same name. When false (the common case), a.b and a['b'] (and a[0] /
+// a['0']) compare equal via their shared static property name. When true, that
+// fast path is skipped and a.b / a['b'] are compared structurally instead —
+// same access-expression Kind (non-computed vs computed) and the same
+// property node — so a.b and a['b'] are no longer considered the same
+// reference even though they name the same runtime property. ESLint rules use
+// `true` for backward compatibility in specific contexts (e.g. operator-assignment).
+//
 // Behavior details:
-//   - Parenthesized expressions and type assertions (as, <T>) are transparently
-//     unwrapped on both sides via [ast.SkipOuterExpressions].
+//   - Parenthesized expressions and type assertions (as, <T>, satisfies, the
+//     non-null `!` operator) are transparently unwrapped on both sides via
+//     [ast.SkipOuterExpressions].
 //   - Optional chaining is ignored: a.b and a?.b are considered the same reference,
 //     matching ESLint's isSameReference semantics.
-//   - Cross-syntax comparison is supported via static property names:
-//     a.b and a['b'] are the same reference; a[0] and a['0'] likewise.
+//   - When disableStaticComputedKey is false, cross-syntax comparison is
+//     supported via static property names: a.b and a['b'] are the same
+//     reference; a[0] and a['0'] likewise.
+//   - `this` and `super` each compare equal to themselves, so this.a / this.a
+//     and super.a / super.a are the same reference.
 //   - For non-static element access (a[x]), falls back to comparing the argument
-//     nodes structurally (same Kind + same Identifier/ThisKeyword).
+//     nodes recursively (same Kind + same Identifier/ThisKeyword/literal value).
 //   - Function calls break the chain: a.b() and a.b() are NOT the same reference,
 //     because each call may return a different value.
 //
 // This implements the same logic as ESLint's astUtils.isSameReference combined
 // with astUtils.getStaticPropertyName, adapted for the TypeScript AST.
-func IsSameReference(left, right *ast.Node) bool {
-	left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKTypeAssertions)
-	right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKTypeAssertions)
+func IsSameReference(left, right *ast.Node, disableStaticComputedKey bool) bool {
+	left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKAssertions)
+	right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKAssertions)
 
 	if left == nil || right == nil {
 		return false
 	}
 
-	// Base cases: Identifier and ThisKeyword.
+	// Base cases: Identifier, PrivateIdentifier, ThisKeyword, SuperKeyword, and literal keys
+	// (e.g. `x[0]` vs `x[0]`, reached recursively when disableStaticComputedKey
+	// skips the static-name fast path below).
 	if left.Kind == ast.KindIdentifier && right.Kind == ast.KindIdentifier {
 		return left.AsIdentifier().Text == right.AsIdentifier().Text
 	}
-	if left.Kind == ast.KindThisKeyword && right.Kind == ast.KindThisKeyword {
+	if left.Kind == ast.KindPrivateIdentifier && right.Kind == ast.KindPrivateIdentifier {
+		return left.AsPrivateIdentifier().Text == right.AsPrivateIdentifier().Text
+	}
+	if left.Kind == right.Kind &&
+		(left.Kind == ast.KindThisKeyword || left.Kind == ast.KindSuperKeyword) {
 		return true
+	}
+	if left.Kind == right.Kind &&
+		(left.Kind == ast.KindNullKeyword || left.Kind == ast.KindTrueKeyword || left.Kind == ast.KindFalseKeyword) {
+		return true
+	}
+	if left.Kind == right.Kind && isSameReferenceLiteralKind(left.Kind) {
+		return sameReferenceLiteralValue(left, right)
 	}
 
 	// Member expression comparison.
 	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
-		// Try static property name comparison first (handles cross-type: a.b vs a['b']).
-		leftName, leftOK := AccessExpressionStaticName(left)
-		if leftOK {
-			rightName, rightOK := AccessExpressionStaticName(right)
-			if rightOK && leftName == rightName {
-				return IsSameReference(AccessExpressionObject(left), AccessExpressionObject(right))
+		if !disableStaticComputedKey {
+			// Try static property name comparison first (handles cross-type: a.b vs a['b']).
+			leftName, leftOK := AccessExpressionStaticName(left)
+			if leftOK {
+				rightName, rightOK := AccessExpressionStaticName(right)
+				if rightOK && leftName == rightName {
+					return IsSameReference(AccessExpressionObject(left), AccessExpressionObject(right), disableStaticComputedKey)
+				}
+				return false
 			}
-			return false
 		}
 
-		// Non-static: fall back to same-kind, same-index comparison (e.g. a[x] = a[x]).
-		if left.Kind == right.Kind && left.Kind == ast.KindElementAccessExpression {
-			leftArg := left.AsElementAccessExpression().ArgumentExpression
-			rightArg := right.AsElementAccessExpression().ArgumentExpression
-			if isSameSimpleNode(leftArg, rightArg) {
-				return IsSameReference(left.AsElementAccessExpression().Expression, right.AsElementAccessExpression().Expression)
-			}
+		// Non-static (or disabled): same computed-ness (same Kind), same object,
+		// and the same property node (e.g. a[x] = a[x], or a.b = a.b when disabled).
+		if left.Kind != right.Kind {
+			return false
+		}
+		if !IsSameReference(AccessExpressionObject(left), AccessExpressionObject(right), disableStaticComputedKey) {
+			return false
+		}
+		switch left.Kind {
+		case ast.KindPropertyAccessExpression:
+			return IsSameReference(left.AsPropertyAccessExpression().Name(), right.AsPropertyAccessExpression().Name(), disableStaticComputedKey)
+		case ast.KindElementAccessExpression:
+			return IsSameReference(left.AsElementAccessExpression().ArgumentExpression, right.AsElementAccessExpression().ArgumentExpression, disableStaticComputedKey)
 		}
 	}
 
+	return false
+}
+
+// isSameReferenceLiteralKind reports whether kind is one of the node kinds
+// [sameReferenceLiteralValue] handles. This intentionally excludes
+// NoSubstitutionTemplateLiteral even though [ast.IsLiteralKind] considers it a
+// literal: ESTree gives a no-substitution template literal (a backtick string
+// with no interpolation) its own "TemplateLiteral" type, distinct from
+// "Literal", and ESLint's isSameReference switch has no case for
+// "TemplateLiteral" — it falls through to `default: return false`. So two
+// matching no-substitution template-literal computed keys are NOT the same
+// reference when disableStaticComputedKey skips the static-name fast path,
+// matching upstream.
+func isSameReferenceLiteralKind(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindRegularExpressionLiteral:
+		return true
+	}
+	return false
+}
+
+// sameReferenceLiteralValue compares two same-Kind literal nodes by value, for
+// use as a property key in [IsSameReference]. Unlike [AreNodesStructurallyEqual],
+// this only needs the leaf-literal cases: a literal can never contain a nested
+// access expression worth recursing into. Callers must first confirm
+// [isSameReferenceLiteralKind] to stay aligned with ESLint's isSameReference,
+// which has no "TemplateLiteral" case.
+func sameReferenceLiteralValue(left, right *ast.Node) bool {
+	switch left.Kind {
+	case ast.KindStringLiteral:
+		return left.AsStringLiteral().Text == right.AsStringLiteral().Text
+	case ast.KindNumericLiteral:
+		return NormalizeNumericLiteral(left.AsNumericLiteral().Text) == NormalizeNumericLiteral(right.AsNumericLiteral().Text)
+	case ast.KindBigIntLiteral:
+		return NormalizeBigIntLiteral(left.AsBigIntLiteral().Text) == NormalizeBigIntLiteral(right.AsBigIntLiteral().Text)
+	case ast.KindRegularExpressionLiteral:
+		return left.Text() == right.Text()
+	}
 	return false
 }
 
@@ -1639,21 +2056,6 @@ func AccessExpressionObject(node *ast.Node) *ast.Node {
 		return node.AsElementAccessExpression().Expression
 	}
 	return nil
-}
-
-// isSameSimpleNode checks if two nodes are the same simple reference (Identifier or ThisKeyword).
-// Used as a fallback for comparing non-static element access arguments like a[x] vs a[x].
-func isSameSimpleNode(left, right *ast.Node) bool {
-	if left == nil || right == nil || left.Kind != right.Kind {
-		return false
-	}
-	switch left.Kind {
-	case ast.KindIdentifier:
-		return left.AsIdentifier().Text == right.AsIdentifier().Text
-	case ast.KindThisKeyword:
-		return true
-	}
-	return false
 }
 
 // CollectBindingNames recursively extracts all identifier names from a binding

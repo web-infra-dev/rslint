@@ -5,6 +5,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_importing_jest_globals"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -31,7 +32,7 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 			// N/A: type assertion wrappers on the callee are stripped by ParseJestFnCall for member resolution.
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- Branch lock-in: types=["jest"] without sourceType / import → require autofix ----
+			// ---- Branch lock-in: types=["jest"] with sourceType=commonjs → require autofix ----
 			{
 				Code: `
         jest.useFakeTimers();
@@ -48,7 +49,8 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
-				Options: []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
+				Options:         []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 13},
 				},
@@ -70,8 +72,8 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
-				SourceType: `module`,
-				Options:    []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
+				LanguageOptions: rule.LanguageOptions{SourceType: `module`},
+				Options:         []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 13},
 				},
@@ -91,7 +93,7 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
           test("foo");
         })
       `},
-				SourceType: `script`,
+				LanguageOptions: rule.LanguageOptions{SourceType: `script`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
@@ -111,6 +113,7 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
           (expect)(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 10, EndColumn: 18},
 				},
@@ -128,6 +131,7 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
           test("foo");
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 17},
 				},
@@ -147,7 +151,8 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
           test("foo");
         })
       `},
-				Options: []interface{}{map[string]interface{}{`types`: []interface{}{`hook`}}},
+				Options:         []interface{}{map[string]interface{}{`types`: []interface{}{`hook`}}},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 19},
 				},
@@ -212,6 +217,7 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
           });
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},

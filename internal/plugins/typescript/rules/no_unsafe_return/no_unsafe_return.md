@@ -38,4 +38,5 @@ function baz(): any {
 
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-return](https://typescript-eslint.io/rules/no-unsafe-return)
+- [typescript-eslint: no-unsafe-return](https://typescript-eslint.io/rules/no-unsafe-return)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unsafe-return.ts)

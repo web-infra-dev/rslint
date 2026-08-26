@@ -17,6 +17,16 @@ This document provides a comprehensive reference for utility functions available
 | `type_matches_specifier.go` | Type specifier matching for rule options             |
 | `set.go`                    | Generic Set data structure                           |
 
+Values a rule is handed were written for JavaScript, and Go's standard library answers a nearby but different question about each of them. These packages hold the readings that match — see [JavaScript Semantics](#javascript-semantics-ecmascript-minimatch3-isglob).
+
+| Package                   | Description                                                      |
+| ------------------------- | ---------------------------------------------------------------- |
+| `utils/ecmascript`        | Trim, blank, whitespace, upper/lower case, number-to-string      |
+| `utils/ecmascript/regexp` | Compiles and matches a JavaScript RegExp, and `/i` comparison    |
+| `utils/unicode17`         | A general category — `\p{Lu}`, `\p{L}`, `\p{M}` — as Node has it |
+| `utils/minimatch3`        | Glob matching the way minimatch 3 does — what plugins pin        |
+| `utils/isglob`            | "Was this written as a glob, or is it a plain path?"             |
+
 ---
 
 ## `internal/utils/utils.go` - Basic Utilities
@@ -92,11 +102,21 @@ allMatch := utils.Every(items, func(item T) bool { return condition })
 
 ### Rule Options Parsing
 
+Rule options do not require an `internal/utils` helper. The framework passes
+ESLint's normalized `context.options` array to `Run`; guard the slice length
+before reading the first positional option:
+
 ```go
-// Extract options map from rule options (handles both array and object format)
-optsMap := utils.GetOptionsMap(options)
-if optsMap != nil {
-    // Parse options from optsMap...
+func parseOptions(options []any) Options {
+    opts := Options{/* defaults */}
+    if len(options) == 0 {
+        return opts
+    }
+    optsMap, _ := options[0].(map[string]any)
+    if value, ok := optsMap["someOption"].(bool); ok {
+        opts.SomeOption = value
+    }
+    return opts
 }
 ```
 
@@ -111,11 +131,9 @@ result := utils.NaturalCompare("item2", "item10") // -1
 ### Other Utilities
 
 ```go
-// Create a pointer (useful for optional fields)
-ptr := utils.Ref(value) // *T
-
-// Check if a character is a JS whitespace character
-isWhite := utils.IsStrWhiteSpace(r)
+// Whitespace, trimming, and every other question ECMAScript specifies live in
+// utils/ecmascript — see the JavaScript Semantics section below.
+isWhite := ecmascript.IsWhiteSpaceOrLineTerminator(r)
 ```
 
 ---
@@ -424,6 +442,36 @@ See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_
 
 ---
 
+## `internal/utils/scope/` - ESLint Scope Model
+
+An AST-derived reconstruction of ESLint's lexical scope tree — rslint's stand-in for `sourceCode.getScope()` / eslint-scope. Use it only when a rule's semantics are stated in terms of **scopes** (which scope owns a binding, what an inner scope shadows, whether two positions share a variable scope). For "which symbol is this identifier" and "where else is this symbol used", reach for `ctx.Refs` above instead — it is backed by the binder and understands globals, ambient, and cross-file declarations, which this package deliberately does not.
+
+```go
+manager := scope.Build(ctx.SourceFile)
+
+for _, s := range manager.Scopes { // creation order == pre-order walk of the tree
+    for _, v := range s.Vars {     // declaration order within the scope
+        // v.Name, v.ID (identifier node), v.DefNode, v.Kind (scope.Def*)
+    }
+}
+
+// Resolve a name outward, the way ESLint's scope chain does.
+for s := start; s != nil; s = s.Parent {
+    if declarations := s.Declarations(name); len(declarations) > 0 { /* ... */ }
+}
+```
+
+- Scope kinds (`scope.Kind*`): `Global`, `Function`, `FunctionExprName`, `Block`, `Catch`, `Class`, `Module`, `Type`. ESLint's module scope is collapsed into `Global`.
+- `Scope.VariableScope()` is eslint-scope's `Scope#variableScope`: the nearest enclosing function / namespace / global scope, i.e. the `var` hoist target.
+- Definition kinds (`scope.Def*`) map to eslint-scope's `Definition#type`, including the TypeScript ones (`DefType`, `DefEnumName`, `DefNamespaceName`, `DefTypeParameter`, `DefImport`).
+- eslint-scope merges all same-name declarations in a scope into one `Variable` with several `defs`; here each declaration is its own `scope.Variable` and `Scope.Declarations(name)` is the merged view, in source order — so `Declarations(name)[0]` is `defs[0]`.
+- `Scope.GlobalAugmentation` marks scopes inside `declare global { ... }`; bindings there are conceptually global.
+- Concepts rslint does not expose (`parserOptions.globalReturn`, `ecmaVersion`-dependent function-in-block hoisting) are unmodeled.
+
+`internal/rules/no_shadow` is the reference consumer.
+
+---
+
 ## `internal/utils/builtin_symbol_likes.go` - Builtin Symbol Checking
 
 ### Builtin Type Checking
@@ -457,8 +505,8 @@ isAnyBuiltin := utils.IsAnyBuiltinSymbolLike(program, typeChecker, t)
 // Check if a symbol is from the default library
 isFromLib := utils.IsSymbolFromDefaultLibrary(program, symbol)
 
-// Check if a source file is the default library
-isLibFile := utils.IsSourceFileDefaultLibrary(program, sourceFile)
+// Source-generation questions live on Program, not in internal/utils
+isLibFile := program.IsSourceFileDefaultLibrary(sourceFile)
 ```
 
 ---
@@ -627,6 +675,198 @@ Internal struct fields that Go cannot expose via methods across packages are rea
 - `checker.Type_symbol(t)` — associated symbol (for named types)
 
 See `shim/checker/shim.go` for the full surface (~50 functions). If you find yourself reaching for a method that isn't exposed, add it to the shim rather than duplicating the logic.
+
+---
+
+## JavaScript Semantics (`ecmascript`, `minimatch3`, `isglob`)
+
+A ported rule is handed values that were written for JavaScript: a string to trim, a number to print back out, a regexp or a glob that came from a rule option or from the source under lint. Go's standard library answers a _nearby but different_ question about every one of them, and the gap is observable — it is the difference between a rule that reports what ESLint reports and one that does not.
+
+**Reach for these before writing your own scan, and before reaching for `strings`, `regexp`, or a general-purpose glob library.** If one of them is missing a reading you need, add it there rather than open-coding it in the rule.
+
+### `internal/utils/ecmascript` — the language's own semantics
+
+```go
+import "github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+```
+
+A helper standing in for something JavaScript exposes carries that name with its receiver in front (`StringTrim` for `String.prototype.trim`, `StringToUpperCase` for `String.prototype.toUpperCase`, `NumberToString` for `Number::toString`). Everything else is named the way ECMAScript names it — a grammar production (`IsWhiteSpace`, `IsLineTerminator`), the two of them together (`IsWhiteSpaceOrLineTerminator`) — or, where the language spells out no name, the question being asked (`IsBlank`).
+
+```go
+// String.prototype.trim(). NOT strings.TrimSpace, which disagrees in BOTH
+// directions: it strips U+0085 NEL (not ECMAScript whitespace) and keeps
+// U+FEFF (which ECMAScript trims).
+trimmed := ecmascript.StringTrim(title)
+
+// `s.trim() === ""`
+blank := ecmascript.IsBlank(line)
+
+// Everything `\s` matches and `trim()` strips: ECMAScript WhiteSpace plus
+// LineTerminator. NOT unicode.IsSpace.
+white := ecmascript.IsWhiteSpaceOrLineTerminator(r)
+
+// The two productions on their own, for a rule that reads them apart — JSX
+// text, say, where a line break and a space are not the same thing.
+ecmascript.IsWhiteSpace(r)     // tab, vertical tab, form feed, U+FEFF, Zs
+ecmascript.IsLineTerminator(r) // \n \r U+2028 U+2029; Go knows only the first two
+ecmascript.LineTerminators     // the four, as a string
+
+// String.prototype.toUpperCase / toLowerCase. NOT strings.ToUpper or
+// unicode.ToUpper, which map one character to one character on Go's edition of
+// Unicode: `ß` uppercases to `SS` here as it does in JavaScript, `ﬁ` to `FI`,
+// and a capital sigma lowercases to a final sigma when it ends a word. An
+// all-ASCII string never leaves the ASCII path, so this is the default even
+// for a tag name or an option.
+upper := ecmascript.StringToUpperCase(name)
+lower := ecmascript.StringToLowerCase(name)
+
+// The locale-sensitive pair, which answers the same way: a linter must draw
+// the same diagnostics on a Turkish machine as anywhere else.
+ecmascript.StringToLocaleUpperCase(s)
+ecmascript.StringToLocaleLowerCase(s)
+
+// String(n) / string concatenation. strconv picks the same digits but leaves
+// fixed notation at a different point and spells the infinities differently.
+text := ecmascript.NumberToString(42) // "42", not "4.2e+01"
+
+// Is this string a complete, valid regexp literal (slashes and flags included)?
+// Call it before offering a fix that emits `/.../`.
+ok := ecmascript.IsValidRegexLiteral("/abc/g")
+
+// Byte-level trivia scans. SkipTrailingWhitespace is the reverse counterpart
+// tsgo's scanner.SkipTriviaEx does not provide.
+ecmascript.SkipLeadingWhitespace(text, low, high)
+ecmascript.SkipTrailingWhitespace(text, low, high)
+ecmascript.ContainsLineTerminator(text, low, high)
+ecmascript.IsTriviaWhitespaceByte(b) // ASCII fast path
+ecmascript.IsTriviaWhitespaceRune(r) // call only for r >= U+0080
+```
+
+> `forbidigo` denies `strings.ToLower`, `strings.ToUpper` and `strings.TrimSpace` under `internal/rules/**` and `internal/plugins/**`. There is no exception to argue about: for a string that holds nothing but ASCII the port returns the same answer, and past ASCII it returns the one JavaScript returns.
+
+### `internal/utils/ecmascript/regexp` — a JavaScript RegExp
+
+```go
+import esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+```
+
+Use this for **any** pattern that was written as a JavaScript regexp — a rule option, or a `new RegExp(...)` in the source under lint. The standard library's `regexp` is RE2 and will not even compile a pattern using lookahead, lookbehind, or a backreference; a rule that shrugs off that compile error silently drops whatever option it came from.
+
+```go
+re, err := esregexp.Compile("^\\d+$", "iu") // source, flags
+if err != nil {
+    // ErrUnsupportedFlag / ErrUnsupportedSyntax, or a syntax error
+}
+if re.Test(candidate) {
+    // ...
+}
+re.Source() // "^\\d+$"
+re.Flags()  // "iu"
+```
+
+A `/i` comparison is its own reading, and the pattern widening in this package is built on it:
+
+```go
+// The Canonicalize abstract operation — how `/x/i` compares two characters.
+// The second argument says whether the pattern carries `u` or `v`, because the
+// two readings disagree: without one, an uppercase mapping that never crosses
+// into ASCII, so `k` and U+212A KELVIN SIGN are two characters; with one,
+// simple case folding, so they are one. Σ ς σ are one character either way.
+esregexp.Canonicalize(r, unicodeMode)
+esregexp.CaseEquivalents(r, unicodeMode)      // everything `/i` accepts for r, or nil
+esregexp.CaseEquivalenceGroups(unicodeMode)   // for widening a whole range
+```
+
+`Test` bounds how long one match may run (`esregexp.MatchTimeout`, 1s) and answers `false` on overrun — a backtracking engine on a user-written pattern is a way to hang the linter. Use `TestOrError` when a rule needs to distinguish "no match" from "gave up".
+
+Not covered: the `v` flag's set syntax (`Compile` refuses it), and case-insensitive backreference comparison.
+
+> `depguard` denies `github.com/dlclark/regexp2` under `internal/rules/**` and `internal/plugins/**`. Go through this package.
+
+### `internal/utils/unicode17` — the edition of Unicode Node reads
+
+```go
+import "github.com/web-infra-dev/rslint/internal/utils/unicode17"
+```
+
+Go 1.26's `unicode` tables are Unicode 15.0; Node 26 carries ICU 78, which is Unicode 17.0. Two bicameral scripts, eight new case mappings, nine and a half thousand letters and ninety-three combining marks arrived in between, and a rule that asks Go about them gets an answer ESLint would not give. This package holds that difference, and answers the category questions outright:
+
+```go
+unicode17.IsUpper(r)  // \p{Lu}, as unicode.IsUpper would if it were on 17.0
+unicode17.IsLower(r)  // \p{Ll}
+unicode17.IsLetter(r) // \p{L}
+unicode17.IsMark(r)   // \p{M} — the combining marks
+```
+
+Reach for it when the upstream rule reads a **character class**: change-case's `\p{Ll}` behind `unicorn/filename-case`, `\p{Uppercase_Letter}` behind `unicorn/prefer-array-flat`, `\p{M}` behind `no-misleading-character-class`. When upstream instead writes `c === c.toUpperCase()`, that is a case mapping and belongs to `ecmascript`, which reads this package on its own.
+
+The package deletes itself: `TestDeltaStillNeeded` fails the moment the toolchain stops being Unicode 15.0, which on Go 1.27 is the signal to delete the package rather than maintain it.
+
+> `depguard` denies the standard library's `unicode` under `internal/rules/**` and `internal/plugins/**`. A case question goes to `ecmascript`, a category question here, and an identifier question — is this character allowed to start or continue an identifier? — to tsgo's `scanner.IsIdentifierStart` / `scanner.IsIdentifierPart`, which reads TypeScript's own tables so that a rule and the parser never disagree.
+
+### `internal/utils/minimatch3` — globs the way a plugin reads them
+
+```go
+import "github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+```
+
+A port of minimatch 3.1.5 and the brace-expansion it pulls in, including the extended glob syntax (`!(a)`, `@(a|b)`, `+(a)`, `?(a)`, `*(a)`) that general-purpose Go glob libraries leave out.
+
+```go
+// One-shot
+ok := minimatch3.Match("src/**/*.ts", "src/a/b.ts", minimatch3.Options{Dot: true})
+
+// Compiled, when matching many paths against one pattern
+m := minimatch3.New(pattern, minimatch3.Options{})
+ok = m.Match(path)
+
+// Brace expansion on its own
+variants := minimatch3.BraceExpand("a{b,c}d") // ["abd", "acd"]
+```
+
+`Options` mirrors minimatch's own: `Dot`, `NoBrace`, `NoGlobStar`, `NoExt`, `NoCase`, `NoNegate`, `NoComment`.
+
+> `depguard` denies `github.com/bmatcuk/doublestar` under `internal/rules/**` and `internal/plugins/**`. Go through this package.
+
+### `internal/utils/isglob` — is this even a glob?
+
+```go
+import "github.com/web-infra-dev/rslint/internal/utils/isglob"
+```
+
+Ports is-glob 4.0.3 and the is-extglob 2.1.1 it depends on. A plugin asks this to decide _how to read a rule option_: a value that is a glob gets matched, a value that is not gets compared as a literal. Answering differently from upstream moves the line between the two.
+
+```go
+isglob.Is("src/*.ts")   // true
+isglob.Is("src/a.ts")   // false — a plain path
+isglob.IsExtglob("@(a|b)") // true, the extended-list question on its own
+```
+
+### Which package for which upstream dependency
+
+Open the upstream rule's imports and its plugin's `package.json`, then match:
+
+| Upstream reads the pattern with       | Use                                                         |
+| ------------------------------------- | ----------------------------------------------------------- |
+| a regexp literal or `new RegExp(...)` | `utils/ecmascript/regexp` (import as `esregexp`)            |
+| `minimatch` at `^3.x`                 | `utils/minimatch3`                                          |
+| `is-glob`                             | `utils/isglob`                                              |
+| any other glob package                | **not supported — stop and report to the user (see below)** |
+
+The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks: RE2 refuses syntax JavaScript accepts, and the caller usually swallows the compile error and reports nothing.
+
+### ⚠️ Only minimatch 3 and is-glob are ported
+
+**If the rule you are porting reads globs with anything else, stop and report it to the user. Do not substitute `minimatch3` or `doublestar` and carry on, and do not port the package yourself.**
+
+`minimatch@10` is the one to expect. ESLint moved to it for the paths it matches on its own behalf (flat config `files` / `ignores`), and a plugin may follow. Only the 3.x reading is ported, because that is what the plugin ecosystem pins — `eslint-plugin-import` and `eslint-plugin-react` both depend on `minimatch@^3.1.2`.
+
+The substitutions are not close enough to make quietly:
+
+- **`minimatch3`** differs from 10 on POSIX character classes: `a[[:alpha:]]b` matches `aXb` under 10, and does not under 3.
+- **`doublestar`** differs from 10 on 13 of 37 sampled patterns. Six are extended glob syntax, which it does not implement at all. The other seven are not exotic: `src/**` matches `src` itself under doublestar but not under minimatch, POSIX classes and `{1..3}` ranges are unsupported, a leading `!` is a literal rather than a negation, and the empty path and `a//b` are handled differently.
+
+Report which upstream package and version the rule depends on, and which of its patterns would be read differently. The user decides whether to port it, accept a documented divergence, or skip the rule.
 
 ---
 

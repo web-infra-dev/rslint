@@ -3,12 +3,13 @@ package boolean_prop_naming
 import (
 	_ "embed"
 	"regexp"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed boolean_prop_naming.schema.json
@@ -21,7 +22,7 @@ var BooleanPropNamingRule = rule.Rule{
 }
 
 type ruleOptions struct {
-	rule           *regexp.Regexp
+	rule           *esregexp.RegExp
 	rulePattern    string
 	propTypeNames  map[string]bool
 	customMessage  string
@@ -81,7 +82,7 @@ var templatePlaceholder = regexp.MustCompile(`\{\{([^{}]+?)\}\}`)
 func renderTemplate(tmpl string, data map[string]string) string {
 	return templatePlaceholder.ReplaceAllStringFunc(tmpl, func(match string) string {
 		m := templatePlaceholder.FindStringSubmatch(match)
-		key := strings.TrimSpace(m[1])
+		key := ecmascript.StringTrim(m[1])
 		if v, ok := data[key]; ok {
 			return v
 		}
@@ -108,7 +109,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	if opts.rulePattern == "" {
 		return rule.RuleListeners{}
 	}
-	re, err := regexp.Compile(opts.rulePattern)
+	re, err := esregexp.Compile(opts.rulePattern, "")
 	if err != nil {
 		// Upstream throws (`new RegExp(...)`) on a malformed pattern,
 		// blowing up the whole lint run. We choose to silently degrade so
@@ -595,7 +596,7 @@ func validateMembers(members []*ast.Node, opts ruleOptions, report func(*ast.Nod
 		if !ok || name == "" {
 			continue
 		}
-		if !opts.rule.MatchString(name) {
+		if !opts.rule.TestOrTimeout(name) {
 			report(m, name)
 		}
 	}
@@ -664,7 +665,7 @@ func validateObjectLiteralProps(obj *ast.Node, opts ruleOptions, report func(*as
 		if !ok || name == "" {
 			continue
 		}
-		if !opts.rule.MatchString(name) {
+		if !opts.rule.TestOrTimeout(name) {
 			report(prop, name)
 		}
 	}

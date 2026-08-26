@@ -35,6 +35,22 @@ func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
 	return current
 }
 
+// IsCommaOperator reports whether node is a BinaryExpression whose operator is
+// the comma token — tsgo's collapsed form of ESLint's SequenceExpression.
+func IsCommaOperator(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	bin := node.AsBinaryExpression()
+	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindCommaToken
+}
+
+// IsLooseEqualityOperator reports whether kind is the == or != token, as
+// opposed to their strict (===, !==) counterparts.
+func IsLooseEqualityOperator(kind ast.Kind) bool {
+	return kind == ast.KindEqualsEqualsToken || kind == ast.KindExclamationEqualsToken
+}
+
 // IsCallee checks if a node is the callee of a CallExpression or NewExpression,
 // skipping parentheses and TS type assertions between the node and the call.
 func IsCallee(node *ast.Node) bool {
@@ -86,12 +102,11 @@ func GetStaticStringValue(node *ast.Node) string {
 // astUtils.isSpecificId / isSpecificMemberAccess shape: outer parentheses and
 // optional chaining are transparent, TS-only assertion wrappers are not.
 //
-// globals is the config-declared `languageOptions.globals` / `/* global */`
-// set (ctx.Globals); when it explicitly turns the referenced name `off`,
-// the identifier no longer resolves to a known global and this returns
-// false. Pass nil to skip that check (e.g. for callers whose upstream ESLint
-// rule doesn't consult scope at all).
-func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]GlobalAccess) bool {
+// override returns the final explicitly authored access for a name. When it
+// turns the referenced name `off`, the identifier no longer resolves to a
+// known global. Pass nil to skip that check (e.g. for callers whose upstream
+// ESLint rule doesn't consult scope at all).
+func IsGlobalParseIntCallee(callee *ast.Node, override func(string) GlobalAccess) bool {
 	callee = ast.SkipParentheses(callee)
 	if callee == nil {
 		return false
@@ -101,7 +116,7 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]GlobalAccess) b
 		if callee.AsIdentifier().Text != "parseInt" || IsShadowed(callee, "parseInt") {
 			return false
 		}
-		return globals["parseInt"] != GlobalAccessOff
+		return override == nil || override("parseInt") != GlobalAccessOff
 	}
 
 	if !IsSpecificMemberAccess(callee, "Number", "parseInt") {
@@ -114,7 +129,7 @@ func IsGlobalParseIntCallee(callee *ast.Node, globals map[string]GlobalAccess) b
 		obj.AsIdentifier().Text != "Number" || IsShadowed(obj, "Number") {
 		return false
 	}
-	return globals["Number"] != GlobalAccessOff
+	return override == nil || override("Number") != GlobalAccessOff
 }
 
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference
@@ -312,4 +327,51 @@ func IsClassExtendsHeritageClause(node *ast.Node) bool {
 	grandparent := parent.Parent
 	return grandparent != nil &&
 		(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression)
+}
+
+// VisitDescendants walks node and everything beneath it, depth-first in source
+// order. Returning false from visit leaves that node's own children unvisited
+// and the walk carries on with its siblings, which is how a caller stops
+// descending into a subtree it has already accounted for.
+func VisitDescendants(node *ast.Node, visit func(*ast.Node) bool) {
+	if node == nil || !visit(node) {
+		return
+	}
+	node.ForEachChild(func(child *ast.Node) bool {
+		VisitDescendants(child, visit)
+		return false
+	})
+}
+
+// IsInJSDocSyntax reports whether node came from syntax parsed inside a JSDoc
+// comment. TypeScript-Go deep-clones some of these nodes into the executable
+// tree, preserving NodeFlagsJSDoc on the cloned subtree. Espree and
+// typescript-eslint keep the same text as comments, so none of these names
+// are references for scope-sensitive rules like no-undef and no-undefined.
+func IsInJSDocSyntax(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current.Flags&ast.NodeFlagsJSDoc != 0 || ast.IsJSDocNode(current) {
+			return true
+		}
+		if current.Kind == ast.KindSourceFile {
+			return false
+		}
+	}
+	return false
+}
+
+// IsImportTypeSyntax reports whether node belongs to the argument,
+// attributes, or qualifier of an ImportType. Type arguments are siblings of
+// those fields and remain references.
+func IsImportTypeSyntax(node *ast.Node) bool {
+	current := node
+	for current.Parent != nil && current.Parent.Kind != ast.KindImportType {
+		current = current.Parent
+	}
+	if current.Parent == nil || current.Parent.Kind != ast.KindImportType {
+		return false
+	}
+	importType := current.Parent.AsImportTypeNode()
+	return importType != nil &&
+		(importType.Argument == current || importType.Attributes == current || importType.Qualifier == current)
 }

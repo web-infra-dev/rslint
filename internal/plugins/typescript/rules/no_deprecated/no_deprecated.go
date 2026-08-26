@@ -2,6 +2,7 @@ package no_deprecated
 
 import (
 	"context"
+	_ "embed"
 	"regexp"
 	"strconv"
 	"strings"
@@ -9,17 +10,53 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+//go:embed no_deprecated.schema.json
+var schemaJSON []byte
 
 var deprecatedReasonPattern = regexp.MustCompile(`(?s)@deprecated\s*([\s\S]*?)\*/`)
 
 const (
 	diagnosticCodeSecondEntityName     = 6387
 	declarationReasonSearchWindowBytes = 512
-	maxConstantPropertyResolveDepth    = 8
+	maxAliasDeprecationDepth           = 64
 )
+
+type sourceDeprecationLookupKind uint8
+
+const (
+	sourceDeprecationAny sourceDeprecationLookupKind = iota
+	sourceDeprecationVariable
+	sourceDeprecationStructuralProperty
+	sourceDeprecationMethod
+	sourceDeprecationFunction
+	sourceDeprecationProperty
+)
+
+type sourceDeprecationLookupKey struct {
+	kind          sourceDeprecationLookupKind
+	name          string
+	argCount      int
+	matchArgCount bool
+}
+
+type sourceDeprecationInfo struct {
+	isDeprecated bool
+	reason       string
+}
+
+type callLikeDeprecationInfo struct {
+	checked                        bool
+	callLikeNode                   *ast.Node
+	isDeprecated                   bool
+	reason                         string
+	resolvedNonDeprecatedSignature bool
+}
 
 func buildDeprecatedMessage(name string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -91,7 +128,19 @@ func getReportedNodeName(node *ast.Node) string {
 	return node.Text()
 }
 
-func getJsDocDeprecationFromNode(node *ast.Node) string {
+func reportedIdentifierName(node *ast.Node) string {
+	if node == nil {
+		return ""
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindPrivateIdentifier, ast.KindSuperKeyword:
+		return getReportedNodeName(node)
+	default:
+		return ""
+	}
+}
+
+func getJsDocDeprecationFromNode(typeChecker *checker.Checker, node *ast.Node) string {
 	if node == nil {
 		return ""
 	}
@@ -106,17 +155,126 @@ func getJsDocDeprecationFromNode(node *ast.Node) string {
 				continue
 			}
 			deprecatedTag := tagNode.AsJSDocDeprecatedTag()
-			if deprecatedTag != nil && deprecatedTag.Comment != nil && len(deprecatedTag.Comment.Nodes) > 0 {
-				var text strings.Builder
-				for _, commentNode := range deprecatedTag.Comment.Nodes {
-					text.WriteString(commentNode.Text())
-				}
-				return strings.TrimSpace(text.String())
+			if deprecatedTag != nil {
+				return ecmascript.StringTrim(jsDocCommentText(typeChecker, deprecatedTag.Comment))
 			}
 			return ""
 		}
 	}
 	return ""
+}
+
+func jsDocCommentText(typeChecker *checker.Checker, comment *ast.NodeList) string {
+	if comment == nil {
+		return ""
+	}
+	if len(comment.Nodes) == 1 && comment.Nodes[0].Kind == ast.KindJSDocText {
+		return comment.Nodes[0].Text()
+	}
+	var text strings.Builder
+	for _, commentNode := range comment.Nodes {
+		switch commentNode.Kind {
+		case ast.KindJSDocText:
+			text.WriteString(commentNode.Text())
+		case ast.KindJSDocLink, ast.KindJSDocLinkCode, ast.KindJSDocLinkPlain:
+			text.WriteString(formatJSDocLink(typeChecker, commentNode))
+		}
+	}
+	return text.String()
+}
+
+// formatJSDocLink mirrors TypeScript's buildLinkParts followed by
+// displayPartsToString, including its intentionally observable spacing.
+func formatJSDocLink(typeChecker *checker.Checker, link *ast.Node) string {
+	if link == nil {
+		return ""
+	}
+	linkKind := "link"
+	switch link.Kind {
+	case ast.KindJSDocLinkCode:
+		linkKind = "linkcode"
+	case ast.KindJSDocLinkPlain:
+		linkKind = "linkplain"
+	}
+	prefix := "{@" + linkKind + " "
+
+	linkText := link.Text()
+	nameNode := link.Name()
+	if nameNode == nil {
+		return prefix + linkText + "}"
+	}
+
+	suffix := jsDocLinkNameEnd(linkText)
+	name := scanner.GetTextOfNode(nameNode) + linkText[:suffix]
+	remainingText := skipJSDocLinkSeparator(linkText[suffix:])
+	if jsDocLinkTargetExists(typeChecker, nameNode) {
+		return prefix + name + remainingText + "}"
+	}
+
+	separator := ""
+	if suffix == 0 || (suffix < len(linkText) && linkText[suffix] == '|' && !strings.HasSuffix(name, " ")) {
+		separator = " "
+	}
+	return prefix + name + separator + remainingText + "}"
+}
+
+func jsDocLinkTargetExists(typeChecker *checker.Checker, name *ast.Node) bool {
+	if typeChecker == nil || name == nil {
+		return false
+	}
+	symbol := typeChecker.GetSymbolAtLocation(name)
+	if symbol == nil {
+		return false
+	}
+	symbol = typeChecker.SkipAlias(symbol)
+	if symbol == nil {
+		return false
+	}
+	for _, target := range typeChecker.GetRootSymbols(symbol) {
+		if target != nil && (target.ValueDeclaration != nil || len(target.Declarations) > 0) {
+			return true
+		}
+	}
+	return false
+}
+
+func jsDocLinkNameEnd(text string) int {
+	if strings.HasPrefix(text, "://") {
+		if separator := strings.IndexByte(text, '|'); separator >= 0 {
+			return separator
+		}
+		return len(text)
+	}
+	if strings.HasPrefix(text, "()") {
+		return 2
+	}
+	if len(text) == 0 || text[0] != '<' {
+		return 0
+	}
+	depth := 0
+	for index, character := range text {
+		switch character {
+		case '<':
+			depth++
+		case '>':
+			depth--
+		}
+		if depth == 0 {
+			return index + 1
+		}
+	}
+	return 0
+}
+
+func skipJSDocLinkSeparator(text string) string {
+	if len(text) == 0 || text[0] != '|' {
+		return text
+	}
+	index := 1
+	for index < len(text) && text[index] == ' ' {
+		index++
+	}
+	return text[index:]
 }
 
 func hasDeprecatedTag(node *ast.Node) bool {
@@ -247,20 +405,14 @@ func getJsDocDeprecation(typeChecker *checker.Checker, symbol *ast.Symbol) (bool
 			continue
 		}
 		if isDeclarationDeprecated(typeChecker, decl) {
-			reason := getJsDocDeprecationFromNode(decl)
-			if reason == "" {
-				reason = deprecatedReasonFromDeclaration(decl)
-			}
+			reason := deprecatedReasonFromDeclaration(typeChecker, decl)
 			return true, reason
 		}
 	}
 	if symbol.ValueDeclaration != nil {
 		if symbol.ValueDeclaration.Kind != ast.KindBindingElement &&
 			isDeclarationDeprecated(typeChecker, symbol.ValueDeclaration) {
-			reason := getJsDocDeprecationFromNode(symbol.ValueDeclaration)
-			if reason == "" {
-				reason = deprecatedReasonFromDeclaration(symbol.ValueDeclaration)
-			}
+			reason := deprecatedReasonFromDeclaration(typeChecker, symbol.ValueDeclaration)
 			return true, reason
 		}
 	}
@@ -281,21 +433,37 @@ func searchForDeprecationInAliasesChain(
 		}
 		return false, ""
 	}
-	if isDeprecated, reason := getJsDocDeprecation(typeChecker, symbol); isDeprecated {
-		return true, reason
+	targetSymbol := typeChecker.GetAliasedSymbol(symbol)
+	for depth := 0; symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 && depth < maxAliasDeprecationDepth; depth++ {
+		if symbol == targetSymbol {
+			if checkDeprecationsOfAliasedSymbol {
+				return getJsDocDeprecation(typeChecker, symbol)
+			}
+			break
+		}
+		if isDeprecated, reason := getJsDocDeprecation(typeChecker, symbol); isDeprecated {
+			return true, reason
+		}
+		if len(symbol.Declarations) == 0 {
+			break
+		}
+		immediateAliasedSymbol := typeChecker.GetImmediateAliasedSymbol(symbol)
+		if immediateAliasedSymbol == nil {
+			break
+		}
+		if immediateAliasedSymbol == symbol {
+			break
+		}
+		symbol = immediateAliasedSymbol
+		if checkDeprecationsOfAliasedSymbol && symbol == targetSymbol {
+			return getJsDocDeprecation(typeChecker, symbol)
+		}
 	}
-	if !checkDeprecationsOfAliasedSymbol {
-		return false, ""
-	}
-	aliasedSymbol := typeChecker.GetAliasedSymbol(symbol)
-	if aliasedSymbol == nil {
-		return false, ""
-	}
-	return getJsDocDeprecation(typeChecker, aliasedSymbol)
+	return false, ""
 }
 
 func stripQuotes(text string) string {
-	text = strings.TrimSpace(text)
+	text = ecmascript.StringTrim(text)
 	if len(text) >= 2 {
 		if (strings.HasPrefix(text, "'") && strings.HasSuffix(text, "'")) ||
 			(strings.HasPrefix(text, "\"") && strings.HasSuffix(text, "\"")) ||
@@ -337,25 +505,25 @@ func sourceSpanText(sourceFile *ast.SourceFile, pos int, end int) string {
 }
 
 func cleanupDeprecatedReason(text string) string {
-	text = strings.TrimSpace(text)
+	text = ecmascript.StringTrim(text)
 	if text == "" {
 		return ""
 	}
 	text = strings.TrimPrefix(text, ":")
-	text = strings.TrimSpace(text)
+	text = ecmascript.StringTrim(text)
 	text = strings.TrimSuffix(text, "*/")
-	text = strings.TrimSpace(text)
+	text = ecmascript.StringTrim(text)
 	lines := strings.Split(text, "\n")
 	parts := make([]string, 0, len(lines))
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := ecmascript.StringTrim(line)
 		trimmed = strings.TrimPrefix(trimmed, "*")
-		trimmed = strings.TrimSpace(trimmed)
+		trimmed = ecmascript.StringTrim(trimmed)
 		if trimmed != "" {
 			parts = append(parts, trimmed)
 		}
 	}
-	return strings.TrimSpace(strings.Join(parts, " "))
+	return ecmascript.StringTrim(strings.Join(parts, "\n"))
 }
 
 func deprecatedReasonFromDiagnostic(diagnostic *ast.Diagnostic) string {
@@ -382,9 +550,12 @@ func deprecatedReasonFromDiagnostic(diagnostic *ast.Diagnostic) string {
 	return ""
 }
 
-func deprecatedReasonFromDeclaration(declaration *ast.Node) string {
+func deprecatedReasonFromDeclaration(typeChecker *checker.Checker, declaration *ast.Node) string {
 	if declaration == nil {
 		return ""
+	}
+	if reason := getJsDocDeprecationFromNode(typeChecker, declaration); reason != "" {
+		return reason
 	}
 	sourceFile := ast.GetSourceFileOfNode(declaration)
 	if sourceFile == nil {
@@ -422,59 +593,14 @@ func deprecatedReasonFromDeclaration(declaration *ast.Node) string {
 	return cleanupDeprecatedReason(lastMatch[1])
 }
 
-type noDeprecatedAllowEntry struct {
-	From    string
-	Name    string
-	Package string
-}
-
-func parseAllowEntries(options any) []noDeprecatedAllowEntry {
-	entries := []noDeprecatedAllowEntry{}
-	var optionMap map[string]interface{}
-	switch value := options.(type) {
-	case map[string]interface{}:
-		optionMap = value
-	case []interface{}:
-		if len(value) > 0 {
-			if parsedMap, ok := value[0].(map[string]interface{}); ok {
-				optionMap = parsedMap
-			}
-		}
+// parseAllowSpecifiers decodes the `allow` option — type specifiers written
+// either in the string shorthand or in object form.
+func parseAllowSpecifiers(options []any) []utils.TypeOrValueSpecifier {
+	if len(options) == 0 {
+		return nil
 	}
-	if optionMap == nil {
-		return entries
-	}
-	rawAllowValue, exists := optionMap["allow"]
-	if !exists {
-		return entries
-	}
-	rawAllow, ok := rawAllowValue.([]interface{})
-	if !ok {
-		return entries
-	}
-	for _, raw := range rawAllow {
-		switch value := raw.(type) {
-		case string:
-			entries = append(entries, noDeprecatedAllowEntry{
-				Name: value,
-			})
-		case map[string]interface{}:
-			entry := noDeprecatedAllowEntry{}
-			if name, ok := value["name"].(string); ok {
-				entry.Name = name
-			}
-			if from, ok := value["from"].(string); ok {
-				entry.From = from
-			}
-			if pkg, ok := value["package"].(string); ok {
-				entry.Package = pkg
-			}
-			if entry.Name != "" {
-				entries = append(entries, entry)
-			}
-		}
-	}
-	return entries
+	optsMap, _ := options[0].(map[string]any)
+	return utils.ParseTypeOrValueSpecifiers(optsMap["allow"])
 }
 
 func mostSpecificNodeContainingRange(node *ast.Node, position int, end int) *ast.Node {
@@ -520,21 +646,6 @@ func diagnosticNode(sourceFile *ast.SourceFile, position int, end int) *ast.Node
 	return nil
 }
 
-func symbolHierarchyNames(symbol *ast.Symbol) map[string]bool {
-	names := map[string]bool{}
-	for current := symbol; current != nil; current = current.Parent {
-		if current.Name == "" {
-			continue
-		}
-		names[current.Name] = true
-		unquoted := strings.Trim(current.Name, "\"'")
-		if unquoted != "" {
-			names[unquoted] = true
-		}
-	}
-	return names
-}
-
 func declarationInCurrentFile(symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
 	if symbol == nil || sourceFile == nil {
 		return false
@@ -554,30 +665,6 @@ func declarationInCurrentFile(symbol *ast.Symbol, sourceFile *ast.SourceFile) bo
 	return false
 }
 
-func packageMatchesSymbol(entryPackage string, symbol *ast.Symbol) bool {
-	if entryPackage == "" || symbol == nil {
-		return false
-	}
-	hierarchy := symbolHierarchyNames(symbol)
-	if hierarchy[entryPackage] || hierarchy["@types/"+entryPackage] {
-		return true
-	}
-	for current := symbol; current != nil; current = current.Parent {
-		for _, declaration := range current.Declarations {
-			sourceFile := ast.GetSourceFileOfNode(declaration)
-			if sourceFile == nil {
-				continue
-			}
-			fileName := sourceFile.FileName()
-			if strings.Contains(fileName, "/node_modules/"+entryPackage+"/") ||
-				strings.Contains(fileName, "/node_modules/@types/"+entryPackage+"/") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func walkAst(node *ast.Node, visitor func(*ast.Node) bool) bool {
 	if node == nil {
 		return false
@@ -588,25 +675,6 @@ func walkAst(node *ast.Node, visitor func(*ast.Node) bool) bool {
 	return node.ForEachChild(func(child *ast.Node) bool {
 		return walkAst(child, visitor)
 	})
-}
-
-func moduleSpecifierText(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
-	switch node.Kind {
-	case ast.KindStringLiteral:
-		stringLiteral := node.AsStringLiteral()
-		if stringLiteral != nil {
-			return stringLiteral.Text
-		}
-	case ast.KindNoSubstitutionTemplateLiteral:
-		templateLiteral := node.AsNoSubstitutionTemplateLiteral()
-		if templateLiteral != nil {
-			return templateLiteral.Text
-		}
-	}
-	return stripQuotes(strings.TrimSpace(node.Text()))
 }
 
 func nodeNameText(node *ast.Node) string {
@@ -660,213 +728,6 @@ func nodeNameText(node *ast.Node) string {
 		// which can panic in typescript-go internals.
 		return ""
 	}
-}
-
-func importedNameMatches(targetName string, node *ast.Node) bool {
-	if targetName == "" || node == nil {
-		return false
-	}
-	return normalizeComparableName(targetName) == normalizeComparableName(nodeNameText(node))
-}
-
-func staticImportContainsName(importDeclaration *ast.ImportDeclaration, targetName string) bool {
-	if importDeclaration == nil || importDeclaration.ImportClause == nil || targetName == "" {
-		return false
-	}
-	importClause := importDeclaration.ImportClause.AsImportClause()
-	if importClause == nil {
-		return false
-	}
-	if importClause.Name() != nil && importedNameMatches(targetName, importClause.Name()) {
-		return true
-	}
-	if importClause.NamedBindings == nil {
-		return false
-	}
-	if importClause.NamedBindings.Kind == ast.KindNamespaceImport {
-		namespaceImport := importClause.NamedBindings.AsNamespaceImport()
-		if namespaceImport != nil && namespaceImport.Name() != nil && importedNameMatches(targetName, namespaceImport.Name()) {
-			return true
-		}
-		return false
-	}
-	if importClause.NamedBindings.Kind != ast.KindNamedImports {
-		return false
-	}
-	namedImports := importClause.NamedBindings.AsNamedImports()
-	if namedImports == nil || namedImports.Elements == nil {
-		return false
-	}
-	for _, elementNode := range namedImports.Elements.Nodes {
-		importSpecifier := elementNode.AsImportSpecifier()
-		if importSpecifier == nil {
-			continue
-		}
-		if importSpecifier.Name() != nil && importedNameMatches(targetName, importSpecifier.Name()) {
-			return true
-		}
-		if importSpecifier.PropertyName != nil && importedNameMatches(targetName, importSpecifier.PropertyName) {
-			return true
-		}
-	}
-	return false
-}
-
-func isImportCallFromPackage(initializer *ast.Node, pkg string) bool {
-	if initializer == nil || pkg == "" {
-		return false
-	}
-	current := ast.SkipParentheses(initializer)
-	if current == nil {
-		return false
-	}
-	if current.Kind == ast.KindAwaitExpression {
-		awaitExpression := current.AsAwaitExpression()
-		if awaitExpression == nil {
-			return false
-		}
-		current = ast.SkipParentheses(awaitExpression.Expression)
-	}
-	if current == nil || current.Kind != ast.KindCallExpression {
-		return false
-	}
-	callExpression := current.AsCallExpression()
-	if callExpression == nil || callExpression.Expression == nil || callExpression.Arguments == nil || len(callExpression.Arguments.Nodes) == 0 {
-		return false
-	}
-	callee := ast.SkipParentheses(callExpression.Expression)
-	if callee == nil || callee.Kind != ast.KindImportKeyword {
-		return false
-	}
-	return moduleSpecifierText(callExpression.Arguments.Nodes[0]) == pkg
-}
-
-func dynamicImportBindingContainsName(nameNode *ast.Node, targetName string) bool {
-	if nameNode == nil || targetName == "" || nameNode.Kind != ast.KindObjectBindingPattern {
-		return false
-	}
-	objectBindingPattern := nameNode.AsBindingPattern()
-	if objectBindingPattern == nil || objectBindingPattern.Elements == nil {
-		return false
-	}
-	for _, elementNode := range objectBindingPattern.Elements.Nodes {
-		bindingElement := elementNode.AsBindingElement()
-		if bindingElement == nil {
-			continue
-		}
-		propertyName := bindingElementPropertyName(bindingElement)
-		if propertyName != "" && normalizeComparableName(propertyName) == normalizeComparableName(targetName) {
-			return true
-		}
-		name := bindingElement.Name()
-		if name != nil && importedNameMatches(targetName, name) {
-			return true
-		}
-	}
-	return false
-}
-
-func nameImportedFromPackage(sourceFile *ast.SourceFile, name string, pkg string) bool {
-	if sourceFile == nil || name == "" || pkg == "" {
-		return false
-	}
-	if sourceFile.Statements == nil {
-		return false
-	}
-	for _, statement := range sourceFile.Statements.Nodes {
-		if statement == nil {
-			continue
-		}
-		if statement.Kind == ast.KindImportDeclaration {
-			importDeclaration := statement.AsImportDeclaration()
-			if importDeclaration == nil || importDeclaration.ModuleSpecifier == nil {
-				continue
-			}
-			if moduleSpecifierText(importDeclaration.ModuleSpecifier) != pkg {
-				continue
-			}
-			if staticImportContainsName(importDeclaration, name) {
-				return true
-			}
-			continue
-		}
-		if walkAst(statement, func(node *ast.Node) bool {
-			if node == nil || node.Kind != ast.KindVariableDeclaration {
-				return false
-			}
-			variableDeclaration := node.AsVariableDeclaration()
-			if variableDeclaration == nil || variableDeclaration.Initializer == nil || variableDeclaration.Name() == nil {
-				return false
-			}
-			if !isImportCallFromPackage(variableDeclaration.Initializer, pkg) {
-				return false
-			}
-			return dynamicImportBindingContainsName(variableDeclaration.Name(), name)
-		}) {
-			return true
-		}
-	}
-	// Fallback for parser edge cases where import binding nodes are not exposed as expected.
-	sourceText := sourceFile.Text()
-	if sourceText == "" {
-		return false
-	}
-	namePattern := regexp.QuoteMeta(name)
-	pkgPattern := regexp.QuoteMeta(pkg)
-	staticImportPattern := regexp.MustCompile(`(?s)import\s*\{[^}]*\b` + namePattern + `\b[^}]*\}\s*from\s*['"]` + pkgPattern + `['"]`)
-	if staticImportPattern.MatchString(sourceText) {
-		return true
-	}
-	dynamicImportPattern := regexp.MustCompile(`(?s)\{[^}]*\b` + namePattern + `\b[^}]*\}\s*=\s*(?:await\s+)?import\(\s*['"]` + pkgPattern + `['"]\s*\)`)
-	return dynamicImportPattern.MatchString(sourceText)
-}
-
-func allowEntryMatches(entry noDeprecatedAllowEntry, diagnosticName string, symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
-	if entry.Name != "" {
-		if normalizeComparableName(diagnosticName) == normalizeComparableName(entry.Name) {
-			// direct match
-		} else if symbol != nil {
-			hierarchy := symbolHierarchyNames(symbol)
-			nameMatched := false
-			for hierarchyName := range hierarchy {
-				if normalizeComparableName(hierarchyName) == normalizeComparableName(entry.Name) {
-					nameMatched = true
-					break
-				}
-			}
-			if !nameMatched {
-				return false
-			}
-		} else {
-			return false
-		}
-	}
-
-	switch entry.From {
-	case "":
-		return true
-	case "file":
-		if symbol == nil {
-			return entry.Name != "" && normalizeComparableName(diagnosticName) == normalizeComparableName(entry.Name)
-		}
-		return declarationInCurrentFile(symbol, sourceFile)
-	case "package":
-		if packageMatchesSymbol(entry.Package, symbol) {
-			return true
-		}
-		return nameImportedFromPackage(sourceFile, entry.Name, entry.Package)
-	default:
-		return false
-	}
-}
-
-func shouldAllowDiagnostic(entries []noDeprecatedAllowEntry, diagnosticName string, symbol *ast.Symbol, sourceFile *ast.SourceFile) bool {
-	for _, entry := range entries {
-		if allowEntryMatches(entry, diagnosticName, symbol, sourceFile) {
-			return true
-		}
-	}
-	return false
 }
 
 func symbolAtLocation(typeChecker *checker.Checker, node *ast.Node) *ast.Symbol {
@@ -929,22 +790,28 @@ func symbolAtLocation(typeChecker *checker.Checker, node *ast.Node) *ast.Symbol 
 	return nil
 }
 
-func getCallLikeDeprecation(ctx rule.RuleContext, node *ast.Node) (bool, string) {
+func getCallLikeDeprecation(ctx rule.RuleContext, node *ast.Node) (bool, string, bool) {
 	if ctx.TypeChecker == nil || node == nil || node.Parent == nil {
-		return false, ""
+		return false, "", false
 	}
 	signature := checker.Checker_getResolvedSignature(ctx.TypeChecker, node.Parent, nil, checker.CheckModeNormal)
 	if signature == nil {
-		return false, ""
+		return false, "", false
 	}
 	signatureDecl := signature.Declaration()
-	if signatureDecl != nil && (isDeclarationDeprecated(ctx.TypeChecker, signatureDecl) || hasDeprecatedTag(signatureDecl)) {
-		reason := getJsDocDeprecationFromNode(signatureDecl)
-		return true, reason
+	signatureDeprecated := signatureDecl != nil && isDeclarationDeprecated(ctx.TypeChecker, signatureDecl)
+	resolvedNonDeprecatedSignature := signatureDecl != nil &&
+		(signatureDecl.Kind == ast.KindFunctionDeclaration ||
+			signatureDecl.Kind == ast.KindMethodDeclaration ||
+			signatureDecl.Kind == ast.KindMethodSignature) &&
+		!signatureDeprecated
+	if signatureDeprecated {
+		reason := getJsDocDeprecationFromNode(ctx.TypeChecker, signatureDecl)
+		return true, reason, false
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
-		return false, ""
+		return false, "", resolvedNonDeprecatedSignature
 	}
 	aliasedSymbol := symbol
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
@@ -957,16 +824,33 @@ func getCallLikeDeprecation(ctx rule.RuleContext, node *ast.Node) (bool, string)
 	if symbolDeclarationKind != ast.KindMethodDeclaration &&
 		symbolDeclarationKind != ast.KindFunctionDeclaration &&
 		symbolDeclarationKind != ast.KindMethodSignature {
-		return searchForDeprecationInAliasesChain(ctx.TypeChecker, symbol, true)
+		isDeprecated, reason := searchForDeprecationInAliasesChain(ctx.TypeChecker, symbol, true)
+		return isDeprecated, reason, resolvedNonDeprecatedSignature
 	}
 	isDeprecated, reason := searchForDeprecationInAliasesChain(ctx.TypeChecker, symbol, false)
 	if isDeprecated {
-		return true, reason
+		return true, reason, false
 	}
 	if signatureDecl == nil && aliasedSymbol != nil {
-		return getJsDocDeprecation(ctx.TypeChecker, aliasedSymbol)
+		isDeprecated, reason := getJsDocDeprecation(ctx.TypeChecker, aliasedSymbol)
+		return isDeprecated, reason, false
 	}
-	return false, ""
+	return false, "", resolvedNonDeprecatedSignature
+}
+
+func getCallLikeDeprecationInfo(ctx rule.RuleContext, node *ast.Node) callLikeDeprecationInfo {
+	callLikeNode := getCallLikeNode(node)
+	if callLikeNode == nil {
+		return callLikeDeprecationInfo{checked: true}
+	}
+	isDeprecated, reason, resolvedNonDeprecatedSignature := getCallLikeDeprecation(ctx, callLikeNode)
+	return callLikeDeprecationInfo{
+		checked:                        true,
+		callLikeNode:                   callLikeNode,
+		isDeprecated:                   isDeprecated,
+		reason:                         reason,
+		resolvedNonDeprecatedSignature: resolvedNonDeprecatedSignature,
+	}
 }
 
 func getJsxAttributeDeprecation(ctx rule.RuleContext, elementNode *ast.Node, propertyName string) (bool, string) {
@@ -1070,13 +954,19 @@ func getBindingPatternSourceType(ctx rule.RuleContext, bindingPattern *ast.Node,
 	return nil
 }
 
-func getDeprecationReason(ctx rule.RuleContext, node *ast.Node) (bool, string) {
+func getDeprecationReason(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	callLikeDeprecation callLikeDeprecationInfo,
+) (bool, string) {
 	if ctx.TypeChecker == nil || node == nil {
 		return false, ""
 	}
-	callLikeNode := getCallLikeNode(node)
-	if callLikeNode != nil {
-		return getCallLikeDeprecation(ctx, callLikeNode)
+	if !callLikeDeprecation.checked {
+		callLikeDeprecation = getCallLikeDeprecationInfo(ctx, node)
+	}
+	if callLikeDeprecation.callLikeNode != nil {
+		return callLikeDeprecation.isDeprecated, callLikeDeprecation.reason
 	}
 	if node.Parent != nil && node.Parent.Kind == ast.KindJsxAttribute && node.Kind != ast.KindSuperKeyword {
 		if node.Parent.Parent != nil && node.Parent.Parent.Parent != nil {
@@ -1115,7 +1005,7 @@ func getDeprecationReason(ctx rule.RuleContext, node *ast.Node) (bool, string) {
 									propertyName = bindingName
 								}
 								if propertyName == "" && bindingElement.PropertyName != nil {
-									if resolvedName, ok := resolveConstantPropertyName(ctx, bindingElement.PropertyName, 0, map[*ast.Symbol]bool{}); ok {
+									if resolvedName, ok := elementAccessPropertyName(ctx, bindingElement.PropertyName); ok {
 										propertyName = resolvedName
 									}
 								}
@@ -1446,7 +1336,7 @@ func isInImportStatementRange(sourceFile *ast.SourceFile, pos int) bool {
 		lineEnd = pos + lineEndRelative
 	}
 	lineText := text[lineStart:lineEnd]
-	trimmedLine := strings.TrimSpace(lineText)
+	trimmedLine := ecmascript.StringTrim(lineText)
 	if !strings.HasPrefix(trimmedLine, "import ") {
 		return false
 	}
@@ -1460,18 +1350,13 @@ func symbolIsDeprecated(typeChecker *checker.Checker, symbol *ast.Symbol) bool {
 	if typeChecker == nil || symbol == nil {
 		return false
 	}
-	if symbol.ValueDeclaration != nil && isDeclarationDeprecated(typeChecker, symbol.ValueDeclaration) {
-		return true
-	}
-	if len(symbol.Declarations) == 0 {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil || !isDeclarationDeprecated(typeChecker, declaration) {
-			return false
-		}
-	}
-	return true
+	isDeprecated, _ := getJsDocDeprecation(typeChecker, symbol)
+	return isDeprecated
+}
+
+func resolvedSymbolIsDeprecated(typeChecker *checker.Checker, symbol *ast.Symbol) bool {
+	isDeprecated, _ := searchForDeprecationInAliasesChain(typeChecker, symbol, true)
+	return isDeprecated
 }
 
 func bindingElementPropertyName(bindingElement *ast.BindingElement) string {
@@ -1513,94 +1398,34 @@ func bindingElementIndex(bindingElement *ast.BindingElement) (int, bool) {
 	return 0, false
 }
 
-func resolveConstantPropertyName(ctx rule.RuleContext, node *ast.Node, depth int, seen map[*ast.Symbol]bool) (string, bool) {
-	if ctx.TypeChecker == nil || node == nil || depth > maxConstantPropertyResolveDepth {
+func elementAccessPropertyName(ctx rule.RuleContext, argument *ast.Node) (string, bool) {
+	if ctx.TypeChecker == nil || argument == nil {
 		return "", false
 	}
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	propertyType := ctx.TypeChecker.GetTypeAtLocation(argument)
+	if propertyType == nil {
 		return "", false
 	}
-	switch node.Kind {
-	case ast.KindStringLiteral:
-		stringLiteral := node.AsStringLiteral()
-		if stringLiteral == nil {
-			return "", false
-		}
-		return stringLiteral.Text, true
-	case ast.KindNoSubstitutionTemplateLiteral:
-		templateLiteral := node.AsNoSubstitutionTemplateLiteral()
-		if templateLiteral == nil {
-			return "", false
-		}
-		return templateLiteral.Text, true
-	case ast.KindNumericLiteral:
-		numericLiteral := node.AsNumericLiteral()
-		if numericLiteral == nil {
-			return "", false
-		}
-		return numericLiteral.Text, true
-	case ast.KindAsExpression:
-		asExpression := node.AsAsExpression()
-		if asExpression == nil {
-			return "", false
-		}
-		return resolveConstantPropertyName(ctx, asExpression.Expression, depth+1, seen)
-	case ast.KindTypeAssertionExpression:
-		typeAssertion := node.AsTypeAssertion()
-		if typeAssertion == nil {
-			return "", false
-		}
-		return resolveConstantPropertyName(ctx, typeAssertion.Expression, depth+1, seen)
-	case ast.KindPropertyAccessExpression:
-		propertyAccess := node.AsPropertyAccessExpression()
-		if propertyAccess == nil || propertyAccess.Name() == nil {
-			return "", false
-		}
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(propertyAccess.Name())
-		if symbol != nil && symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Kind == ast.KindEnumMember {
-			enumMember := symbol.ValueDeclaration.AsEnumMember()
-			if enumMember != nil {
-				return resolveConstantPropertyName(ctx, enumMember.Initializer, depth+1, seen)
-			}
-		}
-	case ast.KindIdentifier:
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-		if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
-			return "", false
-		}
-		if seen[symbol] {
-			return "", false
-		}
-		seen[symbol] = true
-		defer delete(seen, symbol)
-
-		variableDeclaration := symbol.ValueDeclaration.AsVariableDeclaration()
-		if variableDeclaration == nil || variableDeclaration.Initializer == nil {
-			return "", false
-		}
-		return resolveConstantPropertyName(ctx, variableDeclaration.Initializer, depth+1, seen)
+	flags := checker.Type_flags(propertyType)
+	if flags&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral) == 0 {
+		return "", false
 	}
-	if constantValue := ctx.TypeChecker.GetConstantValue(node); constantValue != nil {
-		if text, ok := constantValue.(string); ok {
-			return text, true
-		}
-		switch value := constantValue.(type) {
-		case float64:
-			return strconv.FormatFloat(value, 'f', -1, 64), true
-		case int:
-			return strconv.Itoa(value), true
-		case int32:
-			return strconv.Itoa(int(value)), true
-		case int64:
-			return strconv.FormatInt(value, 10), true
-		}
+	literalType := propertyType.AsLiteralType()
+	if literalType == nil {
+		return "", false
+	}
+	if flags&checker.TypeFlagsStringLiteral != 0 {
+		value, ok := literalType.Value().(string)
+		return value, ok
+	}
+	if flags&checker.TypeFlagsNumberLiteral != 0 {
+		return checker.ValueToString(literalType.Value()), true
+	}
+	if flags&checker.TypeFlagsBigIntLiteral != 0 {
+		// Upstream applies String() to TypeScript's PseudoBigInt object.
+		return "[object Object]", true
 	}
 	return "", false
-}
-
-func elementAccessPropertyName(ctx rule.RuleContext, argument *ast.Node) (string, bool) {
-	return resolveConstantPropertyName(ctx, argument, 0, map[*ast.Symbol]bool{})
 }
 
 func isPropertyLikeDeclaration(node *ast.Node) bool {
@@ -1660,7 +1485,7 @@ func deprecatedInfoByNameInSource(ctx rule.RuleContext, name string, propertyOnl
 		}
 		found = true
 		if reason == "" {
-			reason = deprecatedReasonFromDeclaration(node)
+			reason = deprecatedReasonFromDeclaration(ctx.TypeChecker, node)
 		}
 		return reason != ""
 	})
@@ -1690,7 +1515,7 @@ func deprecatedVariableInfoByNameInSource(ctx rule.RuleContext, name string) (bo
 		}
 		found = true
 		if reason == "" {
-			reason = deprecatedReasonFromDeclaration(node)
+			reason = deprecatedReasonFromDeclaration(ctx.TypeChecker, node)
 		}
 		return reason != ""
 	})
@@ -1727,7 +1552,7 @@ func deprecatedStructuralPropertyInfoByNameInSource(ctx rule.RuleContext, name s
 			return false
 		}
 		if reason == "" {
-			reason = deprecatedReasonFromDeclaration(node)
+			reason = deprecatedReasonFromDeclaration(ctx.TypeChecker, node)
 		}
 		return reason != ""
 	})
@@ -1774,7 +1599,7 @@ func deprecatedMethodInfoByNameInSource(ctx rule.RuleContext, name string, argCo
 			continue
 		}
 		if reason == "" {
-			reason = deprecatedReasonFromDeclaration(node)
+			reason = deprecatedReasonFromDeclaration(ctx.TypeChecker, node)
 		}
 	}
 	return found && allDeprecated, reason
@@ -1820,15 +1645,10 @@ func deprecatedFunctionInfoByNameInSource(ctx rule.RuleContext, name string, arg
 			continue
 		}
 		if reason == "" {
-			reason = deprecatedReasonFromDeclaration(node)
+			reason = deprecatedReasonFromDeclaration(ctx.TypeChecker, node)
 		}
 	}
 	return found && allDeprecated, reason
-}
-
-func deprecatedReasonByNameInSource(ctx rule.RuleContext, name string) string {
-	_, reason := deprecatedInfoByNameInSource(ctx, name, false)
-	return reason
 }
 
 func deprecatedPropertyInfoByNameInSource(ctx rule.RuleContext, name string) (bool, string) {
@@ -1856,7 +1676,7 @@ func deprecatedPropertyInfoByNameInSource(ctx rule.RuleContext, name string) (bo
 			return false
 		}
 		if reason == "" {
-			reason = deprecatedReasonFromDeclaration(node)
+			reason = deprecatedReasonFromDeclaration(ctx.TypeChecker, node)
 		}
 		return reason != ""
 	})
@@ -1878,27 +1698,155 @@ func shouldUseDeprecatedVariableSourceFallback(node *ast.Node) bool {
 	}
 }
 
-// isLocalNonDeprecatedSymbol returns true when the identifier at node resolves
-// to a local (same-file) declaration that is NOT deprecated. In that case we
-// skip the name-only fallback to avoid false positives when a local variable
-// shadows a deprecated declaration of the same name.
-func isLocalNonDeprecatedSymbol(ctx rule.RuleContext, node *ast.Node) bool {
+func bindingElementHasResolvedNonDeprecatedProperty(ctx rule.RuleContext, declaration *ast.Node) bool {
+	if ctx.TypeChecker == nil || declaration == nil || declaration.Kind != ast.KindBindingElement || declaration.Parent == nil {
+		return false
+	}
+	bindingElement := declaration.AsBindingElement()
+	if bindingElement == nil {
+		return false
+	}
+	bindingPattern := declaration.Parent
+	if bindingPattern.Kind != ast.KindObjectBindingPattern && bindingPattern.Kind != ast.KindArrayBindingPattern {
+		return false
+	}
+	sourceType := getBindingPatternSourceType(ctx, bindingPattern, map[*ast.Node]bool{})
+	if sourceType == nil {
+		return false
+	}
+	propertyName := bindingElementPropertyName(bindingElement)
+	if bindingPattern.Kind == ast.KindArrayBindingPattern {
+		index, ok := bindingElementIndex(bindingElement)
+		if !ok {
+			return false
+		}
+		propertyName = strconv.Itoa(index)
+	}
+	if propertyName == "" {
+		return false
+	}
+	property := checker.Checker_getPropertyOfType(ctx.TypeChecker, sourceType, propertyName)
+	if property == nil {
+		return false
+	}
+	// Module namespace properties can be export aliases. Upstream checks the
+	// export alias's own JSDoc here rather than merging tags from the aliased
+	// function's overload declarations. A deprecated re-export still reports,
+	// while an unannotated re-export of mixed overloads does not.
+	if property.Flags&ast.SymbolFlagsAlias != 0 {
+		return !symbolIsDeprecated(ctx.TypeChecker, property)
+	}
+	return !resolvedSymbolIsDeprecated(ctx.TypeChecker, property)
+}
+
+func propertyAccessHasResolvedNonDeprecatedProperty(ctx rule.RuleContext, node *ast.Node) bool {
+	if ctx.TypeChecker == nil || node == nil {
+		return false
+	}
+	var access *ast.PropertyAccessExpression
+	if node.Kind == ast.KindPropertyAccessExpression {
+		access = node.AsPropertyAccessExpression()
+	} else if isPropertyAccessName(node) {
+		access = node.Parent.AsPropertyAccessExpression()
+	}
+	if access == nil || access.Expression == nil || access.Name() == nil {
+		return false
+	}
+	objectType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, access.Expression)
+	if objectType == nil {
+		return false
+	}
+	property := checker.Checker_getPropertyOfType(ctx.TypeChecker, objectType, access.Name().Text())
+	if property == nil {
+		return false
+	}
+	return !resolvedSymbolIsDeprecated(ctx.TypeChecker, property)
+}
+
+func hasResolvedNonDeprecatedAccessTarget(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	callLikeDeprecation callLikeDeprecationInfo,
+) bool {
 	if ctx.TypeChecker == nil || ctx.SourceFile == nil || node == nil {
 		return false
+	}
+	if !callLikeDeprecation.checked {
+		callLikeDeprecation = getCallLikeDeprecationInfo(ctx, node)
+	}
+	if callLikeDeprecation.callLikeNode != nil {
+		if callLikeDeprecation.isDeprecated {
+			return false
+		}
+		if callLikeDeprecation.resolvedNonDeprecatedSignature {
+			return true
+		}
+	}
+	if propertyAccessHasResolvedNonDeprecatedProperty(ctx, node) {
+		return true
+	}
+	bindingDeclaration := node
+	if bindingDeclaration.Kind != ast.KindBindingElement && bindingDeclaration.Parent != nil && bindingDeclaration.Parent.Kind == ast.KindBindingElement {
+		bindingDeclaration = bindingDeclaration.Parent
+	}
+	if bindingElementHasResolvedNonDeprecatedProperty(ctx, bindingDeclaration) {
+		return true
+	}
+	// References to a destructured variable resolve to the local binding symbol,
+	// not to the source object's property. Follow that symbol back to its binding
+	// element so an unrelated deprecated property with the same name cannot win
+	// through the source-wide fallback.
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	if symbol != nil {
+		for _, declaration := range symbol.Declarations {
+			if declaration != nil && declaration.Kind == ast.KindBindingElement &&
+				bindingElementHasResolvedNonDeprecatedProperty(ctx, declaration) {
+				return true
+			}
+		}
+		if symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Kind == ast.KindBindingElement &&
+			bindingElementHasResolvedNonDeprecatedProperty(ctx, symbol.ValueDeclaration) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasResolvedNonDeprecatedTarget returns true when the checker has resolved the
+// identifier to a concrete non-deprecated declaration. A source-wide lookup by
+// name is only safe when resolution failed: otherwise an unrelated type with a
+// deprecated member of the same name can be mistaken for the resolved target.
+func hasResolvedNonDeprecatedTarget(ctx rule.RuleContext, node *ast.Node) bool {
+	if propertyAccessHasResolvedNonDeprecatedProperty(ctx, node) {
+		return true
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		return false
 	}
+	allowCrossFileDeclaration := isPropertyAccessName(node)
 	checkDecl := func(decl *ast.Node) bool {
-		if decl == nil || decl.Kind == ast.KindBindingElement || decl.Kind == ast.KindShorthandPropertyAssignment {
+		if decl == nil || decl.Kind == ast.KindShorthandPropertyAssignment {
 			return false
+		}
+		if decl.Kind == ast.KindBindingElement {
+			return bindingElementHasResolvedNonDeprecatedProperty(ctx, decl)
 		}
 		declSourceFile := ast.GetSourceFileOfNode(decl)
-		if declSourceFile == nil || declSourceFile != ctx.SourceFile {
+		if declSourceFile == nil {
 			return false
 		}
-		// If the declaration is deprecated, allow the fallback to find it.
+		if declSourceFile != ctx.SourceFile {
+			// Virtual-file programs can expose a second SourceFile instance for
+			// a declaration in the current logical file. Preserve the existing
+			// source fallback for that case; only a property access resolved to a
+			// genuinely different file is conclusive cross-file evidence.
+			if !allowCrossFileDeclaration || declSourceFile.FileName() == ctx.SourceFile.FileName() {
+				return false
+			}
+		}
+		// If the resolved declaration is deprecated, let the normal detection
+		// path (or, if necessary, its source fallback) report it.
 		if isDeclarationDeprecated(ctx.TypeChecker, decl) {
 			return false
 		}
@@ -1942,17 +1890,6 @@ func isPropertyAccessCalleeName(node *ast.Node) bool {
 	return callExpression != nil && callExpression.Expression == node.Parent
 }
 
-func propertyAccessDisplayName(sourceFile *ast.SourceFile, node *ast.Node) string {
-	if !isPropertyAccessName(node) {
-		return getReportedNodeName(node)
-	}
-	text := strings.TrimSpace(sourceSpanText(sourceFile, node.Parent.Pos(), node.Parent.End()))
-	if text == "" {
-		return getReportedNodeName(node)
-	}
-	return text
-}
-
 func propertyAccessCallArgCount(node *ast.Node) (int, bool) {
 	if !isPropertyAccessCalleeName(node) {
 		return 0, false
@@ -1989,12 +1926,75 @@ func isIdentifierTaggedTemplateTag(node *ast.Node) bool {
 var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 	Name:             "no-deprecated",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Schema:           rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}
-		allowEntries := parseAllowEntries(options)
+		allowSpecifiers := parseAllowSpecifiers(options)
+		var sourceDeprecationCache map[sourceDeprecationLookupKey]sourceDeprecationInfo
+		lookupSourceDeprecation := func(kind sourceDeprecationLookupKind, name string, argCount int, matchArgCount bool) (bool, string) {
+			key := sourceDeprecationLookupKey{
+				kind:          kind,
+				name:          name,
+				argCount:      argCount,
+				matchArgCount: matchArgCount,
+			}
+			if info, ok := sourceDeprecationCache[key]; ok {
+				return info.isDeprecated, info.reason
+			}
+			info := sourceDeprecationInfo{}
+			switch kind {
+			case sourceDeprecationAny:
+				info.isDeprecated, info.reason = deprecatedInfoByNameInSource(ctx, name, false)
+			case sourceDeprecationVariable:
+				info.isDeprecated, info.reason = deprecatedVariableInfoByNameInSource(ctx, name)
+			case sourceDeprecationStructuralProperty:
+				info.isDeprecated, info.reason = deprecatedStructuralPropertyInfoByNameInSource(ctx, name)
+			case sourceDeprecationMethod:
+				info.isDeprecated, info.reason = deprecatedMethodInfoByNameInSource(ctx, name, argCount, matchArgCount)
+			case sourceDeprecationFunction:
+				info.isDeprecated, info.reason = deprecatedFunctionInfoByNameInSource(ctx, name, argCount, matchArgCount)
+			case sourceDeprecationProperty:
+				info.isDeprecated, info.reason = deprecatedPropertyInfoByNameInSource(ctx, name)
+			}
+			if sourceDeprecationCache == nil {
+				sourceDeprecationCache = make(map[sourceDeprecationLookupKey]sourceDeprecationInfo)
+			}
+			sourceDeprecationCache[key] = info
+			return info.isDeprecated, info.reason
+		}
+		lastCallLikeDeprecation := callLikeDeprecationInfo{}
+		callLikeDeprecationForNode := func(node *ast.Node) callLikeDeprecationInfo {
+			callLikeNode := getCallLikeNode(node)
+			if lastCallLikeDeprecation.checked && lastCallLikeDeprecation.callLikeNode == callLikeNode {
+				return lastCallLikeDeprecation
+			}
+			lastCallLikeDeprecation = getCallLikeDeprecationInfo(ctx, node)
+			return lastCallLikeDeprecation
+		}
+		// A reference is allowed when the type at that location matches a
+		// specifier, or when the referenced value itself does — an export whose
+		// type carries a different name is only reachable through the latter.
+		isAllowed := func(node *ast.Node) bool {
+			if len(allowSpecifiers) == 0 || node == nil {
+				return false
+			}
+			nodeType := ctx.TypeChecker.GetTypeAtLocation(node)
+			return utils.TypeMatchesSomeSpecifier(nodeType, allowSpecifiers, nil, ctx.Program()) ||
+				utils.ValueMatchesSomeSpecifier(node, allowSpecifiers, ctx.Program(), nodeType)
+		}
+		// A computed access names no value of its own, so only the type carrying
+		// the deprecated property can be allowed there. That type is the one
+		// written at the receiver: a specifier matches the type parameter of a
+		// generic receiver, not the constraint the property comes from.
+		isObjectTypeAllowed := func(expression *ast.Node) bool {
+			if len(allowSpecifiers) == 0 || expression == nil {
+				return false
+			}
+			objectType := ctx.TypeChecker.GetTypeAtLocation(expression)
+			return utils.TypeMatchesSomeSpecifier(objectType, allowSpecifiers, nil, ctx.Program())
+		}
 		sourceFile := ctx.SourceFile
 		if sourceFile.AsNode().Flags&ast.NodeFlagsAmbient != 0 {
 			// Avoid crashing TypeScript's suggestion diagnostics on ambient source files.
@@ -2093,14 +2093,16 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			}
 			return false
 		}
-		reportedRanges := map[string]bool{}
-		reportRange := func(diagnosticRange core.TextRange, message rule.RuleMessage) {
-			key := strconv.Itoa(diagnosticRange.Pos()) + ":" + strconv.Itoa(diagnosticRange.End())
-			if reportedRanges[key] {
-				return
+		var reportedRanges map[core.TextRange]struct{}
+		claimRange := func(diagnosticRange core.TextRange) bool {
+			if _, reported := reportedRanges[diagnosticRange]; reported {
+				return false
 			}
-			reportedRanges[key] = true
-			ctx.ReportRange(diagnosticRange, message)
+			if reportedRanges == nil {
+				reportedRanges = make(map[core.TextRange]struct{})
+			}
+			reportedRanges[diagnosticRange] = struct{}{}
+			return true
 		}
 		// Two parallel detection paths: (1) TypeScript's GetSuggestionDiagnostics for
 		// symbol/type-driven deprecations, and (2) AST listeners for cases the type
@@ -2120,6 +2122,29 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if shouldIgnoreDynamicImportDefault(node, diagnostic.Pos(), diagnostic.End(), name, ctx.TypeChecker) {
 					continue
 				}
+				elementAccess := elementAccessForDiagnosticRange(node, diagnostic.Pos(), diagnostic.End())
+				if elementAccess != nil {
+					if isObjectTypeAllowed(elementAccess.Expression) {
+						continue
+					}
+				} else if isAllowed(node) {
+					continue
+				}
+				resolvedNode := node
+				reportName := name
+				if identifierName := reportedIdentifierName(resolvedNode); identifierName != "" {
+					reportName = identifierName
+				}
+				if access := propertyAccessForDiagnosticRange(node, diagnostic.Pos(), diagnostic.End()); access != nil && access.Name() != nil {
+					resolvedNode = access.Name()
+					if identifierName := reportedIdentifierName(resolvedNode); identifierName != "" {
+						reportName = identifierName
+					}
+				}
+				callDeprecation := callLikeDeprecationForNode(resolvedNode)
+				if hasResolvedNonDeprecatedAccessTarget(ctx, resolvedNode, callDeprecation) {
+					continue
+				}
 				symbol := symbolAtLocation(ctx.TypeChecker, node)
 				if symbol != nil && declarationInCurrentFile(symbol, ctx.SourceFile) {
 					if isDeprecatedLocal, _ := getJsDocDeprecation(ctx.TypeChecker, symbol); !isDeprecatedLocal {
@@ -2135,7 +2160,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if isInImportStatementRange(sourceFile, diagnostic.Pos()) {
 					continue
 				}
-				if elementAccess := elementAccessForDiagnosticRange(node, diagnostic.Pos(), diagnostic.End()); elementAccess != nil && elementAccess.Expression != nil {
+				if elementAccess != nil && elementAccess.Expression != nil {
 					rawObjectType := ctx.TypeChecker.GetTypeAtLocation(elementAccess.Expression)
 					if rawObjectType != nil && (utils.IsTypeAnyType(rawObjectType) || utils.IsTypeUnknownType(rawObjectType)) {
 						continue
@@ -2145,22 +2170,30 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if promotedRange := promotedDynamicImportDefaultRange(node, diagnostic.Pos(), diagnostic.End(), name, ctx.TypeChecker); promotedRange != nil {
 					diagnosticRange = *promotedRange
 				}
-				if shouldAllowDiagnostic(allowEntries, name, symbol, ctx.SourceFile) {
+				if !claimRange(diagnosticRange) {
 					continue
 				}
-				message := buildDeprecatedMessage(name)
-				if reason := deprecatedReasonFromDiagnostic(diagnostic); reason != "" {
-					message = buildDeprecatedWithReasonMessage(name, reason)
-				} else if symbol != nil {
+				message := buildDeprecatedMessage(reportName)
+				reason := ""
+				if symbol != nil {
+					_, reason = searchForDeprecationInAliasesChain(ctx.TypeChecker, symbol, true)
+				}
+				if reason == "" {
+					reason = deprecatedReasonFromDiagnostic(diagnostic)
+				}
+				if reason == "" && symbol != nil {
 					for _, declaration := range symbol.Declarations {
 						if declaration == nil {
 							continue
 						}
-						if reason := deprecatedReasonFromDeclaration(declaration); reason != "" {
-							message = buildDeprecatedWithReasonMessage(name, reason)
+						if reasonFromDeclaration := deprecatedReasonFromDeclaration(ctx.TypeChecker, declaration); reasonFromDeclaration != "" {
+							reason = reasonFromDeclaration
 							break
 						}
 					}
+				}
+				if reason != "" {
+					message = buildDeprecatedWithReasonMessage(reportName, reason)
 				}
 				deprecationNode := node
 				if node != nil && node.Kind == ast.KindVariableDeclaration {
@@ -2170,16 +2203,17 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					}
 				}
 				if message.Id != "deprecatedWithReason" {
-					if _, reason := getDeprecationReason(ctx, deprecationNode); reason != "" {
-						message = buildDeprecatedWithReasonMessage(name, reason)
+					callDeprecation := callLikeDeprecationForNode(deprecationNode)
+					if _, reason := getDeprecationReason(ctx, deprecationNode, callDeprecation); reason != "" {
+						message = buildDeprecatedWithReasonMessage(reportName, reason)
 					}
 				}
 				if message.Id != "deprecatedWithReason" {
-					if reason := deprecatedReasonByNameInSource(ctx, name); reason != "" {
-						message = buildDeprecatedWithReasonMessage(name, reason)
+					if _, reason := lookupSourceDeprecation(sourceDeprecationAny, reportName, 0, false); reason != "" {
+						message = buildDeprecatedWithReasonMessage(reportName, reason)
 					}
 				}
-				reportRange(diagnosticRange, message)
+				ctx.ReportRange(diagnosticRange, message)
 			}
 		}
 		checkIdentifier := func(node *ast.Node) {
@@ -2199,32 +2233,53 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				return
 			}
 			reportName := name
-			isDeprecated, reason := getDeprecationReason(ctx, node)
-			if !isDeprecated && shouldUseDeprecatedVariableSourceFallback(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
-				isDeprecated, reason = deprecatedVariableInfoByNameInSource(ctx, name)
+			callDeprecation := callLikeDeprecationForNode(node)
+			isDeprecated, reason := getDeprecationReason(ctx, node, callDeprecation)
+			allowanceChecked := isDeprecated
+			if allowanceChecked && isAllowed(node) {
+				return
 			}
-			if !isDeprecated && isPropertyAccessName(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
-				isDeprecated, reason = deprecatedStructuralPropertyInfoByNameInSource(ctx, name)
-				if !isDeprecated {
-					argCount, matchArgCount := propertyAccessCallArgCount(node)
-					isDeprecated, reason = deprecatedMethodInfoByNameInSource(ctx, name, argCount, matchArgCount)
-					if isDeprecated && isPropertyAccessCalleeName(node) {
-						reportName = propertyAccessDisplayName(ctx.SourceFile, node)
-					}
+			resolvedNonDeprecated := !isDeprecated && callDeprecation.resolvedNonDeprecatedSignature
+			if isDeprecated && isBindingElementNameOrProperty(node) {
+				resolvedNonDeprecated = hasResolvedNonDeprecatedAccessTarget(ctx, node, callDeprecation)
+				if resolvedNonDeprecated {
+					isDeprecated = false
+					reason = ""
 				}
 			}
-			if !isDeprecated && isBindingElementNameOrProperty(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
-				isDeprecated, reason = deprecatedPropertyInfoByNameInSource(ctx, name)
+			if !isDeprecated && !resolvedNonDeprecated {
+				resolvedNonDeprecated = hasResolvedNonDeprecatedTarget(ctx, node)
 			}
-			if !isDeprecated && !isLocalNonDeprecatedSymbol(ctx, node) {
+			if !isDeprecated && shouldUseDeprecatedVariableSourceFallback(node) && !resolvedNonDeprecated {
+				isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationVariable, name, 0, false)
+			}
+			if !isDeprecated && isPropertyAccessName(node) && !resolvedNonDeprecated {
+				isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationStructuralProperty, name, 0, false)
+				if !isDeprecated {
+					argCount, matchArgCount := propertyAccessCallArgCount(node)
+					isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationMethod, name, argCount, matchArgCount)
+				}
+			}
+			if !isDeprecated && isBindingElementNameOrProperty(node) && !resolvedNonDeprecated {
+				isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationProperty, name, 0, false)
+			}
+			if !isDeprecated && !resolvedNonDeprecated {
 				argCount, matchArgCount := callArgCountForIdentifierCallee(node)
 				if matchArgCount {
-					isDeprecated, reason = deprecatedFunctionInfoByNameInSource(ctx, name, argCount, true)
+					isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationFunction, name, argCount, true)
 				} else if isIdentifierTaggedTemplateTag(node) {
-					isDeprecated, reason = deprecatedFunctionInfoByNameInSource(ctx, name, 0, false)
+					isDeprecated, reason = lookupSourceDeprecation(sourceDeprecationFunction, name, 0, false)
 				}
 			}
 			if !isDeprecated {
+				return
+			}
+			if !allowanceChecked && isAllowed(node) {
+				return
+			}
+			trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+			diagnosticRange := core.NewTextRange(trimmedRange.Pos(), trimmedRange.End())
+			if !claimRange(diagnosticRange) {
 				return
 			}
 			symbol := symbolAtLocation(ctx.TypeChecker, node)
@@ -2234,11 +2289,6 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if symbol != nil && symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Kind == ast.KindBindingElement {
 				symbol = nil
 			}
-			// Only report if the deprecated symbol isn't just a local declaration in the current file.
-			// Allow reporting for deprecated locals (for example, symbol usage).
-			if shouldAllowDiagnostic(allowEntries, name, symbol, ctx.SourceFile) {
-				return
-			}
 			message := buildDeprecatedMessage(reportName)
 			if reason != "" {
 				message = buildDeprecatedWithReasonMessage(reportName, reason)
@@ -2247,19 +2297,18 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					if declaration == nil {
 						continue
 					}
-					if reasonFromDecl := deprecatedReasonFromDeclaration(declaration); reasonFromDecl != "" {
+					if reasonFromDecl := deprecatedReasonFromDeclaration(ctx.TypeChecker, declaration); reasonFromDecl != "" {
 						message = buildDeprecatedWithReasonMessage(reportName, reasonFromDecl)
 						break
 					}
 				}
 			}
 			if message.Id != "deprecatedWithReason" {
-				if reasonByName := deprecatedReasonByNameInSource(ctx, name); reasonByName != "" {
+				if _, reasonByName := lookupSourceDeprecation(sourceDeprecationAny, name, 0, false); reasonByName != "" {
 					message = buildDeprecatedWithReasonMessage(reportName, reasonByName)
 				}
 			}
-			trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
+			ctx.ReportRange(diagnosticRange, message)
 		}
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
@@ -2322,18 +2371,23 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				isDeprecated := symbolIsDeprecated(ctx.TypeChecker, propertySymbol)
 				sourceDeprecated, sourceReason := false, ""
 				if !isDeprecated && propertySymbol == nil && attributesType != nil && !utils.IsTypeAnyType(attributesType) && !utils.IsTypeUnknownType(attributesType) {
-					sourceDeprecated, sourceReason = deprecatedPropertyInfoByNameInSource(ctx, nameText)
+					sourceDeprecated, sourceReason = lookupSourceDeprecation(sourceDeprecationProperty, nameText, 0, false)
 				}
 				if !isDeprecated && !sourceDeprecated {
 					return
 				}
-				if shouldAllowDiagnostic(allowEntries, nameText, propertySymbol, ctx.SourceFile) {
+				if isAllowed(nameNode) {
+					return
+				}
+				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
+				diagnosticRange := core.NewTextRange(trimmedRange.Pos(), trimmedRange.End())
+				if !claimRange(diagnosticRange) {
 					return
 				}
 				message := buildDeprecatedMessage(nameText)
 				if propertySymbol != nil {
 					for _, declaration := range propertySymbol.Declarations {
-						if reason := deprecatedReasonFromDeclaration(declaration); reason != "" {
+						if reason := deprecatedReasonFromDeclaration(ctx.TypeChecker, declaration); reason != "" {
 							message = buildDeprecatedWithReasonMessage(nameText, reason)
 							break
 						}
@@ -2342,8 +2396,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if message.Id != "deprecatedWithReason" && sourceReason != "" {
 					message = buildDeprecatedWithReasonMessage(nameText, sourceReason)
 				}
-				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-				reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
+				ctx.ReportRange(diagnosticRange, message)
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				elementAccess := node.AsElementAccessExpression()
@@ -2363,18 +2416,23 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				isDeprecated := symbolIsDeprecated(ctx.TypeChecker, propertySymbol)
 				sourceDeprecated, sourceReason := false, ""
 				if !isDeprecated && propertySymbol == nil && objectType != nil && rawObjectType != nil && !utils.IsTypeAnyType(rawObjectType) && !utils.IsTypeUnknownType(rawObjectType) && !utils.IsTypeAnyType(objectType) && !utils.IsTypeUnknownType(objectType) {
-					sourceDeprecated, sourceReason = deprecatedStructuralPropertyInfoByNameInSource(ctx, propertyName)
+					sourceDeprecated, sourceReason = lookupSourceDeprecation(sourceDeprecationStructuralProperty, propertyName, 0, false)
 				}
 				if !isDeprecated && !sourceDeprecated {
 					return
 				}
-				if shouldAllowDiagnostic(allowEntries, propertyName, propertySymbol, ctx.SourceFile) {
+				if isObjectTypeAllowed(elementAccess.Expression) {
+					return
+				}
+				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, elementAccess.ArgumentExpression)
+				diagnosticRange := core.NewTextRange(trimmedRange.Pos(), trimmedRange.End())
+				if !claimRange(diagnosticRange) {
 					return
 				}
 				message := buildDeprecatedMessage(propertyName)
 				if propertySymbol != nil {
 					for _, declaration := range propertySymbol.Declarations {
-						if reason := deprecatedReasonFromDeclaration(declaration); reason != "" {
+						if reason := deprecatedReasonFromDeclaration(ctx.TypeChecker, declaration); reason != "" {
 							message = buildDeprecatedWithReasonMessage(propertyName, reason)
 							break
 						}
@@ -2383,8 +2441,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if message.Id != "deprecatedWithReason" && sourceReason != "" {
 					message = buildDeprecatedWithReasonMessage(propertyName, sourceReason)
 				}
-				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, elementAccess.ArgumentExpression)
-				reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
+				ctx.ReportRange(diagnosticRange, message)
 			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
 				access := node.AsPropertyAccessExpression()
@@ -2400,32 +2457,43 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if shouldIgnoreDynamicImportDefault(nameNode, nameNode.Pos(), nameNode.End(), name, ctx.TypeChecker) {
 					return
 				}
+				if isAllowed(nameNode) {
+					return
+				}
+				callDeprecation := callLikeDeprecationForNode(nameNode)
+				if !callDeprecation.isDeprecated && callDeprecation.resolvedNonDeprecatedSignature {
+					return
+				}
 				propertySymbol := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
 				if !symbolIsDeprecated(ctx.TypeChecker, propertySymbol) {
 					return
 				}
-				if shouldAllowDiagnostic(allowEntries, name, propertySymbol, ctx.SourceFile) {
+				if hasResolvedNonDeprecatedAccessTarget(ctx, nameNode, callDeprecation) {
 					return
 				}
-				_, reason := getDeprecationReason(ctx, nameNode)
+				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
+				diagnosticRange := core.NewTextRange(trimmedRange.Pos(), trimmedRange.End())
+				if !claimRange(diagnosticRange) {
+					return
+				}
+				_, reason := getDeprecationReason(ctx, nameNode, callDeprecation)
 				message := buildDeprecatedMessage(name)
 				if reason != "" {
 					message = buildDeprecatedWithReasonMessage(name, reason)
 				} else if propertySymbol != nil {
 					for _, declaration := range propertySymbol.Declarations {
-						if reasonFromDecl := deprecatedReasonFromDeclaration(declaration); reasonFromDecl != "" {
+						if reasonFromDecl := deprecatedReasonFromDeclaration(ctx.TypeChecker, declaration); reasonFromDecl != "" {
 							message = buildDeprecatedWithReasonMessage(name, reasonFromDecl)
 							break
 						}
 					}
 				}
 				if message.Id != "deprecatedWithReason" {
-					if reasonByName := deprecatedReasonByNameInSource(ctx, name); reasonByName != "" {
+					if _, reasonByName := lookupSourceDeprecation(sourceDeprecationAny, name, 0, false); reasonByName != "" {
 						message = buildDeprecatedWithReasonMessage(name, reasonByName)
 					}
 				}
-				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-				reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
+				ctx.ReportRange(diagnosticRange, message)
 			},
 		}
 	},

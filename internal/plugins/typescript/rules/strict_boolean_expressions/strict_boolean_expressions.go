@@ -10,7 +10,7 @@
 package strict_boolean_expressions
 
 import (
-	"encoding/json"
+	_ "embed"
 	"fmt"
 	"regexp"
 
@@ -22,22 +22,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// Options mirrors typescript-eslint's option shape. Pointer-typed booleans
-// distinguish "user explicitly set false" from "user did not set, fall back to
-// upstream default" — important because upstream defaults are split: string /
-// number / nullable-object default to `true`, everything else defaults to
-// `false`.
-type Options struct {
-	AllowAny                                               *bool `json:"allowAny"`
-	AllowNullableBoolean                                   *bool `json:"allowNullableBoolean"`
-	AllowNullableEnum                                      *bool `json:"allowNullableEnum"`
-	AllowNullableNumber                                    *bool `json:"allowNullableNumber"`
-	AllowNullableObject                                    *bool `json:"allowNullableObject"`
-	AllowNullableString                                    *bool `json:"allowNullableString"`
-	AllowNumber                                            *bool `json:"allowNumber"`
-	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing *bool `json:"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"`
-	AllowString                                            *bool `json:"allowString"`
-}
+//go:embed strict_boolean_expressions.schema.json
+var schemaJSON []byte
 
 type resolvedOptions struct {
 	allowAny                                               bool
@@ -51,7 +37,7 @@ type resolvedOptions struct {
 	allowString                                            bool
 }
 
-func parseOptions(options any) resolvedOptions {
+func parseOptions(options []any) resolvedOptions {
 	// Defaults match upstream:
 	//   allowString=true, allowNumber=true, allowNullableObject=true,
 	//   all other booleans default to false.
@@ -61,49 +47,37 @@ func parseOptions(options any) resolvedOptions {
 		allowNullableObject: true,
 	}
 
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	optsMap, _ := options[0].(map[string]any)
 
-	// Round-trip via JSON so the call accepts both the CLI shape (bare object)
-	// and the rule_tester shape (array-wrapped), matching every other
-	// typescript-eslint rule in this repo.
-	jsonBytes, err := json.Marshal(optsMap)
-	if err != nil {
-		return opts
+	if value, ok := optsMap["allowAny"].(bool); ok {
+		opts.allowAny = value
 	}
-	var parsed Options
-	if err := json.Unmarshal(jsonBytes, &parsed); err != nil {
-		return opts
+	if value, ok := optsMap["allowNullableBoolean"].(bool); ok {
+		opts.allowNullableBoolean = value
 	}
-
-	if parsed.AllowAny != nil {
-		opts.allowAny = *parsed.AllowAny
+	if value, ok := optsMap["allowNullableEnum"].(bool); ok {
+		opts.allowNullableEnum = value
 	}
-	if parsed.AllowNullableBoolean != nil {
-		opts.allowNullableBoolean = *parsed.AllowNullableBoolean
+	if value, ok := optsMap["allowNullableNumber"].(bool); ok {
+		opts.allowNullableNumber = value
 	}
-	if parsed.AllowNullableEnum != nil {
-		opts.allowNullableEnum = *parsed.AllowNullableEnum
+	if value, ok := optsMap["allowNullableObject"].(bool); ok {
+		opts.allowNullableObject = value
 	}
-	if parsed.AllowNullableNumber != nil {
-		opts.allowNullableNumber = *parsed.AllowNullableNumber
+	if value, ok := optsMap["allowNullableString"].(bool); ok {
+		opts.allowNullableString = value
 	}
-	if parsed.AllowNullableObject != nil {
-		opts.allowNullableObject = *parsed.AllowNullableObject
+	if value, ok := optsMap["allowNumber"].(bool); ok {
+		opts.allowNumber = value
 	}
-	if parsed.AllowNullableString != nil {
-		opts.allowNullableString = *parsed.AllowNullableString
+	if value, ok := optsMap["allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"].(bool); ok {
+		opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = value
 	}
-	if parsed.AllowNumber != nil {
-		opts.allowNumber = *parsed.AllowNumber
-	}
-	if parsed.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing != nil {
-		opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = *parsed.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing
-	}
-	if parsed.AllowString != nil {
-		opts.allowString = *parsed.AllowString
+	if value, ok := optsMap["allowString"].(bool); ok {
+		opts.allowString = value
 	}
 	return opts
 }
@@ -278,10 +252,10 @@ func sugDefaultZero() rule.RuleMessage {
 
 var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 	Name:             "strict-boolean-expressions",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _optionsRaw []any) rule.RuleListeners {
-		optionsRaw := rule.LegacyUnwrapOptions(_optionsRaw)
-		opts := parseOptions(optionsRaw)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 		tc := ctx.TypeChecker
 		sf := ctx.SourceFile
 
@@ -290,7 +264,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 		// I am doing" flag, the rule reports a single noStrictNullCheck
 		// diagnostic anchored at the start of the file and still walks the
 		// rest of the file.
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ctx.Program().Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,

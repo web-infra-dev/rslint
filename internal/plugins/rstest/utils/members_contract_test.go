@@ -21,9 +21,10 @@ var misalignedMembersProbe = rule.Rule{
 	Name:             "rstest/members-alignment-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := rstestUtils.ParseRstestFnCall(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return
 				}
@@ -77,13 +78,14 @@ var semanticFlagProbe = rule.Rule{
 	Name:             "rstest/semantic-flag-probe",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := rstestUtils.ParseRstestFnCall(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return
 				}
-				if parsed.Skipped || parsed.Todo || parsed.IsParameterized() {
+				if parsed.Skipped || parsed.Todo || parsed.IsFocused() || parsed.IsParameterized() {
 					ctx.ReportNode(node, probeMessage("flagged", "call carries a semantic flag"))
 				}
 			},
@@ -105,6 +107,8 @@ func TestSemanticFieldsSurviveAliases(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{Code: `const skipped = test.skip; skipped("case", cb);`, Errors: flagged},
 			{Code: `const todoTest = test.todo; todoTest("case");`, Errors: flagged},
+			{Code: `const focused = test.only; focused("case", cb);`, Errors: flagged},
+			{Code: `const focusedEach = test.only.each([1]); focusedEach("case", cb);`, Errors: flagged},
 			{Code: `const forCase = test.for([1]); forCase("case", cb);`, Errors: flagged},
 			{Code: `const base = test;
 const skipped = base.skip;
@@ -112,6 +116,60 @@ skipped.each([1])("case", cb);`, Errors: flagged},
 			{Code: `import * as rstest from "@rstest/core";
 const skippedSuite = rstest.describe.skip;
 skippedSuite("suite", cb);`, Errors: flagged},
+		},
+	)
+}
+
+var focusEntriesProbe = rule.Rule{
+	Name:             "rstest/focus-entries-probe",
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				parsed := analysis.ParseFnCall(node)
+				if parsed == nil || !parsed.IsFocused() {
+					return
+				}
+				for _, entry := range parsed.FocusEntries() {
+					ctx.ReportNode(entry.Node, probeMessage("focused", "focus source"))
+				}
+			},
+		}
+	},
+}
+
+func TestFocusEntriesPreserveAliasSourceNodes(t *testing.T) {
+	focused := []rule_tester.InvalidTestCaseError{{MessageId: "focused"}}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &focusEntriesProbe,
+		[]rule_tester.ValidTestCase{
+			{Code: `test("case", cb);`},
+			{Code: `const plain = test; plain("case", cb);`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `test.only("case", cb);`, Errors: focused},
+			{Code: `const focused = test.only; focused("case", cb);`, Errors: focused},
+			{Code: `const focusedEach = test.only.each([1]); focusedEach("case", cb);`, Errors: focused},
+			{
+				Code: `const base = test.only;
+const focused = base.only;
+focused("case", cb);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "focused", Line: 1},
+					{MessageId: "focused", Line: 2},
+				},
+			},
+			{
+				Code:   `import.meta.rstest.test.only("case", cb);`,
+				Errors: focused,
+			},
+			{
+				Code: `import { test } from "@rstest/playwright";
+const focused = test.only;
+focused("case", cb);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "focused", Line: 2}},
+			},
 		},
 	)
 }

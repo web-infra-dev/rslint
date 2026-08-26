@@ -223,6 +223,34 @@ func TestNoCommentedOutTests(t *testing.T) {
 				},
 			},
 			{
+				Code:     "const pattern = /foo\\/bar/;\n// test(\"regex\", () => {})",
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "const value = `before ${name} after`;\n// test(\"template\", () => {})",
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "const element = <div>{value}</div>;\n// test(\"tsx\", () => <div />)",
+				FileName: "file.tsx",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code:     "const element = <div>{/* test(\"jsx\", () => {}) */}</div>;",
+				FileName: "file.tsx",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 23},
+				},
+			},
+			{
 				Code: "// test(\"first\", () => {})\n// test(\"second\", () => {})",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "commentedTests", Line: 1, Column: 1},

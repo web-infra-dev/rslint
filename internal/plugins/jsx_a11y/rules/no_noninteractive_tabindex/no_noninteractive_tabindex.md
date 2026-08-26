@@ -112,4 +112,5 @@ Examples of **correct** code with `{ "allowExpressionValues": true }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-noninteractive-tabindex](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-noninteractive-tabindex.md)
+- [eslint-plugin-jsx-a11y: no-noninteractive-tabindex](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-noninteractive-tabindex.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-noninteractive-tabindex.js)

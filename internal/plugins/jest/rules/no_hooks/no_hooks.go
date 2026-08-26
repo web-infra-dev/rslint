@@ -1,83 +1,23 @@
 package no_hooks
 
 import (
-	_ "embed"
-	"fmt"
-	"slices"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_hooks"
 )
 
-//go:embed no_hooks.schema.json
-var schemaJSON []byte
-
-// Message builders
-
-func buildErrorUnexpectedHookMessage(hook string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "unexpectedHook",
-		Description: fmt.Sprintf("Unexpected '%s' hook", hook),
-	}
-}
-
-var allowedHooks = map[string]bool{
-	"beforeEach": true,
-	"afterEach":  true,
-	"beforeAll":  true,
-	"afterAll":   true,
-}
-
-type Options struct {
-	Allow []string `json:"allow"`
-}
-
-func parseAllowList(raw any) []string {
-	items, ok := raw.([]interface{})
-	if !ok {
-		return []string{}
-	}
-	out := make([]string, 0, len(items))
-	for _, item := range items {
-		s, ok := item.(string)
-		if ok && allowedHooks[s] {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-func parseOptions(options []any) Options {
-	opts := Options{Allow: []string{}}
-	if len(options) == 0 {
-		return opts
-	}
-
-	optsMap, _ := options[0].(map[string]interface{})
-	if raw, ok := optsMap["allow"]; ok {
-		opts.Allow = parseAllowList(raw)
-	}
-	return opts
-}
-
-var NoHooksRule = rule.Rule{
-	Name:   "jest/no-hooks",
-	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := parseOptions(options)
-
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil || jestFnCall.Kind != utils.JestFnTypeHook {
-					return
+var NoHooksRule = shared.NewRule(shared.Config{
+	Name: "jest/no-hooks",
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		return shared.Runtime{
+			Parse: func(node *ast.Node) *shared.ParsedCall {
+				parsed := utils.ParseJestFnCall(node, ctx)
+				if parsed == nil {
+					return nil
 				}
-
-				if !slices.Contains(opts.Allow, jestFnCall.Name) {
-					ctx.ReportNode(node, buildErrorUnexpectedHookMessage(jestFnCall.Name))
-				}
+				return &parsed.ParsedCall
 			},
 		}
 	},
-}
+})

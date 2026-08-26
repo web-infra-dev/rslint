@@ -68,7 +68,7 @@ function bar() {
 
 ### `commentPattern`
 
-A custom regular expression pattern to match fallthrough comments. By default matches `/falls?\s?through/i`.
+A custom regular expression pattern to match fallthrough comments, applied case-sensitively as `new RegExp(commentPattern, "u")`. By default matches `/falls?\s?through/iu`.
 
 ```json
 { "no-fallthrough": ["error", { "commentPattern": "break[\\s\\w]*omitted" }] }
@@ -92,4 +92,5 @@ When set to `true`, reports fallthrough comments on cases that cannot actually f
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/no-fallthrough
+- [ESLint: no-fallthrough](https://eslint.org/docs/latest/rules/no-fallthrough)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-fallthrough.js)

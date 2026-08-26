@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 type CompilerReactFunctionType string
@@ -681,7 +682,10 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 		// fall through to anonymous handling
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		if fn.Parent != nil && ast.IsObjectLiteralExpression(fn.Parent) {
-			return fn.Name()
+			name := fn.Name()
+			if name != nil && !ast.IsComputedPropertyName(name) {
+				return name
+			}
 		}
 		return nil
 	case ast.KindArrowFunction:
@@ -718,7 +722,7 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 		}
 	case ast.KindPropertyAssignment:
 		pa := p.AsPropertyAssignment()
-		if pa.Initializer == child {
+		if pa.Initializer == child && p.Name() != nil && !ast.IsComputedPropertyName(p.Name()) {
 			return p.Name()
 		}
 	case ast.KindBindingElement:
@@ -847,7 +851,7 @@ func IsInsideComponentOrHook(node *ast.Node) bool {
 // compiles it as a regex. Returns nil when the setting is absent
 // or the pattern fails to compile — mirroring upstream's lenient
 // behavior of silently ignoring malformed regex strings.
-func AdditionalHooksFromSettings(settings map[string]interface{}, key string) *regexp.Regexp {
+func AdditionalHooksFromSettings(settings map[string]interface{}, key string) *esregexp.RegExp {
 	if settings == nil {
 		return nil
 	}
@@ -863,7 +867,7 @@ func AdditionalHooksFromSettings(settings map[string]interface{}, key string) *r
 	if !ok || pattern == "" {
 		return nil
 	}
-	re, err := regexp.Compile(pattern)
+	re, err := esregexp.Compile(pattern, "")
 	if err != nil {
 		return nil
 	}

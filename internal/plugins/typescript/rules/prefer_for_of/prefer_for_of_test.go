@@ -306,6 +306,13 @@ for (let i = 0; i < arr.length; i++) {
 for (let i = 0; i < arr.length; i++) {
   const x: typeof i = arr[i];
 }`},
+		// A class `extends` expression uses its qualifier at runtime.
+		{Code: `
+namespace i { export class Y {} }
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i]);
+  class X extends i.Y {}
+}`},
 		// ======== A `var` redeclaration writes the same function-scoped index ========
 		{Code: `
 for (var i = 0; i < arr.length; i++) {
@@ -342,6 +349,18 @@ for (var i = 0; i < arr.length; i++) {
   console.log(arr[i]);
 }`},
 	}, []rule_tester.InvalidTestCase{
+		// ---- A type-only heritage qualifier resolves in namespace space ----
+		{
+			Code: `
+namespace i { export interface Y {} }
+for (let i = 0; i < arr.length; i++) {
+  console.log(arr[i]);
+  class X implements i.Y {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferForOf", Line: 3, Column: 1, EndLine: 6, EndColumn: 2},
+			},
+		},
 		// ---- A `var` redeclaration that assigns nothing ----
 		{
 			Code: `

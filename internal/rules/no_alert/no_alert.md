@@ -33,4 +33,5 @@ function foo() {
 
 ## Original Documentation
 
-https://eslint.org/docs/latest/rules/no-alert
+- [ESLint: no-alert](https://eslint.org/docs/latest/rules/no-alert)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-alert.js)

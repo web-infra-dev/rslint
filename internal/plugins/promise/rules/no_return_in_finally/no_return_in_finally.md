@@ -28,7 +28,8 @@ myPromise.finally(() => {})
 
 ## Original Documentation
 
-https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-return-in-finally.md
+- [eslint-plugin-promise: no-return-in-finally](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/no-return-in-finally.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/no-return-in-finally.js)
 
 ## ESLint Parity and Compatibility
 

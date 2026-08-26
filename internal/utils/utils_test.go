@@ -32,26 +32,24 @@ func TestExtractRegexPatternAndFlags(t *testing.T) {
 	}
 }
 
-func TestIsValidRegexLiteral(t *testing.T) {
-	tests := []struct {
-		name    string
-		literal string
-		want    bool
-	}{
-		{name: "basic", literal: `/abc/g`, want: true},
-		{name: "unicode sets", literal: `/[[A--B]]/v`, want: true},
-		{name: "inline modifier", literal: `/(?i:foo)bar/`, want: true},
-		{name: "annex b decimal escape", literal: `/\78\126\5934/`, want: true},
-		{name: "invalid unicode property", literal: `/\p{NotAProperty}/u`, want: false},
-		{name: "invalid v set", literal: `/[[A&&&]]/v`, want: false},
-		{name: "invalid flag", literal: `/a/-`, want: false},
-		{name: "conflicting unicode flags", literal: `/a/uv`, want: false},
-		{name: "unterminated class", literal: `/[a/`, want: false},
-		{name: "not a literal", literal: `abc`, want: false},
+func TestIsESTreeLiteralKind(t *testing.T) {
+	literals := []ast.Kind{
+		ast.KindStringLiteral,
+		ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword,
 	}
-	for _, tt := range tests {
-		if got := IsValidRegexLiteral(tt.literal); got != tt.want {
-			t.Errorf("%s: IsValidRegexLiteral(%q) = %v, want %v", tt.name, tt.literal, got, tt.want)
+	for _, kind := range literals {
+		if !IsESTreeLiteralKind(kind) {
+			t.Errorf("IsESTreeLiteralKind(%v) = false, want true", kind)
+		}
+	}
+	for _, kind := range []ast.Kind{ast.KindIdentifier, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression} {
+		if IsESTreeLiteralKind(kind) {
+			t.Errorf("IsESTreeLiteralKind(%v) = true, want false", kind)
 		}
 	}
 }
@@ -294,13 +292,12 @@ func TestResolveLegacyMaxOption(t *testing.T) {
 		want       int
 	}{
 		{name: "nil uses default", defaultMax: 3, want: 3},
-		{name: "empty array uses default", options: []interface{}{}, defaultMax: 3, want: 3},
 		{name: "bare number", options: 4, defaultMax: 3, want: 4},
-		{name: "array number", options: []interface{}{float64(5)}, defaultMax: 3, want: 5},
-		{name: "bare max object", options: map[string]interface{}{"max": 6}, defaultMax: 3, want: 6},
-		{name: "array maximum object", options: []interface{}{map[string]interface{}{"maximum": 7, "max": 1}}, defaultMax: 3, want: 7},
-		{name: "zero maximum falls through to max", options: []interface{}{map[string]interface{}{"maximum": 0, "max": 8}}, defaultMax: 3, want: 8},
-		{name: "zero maximum without fallback disables", options: []interface{}{map[string]interface{}{"maximum": 0}}, defaultMax: 3, want: math.MaxInt},
+		{name: "json-decoded number", options: float64(5), defaultMax: 3, want: 5},
+		{name: "max object", options: map[string]interface{}{"max": 6}, defaultMax: 3, want: 6},
+		{name: "maximum wins over max", options: map[string]interface{}{"maximum": 7, "max": 1}, defaultMax: 3, want: 7},
+		{name: "zero maximum falls through to max", options: map[string]interface{}{"maximum": 0, "max": 8}, defaultMax: 3, want: 8},
+		{name: "zero maximum without fallback disables", options: map[string]interface{}{"maximum": 0}, defaultMax: 3, want: math.MaxInt},
 		{name: "nonnumeric max disables", options: map[string]interface{}{"max": "wide"}, defaultMax: 3, want: math.MaxInt},
 		{name: "object without max keys uses default", options: map[string]interface{}{"foo": 1}, defaultMax: 3, want: 3},
 	}
@@ -445,7 +442,13 @@ func TestDefaultExcludeDirNames_ContainsExpected(t *testing.T) {
 	}
 }
 
+// Every expectation here is what natural-compare@1.4.0 answers, which is the
+// package the rules that sort naturally hand the pair to.
 func TestNaturalCompare(t *testing.T) {
+	// A lone surrogate has no UTF-8 encoding of its own, so the compiler
+	// carries one as the three bytes UTF-8 would spell the code point with.
+	loneD800 := string([]byte{0xED, 0xA0, 0x80})
+	loneD801 := string([]byte{0xED, 0xA0, 0x81})
 	tests := []struct {
 		a, b string
 		want int
@@ -458,17 +461,60 @@ func TestNaturalCompare(t *testing.T) {
 		{"a2", "a10", -1},
 		{"a10", "a2", 1},
 		{"a1", "a1", 0},
-		// leading zeros
-		{"a01", "a1", 0},
-		{"a02", "a1", 1},
+		{"a1b2", "a1b10", -1},
+		{"a1", "a1b", -1},
+		{"a10", "a1b", 1},
+		// A run that starts with `0` is not a number, so it is read character
+		// by character and `a01` lands below `a1`.
+		{"a01", "a1", -1},
+		{"a1", "a01", 1},
+		{"a02", "a1", -1},
+		{"a0", "a1", -1},
+		{"a00", "a0", 1},
+		// A run that starts past `0` carries its zeros, so `a007` is seven.
+		{"a007", "a7", -1},
+		{"a7", "a007", 1},
 		// length difference
 		{"a", "ab", -1},
 		{"ab", "a", 1},
 		// multi-byte UTF-8 characters
-		{"α1", "α2", -1},
-		{"α2", "α10", -1},
-		{"中1", "中2", -1},
-		{"中10", "中2", 1},
+		{"\u03B11", "\u03B12", -1},
+		{"\u03B12", "\u03B110", -1},
+		{"\u4E2D1", "\u4E2D2", -1},
+		{"\u4E2D10", "\u4E2D2", 1},
+		// A digit of another script does not start a number, so it is read as
+		// the character it is and nine sorts after one rather than before ten.
+		{"x\u0669", "x\u0661\u0660", 1},
+		{"a\u0660\u0662", "a\u0660\u0661\u0660", 1},
+		{"\u0669", "\u0661", 1},
+		// The order is not the code unit's own: `-` sits just below the
+		// digits, and the punctuation around the letters is folded in below
+		// them rather than left where ASCII puts it.
+		{"B", "_", 1},
+		{"_", "A", -1},
+		{"Z", "a", -1},
+		{"a", "{", 1},
+		{"-", "0", -1},
+		{".", "-", -1},
+		{"a-1", "a.1", 1},
+		{"a~", "aA", -1},
+		// A character outside the basic plane is walked as its two UTF-16
+		// code units, so it compares as the first of them.
+		{"\U0001F600", "\uFFFF", -1},
+		{"\uFFFF", "\U0001F600", 1},
+		// A lone surrogate is the code unit it stands for, so a pair of them
+		// still tells apart.
+		{loneD800, loneD801, -1},
+		{loneD801, loneD800, 1},
+		{loneD800, loneD800, 0},
+		// A NUL reads as the end of the string does, so a pair that differs
+		// only past one of them sorts alike.
+		{"a\x001", "a\x002", 0},
+		{"a\x00", "ab", -1},
+		// Two numbers too large to tell apart as JavaScript numbers sort
+		// alike, which is the one way unequal strings come back 0.
+		{"a9007199254740993", "a9007199254740992", 0},
+		{"a99999999999999999999999999999999", "a99999999999999999999999999999998", 0},
 		// empty
 		{"", "", 0},
 		{"a", "", 1},
@@ -528,9 +574,24 @@ func TestIsConstructorName(t *testing.T) {
 
 		// ── Non-ASCII digits are NOT stripped as prefix (matches ESLint's
 		// `[0-9]` which only accepts ASCII 0–9). An Arabic-Indic digit at
-		// the start is the first non-prefix rune and `unicode.IsUpper`
-		// returns false for it → not a constructor.
-		{"٠Foo", false},
+		// the start is the first non-prefix rune, and it is its own
+		// uppercase, so ESLint calls the name a constructor.
+		{"٠Foo", true},
+		// A character with no case of its own answers the same way.
+		{"中Foo", true},
+		// A capital Unicode 16 added: its own uppercase, so a constructor,
+		// which the toolchain's own tables cannot see yet.
+		{"\uA7DCFoo", true},
+		// Its lowercase is not.
+		{"\u019BFoo", false},
+
+		// ── Bytes that are not UTF-8 ──
+		// A source file the scanner never produces, but the walk still has to
+		// step one byte at a time rather than the three a replacement
+		// character is written in.
+		{"\xff", true},
+		{"_\xff", true},
+		{"$\xed\xa0", true},
 	}
 	for _, tt := range tests {
 		got := IsConstructorName(tt.name)

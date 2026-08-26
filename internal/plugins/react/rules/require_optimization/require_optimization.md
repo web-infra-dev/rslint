@@ -79,5 +79,5 @@ The decorator name must appear as a bare identifier in the class's decorator lis
 
 ## Original Documentation
 
-- [eslint-plugin-react: require-optimization](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/require-optimization.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/require-optimization.js)
+- [eslint-plugin-react: require-optimization](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/require-optimization.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/require-optimization.js)

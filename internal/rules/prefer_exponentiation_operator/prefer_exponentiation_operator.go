@@ -2,7 +2,6 @@ package prefer_exponentiation_operator
 
 import (
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -10,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 const messageUseExponentiation = "Use the '**' operator instead of 'Math.pow'."
@@ -101,11 +101,10 @@ func staticAccessObject(node *ast.Node) *ast.Node {
 	return utils.AccessExpressionObject(ast.SkipParentheses(node))
 }
 
-// globals is ctx.Globals; a config `/* global Math: off */` /
-// `languageOptions.globals` entry un-declares the name, so it no longer
-// resolves to a known global — mirrors ESLint's ReferenceTracker finding no
-// global-scope variable to track references through.
-func isGlobalNameReference(node *ast.Node, name string, globals map[string]utils.GlobalAccess) bool {
+// globals is the framework's effective global scope. An unavailable edition
+// global or an authored `off` setting leaves ReferenceTracker with no variable
+// to follow.
+func isGlobalNameReference(node *ast.Node, name string, globals rule.Globals) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil ||
 		node.Kind != ast.KindIdentifier ||
@@ -113,13 +112,10 @@ func isGlobalNameReference(node *ast.Node, name string, globals map[string]utils
 		utils.IsShadowed(node, name) {
 		return false
 	}
-	if globals[name] == utils.GlobalAccessOff {
-		return false
-	}
-	return true
+	return globals.Access(name).IsDeclared()
 }
 
-func isGlobalMathExpression(node *ast.Node, globals map[string]utils.GlobalAccess) bool {
+func isGlobalMathExpression(node *ast.Node, globals rule.Globals) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
@@ -141,7 +137,7 @@ func isGlobalMathExpression(node *ast.Node, globals map[string]utils.GlobalAcces
 	return isGlobalNameReference(object, "globalThis", globals)
 }
 
-func isMathPowCall(node *ast.Node, globals map[string]utils.GlobalAccess) bool {
+func isMathPowCall(node *ast.Node, globals rule.Globals) bool {
 	call := node.AsCallExpression()
 	if call == nil {
 		return false
@@ -311,7 +307,7 @@ func isBaseStartThatNeedsWholeParens(sf *ast.SourceFile, base *ast.Node) bool {
 }
 
 func trimTokenText(text string) string {
-	return strings.TrimFunc(text, unicode.IsSpace)
+	return ecmascript.StringTrim(text)
 }
 
 func canTokenTextsBeAdjacent(left string, right string) bool {
@@ -343,12 +339,12 @@ func previousAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	if text[pos-1] == '/' && pos >= 2 && text[pos-2] == '*' {
 		return "", false
 	}
-	if unicode.IsSpace(rune(text[pos-1])) {
+	if ecmascript.IsWhiteSpaceOrLineTerminator(rune(text[pos-1])) {
 		return "", false
 	}
 
 	start := pos - 1
-	for start > 0 && !unicode.IsSpace(rune(text[start-1])) {
+	for start > 0 && !ecmascript.IsWhiteSpaceOrLineTerminator(rune(text[start-1])) {
 		ch := text[start-1]
 		if strings.ContainsRune("()[]{};,.?:", rune(ch)) {
 			break
@@ -363,7 +359,7 @@ func nextAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	if pos < 0 || pos >= len(text) {
 		return "", false
 	}
-	if unicode.IsSpace(rune(text[pos])) {
+	if ecmascript.IsWhiteSpaceOrLineTerminator(rune(text[pos])) {
 		return "", false
 	}
 	if text[pos] == '/' && pos+1 < len(text) && (text[pos+1] == '*' || text[pos+1] == '/') {
@@ -371,7 +367,7 @@ func nextAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	}
 
 	end := pos + 1
-	for end < len(text) && !unicode.IsSpace(rune(text[end])) {
+	for end < len(text) && !ecmascript.IsWhiteSpaceOrLineTerminator(rune(text[end])) {
 		ch := text[end]
 		if strings.ContainsRune("()[]{};,.?:", rune(ch)) {
 			break
@@ -451,7 +447,8 @@ func buildFixes(sf *ast.SourceFile, node *ast.Node) []rule.RuleFix {
 
 // https://eslint.org/docs/latest/rules/prefer-exponentiation-operator
 var PreferExponentiationOperatorRule = rule.Rule{
-	Name: "prefer-exponentiation-operator",
+	Name:   "prefer-exponentiation-operator",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
 		message := buildUseExponentiationMessage()

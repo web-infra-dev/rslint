@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "onlyInlineLambdas": {
+          "type": "boolean",
+          "description": "Whether to restrict checking only to members immediately assigned a lambda value."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

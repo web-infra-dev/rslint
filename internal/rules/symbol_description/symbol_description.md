@@ -21,4 +21,5 @@ var bar = Symbol(someString);
 
 ## Original Documentation
 
-- [ESLint symbol-description](https://eslint.org/docs/latest/rules/symbol-description)
+- [ESLint: symbol-description](https://eslint.org/docs/latest/rules/symbol-description)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/symbol-description.js)

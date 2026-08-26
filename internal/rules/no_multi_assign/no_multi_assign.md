@@ -85,4 +85,5 @@ class Foo {
 
 ## Original Documentation
 
-- [ESLint no-multi-assign](https://eslint.org/docs/latest/rules/no-multi-assign)
+- [ESLint: no-multi-assign](https://eslint.org/docs/latest/rules/no-multi-assign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-multi-assign.js)

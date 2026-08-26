@@ -103,6 +103,14 @@ func Checker_getReturnTypeOfSignature(recv *checker.Checker, sig *checker.Signat
 func Checker_getApparentType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getTypeArguments github.com/microsoft/typescript-go/internal/checker.(*Checker).getTypeArguments
 func Checker_getTypeArguments(recv *checker.Checker, t *checker.Type) []*checker.Type
+//go:linkname Checker_getTypeParameterFromMappedType github.com/microsoft/typescript-go/internal/checker.(*Checker).getTypeParameterFromMappedType
+func Checker_getTypeParameterFromMappedType(recv *checker.Checker, t *checker.Type) *checker.Type
+//go:linkname Checker_getConstraintTypeFromMappedType github.com/microsoft/typescript-go/internal/checker.(*Checker).getConstraintTypeFromMappedType
+func Checker_getConstraintTypeFromMappedType(recv *checker.Checker, t *checker.Type) *checker.Type
+//go:linkname Checker_getNameTypeFromMappedType github.com/microsoft/typescript-go/internal/checker.(*Checker).getNameTypeFromMappedType
+func Checker_getNameTypeFromMappedType(recv *checker.Checker, t *checker.Type) *checker.Type
+//go:linkname Checker_getTemplateTypeFromMappedType github.com/microsoft/typescript-go/internal/checker.(*Checker).getTemplateTypeFromMappedType
+func Checker_getTemplateTypeFromMappedType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getTypeFromTypeNode github.com/microsoft/typescript-go/internal/checker.(*Checker).getTypeFromTypeNode
 func Checker_getTypeFromTypeNode(recv *checker.Checker, node *ast.Node) *checker.Type
 //go:linkname Checker_isArrayType github.com/microsoft/typescript-go/internal/checker.(*Checker).isArrayType

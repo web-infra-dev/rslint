@@ -400,7 +400,7 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 							foo.bar = await something;
 						}
 					}`,
-				Options: map[string]interface{}{"allowProperties": true},
+				Options: []interface{}{map[string]interface{}{"allowProperties": true}},
 			},
 			{
 				Code: `
@@ -409,7 +409,7 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 						yield something;
 						foo.bar = 1;
 					}`,
-				Options: map[string]interface{}{"allowProperties": true},
+				Options: []interface{}{map[string]interface{}{"allowProperties": true}},
 			},
 
 			// ---- Loop body awaits don't propagate to post-loop code ----
@@ -685,7 +685,7 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 							foo.bar = await something;
 						}
 					}`,
-				Options: map[string]interface{}{"allowProperties": false},
+				Options: []interface{}{map[string]interface{}{"allowProperties": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "nonAtomicObjectUpdate"},
 				},
@@ -697,7 +697,7 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 						yield something;
 						foo.bar = 1;
 					}`,
-				Options: map[string]interface{}{"allowProperties": false},
+				Options: []interface{}{map[string]interface{}{"allowProperties": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "nonAtomicObjectUpdate"},
 				},
@@ -712,7 +712,7 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 							foo = await something;
 						}
 					}`,
-				Options: map[string]interface{}{"allowProperties": true},
+				Options: []interface{}{map[string]interface{}{"allowProperties": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "nonAtomicUpdate"},
 				},
@@ -725,7 +725,7 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 						yield something;
 						foo = 1;
 					}`,
-				Options: map[string]interface{}{"allowProperties": true},
+				Options: []interface{}{map[string]interface{}{"allowProperties": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "nonAtomicUpdate"},
 				},

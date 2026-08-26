@@ -58,6 +58,7 @@ func buildWrongTypeAnnotationSuggestionMessage() rule.RuleMessage {
 
 var UseUnknownInCatchCallbackVariableRule = rule.CreateRule(rule.Rule{
 	Name:             "use-unknown-in-catch-callback-variable",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var collectFlaggedNodes func(node *ast.Node) []*ast.Node

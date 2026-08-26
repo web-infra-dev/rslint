@@ -1,0 +1,21 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fixToUnknown": {
+          "type": "boolean",
+          "description": "Whether to enable auto-fixing in which the `any` type is converted to the `unknown` type."
+        },
+        "ignoreRestArgs": {
+          "type": "boolean",
+          "description": "Whether to ignore rest parameter arrays."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

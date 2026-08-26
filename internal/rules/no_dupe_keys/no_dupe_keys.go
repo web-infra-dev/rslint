@@ -26,11 +26,16 @@ const (
 // generated or configuration-heavy objects.
 const inlineObjectStateCapacity = 16
 
+// Bound the lazy overflow allocation when a large object contains mostly
+// spreads or dynamic keys that never enter the state.
+const maxObjectStateCapacityHint = inlineObjectStateCapacity * 4
+
 type objectState struct {
-	names    [inlineObjectStateCapacity]string
-	states   [inlineObjectStateCapacity]propertyState
-	count    int
-	overflow map[string]propertyState
+	names                [inlineObjectStateCapacity]string
+	states               [inlineObjectStateCapacity]propertyState
+	count                int
+	overflowCapacityHint int
+	overflow             map[string]propertyState
 }
 
 func registerProperty(state propertyState, kind propertyKind) (propertyState, bool) {
@@ -72,7 +77,11 @@ func (state *objectState) register(name string, kind propertyKind) bool {
 		return false
 	}
 
-	state.overflow = make(map[string]propertyState, inlineObjectStateCapacity*2)
+	capacity := state.overflowCapacityHint
+	if capacity <= inlineObjectStateCapacity {
+		capacity = inlineObjectStateCapacity * 2
+	}
+	state.overflow = make(map[string]propertyState, capacity)
 	for index := range state.count {
 		state.overflow[state.names[index]] = state.states[index]
 	}
@@ -82,7 +91,8 @@ func (state *objectState) register(name string, kind propertyKind) bool {
 
 // https://eslint.org/docs/latest/rules/no-dupe-keys
 var NoDupeKeysRule = rule.Rule{
-	Name: "no-dupe-keys",
+	Name:   "no-dupe-keys",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
@@ -90,7 +100,12 @@ var NoDupeKeysRule = rule.Rule{
 				if objLit == nil || objLit.Properties == nil || len(objLit.Properties.Nodes) < 2 {
 					return
 				}
-				state := objectState{}
+				// tsgo represents assignment destructuring with object literals,
+				// while ESTree exposes ObjectPattern nodes that ESLint skips.
+				if ast.IsAssignmentTarget(node) && utils.IsInDestructuringAssignment(node) {
+					return
+				}
+				state := objectState{overflowCapacityHint: min(len(objLit.Properties.Nodes), maxObjectStateCapacityHint)}
 
 				for _, prop := range objLit.Properties.Nodes {
 					var kind propertyKind
@@ -133,7 +148,11 @@ var NoDupeKeysRule = rule.Rule{
 					}
 
 					if state.register(name, kind) {
-						ctx.ReportNode(prop, rule.RuleMessage{
+						reportNode := nameNode
+						if nameNode.Kind == ast.KindComputedPropertyName {
+							reportNode = ast.SkipParentheses(nameNode.AsComputedPropertyName().Expression)
+						}
+						ctx.ReportNode(reportNode, rule.RuleMessage{
 							Id:          "unexpected",
 							Description: "Duplicate key '" + name + "'.",
 						})

@@ -1,22 +1,23 @@
 package no_script_url
 
 import (
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // https://eslint.org/docs/latest/rules/no-script-url
 var NoScriptUrlRule = rule.Rule{
-	Name: "no-script-url",
+	Name:   "no-script-url",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		const jsScheme = "javascript:"
 
 		check := func(node *ast.Node) {
 			value := utils.GetStaticStringValue(node)
-			if len(value) >= len(jsScheme) && strings.EqualFold(value[:len(jsScheme)], jsScheme) {
+			if len(value) >= len(jsScheme) && ecmascript.EqualsWhenLowercased(value[:len(jsScheme)], jsScheme) {
 				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "unexpectedScriptURL",
 					Description: "Script URL is a form of eval.",

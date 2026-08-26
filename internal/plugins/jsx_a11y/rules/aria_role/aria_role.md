@@ -96,4 +96,5 @@ Examples of **incorrect** code with `{ "ignoreNonDOM": true }` (a real DOM eleme
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/aria-role](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-role.md)
+- [eslint-plugin-jsx-a11y: aria-role](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/aria-role.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/aria-role.js)

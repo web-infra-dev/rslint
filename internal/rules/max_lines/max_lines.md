@@ -72,4 +72,5 @@ var b = 2;
 
 ## Original Documentation
 
-- [https://eslint.org/docs/latest/rules/max-lines](https://eslint.org/docs/latest/rules/max-lines)
+- [ESLint: max-lines](https://eslint.org/docs/latest/rules/max-lines)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/max-lines.js)

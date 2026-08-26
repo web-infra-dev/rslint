@@ -337,6 +337,59 @@ func TestNamingConventionRule(t *testing.T) {
 			},
 		},
 	}, []rule_tester.InvalidTestCase{
+		// Modifier-specific selectors must still distinguish explicit private
+		// and protected members from the implicit public default when modifier
+		// computation is limited to the bits needed by this config.
+		{
+			Code: "class MyClass {\n  private privateValue = 1;\n  protected ProtectedValue = 2;\n  PublicMethod() {}\n}",
+			Options: []interface{}{
+				map[string]interface{}{
+					"format":            []interface{}{"camelCase"},
+					"leadingUnderscore": "require",
+					"modifiers":         []interface{}{"private"},
+					"selector":          "memberLike",
+				},
+				map[string]interface{}{
+					"format":            []interface{}{"camelCase"},
+					"leadingUnderscore": "require",
+					"modifiers":         []interface{}{"protected"},
+					"selector":          "memberLike",
+				},
+				map[string]interface{}{
+					"format":    []interface{}{"camelCase", "UPPER_CASE"},
+					"modifiers": []interface{}{"public"},
+					"selector":  "method",
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingUnderscore", Line: 2, Column: 11},
+				{MessageId: "missingUnderscore", Line: 3, Column: 13},
+				{MessageId: "doesNotMatchFormat", Line: 4, Column: 3},
+			},
+		},
+
+		// Reference tracking must distinguish same-named bindings in nested
+		// scopes. The shorthand reads only the inner binding: it uses the base
+		// snake_case config and fails, while the outer binding is unused and
+		// correctly matches the PascalCase override.
+		{
+			Code: "function use_value() {\n  const SameName = 1;\n  return { SameName };\n}\nuse_value();\nconst SameName = 2;",
+			Options: []interface{}{
+				map[string]interface{}{
+					"format":   []interface{}{"snake_case"},
+					"selector": "variable",
+				},
+				map[string]interface{}{
+					"format":    []interface{}{"PascalCase"},
+					"modifiers": []interface{}{"unused"},
+					"selector":  "variable",
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "doesNotMatchFormat", Line: 2, Column: 9},
+			},
+		},
+
 		// Members never get the `unused` modifier: an unreferenced type
 		// property is still checked against the base format, not the
 		// unused override.
@@ -580,6 +633,78 @@ func TestNamingConventionRule(t *testing.T) {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "missingUnderscore", Line: 1, Column: 7},
+			},
+		},
+	})
+}
+
+// TestNamingConventionRegexSchema locks in that both regex-valued options are
+// validated as regexes: `filter`'s bare-string form and the `regex` key of
+// its object form (shared by `custom`). The rule compiles each one, so an
+// unparsable pattern would otherwise be dropped and the selector would apply
+// to everything. Upstream's schema declares bare strings.
+func TestNamingConventionRegexSchema(t *testing.T) {
+	selector := func(filter any) []any {
+		return []any{map[string]any{
+			"selector": "variable",
+			"format":   []any{"camelCase"},
+			"filter":   filter,
+		}}
+	}
+	for name, filter := range map[string]any{
+		"bare string":  "(",
+		"regex object": map[string]any{"match": true, "regex": "("},
+	} {
+		if err := NamingConventionRule.Schema.Validate(selector(filter)); err == nil {
+			t.Errorf("expected an invalid filter %s to fail schema validation", name)
+		}
+	}
+	for name, filter := range map[string]any{
+		"bare string":  "^ignored",
+		"regex object": map[string]any{"match": true, "regex": "^ignored"},
+	} {
+		if err := NamingConventionRule.Schema.Validate(selector(filter)); err != nil {
+			t.Errorf("expected a valid filter %s to pass schema validation, got: %v", name, err)
+		}
+	}
+}
+
+// TestNamingConventionCustomLookahead locks in that `custom.regex` (and by
+// extension `filter`, which shares the same compile path) is matched with
+// the same ECMAScript regex engine the schema validates it against
+// (regexp2), not Go's RE2. RE2 cannot compile lookahead, so a JS-only
+// pattern that passes schema validation would otherwise silently fail to
+// compile and never flag a mismatched name.
+func TestNamingConventionCustomLookahead(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NamingConventionRule, []rule_tester.ValidTestCase{
+		{
+			Code: `const myVar = 1;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "variable",
+					"format":   []interface{}{"camelCase"},
+					"custom": map[string]interface{}{
+						"regex": "^(?!deprecated).*$",
+						"match": true,
+					},
+				},
+			},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code: `const deprecatedVar = 1;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector": "variable",
+					"format":   []interface{}{"camelCase"},
+					"custom": map[string]interface{}{
+						"regex": "^(?!deprecated).*$",
+						"match": true,
+					},
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "satisfyCustom", Line: 1, Column: 7},
 			},
 		},
 	})

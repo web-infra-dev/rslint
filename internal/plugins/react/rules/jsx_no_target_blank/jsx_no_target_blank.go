@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_no_target_blank.schema.json
@@ -134,7 +135,7 @@ func attributeValuePossiblyBlank(attr *ast.Node) bool {
 	}
 	// Direct `attr="_blank"` form.
 	if s, ok := stringLiteralText(init); ok {
-		return strings.EqualFold(s, "_blank")
+		return ecmascript.EqualsWhenLowercased(s, "_blank")
 	}
 	// `attr={…}` form — unwrap the JsxExpression and any paren wrappers.
 	expr := jsxExpressionInner(init)
@@ -142,14 +143,14 @@ func attributeValuePossiblyBlank(attr *ast.Node) bool {
 		return false
 	}
 	if s, ok := stringLiteralText(expr); ok {
-		return strings.EqualFold(s, "_blank")
+		return ecmascript.EqualsWhenLowercased(s, "_blank")
 	}
 	if expr.Kind == ast.KindConditionalExpression {
 		cond := expr.AsConditionalExpression()
-		if s, ok := stringLiteralText(cond.WhenTrue); ok && strings.EqualFold(s, "_blank") {
+		if s, ok := stringLiteralText(cond.WhenTrue); ok && ecmascript.EqualsWhenLowercased(s, "_blank") {
 			return true
 		}
-		if s, ok := stringLiteralText(cond.WhenFalse); ok && strings.EqualFold(s, "_blank") {
+		if s, ok := stringLiteralText(cond.WhenFalse); ok && ecmascript.EqualsWhenLowercased(s, "_blank") {
 			return true
 		}
 	}
@@ -314,7 +315,7 @@ func hasSecureRel(attrs []*ast.Node, allowReferrer, warnOnSpread bool, spreadIdx
 		if v == nil {
 			return false
 		}
-		tags := strings.Split(strings.ToLower(*v), " ")
+		tags := strings.Split(ecmascript.StringToLowerCase(*v), " ")
 		if slices.Contains(tags, "noreferrer") {
 			continue
 		}

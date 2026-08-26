@@ -659,5 +659,46 @@
       "rstest:no-disabled-tests",
       "rstest:no-identical-title"
     ]
+  },
+  {
+    "version": "0.8.0",
+    "rules": [
+      "@typescript-eslint:no-unnecessary-type-parameters",
+      "eslint-plugin-import:no-restricted-paths",
+      "eslint:consistent-return",
+      "eslint:no-useless-return",
+      "eslint:unicode-bom",
+      "rstest:no-conditional-expect",
+      "rstest:no-interpolation-in-snapshots",
+      "rstest:valid-title"
+    ]
+  },
+  {
+    "version": "0.8.1",
+    "rules": [
+      "eslint-plugin-jest:valid-expect-in-promise",
+      "eslint:block-scoped-var",
+      "eslint:init-declarations",
+      "eslint:max-classes-per-file",
+      "eslint:max-statements",
+      "eslint:no-continue",
+      "eslint:no-div-regex",
+      "eslint:no-eq-null",
+      "eslint:no-negated-condition",
+      "eslint:no-plusplus",
+      "eslint:no-promise-executor-return",
+      "eslint:no-ternary",
+      "eslint:no-undefined",
+      "eslint:no-use-before-define",
+      "eslint:no-void",
+      "eslint:no-warning-comments",
+      "eslint:operator-assignment",
+      "rstest:expect-expect",
+      "rstest:no-focused-tests",
+      "rstest:no-import-node-test",
+      "rstest:no-standalone-expect",
+      "rstest:valid-expect",
+      "rstest:valid-expect-in-promise"
+    ]
   }
 ]

@@ -33,6 +33,25 @@ declare const map: { [k: string]: number };
 map[key];
 ```
 
+Optional chaining on `any` remains unsafe by default. Set
+`allowOptionalChaining` to `true` to allow only the access link containing
+`?.`:
+
+```json
+{
+  "@typescript-eslint/no-unsafe-member-access": [
+    "error",
+    { "allowOptionalChaining": true }
+  ]
+}
+```
+
+```typescript
+declare const value: any;
+const result: unknown = value?.property;
+```
+
 ## Original Documentation
 
-- [typescript-eslint no-unsafe-member-access](https://typescript-eslint.io/rules/no-unsafe-member-access)
+- [typescript-eslint: no-unsafe-member-access](https://typescript-eslint.io/rules/no-unsafe-member-access)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unsafe-member-access.ts)

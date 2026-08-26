@@ -51,4 +51,5 @@ TypeScript's JSX parser rejects unescaped `>` and `}` in JSX text with a syntax 
 
 ## Original Documentation
 
-- [react/no-unescaped-entities](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-unescaped-entities.md)
+- [eslint-plugin-react: no-unescaped-entities](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-unescaped-entities.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-unescaped-entities.js)

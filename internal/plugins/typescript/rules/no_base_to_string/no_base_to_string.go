@@ -1,6 +1,7 @@
 package no_base_to_string
 
 import (
+	_ "embed"
 	"fmt"
 	"slices"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_base_to_string.schema.json
+var schemaJSON []byte
 
 func certaintyToString(certainty usefulness) string {
 	switch certainty {
@@ -40,6 +44,20 @@ type NoBaseToStringOptions struct {
 	IgnoredTypeNames []string
 }
 
+func parseOptions(options []any) NoBaseToStringOptions {
+	opts := NoBaseToStringOptions{
+		IgnoredTypeNames: []string{"Error", "RegExp", "URL", "URLSearchParams"},
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if raw, ok := optsMap["ignoredTypeNames"].([]any); ok {
+		opts.IgnoredTypeNames = utils.ToStringSlice(raw)
+	}
+	return opts
+}
+
 type usefulness uint32
 
 const (
@@ -50,15 +68,10 @@ const (
 
 var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 	Name:             "no-base-to-string",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(NoBaseToStringOptions)
-		if !ok {
-			opts = NoBaseToStringOptions{
-				IgnoredTypeNames: []string{"Error", "RegExp", "URL", "URLSearchParams"},
-			}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		var collectToStringCertainty func(
 			t *checker.Type,
@@ -269,8 +282,8 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 		isBuiltInStringCall := func(node *ast.CallExpression) bool {
 			if ast.IsIdentifier(node.Expression) && node.Expression.AsIdentifier().Text == "String" && len(node.Arguments.Nodes) > 0 {
 				tt := ctx.TypeChecker.GetTypeAtLocation(node.Expression)
-				s := utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, tt, "String")
-				sc := utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, tt, "StringConstructor")
+				s := utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, tt, "String")
+				sc := utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, tt, "StringConstructor")
 				return s || sc
 				// TODO(port-scopemanager)
 				// const scope = context.sourceCode.getScope(node);

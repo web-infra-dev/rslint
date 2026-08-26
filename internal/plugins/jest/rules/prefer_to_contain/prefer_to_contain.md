@@ -25,4 +25,5 @@ expect(a).not.toContain(b);
 
 ## Original Documentation
 
-- [jest/prefer-to-contain](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-to-contain.md)
+- [eslint-plugin-jest: prefer-to-contain](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-to-contain.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-to-contain.ts)

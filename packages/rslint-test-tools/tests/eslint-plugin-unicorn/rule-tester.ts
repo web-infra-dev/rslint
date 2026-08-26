@@ -1,6 +1,7 @@
 import path from 'node:path';
 import util from 'node:util';
 
+import type { RslintConfigEntry } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
 
 import { buildConfigForSettings } from '../src/util/load-test-config';
@@ -33,6 +34,7 @@ export interface ValidTestCase {
   code: string;
   options?: any;
   filename?: string | undefined;
+  languageOptions?: RslintConfigEntry['languageOptions'];
   only?: boolean;
   settings?: Record<string, any> | undefined;
 }
@@ -80,6 +82,10 @@ export class RuleTester {
 
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
+          const languageOptions =
+            typeof validCase === 'string'
+              ? undefined
+              : validCase.languageOptions;
           const settings =
             typeof validCase === 'string' ? undefined : validCase.settings;
           const defaultFilename = 'src/virtual.tsx';
@@ -95,6 +101,7 @@ export class RuleTester {
             config: [
               ...resolvedConfig,
               {
+                ...(languageOptions ? { languageOptions } : {}),
                 rules: {
                   [ruleName]:
                     Array.isArray(options) && options.length > 0
@@ -126,7 +133,13 @@ export class RuleTester {
             assert.fail('Invalid cases must have at least one error');
           }
 
-          const { code, only = false, options = [], settings } = item;
+          const {
+            code,
+            only = false,
+            options = [],
+            settings,
+            languageOptions,
+          } = item;
           if (hasOnly && !only) {
             continue;
           }
@@ -142,6 +155,7 @@ export class RuleTester {
             config: [
               ...resolvedConfig,
               {
+                ...(languageOptions ? { languageOptions } : {}),
                 rules: {
                   [ruleName]:
                     Array.isArray(options) && options.length > 0
@@ -210,6 +224,9 @@ export class RuleTester {
               } else if (typeof error === 'object' && error !== null) {
                 if (typeof error.message === 'string') {
                   assertMessageMatches(message.message, error.message);
+                }
+                if (error.messageId !== undefined) {
+                  assert.strictEqual(message.messageId, error.messageId);
                 }
               }
             }

@@ -86,4 +86,5 @@ function a(x) {
 
 ## Original Documentation
 
-- [ESLint `complexity` rule](https://eslint.org/docs/latest/rules/complexity)
+- [ESLint: complexity](https://eslint.org/docs/latest/rules/complexity)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/complexity.js)

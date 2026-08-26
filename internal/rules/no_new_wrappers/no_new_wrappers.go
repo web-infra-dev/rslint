@@ -16,7 +16,8 @@ var wrapperObjects = map[string]bool{
 }
 
 var NoNewWrappersRule = rule.Rule{
-	Name: "no-new-wrappers",
+	Name:   "no-new-wrappers",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
@@ -45,7 +46,7 @@ var NoNewWrappersRule = rule.Rule{
 				// entry un-declares the builtin, so it no longer resolves to a
 				// known global — ESLint's `getVariableByName` would return
 				// undefined and the rule stays silent.
-				if ctx.Globals[name] == utils.GlobalAccessOff {
+				if !ctx.Globals.Access(name).IsDeclared() {
 					return
 				}
 

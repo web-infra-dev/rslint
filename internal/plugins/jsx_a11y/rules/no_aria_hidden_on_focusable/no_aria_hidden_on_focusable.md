@@ -55,4 +55,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-aria-hidden-on-focusable](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-aria-hidden-on-focusable.md)
+- [eslint-plugin-jsx-a11y: no-aria-hidden-on-focusable](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-aria-hidden-on-focusable.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-aria-hidden-on-focusable.js)

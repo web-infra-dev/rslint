@@ -1,11 +1,16 @@
 package no_useless_rename
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_useless_rename.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-useless-rename
 
@@ -15,12 +20,12 @@ type options struct {
 	ignoreExport        bool
 }
 
-func parseOptions(opts any) options {
+func parseOptions(opts []any) options {
 	out := options{}
-	m := utils.GetOptionsMap(opts)
-	if m == nil {
+	if len(opts) == 0 {
 		return out
 	}
+	m, _ := opts[0].(map[string]any)
 	if v, ok := m["ignoreDestructuring"].(bool); ok {
 		out.ignoreDestructuring = v
 	}
@@ -243,9 +248,10 @@ func (s *noUselessRenameState) walkAssignmentPattern(node *ast.Node) {
 }
 
 var NoUselessRenameRule = rule.Rule{
-	Name: "no-useless-rename",
+	Name:   "no-useless-rename",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, optionsAny []any) rule.RuleListeners {
-		opts := parseOptions(rule.LegacyUnwrapOptions(optionsAny))
+		opts := parseOptions(optionsAny)
 		if opts.ignoreDestructuring && opts.ignoreImport && opts.ignoreExport {
 			return nil
 		}

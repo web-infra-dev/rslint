@@ -29,4 +29,5 @@ import { foo } from 'bar';
 
 ## Original Documentation
 
-- [typescript-eslint triple-slash-reference](https://typescript-eslint.io/rules/triple-slash-reference)
+- [typescript-eslint: triple-slash-reference](https://typescript-eslint.io/rules/triple-slash-reference)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/triple-slash-reference.ts)

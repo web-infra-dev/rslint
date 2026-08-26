@@ -71,4 +71,5 @@ Examples of **incorrect** code with `{ "ignoreNonDOM": true }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-autofocus](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-autofocus.md)
+- [eslint-plugin-jsx-a11y: no-autofocus](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-autofocus.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-autofocus.js)

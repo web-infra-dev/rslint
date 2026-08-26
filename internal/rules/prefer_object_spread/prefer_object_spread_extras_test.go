@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -45,8 +46,11 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			// ---- Branch lock-in: "window" declared off via languageOptions.globals ----
 			{Code: `window.Object.assign({}, foo)`, Globals: map[string]any{"window": "off"}},
 
+			// ---- Branch lock-in: an undeclared host global is not assumed ----
+			{Code: `window.Object.assign({}, foo)`},
+
 			// ---- Branch lock-in: "window" shadowed by a function parameter ----
-			{Code: `function f(window) { return window.Object.assign({}, a); }`},
+			{Code: `function f(window) { return window.Object.assign({}, a); }`, Globals: map[string]any{"window": "readonly"}},
 
 			// ---- Member-name evaluation: a computed member name that cannot
 			// be statically folded must not match ----
@@ -64,7 +68,7 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 
 			// ---- Modified-global tracking: same for a written global-object
 			// entry name ----
-			{Code: `window = {}; window.Object.assign({}, foo);`},
+			{Code: `window = {}; window.Object.assign({}, foo);`, Globals: map[string]any{"window": "writable"}},
 
 			// ---- Modified-global tracking: an alias whose initializer reads
 			// the global after it was modified must not match (capture-position
@@ -369,19 +373,22 @@ func TestPreferObjectSpreadExtras(t *testing.T) {
 			// ---- Global-object entries: window / self / global alongside the
 			// globalThis case already covered above ----
 			{
-				Code:   `window.Object.assign({}, foo)`,
-				Output: []string{`({ ...foo})`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+				Code:    `window.Object.assign({}, foo)`,
+				Globals: map[string]any{"window": "readonly"},
+				Output:  []string{`({ ...foo})`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
 			},
 			{
-				Code:   `self.Object.assign({}, foo)`,
-				Output: []string{`({ ...foo})`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+				Code:    `self.Object.assign({}, foo)`,
+				Globals: map[string]any{"self": "readonly"},
+				Output:  []string{`({ ...foo})`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
 			},
 			{
-				Code:   `global.Object.assign({}, foo)`,
-				Output: []string{`({ ...foo})`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
+				Code:    `global.Object.assign({}, foo)`,
+				Globals: map[string]any{"global": "readonly"},
+				Output:  []string{`({ ...foo})`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useSpreadMessage", Line: 1, Column: 1}},
 			},
 
 			// ---- Modified-global tracking: a write to a local binding that
@@ -540,7 +547,7 @@ func TestPreferObjectSpreadEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			HasTypeInfo:  true,
 			ExcludePaths: []string{},

@@ -10,7 +10,8 @@ export type RuleSeverity = 'off' | 'warn' | 'error' | 0 | 1 | 2;
  * `NATIVE_PLUGIN_RESERVED_NAMES` unions these prefixes with the alternate
  * `eslint-plugin-*` declaration names (`NATIVE_PLUGIN_DECL_ALIASES`), so a
  * ported plugin that also has such an alias must be added to BOTH lists here —
- * kept in sync with config.go's PluginInfo.DeclNames (a Go test guards the drift).
+ * kept in sync with `internal/config/plugin_declarations.go` (a Go test guards
+ * the drift).
  */
 const NATIVE_PLUGINS = [
   '@typescript-eslint',
@@ -25,9 +26,10 @@ const NATIVE_PLUGINS = [
 ] as const;
 
 // Alternate `eslint-plugin-*` declaration names that Go normalizes onto a
-// native prefix (mirrors config.go's PluginInfo.DeclNames). A community plugin
-// must not be mounted under one of these either: Go would normalize the key
-// onto the native prefix, and the gate — which keys off the un-normalized
+// bundled prefix (mirrors `bundledPluginDeclarations` in
+// `internal/config/plugin_declarations.go`). A community plugin must not be
+// mounted under one of these either: Go would normalize the key
+// onto the bundled prefix, and the gate — which keys off the un-normalized
 // `<prefix>/<rule>` — would then silently drop the community rules.
 const NATIVE_PLUGIN_DECL_ALIASES = [
   'eslint-plugin-import',
@@ -68,18 +70,22 @@ export type RuleOptions = Record<string, any>;
  * rslint's own `{ level, options }` object form has been removed.
  *
  * - `RuleSeverity` — just toggle the rule.
- * - `[RuleSeverity, ...args]` — ESLint-style array form. Most rules take a
- *   single options object (`[severity, { ... }]`); some accept positional
- *   string/object args (`[severity, "always", { ... }]`).
+ * - `[RuleSeverity, ...Options]` — ESLint-style array form. `Options` is the
+ *   rule's own options-array type for rules with a precisely-typed entry in
+ *   `RulesRecord`; other rules default to `any[]`.
  */
-export type RuleEntry = RuleSeverity | readonly [RuleSeverity, ...any[]];
+export type RuleEntry<Options extends any[] = any[]> =
+  RuleSeverity | readonly [RuleSeverity, ...Options];
 
 /**
- * Map of rule name → rule configuration. Rule names are `string` (no
- * enumeration of known rules yet); the value shape is what gives editors
- * hints when typing the array or object form.
+ * Map of rule name → rule configuration. Rules with a known options shape
+ * get a named, precisely-typed property here; every other rule name (not
+ * yet typed, or a community/plugin rule) falls back to the untyped index
+ * signature (`any[]`).
  */
-export type RulesRecord = Record<string, RuleEntry>;
+export interface RulesRecord {
+  [key: string]: RuleEntry<any[]> | undefined;
+}
 
 /**
  * TypeScript parser options. `project` may be a single tsconfig path or a list.
@@ -92,6 +98,8 @@ export interface ParserOptions {
   projectService?: boolean;
   /**
    * tsconfig.json path(s) used for typed linting. Glob patterns are supported.
+   * Omit this field to use a governing config's default `tsconfig.json`; pass
+   * an empty array to disable that fallback.
    *
    * @example
    * project: './tsconfig.json'
@@ -129,6 +137,14 @@ export type GlobalsConfig = Record<string, GlobalAccess>;
  * Language-specific configuration.
  */
 export interface LanguageOptions {
+  /** ECMAScript edition used for language globals; omitted defaults to `'latest'`. */
+  ecmaVersion?: number | 'latest';
+  /**
+   * Module kind for the file. When omitted, an exact lowercase `.cjs`
+   * extension resolves to `'commonjs'`; every other filename resolves to
+   * `'module'`. This does not change TypeScript parsing.
+   */
+  sourceType?: 'module' | 'script' | 'commonjs';
   parserOptions?: ParserOptions;
   /**
    * Global variables available in this file's scope, e.g. from a browser
@@ -137,7 +153,19 @@ export interface LanguageOptions {
    * un-declares a global inherited from an earlier entry.
    *
    * @example
-   * globals: { myGlobal: 'readonly' }
+   * import { defineConfig, globals } from '@rslint/core';
+   *
+   * export default defineConfig([
+   *   {
+   *     files: ['src/*.js'],
+   *     languageOptions: {
+   *       globals: {
+   *         ...globals.browser,
+   *         BUILD_ID: 'readonly',
+   *       },
+   *     },
+   *   },
+   * ]);
    */
   globals?: GlobalsConfig;
 }

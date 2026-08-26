@@ -1,6 +1,7 @@
 package no_unnecessary_condition
 
 import (
+	_ "embed"
 	"fmt"
 	"math"
 	"strconv"
@@ -14,6 +15,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unnecessary_condition.schema.json
+var schemaJSON []byte
 
 // strictNullishFlag matches the original typescript-eslint behavior:
 // only null and undefined are considered "nullish" for isAlwaysNullish.
@@ -254,21 +258,22 @@ type ruleOptions struct {
 	checkTypePredicates                                    bool
 }
 
-func parseOptions(options any) ruleOptions {
+func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{
 		allowConstantLoopConditions: loopConditionNever,
 	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["allowConstantLoopConditions"]; ok {
-			opts.allowConstantLoopConditions = normalizeAllowConstantLoopConditions(v)
-		}
-		if v, ok := optsMap["allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"].(bool); ok {
-			opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = v
-		}
-		if v, ok := optsMap["checkTypePredicates"].(bool); ok {
-			opts.checkTypePredicates = v
-		}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if v, ok := optsMap["allowConstantLoopConditions"]; ok {
+		opts.allowConstantLoopConditions = normalizeAllowConstantLoopConditions(v)
+	}
+	if v, ok := optsMap["allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"].(bool); ok {
+		opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = v
+	}
+	if v, ok := optsMap["checkTypePredicates"].(bool); ok {
+		opts.checkTypePredicates = v
 	}
 	return opts
 }
@@ -323,13 +328,13 @@ func buildTypeGuardAlreadyIsTypeMessage(typeGuardOrAssertionFunction string) rul
 // Rule definition
 var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-condition",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		tc := ctx.TypeChecker
 
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ctx.Program().Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,

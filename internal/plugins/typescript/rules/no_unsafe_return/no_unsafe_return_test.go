@@ -833,3 +833,77 @@ function overload(x: any): any {
 		},
 	})
 }
+
+func TestNoUnsafeReturnContextualSignatureEdges(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeReturnRule, []rule_tester.ValidTestCase{
+		{Code: `
+type UnionSet = (() => Set<string>) | (() => Set<number>);
+const unionSets: UnionSet = () => new Set<any>();
+`},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code: `
+type IntersectionSet = (() => Set<string>) & (() => Set<number>);
+const intersectionSets: IntersectionSet = () => new Set<any>();
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unsafeReturnAssignment"}},
+		},
+	})
+}
+
+func TestNoUnsafeReturnThisMessage(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.noImplicitThis.json", t, &NoUnsafeReturnRule, nil, []rule_tester.InvalidTestCase{
+		{
+			Code: `
+function implicitThis() {
+  return this;
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "unsafeReturnThis",
+				Message: "Unsafe return of a value of type ``any``. `this` is typed as `any`.\n" +
+					"You can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.",
+			}},
+		},
+	})
+}
+
+func TestNoUnsafeReturnExplicitStrictnessMatrix(t *testing.T) {
+	const code = `
+declare const value: any;
+declare const bool: boolean;
+function identifierAny() {
+  return value && bool;
+}
+function callAny() {
+  return value.method() && bool;
+}
+`
+
+	tests := []struct {
+		name      string
+		tsconfig  string
+		isInvalid bool
+	}{
+		{name: "strict false", tsconfig: "tsconfig.unstrict.json"},
+		{name: "strict true", tsconfig: "tsconfig.json", isInvalid: true},
+		{name: "strict true with strictNullChecks false", tsconfig: "tsconfig.strict-with-null-checks-off.json"},
+		{name: "strict false with strictNullChecks true", tsconfig: "tsconfig.strict-null-checks-only.json", isInvalid: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if !test.isInvalid {
+				rule_tester.RunRuleTester(fixtures.GetRootDir(), test.tsconfig, t, &NoUnsafeReturnRule, []rule_tester.ValidTestCase{{Code: code}}, nil)
+				return
+			}
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), test.tsconfig, t, &NoUnsafeReturnRule, nil, []rule_tester.InvalidTestCase{{
+				Code: code,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unsafeReturn", Line: 5, Column: 3},
+					{MessageId: "unsafeReturn", Line: 8, Column: 3},
+				},
+			}})
+		})
+	}
+}

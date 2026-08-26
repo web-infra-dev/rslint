@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -89,28 +90,20 @@ func TestNoRestrictedGlobalsUpstream(t *testing.T) {
 				}},
 			},
 
-			// SKIP: these upstream cases are valid only because "window"/"self"/
-			// "globalThis"/"myGlobal" are not recognized globals absent an ESLint
-			// environment (languageOptions.globals) or a sufficient ecmaVersion.
-			// rslint does not model ESLint's environment/global configuration, so
-			// it always recognizes globalThis/self/window (and configured
-			// globalObjects) as global-object roots when checkGlobalObject is
-			// true — see the rule doc's "Differences from ESLint" section and the
-			// "Intentional divergence" cases in the extras file.
+			// checkGlobalObject still requires the receiver to exist in the
+			// effective global scope.
 			{
 				Code:    `window.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
-				Skip:    true,
 			},
 			{
 				Code:    `self.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
-				Skip:    true,
 			},
 			{
-				Code:    `globalThis.foo()`,
-				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
-				Skip:    true,
+				Code:            `globalThis.foo()`,
+				Options:         []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
 			},
 			{
 				Code: `myGlobal.foo()`,
@@ -119,7 +112,6 @@ func TestNoRestrictedGlobalsUpstream(t *testing.T) {
 					"checkGlobalObject": true,
 					"globalObjects":     []interface{}{"myGlobal"},
 				}},
-				Skip: true,
 			},
 			// "otherGlobal" is valid here for a structural reason (it's simply not
 			// in globalObjects), not environment-gating — migrated normally.
@@ -429,21 +421,25 @@ export default class Test {
 			{
 				Code:    `window.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 11}},
 			},
 			{
 				Code:    `self.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"self": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 6, EndLine: 1, EndColumn: 9}},
 			},
 			{
 				Code:    `window.window.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 15, EndLine: 1, EndColumn: 18}},
 			},
 			{
 				Code:    `self.self.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"self": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 11, EndLine: 1, EndColumn: 14}},
 			},
 			{
@@ -461,25 +457,29 @@ export default class Test {
 				Options: []interface{}{map[string]interface{}{
 					"globals": []interface{}{"foo"}, "checkGlobalObject": true, "globalObjects": []interface{}{"myGlobal"},
 				}},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 10, EndLine: 1, EndColumn: 13}},
+				Globals: map[string]any{"myGlobal": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 10, EndLine: 1, EndColumn: 13}},
 			},
 			{
 				Code: `myGlobal.myGlobal.foo()`,
 				Options: []interface{}{map[string]interface{}{
 					"globals": []interface{}{"foo"}, "checkGlobalObject": true, "globalObjects": []interface{}{"myGlobal"},
 				}},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 19, EndLine: 1, EndColumn: 22}},
+				Globals: map[string]any{"myGlobal": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 19, EndLine: 1, EndColumn: 22}},
 			},
 
 			// ---- checkGlobalObject: bracket access ----
 			{
 				Code:    `window["foo"]`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}},
 			},
 			{
 				Code:    `self["foo"]`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"self": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 6, EndLine: 1, EndColumn: 11}},
 			},
 			{
@@ -492,18 +492,21 @@ export default class Test {
 				Options: []interface{}{map[string]interface{}{
 					"globals": []interface{}{"foo"}, "checkGlobalObject": true, "globalObjects": []interface{}{"myGlobal"},
 				}},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 10, EndLine: 1, EndColumn: 15}},
+				Globals: map[string]any{"myGlobal": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 10, EndLine: 1, EndColumn: 15}},
 			},
 
 			// ---- checkGlobalObject: optional chaining ----
 			{
 				Code:    `window?.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 9, EndLine: 1, EndColumn: 12}},
 			},
 			{
 				Code:    `self?.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"self": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 7, EndLine: 1, EndColumn: 10}},
 			},
 
@@ -513,6 +516,7 @@ export default class Test {
 				Options: []interface{}{map[string]interface{}{
 					"globals": []interface{}{"foo"}, "checkGlobalObject": true, "globalObjects": []interface{}{"myGlobal"},
 				}},
+				Globals: map[string]any{"window": "readonly", "myGlobal": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
 					{MessageId: "defaultMessage", Line: 1, Column: 24, EndLine: 1, EndColumn: 27},
@@ -524,6 +528,7 @@ export default class Test {
 					"globals": []interface{}{"foo", "bar"}, "checkGlobalObject": true,
 					"globalObjects": []interface{}{"myGlobal", "myOtherGlobal"},
 				}},
+				Globals: map[string]any{"myGlobal": "readonly", "myOtherGlobal": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "defaultMessage", Line: 1, Column: 10, EndLine: 1, EndColumn: 13},
 					{MessageId: "defaultMessage", Line: 1, Column: 31, EndLine: 1, EndColumn: 34},
@@ -532,6 +537,7 @@ export default class Test {
 			{
 				Code:    `foo(); window.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "defaultMessage", Line: 1, Column: 1, EndLine: 1, EndColumn: 4},
 					{MessageId: "defaultMessage", Line: 1, Column: 15, EndLine: 1, EndColumn: 18},
@@ -540,6 +546,7 @@ export default class Test {
 			{
 				Code:    `foo(); self.foo()`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"foo"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"self": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "defaultMessage", Line: 1, Column: 1, EndLine: 1, EndColumn: 4},
 					{MessageId: "defaultMessage", Line: 1, Column: 13, EndLine: 1, EndColumn: 16},
@@ -550,6 +557,7 @@ export default class Test {
 				Options: []interface{}{map[string]interface{}{
 					"globals": []interface{}{"foo"}, "checkGlobalObject": true, "globalObjects": []interface{}{"myGlobal"},
 				}},
+				Globals: map[string]any{"myGlobal": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "defaultMessage", Line: 1, Column: 1, EndLine: 1, EndColumn: 4},
 					{MessageId: "defaultMessage", Line: 1, Column: 17, EndLine: 1, EndColumn: 20},
@@ -560,11 +568,13 @@ export default class Test {
 			{
 				Code:    `function onClick(event) { console.log(event); console.log(window.event); }`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"event"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"window": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 66, EndLine: 1, EndColumn: 71}},
 			},
 			{
 				Code:    `function onClick(event) { console.log(event); console.log(self.event); }`,
 				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"event"}, "checkGlobalObject": true}},
+				Globals: map[string]any{"self": "readonly"},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 64, EndLine: 1, EndColumn: 69}},
 			},
 			{
@@ -577,7 +587,8 @@ export default class Test {
 				Options: []interface{}{map[string]interface{}{
 					"globals": []interface{}{"event"}, "checkGlobalObject": true, "globalObjects": []interface{}{"myGlobal"},
 				}},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 68, EndLine: 1, EndColumn: 73}},
+				Globals: map[string]any{"myGlobal": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 68, EndLine: 1, EndColumn: 73}},
 			},
 
 			// ---- TypeScript: value reference reported, type annotation is not ----

@@ -9,9 +9,11 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed jsx_no_literals.schema.json
@@ -64,14 +66,27 @@ func (c *ruleConfig) hasElementOverrides() bool {
 	return len(c.elementOverrides) > 0
 }
 
+// listenerRequirements identifies AST kinds that can produce a diagnostic for
+// this configuration. JSX text is always relevant, but the other literal kinds
+// are opt-in. Avoiding listeners for them is important because ordinary source
+// files contain many StringLiteral nodes that cannot affect the default rule.
+func (c *ruleConfig) listenerRequirements() (stringLiterals, templates, attributes bool) {
+	stringLiterals = c.base.noStrings || c.base.noAttributeStrings
+	templates = c.base.noStrings
+	attributes = c.base.noStrings || len(c.base.restrictedAttributes) > 0
+	for _, override := range c.elementOverrides {
+		stringLiterals = stringLiterals || override.noStrings || override.noAttributeStrings
+		templates = templates || override.noStrings
+		attributes = attributes || override.noStrings || len(override.restrictedAttributes) > 0
+	}
+	return stringLiterals, templates, attributes
+}
+
 func parseConfig(options []any) ruleConfig {
 	cfg := ruleConfig{
 		base: elementConfig{
-			configType:           configTypeElement,
-			allowedStrings:       map[string]struct{}{},
-			restrictedAttributes: map[string]struct{}{},
+			configType: configTypeElement,
 		},
-		elementOverrides: map[string]*elementConfig{},
 	}
 	if len(options) == 0 {
 		return cfg
@@ -90,8 +105,6 @@ func parseConfig(options []any) ruleConfig {
 		child := &elementConfig{
 			configType:            configTypeOverride,
 			name:                  elementName,
-			allowedStrings:        map[string]struct{}{},
-			restrictedAttributes:  map[string]struct{}{},
 			applyToNestedElements: true,
 		}
 		populateElementConfig(child, childMap)
@@ -102,6 +115,9 @@ func parseConfig(options []any) ruleConfig {
 		if v, ok := childMap["applyToNestedElements"]; ok {
 			child.applyToNestedElements = truthyBool(v)
 		}
+		if cfg.elementOverrides == nil {
+			cfg.elementOverrides = make(map[string]*elementConfig, len(rawOverrides))
+		}
 		cfg.elementOverrides[elementName] = child
 	}
 	return cfg
@@ -111,21 +127,24 @@ func populateElementConfig(c *elementConfig, m map[string]interface{}) {
 	c.noStrings, _ = m["noStrings"].(bool)
 	c.ignoreProps, _ = m["ignoreProps"].(bool)
 	c.noAttributeStrings, _ = m["noAttributeStrings"].(bool)
-	populateStringSetFromMap(m, "allowedStrings", c.allowedStrings)
-	populateStringSetFromMap(m, "restrictedAttributes", c.restrictedAttributes)
+	populateStringSetFromMap(m, "allowedStrings", &c.allowedStrings)
+	populateStringSetFromMap(m, "restrictedAttributes", &c.restrictedAttributes)
 }
 
 // populateStringSetFromMap reads the array-of-strings option at `key` from
 // `source`, trims each entry, and inserts it into `target`. Mirrors upstream's
 // `new Set(map(iterFrom(config.<key>), trimIfString))` shape.
-func populateStringSetFromMap(source map[string]interface{}, key string, target map[string]struct{}) {
+func populateStringSetFromMap(source map[string]interface{}, key string, target *map[string]struct{}) {
 	arr, ok := source[key].([]interface{})
 	if !ok {
 		return
 	}
 	for _, s := range arr {
 		if str, ok := s.(string); ok {
-			target[strings.TrimSpace(str)] = struct{}{}
+			if *target == nil {
+				*target = make(map[string]struct{}, len(arr))
+			}
+			(*target)[ecmascript.StringTrim(str)] = struct{}{}
 		}
 	}
 }
@@ -221,7 +240,7 @@ func hasJSXContentParentOrGrandParent(node *ast.Node) bool {
 // classifies whether the parent shape qualifies as a JSX literal site.
 // `text` is the cooked literal value used to check whitespace-only short-circuit.
 func isStandardJSXNode(text string, parentKind ast.Kind, cfg *elementConfig) bool {
-	if strings.TrimSpace(text) == "" {
+	if ecmascript.StringTrim(text) == "" {
 		return false
 	}
 	switch parentKind {
@@ -236,8 +255,8 @@ func isStandardJSXNode(text string, parentKind ast.Kind, cfg *elementConfig) boo
 }
 
 func isViableTextNode(rawText, cookedText string, parentKind ast.Kind, cfg *elementConfig) bool {
-	rawTrim := strings.TrimSpace(rawText)
-	cookedTrim := strings.TrimSpace(cookedText)
+	rawTrim := ecmascript.StringTrim(rawText)
+	cookedTrim := ecmascript.StringTrim(cookedText)
 	if _, ok := cfg.allowedStrings[rawTrim]; ok {
 		return false
 	}
@@ -249,6 +268,15 @@ func isViableTextNode(rawText, cookedText string, parentKind ast.Kind, cfg *elem
 		return standard
 	}
 	return standard && parentKind != ast.KindJsxExpression
+}
+
+func isRelevantStringLiteralParent(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindJsxAttribute, ast.KindJsxElement, ast.KindJsxExpression, ast.KindJsxFragment:
+		return true
+	default:
+		return false
+	}
 }
 
 // elementNameInfo carries the simple + dotted display name of a JSX element's
@@ -387,7 +415,7 @@ func formatMessage(messageId string, text, attribute, element string) string {
 	return ""
 }
 
-func reportLiteralNode(ctx rule.RuleContext, node *ast.Node, messageId string, cfg *elementConfig, text string) {
+func literalMessage(messageId string, cfg *elementConfig, text string) rule.RuleMessage {
 	element := ""
 	if cfg.configType == configTypeOverride {
 		element = cfg.name
@@ -397,11 +425,19 @@ func reportLiteralNode(ctx rule.RuleContext, node *ast.Node, messageId string, c
 	if element != "" {
 		data["element"] = element
 	}
-	ctx.ReportNode(node, rule.RuleMessage{
+	return rule.RuleMessage{
 		Id:          messageId,
 		Description: desc,
 		Data:        data,
-	})
+	}
+}
+
+func reportLiteralNode(ctx rule.RuleContext, node *ast.Node, messageId string, cfg *elementConfig, text string) {
+	ctx.ReportNode(node, literalMessage(messageId, cfg, text))
+}
+
+func reportLiteralRange(ctx rule.RuleContext, textRange core.TextRange, messageId string, cfg *elementConfig, text string) {
+	ctx.ReportRange(textRange, literalMessage(messageId, cfg, text))
 }
 
 func reportRestrictedAttribute(ctx rule.RuleContext, attrNode *ast.Node, valueText, attribute string, cfg *elementConfig) {
@@ -534,7 +570,7 @@ func collectRenamedImports(sf *ast.SourceFile) map[string]string {
 
 // trimmedSource returns `node`'s raw source text with leading/trailing whitespace stripped.
 func trimmedSource(ctx rule.RuleContext, node *ast.Node) string {
-	return strings.TrimSpace(utils.TrimmedNodeText(ctx.SourceFile, node))
+	return ecmascript.StringTrim(utils.TrimmedNodeText(ctx.SourceFile, node))
 }
 
 // stringLiteralValue extracts the cooked text of a StringLiteral node.
@@ -575,7 +611,7 @@ func handleJsxAttribute(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, r
 		attrName := nameNode.AsIdentifier().Text
 		if _, restricted := resolved.restrictedAttributes[attrName]; restricted {
 			cooked := stringLiteralValue(init)
-			if _, allowed := resolved.allowedStrings[strings.TrimSpace(cooked)]; !allowed {
+			if _, allowed := resolved.allowedStrings[ecmascript.StringTrim(cooked)]; !allowed {
 				reportRestrictedAttribute(ctx, node, trimmedSource(ctx, init), attrName, resolved)
 			}
 			return
@@ -602,6 +638,10 @@ func handleJsxAttribute(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, r
 // literals (the JSXAttribute handler owns that report); replicated here via
 // the parent-kind check inside `isStandardJSXNode`.
 func handleStringLiteral(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, renamedImports map[string]string) {
+	parent := parentIgnoringBinaryAndParens(node)
+	if parent == nil || !isRelevantStringLiteralParent(parent.Kind) {
+		return
+	}
 	resolved := resolveOverride(node, cfg, renamedImports)
 	if resolved == nil {
 		resolved = &cfg.base
@@ -610,13 +650,15 @@ func handleStringLiteral(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, 
 	if hasJSXContent && shouldAllowElement(resolved) {
 		return
 	}
-	parent := parentIgnoringBinaryAndParens(node)
-	if parent == nil {
+	cooked := node.AsStringLiteral().Text
+	if !isStandardJSXNode(cooked, parent.Kind, resolved) || (!resolved.noStrings && parent.Kind == ast.KindJsxExpression) {
 		return
 	}
-	cooked := node.AsStringLiteral().Text
 	rawSource := trimmedSource(ctx, node)
-	if !isViableTextNode(rawSource, cooked, parent.Kind, resolved) {
+	if _, allowed := resolved.allowedStrings[ecmascript.StringTrim(rawSource)]; allowed {
+		return
+	}
+	if _, allowed := resolved.allowedStrings[ecmascript.StringTrim(cooked)]; allowed {
 		return
 	}
 	// Upstream gates the report on `hasJSXParentOrGrandParent || !config.ignoreProps`
@@ -630,6 +672,14 @@ func handleStringLiteral(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, 
 }
 
 func handleJsxText(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, renamedImports map[string]string) {
+	jt := node.AsJsxText()
+	if jt.ContainsOnlyTriviaWhiteSpaces {
+		return
+	}
+	parent := node.Parent
+	if parent == nil {
+		return
+	}
 	resolved := resolveOverride(node, cfg, renamedImports)
 	if resolved == nil {
 		resolved = &cfg.base
@@ -637,26 +687,32 @@ func handleJsxText(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, rename
 	if shouldAllowElement(resolved) {
 		return
 	}
-	jt := node.AsJsxText()
-	if jt.ContainsOnlyTriviaWhiteSpaces {
-		return
-	}
 	// tsgo's JsxText.Text is the raw source text — HTML entities like
 	// `&mdash;` stay encoded (decoding happens later, during JSX transform).
 	// ESLint's espree+acorn-jsx feeds the rule a decoded `node.value`, so to
 	// keep `allowedStrings` lookups byte-equivalent we decode here. The raw
-	// form is still checked separately via `rawSource` below.
+	// form is still checked separately via `rawSource` below. Use JsxText.Text
+	// directly: scanner-based token trimming is invalid in JSX text because
+	// text such as `// {marker}` is not a JavaScript comment. Treating it as
+	// one can advance the trimmed start beyond this node's end and panic.
 	cooked := html.UnescapeString(jt.Text)
-	rawSource := trimmedSource(ctx, node)
-	parent := node.Parent
-	if parent == nil {
-		return
-	}
+	rawSource := ecmascript.StringTrim(jt.Text)
 	if !isViableTextNode(rawSource, cooked, parent.Kind, resolved) {
 		return
 	}
 	hasJSXContent := hasJSXContentParentOrGrandParent(node)
-	reportLiteralNode(ctx, node, defaultMessageId(hasJSXContent, resolved), resolved, rawSource)
+	startOffset := strings.Index(jt.Text, rawSource)
+	if startOffset < 0 {
+		startOffset = 0
+	}
+	start := node.Pos() + startOffset
+	reportLiteralRange(
+		ctx,
+		core.NewTextRange(start, start+len(rawSource)),
+		defaultMessageId(hasJSXContent, resolved),
+		resolved,
+		rawSource,
+	)
 }
 
 // handleTemplate handles upstream's TemplateLiteral listener for both
@@ -702,26 +758,32 @@ var JsxNoLiteralsRule = rule.Rule{
 		var renamedImports map[string]string
 		if cfg.hasElementOverrides() {
 			renamedImports = collectRenamedImports(ctx.SourceFile)
-		} else {
-			renamedImports = map[string]string{}
 		}
 
-		return rule.RuleListeners{
-			ast.KindStringLiteral: func(node *ast.Node) {
-				handleStringLiteral(ctx, node, &cfg, renamedImports)
-			},
+		stringLiterals, templates, attributes := cfg.listenerRequirements()
+		listeners := rule.RuleListeners{
 			ast.KindJsxText: func(node *ast.Node) {
 				handleJsxText(ctx, node, &cfg, renamedImports)
 			},
-			ast.KindNoSubstitutionTemplateLiteral: func(node *ast.Node) {
-				handleTemplate(ctx, node, &cfg, renamedImports)
-			},
-			ast.KindTemplateExpression: func(node *ast.Node) {
-				handleTemplate(ctx, node, &cfg, renamedImports)
-			},
-			ast.KindJsxAttribute: func(node *ast.Node) {
-				handleJsxAttribute(ctx, node, &cfg, renamedImports)
-			},
 		}
+		if stringLiterals {
+			listeners[ast.KindStringLiteral] = func(node *ast.Node) {
+				handleStringLiteral(ctx, node, &cfg, renamedImports)
+			}
+		}
+		if templates {
+			listeners[ast.KindNoSubstitutionTemplateLiteral] = func(node *ast.Node) {
+				handleTemplate(ctx, node, &cfg, renamedImports)
+			}
+			listeners[ast.KindTemplateExpression] = func(node *ast.Node) {
+				handleTemplate(ctx, node, &cfg, renamedImports)
+			}
+		}
+		if attributes {
+			listeners[ast.KindJsxAttribute] = func(node *ast.Node) {
+				handleJsxAttribute(ctx, node, &cfg, renamedImports)
+			}
+		}
+		return listeners
 	},
 }

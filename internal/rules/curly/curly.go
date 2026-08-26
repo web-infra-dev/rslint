@@ -1,6 +1,7 @@
 package curly
 
 import (
+	_ "embed"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed curly.schema.json
+var schemaJSON []byte
 
 // curlyOptions mirrors ESLint's positional options: the first element selects
 // the mode ("all" | "multi" | "multi-line" | "multi-or-nest"); the second, when
@@ -20,24 +24,15 @@ type curlyOptions struct {
 	consistent  bool
 }
 
-func parseOptions(options any) curlyOptions {
+func parseOptions(options []any) curlyOptions {
 	opts := curlyOptions{}
 
 	var first, second string
-	switch v := options.(type) {
-	case string:
-		first = v
-	case []interface{}:
-		if len(v) > 0 {
-			if s, ok := v[0].(string); ok {
-				first = s
-			}
-		}
-		if len(v) > 1 {
-			if s, ok := v[1].(string); ok {
-				second = s
-			}
-		}
+	if len(options) > 0 {
+		first, _ = options[0].(string)
+	}
+	if len(options) > 1 {
+		second, _ = options[1].(string)
 	}
 
 	switch first {
@@ -52,6 +47,10 @@ func parseOptions(options any) curlyOptions {
 		opts.consistent = true
 	}
 	return opts
+}
+
+func (o curlyOptions) allMode() bool {
+	return !o.multiOnly && !o.multiLine && !o.multiOrNest
 }
 
 // expectation is a tri-state mirroring ESLint's `expected` (true / false / null).
@@ -85,15 +84,31 @@ type curlyChecker struct {
 // CurlyRule enforces consistent brace usage on control statements.
 // https://eslint.org/docs/latest/rules/curly
 var CurlyRule = rule.Rule{
-	Name: "curly",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "curly",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		c := &curlyChecker{
-			ctx:     ctx,
-			sf:      ctx.SourceFile,
-			text:    ctx.SourceFile.Text(),
-			lineMap: ctx.SourceFile.ECMALineMap(),
-			opts:    parseOptions(options),
+			ctx:  ctx,
+			sf:   ctx.SourceFile,
+			text: ctx.SourceFile.Text(),
+			opts: parseOptions(options),
+		}
+
+		// The default/"all" mode only checks whether each body is a block. Keep
+		// it off the multi-mode path, which also inspects statements, tokens,
+		// comments, and lines. "all" plus "consistent" has the same semantics.
+		if c.opts.allMode() {
+			// Reuse one bound listener so setup does not allocate one closure per
+			// supported statement kind on every file.
+			listener := c.checkAllStatement
+			return rule.RuleListeners{
+				ast.KindIfStatement:    listener,
+				ast.KindWhileStatement: listener,
+				ast.KindDoStatement:    listener,
+				ast.KindForStatement:   listener,
+				ast.KindForInStatement: listener,
+				ast.KindForOfStatement: listener,
+			}
 		}
 
 		return rule.RuleListeners{
@@ -117,7 +132,53 @@ var CurlyRule = rule.Rule{
 	},
 }
 
+func (c *curlyChecker) checkAllStatement(node *ast.Node) {
+	switch node.Kind {
+	case ast.KindIfStatement:
+		c.checkAllIfStatement(node)
+	case ast.KindWhileStatement:
+		c.checkAllBody(node.AsWhileStatement().Statement, "while", true)
+	case ast.KindDoStatement:
+		c.checkAllBody(node.AsDoStatement().Statement, "do", false)
+	case ast.KindForStatement:
+		c.checkAllBody(node.AsForStatement().Statement, "for", true)
+	case ast.KindForInStatement:
+		c.checkAllBody(node.AsForInOrOfStatement().Statement, "for-in", false)
+	case ast.KindForOfStatement:
+		c.checkAllBody(node.AsForInOrOfStatement().Statement, "for-of", false)
+	}
+}
+
+func (c *curlyChecker) checkAllIfStatement(node *ast.Node) {
+	parent := node.Parent
+	isElseIf := parent != nil && parent.Kind == ast.KindIfStatement &&
+		parent.AsIfStatement().ElseStatement == node
+	if isElseIf {
+		return
+	}
+
+	for current := node; current != nil; current = current.AsIfStatement().ElseStatement {
+		ifStmt := current.AsIfStatement()
+		c.checkAllBody(ifStmt.ThenStatement, "if", true)
+		alt := ifStmt.ElseStatement
+		if alt != nil && alt.Kind != ast.KindIfStatement {
+			c.checkAllBody(alt, "else", false)
+			break
+		}
+	}
+}
+
+func (c *curlyChecker) checkAllBody(body *ast.Node, name string, condition bool) {
+	if body.Kind == ast.KindBlock {
+		return
+	}
+	c.reportMissingBraces(body, name, condition)
+}
+
 func (c *curlyChecker) lineOf(pos int) int {
+	if c.lineMap == nil {
+		c.lineMap = c.sf.ECMALineMap()
+	}
 	return scanner.ComputeLineOfPosition(c.lineMap, pos)
 }
 
@@ -130,13 +191,27 @@ func (c *curlyChecker) checkIfStatement(node *ast.Node) {
 	if isElseIf {
 		return
 	}
-	for _, pc := range c.prepareIfChecks(node) {
+
+	if !c.opts.consistent {
+		for current := node; current != nil; current = current.AsIfStatement().ElseStatement {
+			ifStmt := current.AsIfStatement()
+			c.check(c.prepareCheck(current, ifStmt.ThenStatement, "if", true))
+			alt := ifStmt.ElseStatement
+			if alt != nil && alt.Kind != ast.KindIfStatement {
+				c.check(c.prepareCheck(current, alt, "else", false))
+				break
+			}
+		}
+		return
+	}
+
+	for _, pc := range c.prepareConsistentIfChecks(node) {
 		c.check(pc)
 	}
 }
 
-func (c *curlyChecker) prepareIfChecks(node *ast.Node) []preparedCheck {
-	checks := []preparedCheck{}
+func (c *curlyChecker) prepareConsistentIfChecks(node *ast.Node) []preparedCheck {
+	checks := make([]preparedCheck, 0, 2)
 
 	for current := node; current != nil; current = current.AsIfStatement().ElseStatement {
 		ifStmt := current.AsIfStatement()
@@ -148,31 +223,29 @@ func (c *curlyChecker) prepareIfChecks(node *ast.Node) []preparedCheck {
 		}
 	}
 
-	if c.opts.consistent {
-		// If any node should have, or already has, braces then they all must.
-		anyExpected := false
-		for _, pc := range checks {
-			var v bool
-			switch pc.expected {
-			case expectBraces:
-				v = true
-			case expectNoBraces:
-				v = false
-			default:
-				v = pc.actual
-			}
-			if v {
-				anyExpected = true
-				break
-			}
+	// If any node should have, or already has, braces then they all must.
+	anyExpected := false
+	for _, pc := range checks {
+		var v bool
+		switch pc.expected {
+		case expectBraces:
+			v = true
+		case expectNoBraces:
+			v = false
+		default:
+			v = pc.actual
 		}
-		target := expectNoBraces
-		if anyExpected {
-			target = expectBraces
+		if v {
+			anyExpected = true
+			break
 		}
-		for i := range checks {
-			checks[i].expected = target
-		}
+	}
+	target := expectNoBraces
+	if anyExpected {
+		target = expectBraces
+	}
+	for i := range checks {
+		checks[i].expected = target
 	}
 
 	return checks
@@ -183,7 +256,7 @@ func (c *curlyChecker) prepareCheck(node, body *ast.Node, name string, condition
 	expected := expectDontCare
 
 	switch {
-	case hasBlock && (len(c.blockStatements(body)) != 1 || c.areBracesNecessary(body)):
+	case hasBlock && (len(c.blockStatements(body)) != 1 || utils.AreBracesNecessary(c.sf, body)):
 		expected = expectBraces
 	case c.opts.multiOnly:
 		expected = expectNoBraces
@@ -232,24 +305,35 @@ func (c *curlyChecker) check(pc preparedCheck) {
 		return
 	}
 
-	bodyRange := utils.TrimNodeTextRange(c.sf, pc.body)
-
 	if wantBraces {
-		fixText := "{" + c.text[bodyRange.Pos():bodyRange.End()] + "}"
-		c.ctx.ReportRangeWithFixes(
-			bodyRange,
-			c.message(true, pc.condition, pc.name),
-			rule.RuleFixReplaceRange(bodyRange, fixText),
-		)
+		c.reportMissingBraces(pc.body, pc.name, pc.condition)
 		return
 	}
 
 	// Unnecessary braces: body is a block statement.
-	if fix, ok := c.buildRemoveBracesFix(pc.node, pc.body, bodyRange); ok {
-		c.ctx.ReportRangeWithFixes(bodyRange, c.message(false, pc.condition, pc.name), fix)
-	} else {
-		c.ctx.ReportRange(bodyRange, c.message(false, pc.condition, pc.name))
-	}
+	bodyRange := utils.TrimNodeTextRange(c.sf, pc.body)
+	c.ctx.ReportRangeWithDeferredFixes(
+		bodyRange,
+		c.message(false, pc.condition, pc.name),
+		func() []rule.RuleFix {
+			if fix, ok := c.buildRemoveBracesFix(pc.node, pc.body, bodyRange); ok {
+				return []rule.RuleFix{fix}
+			}
+			return nil
+		},
+	)
+}
+
+func (c *curlyChecker) reportMissingBraces(body *ast.Node, name string, condition bool) {
+	bodyRange := utils.TrimNodeTextRange(c.sf, body)
+	c.ctx.ReportRangeWithDeferredFixes(
+		bodyRange,
+		c.message(true, condition, name),
+		func() []rule.RuleFix {
+			fixText := "{" + c.text[bodyRange.Pos():bodyRange.End()] + "}"
+			return []rule.RuleFix{rule.RuleFixReplaceRange(bodyRange, fixText)}
+		},
+	)
 }
 
 func (c *curlyChecker) message(missing, condition bool, name string) rule.RuleMessage {
@@ -361,23 +445,6 @@ func (c *curlyChecker) lastTokenBefore(fromPos, beforePos int) (start, end int, 
 	return
 }
 
-// areBracesNecessary mirrors astUtils.areBracesNecessary: a single-statement
-// block still needs its braces when the statement is a lexical declaration, or
-// when it ends with an `if` that would capture a trailing `else`.
-func (c *curlyChecker) areBracesNecessary(block *ast.Node) bool {
-	statement := c.blockStatements(block)[0]
-	return isLexicalDeclaration(statement) ||
-		(hasUnsafeIf(statement) && c.isFollowedByElseKeyword(block))
-}
-
-func (c *curlyChecker) isFollowedByElseKeyword(block *ast.Node) bool {
-	nextStart := scanner.SkipTrivia(c.text, block.End())
-	if nextStart >= len(c.text) {
-		return false
-	}
-	return scanner.ScanTokenAtPosition(c.sf, nextStart) == ast.KindElseKeyword
-}
-
 // isCollapsedOneLiner reports whether the body sits on the same line as the
 // token that precedes it (its closing `)` / `do` / `else`).
 func (c *curlyChecker) isCollapsedOneLiner(node *ast.Node) bool {
@@ -427,53 +494,4 @@ func (c *curlyChecker) hasLeadingComments(block, statement *ast.Node) bool {
 
 func (c *curlyChecker) blockStatements(block *ast.Node) []*ast.Node {
 	return block.AsBlock().Statements.Nodes
-}
-
-// isLexicalDeclaration mirrors astUtils.isLexicalDeclaration: let/const/using/
-// await using variable declarations and function/class declarations.
-//
-// NOTE: Unlike ESLint (which only sees JavaScript), tsgo also parses TypeScript
-// declarations that are equally illegal as an unbraced control-statement body
-// (`if (a) enum E {}` is a syntax error). They are treated the same as lexical
-// declarations so the autofix never strips a required block.
-func isLexicalDeclaration(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindVariableStatement:
-		declList := node.AsVariableStatement().DeclarationList
-		return declList.Flags&ast.NodeFlagsBlockScoped != 0
-	case ast.KindFunctionDeclaration,
-		ast.KindClassDeclaration,
-		ast.KindEnumDeclaration,
-		ast.KindModuleDeclaration,
-		ast.KindInterfaceDeclaration,
-		ast.KindTypeAliasDeclaration,
-		ast.KindImportEqualsDeclaration:
-		return true
-	}
-	return false
-}
-
-// hasUnsafeIf reports whether the code contains an `if` that would become
-// associated with an `else` appended directly after it.
-func hasUnsafeIf(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindIfStatement:
-		ifStmt := node.AsIfStatement()
-		if ifStmt.ElseStatement == nil {
-			return true
-		}
-		return hasUnsafeIf(ifStmt.ElseStatement)
-	case ast.KindForStatement:
-		return hasUnsafeIf(node.AsForStatement().Statement)
-	case ast.KindForInStatement, ast.KindForOfStatement:
-		return hasUnsafeIf(node.AsForInOrOfStatement().Statement)
-	case ast.KindLabeledStatement:
-		return hasUnsafeIf(node.AsLabeledStatement().Statement)
-	case ast.KindWithStatement:
-		return hasUnsafeIf(node.AsWithStatement().Statement)
-	case ast.KindWhileStatement:
-		return hasUnsafeIf(node.AsWhileStatement().Statement)
-	default:
-		return false
-	}
 }

@@ -1,10 +1,15 @@
 package use_isnan
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed use_isnan.schema.json
+var schemaJSON []byte
 
 var (
 	comparisonWithNaNMessage = rule.RuleMessage{
@@ -182,24 +187,21 @@ type useIsNaNOptions struct {
 	enforceForIndexOf    bool
 }
 
-func parseOptions(opts any) useIsNaNOptions {
+func parseOptions(options []any) useIsNaNOptions {
 	result := useIsNaNOptions{
 		enforceForSwitchCase: true,
 		enforceForIndexOf:    false,
 	}
+	if len(options) == 0 {
+		return result
+	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if val, ok := optsMap["enforceForSwitchCase"]; ok {
-			if boolVal, ok := val.(bool); ok {
-				result.enforceForSwitchCase = boolVal
-			}
-		}
-		if val, ok := optsMap["enforceForIndexOf"]; ok {
-			if boolVal, ok := val.(bool); ok {
-				result.enforceForIndexOf = boolVal
-			}
-		}
+	optsMap, _ := options[0].(map[string]any)
+	if boolVal, ok := optsMap["enforceForSwitchCase"].(bool); ok {
+		result.enforceForSwitchCase = boolVal
+	}
+	if boolVal, ok := optsMap["enforceForIndexOf"].(bool); ok {
+		result.enforceForIndexOf = boolVal
 	}
 
 	return result
@@ -207,13 +209,13 @@ func parseOptions(opts any) useIsNaNOptions {
 
 // UseIsNaNRule requires calls to isNaN() when checking for NaN
 var UseIsNaNRule = rule.Rule{
-	Name: "use-isnan",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	Name:   "use-isnan",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if !sourceMayUseNaN(ctx.SourceFile) {
 			return nil
 		}
 
-		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		checker := globalReferenceChecker{
 			refs:       ctx.Refs,

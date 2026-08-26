@@ -37,7 +37,8 @@ var decimalPowerCache [maxCachedDecimalExponent - minCachedDecimalExponent + 1]d
 
 // https://eslint.org/docs/latest/rules/no-loss-of-precision
 var NoLossOfPrecisionRule = rule.Rule{
-	Name: "no-loss-of-precision",
+	Name:   "no-loss-of-precision",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNumericLiteral: func(node *ast.Node) {

@@ -8,8 +8,11 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -268,7 +271,7 @@ func TestPreferDestructuringEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			HasTypeInfo:  true,
 			ExcludePaths: []string{},
@@ -336,6 +339,58 @@ func TestPreferDestructuringEditDemand(t *testing.T) {
 				t.Fatalf("diagnostic %d: autofix-only rule materialized suggestions", index)
 			}
 		}
+	}
+}
+
+func TestPreferDestructuringDisableDirectives(t *testing.T) {
+	t.Parallel()
+
+	const code = `const line = object.line; // eslint-disable-line prefer-destructuring
+// eslint-disable-next-line prefer-destructuring
+const next = object.next;
+/* eslint-disable prefer-destructuring */
+const scoped = object.scoped;
+/* eslint-enable prefer-destructuring */
+const kept = object.kept;`
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/disable-directives.ts",
+		Path:     "/disable-directives.ts",
+	}, code, core.ScriptKindTS)
+	comments := rule.NewCommentStore(sourceFile)
+	diagnostics := make([]rule.RuleDiagnostic, 0, 1)
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithDiagnosticConsumer(
+		PreferDestructuringRule.Name,
+		rule.SeverityError,
+		rule.DiagnosticConsumer{
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	)
+
+	listeners := PreferDestructuringRule.Run(ctx, nil)
+	var visit ast.Visitor
+	visit = func(node *ast.Node) bool {
+		if listener := listeners[node.Kind]; listener != nil {
+			listener(node)
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want one unsuppressed report", len(diagnostics))
+	}
+	diagnostic := diagnostics[0]
+	if got := code[diagnostic.Range.Pos():diagnostic.Range.End()]; got != "kept = object.kept" {
+		t.Fatalf("diagnostic range text = %q, want unsuppressed declaration", got)
+	}
+	if diagnostic.Message.Id != "preferDestructuring" ||
+		diagnostic.Message.Description != "Use object destructuring." {
+		t.Fatalf("diagnostic message = %#v", diagnostic.Message)
 	}
 }
 

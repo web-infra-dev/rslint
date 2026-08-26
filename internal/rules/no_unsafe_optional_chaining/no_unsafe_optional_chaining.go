@@ -1,17 +1,21 @@
 package no_unsafe_optional_chaining
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unsafe_optional_chaining.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-unsafe-optional-chaining
 var NoUnsafeOptionalChainingRule = rule.Rule{
-	Name: "no-unsafe-optional-chaining",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	Name:   "no-unsafe-optional-chaining",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Every optional chain contains the contiguous `?.` token. A miss is
 		// conclusive, while matches in comments or strings are harmless false
 		// positives that take the regular AST path.
@@ -21,7 +25,6 @@ var NoUnsafeOptionalChainingRule = rule.Rule{
 		// Capture after the guard so token-free files do not move ctx to the heap.
 		reportCtx := ctx
 
-		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		unsafeOptionalChainMsg := rule.RuleMessage{
@@ -230,16 +233,17 @@ type noUnsafeOptionalChainingOptions struct {
 	disallowArithmeticOperators bool
 }
 
-func parseOptions(opts any) noUnsafeOptionalChainingOptions {
+func parseOptions(options []any) noUnsafeOptionalChainingOptions {
 	result := noUnsafeOptionalChainingOptions{
 		disallowArithmeticOperators: false,
 	}
+	if len(options) == 0 {
+		return result
+	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if disallow, ok := optsMap["disallowArithmeticOperators"].(bool); ok {
-			result.disallowArithmeticOperators = disallow
-		}
+	m, _ := options[0].(map[string]any)
+	if disallow, ok := m["disallowArithmeticOperators"].(bool); ok {
+		result.disallowArithmeticOperators = disallow
 	}
 
 	return result

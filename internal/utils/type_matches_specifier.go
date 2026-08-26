@@ -1,40 +1,20 @@
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"sync"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/module"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 type TypeOrValueSpecifierFrom uint8
-
-// unmarshal TypeOrValueSpecifierFrom from JSON string
-func (s *TypeOrValueSpecifierFrom) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err != nil {
-		return fmt.Errorf("failed to unmarshal TypeOrValueSpecifierFrom: %w", err)
-	}
-	switch str {
-	case "file":
-		*s = TypeOrValueSpecifierFromFile
-	case "lib":
-		*s = TypeOrValueSpecifierFromLib
-	case "package":
-		*s = TypeOrValueSpecifierFromPackage
-	default:
-		return fmt.Errorf("unknown TypeOrValueSpecifierFrom value: %s", str)
-	}
-	return nil
-}
 
 const (
 	TypeOrValueSpecifierFromFile TypeOrValueSpecifierFrom = iota
@@ -47,62 +27,124 @@ const (
 
 type NameList []string
 
-// unmarshal a string or a list of strings to NameList
-func (s *NameList) UnmarshalJSON(data []byte) error {
-	var singleName string
-	if err := json.Unmarshal(data, &singleName); err == nil {
-		*s = NameList{singleName}
-		return nil
-	}
-
-	var names []string
-	if err := json.Unmarshal(data, &names); err != nil {
-		return fmt.Errorf("failed to unmarshal NameList: %w", err)
-	}
-	*s = names
-	return nil
-}
-
 type TypeOrValueSpecifier struct {
-	From TypeOrValueSpecifierFrom `json:"from"`
-	Name NameList                 `json:"name"`
+	From TypeOrValueSpecifierFrom
+	Name NameList
 	// Can be used when From == TypeOrValueSpecifierFromFile
-	Path string `json:"path"`
+	Path string
 	// Can be used when From == TypeOrValueSpecifierFromPackage
-	Package string `json:"package"`
+	Package string
+	// pathProvided distinguishes an omitted path from an explicitly empty one.
+	// Both decode to Path == "", but upstream treats only the omitted form as
+	// matching declarations anywhere in the current project.
+	pathProvided bool
 }
 
-// UnmarshalJSON handles both string shorthand ("Promise") and object form
-// ({"from": "lib", "name": "Promise"}) for TypeOrValueSpecifier, matching
-// the original TypeScript-ESLint TypeOrValueSpecifier union type.
-func (s *TypeOrValueSpecifier) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err == nil {
-		s.From = TypeOrValueSpecifierFromString
-		s.Name = NameList{str}
+// ParseTypeOrValueSpecifier decodes one entry of a type specifier option from
+// its configured value, handling both the string shorthand ("Promise") and the
+// object form ({"from": "lib", "name": "Promise"}), matching the original
+// TypeScript-ESLint TypeOrValueSpecifier union type. It reports false for a
+// value that matches neither shape.
+func ParseTypeOrValueSpecifier(raw any) (TypeOrValueSpecifier, bool) {
+	if str, ok := raw.(string); ok {
+		return TypeOrValueSpecifier{
+			From: TypeOrValueSpecifierFromString,
+			Name: NameList{str},
+		}, true
+	}
+
+	fields, ok := raw.(map[string]any)
+	if !ok {
+		return TypeOrValueSpecifier{}, false
+	}
+
+	var specifier TypeOrValueSpecifier
+	if raw, ok := fields["from"]; ok {
+		str, ok := raw.(string)
+		if !ok {
+			return TypeOrValueSpecifier{}, false
+		}
+		switch str {
+		case "file":
+			specifier.From = TypeOrValueSpecifierFromFile
+		case "lib":
+			specifier.From = TypeOrValueSpecifierFromLib
+		case "package":
+			specifier.From = TypeOrValueSpecifierFromPackage
+		default:
+			return TypeOrValueSpecifier{}, false
+		}
+	}
+	if raw, ok := fields["name"]; ok {
+		names, ok := parseNameList(raw)
+		if !ok {
+			return TypeOrValueSpecifier{}, false
+		}
+		specifier.Name = names
+	}
+	if raw, ok := fields["path"]; ok {
+		str, ok := raw.(string)
+		if !ok {
+			return TypeOrValueSpecifier{}, false
+		}
+		specifier.Path = str
+		specifier.pathProvided = true
+	}
+	if raw, ok := fields["package"]; ok {
+		str, ok := raw.(string)
+		if !ok {
+			return TypeOrValueSpecifier{}, false
+		}
+		specifier.Package = str
+	}
+	return specifier, true
+}
+
+// ParseTypeOrValueSpecifiers decodes a list of type specifiers. It returns nil
+// when the value is not a list or when any entry matches neither specifier
+// shape, so a malformed option falls back to the rule's default.
+func ParseTypeOrValueSpecifiers(raw any) []TypeOrValueSpecifier {
+	items, ok := raw.([]any)
+	if !ok {
 		return nil
 	}
-	type Alias TypeOrValueSpecifier
-	var alias Alias
-	if err := json.Unmarshal(data, &alias); err != nil {
-		return err
+	specifiers := make([]TypeOrValueSpecifier, 0, len(items))
+	for _, item := range items {
+		specifier, ok := ParseTypeOrValueSpecifier(item)
+		if !ok {
+			return nil
+		}
+		specifiers = append(specifiers, specifier)
 	}
-	*s = TypeOrValueSpecifier(alias)
-	return nil
+	return specifiers
 }
 
-func typeMatchesStringSpecifierWithCalleeNames(
+// parseNameList decodes a specifier's `name`, written either as a single name
+// or as a list of them.
+func parseNameList(raw any) (NameList, bool) {
+	if str, ok := raw.(string); ok {
+		return NameList{str}, true
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	names := make(NameList, 0, len(items))
+	for _, item := range items {
+		str, ok := item.(string)
+		if !ok {
+			return nil, false
+		}
+		names = append(names, str)
+	}
+	return names, true
+}
+
+func specifierNameMatchesWithCalleeNames(
 	t *checker.Type,
 	names []string,
 	calleeNames []string,
 ) bool {
-	// Handle union types: all constituents must match the specifier
-	if parts := UnionTypeParts(t); len(parts) > 1 {
-		return Every(parts, func(part *checker.Type) bool {
-			return typeMatchesStringSpecifierWithCalleeNames(part, names, calleeNames)
-		})
-	}
-
 	alias := checker.Type_alias(t)
 	var symbol *ast.Symbol
 	if alias == nil {
@@ -130,17 +172,42 @@ func typeMatchesStringSpecifierWithCalleeNames(
 	return false
 }
 
+func typeMatchesInlineSpecifierWithCalleeNames(
+	t *checker.Type,
+	names []string,
+	calleeNames []string,
+) bool {
+	if parts := UnionTypeParts(t); len(parts) > 1 {
+		return Every(parts, func(part *checker.Type) bool {
+			return typeMatchesInlineSpecifierWithCalleeNames(part, names, calleeNames)
+		})
+	}
+	if IsIntrinsicErrorType(t) {
+		return false
+	}
+	if specifierNameMatchesWithCalleeNames(t, names, calleeNames) {
+		return true
+	}
+	if parts := IntersectionTypeParts(t); len(parts) > 1 {
+		return Some(parts, func(part *checker.Type) bool {
+			return typeMatchesInlineSpecifierWithCalleeNames(part, names, calleeNames)
+		})
+	}
+	return false
+}
+
 func typeDeclaredInFile(
 	relativePath string,
+	pathProvided bool,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
-	cwd := program.Host().GetCurrentDirectory()
-	useCaseSensitiveFileNames := program.Host().FS().UseCaseSensitiveFileNames()
+	cwd := program.CurrentDirectory()
+	useCaseSensitiveFileNames := program.FS().UseCaseSensitiveFileNames()
 	canonical := func(fileName string) string {
 		return tspath.GetCanonicalFileName(fileName, useCaseSensitiveFileNames)
 	}
-	if relativePath == "" {
+	if !pathProvided {
 		return Some(declarationFiles, func(f *ast.SourceFile) bool {
 			return strings.HasPrefix(canonical(f.FileName()), canonical(cwd))
 		})
@@ -153,7 +220,7 @@ func typeDeclaredInFile(
 
 func typeDeclaredInLib(
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	// Assertion: The type is not an error type.
 
@@ -162,7 +229,7 @@ func typeDeclaredInLib(
 		return true
 	}
 	return Some(declarationFiles, func(d *ast.SourceFile) bool {
-		return IsSourceFileDefaultLibrary(program, d)
+		return program.IsSourceFileDefaultLibrary(d)
 	})
 }
 
@@ -196,52 +263,18 @@ func typeDeclaredInDeclareModule(
 	})
 }
 
-// resolvedPackageName returns the package a declaration file belongs to, in the
-// "name/subpath" form module resolution records, such as "demo-pkg/index.d.ts"
-// or "@types/node/globals.d.ts". Workspace packages are symlinked into
-// node_modules and resolve to their real path, so the owning package is found
-// through the nearest enclosing package.json that names one instead of through
-// the file name.
-func resolvedPackageName(program *compiler.Program, fileName string) string {
-	directory := tspath.GetDirectoryPath(fileName)
-	for directory != "" {
-		packageDirectory := program.GetNearestAncestorDirectoryWithPackageJson(directory)
-		if packageDirectory == "" {
-			return ""
-		}
-		info := program.GetPackageJsonInfo(tspath.CombinePaths(packageDirectory, "package.json"))
-		if info.Exists() {
-			if name, ok := info.Contents.Name.GetValue(); ok && name != "" {
-				if subpath, nested := strings.CutPrefix(fileName, packageDirectory+"/"); nested {
-					return name + "/" + subpath
-				}
-				return name
-			}
-		}
-		// A package.json without a name, such as the `{"type": "module"}` files
-		// dual-published packages drop into subdirectories, belongs to whichever
-		// named package encloses it.
-		parent := tspath.GetDirectoryPath(packageDirectory)
-		if parent == packageDirectory {
-			return ""
-		}
-		directory = parent
-	}
-	return ""
-}
-
 // packageMatchers caches the compiled matcher per `package` specifier, which
 // comes from the rule options and so takes only a handful of distinct values.
-var packageMatchers sync.Map // package name -> *regexp2.Regexp, nil when the pattern is invalid
+var packageMatchers sync.Map // package name -> *esregexp.RegExp, nil when the pattern is invalid
 
 // packageMatcher builds `new RegExp(`${packageName}|${typesPackageName}`)`. The
 // pattern carries no anchors, so "demo" matches "demo-pkg" as well.
-func packageMatcher(packageName string) *regexp2.Regexp {
+func packageMatcher(packageName string) *esregexp.RegExp {
 	if cached, ok := packageMatchers.Load(packageName); ok {
-		matcher, _ := cached.(*regexp2.Regexp)
+		matcher, _ := cached.(*esregexp.RegExp)
 		return matcher
 	}
-	matcher, err := CompileRegexp2(packageName+"|"+module.MangleScopedPackageName(packageName), JSRegexOptions)
+	matcher, err := esregexp.Compile(packageName+"|"+module.MangleScopedPackageName(packageName), "")
 	if err != nil {
 		matcher = nil
 	}
@@ -252,7 +285,7 @@ func packageMatcher(packageName string) *regexp2.Regexp {
 func typeDeclaredInDeclarationFile(
 	packageName string,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	matcher := packageMatcher(packageName)
 	if matcher == nil {
@@ -262,9 +295,10 @@ func typeDeclaredInDeclarationFile(
 		if file == nil || !program.IsSourceFileFromExternalLibrary(file) {
 			continue
 		}
-		name := resolvedPackageName(program, file.FileName())
-		if name != "" && Regexp2MatchString(matcher, name) {
-			return true
+		for _, name := range program.PackageNamesForSourceFile(file) {
+			if matcher.TestOrTimeout(name) {
+				return true
+			}
 		}
 	}
 	return false
@@ -274,7 +308,7 @@ func typeDeclaredInPackageDeclarationFile(
 	packageName string,
 	declarations []*ast.Node,
 	declarationFiles []*ast.SourceFile,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	return typeDeclaredInDeclareModule(packageName, declarations) ||
 		typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
@@ -283,7 +317,7 @@ func typeDeclaredInPackageDeclarationFile(
 func typeMatchesSpecifier(
 	t *checker.Type,
 	specifier TypeOrValueSpecifier,
-	program *compiler.Program,
+	program *program.Program,
 	calleeNames []string,
 ) bool {
 	// Handle union types: all constituents must match the specifier
@@ -292,45 +326,61 @@ func typeMatchesSpecifier(
 			return typeMatchesSpecifier(part, specifier, program, calleeNames)
 		})
 	}
-
-	if !typeMatchesStringSpecifierWithCalleeNames(t, specifier.Name, calleeNames) {
+	if IsIntrinsicErrorType(t) {
 		return false
 	}
 
-	symbol := checker.Type_symbol(t)
-	if symbol == nil {
-		alias := checker.Type_alias(t)
-		if alias != nil {
-			symbol = alias.Symbol()
+	wholeTypeMatches := false
+	if specifierNameMatchesWithCalleeNames(t, specifier.Name, calleeNames) {
+		symbol := checker.Type_symbol(t)
+		if symbol == nil {
+			alias := checker.Type_alias(t)
+			if alias != nil {
+				symbol = alias.Symbol()
+			}
+		}
+		var declarations []*ast.Node
+		if symbol != nil {
+			declarations = symbol.Declarations
+		}
+		declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
+			return ast.GetSourceFileOfNode(d)
+		})
+
+		switch specifier.From {
+		case TypeOrValueSpecifierFromString:
+			wholeTypeMatches = true
+		case TypeOrValueSpecifierFromFile:
+			wholeTypeMatches = typeDeclaredInFile(
+				specifier.Path,
+				specifier.pathProvided || specifier.Path != "",
+				declarationFiles,
+				program,
+			)
+		case TypeOrValueSpecifierFromLib:
+			wholeTypeMatches = typeDeclaredInLib(declarationFiles, program)
+		case TypeOrValueSpecifierFromPackage:
+			wholeTypeMatches = typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
+		default:
+			panic(fmt.Sprintf("unknown type specifier from: %v", specifier.From))
 		}
 	}
-	var declarations []*ast.Node
-	if symbol != nil {
-		declarations = symbol.Declarations
+	if wholeTypeMatches {
+		return true
 	}
-	declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
-		return ast.GetSourceFileOfNode(d)
-	})
-
-	switch specifier.From {
-	case TypeOrValueSpecifierFromString:
-		return true // string shorthand matches any origin; name already matched above
-	case TypeOrValueSpecifierFromFile:
-		return typeDeclaredInFile(specifier.Path, declarationFiles, program)
-	case TypeOrValueSpecifierFromLib:
-		return typeDeclaredInLib(declarationFiles, program)
-	case TypeOrValueSpecifierFromPackage:
-		return typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
-	default:
-		panic(fmt.Sprintf("unknown type specifier from: %v", specifier.From))
+	if parts := IntersectionTypeParts(t); len(parts) > 1 {
+		return Some(parts, func(part *checker.Type) bool {
+			return typeMatchesSpecifier(part, specifier, program, calleeNames)
+		})
 	}
+	return false
 }
 
 func TypeMatchesSomeSpecifier(
 	t *checker.Type,
 	specifiers []TypeOrValueSpecifier,
 	inlineSpecifiers []string,
-	program *compiler.Program,
+	program *program.Program,
 ) bool {
 	return TypeMatchesSomeSpecifierWithCalleeNames(t, specifiers, inlineSpecifiers, program, nil)
 }
@@ -342,18 +392,71 @@ func TypeMatchesSomeSpecifierWithCalleeNames(
 	t *checker.Type,
 	specifiers []TypeOrValueSpecifier,
 	inlineSpecifiers []string,
-	program *compiler.Program,
+	program *program.Program,
 	calleeNames []string,
 ) bool {
-	for _, typePart := range IntersectionTypeParts(t) {
-		if IsIntrinsicErrorType(typePart) {
-			continue
-		}
-		if Some(specifiers, func(s TypeOrValueSpecifier) bool {
-			return typeMatchesSpecifier(t, s, program, calleeNames)
-		}) || typeMatchesStringSpecifierWithCalleeNames(t, inlineSpecifiers, calleeNames) {
-			return true
+	return Some(specifiers, func(s TypeOrValueSpecifier) bool {
+		return typeMatchesSpecifier(t, s, program, calleeNames)
+	}) || typeMatchesInlineSpecifierWithCalleeNames(t, inlineSpecifiers, calleeNames)
+}
+
+// specifierStaticName is the name a specifier compares against when it matches
+// the referenced value rather than its type.
+func specifierStaticName(node *ast.Node) string {
+	if node == nil {
+		return ""
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindStringLiteral:
+		return node.Text()
+	case ast.KindPrivateIdentifier:
+		// A specifier names the member, so `#value` is spelled `value`.
+		return strings.TrimPrefix(node.Text(), "#")
+	}
+	return ""
+}
+
+func valueMatchesSpecifier(
+	node *ast.Node,
+	specifier TypeOrValueSpecifier,
+	program *program.Program,
+	t *checker.Type,
+) bool {
+	staticName := specifierStaticName(node)
+	if staticName == "" || !slices.Contains(specifier.Name, staticName) {
+		return false
+	}
+	if specifier.From != TypeOrValueSpecifierFromPackage {
+		return true
+	}
+
+	symbol := checker.Type_symbol(t)
+	if symbol == nil {
+		if alias := checker.Type_alias(t); alias != nil {
+			symbol = alias.Symbol()
 		}
 	}
-	return false
+	var declarations []*ast.Node
+	if symbol != nil {
+		declarations = symbol.Declarations
+	}
+	declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
+		return ast.GetSourceFileOfNode(d)
+	})
+	return typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
+}
+
+// ValueMatchesSomeSpecifier matches the value a node references instead of its
+// type, so a specifier can name an export whose type carries a different name.
+// Only `from: "package"` narrows further than the name; `file` and `lib` value
+// specifiers match on the name alone.
+func ValueMatchesSomeSpecifier(
+	node *ast.Node,
+	specifiers []TypeOrValueSpecifier,
+	program *program.Program,
+	t *checker.Type,
+) bool {
+	return Some(specifiers, func(s TypeOrValueSpecifier) bool {
+		return valueMatchesSpecifier(node, s, program, t)
+	})
 }

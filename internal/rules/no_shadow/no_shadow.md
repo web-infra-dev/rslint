@@ -33,9 +33,11 @@ function b() {
 Shadowing a built-in global (for example `Object`, `Array`) is reported when
 this option is `true`. Default: `false`.
 
-Configured `languageOptions.globals` and active `/* global */` directives
-participate as built-in globals; an explicit `"off"` setting un-declares the
-name, so shadowing it is no longer reported.
+Configured [`languageOptions.globals`](/config/language-options#languageoptionsglobals) and
+active `/* global */` directives participate as built-in globals; an explicit
+`"off"` setting un-declares the name, so shadowing it is no longer reported.
+Use the `globals` catalog exported by `@rslint/core` to add browser, Node.js,
+worker, or other environment names.
 
 ```json
 { "no-shadow": ["error", { "builtinGlobals": true }] }
@@ -90,4 +92,5 @@ Ignores shadowing for parameters declared inside a function type. Default:
 
 ## Original Documentation
 
-[https://eslint.org/docs/latest/rules/no-shadow](https://eslint.org/docs/latest/rules/no-shadow)
+- [ESLint: no-shadow](https://eslint.org/docs/latest/rules/no-shadow)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-shadow.js)

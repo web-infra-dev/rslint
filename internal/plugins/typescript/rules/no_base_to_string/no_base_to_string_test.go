@@ -161,7 +161,7 @@ Number(1);
     `},
 			{
 				Code:    "String(/regex/);",
-				Options: NoBaseToStringOptions{IgnoredTypeNames: []string{"RegExp"}},
+				Options: map[string]interface{}{"ignoredTypeNames": []interface{}{"RegExp"}},
 			},
 			{
 				Code: `
@@ -169,7 +169,7 @@ type Foo = { a: string } | { b: string };
 declare const foo: Foo;
 String(foo);
       `,
-				Options: NoBaseToStringOptions{IgnoredTypeNames: []string{"Foo"}},
+				Options: map[string]interface{}{"ignoredTypeNames": []interface{}{"Foo"}},
 			},
 			// TODO(port): this is invalid ts file (with lib)
 			{Code: `

@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildPreferFindMessage() rule.RuleMessage {
@@ -46,6 +47,7 @@ type filterExpressionData struct {
 // that should be `arr.find(...)`. Mirrors typescript-eslint's prefer-find rule.
 var PreferFindRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-find",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil {
@@ -590,7 +592,7 @@ func jsStringFromNumber(v float64) string {
 //     JS `Number()` rejects them (`Number('1_000') === NaN`). Reject any
 //     string containing `_` up front to match JS.
 func jsNumberFromString(s string) float64 {
-	trimmed := strings.TrimSpace(s)
+	trimmed := ecmascript.StringTrim(s)
 	if trimmed == "" {
 		return 0
 	}

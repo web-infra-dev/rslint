@@ -19,8 +19,8 @@ import (
 )
 
 // objectOption is the array-wrapped single-option shape that matches
-// rule_tester's JSON path through utils.GetOptionsMap — the typed-struct
-// shortcut would silently bypass it. See PORT_RULE.md Phase 2 Step 4.
+// rule_tester's JSON path through parseOptions — the typed-struct shortcut
+// would silently bypass it. See PORT_RULE.md Phase 2 Step 4.
 func objectOption(opts map[string]interface{}) []interface{} {
 	return []interface{}{opts}
 }
@@ -435,6 +435,9 @@ class Foo {
 					{MessageId: "missingThis", Line: 3, Column: 3, EndLine: 3, EndColumn: 19},
 				},
 			},
+			// An auto-accessor is an AccessorProperty, which getFunctionHeadLoc and
+			// getFunctionNameWithKind have no case for, so upstream reports the
+			// initializer from its own `=>` and names it as a plain arrow function.
 			{
 				Code: `
 class Foo {
@@ -443,7 +446,7 @@ class Foo {
       `,
 				Options: objectOption(map[string]interface{}{}),
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingThis", Line: 3, Column: 3},
+					{MessageId: "missingThis", Message: "Expected 'this' to be used by class arrow function.", Line: 3, Column: 24, EndLine: 3, EndColumn: 26},
 				},
 			},
 			{
@@ -454,7 +457,7 @@ class Foo {
       `,
 				Options: objectOption(map[string]interface{}{}),
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingThis", Line: 3, Column: 3},
+					{MessageId: "missingThis", Message: "Expected 'this' to be used by class arrow function.", Line: 3, Column: 32, EndLine: 3, EndColumn: 34},
 				},
 			},
 			{
@@ -465,7 +468,7 @@ class Foo {
       `,
 				Options: objectOption(map[string]interface{}{}),
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingThis", Line: 3, Column: 3},
+					{MessageId: "missingThis", Message: "Expected 'this' to be used by class arrow function.", Line: 3, Column: 34, EndLine: 3, EndColumn: 36},
 				},
 			},
 			{

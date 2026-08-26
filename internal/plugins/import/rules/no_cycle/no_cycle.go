@@ -7,11 +7,13 @@ import (
 	"math"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
-	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+// The dependency graph this rule reads, and every question asked of it, live
+// in graph.go. What is left here is the rule itself: its options, the per-file
+// entry point, and the message it reports.
 
 //go:embed no_cycle.schema.json
 var schemaJSON []byte
@@ -22,21 +24,7 @@ type ruleOptions struct {
 	maxDepth                           int
 	ignoreExternal                     bool
 	allowUnsafeDynamicCyclicDependency bool
-	moduleReferences                   import_utils.ModuleReferenceOptions
-}
-
-type routeStep struct {
-	value string
-	line  int
-}
-
-type queuedModule struct {
-	sourceFile    *ast.SourceFile
-	parent        int
-	viaSourceFile *ast.SourceFile
-	viaSource     *ast.Node
-	viaSpecifier  string
-	depth         int
+	referenceKinds                     program.ModuleReferenceKinds
 }
 
 // NoCycleRule forbids dependency paths that resolve back to the linted module.
@@ -54,10 +42,8 @@ var NoCycleRule = rule.Rule{
 
 func parseOptions(options []any) ruleOptions {
 	opts := ruleOptions{
-		maxDepth: unlimitedDepth,
-		moduleReferences: import_utils.ModuleReferenceOptions{
-			ESModule: true,
-		},
+		maxDepth:       unlimitedDepth,
+		referenceKinds: program.ESModuleReferences,
 	}
 	if len(options) == 0 {
 		return opts
@@ -69,10 +55,18 @@ func parseOptions(options []any) ruleOptions {
 	}
 	opts.ignoreExternal, _ = optsMap["ignoreExternal"].(bool)
 	opts.allowUnsafeDynamicCyclicDependency, _ = optsMap["allowUnsafeDynamicCyclicDependency"].(bool)
-	opts.moduleReferences.CommonJS, _ = optsMap["commonjs"].(bool)
-	opts.moduleReferences.AMD, _ = optsMap["amd"].(bool)
+	if commonJS, _ := optsMap["commonjs"].(bool); commonJS {
+		opts.referenceKinds |= program.CommonJSReferences
+	}
+	if amd, _ := optsMap["amd"].(bool); amd {
+		opts.referenceKinds |= program.AMDReferences
+	}
 	if esmodule, ok := optsMap["esmodule"].(bool); ok {
-		opts.moduleReferences.ESModule = esmodule
+		if esmodule {
+			opts.referenceKinds |= program.ESModuleReferences
+		} else {
+			opts.referenceKinds &^= program.ESModuleReferences
+		}
 	}
 
 	return opts
@@ -125,7 +119,7 @@ func normalizeDepth(depth int) (int, bool) {
 }
 
 func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
-	if ctx.SourceFile == nil || ctx.Program == nil {
+	if ctx.SourceFile == nil || !ctx.Program().IsValid() {
 		return
 	}
 
@@ -134,212 +128,50 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 		return
 	}
 
-	traversed := make(map[string]bool)
-	for _, ref := range collectModuleReferences(ctx, ctx.SourceFile, opts.moduleReferences) {
-		checkReference(ctx, opts, myPath, traversed, ref)
-	}
-}
-
-func checkReference(ctx rule.RuleContext, opts ruleOptions, myPath string, traversed map[string]bool, ref import_utils.ModuleReference) {
-	if ref.OnlyTypes || ref.Target == nil || shouldIgnoreExternal(ctx, opts, ref) {
+	// Every report sits on a reference this file wrote, so a file that wrote
+	// none has no answer to look up. Asking that of the file alone, before the
+	// graph, is what keeps an import-free file off the build: the graph spans
+	// the whole effective source set, and the editor discards it on every keystroke, so
+	// there is no run to amortize it over on that path.
+	sourceGraph := ctx.Program().ModuleGraph()
+	if len(sourceGraph.References(ctx.SourceFile, opts.referenceKinds)) == 0 {
 		return
 	}
 
-	if opts.allowUnsafeDynamicCyclicDependency && ref.Dynamic {
+	graph := moduleGraphFor(ctx, sourceGraph, opts)
+	if graph == nil {
 		return
 	}
-
-	if moduleReferencePath(ref) == myPath {
-		return
-	}
-
-	route, ok := detectCycle(ctx, opts, myPath, traversed, ref.Target)
+	self, ok := graph.index[ctx.SourceFile]
 	if !ok {
 		return
 	}
 
-	reportNode := ref.Importer
-	if reportNode == nil {
-		reportNode = ref.Source
-	}
-	ctx.ReportNode(reportNode, messageCycle(route))
-}
-
-func detectCycle(ctx rule.RuleContext, opts ruleOptions, myPath string, traversed map[string]bool, start *ast.SourceFile) ([]routeStep, bool) {
-	queue := []queuedModule{{sourceFile: start, parent: -1}}
-	if traversed == nil {
-		traversed = make(map[string]bool)
+	// A reference is only reportable when its target reaches this file again,
+	// which puts the two in one strongly connected group. Files holding no
+	// such reference — nearly all of them in a healthy project — are answered
+	// from the group numbers alone, without walking the graph.
+	if !graph.hasCyclicCandidate(opts, self) {
+		return
 	}
 
-	for head := 0; head < len(queue); head++ {
-		next := queue[head]
-		if next.sourceFile == nil {
+	node := &graph.nodes[self]
+	traversed := make(map[int32]bool)
+	for r := range node.refs {
+		if !graph.isReportCandidate(opts, self, r) {
+			continue
+		}
+		route, found := graph.detectCycle(opts, self, traversed, node.edge[r])
+		if !found {
 			continue
 		}
 
-		sourcePath := next.sourceFile.FileName()
-		if traversed[sourcePath] {
-			continue
+		reportNode := node.refs[r].Declaration
+		if reportNode == nil {
+			reportNode = node.refs[r].Specifier
 		}
-		traversed[sourcePath] = true
-
-		refs := collectModuleReferences(ctx, next.sourceFile, opts.moduleReferences)
-		dynamicPaths := unsafeDynamicPaths(ctx, opts, refs)
-		for _, ref := range refs {
-			if !referenceIsTraversable(ctx, opts, ref) {
-				continue
-			}
-			targetPath := moduleReferencePath(ref)
-			if targetPath == "" || traversed[targetPath] || dynamicPaths[targetPath] {
-				continue
-			}
-			if targetPath == myPath {
-				return routeTo(queue, head), true
-			}
-			if next.depth+1 < opts.maxDepth {
-				queue = append(queue, queuedModule{
-					sourceFile:    ref.Target,
-					parent:        head,
-					viaSourceFile: ref.SourceFile,
-					viaSource:     ref.Source,
-					viaSpecifier:  ref.Specifier,
-					depth:         next.depth + 1,
-				})
-			}
-		}
+		ctx.ReportNode(reportNode, messageCycle(route))
 	}
-
-	return nil, false
-}
-
-func unsafeDynamicPaths(ctx rule.RuleContext, opts ruleOptions, refs []import_utils.ModuleReference) map[string]bool {
-	if !opts.allowUnsafeDynamicCyclicDependency {
-		return nil
-	}
-
-	var dynamicPaths map[string]bool
-	for _, ref := range refs {
-		if !ref.Dynamic || !referenceIsTraversable(ctx, opts, ref) {
-			continue
-		}
-		if dynamicPaths == nil {
-			dynamicPaths = make(map[string]bool)
-		}
-		dynamicPaths[moduleReferencePath(ref)] = true
-	}
-	return dynamicPaths
-}
-
-func referenceIsTraversable(ctx rule.RuleContext, opts ruleOptions, ref import_utils.ModuleReference) bool {
-	return !ref.OnlyTypes && ref.Target != nil && !shouldIgnoreExternal(ctx, opts, ref)
-}
-
-func routeTo(queue []queuedModule, index int) []routeStep {
-	// Queue entries retain parent links instead of copying the complete route
-	// at every edge. Materialize source lines only for a path that closes a cycle.
-	depth := queue[index].depth
-	route := make([]routeStep, depth)
-	for routeIndex := depth - 1; routeIndex >= 0; routeIndex-- {
-		next := queue[index]
-		route[routeIndex] = routeStep{
-			value: next.viaSpecifier,
-			line:  sourceLine(next.viaSourceFile, next.viaSource),
-		}
-		index = next.parent
-	}
-	return route
-}
-
-func collectModuleReferences(ctx rule.RuleContext, sourceFile *ast.SourceFile, options import_utils.ModuleReferenceOptions) []import_utils.ModuleReference {
-	if sourceFile == nil || (!options.ESModule && !options.CommonJS && !options.AMD) {
-		return nil
-	}
-	// SourceFile.Imports is populated by the parser and avoids walking every AST
-	// node in the usual static-ESM case. The generic collector remains necessary
-	// for call-based edges, parser recovery, and imports inside module bodies.
-	if options.CommonJS || options.AMD || sourceFileNeedsFullModuleScan(sourceFile) {
-		return import_utils.CollectModuleReferences(ctx, sourceFile, options)
-	}
-
-	imports := sourceFile.Imports()
-	refs := make([]import_utils.ModuleReference, 0, len(imports))
-	for _, source := range imports {
-		importer := ast.TryGetImportFromModuleSpecifier(source)
-		if importer == nil {
-			continue
-		}
-
-		onlyTypes := false
-		switch importer.Kind {
-		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			onlyTypes = importDeclarationOnlyImportsTypes(importer.AsImportDeclaration())
-		case ast.KindExportDeclaration:
-			onlyTypes = ast.IsTypeOnlyImportOrExportDeclaration(importer)
-		default:
-			continue
-		}
-
-		ref := import_utils.ModuleReference{
-			Source:     source,
-			Importer:   importer,
-			SourceFile: sourceFile,
-			Specifier:  source.Text(),
-			OnlyTypes:  onlyTypes,
-		}
-		ref.ResolvedPath, ref.Target, _ = import_utils.ResolveModuleReferenceFromSourceFile(ctx, sourceFile, source)
-		if ref.Target != nil && import_utils.IsImportPathIgnored(ctx.Settings, ref.Target.FileName()) {
-			continue
-		}
-		refs = append(refs, ref)
-	}
-	return refs
-}
-
-func sourceFileNeedsFullModuleScan(sourceFile *ast.SourceFile) bool {
-	if sourceFile.Flags&ast.NodeFlagsPossiblyContainsDynamicImport != 0 || len(sourceFile.Diagnostics()) != 0 {
-		return true
-	}
-	for _, statement := range sourceFile.Statements.Nodes {
-		if statement != nil && statement.Kind == ast.KindModuleDeclaration {
-			return true
-		}
-	}
-	return false
-}
-
-func importDeclarationOnlyImportsTypes(importDecl *ast.ImportDeclaration) bool {
-	if importDecl == nil || importDecl.ImportClause == nil {
-		return false
-	}
-
-	importClause := importDecl.ImportClause
-	if importClause.IsTypeOnly() {
-		return true
-	}
-
-	clause := importClause.AsImportClause()
-	if clause == nil || clause.Name() != nil || clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
-		return false
-	}
-	namedImports := clause.NamedBindings.AsNamedImports()
-	if namedImports == nil || namedImports.Elements == nil || len(namedImports.Elements.Nodes) == 0 {
-		return false
-	}
-
-	for _, specifier := range namedImports.Elements.Nodes {
-		if specifier == nil || specifier.Kind != ast.KindImportSpecifier || !ast.IsTypeOnlyImportDeclaration(specifier) {
-			return false
-		}
-	}
-	return true
-}
-
-func sourceLine(sourceFile *ast.SourceFile, source *ast.Node) int {
-	if sourceFile == nil || source == nil {
-		return 1
-	}
-	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, source.Pos())
-	return line + 1
 }
 
 func messageCycle(route []routeStep) rule.RuleMessage {
@@ -355,18 +187,4 @@ func messageCycle(route []routeStep) rule.RuleMessage {
 		Id:          "cycle",
 		Description: description,
 	}
-}
-
-func moduleReferencePath(ref import_utils.ModuleReference) string {
-	if ref.Target != nil {
-		return ref.Target.FileName()
-	}
-	return ref.ResolvedPath
-}
-
-func shouldIgnoreExternal(ctx rule.RuleContext, opts ruleOptions, ref import_utils.ModuleReference) bool {
-	if !opts.ignoreExternal {
-		return false
-	}
-	return import_utils.IsExternalModulePath(ctx.Settings, ref.Specifier, moduleReferencePath(ref))
 }

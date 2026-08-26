@@ -114,20 +114,8 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 				}),
 			},
 
-			// ---- Differences from ESLint: extended glob syntax is matched literally, so a
-			// `!(...)` target selects no file and leaves the zone inactive ----
-			{
-				Code:     `import b from "../server/b"`,
-				FileName: "restricted-paths/client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./restricted-paths/!(server)/**/*",
-					"from":   "./restricted-paths/server",
-				}),
-			},
-
-			// ---- Differences from ESLint: the `?` opening a `?(...)` list is matched
-			// literally too, so it cannot act as a base wildcard and pull in a directory
-			// that merely ends in `(server)` ----
+			// ---- A `?(...)` list matches what it names, so it does not reach a
+			// directory that merely ends in `(server)` ----
 			{
 				Code:     `import a from "../x(server)/a"`,
 				FileName: "restricted-paths/client/a.ts",
@@ -141,29 +129,6 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 			// only when it takes exactly one argument ----
 			{
 				Code:     `const b = require("../server/b", "extra")`,
-				FileName: "restricted-paths/client/consumer.js",
-				TSConfig: "tsconfig.allow-js.json",
-				Options: zones(map[string]interface{}{
-					"target": "./restricted-paths/client",
-					"from":   "./restricted-paths/server",
-				}),
-			},
-
-			// ---- Differences from ESLint: a specifier only resolves through the
-			// module resolution TypeScript recorded for it, and TypeScript records a
-			// `require()` call only in a JavaScript file and only when its callee is a
-			// bare `require` identifier. On its own, either other shape leaves the
-			// specifier unresolved and no zone can match it ----
-			{
-				Code:     `const b = require("../server/b")`,
-				FileName: "restricted-paths/client/a.ts",
-				Options: zones(map[string]interface{}{
-					"target": "./restricted-paths/client",
-					"from":   "./restricted-paths/server",
-				}),
-			},
-			{
-				Code:     `const b = (require)("../server/b")`,
 				FileName: "restricted-paths/client/consumer.js",
 				TSConfig: "tsconfig.allow-js.json",
 				Options: zones(map[string]interface{}{
@@ -207,6 +172,19 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 			// inspects a module specifier string literal and the linted file's path.
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- An extended glob list in a `target` selects the zone the way
+			// upstream's Minimatch does: `!(server)` names every directory but
+			// that one, so `client` is inside the zone ----
+			{
+				Code:     `import b from "../server/b"`,
+				FileName: "restricted-paths/client/a.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/!(server)/**/*",
+					"from":   "./restricted-paths/server",
+				}),
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 15)},
+			},
+
 			// ---- Options: the bare single-object shape a CLI config passes ----
 			{
 				Code:     `import b from "../server/b"`,
@@ -456,34 +434,28 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 34)},
 			},
 
-			// ---- Dimension 4: an earlier declaration of the same specifier resolves it
-			// for the whole file, so the `require` shapes above reach a resolved path
-			// too. ESTree has no parenthesized-expression node, so upstream reads
-			// through the parentheses and reports both calls. ----
+			// ---- Dimension 4: TypeScript records no module resolution for either of
+			// these `require` shapes, so both reach their target through TypeScript's
+			// resolver instead. ESTree has no parenthesized-expression node, so
+			// upstream reads through the parentheses and reports the call. ----
 			{
-				Code:     `import "../server/b"; (require)("../server/b");`,
+				Code:     `const b = (require)("../server/b")`,
 				FileName: "restricted-paths/client/consumer.js",
 				TSConfig: "tsconfig.allow-js.json",
 				Options: zones(map[string]interface{}{
 					"target": "./restricted-paths/client",
 					"from":   "./restricted-paths/server",
 				}),
-				Errors: []rule_tester.InvalidTestCaseError{
-					unexpectedPath("../server/b", 1, 8),
-					unexpectedPath("../server/b", 1, 33),
-				},
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 21)},
 			},
 			{
-				Code:     `import "../server/b"; const c = require("../server/b");`,
+				Code:     `const b = require("../server/b")`,
 				FileName: "restricted-paths/client/a.ts",
 				Options: zones(map[string]interface{}{
 					"target": "./restricted-paths/client",
 					"from":   "./restricted-paths/server",
 				}),
-				Errors: []rule_tester.InvalidTestCaseError{
-					unexpectedPath("../server/b", 1, 8),
-					unexpectedPath("../server/b", 1, 41),
-				},
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 19)},
 			},
 			// The extra argument keeps the `require` call out of the report even
 			// though its specifier now resolves.

@@ -34,4 +34,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [ESLint no-nonoctal-decimal-escape](https://eslint.org/docs/latest/rules/no-nonoctal-decimal-escape)
+- [ESLint: no-nonoctal-decimal-escape](https://eslint.org/docs/latest/rules/no-nonoctal-decimal-escape)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-nonoctal-decimal-escape.js)

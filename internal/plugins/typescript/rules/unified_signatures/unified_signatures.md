@@ -32,4 +32,5 @@ function baz(x: string): string;
 
 ## Original Documentation
 
-- [typescript-eslint unified-signatures](https://typescript-eslint.io/rules/unified-signatures)
+- [typescript-eslint: unified-signatures](https://typescript-eslint.io/rules/unified-signatures)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/unified-signatures.ts)

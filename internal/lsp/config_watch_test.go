@@ -96,7 +96,7 @@ func TestReloadConfigAndRelint_RefreshesJSONFallbackWhenJSConfigsActive(t *testi
 	}
 }
 
-func TestReloadConfigAndRelint_ClearsTypeInfoFiles(t *testing.T) {
+func TestReloadConfigAndRelint_RecomputesTypeInfoCapability(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"
@@ -206,7 +206,7 @@ func TestHandleDidChangeWatchedFiles_DetectsConfigFiles(t *testing.T) {
 	}
 }
 
-func TestHandleDidChangeWatchedFiles_TsConfigChangeRebuildsTypeInfoFiles(t *testing.T) {
+func TestHandleDidChangeWatchedFiles_TsConfigChangeRecomputesTypeInfoCapability(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"
@@ -468,13 +468,21 @@ func TestReloadConfig_NoTsConfigsIsAccepted(t *testing.T) {
 	s.cwd = dir
 	s.rslintConfigPath = filepath.Join(dir, "rslint.json")
 
-	config.RegisterAllRules()
 	err := s.reloadConfig()
 	if err != nil {
 		t.Fatalf("reloadConfig should accept config without tsconfigs, got error: %v", err)
 	}
 	if len(s.jsonConfig) != 1 {
 		t.Errorf("expected 1 config entry, got %d", len(s.jsonConfig))
+	}
+	if s.jsonConfigOwnerIndex == nil || s.jsonFileConfigResolver == nil {
+		t.Fatal("reloadConfig did not publish a complete JSON evaluation generation")
+	}
+	s.configSnapshotIncludesGitignore = true
+	target := lspTargetIdentity(filepath.Join(dir, "index.ts"), s.fs)
+	selection := s.selectDocumentConfig(target)
+	if selection.resolved.MergedConfig == nil {
+		t.Fatal("reloaded JSON resolver did not select a supported target")
 	}
 }
 

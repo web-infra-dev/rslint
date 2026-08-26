@@ -429,6 +429,7 @@ ruleTester.run('prefer-regex-literals', {
     },
     {
       code: "new window['RegExp']('\\\\x56\\\\x78\\\\x45', '');",
+      languageOptions: { globals: { window: 'readonly' } },
       errors: [{ messageId: 'unexpectedRegExp' }],
     },
     {

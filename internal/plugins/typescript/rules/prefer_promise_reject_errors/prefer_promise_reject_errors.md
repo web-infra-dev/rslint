@@ -22,4 +22,5 @@ Promise.reject(unknownVariable);
 
 ## Original Documentation
 
-- [typescript-eslint prefer-promise-reject-errors](https://typescript-eslint.io/rules/prefer-promise-reject-errors)
+- [typescript-eslint: prefer-promise-reject-errors](https://typescript-eslint.io/rules/prefer-promise-reject-errors)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/prefer-promise-reject-errors.ts)

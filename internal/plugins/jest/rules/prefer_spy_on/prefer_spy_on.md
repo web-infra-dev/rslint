@@ -31,4 +31,5 @@ jest.spyOn(window, 'fetch').mockReturnValue('ok');
 
 ## Original Documentation
 
-- [jest/prefer-spy-on](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-spy-on.md)
+- [eslint-plugin-jest: prefer-spy-on](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-spy-on.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-spy-on.ts)

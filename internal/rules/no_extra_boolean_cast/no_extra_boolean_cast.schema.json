@@ -1,0 +1,29 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "enforceForInnerExpressions": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enforceForLogicalOperands": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

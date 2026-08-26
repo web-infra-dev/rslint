@@ -141,24 +141,22 @@ func (b *Builder[E]) variableDeclaration(node *ast.Node) {
 
 func (b *Builder[E]) ifStatement(node *ast.Node) {
 	stmt := node.AsIfStatement()
-	b.expr(stmt.Expression)
-	testEnd := b.cur
 	after := b.newBlock()
-
 	thenEntry := b.newBlock()
-	b.link(testEnd, thenEntry)
+	elseEntry := after
+	if stmt.ElseStatement != nil {
+		elseEntry = b.newBlock()
+	}
+	b.condition(stmt.Expression, thenEntry, elseEntry)
+
 	b.enter(thenEntry)
 	b.statement(stmt.ThenStatement)
 	b.link(b.cur, after)
 
 	if stmt.ElseStatement != nil {
-		elseEntry := b.newBlock()
-		b.link(testEnd, elseEntry)
 		b.enter(elseEntry)
 		b.statement(stmt.ElseStatement)
 		b.link(b.cur, after)
-	} else {
-		b.link(testEnd, after)
 	}
 
 	b.enter(after)
@@ -169,15 +167,13 @@ func (b *Builder[E]) whileStatement(node *ast.Node) {
 	test := b.newBlock()
 	b.link(b.cur, test)
 	b.enter(test)
-	b.expr(stmt.Expression)
-	testEnd := b.cur
-
 	after := b.newBlock()
-	if !isAlwaysTruthyTest(stmt.Expression) {
-		b.link(testEnd, after)
-	}
 	body := b.newBlock()
-	b.link(testEnd, body)
+	falseEntry := after
+	if isAlwaysTruthyTest(stmt.Expression) {
+		falseEntry = nil
+	}
+	b.condition(stmt.Expression, body, falseEntry)
 
 	b.pushJump(node, after, test, node)
 	b.enter(body)
@@ -224,25 +220,44 @@ func (b *Builder[E]) forStatement(node *ast.Node) {
 			b.expr(stmt.Initializer)
 		}
 	}
+	if stmt.Condition == nil && stmt.Incrementor == nil {
+		// ESLint keeps the body of `for (;;) { ... }` on the loop-header
+		// segment itself. Model that shape as one self-looping block: events at
+		// the top of the body stay on the repeated header, while a branch in the
+		// body still creates later blocks that cycle analysis can identify.
+		body := b.newBlock()
+		b.link(b.cur, body)
+		after := b.newBlock()
+		b.pushJump(node, after, body, node)
+		b.enter(body)
+		b.statement(stmt.Statement)
+		b.loop(node)
+		b.link(b.cur, body)
+		b.popJump()
+		b.enter(after)
+		return
+	}
 
 	test := b.newBlock()
 	b.link(b.cur, test)
 	b.enter(test)
-	if stmt.Condition != nil {
-		b.expr(stmt.Condition)
-	}
-	testEnd := b.cur
-
 	after := b.newBlock()
-	if stmt.Condition != nil && !isAlwaysTruthyTest(stmt.Condition) {
-		b.link(testEnd, after)
-	}
 	body := b.newBlock()
-	b.link(testEnd, body)
+	falseEntry := after
+	if stmt.Condition == nil || isAlwaysTruthyTest(stmt.Condition) {
+		falseEntry = nil
+	}
+	b.condition(stmt.Condition, body, falseEntry)
 
+	// The incrementor runs after the body and is laid out before it, so a body
+	// that always leaves abruptly does not make it unreachable and lose the
+	// fork a throwable node in it makes.
 	update := test
 	if stmt.Incrementor != nil {
 		update = b.newBlock()
+		b.enterDisconnected(update)
+		b.expr(stmt.Incrementor)
+		b.link(b.cur, test)
 	}
 
 	b.pushJump(node, after, update, node)
@@ -251,12 +266,6 @@ func (b *Builder[E]) forStatement(node *ast.Node) {
 	b.loop(node)
 	b.link(b.cur, update)
 	b.popJump()
-
-	if stmt.Incrementor != nil {
-		b.enter(update)
-		b.expr(stmt.Incrementor)
-		b.link(b.cur, test)
-	}
 
 	b.enter(after)
 }
@@ -317,38 +326,59 @@ func (b *Builder[E]) switchStatement(node *ast.Node) {
 	}
 
 	bodies := make([]*Block[E], len(clauses))
+	dispatchFrom := make([]*Block[E], len(clauses))
+	dispatchEdge := make([]int, len(clauses))
+	for i := range dispatchEdge {
+		dispatchEdge[i] = -1
+	}
 	for i := range clauses {
 		bodies[i] = b.newBlock()
 	}
 
 	defaultIndex := -1
+	firstCaseIndex := -1
 	testCur := b.cur
 	for i, clause := range clauses {
 		if clause.Kind == ast.KindDefaultClause {
 			defaultIndex = i
 			continue
 		}
+		if firstCaseIndex == -1 {
+			firstCaseIndex = i
+		}
 		b.cur = testCur
 		b.expr(clause.AsCaseOrDefaultClause().Expression)
-		b.link(b.cur, bodies[i])
+		dispatchFrom[i] = b.cur
+		dispatchEdge[i] = b.linkWithCycleBarrier(b.cur, bodies[i], false)
 		nextTest := b.newBlock()
 		b.link(b.cur, nextTest)
 		b.enter(nextTest)
 		testCur = b.cur
 	}
 	if defaultIndex >= 0 {
-		b.link(testCur, bodies[defaultIndex])
+		dispatchFrom[defaultIndex] = testCur
+		dispatchEdge[defaultIndex] = b.linkWithCycleBarrier(testCur, bodies[defaultIndex], false)
 	} else {
 		b.link(testCur, after)
 	}
 
 	b.pushJump(node, after, nil, nil)
+	switchJump := len(b.jumps) - 1
+	hadSwitchBreak := false
 	var fallthroughFrom *Block[E]
 	for i, clause := range clauses {
-		b.link(fallthroughFrom, bodies[i])
+		beforeFirstCase := firstCaseIndex == -1 || clause.Kind == ast.KindDefaultClause && i < firstCaseIndex
+		barrier := hadSwitchBreak || beforeFirstCase
+		if from := dispatchFrom[i]; from != nil && dispatchEdge[i] >= 0 {
+			b.setCycleBarrier(from, dispatchEdge[i], barrier)
+		}
+		b.linkWithCycleBarrier(fallthroughFrom, bodies[i], barrier)
 		b.enter(bodies[i])
 		b.statements(clause.AsCaseOrDefaultClause().Statements)
 		fallthroughFrom = b.cur
+		if i >= firstCaseIndex && firstCaseIndex != -1 {
+			hadSwitchBreak = b.jumps[switchJump].broken
+		}
 	}
 	b.link(fallthroughFrom, after)
 	b.popJump()
@@ -408,6 +438,9 @@ func (b *Builder[E]) tryStatement(node *ast.Node) {
 	for _, end := range normalEnds {
 		b.link(end, normalEntry)
 	}
+	for _, source := range frame.implicit {
+		b.link(source, normalEntry)
+	}
 	b.enter(normalEntry)
 	b.statement(stmt.FinallyBlock)
 	b.link(b.cur, after)
@@ -428,6 +461,8 @@ func (b *Builder[E]) tryStatement(node *ast.Node) {
 					outer := b.tryStack[i]
 					outer.returnedAny = true
 					b.link(b.cur, outer.finallyEntry)
+				} else {
+					b.markFinal(b.cur)
 				}
 			}
 			if frame.thrownAny {
@@ -435,6 +470,8 @@ func (b *Builder[E]) tryStatement(node *ast.Node) {
 					outer := b.tryStack[i]
 					outer.thrownAny = true
 					b.link(b.cur, throwTarget(outer))
+				} else {
+					b.markThrown(b.cur)
 				}
 			}
 		}
@@ -484,6 +521,7 @@ func (b *Builder[E]) makeBreak(label *ast.Node) {
 		} else if !slices.Contains(target.labels, name) {
 			continue
 		}
+		b.jumps[i].broken = true
 		b.link(b.cur, target.breakTo)
 		break
 	}
@@ -520,6 +558,8 @@ func (b *Builder[E]) makeReturn() {
 		frame := b.tryStack[i]
 		frame.returnedAny = true
 		b.link(b.cur, frame.finallyEntry)
+	} else {
+		b.markFinal(b.cur)
 	}
 	b.makeUnreachable()
 }
@@ -532,6 +572,8 @@ func (b *Builder[E]) makeThrow() {
 		frame := b.tryStack[i]
 		frame.thrownAny = true
 		b.link(b.cur, throwTarget(frame))
+	} else {
+		b.markThrown(b.cur)
 	}
 	b.makeUnreachable()
 }
@@ -547,11 +589,15 @@ func (b *Builder[E]) makeYield() {
 		frame := b.tryStack[i]
 		frame.returnedAny = true
 		b.link(b.cur, frame.finallyEntry)
+	} else {
+		b.markFinal(b.cur)
 	}
 	if i := b.throwFrame(); i >= 0 {
 		frame := b.tryStack[i]
 		frame.thrownAny = true
 		b.link(b.cur, throwTarget(frame))
+	} else {
+		b.markThrown(b.cur)
 	}
 	next := b.newBlock()
 	b.link(b.cur, next)

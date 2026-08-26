@@ -153,6 +153,12 @@ that the rule framework already shares or can skip:
   counts (see AST_PATTERNS.md).
 - **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
   `ctx.SourceFile.AsNode()` once per rule.
+- **Cross-file source and module questions**: use the unified
+  `ctx.Program()` facade. Resolve one specifier with `Program.ResolveModule`;
+  enumerate generic module references with `Program.ModuleGraph().References`;
+  share configuration-complete rule indexes with `rule.CachedByProgram`.
+  Never add a backend-kind branch, raw compiler Program, parallel source
+  runtime, or module-resolution helper under `internal/utils`.
 
 See [AST_PATTERNS.md](references/AST_PATTERNS.md) for the APIs, boundaries, and
 worked examples.
@@ -264,6 +270,24 @@ The workflow is complete ONLY when all tasks created during Planning are marked 
 | References to a declared symbol             | `ctx.Refs.References(decl.Symbol())`                   |
 | Identifier → symbol (incl. globals/`.d.ts`) | `ctx.Refs.Resolve(node)`                               |
 | Every comment in the file                   | `ctx.Comments.All()`                                   |
+
+**Values that came from JavaScript** — Go's standard library answers a nearby but different question about each, so never reach for `strings.TrimSpace`, `strings.ToLower`, the `unicode` package, the stdlib `regexp`, or `doublestar` on one:
+
+| Need                                                   | Use                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------- |
+| Trim, blank, whitespace, upper/lower case, `String(n)` | `utils/ecmascript`                                      |
+| A regexp option, a `new RegExp(...)`, `/i` comparison  | `utils/ecmascript/regexp`, imported as `esregexp`       |
+| A general category — `\p{Lu}`, `\p{L}`, `\p{M}`        | `utils/unicode17`                                       |
+| "May this character start or continue an identifier?"  | tsgo's `scanner.IsIdentifierStart` / `IsIdentifierPart` |
+| A glob option (upstream on `minimatch@3`)              | `utils/minimatch3`                                      |
+| "Is this a glob or a plain path?"                      | `utils/isglob`                                          |
+| Any other glob package, **`minimatch@10`** too         | **Not ported — stop and report to the user**            |
+
+`depguard` denies the standard library's `unicode` and `forbidigo` denies `strings.ToLower` / `ToUpper` / `TrimSpace` under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. The ports agree with the standard library on ASCII, so there is nothing to weigh: the case a rule spells out is the JavaScript one.
+
+The stdlib `regexp` is not banned outright: a pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. A pattern out of a rule option, a config file or the source under lint takes `esregexp`, however plain it looks.
+
+Only minimatch 3 and is-glob are ported, and a third has no safe substitute: `minimatch3` differs from `minimatch@10` on POSIX classes, and `doublestar` differs on far more than extended glob syntax (`src/**` matches `src` under doublestar but not under minimatch). Report which package and version the rule needs and which patterns would be misread; do not quietly swap in either one, and do not port a new glob package without asking first. See [UTILS_REFERENCE.md § JavaScript Semantics](references/UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
 
 **Directory Structure**:
 

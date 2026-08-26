@@ -12,8 +12,8 @@ import (
 // kept in roughly the same order so a diff against that file is tractable.
 //
 // Cases that depend on upstream's env-based globals are converted to use
-// `builtinGlobals` against well-known ECMAScript / TypeScript default-library
-// names so the underlying semantics are still exercised. Config
+// `builtinGlobals` against well-known ECMAScript names or explicit configured
+// globals so the underlying semantics are still exercised. Config
 // `languageOptions.globals` and `/* global */` comments are modeled via
 // `ctx.Globals` (see the dedicated cases below).
 func TestNoShadowTSESLintRule(t *testing.T) {
@@ -60,18 +60,27 @@ function foo() {
   var Object = 0;
 }
 			`},
+			// Host-library names are not part of scope-manager's default esnext
+			// type globals.
+			{Code: `function foo(window: number, NodeListOf: number, HTMLElement: number) {}`,
+				Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: `function foo(Record: number) {}`,
+				Options: map[string]interface{}{"builtinGlobals": false}},
 
-			// ---- ctx.Globals: an explicit `off` setting (config
-			// `Array: "off"` / `/* global Array: off */`) un-declares the
-			// builtin, so shadowing it stays silent even under
-			// `builtinGlobals: true` ----
+			// Type-only declarations do not shadow implicit globals while
+			// ignoreTypeValueShadow is enabled (the default).
 			{Code: `
-function fn(Array: number) {}
-			`, Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"Array": "off"}},
-			{Code: `
-/* global Array: off */
-declare const Array: (environment: 'dev' | 'prod' | 'test') => boolean;
+function fn() {
+  type Record = string;
+}
 			`, Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: `
+function fn() {
+  type ConfiguredType = string;
+}
+			`, Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"ConfiguredType": "readonly"}},
+			{Code: `type Fn = (ConfiguredType: number) => void;`,
+				Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"ConfiguredType": "readonly"}},
 
 			// ---- this params ----
 			{Code: `
@@ -126,8 +135,7 @@ const x = 1;
 			`},
 
 			// ---- ignoreTypeValueShadow + builtinGlobals interaction ----
-			// SKIP equivalent: rslint doesn't model `languageOptions.globals` configuration,
-			// but the no-globals form is the same as `type Foo = 1` at module scope.
+			// The no-globals form is the same as `type Foo = 1` at module scope.
 			{Code: `type Foo = 1;`},
 			{Code: `type Foo = 1;`, Options: map[string]interface{}{"ignoreTypeValueShadow": true}},
 			{Code: `type Foo = 1;`, Options: map[string]interface{}{"builtinGlobals": false, "ignoreTypeValueShadow": false}},
@@ -597,10 +605,6 @@ declare function doWork(): Promise<void>;
 const reducer = <S, A>(initial: S, fn: (s: S, a: A) => S) =>
   (state: S, action: A) => fn(state, action);
 			`},
-
-			// ---- Function-name initializer exception with TS wrappers ----
-			{Code: `(function() { var f = (function f() {} as any); f() }())`},
-			{Code: `(function() { var A = (class A {} satisfies object); })()`},
 
 			// ---- Destructuring with defaults — outer name reuse in default expr ----
 			{Code: `
@@ -1176,6 +1180,61 @@ function doThing(foo: number, bar: number) {}
 					},
 				},
 			},
+			// A type-only sibling specifier does not turn a value import into a
+			// type import in the typescript-eslint extension.
+			{
+				Code: `
+import { request, type Server } from 'node:http';
+function use(request: unknown) {}
+				`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadow",
+						Message:   "'request' is already declared in the upper scope on line 2 column 10.",
+						Line:      3,
+						Column:    14,
+					},
+				},
+			},
+			// TypeScript assertion wrappers are not transparent initializers.
+			{
+				Code: `(function() { var f = (function f() {} as any); f() }())`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadow"},
+				},
+			},
+			{
+				Code: `(function() { var A = (class A {} satisfies object); })()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noShadow"},
+				},
+			},
+			// The typescript-eslint extension uses a dedicated enum diagnostic.
+			{
+				Code: `enum A { A }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noEnumShadow",
+						Message:   "Enum members are added to the enum scope, so references to 'A' in enum member initializers resolve to this member instead of the declaration in the upper scope on line 1 column 6.",
+						Line:      1,
+						Column:    10,
+					},
+				},
+			},
+			// Scope-manager merges the namespace and enum declarations; the enum
+			// definition still selects noEnumShadow while the first declaration
+			// supplies the reported upper-scope location.
+			{
+				Code: `namespace A {} enum A { A }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noEnumShadow",
+						Message:   "Enum members are added to the enum scope, so references to 'A' in enum member initializers resolve to this member instead of the declaration in the upper scope on line 1 column 11.",
+						Line:      1,
+						Column:    25,
+					},
+				},
+			},
 			// value interface shadowed by `declare module` interface
 			{
 				Code: `
@@ -1591,6 +1650,175 @@ declare const Array: (environment: 'dev' | 'prod' | 'test') => boolean;
 						Message:   "'Array' is already a global variable.",
 						Line:      2,
 						Column:    15,
+					},
+				},
+			},
+			// scope-manager's default TypeScript type globals participate in
+			// builtin shadow checks, including globals without runtime values.
+			{
+				Code: `
+function fn(Record: number) {}
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Record' is already a global variable.",
+						Line:      2,
+						Column:    13,
+					},
+				},
+			},
+			{
+				Code: `
+function fn(ImportMeta: number) {}
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'ImportMeta' is already a global variable.",
+						Line:      2,
+						Column:    13,
+					},
+				},
+			},
+			{
+				Code:    `type Fn = (Record: number) => void;`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Record' is already a global variable.",
+						Line:      1,
+						Column:    12,
+					},
+				},
+			},
+			// Type-only declarations are reported when the type/value exception
+			// is disabled.
+			{
+				Code: `
+function fn() {
+  type Record = string;
+}
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true, "ignoreTypeValueShadow": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Record' is already a global variable.",
+						Line:      3,
+						Column:    8,
+					},
+				},
+			},
+			// Import bindings are value variables in scope-manager, even for
+			// `import type`, so the default type/value exception does not hide it.
+			{
+				Code: `
+import type { Record } from 'pkg';
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Record' is already a global variable.",
+						Line:      2,
+						Column:    15,
+					},
+				},
+			},
+			// Turning off a same-named value global does not remove the default
+			// TypeScript type variable from scope-manager.
+			{
+				Code: `
+function fn(Array: number) {}
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Globals: map[string]any{"Array": "off"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Array' is already a global variable.",
+						Line:      2,
+						Column:    13,
+					},
+				},
+			},
+			{
+				Code: `
+/* global Array: off */
+declare const Array: (environment: string) => boolean;
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Array' is already a global variable.",
+						Line:      3,
+						Column:    15,
+					},
+				},
+			},
+			{
+				Code: `
+import type { ConfiguredType } from 'pkg';
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Globals: map[string]any{"ConfiguredType": "readonly"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'ConfiguredType' is already a global variable.",
+						Line:      2,
+						Column:    15,
+					},
+				},
+			},
+			// scope-manager merges same-scope declarations into one variable,
+			// so an implicit global produces one report at the first identifier.
+			{
+				Code: `
+interface Record {}
+namespace Record { export const value = 1; }
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Record' is already a global variable.",
+						Line:      2,
+						Column:    11,
+					},
+				},
+			},
+			{
+				Code: `
+class Record {}
+namespace Record { export const value = 1; }
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Record' is already a global variable.",
+						Line:      2,
+						Column:    7,
+					},
+				},
+			},
+			// The static-method generic exception only applies when the outer
+			// binding is the enclosing class's generic, not an implicit global.
+			{
+				Code:    `class C { static method<Record>() {} }`,
+				Options: map[string]interface{}{"builtinGlobals": true, "ignoreTypeValueShadow": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Record' is already a global variable.",
+						Line:      1,
+						Column:    25,
 					},
 				},
 			},
@@ -2252,6 +2480,31 @@ class A<T> extends Map<string, T> {}
 						Message:   "'T' is already declared in the upper scope on line 2 column 6.",
 						Line:      3,
 						Column:    9,
+					},
+				},
+			},
+		},
+	)
+}
+
+func TestNoShadowTSESLintJavaScriptGlobals(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.allow-js.json",
+		t,
+		&NoShadowRule,
+		nil,
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:     `function fn(Record) {}`,
+				FileName: "plain.js",
+				Options:  map[string]interface{}{"builtinGlobals": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Record' is already a global variable.",
+						Line:      1,
+						Column:    13,
 					},
 				},
 			},

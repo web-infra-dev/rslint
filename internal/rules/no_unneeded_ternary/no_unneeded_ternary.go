@@ -1,10 +1,15 @@
 package no_unneeded_ternary
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unneeded_ternary.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-unneeded-ternary
 
@@ -12,12 +17,12 @@ type options struct {
 	defaultAssignment bool
 }
 
-func parseOptions(opts any) options {
+func parseOptions(ruleOptions []any) options {
 	result := options{defaultAssignment: true}
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap == nil {
+	if len(ruleOptions) == 0 {
 		return result
 	}
+	optsMap, _ := ruleOptions[0].(map[string]any)
 	if v, ok := optsMap["defaultAssignment"].(bool); ok {
 		result.defaultAssignment = v
 	}
@@ -189,9 +194,9 @@ func buildDefaultAssignmentFix(sf *ast.SourceFile, cond *ast.ConditionalExpressi
 // exist: `x ? true : false` → `x` / `!!x`, and (with `defaultAssignment:
 // false`) `a ? a : b` → `a || b`.
 var NoUnneededTernaryRule = rule.Rule{
-	Name: "no-unneeded-ternary",
-	Run: func(ctx rule.RuleContext, _ruleOptions []any) rule.RuleListeners {
-		ruleOptions := rule.LegacyUnwrapOptions(_ruleOptions)
+	Name:   "no-unneeded-ternary",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, ruleOptions []any) rule.RuleListeners {
 		opts := parseOptions(ruleOptions)
 
 		condExprMsg := rule.RuleMessage{

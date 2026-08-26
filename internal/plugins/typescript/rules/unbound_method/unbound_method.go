@@ -1,11 +1,16 @@
 package unbound_method
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed unbound_method.schema.json
+var schemaJSON []byte
 
 //go:generate node ./generate-natively-bound-members.mjs
 
@@ -25,7 +30,19 @@ func buildUnboundWithoutThisAnnotationMessage() rule.RuleMessage {
 }
 
 type UnboundMethodOptions struct {
-	IgnoreStatic *bool
+	IgnoreStatic bool
+}
+
+func parseOptions(options []any) UnboundMethodOptions {
+	opts := UnboundMethodOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["ignoreStatic"].(bool); ok {
+		opts.IgnoreStatic = value
+	}
+	return opts
 }
 
 func isNodeInsideTypeDeclaration(node *ast.Node) bool {
@@ -191,29 +208,10 @@ func checkIfMethod(symbol *ast.Symbol, ignoreStatic bool) ( /* dangerous */ bool
 
 var UnboundMethodRule = rule.CreateRule(rule.Rule{
 	Name:             "unbound-method",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(UnboundMethodOptions)
-		if !ok {
-			opts = UnboundMethodOptions{}
-			if options != nil {
-				var optsMap map[string]interface{}
-				if optsArray, ok := options.([]interface{}); ok && len(optsArray) > 0 {
-					optsMap, _ = optsArray[0].(map[string]interface{})
-				} else {
-					optsMap, _ = options.(map[string]interface{})
-				}
-				if optsMap != nil {
-					if ignoreStatic, ok := optsMap["ignoreStatic"].(bool); ok {
-						opts.IgnoreStatic = utils.Ref(ignoreStatic)
-					}
-				}
-			}
-		}
-		if opts.IgnoreStatic == nil {
-			opts.IgnoreStatic = utils.Ref(false)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		isNativelyBound := func(object *ast.Node, property *ast.Node) bool {
 			// We can't rely entirely on the type-level checks made at the end of this
@@ -238,7 +236,7 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 
 			// if `${object.name}.${property.name}` doesn't match any of
 			// the nativelyBoundMembers, then we fallback to type-level checks
-			return utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(object), supportedGlobalTypes...) && utils.IsAnyBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(property))
+			return utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(object), supportedGlobalTypes...) && utils.IsAnyBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(property))
 		}
 
 		checkIfMethodAndReport := func(node *ast.Node, symbol *ast.Symbol) bool {
@@ -246,7 +244,7 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			dangerous, firstParamIsThis := checkIfMethod(symbol, *opts.IgnoreStatic)
+			dangerous, firstParamIsThis := checkIfMethod(symbol, opts.IgnoreStatic)
 
 			if !dangerous {
 				return false

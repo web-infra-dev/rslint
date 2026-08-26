@@ -8,7 +8,7 @@ foo();
       ",
   "diagnostics": [
     {
-      "message": "'a' is defined but never used.",
+      "message": "'a' is defined but never used. Allowed unused args must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -39,7 +39,7 @@ foo();
       ",
   "diagnostics": [
     {
-      "message": "'c' is defined but never used.",
+      "message": "'c' is defined but never used. Allowed unused args must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -68,7 +68,7 @@ foo();
       ",
   "diagnostics": [
     {
-      "message": "'_a' is defined but never used.",
+      "message": "'_a' is defined but never used. Allowed unused args must match /[iI]gnored/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -94,7 +94,7 @@ exports[`no-unused-vars > invalid 4`] = `
   "code": "var [firstItemIgnored, secondItem] = items;",
   "diagnostics": [
     {
-      "message": "'secondItem' is assigned a value but never used.",
+      "message": "'secondItem' is assigned a value but never used. Allowed unused vars must match /[iI]gnored/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -153,7 +153,7 @@ const [a, _b, c] = array;
       ",
   "diagnostics": [
     {
-      "message": "'a' is assigned a value but never used.",
+      "message": "'a' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -168,7 +168,7 @@ const [a, _b, c] = array;
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'c' is assigned a value but never used.",
+      "message": "'c' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -200,7 +200,7 @@ const ignoreArray = ['ignore'];
       ",
   "diagnostics": [
     {
-      "message": "'a' is assigned a value but never used.",
+      "message": "'a' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -215,7 +215,7 @@ const ignoreArray = ['ignore'];
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'c' is assigned a value but never used.",
+      "message": "'c' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -230,7 +230,7 @@ const ignoreArray = ['ignore'];
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'fooArray' is assigned a value but never used.",
+      "message": "'fooArray' is assigned a value but never used. Allowed unused vars must match /ignore/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -245,7 +245,7 @@ const ignoreArray = ['ignore'];
       "ruleName": "@typescript-eslint/no-unused-vars",
     },
     {
-      "message": "'barArray' is assigned a value but never used.",
+      "message": "'barArray' is assigned a value but never used. Allowed unused vars must match /ignore/u.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -306,7 +306,7 @@ foo();
       ",
   "diagnostics": [
     {
-      "message": "'_a' is assigned a value but never used.",
+      "message": "'_a' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {
@@ -518,7 +518,7 @@ exports[`no-unused-vars > invalid 16`] = `
   "code": "({ a, ...rest }) => {};",
   "diagnostics": [
     {
-      "message": "'rest' is assigned a value but never used.",
+      "message": "'rest' is defined but never used.",
       "messageId": "unusedVar",
       "range": {
         "end": {

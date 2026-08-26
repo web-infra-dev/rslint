@@ -1,17 +1,198 @@
 package require_await
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func buildMissingAwaitMessage() rule.RuleMessage {
+func buildMissingAwaitMessage(node *ast.Node) rule.RuleMessage {
+	name := utils.UpperCaseFirstASCII(functionNameWithKind(node))
 	return rule.RuleMessage{
 		Id:          "missingAwait",
-		Description: "Function has no 'await' expression.",
+		Description: name + " has no 'await' expression.",
+		Data:        map[string]string{"name": name},
 	}
+}
+
+// functionNameWithKind mirrors @eslint-community/eslint-utils for tsgo's
+// function-shaped nodes. Unlike ESLint core's helper, it recovers names from
+// outer bindings and folds computed property names without a scope.
+func functionNameWithKind(node *ast.Node) string {
+	if node.Kind == ast.KindConstructor {
+		return utils.GetFunctionNameWithKindCore(node)
+	}
+
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	if parent == nil {
+		return ""
+	}
+	owner := functionPropertyOwner(node, parent)
+	tokens := make([]string, 0, 5)
+
+	if isClassFunctionOwner(node, owner) {
+		if ast.HasSyntacticModifier(owner, ast.ModifierFlagsStatic) {
+			tokens = append(tokens, "static")
+		}
+		if name := owner.Name(); name != nil && name.Kind == ast.KindPrivateIdentifier {
+			tokens = append(tokens, "private")
+		}
+	}
+	flags := ast.GetFunctionFlags(node)
+	if flags&ast.FunctionFlagsAsync != 0 {
+		tokens = append(tokens, "async")
+	}
+	if flags&ast.FunctionFlagsGenerator != 0 {
+		tokens = append(tokens, "generator")
+	}
+
+	switch {
+	case node.Kind == ast.KindGetAccessor:
+		tokens = append(tokens, "getter")
+	case node.Kind == ast.KindSetAccessor:
+		tokens = append(tokens, "setter")
+	case owner != nil:
+		tokens = append(tokens, "method")
+	case node.Kind == ast.KindArrowFunction:
+		tokens = append(tokens, "arrow", "function")
+	default:
+		tokens = append(tokens, "function")
+	}
+
+	if owner != nil {
+		if nameNode := owner.Name(); nameNode != nil && nameNode.Kind == ast.KindPrivateIdentifier {
+			tokens = append(tokens, nameNode.AsPrivateIdentifier().Text)
+		} else if name, ok := functionPropertyName(owner); ok && name != "" {
+			tokens = append(tokens, "'"+name+"'")
+		}
+	} else if name := functionOwnName(node); name != "" {
+		tokens = append(tokens, "'"+name+"'")
+	} else if name := functionOuterName(node); name != "" {
+		tokens = append(tokens, "'"+name+"'")
+	}
+
+	return strings.Join(tokens, " ")
+}
+
+func functionPropertyOwner(node *ast.Node, parent *ast.Node) *ast.Node {
+	switch node.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return node
+	}
+
+	switch parent.Kind {
+	case ast.KindPropertyAssignment:
+		if ast.SkipParentheses(parent.AsPropertyAssignment().Initializer) == node {
+			return parent
+		}
+	case ast.KindPropertyDeclaration:
+		declaration := parent.AsPropertyDeclaration()
+		if !ast.HasSyntacticModifier(parent, ast.ModifierFlagsAccessor) &&
+			declaration.Initializer != nil &&
+			ast.SkipParentheses(declaration.Initializer) == node {
+			return parent
+		}
+	}
+	return nil
+}
+
+func isClassFunctionOwner(node *ast.Node, owner *ast.Node) bool {
+	if owner == nil {
+		return false
+	}
+	if owner == node {
+		parent := node.Parent
+		return parent != nil && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)
+	}
+	parent := owner.Parent
+	return parent != nil && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)
+}
+
+func functionPropertyName(owner *ast.Node) (string, bool) {
+	nameNode := owner.Name()
+	if nameNode == nil {
+		return "", false
+	}
+	if name, ok := utils.GetStaticPropertyName(nameNode); ok {
+		return name, true
+	}
+	if nameNode.Kind != ast.KindComputedPropertyName {
+		return "", false
+	}
+	expression := ast.SkipParentheses(nameNode.AsComputedPropertyName().Expression)
+	if expression == nil || expression.Kind == ast.KindIdentifier {
+		return "", false
+	}
+	return utils.NewStaticStringEvaluatorWithoutScope().EvalToString(expression)
+}
+
+func functionOwnName(node *ast.Node) string {
+	var name *ast.Node
+	switch node.Kind {
+	case ast.KindFunctionDeclaration:
+		name = node.AsFunctionDeclaration().Name()
+	case ast.KindFunctionExpression:
+		name = node.AsFunctionExpression().Name()
+	}
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return name.AsIdentifier().Text
+}
+
+func functionOuterName(node *ast.Node) string {
+	if node.Name() != nil {
+		return ""
+	}
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsExportDefault) {
+		return "default"
+	}
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	if parent == nil {
+		return ""
+	}
+
+	var binding *ast.Node
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		declaration := parent.AsVariableDeclaration()
+		if declaration.Initializer != nil && ast.SkipParentheses(declaration.Initializer) == node {
+			binding = parent.Name()
+		}
+	case ast.KindParameter:
+		parameter := parent.AsParameterDeclaration()
+		if parameter.Initializer != nil && ast.SkipParentheses(parameter.Initializer) == node {
+			binding = parent.Name()
+		}
+	case ast.KindBindingElement:
+		element := parent.AsBindingElement()
+		if element.Initializer != nil && ast.SkipParentheses(element.Initializer) == node {
+			binding = parent.Name()
+		}
+	case ast.KindShorthandPropertyAssignment:
+		property := parent.AsShorthandPropertyAssignment()
+		if property.ObjectAssignmentInitializer != nil && ast.SkipParentheses(property.ObjectAssignmentInitializer) == node {
+			binding = parent.Name()
+		}
+	case ast.KindBinaryExpression:
+		assignment := parent.AsBinaryExpression()
+		if ast.IsAssignmentOperator(assignment.OperatorToken.Kind) && ast.SkipParentheses(assignment.Right) == node {
+			binding = ast.SkipParentheses(assignment.Left)
+		}
+	case ast.KindExportAssignment:
+		assignment := parent.AsExportAssignment()
+		if !assignment.IsExportEquals && ast.SkipParentheses(assignment.Expression) == node {
+			return "default"
+		}
+	}
+
+	if binding != nil && binding.Kind == ast.KindIdentifier {
+		return binding.AsIdentifier().Text
+	}
+	return ""
 }
 
 //nolint:unused
@@ -111,6 +292,7 @@ func hasAsyncIterator(typeChecker *checker.Checker, t *checker.Type) bool {
 
 var RequireAwaitRule = rule.CreateRule(rule.Rule{
 	Name:             "require-await",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var scopes []scopeInfo
@@ -254,8 +436,7 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 				//     },
 				//   ],
 				// });
-				// TODO(port): getFunctionHeadLoc
-				ctx.ReportNode(node, buildMissingAwaitMessage())
+				ctx.ReportRange(utils.GetFunctionHeadLoc(ctx.SourceFile, node), buildMissingAwaitMessage(node))
 			}
 
 			scopes = scopes[:len(scopes)-1]

@@ -38,4 +38,5 @@ interface Baz {
 
 ## Original Documentation
 
-- [typescript-eslint no-misused-new](https://typescript-eslint.io/rules/no-misused-new)
+- [typescript-eslint: no-misused-new](https://typescript-eslint.io/rules/no-misused-new)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-misused-new.ts)

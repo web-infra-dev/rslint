@@ -25,4 +25,5 @@ throw new CustomError('error');
 
 ## Original Documentation
 
-- [typescript-eslint only-throw-error](https://typescript-eslint.io/rules/only-throw-error)
+- [typescript-eslint: only-throw-error](https://typescript-eslint.io/rules/only-throw-error)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/only-throw-error.ts)

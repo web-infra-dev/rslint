@@ -84,6 +84,21 @@
       "type": "object",
       "description": "Language-specific configuration options",
       "properties": {
+        "ecmaVersion": {
+          "description": "ECMAScript edition used for language globals. Omitted or \"latest\" follows the ESLint version targeted by rslint.",
+          "default": "latest",
+          "oneOf": [
+            { "const": "latest" },
+            { "type": "integer", "enum": [3, 5] },
+            { "type": "integer", "minimum": 6, "maximum": 17 },
+            { "type": "integer", "minimum": 2015, "maximum": 2026 }
+          ]
+        },
+        "sourceType": {
+          "type": "string",
+          "enum": ["module", "script", "commonjs"],
+          "description": "Module kind exposed to rules whose behavior depends on it. This does not change TypeScript parsing; when omitted, an exact lowercase .cjs extension resolves to commonjs and every other filename resolves to module."
+        },
         "parserOptions": {
           "$ref": "#/definitions/ParserOptions",
           "description": "Parser-specific configuration options"

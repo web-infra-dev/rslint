@@ -3,12 +3,12 @@ package no_instanceof_builtins
 import (
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_instanceof_builtins.schema.json
@@ -152,10 +152,10 @@ func parseOptions(rawOptions []any) options {
 		exclude:         utils.NewSetFromItems[string](),
 	}
 
-	optsMap := utils.GetOptionsMap(rawOptions)
-	if optsMap == nil {
+	if len(rawOptions) == 0 {
 		return opts
 	}
+	optsMap, _ := rawOptions[0].(map[string]any)
 
 	if useErrorIsError, ok := optsMap["useErrorIsError"].(bool); ok {
 		opts.useErrorIsError = useErrorIsError
@@ -211,7 +211,7 @@ func replaceWithTypeOfExpression(sourceFile *ast.SourceFile, binary *ast.BinaryE
 	return []rule.RuleFix{
 		insertAt(leftRange.Pos(), insertBefore),
 		rule.RuleFixReplaceRange(utils.TrimNodeTextRange(sourceFile, binary.OperatorToken), "==="),
-		rule.RuleFixReplaceRange(utils.TrimNodeTextRange(sourceFile, binary.Right), fmt.Sprintf("'%s'", strings.ToLower(constructorName))),
+		rule.RuleFixReplaceRange(utils.TrimNodeTextRange(sourceFile, binary.Right), fmt.Sprintf("'%s'", ecmascript.StringToLowerCase(constructorName))),
 	}
 }
 
@@ -233,7 +233,7 @@ func removeNodeSyntaxAndSpacesBefore(sourceFile *ast.SourceFile, node *ast.Node)
 		}
 		fixes = append(fixes, removeNodeSyntaxAndSpacesBefore(sourceFile, expression)...)
 
-		closeParenEnd := utils.SkipTrailingWhitespace(sourceFile.Text(), nodeRange.Pos(), nodeRange.End())
+		closeParenEnd := ecmascript.SkipTrailingWhitespace(sourceFile.Text(), nodeRange.Pos(), nodeRange.End())
 		if closeParenEnd > nodeRange.Pos() && sourceFile.Text()[closeParenEnd-1] == ')' {
 			fixes = append(fixes, removeRangeAndSpacesBefore(sourceFile, core.NewTextRange(closeParenEnd-1, closeParenEnd)))
 		}
@@ -246,7 +246,7 @@ func removeNodeSyntaxAndSpacesBefore(sourceFile *ast.SourceFile, node *ast.Node)
 func removeRangeAndSpacesBefore(sourceFile *ast.SourceFile, textRange core.TextRange) rule.RuleFix {
 	text := sourceFile.Text()
 	start := textRange.Pos()
-	trimmedStart := utils.SkipTrailingWhitespace(text, 0, start)
+	trimmedStart := ecmascript.SkipTrailingWhitespace(text, 0, start)
 	return rule.RuleFixReplaceRange(
 		textRange.WithPos(trimmedStart),
 		firstLineBreak(text[trimmedStart:start]),
@@ -285,7 +285,7 @@ func messageNoInstanceofBuiltins() rule.RuleMessage {
 }
 
 func messageSwitchToTypeOf(constructorName string) rule.RuleMessage {
-	typeName := strings.ToLower(constructorName)
+	typeName := ecmascript.StringToLowerCase(constructorName)
 	return rule.RuleMessage{
 		Id:          messageIDSwitchToTypeOf,
 		Description: fmt.Sprintf("Switch to `typeof … === '%s'`.", typeName),

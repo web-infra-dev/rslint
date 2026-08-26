@@ -5,11 +5,11 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 var (
@@ -19,7 +19,8 @@ var (
 
 // https://eslint.org/docs/latest/rules/no-regex-spaces
 var NoRegexSpacesRule = rule.Rule{
-	Name: "no-regex-spaces",
+	Name:   "no-regex-spaces",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sf := ctx.SourceFile
 
@@ -172,11 +173,11 @@ func indexInAnyRange(idx int, ranges []classRange) bool {
 // If ANY check fails the pattern is treated as unparsable and the rule
 // skips reporting — matching ESLint.
 func isValidRegexPattern(pattern string, flags utils.RegexFlags) bool {
-	var opt regexp2.RegexOptions = regexp2.ECMAScript
+	compileFlags := ""
 	if flags.UV() {
-		opt |= regexp2.Unicode
+		compileFlags = "u"
 	}
-	if _, err := regexp2.Compile(pattern, opt); err != nil {
+	if _, err := esregexp.Compile(pattern, compileFlags); err != nil {
 		return false
 	}
 	if flags.UV() {

@@ -74,4 +74,5 @@ class Hello extends React.Component {
 
 ## Original Documentation
 
-- [eslint-plugin-react / no-is-mounted](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-is-mounted.md)
+- [eslint-plugin-react: no-is-mounted](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-is-mounted.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-is-mounted.js)

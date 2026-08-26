@@ -45,11 +45,15 @@ type RefStore struct {
 	sourceFile *ast.SourceFile
 	resolver   binder.NameResolver
 	tc         *checker.Checker
+	init       RefStoreInit
 	walked     bool
 	// candidates maps identifier text to the reference-position identifiers
 	// still awaiting resolution; entries move into refs on first query.
 	candidates map[string][]*ast.Node
 	refs       map[*ast.Symbol][]*ast.Node
+	// authoredImports holds the local names bound by the file's own import
+	// declarations; nil until a JSDoc-synthesized binding forces the question.
+	authoredImports map[string]struct{}
 	// merged maps a raw binder symbol onto the checker-merged symbol that
 	// refs is keyed by for it; see mergedSymbol.
 	merged map[*ast.Symbol]*ast.Symbol
@@ -61,8 +65,9 @@ type RefStore struct {
 // a fallback by Resolve for identifiers the binder scope walk can't place,
 // and by References when asked about a symbol that fallback produced; nil
 // disables both (Resolve then never falls back, and References behaves as if
-// every such symbol were never queried).
-func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker) *RefStore {
+// every such symbol were never queried). init supplies only declaration-less
+// wrapper bindings and top-level scope facts resolved by the linter.
+func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *checker.Checker, init RefStoreInit) *RefStore {
 	resolver := binder.NameResolver{CompilerOptions: options}
 	if ast.IsGlobalSourceFile(sourceFile.AsNode()) {
 		// A script file's own top-level locals are never consulted by the
@@ -76,6 +81,7 @@ func NewRefStore(sourceFile *ast.SourceFile, options *core.CompilerOptions, tc *
 		sourceFile: sourceFile,
 		resolver:   resolver,
 		tc:         tc,
+		init:       init,
 	}
 }
 
@@ -202,13 +208,380 @@ func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 	return s.checkerReferenceSymbol(node, meaning)
 }
 
+// ResolveInFile returns the symbol a reference-position identifier resolves to
+// using only the binder's lexical scope walk. Unlike Resolve, it never asks the
+// TypeChecker to supply a declaration from lib files, ambient .d.ts files, or
+// another source file.
+//
+// Imported bindings and declarations authored in this source file are still
+// visible because their binder symbols live in the file's own scope graph.
+// This distinction is required by ESLint-compatible rules such as no-undef:
+// their answer must not change merely because rslint happened to construct a
+// TypeChecker for the file.
+func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return nil
+	}
+	return s.binderReferenceSymbol(node, referenceMeaning(node))
+}
+
+// ResolveInFileWithMeaning is ResolveInFile with an explicit declaration-space
+// meaning. It is for consumers whose reference model intentionally differs
+// from TypeScript's checker semantics, such as ESLint scope variables that can
+// independently be type-capable, value-capable, or both. Like ResolveInFile,
+// it never consults the TypeChecker or declarations outside this source file.
+func (s *RefStore) ResolveInFileWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return nil
+	}
+	return s.binderReferenceSymbol(node, meaning)
+}
+
+// HasImplicitWrapperBinding reports whether the resolved file wrapper supplies
+// a declaration-less, non-global binding with name.
+func (s *RefStore) HasImplicitWrapperBinding(name string) bool {
+	return s != nil && name != "" && s.init.hasImplicitWrapperBinding(name)
+}
+
+// IsDefinedInFile reports whether a reference-position identifier is defined
+// by the file's lexical scope graph or by a non-global binding supplied by its
+// resolved file wrapper. It never consults the TypeChecker and does not
+// manufacture an ast.Symbol for an implicit binding.
+func (s *RefStore) IsDefinedInFile(node *ast.Node) bool {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return false
+	}
+	if s.binderReferenceSymbol(node, referenceMeaning(node)) != nil {
+		return true
+	}
+	return s.HasImplicitWrapperBinding(node.Text())
+}
+
+// IsNameDefinedInFile reports whether name is visible in the value scope at
+// location through a declaration in this file or a binding supplied by the
+// resolved file wrapper. Unlike IsDefinedInFile, location need not itself be a
+// reference-position identifier. The TypeChecker is never consulted.
+func (s *RefStore) IsNameDefinedInFile(location *ast.Node, name string) bool {
+	return s.IsNameDefinedInFileWithMeaning(location, name, ast.SymbolFlagsValue)
+}
+
+// IsNameDefinedInFileWithMeaning is IsNameDefinedInFile for an explicit set of
+// declaration spaces. Implicit wrapper bindings participate only in value
+// lookups.
+func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name string, meaning ast.SymbolFlags) bool {
+	if s == nil || location == nil || name == "" {
+		return false
+	}
+	if s.resolveName(location, name, meaning) != nil {
+		return true
+	}
+	return meaning&ast.SymbolFlagsValue != 0 && s.HasImplicitWrapperBinding(name)
+}
+
+// resolveName runs the binder scope walk for name at location and reconciles
+// its departures from the scopes the source text actually spells.
+//
+// The first is a JavaScript scoping rule NameResolver deliberately leaves out:
+// a parameter initializer cannot see a declaration made in the function body.
+// TypeScript keeps that resolution so the checker can report "used before its
+// declaration" against the right symbol, but scope-shaped consumers need the
+// language answer — the parameter environment is the body environment's
+// parent, so the name belongs to whatever encloses the function.
+//
+// The second is the declarations the parser synthesizes from JSDoc tags, which
+// join a scope's symbol table without being written there.
+//
+// The rest are bindings the binder's symbol tables carry that the language
+// declares nowhere the walk passes: a namespace re-export, a segment of a
+// dotted namespace name, and a class expression's self-reference seen from the
+// class's own decorators. Every skip resumes the walk from the scope that held
+// the rejected binding, so an outer declaration of the same name is still
+// found.
+func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
+	for location != nil {
+		result := s.resolver.Resolve(location, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
+		if result == nil {
+			return nil
+		}
+		if scope := jsdocOnlyScope(result, name); scope != nil && !s.hasAuthoredImportBinding(name) {
+			location = scope.Parent
+			continue
+		}
+		if isExportAliasOnly(result) {
+			location = outerExportScopeLocation(result.Declarations[0])
+			continue
+		}
+		if isQualifiedNamespaceNameOnly(result) {
+			if scope := bindingScope(result, name); scope != nil {
+				location = scope.Parent
+				continue
+			}
+		}
+		if class := classExpressionNameInOwnDecorator(location, result); class != nil {
+			location = class.Parent
+			continue
+		}
+		fn := bodyOnlyParameterBarrier(location, result)
+		if fn == nil {
+			return result
+		}
+		// A named function expression binds its own name outside the body, so
+		// that binding survives the barrier; everything else resolves from the
+		// scope holding the function.
+		if own := functionExpressionSelfBinding(fn, name, meaning); own != nil {
+			return own
+		}
+		location = fn.Parent
+	}
+	return nil
+}
+
+// isExportAliasOnly reports whether every declaration of symbol is an export
+// specifier or a namespace export. A namespace's `export { X } from 'y'`,
+// `export * as X from 'y'`, and bare `export { X }` add X to what the namespace
+// exports without declaring it inside — ESLint's scope manager creates no
+// variable for them, so the scope walk has to step over the binding and resume
+// outside the namespace.
+func isExportAliasOnly(symbol *ast.Symbol) bool {
+	if len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration.Kind != ast.KindExportSpecifier && declaration.Kind != ast.KindNamespaceExport {
+			return false
+		}
+	}
+	return true
+}
+
+// isQualifiedNamespaceNameOnly reports whether every declaration of symbol is a
+// segment of a dotted namespace name. `namespace N.M {}` opens one scope for
+// the whole declaration and declares neither segment in it — ESLint's scope
+// manager only creates a variable for a namespace named by a plain identifier
+// — so the scope walk has to step over the binding and resume outside.
+func isQualifiedNamespaceNameOnly(symbol *ast.Symbol) bool {
+	if len(symbol.Declarations) == 0 {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if !utils.IsQualifiedNamespaceSegment(declaration) {
+			return false
+		}
+	}
+	return true
+}
+
+// bindingScope returns the node whose symbol table binds name to symbol —
+// either as a local or, for a namespace member, as an export. It returns nil
+// when no enclosing table claims it, leaving the caller to keep the symbol
+// rather than guess where the walk should resume.
+func bindingScope(symbol *ast.Symbol, name string) *ast.Node {
+	if len(symbol.Declarations) == 0 {
+		return nil
+	}
+	for node := symbol.Declarations[0].Parent; node != nil; node = node.Parent {
+		if locals := node.Locals(); locals != nil && locals[name] == symbol {
+			return node
+		}
+		if owner := node.Symbol(); owner != nil && owner.Exports != nil && owner.Exports[name] == symbol {
+			return node
+		}
+	}
+	return nil
+}
+
+// classExpressionNameInOwnDecorator returns the class expression that binds
+// result to its own name while location sits in one of that class's
+// decorators. A class's decorators are evaluated in the scope holding the
+// class, so the name a class expression binds for itself does not reach them,
+// but TypeScript's resolver keeps that self-reference visible throughout the
+// class node — decorators included.
+func classExpressionNameInOwnDecorator(location *ast.Node, result *ast.Symbol) *ast.Node {
+	if len(result.Declarations) != 1 || result.Declarations[0].Kind != ast.KindClassExpression {
+		return nil
+	}
+	class := result.Declarations[0]
+	for node := location; node != nil; node = node.Parent {
+		if node.Kind == ast.KindDecorator && node.Parent == class {
+			return class
+		}
+	}
+	return nil
+}
+
+// jsdocOnlyScope returns the scope whose symbol table binds name to symbol when
+// every declaration of symbol was synthesized from a JSDoc tag. ESLint reads
+// that text as a comment and declares nothing, so the binding has to be stepped
+// over. It returns nil when the symbol has a declaration the file spells, and
+// when no enclosing scope table claims it — leaving that symbol in place rather
+// than guessing where the walk should resume.
+func jsdocOnlyScope(symbol *ast.Symbol, name string) *ast.Node {
+	if len(symbol.Declarations) == 0 || hasAuthoredDeclaration(symbol) {
+		return nil
+	}
+	for node := symbol.Declarations[0].Parent; node != nil; node = node.Parent {
+		if locals := node.Locals(); locals != nil && locals[name] == symbol {
+			return node
+		}
+	}
+	return nil
+}
+
+// hasAuthoredImportBinding reports whether an import declaration the file
+// spells introduces name. Two aliases cannot share one table slot, so when a
+// JSDoc `@import` tag binds a name a real import already binds, the symbol the
+// binder keeps carries only one of them — and it can be the synthesized one.
+// The authored syntax declares the name either way.
+func (s *RefStore) hasAuthoredImportBinding(name string) bool {
+	if s.authoredImports == nil {
+		s.authoredImports = collectAuthoredImportBindings(s.sourceFile)
+	}
+	_, ok := s.authoredImports[name]
+	return ok
+}
+
+// collectAuthoredImportBindings gathers every local name bound by an import
+// declaration written in the file. The declarations reparsed from `@import`
+// tags carry their own node kind, so they never enter this set.
+func collectAuthoredImportBindings(sourceFile *ast.SourceFile) map[string]struct{} {
+	bindings := make(map[string]struct{})
+	if sourceFile == nil || sourceFile.Statements == nil {
+		return bindings
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && ast.IsDeclarationName(node) {
+			bindings[node.Text()] = struct{}{}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement.Kind == ast.KindImportDeclaration ||
+			statement.Kind == ast.KindImportEqualsDeclaration {
+			statement.ForEachChild(visit)
+		}
+	}
+	return bindings
+}
+
+// bodyOnlyParameterBarrier returns the function whose body holds every
+// declaration of result while location sits in that function's parameter list,
+// which is the shape where the scope walk crossed a boundary the language does
+// not. It returns nil when no such function encloses location.
+func bodyOnlyParameterBarrier(location *ast.Node, result *ast.Symbol) *ast.Node {
+	if len(result.Declarations) == 0 {
+		return nil
+	}
+	for node := location; node != nil; node = node.Parent {
+		if node.Kind != ast.KindParameter || node.Parent == nil || !ast.IsFunctionLike(node.Parent) {
+			continue
+		}
+		fn := node.Parent
+		if body := fn.Body(); body != nil && declaredOnlyWithin(result, body) {
+			return fn
+		}
+	}
+	return nil
+}
+
+// declaredOnlyWithin reports whether every declaration of symbol lies inside
+// body. A symbol that also has a declaration outside it — a parameter of the
+// same name, a type parameter, a merged outer declaration — stays visible from
+// the parameter list.
+func declaredOnlyWithin(symbol *ast.Symbol, body *ast.Node) bool {
+	for _, decl := range symbol.Declarations {
+		if decl.Pos() < body.Pos() || decl.End() > body.End() {
+			return false
+		}
+	}
+	return true
+}
+
+// functionExpressionSelfBinding returns the symbol a named function expression
+// binds for its own name. The binder keeps that symbol off the function's
+// locals table, so a scope walk restarted outside the function would otherwise
+// lose it.
+func functionExpressionSelfBinding(fn *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
+	if meaning&ast.SymbolFlagsFunction == 0 || !ast.IsFunctionExpression(fn) {
+		return nil
+	}
+	if fnName := fn.Name(); fnName != nil && fnName.Text() == name {
+		return fn.Symbol()
+	}
+	return nil
+}
+
+// IsGlobalNameReference reports whether name at location refers to an
+// environment global rather than to a declaration in this file, mirroring
+// ESLint's sourceCode.isGlobalReference for the given declaration spaces.
+//
+// A global script file needs its own answer: ESLint keeps that file's top-level
+// declarations and the configured globals in one global-scope variable, so any
+// definition of the name there — a type-only `interface` or `type` included —
+// clears the global reference. Inner scopes hold separate variables, and a
+// value reference only resolves to one declared in a requested space, so a
+// type-only declaration inside a namespace or function leaves it global.
+func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meaning ast.SymbolFlags) bool {
+	if s == nil || location == nil || name == "" {
+		return false
+	}
+	if s.sourceFile != nil && ast.IsGlobalSourceFile(s.sourceFile.AsNode()) &&
+		hasAuthoredDeclaration(s.sourceFile.Locals[name]) {
+		return false
+	}
+	return !s.IsNameDefinedInFileWithMeaning(location, name, meaning)
+}
+
+// hasAuthoredDeclaration reports whether symbol has a declaration the file
+// actually spells in syntax. A JSDoc tag such as `@typedef` or `@import` is
+// reparsed into synthesized declaration nodes that join the file's symbol
+// table; ESLint reads that same text as a comment and creates no scope variable
+// for it, so a symbol declared only that way defines nothing.
+func hasAuthoredDeclaration(symbol *ast.Symbol) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, decl := range symbol.Declarations {
+		if !isJSDocSynthesized(decl) {
+			return true
+		}
+	}
+	return false
+}
+
+// isJSDocSynthesized reports whether the parser produced node from a JSDoc
+// tag. Only the root of a reparsed subtree carries the flag — the import
+// specifier a `@import` tag binds is a deep clone inside a flagged clause — so
+// the answer comes from the ancestor chain.
+func isJSDocSynthesized(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current.Flags&ast.NodeFlagsReparsed != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// HasNonGlobalProgramScope reports whether program-level declarations should
+// be treated as living outside the global scope. Module syntax and resolved
+// language defaults can both contribute; an authored global program scope
+// (script, or commonjs on TypeScript-flavoured extensions) forces global
+// program scope instead.
+func (s *RefStore) HasNonGlobalProgramScope() bool {
+	if s == nil || s.init.globalTopLevelScope {
+		return false
+	}
+	return ast.IsExternalModule(s.sourceFile) || s.init.nonGlobalTopLevelScope
+}
+
 // binderReferenceSymbol resolves one reference without checker work. A named
 // export nested in a namespace needs one extra guard: the binder exposes that
 // export's own alias in the namespace's Exports table. If no local declaration
 // matches the requested meaning, NameResolver can otherwise return the alias
 // being declared instead of continuing to an outer lexical declaration.
 func (s *RefStore) binderReferenceSymbol(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
-	target := s.resolver.Resolve(node, node.Text(), meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
+	target := s.resolveName(node, node.Text(), meaning)
 	if !isOwnExportAlias(node, target) {
 		return target
 	}
@@ -216,7 +589,7 @@ func (s *RefStore) binderReferenceSymbol(node *ast.Node, meaning ast.SymbolFlags
 	if outer == nil {
 		return nil
 	}
-	return s.resolver.Resolve(outer, node.Text(), meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
+	return s.resolveName(outer, node.Text(), meaning)
 }
 
 // checkerReferenceSymbol resolves a reference the binder-only scope walk
@@ -421,6 +794,14 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		entity.Parent.AsImportEqualsDeclaration().ModuleReference == entity {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
+	// Heritage clauses parse dotted names as PropertyAccessExpressions rather
+	// than QualifiedNames. In a type-only heritage position, the root of that
+	// property-access chain still names a namespace and must skip a same-named
+	// value binding. A class `extends` expression is not part of a type node, so
+	// it deliberately continues to the value-space branch below.
+	if isTypeOnlyPropertyAccessQualifier(n) {
+		return ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	}
 	if ast.IsExpressionNode(n) {
 		return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
 	}
@@ -433,4 +814,20 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		return ast.SymbolFlagsType | ast.SymbolFlagsAlias
 	}
 	return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
+}
+
+// isTypeOnlyPropertyAccessQualifier reports whether n is the lexical root of
+// an expression-shaped qualified name used as a type. TypeScript represents
+// `N.T` in `class C implements N.T` and `interface I extends N.T` with a
+// PropertyAccessExpression, even though N has namespace meaning there.
+func isTypeOnlyPropertyAccessQualifier(n *ast.Node) bool {
+	entity := n
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression {
+		access := entity.Parent.AsPropertyAccessExpression()
+		if access == nil || access.Expression != entity {
+			break
+		}
+		entity = entity.Parent
+	}
+	return entity != n && ast.IsPartOfTypeNode(entity)
 }

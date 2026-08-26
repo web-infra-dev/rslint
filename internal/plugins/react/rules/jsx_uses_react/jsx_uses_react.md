@@ -6,4 +6,5 @@ Prevent React from being incorrectly marked as unused when JSX is used. This rul
 
 ## Original Documentation
 
-- [react/jsx-uses-react](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-uses-react.md)
+- [eslint-plugin-react: jsx-uses-react](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-uses-react.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-uses-react.js)

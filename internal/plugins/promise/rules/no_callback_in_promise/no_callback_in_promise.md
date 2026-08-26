@@ -63,3 +63,8 @@ whatever.then(() => process.nextTick(cb))              // error
 ## Differences from ESLint
 
 None. The rule behaves identically to the upstream `eslint-plugin-promise` implementation.
+
+## Original Documentation
+
+- [eslint-plugin-promise: no-callback-in-promise](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/no-callback-in-promise.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/no-callback-in-promise.js)

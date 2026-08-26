@@ -32,4 +32,5 @@ export { value, type MyType } from './mixed';
 
 ## Original Documentation
 
-- [typescript-eslint consistent-type-exports](https://typescript-eslint.io/rules/consistent-type-exports)
+- [typescript-eslint: consistent-type-exports](https://typescript-eslint.io/rules/consistent-type-exports)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.46.3/packages/eslint-plugin/src/rules/consistent-type-exports.ts)

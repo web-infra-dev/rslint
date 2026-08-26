@@ -9,7 +9,8 @@ import (
 )
 
 var NoDupeClassMembersRule = rule.Rule{
-	Name: "no-dupe-class-members",
+	Name:   "no-dupe-class-members",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkClass := func(node *ast.Node) {
 			type memberState struct {

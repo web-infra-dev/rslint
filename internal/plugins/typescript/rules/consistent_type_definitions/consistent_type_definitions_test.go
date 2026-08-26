@@ -2,11 +2,14 @@ package consistent_type_definitions
 
 import (
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -47,7 +50,14 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 			Code:   `type T = { [K: string]: number };`,
 			Output: []string{`interface T { [K: string]: number }`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "interfaceOverType"},
+				{
+					MessageId: "interfaceOverType",
+					Message:   "Use an `interface` instead of a `type`.",
+					Line:      1,
+					Column:    6,
+					EndLine:   1,
+					EndColumn: 7,
+				},
 			},
 		},
 		{
@@ -135,6 +145,41 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 				{MessageId: "interfaceOverType"},
 			},
 		},
+		{
+			Code:   `type /* before-name */ T = { x: number };`,
+			Output: []string{`interface /* before-name */ T { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
+		{
+			Code:   `export /* before-type */ type T = { x: number };`,
+			Output: []string{`export /* before-type */ interface T { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
+		{
+			Code:   `type T /* first */ /* second */ = { x: number };`,
+			Output: []string{`interface T /* first */ /* second */ { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
+		{
+			Code:   `type T = /* after-equals */ { x: number };`,
+			Output: []string{`interface T { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
+		{
+			Code:   `type T</* parameter */ U> /* before-equals */ = (/* after-equals */ { x: U });`,
+			Output: []string{`interface T</* parameter */ U> /* before-equals */ { x: U }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "interfaceOverType"},
+			},
+		},
 		// type → interface with excessive whitespace
 		{
 			Code:   `type T=                         { x: number; };`,
@@ -190,7 +235,14 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 			Options: []interface{}{"type"},
 			Output:  []string{`type T = { x: number; }`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "typeOverInterface"},
+				{
+					MessageId: "typeOverInterface",
+					Message:   "Use a `type` instead of an `interface`.",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 12,
+				},
 			},
 		},
 		{
@@ -257,6 +309,22 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 				{MessageId: "typeOverInterface"},
 			},
 		},
+		{
+			Code:    `interface /* before-name */ T { x: number }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`type /* before-name */ T = { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
+		{
+			Code:    `export /* before-interface */ interface T { x: number }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`export /* before-interface */ type T = { x: number }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
 		// interface → type with excessive whitespace
 		{
 			Code:    `interface T                          { x: number; }`,
@@ -293,11 +361,43 @@ func TestConsistentTypeDefinitionsRule(t *testing.T) {
 				{MessageId: "typeOverInterface"},
 			},
 		},
+		{
+			Code:    `declare namespace global { interface A {} }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`declare namespace global { type A = {} }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
+		{
+			Code:    `declare module global { interface A {} }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`declare module global { type A = {} }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
+		{
+			Code:    `declare namespace Outer { global { interface A {} } }`,
+			Options: []interface{}{"type"},
+			Output:  []string{`declare namespace Outer { global { type A = {} } }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
 		// export default interface
 		{
 			Code:    "export default interface Test {\n  bar(): string;\n  foo(): number;\n}",
 			Options: []interface{}{"type"},
 			Output:  []string{"type Test = {\n  bar(): string;\n  foo(): number;\n}\nexport default Test"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "typeOverInterface"},
+			},
+		},
+		{
+			Code:    `export default interface Test extends Base<T>, Extra { x: T };`,
+			Options: []interface{}{"type"},
+			Output:  []string{"type Test = { x: T } & Base<T> & Extra\nexport default Test;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "typeOverInterface"},
 			},
@@ -369,7 +469,7 @@ declare global { interface Array<T> { item: T; } }`,
 
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      program,
+					Program:      lintprogram.NewFromCompiler(program),
 					File:         sourceFile.FileName(),
 					ExcludePaths: []string{},
 					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
@@ -446,4 +546,192 @@ declare global { interface Array<T> { item: T; } }`,
 			}
 		})
 	}
+}
+
+func TestConsistentTypeDefinitionsFixEdits(t *testing.T) {
+	testCases := []struct {
+		name             string
+		code             string
+		options          []any
+		wantMergedSource string
+		wantMergedText   string
+		wantOutput       string
+	}{
+		{
+			name: "reported DoActionV2Resp export",
+			code: `export type DoActionV2Resp = {
+  code?: number;
+  msg?: string;
+  data?: {
+    resp?: string;
+    success?: boolean;
+  };
+};`,
+			wantMergedSource: `type DoActionV2Resp = {
+  code?: number;
+  msg?: string;
+  data?: {
+    resp?: string;
+    success?: boolean;
+  };
+};`,
+			wantMergedText: `interface DoActionV2Resp {
+  code?: number;
+  msg?: string;
+  data?: {
+    resp?: string;
+    success?: boolean;
+  };
+}`,
+			wantOutput: `export interface DoActionV2Resp {
+  code?: number;
+  msg?: string;
+  data?: {
+    resp?: string;
+    success?: boolean;
+  };
+}`,
+		},
+		{
+			name: "reported GetShareDeepResearchPodcastResp export",
+			code: `export type GetShareDeepResearchPodcastResp = {
+  podcast_gen_status?: PodcastGenStatus;
+  audit_status?: AuditStatus;
+  episode?: Episode;
+};`,
+			wantMergedSource: `type GetShareDeepResearchPodcastResp = {
+  podcast_gen_status?: PodcastGenStatus;
+  audit_status?: AuditStatus;
+  episode?: Episode;
+};`,
+			wantMergedText: `interface GetShareDeepResearchPodcastResp {
+  podcast_gen_status?: PodcastGenStatus;
+  audit_status?: AuditStatus;
+  episode?: Episode;
+}`,
+			wantOutput: `export interface GetShareDeepResearchPodcastResp {
+  podcast_gen_status?: PodcastGenStatus;
+  audit_status?: AuditStatus;
+  episode?: Episode;
+}`,
+		},
+		{
+			name:             "type alias parameters preserve trivia before close",
+			code:             `export type T<U /* before close */,> /* before equals */ = ({ x: U });`,
+			wantMergedSource: `type T<U /* before close */,> /* before equals */ = ({ x: U });`,
+			wantMergedText:   `interface T<U /* before close */,> /* before equals */ { x: U }`,
+			wantOutput:       `export interface T<U /* before close */,> /* before equals */ { x: U }`,
+		},
+		{
+			name:             "export interface keeps modifier outside fix",
+			code:             `export interface T { x: number }`,
+			options:          []any{"type"},
+			wantMergedSource: `interface T `,
+			wantMergedText:   `type T = `,
+			wantOutput:       `export type T = { x: number }`,
+		},
+		{
+			name:             "type parameters comments and heritage",
+			code:             `export declare interface T<U /* before close */> extends A, B<U> { x: U }`,
+			options:          []any{"type"},
+			wantMergedSource: `interface T<U /* before close */> extends A, B<U> { x: U }`,
+			wantMergedText:   `type T<U /* before close */> = { x: U } & A & B<U>`,
+			wantOutput:       `export declare type T<U /* before close */> = { x: U } & A & B<U>`,
+		},
+		{
+			name:             "default export spans wrapper",
+			code:             `export default interface T extends A, B { x: number }`,
+			options:          []any{"type"},
+			wantMergedSource: `export default interface T extends A, B { x: number }`,
+			wantMergedText:   "type T = { x: number } & A & B\nexport default T",
+			wantOutput:       "type T = { x: number } & A & B\nexport default T",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			diagnostics := lintConsistentTypeDefinitions(t, testCase.code, testCase.options, rule.EditDemandAutofix)
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+			}
+			if diagnostics[0].FixesPtr == nil {
+				t.Fatal("diagnostic has no fixes")
+			}
+
+			merged := mergeFixesForTest(testCase.code, *diagnostics[0].FixesPtr)
+			if got := testCase.code[merged.Range.Pos():merged.Range.End()]; got != testCase.wantMergedSource {
+				t.Errorf("merged fix source = %q, want %q", got, testCase.wantMergedSource)
+			}
+			if merged.Text != testCase.wantMergedText {
+				t.Errorf("merged fix text = %q, want %q", merged.Text, testCase.wantMergedText)
+			}
+
+			output, unapplied, fixed := linter.ApplyRuleFixes(testCase.code, diagnostics)
+			if !fixed || len(unapplied) != 0 {
+				t.Fatalf("ApplyRuleFixes fixed = %v, unapplied = %d", fixed, len(unapplied))
+			}
+			if output != testCase.wantOutput {
+				t.Errorf("fixed output = %q, want %q", output, testCase.wantOutput)
+			}
+		})
+	}
+}
+
+func lintConsistentTypeDefinitions(
+	t *testing.T,
+	code string,
+	options []any,
+	demand rule.EditDemand,
+) []rule.RuleDiagnostic {
+	t.Helper()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(code, "fix-edits.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:      lintprogram.NewFromCompiler(program),
+		File:         sourceFile.FileName(),
+		ExcludePaths: []string{},
+		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+			return []linter.ConfiguredRule{{
+				Name:     ConsistentTypeDefinitionsRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return ConsistentTypeDefinitionsRule.Run(ctx, options)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: demand,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	})
+	return diagnostics
+}
+
+func mergeFixesForTest(source string, fixes []rule.RuleFix) rule.RuleFix {
+	fixes = slices.Clone(fixes)
+	slices.SortFunc(fixes, func(a rule.RuleFix, b rule.RuleFix) int {
+		if byStart := a.Range.Pos() - b.Range.Pos(); byStart != 0 {
+			return byStart
+		}
+		return a.Range.End() - b.Range.End()
+	})
+
+	start := fixes[0].Range.Pos()
+	end := fixes[len(fixes)-1].Range.End()
+	lastEnd := start
+	var text strings.Builder
+	for _, fix := range fixes {
+		text.WriteString(source[lastEnd:fix.Range.Pos()])
+		text.WriteString(fix.Text)
+		lastEnd = fix.Range.End()
+	}
+	return rule.RuleFixReplaceRange(fixes[0].Range.WithEnd(end), text.String())
 }

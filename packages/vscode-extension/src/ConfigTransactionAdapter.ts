@@ -1,5 +1,4 @@
 import {
-  CONFIG_DISCOVERY_PROTOCOL_VERSION,
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
   type ConfigModuleActivationPlan,
@@ -18,7 +17,7 @@ interface ConfigActivationWireResponse {
 }
 
 export interface ConfigTransactionControlRequest {
-  protocolVersion: typeof CONFIG_DISCOVERY_PROTOCOL_VERSION;
+  protocolVersion: number;
   transactionId: string;
 }
 
@@ -64,11 +63,12 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 function assertTransactionControlRequest(
   request: ConfigTransactionControlRequest,
+  protocolVersion: number,
 ): void {
   if (!request || typeof request !== 'object') {
     throw new Error('config transaction request must be an object');
   }
-  if (request.protocolVersion !== CONFIG_DISCOVERY_PROTOCOL_VERSION) {
+  if (request.protocolVersion !== protocolVersion) {
     throw new Error(
       `unsupported config transaction protocol ${String(request.protocolVersion)}`,
     );
@@ -96,6 +96,7 @@ export class LspConfigTransactionAdapter {
     private readonly host: ConfigModuleHostAdapter,
     private readonly pluginLintPool: PluginLintPoolAdapter,
     private readonly fingerprint: (plan: ConfigModuleActivationPlan) => string,
+    private readonly protocolVersion: number,
   ) {}
 
   async loadConfigs(
@@ -103,7 +104,7 @@ export class LspConfigTransactionAdapter {
     signal?: AbortSignal,
   ): Promise<LoadConfigsResponse> {
     this.assertActive();
-    assertTransactionControlRequest(request);
+    assertTransactionControlRequest(request, this.protocolVersion);
     throwIfAborted(signal);
     const transactionId = request.transactionId;
     this.transactions.add(transactionId);
@@ -131,7 +132,7 @@ export class LspConfigTransactionAdapter {
     signal?: AbortSignal,
   ): Promise<ConfigActivationWireResponse> {
     this.assertActive();
-    assertTransactionControlRequest(request);
+    assertTransactionControlRequest(request, this.protocolVersion);
     throwIfAborted(signal);
     const transactionId = request.transactionId;
     try {
@@ -155,9 +156,9 @@ export class LspConfigTransactionAdapter {
       throwIfAborted(signal);
       return {
         transactionId: activation.transactionId,
-        // Never ask Go to register/dispatch placeholder rules without the
+        // Never include dispatch placeholders in Go's catalog without the
         // matching worker generation. On first startup Go may still commit the
-        // ordinary native config as a degraded no-host generation; with a
+        // ordinary Go config as a degraded no-host generation; with a
         // last-good generation it instead aborts this transaction.
         eslintPluginEntries: pluginHostReady
           ? activation.eslintPluginEntries
@@ -175,7 +176,7 @@ export class LspConfigTransactionAdapter {
     request: ConfigTransactionControlRequest,
   ): Promise<ConfigCommitWireResponse> {
     this.assertActive();
-    assertTransactionControlRequest(request);
+    assertTransactionControlRequest(request, this.protocolVersion);
     const transactionId = request.transactionId;
     if (!(await this.pluginLintPool.commit(transactionId))) {
       throw new Error(
@@ -192,7 +193,7 @@ export class LspConfigTransactionAdapter {
   async abortConfigs(
     request: ConfigTransactionControlRequest,
   ): Promise<ConfigAbortWireResponse> {
-    assertTransactionControlRequest(request);
+    assertTransactionControlRequest(request, this.protocolVersion);
     const transactionId = request.transactionId;
     try {
       await this.pluginLintPool.abort(transactionId);

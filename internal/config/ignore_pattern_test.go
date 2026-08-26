@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"gotest.tools/v3/assert"
 )
@@ -389,6 +390,50 @@ func TestIsDirAbsolutelyBlocked_AncestorScan(t *testing.T) {
 		parsed := ParseIgnorePatterns(c.ignores)
 		if got := isDirAbsolutelyBlocked(c.dir, parsed); got != c.want {
 			t.Errorf("%s: isDirAbsolutelyBlocked(%q, %v) = %v, want %v", c.name, c.dir, c.ignores, got, c.want)
+		}
+	}
+}
+
+func TestDirectoryBlockMatcherCachesLexicalDirectory(t *testing.T) {
+	patterns := ParseIgnorePatterns([]string{"dist/**", "**/build", "!dist/keep.ts"})
+	tests := []struct {
+		name      string
+		cwd       string
+		filePaths []string
+	}{
+		{"unix", "/repo", []string{
+			"/repo/src/a.ts",
+			"/repo/src/b.ts",
+			"/repo/dist/a.ts",
+			"/repo/dist/b.ts",
+		}},
+		{"windows separators", `C:\repo`, []string{
+			`C:\repo\src\a.ts`,
+			`C:\repo\src\b.ts`,
+			"C:/repo/src/c.ts",
+		}},
+		{"relative root", "", []string{"a.ts", "b.ts"}},
+	}
+
+	for _, test := range tests {
+		matcher := newDirectoryBlockMatcher(patterns, test.cwd)
+		uniqueDirectories := make(map[string]struct{})
+		for _, filePath := range test.filePaths {
+			got := matcher.blocksFileDirectory(filePath)
+			want := isDirBlockedByIgnores(filePath, patterns, test.cwd)
+			if got != want {
+				t.Errorf("%s filePath=%q cwd=%q: cached=%v direct=%v", test.name, filePath, test.cwd, got, want)
+			}
+			uniqueDirectories[tspath.GetDirectoryPath(filePath)] = struct{}{}
+		}
+
+		cacheEntries := 0
+		matcher.results.entries.Range(func(_, _ any) bool {
+			cacheEntries++
+			return true
+		})
+		if cacheEntries != len(uniqueDirectories) {
+			t.Fatalf("%s cache entries = %d, want one per lexical directory (%d)", test.name, cacheEntries, len(uniqueDirectories))
 		}
 	}
 }

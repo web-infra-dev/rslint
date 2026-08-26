@@ -1,11 +1,16 @@
 package prefer_promise_reject_errors
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_promise_reject_errors.schema.json
+var schemaJSON []byte
 
 func buildRejectAnErrorMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -15,46 +20,52 @@ func buildRejectAnErrorMessage() rule.RuleMessage {
 }
 
 type PreferPromiseRejectErrorsOptions struct {
-	AllowEmptyReject     *bool
-	AllowThrowingAny     *bool
-	AllowThrowingUnknown *bool
+	AllowEmptyReject     bool
+	AllowThrowingAny     bool
+	AllowThrowingUnknown bool
+}
+
+func parseOptions(options []any) PreferPromiseRejectErrorsOptions {
+	opts := PreferPromiseRejectErrorsOptions{}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["allowEmptyReject"].(bool); ok {
+		opts.AllowEmptyReject = value
+	}
+	if value, ok := optsMap["allowThrowingAny"].(bool); ok {
+		opts.AllowThrowingAny = value
+	}
+	if value, ok := optsMap["allowThrowingUnknown"].(bool); ok {
+		opts.AllowThrowingUnknown = value
+	}
+	return opts
 }
 
 var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-promise-reject-errors",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts, ok := options.(PreferPromiseRejectErrorsOptions)
-		if !ok {
-			opts = PreferPromiseRejectErrorsOptions{}
-		}
-		if opts.AllowEmptyReject == nil {
-			opts.AllowEmptyReject = utils.Ref(false)
-		}
-		if opts.AllowThrowingAny == nil {
-			opts.AllowThrowingAny = utils.Ref(false)
-		}
-		if opts.AllowThrowingUnknown == nil {
-			opts.AllowThrowingUnknown = utils.Ref(false)
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		checkRejectCall := func(callExpression *ast.CallExpression) {
 			if len(callExpression.Arguments.Nodes) != 0 {
 				argument := callExpression.Arguments.Nodes[0]
 				t := ctx.TypeChecker.GetTypeAtLocation(argument)
 
-				if *opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
+				if opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
 					return
 				}
-				if *opts.AllowThrowingUnknown && utils.IsTypeUnknownType(t) {
+				if opts.AllowThrowingUnknown && utils.IsTypeUnknownType(t) {
 					return
 				}
 
-				if utils.IsErrorLike(ctx.Program, ctx.TypeChecker, t) || utils.IsReadonlyErrorLike(ctx.Program, ctx.TypeChecker, t) {
+				if utils.IsErrorLike(ctx.Program(), ctx.TypeChecker, t) || utils.IsReadonlyErrorLike(ctx.Program(), ctx.TypeChecker, t) {
 					return
 				}
-			} else if *opts.AllowEmptyReject {
+			} else if opts.AllowEmptyReject {
 				return
 			}
 			ctx.ReportNode(&callExpression.Node, buildRejectAnErrorMessage())
@@ -62,7 +73,7 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 
 		typeAtLocationIsLikePromise := func(node *ast.Node) bool {
 			t := ctx.TypeChecker.GetTypeAtLocation(node)
-			return (utils.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, t) || utils.IsPromiseLike(ctx.Program, ctx.TypeChecker, t))
+			return (utils.IsPromiseConstructorLike(ctx.Program(), ctx.TypeChecker, t) || utils.IsPromiseLike(ctx.Program(), ctx.TypeChecker, t))
 		}
 
 		return rule.RuleListeners{
@@ -111,7 +122,7 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 						break
 					}
 
-					if !utils.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(parentNode.Expression())) {
+					if !utils.IsPromiseConstructorLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(parentNode.Expression())) {
 						return
 					}
 

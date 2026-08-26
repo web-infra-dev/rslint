@@ -44,15 +44,15 @@ func TestNoElseReturnUpstream(t *testing.T) {
         `},
 			{
 				Code:    "function foo19() { if (true) { return x; } else if (false) { return y; } }",
-				Options: map[string]interface{}{"allowElseIf": true},
+				Options: []any{map[string]interface{}{"allowElseIf": true}},
 			},
 			{
 				Code:    "function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }",
-				Options: map[string]interface{}{"allowElseIf": true},
+				Options: []any{map[string]interface{}{"allowElseIf": true}},
 			},
 			{
 				Code:    "function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }",
-				Options: map[string]interface{}{"allowElseIf": true},
+				Options: []any{map[string]interface{}{"allowElseIf": true}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -137,7 +137,7 @@ func TestNoElseReturnUpstream(t *testing.T) {
 					"function foo9a() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }",
 					"function foo9a() {if (x) { return true; } if (y) { return true; }  notAReturn();  }",
 				},
-				Options: map[string]interface{}{"allowElseIf": false},
+				Options: []any{map[string]interface{}{"allowElseIf": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt("function foo9a() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }", "if (y) { return true; } else { notAReturn(); }"),
 				},
@@ -145,7 +145,7 @@ func TestNoElseReturnUpstream(t *testing.T) {
 			{
 				Code:    "function foo9b() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }",
 				Output:  []string{"function foo9b() {if (x) { return true; } if (y) { return true; }  notAReturn();  }"},
-				Options: map[string]interface{}{"allowElseIf": false},
+				Options: []any{map[string]interface{}{"allowElseIf": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt("function foo9b() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }", "{ notAReturn(); }"),
 				},
@@ -211,7 +211,7 @@ func TestNoElseReturnUpstream(t *testing.T) {
 			{
 				Code:    "function foo19() { if (true) { return x; } else if (false) { return y; } }",
 				Output:  []string{"function foo19() { if (true) { return x; } if (false) { return y; } }"},
-				Options: map[string]interface{}{"allowElseIf": false},
+				Options: []any{map[string]interface{}{"allowElseIf": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt("function foo19() { if (true) { return x; } else if (false) { return y; } }", "if (false) { return y; }"),
 				},
@@ -219,7 +219,7 @@ func TestNoElseReturnUpstream(t *testing.T) {
 			{
 				Code:    "function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }",
 				Output:  []string{"function foo20() {if (x) { return true; } if (y) { notAReturn() } else { notAReturn(); } }"},
-				Options: map[string]interface{}{"allowElseIf": false},
+				Options: []any{map[string]interface{}{"allowElseIf": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt("function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }", "if (y) { notAReturn() } else { notAReturn(); }"),
 				},
@@ -227,7 +227,7 @@ func TestNoElseReturnUpstream(t *testing.T) {
 			{
 				Code:    "function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }",
 				Output:  []string{"function foo21() { var x = true; if (x) { return x; } if (x === false) { return false; } }"},
-				Options: map[string]interface{}{"allowElseIf": false},
+				Options: []any{map[string]interface{}{"allowElseIf": false}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt("function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }", "if (x === false) { return false; }"),
 				},

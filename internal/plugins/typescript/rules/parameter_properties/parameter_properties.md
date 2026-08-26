@@ -56,4 +56,5 @@ class Foo {
 
 ## Original Documentation
 
-https://typescript-eslint.io/rules/parameter-properties
+- [typescript-eslint: parameter-properties](https://typescript-eslint.io/rules/parameter-properties)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/parameter-properties.ts)

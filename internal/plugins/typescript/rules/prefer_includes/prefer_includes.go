@@ -190,7 +190,7 @@ func isUndefinedLiteral(ctx rule.RuleContext, node *ast.Node) bool {
 	if id == nil || id.Text != "undefined" {
 		return false
 	}
-	if ctx.TypeChecker == nil || ctx.Program == nil {
+	if ctx.TypeChecker == nil || ctx.Program() == nil {
 		return true
 	}
 	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
@@ -220,6 +220,7 @@ func isConstVariableDeclaration(node *ast.Node) bool {
 // PreferIncludesRule checks for indexOf comparisons that can use includes instead.
 var PreferIncludesRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-includes",
+	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		getNodeText := func(n *ast.Node) string {

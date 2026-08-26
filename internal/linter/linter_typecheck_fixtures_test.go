@@ -198,7 +198,7 @@ func TestFixture_ProjectReferences_FileReportedExactlyOnce(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        []*compiler.Program{progA, progB},
+		Programs:        wrapTestPrograms(progA, progB),
 		SingleThreaded:  true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
 		TypeCheck:       true,

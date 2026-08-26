@@ -8,7 +8,7 @@ foo(1 as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`number\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -37,7 +37,7 @@ foo(error);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type error typed assigned to a parameter of type number.",
+      "message": "Unsafe argument of type error typed assigned to a parameter of type \`number\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -66,7 +66,7 @@ foo(1, 1 as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -95,7 +95,7 @@ foo(1, 2, 3, 1 as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`number\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -124,7 +124,7 @@ foo(1 as any, 1 as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -139,7 +139,7 @@ foo(1 as any, 1 as any);
       "ruleName": "@typescript-eslint/no-unsafe-argument",
     },
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`number\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -169,7 +169,7 @@ foo(...(x as any));
       ",
   "diagnostics": [
     {
-      "message": "Unsafe spread of an any type.",
+      "message": "Unsafe spread of an \`any\` type.",
       "messageId": "unsafeSpread",
       "range": {
         "end": {
@@ -199,7 +199,7 @@ foo(...(x as any[]));
       ",
   "diagnostics": [
     {
-      "message": "Unsafe spread of an any[] array type.",
+      "message": "Unsafe spread of an \`any[]\` array type.",
       "messageId": "unsafeArraySpread",
       "range": {
         "end": {
@@ -262,7 +262,7 @@ foo(...x);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe spread of a tuple type. The argument is of type any and is assigned to a parameter of type number.",
+      "message": "Unsafe spread of a tuple type. The argument is of type \`any\` and is assigned to a parameter of type \`number\`.",
       "messageId": "unsafeTupleSpread",
       "range": {
         "end": {
@@ -293,7 +293,7 @@ foo(...x);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe spread of a tuple type. The argument is error typed and is assigned to a parameter of type number.",
+      "message": "Unsafe spread of a tuple type. The argument is error typed and is assigned to a parameter of type \`number\`.",
       "messageId": "unsafeTupleSpread",
       "range": {
         "end": {
@@ -322,7 +322,7 @@ foo(...(['foo', 1, 2] as [string, any, number]));
       ",
   "diagnostics": [
     {
-      "message": "Unsafe spread of a tuple type. The argument is of type any and is assigned to a parameter of type number.",
+      "message": "Unsafe spread of a tuple type. The argument is of type \`any\` and is assigned to a parameter of type \`number\`.",
       "messageId": "unsafeTupleSpread",
       "range": {
         "end": {
@@ -353,7 +353,7 @@ foo('a', ...x, 1 as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -384,7 +384,7 @@ foo('a', ...x, 1 as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -415,7 +415,7 @@ foo(new Set<any>(), ...x);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type Set<any> assigned to a parameter of type Set<string>.",
+      "message": "Unsafe argument of type \`Set<any>\` assigned to a parameter of type \`Set<string>\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -430,7 +430,7 @@ foo(new Set<any>(), ...x);
       "ruleName": "@typescript-eslint/no-unsafe-argument",
     },
     {
-      "message": "Unsafe spread of a tuple type. The argument is of type Map<any, string> and is assigned to a parameter of type Map<string, string>.",
+      "message": "Unsafe spread of a tuple type. The argument is of type \`Map<any, string>\` and is assigned to a parameter of type \`Map<string, string>\`.",
       "messageId": "unsafeTupleSpread",
       "range": {
         "end": {
@@ -459,7 +459,7 @@ foo(1 as any, 'a' as any, 1 as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`number\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -474,7 +474,7 @@ foo(1 as any, 'a' as any, 1 as any);
       "ruleName": "@typescript-eslint/no-unsafe-argument",
     },
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -503,7 +503,7 @@ foo('a', 1 as any, 'a' as any, 1 as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`number\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -518,7 +518,7 @@ foo('a', 1 as any, 'a' as any, 1 as any);
       "ruleName": "@typescript-eslint/no-unsafe-argument",
     },
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -549,7 +549,7 @@ foo(t as any);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type T.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`T\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -584,7 +584,7 @@ foo<number>\`\${arg}\${arg}\${arg}\`;
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`number\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -599,7 +599,7 @@ foo<number>\`\${arg}\${arg}\${arg}\`;
       "ruleName": "@typescript-eslint/no-unsafe-argument",
     },
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -629,7 +629,7 @@ foo\`\${arg}\`;
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`number\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -660,7 +660,7 @@ foo\`\${arg}\`;
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type T.",
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`T\`.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {

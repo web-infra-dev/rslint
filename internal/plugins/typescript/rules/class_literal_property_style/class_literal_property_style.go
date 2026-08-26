@@ -1,12 +1,17 @@
 package class_literal_property_style
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+//go:embed class_literal_property_style.schema.json
+var schemaJSON []byte
 
 type propertiesInfo struct {
 	excludeSet map[string]bool
@@ -187,22 +192,13 @@ func isFunction(node *ast.Node) bool {
 }
 
 var ClassLiteralPropertyStyleRule = rule.CreateRule(rule.Rule{
-	Name: "class-literal-property-style",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "class-literal-property-style",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		style := "fields" // default option
-
-		// Parse options - handle both string and array formats
-		if options != nil {
-			switch opts := options.(type) {
-			case string:
-				style = opts
-			case []interface{}:
-				if len(opts) > 0 {
-					if s, ok := opts[0].(string); ok {
-						style = s
-					}
-				}
+		if len(options) > 0 {
+			if s, ok := options[0].(string); ok {
+				style = s
 			}
 		}
 
@@ -272,13 +268,13 @@ var ClassLiteralPropertyStyleRule = rule.CreateRule(rule.Rule{
 				var nameText string
 				if nameNode.Kind == ast.KindComputedPropertyName {
 					// For computed properties, get the full text including brackets
-					nameText = strings.TrimSpace(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
+					nameText = ecmascript.StringTrim(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
 				} else {
 					// For regular identifiers, just get the text
 					nameText = nameNode.Text()
 				}
 
-				valueText := strings.TrimSpace(ctx.SourceFile.Text()[returnStmt.Expression.Pos():returnStmt.Expression.End()])
+				valueText := ecmascript.StringTrim(ctx.SourceFile.Text()[returnStmt.Expression.Pos():returnStmt.Expression.End()])
 
 				var fixText string
 				fixText += printNodeModifiers(node, "readonly")
@@ -337,13 +333,13 @@ var ClassLiteralPropertyStyleRule = rule.CreateRule(rule.Rule{
 					var nameText string
 					if nameNode.Kind == ast.KindComputedPropertyName {
 						// For computed properties, get the full text including brackets
-						nameText = strings.TrimSpace(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
+						nameText = ecmascript.StringTrim(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
 					} else {
 						// For regular identifiers, just get the text
 						nameText = nameNode.Text()
 					}
 
-					valueText := strings.TrimSpace(ctx.SourceFile.Text()[property.Initializer.Pos():property.Initializer.End()])
+					valueText := ecmascript.StringTrim(ctx.SourceFile.Text()[property.Initializer.Pos():property.Initializer.End()])
 
 					var fixText string
 					fixText += printNodeModifiers(node, "get")

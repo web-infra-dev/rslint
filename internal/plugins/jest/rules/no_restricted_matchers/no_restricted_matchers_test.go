@@ -238,6 +238,27 @@ func TestNoRestrictedMatchersRule(t *testing.T) {
 					},
 				},
 			},
+			// The reported range spans the member chain, and its start comes
+			// from the first entry's Pos(), which includes leading trivia.
+			// Without trimming, these report from the whitespace after the dot.
+			{
+				Code: `expect(a). /* c */ toBe(b)`,
+				Options: []interface{}{
+					map[string]interface{}{"toBe": nil},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedChain", Line: 1, Column: 20, EndColumn: 24},
+				},
+			},
+			{
+				Code: "expect(a).\n  not.toBe(b)",
+				Options: []interface{}{
+					map[string]interface{}{"not.toBe": nil},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedChain", Line: 2, Column: 3, EndLine: 2, EndColumn: 11},
+				},
+			},
 		},
 	)
 }

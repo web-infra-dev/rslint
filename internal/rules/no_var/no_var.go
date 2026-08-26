@@ -2,6 +2,7 @@ package no_var
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -9,7 +10,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-var
 var NoVarRule = rule.Rule{
-	Name: "no-var",
+	Name:   "no-var",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
@@ -24,21 +26,12 @@ var NoVarRule = rule.Rule{
 					return
 				}
 
-				// Report on the VariableStatement parent to include `declare` in the range,
-				// but not when exported (ESLint excludes the `export` keyword from the range).
-				// For for-loop initializers (no VariableStatement parent), report on self.
-				reportNode := node
-				if node.Parent != nil && node.Parent.Kind == ast.KindVariableStatement &&
-					!ast.HasSyntacticModifier(node.Parent, ast.ModifierFlagsExport) {
-					reportNode = node.Parent
-				}
-
 				msg := rule.RuleMessage{
 					Id:          "unexpectedVar",
 					Description: "Unexpected var, use let or const instead.",
 				}
 
-				ctx.ReportNodeWithDeferredFixes(reportNode, msg, func() []rule.RuleFix {
+				ctx.ReportRangeWithDeferredFixes(noVarReportRange(node, ctx.SourceFile), msg, func() []rule.RuleFix {
 					if !canFix(node, &ctx) {
 						return nil
 					}
@@ -50,11 +43,43 @@ var NoVarRule = rule.Rule{
 	},
 }
 
-// isInDeclareGlobal checks if a node is inside a `declare global { }` block.
+// noVarReportRange mirrors the range of ESLint's VariableDeclaration node.
+// tsgo stores export/declare as VariableStatement modifiers and excludes the
+// trailing semicolon from the nested VariableDeclarationList, while ESTree
+// wraps only `export` and keeps every other modifier plus the semicolon on the
+// declaration itself.
+func noVarReportRange(node *ast.Node, sourceFile *ast.SourceFile) core.TextRange {
+	statement := node.Parent
+	if statement == nil || statement.Kind != ast.KindVariableStatement {
+		return utils.TrimNodeTextRange(sourceFile, node)
+	}
+
+	modifiers := statement.Modifiers()
+	if modifiers == nil || !ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport) {
+		return utils.TrimNodeTextRange(sourceFile, statement)
+	}
+
+	start := utils.TrimNodeTextRange(sourceFile, node).Pos()
+	for _, modifier := range modifiers.Nodes {
+		if modifier.Kind != ast.KindExportKeyword {
+			start = utils.TrimNodeTextRange(sourceFile, modifier).Pos()
+			break
+		}
+	}
+	return core.NewTextRange(start, statement.End())
+}
+
+// isInDeclareGlobal checks whether the declaration is directly contained by a
+// `declare global { }` block. Nested namespaces are separate TSModuleBlocks and
+// are reported by upstream.
 func isInDeclareGlobal(node *ast.Node) bool {
-	return ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
-		return ast.IsGlobalScopeAugmentation(n)
-	}) != nil
+	statement := node.Parent
+	if statement == nil || statement.Kind != ast.KindVariableStatement {
+		return false
+	}
+	moduleBlock := statement.Parent
+	return moduleBlock != nil && moduleBlock.Kind == ast.KindModuleBlock &&
+		moduleBlock.Parent != nil && ast.IsGlobalScopeAugmentation(moduleBlock.Parent)
 }
 
 // ---------- canFix: determines if var→let is safe ----------
@@ -71,9 +96,16 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 
 	// The statement node (VariableStatement for standalone, ForStatement etc. for loops)
 	stmtNode := node.Parent
+	// ESLint sees an exported declaration through an ExportNamedDeclaration
+	// wrapper, which is not a statement-list parent and therefore is never
+	// autofixed by this rule.
+	if stmtNode != nil && stmtNode.Kind == ast.KindVariableStatement &&
+		ast.HasSyntacticModifier(stmtNode, ast.ModifierFlagsExport) {
+		return false
+	}
 
 	// Condition 1: var inside switch case — `let` in case without braces is confusing
-	if stmtNode != nil && stmtNode.Parent != nil &&
+	if stmtNode != nil && stmtNode.Kind == ast.KindVariableStatement && stmtNode.Parent != nil &&
 		(stmtNode.Parent.Kind == ast.KindCaseClause || stmtNode.Parent.Kind == ast.KindDefaultClause) {
 		return false
 	}
@@ -102,20 +134,6 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 		return false
 	}
 
-	// Collect all references from the shared per-file index. A reference can
-	// only resolve to these symbols from within their scope, so the file-wide
-	// lists are identical to what a bounded scope walk would find.
-	refs := make(map[*ast.Symbol][]*ast.Node, len(vars))
-	for _, v := range vars {
-		refs[v.sym] = ctx.Refs.References(v.sym)
-	}
-
-	// Condition 2: self-reference or forward-reference in TDZ
-	// Uses positional range checks (matching ESLint's approach).
-	if hasTDZIssue(declList, vars, refs) {
-		return false
-	}
-
 	for _, v := range vars {
 		// Condition 3: global scope variable (script mode, not module)
 		if isGlobalVar(v.nameNode, ctx) {
@@ -131,7 +149,23 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 		if v.nameNode.Text() == "let" {
 			return false
 		}
+	}
 
+	// Collect references only after the cheap blockers above. A reference can
+	// only resolve to these symbols from within its scope, so the file-wide
+	// lists are identical to what a bounded scope walk would find.
+	refs := make(map[*ast.Symbol][]*ast.Node, len(vars))
+	for _, v := range vars {
+		refs[v.sym] = ctx.Refs.References(v.sym)
+	}
+
+	// Condition 2: self-reference in TDZ
+	// Uses positional range checks (matching ESLint's approach).
+	if hasTDZIssue(declList, vars, refs) {
+		return false
+	}
+
+	for _, v := range vars {
 		varRefs := refs[v.sym]
 
 		// Condition 5: used from outside the block scope
@@ -149,7 +183,7 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 	if isInLoop(node) {
 		for _, v := range vars {
 			// Condition 8: referenced in a closure within the loop
-			if isReferencedInClosure(v.sym, node, refs[v.sym]) {
+			if isReferencedInClosure(node, refs[v.sym]) {
 				return false
 			}
 		}
@@ -168,46 +202,47 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 // Condition 2: hasTDZIssue uses positional range checks (matching ESLint) to detect
 // references that would cause a Temporal Dead Zone error with `let`.
 func hasTDZIssue(declList *ast.VariableDeclarationList, vars []varInfo, refs map[*ast.Symbol][]*ast.Node) bool {
-	if declList.Declarations == nil {
-		return false
-	}
-
-	for _, decl := range declList.Declarations.Nodes {
-		varDecl := decl.AsVariableDeclaration()
-		if varDecl == nil {
+	for _, declaration := range declList.Declarations.Nodes {
+		varDecl := declaration.AsVariableDeclaration()
+		if varDecl == nil || varDecl.Initializer == nil {
 			continue
 		}
+		name := varDecl.Name()
+		if name == nil {
+			continue
+		}
+		nameStart := name.Pos()
+		nameEnd := name.End()
 
-		// Check initializer: if init is NOT a function expression/arrow, any reference
-		// to a same-declaration binding within the init range is a TDZ issue.
-		// This catches `var a = a`, `var foo = (function(){ foo(); })()`, etc.
-		if varDecl.Initializer != nil && !isFunctionNode(varDecl.Initializer) {
-			initStart := varDecl.Initializer.Pos()
-			initEnd := varDecl.Initializer.End()
-			for _, v := range vars {
+		for _, v := range vars {
+			if v.nameNode.Pos() < nameStart || v.nameNode.End() > nameEnd {
+				continue
+			}
+
+			// A non-function initializer executes while its own bindings are in
+			// TDZ. Bindings from earlier declarators are already initialized.
+			if !isFunctionNode(varDecl.Initializer) {
+				initStart := varDecl.Initializer.Pos()
+				initEnd := varDecl.Initializer.End()
 				for _, ref := range refs[v.sym] {
-					refPos := ref.Pos()
-					if refPos >= initStart && refPos < initEnd {
+					if ref.Pos() >= initStart && ref.End() <= initEnd {
 						return true
 					}
 				}
 			}
-		}
-	}
 
-	// Check default values: a reference to a binding within its OWN default value
-	// is a TDZ issue. e.g. `var {a = a} = {}`.
-	for _, v := range vars {
-		defaultRange := getDefaultValueRange(v.nameNode)
-		if defaultRange == nil {
-			continue
-		}
-		defStart := defaultRange.Pos()
-		defEnd := defaultRange.End()
-		for _, ref := range refs[v.sym] {
-			refPos := ref.Pos()
-			if refPos >= defStart && refPos < defEnd {
-				return true
+			// A reference to a binding within its own default value is also a TDZ
+			// issue, e.g. `var {a = a} = {}`.
+			defaultRange := getDefaultValueRange(v.nameNode)
+			if defaultRange == nil {
+				continue
+			}
+			defStart := defaultRange.Pos()
+			defEnd := defaultRange.End()
+			for _, ref := range refs[v.sym] {
+				if ref.Pos() >= defStart && ref.End() <= defEnd {
+					return true
+				}
 			}
 		}
 	}
@@ -237,8 +272,10 @@ func isFunctionNode(node *ast.Node) bool {
 
 // Condition 3: isGlobalVar checks if a variable is in the global scope (script mode).
 func isGlobalVar(nameNode *ast.Node, ctx *rule.RuleContext) bool {
-	// If the source file is a module, top-level vars are module-scoped, not global
-	if ctx.SourceFile.ExternalModuleIndicator != nil {
+	// A syntactic module or a file with module/CommonJS language defaults has a
+	// non-global top-level scope. Omitted sourceType gets ESLint's module default
+	// even when the file contains no import/export marker.
+	if ctx.Refs.HasNonGlobalProgramScope() {
 		return false
 	}
 	// Check if the declaration is at the source file top level (no enclosing function)
@@ -283,7 +320,7 @@ func hasReferenceBeforeDeclaration(nameNode *ast.Node, refs []*ast.Node) bool {
 
 // Condition 8: isReferencedInClosure checks if any reference is from a different
 // function scope than the variable (closure captures in a loop).
-func isReferencedInClosure(sym *ast.Symbol, declNode *ast.Node, refs []*ast.Node) bool {
+func isReferencedInClosure(declNode *ast.Node, refs []*ast.Node) bool {
 	declFuncScope := findEnclosingScope(declNode)
 	for _, ref := range refs {
 		refFuncScope := findEnclosingScope(ref)

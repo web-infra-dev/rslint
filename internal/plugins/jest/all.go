@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_called_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_comparison_matcher"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_each"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_ending_with_an_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_equality_matcher"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_expect_resolves"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_in_order"
@@ -47,6 +48,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/require_top_level_describe"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_title"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -80,13 +82,14 @@ func GetAllRules() []rule.Rule {
 		prefer_called_with.PreferCalledWithRule,
 		prefer_comparison_matcher.PreferComparisonMatcherRule,
 		prefer_each.PreferEachRule,
+		prefer_ending_with_an_expect.PreferEndingWithAnExpectRule,
 		prefer_equality_matcher.PreferEqualityMatcherRule,
 		prefer_expect_resolves.PreferExpectResolvesRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_hooks_on_top.PreferHooksOnTopRule,
-		prefer_spy_on.PreferSpyOnRule,
 		prefer_importing_jest_globals.PreferImportingJestGlobalsRule,
 		prefer_jest_mocked.PreferJestMockedRule,
+		prefer_spy_on.PreferSpyOnRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,
 		prefer_to_contain.PreferToContainRule,
@@ -99,6 +102,7 @@ func GetAllRules() []rule.Rule {
 		require_top_level_describe.RequireTopLevelDescribeRule,
 		valid_describe_callback.ValidDescribeCallbackRule,
 		valid_expect.ValidExpectRule,
+		valid_expect_in_promise.ValidExpectInPromiseRule,
 		valid_title.ValidTitleRule,
 	}
 }

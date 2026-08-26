@@ -7,7 +7,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-nested-ternary
 var NoNestedTernaryRule = rule.Rule{
-	Name: "no-nested-ternary",
+	Name:   "no-nested-ternary",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindConditionalExpression: func(node *ast.Node) {

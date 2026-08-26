@@ -91,4 +91,5 @@ Examples of **incorrect** code with `{ "tr": ["none", "presentation"] }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-interactive-element-to-noninteractive-role](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-interactive-element-to-noninteractive-role.md)
+- [eslint-plugin-jsx-a11y: no-interactive-element-to-noninteractive-role](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-interactive-element-to-noninteractive-role.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-interactive-element-to-noninteractive-role.js)

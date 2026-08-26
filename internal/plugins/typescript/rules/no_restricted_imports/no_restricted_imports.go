@@ -22,18 +22,22 @@
 package no_restricted_imports
 
 import (
-	"strings"
+	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	core "github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
+//go:embed no_restricted_imports.schema.json
+var schemaJSON []byte
+
 var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
-	Name: "no-restricted-imports",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-restricted-imports",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		engine := core.NewEngine(options)
 		if !engine.IsActive() {
 			return rule.RuleListeners{}
@@ -46,7 +50,7 @@ var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
 				if d.ModuleSpecifier == nil {
 					return
 				}
-				source := strings.TrimSpace(utils.GetStaticStringValue(d.ModuleSpecifier))
+				source := ecmascript.StringTrim(utils.GetStaticStringValue(d.ModuleSpecifier))
 				if source == "" {
 					return
 				}
@@ -61,7 +65,7 @@ var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
 				if d.ModuleSpecifier == nil {
 					return
 				}
-				source := strings.TrimSpace(utils.GetStaticStringValue(d.ModuleSpecifier))
+				source := ecmascript.StringTrim(utils.GetStaticStringValue(d.ModuleSpecifier))
 				if source == "" {
 					return
 				}
@@ -85,7 +89,7 @@ var NoRestrictedImportsRule = rule.CreateRule(rule.Rule{
 				if ext.Expression == nil {
 					return
 				}
-				source := strings.TrimSpace(utils.GetStaticStringValue(ext.Expression))
+				source := ecmascript.StringTrim(utils.GetStaticStringValue(ext.Expression))
 				if source == "" {
 					return
 				}

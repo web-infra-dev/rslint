@@ -6,20 +6,9 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
-	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
-	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
-	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
-	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
-	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
-	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
-	rstestPlugin "github.com/web-infra-dev/rslint/internal/plugins/rstest"
-	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
-	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	coreRules "github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -50,10 +39,67 @@ type ConfigEntry struct {
 	// matchers. Keeping the uncommon metadata behind one pointer preserves the
 	// original ConfigEntry footprint for every ordinary authored config entry.
 	collectedGitignore *collectedGitignoreMetadata
+	// authoredPathBase is present only when this entry was authored in a
+	// different directory from the config array that owns it. The native API's
+	// inline overrideConfig is the primary case: it is appended after each
+	// discovered config but keeps the invocation cwd as the base for its
+	// config-relative files, ignores, and parserOptions.project values. Target
+	// matching and project resolution consume this immutable origin instead of
+	// rebasing authored strings during composition.
+	authoredPathBase *configEntryPathBase
 }
 
 type collectedGitignoreMetadata struct {
 	ignores []IgnorePattern
+	scopes  []collectedGitignoreScope
+}
+
+// collectedGitignoreScope is one authoritative Git collection boundary. The
+// slice order is semantic: target resolution first chooses the earliest scope
+// containing the caller's lexical path and only then falls back, in the same
+// order, to canonical-to-physical containment. Patterns from every other
+// scope are inapplicable to that target.
+type collectedGitignoreScope struct {
+	matchDirectory    string
+	physicalDirectory string
+	lexicalDirectory  string
+	caseInsensitive   bool
+}
+
+type configEntryPathBase struct {
+	directory string
+}
+
+// ConfigWithAuthoredPathBase returns a shallow config snapshot whose entries
+// retain directory as their authored origin. It is used when a flat-config
+// suffix is composed from a different origin; the input config and its
+// maps/slices are not mutated.
+func ConfigWithAuthoredPathBase(config RslintConfig, directory string) RslintConfig {
+	if len(config) == 0 {
+		return config
+	}
+	directory = tspath.NormalizePath(directory)
+	effective := append(RslintConfig(nil), config...)
+	for index := range effective {
+		effective[index].authoredPathBase = &configEntryPathBase{directory: directory}
+	}
+	return effective
+}
+
+func configEntryBaseDirectory(entry ConfigEntry, defaultDirectory string) string {
+	if entry.authoredPathBase != nil && entry.authoredPathBase.directory != "" {
+		return entry.authoredPathBase.directory
+	}
+	return defaultDirectory
+}
+
+func configNeedsTargetResolver(config RslintConfig) bool {
+	for _, entry := range config {
+		if entry.authoredPathBase != nil || entry.collectedGitignore != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (entry ConfigEntry) MarshalJSON() ([]byte, error) {
@@ -252,10 +298,7 @@ func ValidateConfig(config RslintConfig) error {
 		if (entry.Files != nil || entry.FilePatternGroups != nil) && len(entry.Files) == 0 && len(entry.FilePatternGroups) == 0 {
 			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
 		}
-		if err := validateConfigGlobals(entry.LanguageOptions); err != nil {
-			return fmt.Errorf("config entry at index %d: %w", index, err)
-		}
-		if err := validateConfigSourceType(entry.LanguageOptions); err != nil {
+		if err := validateLanguageOptions(entry.LanguageOptions); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
 		if err := validateConfigRules(entry.Rules); err != nil {
@@ -263,6 +306,47 @@ func ValidateConfig(config RslintConfig) error {
 		}
 	}
 	return nil
+}
+
+func validateLanguageOptions(languageOptions *LanguageOptions) error {
+	if err := validateConfigGlobals(languageOptions); err != nil {
+		return err
+	}
+	if err := validateConfigSourceType(languageOptions); err != nil {
+		return err
+	}
+	if languageOptions == nil || languageOptions.Raw == nil {
+		return nil
+	}
+
+	if value, present := languageOptions.Raw["ecmaVersion"]; present {
+		if _, ok := normalizeConfigECMAVersion(value); !ok {
+			return fmt.Errorf(
+				"key \"languageOptions.ecmaVersion\": invalid value %v; expected \"latest\", 3, 5, an edition from 6 through %d, or a year from 2015 through %d",
+				value,
+				rule.LatestECMAScriptVersion-2009,
+				rule.LatestECMAScriptVersion,
+			)
+		}
+	}
+
+	return nil
+}
+
+func normalizeConfigECMAVersion(value any) (int, bool) {
+	if text, ok := value.(string); ok {
+		if text == "latest" {
+			// Keep `latest` semantic instead of freezing the config to this
+			// release's numeric edition. rule.LanguageOptions uses zero for latest.
+			return 0, true
+		}
+		return 0, false
+	}
+	version, ok := utils.CoerceIntegral(value)
+	if !ok {
+		return 0, false
+	}
+	return rule.NormalizeECMAScriptVersion(version)
 }
 
 func validateConfigGlobals(languageOptions *LanguageOptions) error {
@@ -294,9 +378,9 @@ func validateConfigGlobals(languageOptions *LanguageOptions) error {
 
 // validateConfigSourceType rejects authored `languageOptions.sourceType`
 // values that are not ESLint's "module" / "script" / "commonjs". Absent is
-// fine — callers treat unset as structural ESM detection. Matches the JS
-// language plugin, which only reads the top-level field (no legacy
-// `parserOptions.sourceType`).
+// fine — ResolveLanguageDefaults fills the filename default afterward.
+// Matches the JS language plugin, which only reads the top-level field (no
+// legacy `parserOptions.sourceType`).
 func validateConfigSourceType(languageOptions *LanguageOptions) error {
 	if languageOptions == nil || languageOptions.Raw == nil {
 		return nil
@@ -306,17 +390,13 @@ func validateConfigSourceType(languageOptions *LanguageOptions) error {
 		return nil
 	}
 	s, ok := value.(string)
-	if !ok || !isValidSourceType(s) {
+	if !ok || !rule.IsValidSourceType(s) {
 		return fmt.Errorf(
 			"key \"languageOptions.sourceType\": invalid value %v; expected \"module\", \"script\", or \"commonjs\"",
 			value,
 		)
 	}
 	return nil
-}
-
-func isValidSourceType(s string) bool {
-	return s == "module" || s == "script" || s == "commonjs"
 }
 
 func validateConfigRules(rules Rules) error {
@@ -332,10 +412,10 @@ func validateConfigRules(rules Rules) error {
 type LanguageOptions struct {
 	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
 	// Raw retains the full languageOptions object as authored (sourceType,
-	// globals, parserOptions.ecmaFeatures, …) — fields the Go core does not
-	// model but the Node eslint-plugin worker needs. Go computes the
-	// per-file merged value via GetConfigForFile and forwards it on the
-	// wire; it is not (de)serialized through this struct's own field tags.
+	// ecmaVersion, globals, parserOptions.ecmaFeatures, …). Go normalizes
+	// ecmaVersion for native globals and forwards the full value to the Node
+	// eslint-plugin worker. It is not (de)serialized through this struct's own
+	// field tags.
 	Raw map[string]any `json:"-"`
 }
 
@@ -356,6 +436,27 @@ func (lo *LanguageOptions) UnmarshalJSON(data []byte) error {
 	lo.ParserOptions = ps.ParserOptions
 	lo.Raw = raw
 	return nil
+}
+
+// MarshalJSON preserves the open languageOptions object captured in Raw while
+// folding any typed ParserOptions updates back into its parserOptions member.
+// Without this counterpart to UnmarshalJSON, a config JSON round trip would
+// silently discard ecmaVersion, globals, sourceType, and unknown parser keys.
+func (lo LanguageOptions) MarshalJSON() ([]byte, error) {
+	raw := deepMergeConfigObjects(nil, lo.Raw)
+	if lo.ParserOptions != nil {
+		encodedParserOptions, err := json.Marshal(lo.ParserOptions)
+		if err != nil {
+			return nil, err
+		}
+		var typedParserOptions map[string]any
+		if err := json.Unmarshal(encodedParserOptions, &typedParserOptions); err != nil {
+			return nil, err
+		}
+		baseParserOptions, _ := configObject(raw["parserOptions"])
+		raw["parserOptions"] = deepMergeConfigObjects(baseParserOptions, typedParserOptions)
+	}
+	return json.Marshal(raw)
 }
 
 // ProjectPaths represents project paths that can be either a single string or an array of strings
@@ -384,6 +485,21 @@ func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
 type ParserOptions struct {
 	ProjectService *bool        `json:"projectService,omitempty"`
 	Project        ProjectPaths `json:"project,omitempty"`
+}
+
+// MarshalJSON preserves the three project states used by resolution: omitted,
+// an explicit empty array, and one or more explicit paths. The default
+// `omitempty` encoder collapses a non-nil empty slice into omission, which
+// would re-enable tsconfig.json fallback after a config round trip.
+func (options ParserOptions) MarshalJSON() ([]byte, error) {
+	encoded := make(map[string]any, 2)
+	if options.ProjectService != nil {
+		encoded["projectService"] = *options.ProjectService
+	}
+	if options.Project != nil {
+		encoded["project"] = options.Project
+	}
+	return json.Marshal(encoded)
 }
 
 // BoolPtr returns a pointer to the given bool value.
@@ -438,83 +554,6 @@ func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
 		return rule.SeverityError
 	}
 	return rule.ParseSeverity(rc.Level)
-}
-
-// PluginInfo defines a known plugin with its rule prefix and all accepted declaration names.
-type PluginInfo struct {
-	RulePrefix  string   // Rule name prefix, e.g. "import"
-	DeclNames   []string // All accepted declaration names, e.g. ["eslint-plugin-import", "import"]
-	getAllRules func() []rule.Rule
-}
-
-// KnownPlugins is the single source of truth for all supported plugins.
-var KnownPlugins = []PluginInfo{
-	{
-		RulePrefix:  "@typescript-eslint",
-		DeclNames:   []string{"@typescript-eslint"},
-		getAllRules: func() []rule.Rule { return typescriptPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "import",
-		DeclNames:   []string{"eslint-plugin-import", "import"},
-		getAllRules: func() []rule.Rule { return importPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "jest",
-		DeclNames:   []string{"eslint-plugin-jest", "jest"},
-		getAllRules: func() []rule.Rule { return jestPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "jsx-a11y",
-		DeclNames:   []string{"eslint-plugin-jsx-a11y", "jsx-a11y"},
-		getAllRules: func() []rule.Rule { return jsxA11yPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "promise",
-		DeclNames:   []string{"eslint-plugin-promise", "promise"},
-		getAllRules: func() []rule.Rule { return promisePlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "react",
-		DeclNames:   []string{"react"},
-		getAllRules: func() []rule.Rule { return reactPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "react-hooks",
-		DeclNames:   []string{"eslint-plugin-react-hooks", "react-hooks"},
-		getAllRules: func() []rule.Rule { return reactHooksPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "rstest",
-		DeclNames:   []string{"rstest"},
-		getAllRules: func() []rule.Rule { return rstestPlugin.GetAllRules() },
-	},
-	{
-		RulePrefix:  "unicorn",
-		DeclNames:   []string{"eslint-plugin-unicorn", "unicorn"},
-		getAllRules: func() []rule.Rule { return unicornPlugin.GetAllRules() },
-	},
-}
-
-// pluginByDeclName is a lookup table built from KnownPlugins: declaration name → *PluginInfo.
-var pluginByDeclName map[string]*PluginInfo
-
-func init() {
-	pluginByDeclName = make(map[string]*PluginInfo)
-	for i := range KnownPlugins {
-		for _, name := range KnownPlugins[i].DeclNames {
-			pluginByDeclName[name] = &KnownPlugins[i]
-		}
-	}
-}
-
-// NormalizePluginName converts a plugin declaration name to its rule prefix form.
-// Looks up KnownPlugins; returns the input unchanged if not found.
-func NormalizePluginName(pluginName string) string {
-	if info, ok := pluginByDeclName[pluginName]; ok {
-		return info.RulePrefix
-	}
-	return pluginName
 }
 
 // parseArrayRuleConfig parses array-style rule configuration like ["error", {...options}]
@@ -615,83 +654,6 @@ func invalidRuleSeverity(value any) error {
 	)
 }
 
-var registerOnce sync.Once
-
-func RegisterAllRules() {
-	registerOnce.Do(func() {
-		registerAllTypeScriptEslintPluginRules()
-		registerAllImportPluginRules()
-		registerAllReactPluginRules()
-		registerAllReactHooksPluginRules()
-		registerAllJestPluginRules()
-		registerAllRstestPluginRules()
-		registerAllJsxA11yPluginRules()
-		registerAllPromisePluginRules()
-		registerAllUnicornPluginRules()
-		registerAllCoreEslintRules()
-	})
-}
-
-func registerAllReactPluginRules() {
-	for _, rule := range reactPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllReactHooksPluginRules() {
-	for _, rule := range reactHooksPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllJestPluginRules() {
-	for _, rule := range jestPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllRstestPluginRules() {
-	for _, rule := range rstestPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllJsxA11yPluginRules() {
-	for _, rule := range jsxA11yPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllPromisePluginRules() {
-	for _, rule := range promisePlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllUnicornPluginRules() {
-	for _, rule := range unicornPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllTypeScriptEslintPluginRules() {
-	for _, rule := range typescriptPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllImportPluginRules() {
-	for _, rule := range importPlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllCoreEslintRules() {
-	for _, rule := range coreRules.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
 // normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
 // normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
 // "/./", resolves ".."), so patterns must undergo the same transformation.
@@ -705,6 +667,45 @@ func normalizePattern(pattern string) string {
 // aligns with ESLint v10: `dir/**` blocks directory traversal entirely, and
 // `!` negation cannot undo it.
 func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string) bool {
+	if hasPatternMatchDirectory(patterns) {
+		for _, pattern := range patterns {
+			if pattern.Negated || pattern.Kind != dirAbsoluteBlock {
+				continue
+			}
+			dirPath, ok := ignoreDirectoryPathForPattern(filePath, cwd, pattern)
+			if ok && directoryPatternAbsolutelyBlocks(pattern, dirPath) {
+				return true
+			}
+		}
+		return false
+	}
+	dirPath, ok := ignoreDirectoryPath(filePath, cwd)
+	return ok && isDirAbsolutelyBlocked(dirPath, patterns)
+}
+
+func ignoreDirectoryPathForPattern(filePath string, defaultDirectory string, pattern IgnorePattern) (string, bool) {
+	matchDirectories := patternMatchDirectories(pattern, defaultDirectory)
+	for index, directory := range matchDirectories {
+		if directory == "" || repeatedMatchDirectory(matchDirectories, index) {
+			continue
+		}
+		dirPath, ok := ignoreDirectoryPath(filePath, directory)
+		if !ok {
+			continue
+		}
+		if pathEscapesCwd(dirPath) && pattern.CaseInsensitive {
+			parent := tspath.GetDirectoryPath(filePath)
+			dirPath = normalizePathWithCaseSensitivity(parent, directory, false)
+			dirPath = strings.TrimSuffix(strings.ReplaceAll(dirPath, "\\", "/"), "/")
+		}
+		if !pathEscapesCwd(dirPath) {
+			return dirPath, true
+		}
+	}
+	return "", false
+}
+
+func ignoreDirectoryPath(filePath string, cwd string) (string, bool) {
 	var dirPath string
 	if cwd != "" {
 		dirPath = normalizePath(tspath.GetDirectoryPath(filePath), cwd)
@@ -714,9 +715,35 @@ func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string
 	dirPath = strings.ReplaceAll(dirPath, "\\", "/")
 	dirPath = strings.TrimSuffix(dirPath, "/")
 	if dirPath == "" || dirPath == "." {
+		return "", false
+	}
+	return dirPath, true
+}
+
+// directoryBlockMatcher caches path-only directory decisions for one immutable
+// ignore-pattern set and cwd. The exact lexical parent is the key: no case,
+// separator, realpath, or filesystem equivalence is introduced by the cache.
+type directoryBlockMatcher struct {
+	patterns []IgnorePattern
+	cwd      string
+	results  publishOnceCache[string, bool]
+}
+
+func newDirectoryBlockMatcher(patterns []IgnorePattern, cwd string) *directoryBlockMatcher {
+	if len(patterns) == 0 {
+		return nil
+	}
+	return &directoryBlockMatcher{patterns: patterns, cwd: cwd}
+}
+
+func (matcher *directoryBlockMatcher) blocksFileDirectory(filePath string) bool {
+	if matcher == nil {
 		return false
 	}
-	return isDirAbsolutelyBlocked(dirPath, patterns)
+	lexicalDirectory := tspath.GetDirectoryPath(filePath)
+	return matcher.results.getOrInit(lexicalDirectory, func() bool {
+		return isDirBlockedByIgnores(filePath, matcher.patterns, matcher.cwd)
+	})
 }
 
 // normalizePath converts file path to be relative to cwd for consistent matching
@@ -729,6 +756,34 @@ func normalizePathWithCaseSensitivity(filePath, cwd string, useCaseSensitive boo
 		UseCaseSensitiveFileNames: useCaseSensitive,
 		CurrentDirectory:          cwd,
 	}))
+}
+
+// fileMatchPath keeps the path representations shared by config-entry
+// selectors and file-level ignores for one resolution. It initializes lazily
+// so directory-blocked files and entries without path matchers do no extra
+// normalization work.
+type fileMatchPath struct {
+	original   string
+	cwd        string
+	normalized string
+	unix       string
+	ready      bool
+}
+
+func newFileMatchPath(filePath string, cwd string) fileMatchPath {
+	return fileMatchPath{original: filePath, cwd: cwd}
+}
+
+func (path *fileMatchPath) normalizedPaths() (string, string) {
+	if !path.ready {
+		path.normalized = path.original
+		if path.cwd != "" {
+			path.normalized = normalizePath(path.original, path.cwd)
+		}
+		path.unix = strings.ReplaceAll(path.normalized, "\\", "/")
+		path.ready = true
+	}
+	return path.normalized, path.unix
 }
 
 // MergedConfig is the final computed configuration for a single file
@@ -772,6 +827,10 @@ func extractConfigIgnores(config RslintConfig) []IgnorePattern {
 // this method. Program-wide type-check diagnostics are intentionally governed
 // by tsconfig membership instead.
 func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
+	if configNeedsTargetResolver(config) {
+		return newConfigTargetResolver(config, cwd, nil).
+			resolve(filePath, "").globallyIgnored
+	}
 	patterns := extractConfigIgnores(config)
 	if len(patterns) == 0 {
 		return false
@@ -793,6 +852,13 @@ func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
 // After global ignore check, entries are merged in order if their files match and ignores don't.
 // cwd is the directory the config lives in; file paths are resolved relative to it.
 func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *MergedConfig {
+	if configNeedsTargetResolver(config) {
+		decision := newConfigTargetResolver(config, cwd, nil).resolve(filePath, "")
+		if !decision.matched || !decision.selected || decision.globallyIgnored {
+			return nil
+		}
+		return config.mergeConfigEntries(decision.key)
+	}
 	// Collect all global ignore patterns and evaluate once. This allows `!`
 	// negation patterns in separate entries to work correctly, aligned with
 	// ESLint v10 which merges all global ignores before evaluating. Callers
@@ -807,7 +873,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 // patterns supplied by the caller, so repeated calls against the same config
 // (one per lint target) don't re-parse the same ignore pattern strings.
 func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd string, globalIgnorePatterns []IgnorePattern) *MergedConfig {
-	key, matched := config.matchConfigEntries(filePath, cwd, globalIgnorePatterns, nil)
+	key, matched := config.matchConfigEntries(filePath, cwd, globalIgnorePatterns, nil, nil)
 	if !matched {
 		return nil
 	}
@@ -832,14 +898,19 @@ func hasFileSelectors(entry ConfigEntry) bool {
 }
 
 func isFileMatchedByConfigEntry(filePath string, entry ConfigEntry, cwd string) bool {
-	if isFileMatched(filePath, entry.Files, cwd) {
+	matchPath := newFileMatchPath(filePath, cwd)
+	return matchPath.matchesConfigEntry(entry)
+}
+
+func (path *fileMatchPath) matchesConfigEntry(entry ConfigEntry) bool {
+	if path.matchesAny(entry.Files) {
 		return true
 	}
 	for _, group := range entry.FilePatternGroups {
 		// ESLint treats an empty nested selector as a vacuously true AND group.
 		matched := true
 		for _, pattern := range group {
-			if !isSingleFilePatternMatched(filePath, pattern, cwd) {
+			if !path.matchesSingle(pattern) {
 				matched = false
 				break
 			}
@@ -899,46 +970,45 @@ func cloneConfigValue(value any) any {
 
 // isFileMatched checks if a file matches any of the given glob patterns
 func isFileMatched(filePath string, patterns []string, cwd string) bool {
+	matchPath := newFileMatchPath(filePath, cwd)
+	return matchPath.matchesAny(patterns)
+}
+
+func (path *fileMatchPath) matchesAny(patterns []string) bool {
 	for _, pattern := range patterns {
-		if isSingleFilePatternMatched(filePath, pattern, cwd) {
+		if path.matchesSingle(pattern) {
 			return true
 		}
 	}
 	return false
 }
 
-func isSingleFilePatternMatched(filePath string, pattern string, cwd string) bool {
+func (path *fileMatchPath) matchesSingle(pattern string) bool {
 	negated := false
 	for strings.HasPrefix(pattern, "!") {
 		negated = !negated
 		pattern = strings.TrimPrefix(pattern, "!")
 	}
-	matched := isPositiveFilePatternMatched(filePath, pattern, cwd)
+	matched := path.matchesPositive(pattern)
 	if negated {
 		return !matched
 	}
 	return matched
 }
 
-func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) bool {
-	var normalizedPath string
-	if cwd != "" {
-		normalizedPath = normalizePath(filePath, cwd)
-	} else {
-		normalizedPath = filePath
-	}
+func (path *fileMatchPath) matchesPositive(pattern string) bool {
+	normalizedPath, unixPath := path.normalizedPaths()
 
 	normalizedPattern := normalizePattern(pattern)
 
 	if utils.MatchGlob(normalizedPattern, normalizedPath) {
 		return true
 	}
-	if normalizedPath != filePath {
-		if utils.MatchGlob(normalizedPattern, filePath) {
+	if normalizedPath != path.original {
+		if utils.MatchGlob(normalizedPattern, path.original) {
 			return true
 		}
 	}
-	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 	if unixPath != normalizedPath {
 		if utils.MatchGlob(normalizedPattern, unixPath) {
 			return true
@@ -996,40 +1066,23 @@ func ExtractGlobals(langOpts *LanguageOptions) map[string]utils.GlobalAccess {
 	return globals
 }
 
-// ExtractSourceType reads the effective module kind from a merged
-// `languageOptions.sourceType`. Only the top-level field is accepted — the
-// same contract as the JS language plugin (no legacy
-// `parserOptions.sourceType`). Returns "" when unset, not a string, or not
-// one of "module" / "script" / "commonjs" — callers should fall back to
-// structural ESM detection. Values ValidateConfig rejects are dropped here
-// rather than guessed at, so a config that skipped validation behaves as if
-// it never mentioned sourceType.
-func ExtractSourceType(langOpts *LanguageOptions) string {
+// ExtractLanguageOptions normalizes the effective per-file language options
+// for native rules. The zero value deliberately represents ESLint flat-config
+// defaults, so a missing languageOptions object needs no allocation.
+func ExtractLanguageOptions(langOpts *LanguageOptions) rule.LanguageOptions {
+	var result rule.LanguageOptions
 	if langOpts == nil || langOpts.Raw == nil {
-		return ""
+		return result
 	}
-	s, ok := langOpts.Raw["sourceType"].(string)
-	if !ok || !isValidSourceType(s) {
-		return ""
+	if value, present := langOpts.Raw["ecmaVersion"]; present {
+		if version, ok := normalizeConfigECMAVersion(value); ok {
+			result.ECMAVersion = version
+		}
 	}
-	return s
-}
-
-// RulePluginPrefix extracts the plugin prefix from a rule name.
-// "@typescript-eslint/no-explicit-any" → "@typescript-eslint"
-// "import/no-unresolved" → "import"
-// "no-debugger" → "" (core rule)
-func RulePluginPrefix(ruleName string) string {
-	lastSlash := strings.LastIndex(ruleName, "/")
-	if lastSlash < 0 {
-		return ""
+	if sourceType, ok := langOpts.Raw["sourceType"].(string); ok && rule.IsValidSourceType(sourceType) {
+		result.SourceType = sourceType
 	}
-	return ruleName[:lastSlash]
-}
-
-// GetCoreRules returns core ESLint rules (those without a "/" prefix in their registered name).
-func GetCoreRules() []rule.Rule {
-	return coreRules.GetAllRules()
+	return result
 }
 
 // InitDefaultConfig, createDefaultConfig, migrateJSONConfig and related helpers

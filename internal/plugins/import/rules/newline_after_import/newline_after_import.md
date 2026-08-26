@@ -39,4 +39,5 @@ const BAZ = 1;
 
 ## Original Documentation
 
-- [eslint-plugin-import/newline-after-import](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/newline-after-import.md)
+- [eslint-plugin-import: newline-after-import](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/newline-after-import.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/newline-after-import.js)

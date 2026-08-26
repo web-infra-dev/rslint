@@ -7,17 +7,41 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // modifierFlagsDisqualifying captures the TS-only modifiers that exclude a
 // member from "valid static" status: the three accessibility keywords
 // (`public` / `private` / `protected`), `readonly`, `declare` (ambient), and
-// any class-element decorator. tsgo carries decorators on the same modifier
-// list as keywords, so a single flag check covers both.
+// any class-element decorator. TypeScript-Go carries decorators on the same
+// modifier list as keywords, so the same mask covers both.
 const modifierFlagsDisqualifying = ast.ModifierFlagsAccessibilityModifier |
 	ast.ModifierFlagsReadonly |
 	ast.ModifierFlagsAmbient |
 	ast.ModifierFlagsDecorator
+
+// hasDisqualifyingSyntacticModifier excludes JSDoc modifiers synthesized by
+// TypeScript-Go's JavaScript reparser. Upstream reads ESTree syntax fields, so
+// tags such as `@public`, `@private`, `@protected`, and `@readonly` must not
+// disqualify an otherwise static-only JavaScript class.
+func hasDisqualifyingSyntacticModifier(member *ast.Node) bool {
+	if member.ModifierFlags()&modifierFlagsDisqualifying == 0 {
+		return false
+	}
+	modifiers := member.Modifiers()
+	if modifiers == nil {
+		return false
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier == nil || modifier.Flags&ast.NodeFlagsReparsed != 0 {
+			continue
+		}
+		if ast.ModifierToFlag(modifier.Kind)&modifierFlagsDisqualifying != 0 {
+			return true
+		}
+	}
+	return false
+}
 
 // isClassElementMethodLike reports whether a class element is one of the
 // kinds the upstream rule treats as `MethodDefinition`: regular method,
@@ -52,7 +76,7 @@ func isStaticMember(member *ast.Node) bool {
 	if ast.IsPrivateIdentifierClassElementDeclaration(member) {
 		return false
 	}
-	if ast.HasSyntacticModifier(member, modifierFlagsDisqualifying) {
+	if hasDisqualifyingSyntacticModifier(member) {
 		return false
 	}
 	return true
@@ -287,7 +311,7 @@ func trimmedTextBetween(text string, start, end int) string {
 	if start >= end || end > len(text) {
 		return ""
 	}
-	return strings.TrimSpace(text[start:end])
+	return ecmascript.StringTrim(text[start:end])
 }
 
 // buildFix walks the class members and produces the list of fixes. Returns

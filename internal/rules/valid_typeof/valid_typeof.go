@@ -1,10 +1,15 @@
 package valid_typeof
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed valid_typeof.schema.json
+var schemaJSON []byte
 
 // validTypes is the set of strings that are valid results of the typeof operator.
 var validTypes = map[string]bool{
@@ -43,16 +48,17 @@ type validTypeofOptions struct {
 	requireStringLiterals bool
 }
 
-func parseOptions(opts any) validTypeofOptions {
+func parseOptions(options []any) validTypeofOptions {
 	result := validTypeofOptions{
 		requireStringLiterals: false,
 	}
+	if len(options) == 0 {
+		return result
+	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if req, ok := optsMap["requireStringLiterals"].(bool); ok {
-			result.requireStringLiterals = req
-		}
+	m, _ := options[0].(map[string]any)
+	if req, ok := m["requireStringLiterals"].(bool); ok {
+		result.requireStringLiterals = req
 	}
 
 	return result
@@ -65,9 +71,9 @@ func isEqualityOperator(kind ast.Kind) bool {
 
 // https://eslint.org/docs/latest/rules/valid-typeof
 var ValidTypeofRule = rule.Rule{
-	Name: "valid-typeof",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "valid-typeof",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -124,7 +130,7 @@ var ValidTypeofRule = rule.Rule{
 
 				case sibling.Kind == ast.KindIdentifier:
 					isUndefinedOff := false
-					if ctx.Globals["undefined"] == utils.GlobalAccessOff {
+					if !ctx.Globals.Access("undefined").IsDeclared() {
 						isUndefinedOff = true
 					}
 					if sibling.Text() == "undefined" && !utils.IsShadowed(sibling, "undefined") && !isUndefinedOff {

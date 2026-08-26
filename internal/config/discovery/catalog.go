@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 
 // AutoJSConfigFileNames is the automatic-discovery priority. Explicit config
@@ -62,19 +63,15 @@ type ConfigDiscoveryRequest struct {
 type ExplicitConfigRequest struct {
 	CWD        string
 	ConfigPath string
-	// TargetFiles limits Git projection to the directory chains between CWD
-	// and an exact target set. A nil slice projects the complete CWD-owned
-	// subtree; a non-nil empty slice projects nothing, as used by
-	// --type-check-only.
-	TargetFiles    []DiscoveryFile
-	Fresh          bool
-	SingleThreaded bool
-}
-
-type configSource struct {
-	CandidateID   string
-	CandidatePath string
-	ExplicitOnly  bool
+	// TargetFiles limits Git projection to exact target directory chains. With
+	// no TargetDirectories, a nil slice projects the complete CWD-owned subtree
+	// and a non-nil empty slice projects nothing, as used by --type-check-only.
+	TargetFiles []DiscoveryFile
+	// TargetDirectories limits Git projection to recursive directory targets.
+	// It may be combined with TargetFiles for mixed CLI invocations.
+	TargetDirectories []string
+	Fresh             bool
+	SingleThreaded    bool
 }
 
 type ConfigFailure struct {
@@ -103,7 +100,7 @@ type ConfigCatalog struct {
 	Configs            map[string]rslintconfig.RslintConfig
 	EffectiveConfigIDs []string
 	EslintPlugins      []rslintconfig.EslintPluginEntry
-	Scopes             map[string]rslintconfig.LintDiscoveryScope
+	Scopes             map[string]target.OwnerScope
 	Failures           []ConfigFailure
 	Stats              ConfigDiscoveryStats
 	// Explicit reports that the catalog came from one explicitly selected
@@ -187,6 +184,7 @@ func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoa
 	automatic := ConfigDiscoveryRequest{
 		CWD:            request.CWD,
 		Files:          request.TargetFiles,
+		Directories:    request.TargetDirectories,
 		Fresh:          request.Fresh,
 		SingleThreaded: request.SingleThreaded,
 	}
@@ -205,21 +203,15 @@ func buildConfigCatalog(
 	}
 	transactionID := nextConfigDiscoveryTransactionID()
 
-	builder := configCatalogBuilder{
-		ctx:                 ctx,
-		fs:                  fsys,
-		loader:              loader,
-		request:             request,
-		explicitConfigPath:  explicitConfigPath,
-		transactionID:       transactionID,
-		loadStates:          make(map[string]*configLoadState),
-		loadStateByIdentity: make(map[tspath.Path]*configLoadState),
-		configs:             make(map[string]rslintconfig.RslintConfig),
-		sources:             make(map[string]configSource),
-		scopes:              make(map[string]rslintconfig.LintDiscoveryScope),
-		failureByPath:       make(map[string]ConfigFailure),
-	}
-	return builder.build()
+	coordinator := newDiscoveryCoordinator(
+		ctx,
+		fsys,
+		loader,
+		request,
+		explicitConfigPath,
+		transactionID,
+	)
+	return coordinator.build()
 }
 
 func normalizeDiscoveryPath(path string, cwd string) string {

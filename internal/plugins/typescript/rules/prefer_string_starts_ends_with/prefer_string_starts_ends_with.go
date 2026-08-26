@@ -1,6 +1,7 @@
 package prefer_string_starts_ends_with
 
 import (
+	_ "embed"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,6 +10,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed prefer_string_starts_ends_with.schema.json
+var schemaJSON []byte
 
 func buildPreferStartsWithMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -25,11 +29,21 @@ func buildPreferEndsWithMessage() rule.RuleMessage {
 }
 
 type Options struct {
-	AllowSingleElementEquality *string `json:"allowSingleElementEquality"`
+	AllowSingleElementEquality string
 }
 
-var defaultOpts = Options{
-	AllowSingleElementEquality: utils.Ref("never"),
+func parseOptions(options []any) Options {
+	opts := Options{
+		AllowSingleElementEquality: "never",
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if value, ok := optsMap["allowSingleElementEquality"].(string); ok {
+		opts.AllowSingleElementEquality = value
+	}
+	return opts
 }
 
 // callInfo holds parsed call expression info
@@ -410,31 +424,14 @@ func needsParentheses(node *ast.Node) bool {
 
 var PreferStringStartsEndsWithRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-string-starts-ends-with",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := defaultOpts
-
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
-				if allowSingleElementEquality, ok := optsMap["allowSingleElementEquality"].(string); ok {
-					opts.AllowSingleElementEquality = utils.Ref(allowSingleElementEquality)
-				}
-			}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		h := &ruleHelper{
 			ctx:                        ctx,
-			allowSingleElementEquality: opts.AllowSingleElementEquality != nil && *opts.AllowSingleElementEquality == "always",
+			allowSingleElementEquality: opts.AllowSingleElementEquality == "always",
 		}
 
 		return rule.RuleListeners{

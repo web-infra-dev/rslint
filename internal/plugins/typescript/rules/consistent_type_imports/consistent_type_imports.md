@@ -26,4 +26,5 @@ import { value, type MyType } from './mixed';
 
 ## Original Documentation
 
-- [typescript-eslint consistent-type-imports](https://typescript-eslint.io/rules/consistent-type-imports)
+- [typescript-eslint: consistent-type-imports](https://typescript-eslint.io/rules/consistent-type-imports)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/consistent-type-imports.ts)

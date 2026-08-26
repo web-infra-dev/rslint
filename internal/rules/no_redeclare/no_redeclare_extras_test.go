@@ -18,8 +18,28 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestTypeScriptImplicitBuiltinsDoNotRequireProgram(t *testing.T) {
+	declarations := newProgramGlobalDeclarations(
+		rule.RuleContext{},
+		typescriptDefaults(),
+		builtinGlobalsTypeScriptLibs,
+	)
+
+	for _, name := range []string{"Record", "ImportMeta", "IteratorObjectConstructor"} {
+		if !declarations.isImplicitBuiltin(name) {
+			t.Errorf("expected default TypeScript type global %q to be an implicit builtin", name)
+		}
+	}
+	for _, name := range []string{"NodeListOf", "HTMLElement", "AbortController"} {
+		if declarations.isImplicitBuiltin(name) {
+			t.Errorf("did not expect host-library name %q to be an implicit builtin", name)
+		}
+	}
+}
 
 func TestNoRedeclareExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
@@ -113,6 +133,14 @@ func TestNoRedeclareExtras(t *testing.T) {
 				Code:    "const chatgpt = {};",
 				Options: map[string]interface{}{"builtinGlobals": false},
 				Globals: map[string]any{"chatgpt": "readonly"},
+			},
+			// espree-parsed commonjs uses a wrapper scope, so builtins are not program globals.
+			{
+				Code:            "var Object = 0;",
+				FileName:        "a.jsx",
+				TSConfig:        "tsconfig.allow-js.json",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -311,7 +339,8 @@ func TestNoRedeclareExtras(t *testing.T) {
 
 			// ---- Real-user: built-in globals report each user declaration ----
 			{
-				Code: "var Object;\nvar Object;",
+				Code:            "var Object;\nvar Object;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("Object", 1, 5),
 					builtinError("Object", 2, 5),
@@ -331,6 +360,60 @@ func TestNoRedeclareExtras(t *testing.T) {
 				},
 			},
 
+			// Authored sourceType on a .js file selects the global program scope,
+			// so builtin Object is redeclared. Without the option, .js defaults to module.
+			{
+				Code:            "var Object = 0;",
+				FileName:        "a.js",
+				TSConfig:        "tsconfig.allow-js.json",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 1, 5),
+				},
+			},
+			// TypeScript-flavoured commonjs keeps a global program scope without the
+			// espree wrapper, so builtin Object is still redeclared.
+			{
+				Code:            "var Object = 0;",
+				FileName:        "a.ts",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 1, 5),
+				},
+			},
+			// typescript-eslint keys module scope on sourceType === "module" alone,
+			// so commonjs keeps global program scope even when the file has module syntax.
+			{
+				Code:            "export {};\nvar Object = 0;",
+				FileName:        "a.ts",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 2, 5),
+				},
+			},
+			{
+				Code:            "import x from './y';\nvar Object = 0;",
+				FileName:        "a.ts",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 2, 5),
+				},
+			},
+			// typescript-eslint keys module scope on sourceType alone; script keeps global scope.
+			{
+				Code:            "export {};\nvar Object = 0;",
+				FileName:        "a.ts",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					builtinError("Object", 2, 5),
+				},
+			},
+
 			// Locks in upstream iterateDeclarations() arm 2: syntax declarations after the first report as plain redeclarations.
 			invalidRedeclared("let a;\nlet a;", "a", 2, 5),
 
@@ -341,16 +424,25 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// An omitted property in an explicitly supplied empty option object
 			// retains upstream's builtinGlobals: true default.
 			{
-				Code:    "var Object = 0;",
-				Options: map[string]interface{}{},
+				Code:            "var Object = 0;",
+				Options:         map[string]interface{}{},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("Object", 1, 5),
 				},
 			},
 			// ESLint core treats parser-provided type declarations as variables;
 			// only the TypeScript extension excludes pure type-space declarations.
-			invalidBuiltin("interface Object {}", "Object", 1, 11),
-			invalidBuiltin("type Array = unknown;", "Array", 1, 6),
+			{
+				Code:            "interface Object {}",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{builtinError("Object", 1, 11)},
+			},
+			{
+				Code:            "type Array = unknown;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{builtinError("Array", 1, 6)},
+			},
 
 			// Locks in upstream checkForBlock() arm: non-function blocks are checked as their own lexical scope.
 			invalidRedeclared("{\n  const a = 1;\n  const a = 2;\n}", "a", 3, 9),
@@ -361,29 +453,33 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// ---- Real-user: config and inline global declaration ordering ----
 			invalidRedeclared("/* globals a:off */ /* globals a */", "a", 1, 32),
 			{
-				Code:    "/* globals Object */ var Object = 0;",
-				Globals: map[string]any{"Object": "off"},
+				Code:            "/* globals Object */ var Object = 0;",
+				Globals:         map[string]any{"Object": "off"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredBySyntaxError("Object", 1, 12),
 				},
 			},
 			{
-				Code:    "/* globals a */ var a = 0;",
-				Globals: map[string]any{"a": "readonly"},
+				Code:            "/* globals a */ var a = 0;",
+				Globals:         map[string]any{"a": "readonly"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("a", 1, 12),
 					builtinError("a", 1, 21),
 				},
 			},
 			{
-				Code: "/* globals a:off */ /* globals a */ var a = 0;",
+				Code:            "/* globals a:off */ /* globals a */ var a = 0;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredBySyntaxError("a", 1, 12),
 					redeclaredBySyntaxError("a", 1, 32),
 				},
 			},
 			{
-				Code: "/* globals a, a */ var a;",
+				Code:            "/* globals a, a */ var a;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredBySyntaxError("a", 1, 12),
 				},
@@ -403,8 +499,9 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// eslint/eslint#19141: config-declared application globals participate
 			// in the implicit-global branch when builtinGlobals uses its default.
 			{
-				Code:    "const chatgpt = {};",
-				Globals: map[string]any{"chatgpt": "readonly"},
+				Code:            "const chatgpt = {};",
+				Globals:         map[string]any{"chatgpt": "readonly"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("chatgpt", 1, 7),
 				},
@@ -413,7 +510,8 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// eslint/eslint#12334: directive diagnostics must cover exactly the
 			// name, including non-zero end locations across CRLF line endings.
 			{
-				Code: "/*globals foo,\r\n    Array */",
+				Code:            "/*globals foo,\r\n    Array */",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					builtinError("Array", 2, 5),
 				},
@@ -458,6 +556,28 @@ func TestNoRedeclareExtras(t *testing.T) {
 			// Export and type-only import wrappers must not hide their declarations.
 			invalidRedeclared("export default function initialize() {} function initialize() {}", "initialize", 1, 50),
 			invalidRedeclared("import type {Model} from './types'; type Model = {};", "Model", 1, 42),
+		},
+	)
+}
+
+func TestNoRedeclareECMAVersion(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoRedeclareRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            "var Promise = 0;",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            "var Promise = 0;",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{builtinError("Promise", 1, 5)},
+			},
 		},
 	)
 }
@@ -533,4 +653,49 @@ func TestNoRedeclareSchemaMatrix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNoRedeclareLanguageDefaults(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.allow-js.json",
+		t,
+		&NoRedeclareRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `var require;`, FileName: "var.cjs"},
+			{
+				Code:     `var require;`,
+				FileName: "legacy-var.cjs",
+				TSConfig: "tsconfig.allow-js-legacy-module-detection.json",
+			},
+			{
+				Code:     `var Object;`,
+				FileName: "legacy-module.js",
+				TSConfig: "tsconfig.allow-js-legacy-module-detection.json",
+			},
+			{Code: `let require;`, FileName: "let.cjs"},
+			{Code: `var Object;`, FileName: "builtin.cjs"},
+			{
+				Code:     `var custom;`,
+				FileName: "configured.cjs",
+				Globals:  map[string]any{"custom": "readonly"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:     `var require; var require;`,
+				FileName: "duplicate.cjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclared", Line: 1, Column: 18},
+				},
+			},
+			{
+				Code:     `/* global require */`,
+				FileName: "directive.cjs",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 11},
+				},
+			},
+		},
+	)
 }

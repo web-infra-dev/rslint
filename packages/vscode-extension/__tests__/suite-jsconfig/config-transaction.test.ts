@@ -248,6 +248,7 @@ suite('LSP config discovery transactions', () => {
       host,
       pool,
       () => 'fingerprint-1',
+      CONFIG_DISCOVERY_PROTOCOL_VERSION,
     );
 
     const loaded = await adapter.loadConfigs(loadRequest());
@@ -292,6 +293,7 @@ suite('LSP config discovery transactions', () => {
       host,
       pool,
       () => 'fingerprint-1',
+      CONFIG_DISCOVERY_PROTOCOL_VERSION,
     );
 
     await adapter.loadConfigs(loadRequest('tx-abort'));
@@ -328,6 +330,7 @@ suite('LSP config discovery transactions', () => {
       host,
       pool,
       () => 'fingerprint-restart',
+      CONFIG_DISCOVERY_PROTOCOL_VERSION,
     );
 
     await adapter.loadConfigs(loadRequest('old-process-tx'));
@@ -356,6 +359,7 @@ suite('LSP config discovery transactions', () => {
       host,
       pool,
       () => 'fingerprint-restart',
+      CONFIG_DISCOVERY_PROTOCOL_VERSION,
     );
     await adapter.loadConfigs(loadRequest('orphaned-tx'));
 
@@ -393,6 +397,7 @@ suite('LSP config discovery transactions', () => {
       host,
       pool,
       () => 'fingerprint-degraded',
+      CONFIG_DISCOVERY_PROTOCOL_VERSION,
     );
 
     await adapter.loadConfigs(loadRequest('tx-degraded'));
@@ -427,6 +432,7 @@ suite('LSP config discovery transactions', () => {
       host,
       pool,
       () => 'fingerprint-before-prepare',
+      CONFIG_DISCOVERY_PROTOCOL_VERSION,
     );
 
     await adapter.loadConfigs(loadRequest('tx-prepare-race'));
@@ -450,6 +456,7 @@ suite('LSP config discovery transactions', () => {
       host,
       pool,
       () => 'fingerprint-1',
+      CONFIG_DISCOVERY_PROTOCOL_VERSION,
     );
 
     await adapter.loadConfigs(loadRequest('tx-response-lost'));
@@ -486,6 +493,7 @@ suite('LSP config discovery transactions', () => {
       host,
       new TestPluginPool(),
       () => 'fingerprint-1',
+      CONFIG_DISCOVERY_PROTOCOL_VERSION,
     );
 
     await assert.rejects(adapter.loadConfigs(loadRequest()), /load failed/);

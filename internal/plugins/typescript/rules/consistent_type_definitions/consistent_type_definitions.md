@@ -71,4 +71,5 @@ Note: Interfaces inside `declare global` blocks report an error but are not auto
 
 ## Original Documentation
 
-- [typescript-eslint consistent-type-definitions](https://typescript-eslint.io/rules/consistent-type-definitions)
+- [typescript-eslint: consistent-type-definitions](https://typescript-eslint.io/rules/consistent-type-definitions)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/consistent-type-definitions.ts)

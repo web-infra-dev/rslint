@@ -27,4 +27,5 @@ Examples of **correct** code with the default `{ "maximum": 1, "when": "always" 
 
 ## Original Documentation
 
-- [react/jsx-max-props-per-line](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-max-props-per-line.md)
+- [eslint-plugin-react: jsx-max-props-per-line](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-max-props-per-line.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-max-props-per-line.js)

@@ -1,23 +1,27 @@
 package no_self_assign
 
 import (
+	_ "embed"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+//go:embed no_self_assign.schema.json
+var schemaJSON []byte
 
 // skipOuterExprKinds defines which outer expressions to skip: parentheses and type assertions.
 const skipOuterExprKinds = ast.OEKParentheses | ast.OEKTypeAssertions
 
 // https://eslint.org/docs/latest/rules/no-self-assign
 var NoSelfAssignRule = rule.Rule{
-	Name: "no-self-assign",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-self-assign",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -53,14 +57,15 @@ type selfAssignOptions struct {
 	props bool
 }
 
-func parseOptions(opts any) selfAssignOptions {
+func parseOptions(options []any) selfAssignOptions {
 	result := selfAssignOptions{props: true} // default: props is true
+	if len(options) == 0 {
+		return result
+	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if p, ok := optsMap["props"].(bool); ok {
-			result.props = p
-		}
+	m, _ := options[0].(map[string]any)
+	if p, ok := m["props"].(bool); ok {
+		result.props = p
 	}
 
 	return result
@@ -68,7 +73,7 @@ func parseOptions(opts any) selfAssignOptions {
 
 // removeWhitespace normalizes node text such as "a . b" to "a.b" without
 // allocating when the usual compact spelling contains no whitespace. Source
-// text is overwhelmingly ASCII, so only non-ASCII bytes enter unicode.IsSpace.
+// text is overwhelmingly ASCII, so only non-ASCII bytes are read as characters.
 func removeWhitespace(text string) string {
 	firstWhitespace := -1
 	for i := 0; i < len(text); {
@@ -81,7 +86,7 @@ func removeWhitespace(text string) string {
 			continue
 		}
 		r, size := utf8.DecodeRuneInString(text[i:])
-		if unicode.IsSpace(r) {
+		if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			firstWhitespace = i
 			break
 		}
@@ -103,7 +108,7 @@ func removeWhitespace(text string) string {
 			continue
 		}
 		r, size := utf8.DecodeRuneInString(text[i:])
-		if !unicode.IsSpace(r) {
+		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			// Copy the original bytes so malformed UTF-8 is preserved instead of
 			// being rewritten as the replacement rune.
 			result.WriteString(text[i : i+size])
@@ -211,7 +216,7 @@ func eachSelfAssignment(left *ast.Node, right *ast.Node, props bool, report func
 	// Unlike destructuring patterns above, member expressions are compared as a whole
 	// reference chain using utils.IsSameReference, matching ESLint's isSameReference approach.
 	case props && ast.IsAccessExpression(left) && ast.IsAccessExpression(right):
-		if utils.IsSameReference(left, right) {
+		if utils.IsSameReference(left, right, false) {
 			report(right)
 		}
 

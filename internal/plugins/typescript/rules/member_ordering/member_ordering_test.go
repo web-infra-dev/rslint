@@ -1,9 +1,14 @@
 package member_ordering
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -1655,4 +1660,143 @@ interface Foo {
 			},
 		},
 	})
+}
+
+func runMemberOrderingWithDemand(
+	t *testing.T,
+	code string,
+	options []any,
+	demand rule.EditDemand,
+) []rule.RuleDiagnostic {
+	t.Helper()
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/source.ts",
+		Path:     "/source.ts",
+	}, code, core.ScriptKindTS)
+	comments := rule.NewCommentStore(sourceFile)
+	var diagnostics []rule.RuleDiagnostic
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithDiagnosticConsumer(MemberOrderingRule.Name, rule.SeverityWarning, rule.DiagnosticConsumer{
+		Demand: demand,
+		Report: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	})
+	listeners := MemberOrderingRule.Run(ctx, options)
+
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if listener := listeners[node.Kind]; listener != nil {
+			listener(node)
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	return diagnostics
+}
+
+func TestMemberOrderingDiagnosticParity(t *testing.T) {
+	const code = `class Subject {
+  method() {}
+  // leading member trivia
+  alpha: number;
+  beta: number;
+}`
+
+	diagnosticsOnly := runMemberOrderingWithDemand(t, code, nil, rule.EditDemandNone)
+	allEdits := runMemberOrderingWithDemand(t, code, nil, rule.EditDemandAll)
+	configuredDefault := runMemberOrderingWithDemand(t, code, []any{map[string]interface{}{
+		"default": map[string]interface{}{"order": "as-written"},
+	}}, rule.EditDemandNone)
+	if len(diagnosticsOnly) != 2 || len(allEdits) != 2 || len(configuredDefault) != 2 {
+		t.Fatalf(
+			"diagnostic counts = %d, %d, and %d; want 2",
+			len(diagnosticsOnly),
+			len(allEdits),
+			len(configuredDefault),
+		)
+	}
+
+	wantMembers := []string{"alpha: number;", "beta: number;"}
+	for index, diagnostic := range diagnosticsOnly {
+		wantRange := core.NewTextRange(
+			strings.Index(code, wantMembers[index]),
+			strings.Index(code, wantMembers[index])+len(wantMembers[index]),
+		)
+		if diagnostic.Range != wantRange {
+			t.Errorf("diagnostic %d range = %#v, want %#v", index, diagnostic.Range, wantRange)
+		}
+		wantDescription := "Member " + strings.TrimSuffix(wantMembers[index], ": number;") +
+			" should be declared before all public instance method definitions."
+		if diagnostic.Message.Id != "incorrectGroupOrder" || diagnostic.Message.Description != wantDescription {
+			t.Errorf("diagnostic %d message = %#v, want %q", index, diagnostic.Message, wantDescription)
+		}
+		if diagnostic.FixesPtr != nil || diagnostic.Suggestions != nil {
+			t.Errorf("diagnostic %d unexpectedly materialized edits", index)
+		}
+		if diagnostic.Range != allEdits[index].Range ||
+			diagnostic.Message.Id != allEdits[index].Message.Id ||
+			diagnostic.Message.Description != allEdits[index].Message.Description {
+			t.Errorf("diagnostic %d changed under all-edit demand", index)
+		}
+		if diagnostic.Range != configuredDefault[index].Range ||
+			diagnostic.Message.Id != configuredDefault[index].Message.Id ||
+			diagnostic.Message.Description != configuredDefault[index].Message.Description {
+			t.Errorf("diagnostic %d changed under an explicit default-order object", index)
+		}
+		if allEdits[index].FixesPtr != nil || allEdits[index].Suggestions != nil {
+			t.Errorf("all-edit diagnostic %d unexpectedly materialized edits", index)
+		}
+	}
+}
+
+func TestMemberOrderingDisableDirectives(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "next line",
+			code: `class Subject {
+  method() {}
+  // rslint-disable-next-line @typescript-eslint/member-ordering
+  alpha: number;
+  beta: number;
+}`,
+		},
+		{
+			name: "line",
+			code: `class Subject {
+  method() {}
+  alpha: number; // rslint-disable-line @typescript-eslint/member-ordering
+  beta: number;
+}`,
+		},
+		{
+			name: "scoped",
+			code: `class Subject {
+  method() {}
+  /* rslint-disable @typescript-eslint/member-ordering */
+  alpha: number;
+  /* rslint-enable @typescript-eslint/member-ordering */
+  beta: number;
+}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			diagnostics := runMemberOrderingWithDemand(t, test.code, nil, rule.EditDemandNone)
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostic count = %d, want 1", len(diagnostics))
+			}
+			if got := test.code[diagnostics[0].Range.Pos():diagnostics[0].Range.End()]; got != "beta: number;" {
+				t.Fatalf("diagnostic range text = %q, want beta member", got)
+			}
+		})
+	}
 }

@@ -105,4 +105,5 @@ function foo() {
 
 ## Original Documentation
 
-- [https://eslint.org/docs/latest/rules/max-depth](https://eslint.org/docs/latest/rules/max-depth)
+- [ESLint: max-depth](https://eslint.org/docs/latest/rules/max-depth)
+- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/max-depth.js)

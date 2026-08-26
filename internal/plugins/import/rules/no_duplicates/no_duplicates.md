@@ -41,7 +41,9 @@ import { y } from './bar';
 When set to `true`, imports with different query strings are treated as different modules.
 
 ```json
-"import/no-duplicates": ["error", { "considerQueryString": true }]
+{
+  "import/no-duplicates": ["error", { "considerQueryString": true }]
+}
 ```
 
 ### `prefer-inline`
@@ -49,9 +51,12 @@ When set to `true`, imports with different query strings are treated as differen
 When set to `true`, supports TypeScript inline type imports, allowing `import type { X }` to be merged into `import { type X }`.
 
 ```json
-"import/no-duplicates": ["error", { "prefer-inline": true }]
+{
+  "import/no-duplicates": ["error", { "prefer-inline": true }]
+}
 ```
 
 ## Original Documentation
 
-- [eslint-plugin-import/no-duplicates](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-duplicates.md)
+- [eslint-plugin-import: no-duplicates](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-duplicates.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-duplicates.js)

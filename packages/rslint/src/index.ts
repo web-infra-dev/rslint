@@ -1,7 +1,9 @@
 export { defineConfig, globalIgnores } from './config/define-config.js';
+export { globals } from './config/globals/index.js';
 export type {
   RslintConfig,
   RslintConfigEntry,
+  LanguageOptions,
   ESLintPlugin,
 } from './config/define-config.js';
 export {
@@ -20,9 +22,10 @@ export {
 // The ESLint v10-aligned programmatic JavaScript API (issue #1106). This `Rslint`
 // class and the `runCLI` wrapper are the only linting surfaces exported from
 // the package root; alongside them the root exports just the config-authoring
-// helpers (`defineConfig` / `globalIgnores`) and the plugin presets. The
-// low-level engine (the `lint` convenience, `RSLintService`, and the Node
-// backend) lives on internal subpaths — `@rslint/core/internal` and
+// helpers (`defineConfig` / `globalIgnores`), the bundled globals catalog, and
+// plugin presets. The low-level engine (the `lint` convenience,
+// `RSLintService`, and the Node backend) lives on internal subpaths —
+// `@rslint/core/internal` and
 // `@rslint/core/service` — not on the public root. (The browser/web-worker
 // backend lives in `@rslint/wasm`.)
 export { Rslint } from './api/rslint.js';

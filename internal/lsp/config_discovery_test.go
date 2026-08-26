@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 
 type configRefreshTestResult struct {
@@ -74,12 +76,27 @@ func newConfigRefreshTestServer(t *testing.T) (*Server, <-chan *lsproto.Message,
 }
 
 func startConfigRefreshForTest(s *Server, reason string) <-chan configRefreshTestResult {
+	return startConfigRefreshRequestForTest(s, configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		Reason:          reason,
+	})
+}
+
+func startExplicitConfigRefreshForTest(s *Server, reason string, configPath string) <-chan configRefreshTestResult {
+	return startConfigRefreshRequestForTest(s, configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		Reason:          reason,
+		ConfigPath: optionalConfigRefreshPath{
+			Value:   configPath,
+			Present: true,
+		},
+	})
+}
+
+func startConfigRefreshRequestForTest(s *Server, request configRefreshRequest) <-chan configRefreshTestResult {
 	result := make(chan configRefreshTestResult, 1)
 	go func() {
-		response, err := s.handleConfigRefresh(context.Background(), map[string]any{
-			"protocolVersion": discovery.ConfigDiscoveryProtocolVersion,
-			"reason":          reason,
-		})
+		response, err := s.handleConfigRefresh(context.Background(), request)
 		result <- configRefreshTestResult{response: response, err: err}
 	}()
 	return result
@@ -240,6 +257,24 @@ func awaitConfigRefreshResult(t *testing.T, result <-chan configRefreshTestResul
 	}
 }
 
+func completeSuccessfulConfigRefreshForTest(
+	t *testing.T,
+	s *Server,
+	outgoing <-chan *lsproto.Message,
+	entries config.RslintConfig,
+) discovery.ConfigLoadBatchRequest {
+	t.Helper()
+	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	loadRequest, loadResponse := loadedConfigResponse(t, loadMessage, entries)
+	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
+	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
+	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
+	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, true), nil)
+	return loadRequest
+}
+
 func writeConfigCandidate(t *testing.T, root string) {
 	t.Helper()
 	if err := os.WriteFile(
@@ -252,17 +287,37 @@ func writeConfigCandidate(t *testing.T, root string) {
 }
 
 func installLastGoodConfig(s *Server, root string) {
-	entries := config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
+	entries := config.RslintConfig{{
+		Plugins: []string{"last-good"},
+		Rules: config.Rules{
+			"no-console":      "error",
+			"last-good/check": "error",
+		},
+	}}
 	s.jsConfigs = map[string]config.RslintConfig{root: entries}
-	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
 	s.tsConfigPathsByConfig = map[string][]string{root: nil}
 	s.eslintPluginConfigGeneration = "last-good"
+	s.ruleCatalog, _ = deriveLSPRuleCatalog(s.currentRuleCatalog(), []config.EslintPluginEntry{{
+		Prefix:    "last-good",
+		RuleNames: []string{"check"},
+	}})
 	s.configDiscoveryHasLastGood = true
+	// Tests using this helper model a catalog committed by an earlier automatic
+	// initial refresh, then exercise a later config/dependency/watch refresh.
+	s.configRefreshInitialized = true
+	s.configRefreshConfigPath = ""
+}
+
+func assertLastGoodRuleCatalog(t *testing.T, s *Server) {
+	t.Helper()
+	if ruleImpl, ok := s.ruleCatalog.Lookup("last-good/check"); !ok || !ruleImpl.IsEslintPluginRule {
+		t.Fatalf("last-good plugin catalog was replaced: %+v", ruleImpl)
+	}
 }
 
 func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 
@@ -313,12 +368,234 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 	if got := s.pluginConfigKeyForURI(fileURI); got != root {
 		t.Fatalf("plugin configKey = %q, want exact catalog path %q", got, root)
 	}
-	if _, active := s.eslintPluginRules[pluginRuleName]; !active {
-		t.Fatalf("committed plugin rule set does not contain %q", pluginRuleName)
-	}
-	registered, ok := config.GlobalRuleRegistry.GetRule(pluginRuleName)
+	registered, ok := s.ruleCatalog.Lookup(pluginRuleName)
 	if !ok || !registered.IsEslintPluginRule {
-		t.Fatalf("plugin placeholder %q was not registered: %+v", pluginRuleName, registered)
+		t.Fatalf("committed rule catalog does not contain plugin rule %q: %+v", pluginRuleName, registered)
+	}
+}
+
+func TestConfigRefreshRequestPreservesConfigPathPresence(t *testing.T) {
+	tests := []struct {
+		name        string
+		params      string
+		wantPresent bool
+		wantPath    string
+		wantError   bool
+	}{
+		{name: "absent", params: `{"protocolVersion":2,"reason":"initial"}`},
+		{name: "string", params: `{"protocolVersion":2,"reason":"initial","configPath":"/repo/custom.config.mjs"}`, wantPresent: true, wantPath: "/repo/custom.config.mjs"},
+		{name: "null", params: `{"protocolVersion":2,"reason":"initial","configPath":null}`, wantError: true},
+		{name: "number", params: `{"protocolVersion":2,"reason":"initial","configPath":42}`, wantError: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := []byte(`{"jsonrpc":"2.0","id":1,"method":"rslint/configRefresh","params":` + test.params + `}`)
+			var message lsproto.Message
+			if err := json.Unmarshal(data, &message); err != nil {
+				t.Fatalf("unmarshal request: %v", err)
+			}
+			request, err := decodeParams[configRefreshRequest](message.AsRequest())
+			if test.wantError {
+				if err == nil {
+					t.Fatal("invalid configPath decoded successfully")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("decode configRefresh: %v", err)
+			}
+			if request.ConfigPath.Present != test.wantPresent || request.ConfigPath.Value != test.wantPath {
+				t.Fatalf("decoded configPath = %+v", request.ConfigPath)
+			}
+		})
+	}
+}
+
+func TestNormalizeLSPExplicitConfigPath(t *testing.T) {
+	root := t.TempDir()
+	for _, extension := range []string{".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"} {
+		configPath := filepath.Join(root, "custom.config"+extension)
+		if got, err := normalizeLSPExplicitConfigPath(configPath); err != nil || got != tspath.NormalizePath(configPath) {
+			t.Fatalf("normalize %q = %q, %v", configPath, got, err)
+		}
+	}
+	for _, configPath := range []string{
+		"",
+		"relative.config.mjs",
+		"file:///repo/custom.config.mjs",
+		filepath.Join(root, "rslint.jsonc"),
+		filepath.Join(root, "custom.config.MJS"),
+		filepath.Join(root, "custom.config.mjs") + "\x00suffix",
+	} {
+		if _, err := normalizeLSPExplicitConfigPath(configPath); err == nil {
+			t.Fatalf("invalid configPath %q was accepted", configPath)
+		}
+	}
+}
+
+func TestHandleConfigRefreshRequiresInitialBeforeMutation(t *testing.T) {
+	s, _, _ := newConfigRefreshTestServer(t)
+	_, err := s.handleConfigRefresh(context.Background(), configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		Reason:          "config-change",
+	})
+	if err == nil || !errors.Is(err, lsproto.ErrorCodeInvalidParams) {
+		t.Fatalf("configRefresh error = %v, want InvalidParams", err)
+	}
+	if s.configRefreshInitialized || s.configDiscoveryActive {
+		t.Fatal("non-initial refresh mutated config source state")
+	}
+}
+
+func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	if err := os.WriteFile(filepath.Join(root, "rslint.jsonc"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	externalRoot := t.TempDir()
+	configPath := filepath.Join(externalRoot, "generated-rstack-config.cjs")
+	if err := os.WriteFile(configPath, []byte("module.exports = [];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	targetPath := filepath.Join(root, "src", "index.ts")
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(targetPath, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	relativeTarget, err := filepath.Rel(externalRoot, targetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initial := startExplicitConfigRefreshForTest(s, "initial", configPath)
+	loadRequest := completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{
+		Files: []string{filepath.ToSlash(relativeTarget)},
+		Rules: config.Rules{"no-debugger": "error"},
+	}})
+	if completed := awaitConfigRefreshResult(t, initial); completed.err != nil {
+		t.Fatalf("explicit initial refresh failed: %v", completed.err)
+	}
+	if len(loadRequest.Candidates) != 1 || loadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+		t.Fatalf("explicit candidates = %+v, want only %q", loadRequest.Candidates, configPath)
+	}
+	configDir := tspath.NormalizePath(externalRoot)
+	if loadRequest.Candidates[0].ConfigDirectory != configDir {
+		t.Fatalf("explicit configDirectory = %q, want config directory %q", loadRequest.Candidates[0].ConfigDirectory, configDir)
+	}
+	if !s.configRefreshInitialized || s.configRefreshConfigPath != tspath.NormalizePath(configPath) {
+		t.Fatalf("fixed config path = %q, initialized=%t", s.configRefreshConfigPath, s.configRefreshInitialized)
+	}
+	if s.rslintConfigPath != "" || len(s.jsonConfig) != 0 {
+		t.Fatalf("explicit config retained JSON fallback: path=%q config=%+v", s.rslintConfigPath, s.jsonConfig)
+	}
+	if value, found := configRuleValue(s.jsConfigs[configDir], "no-debugger"); !found || value != "error" {
+		t.Fatalf("explicit config was not committed at its directory: %+v", s.jsConfigs)
+	}
+	entries, resolvedDirectory, isJSConfig := s.getConfigForURI(documentURIFromPath(targetPath))
+	if !isJSConfig || resolvedDirectory != configDir ||
+		config.NewFileConfigResolverWithFS(entries, resolvedDirectory, s.fs, s.currentRuleCatalog(), false).ConfigForFile(targetPath) == nil {
+		t.Fatalf("explicit external config did not govern workspace target from its authored base")
+	}
+
+	reload := startExplicitConfigRefreshForTest(s, "config-change", configPath)
+	reloadRequest := completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{
+		Rules: config.Rules{"no-console": "error"},
+	}})
+	if completed := awaitConfigRefreshResult(t, reload); completed.err != nil {
+		t.Fatalf("same-path refresh failed: %v", completed.err)
+	}
+	if len(reloadRequest.Candidates) != 1 || reloadRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+		t.Fatalf("same-path candidates = %+v", reloadRequest.Candidates)
+	}
+
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("generated/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	watchResult := make(chan error, 1)
+	go func() {
+		watchResult <- s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+			Changes: []*lsproto.FileEvent{{
+				Uri:  documentURIFromPath(gitignorePath),
+				Type: lsproto.FileChangeTypeChanged,
+			}},
+		})
+	}()
+	watchRequest := completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{
+		Rules: config.Rules{"no-console": "error"},
+	}})
+	if err := <-watchResult; err != nil {
+		t.Fatalf("explicit .gitignore refresh failed: %v", err)
+	}
+	if len(watchRequest.Candidates) != 1 || watchRequest.Candidates[0].ConfigPath != tspath.NormalizePath(configPath) {
+		t.Fatalf("explicit watcher candidates = %+v", watchRequest.Candidates)
+	}
+
+	for _, request := range []configRefreshRequest{
+		{ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion, Reason: "config-change"},
+		{
+			ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+			Reason:          "config-change",
+			ConfigPath: optionalConfigRefreshPath{
+				Value:   filepath.Join(externalRoot, "other.config.cjs"),
+				Present: true,
+			},
+		},
+	} {
+		if _, err := s.handleConfigRefresh(context.Background(), request); err == nil || !errors.Is(err, lsproto.ErrorCodeInvalidParams) {
+			t.Fatalf("changed selection error = %v, want InvalidParams", err)
+		}
+	}
+	select {
+	case message := <-outgoing:
+		t.Fatalf("rejected selection started reverse request: %+v", message)
+	default:
+	}
+}
+
+func TestHandleConfigRefreshKeepsExplicitPathAfterInitialLoadFailure(t *testing.T) {
+	s, outgoing, _ := newConfigRefreshTestServer(t)
+	configPath := filepath.Join(t.TempDir(), "generated-rstack-config.mjs")
+	if err := os.WriteFile(configPath, []byte("export default [];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	initial := startExplicitConfigRefreshForTest(s, "initial", configPath)
+	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+	loadRequest, loadResponse := failedConfigResponse(t, loadMessage, "synthetic explicit load failure")
+	respondToConfigReverseRequest(t, s, loadMessage, loadResponse, nil)
+	activationMessage := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
+	_, activationResponse := activationResponseForRequest(t, activationMessage, true)
+	respondToConfigReverseRequest(t, s, activationMessage, activationResponse, nil)
+	commitMessage := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
+	respondToConfigReverseRequest(t, s, commitMessage, commitResponseForRequest(t, commitMessage, true), nil)
+	completed := awaitConfigRefreshResult(t, initial)
+	if completed.err != nil {
+		t.Fatalf("initial explicit failure stopped the LSP: %v", completed.err)
+	}
+	if completed.response.TransactionID != loadRequest.TransactionID {
+		t.Fatalf("explicit recovery response = %+v", completed.response)
+	}
+	if s.configRefreshConfigPath != tspath.NormalizePath(configPath) || !s.configRefreshInitialized {
+		t.Fatalf("failed initial load lost fixed path: path=%q initialized=%t", s.configRefreshConfigPath, s.configRefreshInitialized)
+	}
+	configDir := tspath.NormalizePath(filepath.Dir(configPath))
+	if _, unavailable := s.jsUnavailableConfigs[configDir]; !unavailable || s.configDiscoveryHasLastGood {
+		t.Fatalf("explicit failure state: unavailable=%t lastGood=%t", unavailable, s.configDiscoveryHasLastGood)
+	}
+	if _, err := s.handleConfigRefresh(context.Background(), configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
+		Reason:          "config-change",
+	}); err == nil || !errors.Is(err, lsproto.ErrorCodeInvalidParams) {
+		t.Fatalf("explicit path omission error = %v, want InvalidParams", err)
+	}
+	select {
+	case message := <-outgoing:
+		t.Fatalf("omitted explicit path started reverse request: %+v", message)
+	default:
 	}
 }
 
@@ -370,9 +647,12 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	if !snapshot.configs[root].IsFileIgnored(rootTarget, root) {
 		t.Fatal("root config did not collect its own .gitignore")
 	}
-	resolvedDir, resolvedConfig := snapshot.ownerResolver.Resolve(rootTarget)
-	if resolvedDir != root || !resolvedConfig.IsFileIgnored(rootTarget, root) {
-		t.Fatalf("committed owner resolver returned stale config: dir=%q config=%+v", resolvedDir, resolvedConfig)
+	resolvedDir, resolved := snapshot.ownerIndex.Resolve(
+		target.FreezeFileIdentity(rootTarget, fsys),
+	)
+	resolvedConfig := snapshot.configs[resolvedDir]
+	if resolvedDir != root || !resolved || !resolvedConfig.IsFileIgnored(rootTarget, root) {
+		t.Fatalf("committed owner index returned stale config: dir=%q resolved=%v config=%+v", resolvedDir, resolved, resolvedConfig)
 	}
 	if snapshot.configs[root].IsFileIgnored(childTarget, root) {
 		t.Fatal("root config crossed the child config's .gitignore source boundary")
@@ -385,8 +665,44 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	}
 }
 
+func TestCompleteDiscoveredConfigSnapshotBuildsOneResolverPerOwner(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	child := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fsys := bundled.WrapFS(osvfs.FS())
+	catalog := &discovery.ConfigCatalog{
+		TransactionID: "resolver-generation",
+		Configs: map[string]config.RslintConfig{
+			root:  {{Rules: config.Rules{"no-console": "error"}}},
+			child: {{Rules: config.Rules{"no-debugger": "error"}}},
+		},
+	}
+	s := newTestServer()
+	s.cwd = root
+	prepared, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := completeDiscoveredConfigSnapshot(prepared, nil, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(completed.fileConfigResolvers) != len(catalog.Configs) {
+		t.Fatalf("file config resolvers = %d, want %d", len(completed.fileConfigResolvers), len(catalog.Configs))
+	}
+	for _, configDirectory := range []string{root, child} {
+		if completed.fileConfigResolvers[configDirectory] == nil {
+			t.Fatalf("missing resolver for %q", configDirectory)
+		}
+	}
+	if completed.jsonFileConfigResolver == nil {
+		t.Fatal("automatic config generation is missing its JSON fallback resolver")
+	}
+}
+
 func TestHandleConfigRefreshInitialPluginHostFailureCommitsNativeCatalog(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 
@@ -420,15 +736,14 @@ func TestHandleConfigRefreshInitialPluginHostFailureCommitsNativeCatalog(t *test
 	}
 	entries := s.jsConfigs[root]
 	if value, found := configRuleValue(entries, "no-debugger"); !found || value != "error" {
-		t.Fatalf("native catalog was lost with plugin host: %+v", s.jsConfigs)
+		t.Fatalf("base rule catalog was lost with plugin host: %+v", s.jsConfigs)
 	}
-	if len(s.eslintPluginRules) != 0 {
-		t.Fatalf("degraded plugin host committed unroutable plugin rules: %+v", s.eslintPluginRules)
+	if _, ok := s.ruleCatalog.Lookup("community/check"); ok {
+		t.Fatal("degraded plugin host committed an unroutable plugin rule")
 	}
 }
 
 func TestHandleConfigRefreshActivationFailureAbortsAndKeepsLastGood(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	installLastGoodConfig(s, root)
@@ -461,10 +776,10 @@ func TestHandleConfigRefreshActivationFailureAbortsAndKeepsLastGood(t *testing.T
 	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("failed activation replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
 	}
+	assertLastGoodRuleCatalog(t, s)
 }
 
 func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	installLastGoodConfig(s, root)
@@ -496,10 +811,10 @@ func TestHandleConfigRefreshInvalidRuleOptionsAbortsAndKeepsLastGood(t *testing.
 	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("invalid options replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
 	}
+	assertLastGoodRuleCatalog(t, s)
 }
 
 func TestHandleConfigRefreshCommitFailureAbortsAndKeepsLastGood(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	installLastGoodConfig(s, root)
@@ -528,10 +843,10 @@ func TestHandleConfigRefreshCommitFailureAbortsAndKeepsLastGood(t *testing.T) {
 	if s.eslintPluginConfigGeneration != "last-good" || s.jsConfigs[root][0].Rules["no-console"] != "error" {
 		t.Fatalf("failed commit replaced last-good state: generation=%q configs=%+v", s.eslintPluginConfigGeneration, s.jsConfigs)
 	}
+	assertLastGoodRuleCatalog(t, s)
 }
 
 func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	if err := os.WriteFile(
@@ -583,7 +898,6 @@ func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *test
 }
 
 func TestHandleConfigRefreshPartialCatalogCommitsUnavailableParentAndUsableChild(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -690,8 +1004,11 @@ func TestUnavailableConfigBoundaryKeepsLexicalSymlinkFailure(t *testing.T) {
 		},
 		Failures: []discovery.ConfigFailure{{Directory: aliasRoot}},
 	}
-	resolver := config.NewConfigOwnerResolver(catalog.Configs, fsy)
-	if owner, _ := resolver.Resolve(filepath.Join(aliasRoot, "src", "index.ts")); owner != realRoot {
+	resolver := target.NewOwnerIndex(catalog.Configs, fsy)
+	if owner, _ := resolver.Resolve(target.FreezeFileIdentity(
+		filepath.Join(aliasRoot, "src", "index.ts"),
+		fsy,
+	)); owner != realRoot {
 		t.Fatalf("test precondition: canonical resolver owner = %q, want %q", owner, realRoot)
 	}
 	boundaries := unavailableConfigBoundaryDirectories(fsy, catalog)
@@ -739,7 +1056,6 @@ func TestFailureAtCommittedConfigBoundaryUsesLexicalIdentity(t *testing.T) {
 }
 
 func TestHandleConfigRefreshAllFailedAbortsWhenUsableLastGoodExists(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	installLastGoodConfig(s, root)
@@ -767,7 +1083,6 @@ func TestHandleConfigRefreshAllFailedAbortsWhenUsableLastGoodExists(t *testing.T
 }
 
 func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -777,7 +1092,7 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 	writeConfigCandidate(t, nested)
 	installLastGoodConfig(s, root)
 	s.jsConfigs[nested] = config.RslintConfig{{Rules: config.Rules{"old-nested": "error"}}}
-	s.jsConfigOwnerResolver = config.NewConfigOwnerResolver(s.jsConfigs, s.fs)
+	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
 	s.tsConfigPathsByConfig[nested] = nil
 
 	result := startConfigRefreshForTest(s, "config-change")
@@ -813,7 +1128,6 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 }
 
 func TestHandleConfigRefreshNewFailedBoundaryUsesParentFallback(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "packages", "app"))
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -852,21 +1166,30 @@ func TestHandleConfigRefreshNewFailedBoundaryUsesParentFallback(t *testing.T) {
 }
 
 func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 
 	first := startConfigRefreshForTest(s, "initial")
 	firstLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
-	firstLoadRequest, firstLoadResponse := loadedConfigResponse(t, firstLoad, config.RslintConfig{{}})
+	firstLoadRequest, firstLoadResponse := loadedConfigResponse(t, firstLoad, config.RslintConfig{{
+		Plugins: []string{"generation-plugin"},
+		Rules:   config.Rules{"generation-plugin/check": "error"},
+	}})
 	respondToConfigReverseRequest(t, s, firstLoad, firstLoadResponse, nil)
 	firstActivation := nextConfigReverseRequest(t, outgoing, methodActivateConfigs)
 	_, firstActivationResponse := activationResponseForRequest(t, firstActivation, true)
+	firstActivationResponse.EslintPluginEntries = []config.EslintPluginEntry{{
+		Prefix:    "generation-plugin",
+		RuleNames: []string{"check"},
+	}}
 	respondToConfigReverseRequest(t, s, firstActivation, firstActivationResponse, nil)
 	firstCommit := nextConfigReverseRequest(t, outgoing, methodCommitConfigs)
 	respondToConfigReverseRequest(t, s, firstCommit, commitResponseForRequest(t, firstCommit, true), nil)
 	if completed := awaitConfigRefreshResult(t, first); completed.err != nil {
 		t.Fatalf("initial configRefresh failed: %v", completed.err)
+	}
+	if _, ok := s.ruleCatalog.Lookup("generation-plugin/check"); !ok {
+		t.Fatal("initial generation did not commit its plugin rule")
 	}
 
 	if err := os.Remove(filepath.Join(root, "rslint.config.mjs")); err != nil {
@@ -914,6 +1237,9 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 	if s.eslintPluginConfigGeneration != secondActivationRequest.TransactionID {
 		t.Fatalf("empty catalog generation = %q, want %q", s.eslintPluginConfigGeneration, secondActivationRequest.TransactionID)
 	}
+	if _, ok := s.ruleCatalog.Lookup("generation-plugin/check"); ok {
+		t.Fatal("deleted config's plugin rule leaked into the empty generation")
+	}
 	if s.configDiscoveryHasLastGood {
 		t.Fatal("empty JavaScript catalog was marked as a usable JavaScript last-good generation")
 	}
@@ -950,7 +1276,6 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 }
 
 func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterDeletion(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	nested := tspath.NormalizePath(filepath.Join(root, "ignored"))
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -1016,7 +1341,6 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterDeletion(t *testing.
 }
 
 func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterCreation(t *testing.T) {
-	config.RegisterAllRules()
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
 	target := tspath.NormalizePath(filepath.Join(root, "source.ts"))
@@ -1076,7 +1400,6 @@ func TestHandleConfigRefreshFailureKeepsCommittedIgnoreAfterCreation(t *testing.
 }
 
 func TestGitignoreWatcherRetriesRefreshAndPreservesLastGoodOnFailure(t *testing.T) {
-	config.RegisterAllRules()
 	workspace := tspath.NormalizePath(t.TempDir())
 	writeConfigCandidate(t, workspace)
 	gitignorePath := filepath.Join(workspace, ".gitignore")
@@ -1158,9 +1481,9 @@ func TestConfigRefreshProtocolRegistration(t *testing.T) {
 func TestHandleConfigRefreshRejectsInvalidProtocolWithoutMutation(t *testing.T) {
 	s := newTestServer()
 	s.eslintPluginConfigGeneration = "last-good"
-	_, err := s.handleConfigRefresh(context.Background(), map[string]any{
-		"protocolVersion": discovery.ConfigDiscoveryProtocolVersion + 1,
-		"reason":          "initial",
+	_, err := s.handleConfigRefresh(context.Background(), configRefreshRequest{
+		ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion + 1,
+		Reason:          "initial",
 	})
 	if err == nil || !strings.Contains(err.Error(), "unsupported config refresh protocol") {
 		t.Fatalf("configRefresh error = %v", err)

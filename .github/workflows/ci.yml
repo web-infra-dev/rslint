@@ -56,16 +56,24 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-test-go
 
-      - name: Unit Test
-        if: matrix.runner != 'rspack-windows-2022-large'
+      - name: Unit Test (Linux)
+        if: matrix.runner == 'rspack-ubuntu-22.04-large'
         run: go test -count=1 ./cmd/... ./internal/...
+        env:
+          # The pod sees the shared node's 192 cores; that much concurrency only thrashes.
+          GOMAXPROCS: 16
 
       - name: Unit Test (Windows)
         if: matrix.runner == 'rspack-windows-2022-large'
         shell: pwsh
         run: |
+          # The Windows runner can exhaust its commit limit with up to 64
+          # package builds/test binaries in flight. Keep every package and
+          # test, but cap inter-package concurrency to bound peak memory use.
+          $packageParallelism = 32
+
           # Pre-build shared dependencies to warm the build cache
-          go build ./cmd/... ./internal/...
+          go build -p $packageParallelism ./cmd/... ./internal/...
 
           $packages = go list ./cmd/... ./internal/... | Where-Object { $_ -ne "" }
           $batchSize = 64
@@ -76,7 +84,7 @@ jobs:
 
             if ($batch.Count -ge $batchSize) {
               Write-Host "Running batch of $($batch.Count) packages..."
-              go test -p 64 -count=1 $batch
+              go test -p $packageParallelism -count=1 $batch
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
               $batch = @()
             }
@@ -85,9 +93,14 @@ jobs:
           # Run remaining packages
           if ($batch.Count -gt 0) {
             Write-Host "Running final batch of $($batch.Count) packages..."
-            go test -p 64 -count=1 $batch
+            go test -p $packageParallelism -count=1 $batch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+      # Fallback for any runner without a dedicated step above.
+      - name: Unit Test
+        if: matrix.runner != 'rspack-ubuntu-22.04-large' && matrix.runner != 'rspack-windows-2022-large'
+        run: go test -count=1 ./cmd/... ./internal/...
 
   lint:
     name: Lint&Check
@@ -155,6 +168,15 @@ jobs:
       - name: Format
         run: pnpm format:check
 
+      # Rule options JSON Schema dump for the generate-rule-option-types
+      # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
+      # Without this, `pnpm run build` below still succeeds but the plugin
+      # skips with a warning and dist/index.d.ts never gets typed rule
+      # options — so the vscode-extension e2e suite that exercises them
+      # (suite-rule-option-types) needs it in place first.
+      - name: Dump rule schemas
+        run: go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json
+
       - name: Build
         run: pnpm run build
 
@@ -217,6 +239,14 @@ jobs:
         shell: pwsh
         run: go build -o npm/rslint/win32-x64-msvc/rslint.exe ./cmd/rslint
 
+      # Rule options JSON Schema dump for the generate-rule-option-types
+      # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
+      # test-vscode-windows has no Go toolchain, so it's generated here (where
+      # Go is already set up) and handed off the same way rslint.exe is below.
+      - name: Dump rule schemas
+        shell: pwsh
+        run: go run ./tools/dump_rule_schemas > rule-schemas.json
+
       # vscode-extension (package "rslint") is excluded here - it's tested on
       # windows-latest instead, since the vscode-extension test does not run
       # reliably on this self-hosted runner.
@@ -231,6 +261,14 @@ jobs:
         with:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc/rslint.exe
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload rule schemas
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-test-rule-schemas-windows
+          path: rule-schemas.json
           retention-days: 1
           if-no-files-found: error
 
@@ -259,6 +297,12 @@ jobs:
         with:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc
+
+      - name: Download rule schemas
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ci-test-rule-schemas-windows
+          path: packages/rslint
 
       # build:js only - skip @rslint/core's build:bin, which invokes `go
       # build` directly. The host rslint.exe was already built on the
@@ -345,9 +389,8 @@ jobs:
         with:
           go-version: 1.26.0
           cache-name: ci-test-wasm
-      - name: Build
-        run: |
-          pnpm --filter '@rslint/tsgo' build
+      - name: Build tsgo server
+        run: pnpm --filter '@rslint/tsgo-server' build
 
       - name: Run tests
         run: cargo test --verbose

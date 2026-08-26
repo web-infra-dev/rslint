@@ -25,16 +25,6 @@ func (key configMatchKey) contains(index int) bool {
 	return key.tail[tailIndex/8]&byte(1<<(tailIndex%8)) != 0
 }
 
-func parseEntryIgnorePatterns(config RslintConfig) [][]IgnorePattern {
-	patterns := make([][]IgnorePattern, len(config))
-	for index, entry := range config {
-		if !isGlobalIgnoreEntry(entry) {
-			patterns[index] = ParseIgnorePatterns(entry.Ignores)
-		}
-	}
-	return patterns
-}
-
 // matchConfigEntries applies the flat-config selection policy once and returns
 // the exact set of contributing entries. A nil entryIgnorePatterns asks the
 // direct compatibility path to parse entry ignores on demand; run-scoped
@@ -44,10 +34,21 @@ func (config RslintConfig) matchConfigEntries(
 	cwd string,
 	globalIgnorePatterns []IgnorePattern,
 	entryIgnorePatterns [][]IgnorePattern,
+	directoryBlocks *directoryBlockMatcher,
 ) (configMatchKey, bool) {
-	if len(globalIgnorePatterns) > 0 &&
-		(isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd) ||
-			isFileIgnored(filePath, globalIgnorePatterns, cwd)) {
+	if len(globalIgnorePatterns) > 0 {
+		var blocked bool
+		if directoryBlocks == nil {
+			blocked = isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd)
+		} else {
+			blocked = directoryBlocks.blocksFileDirectory(filePath)
+		}
+		if blocked {
+			return configMatchKey{}, false
+		}
+	}
+	matchPath := newFileMatchPath(filePath, cwd)
+	if len(globalIgnorePatterns) > 0 && matchPath.isIgnored(globalIgnorePatterns) {
 		return configMatchKey{}, false
 	}
 
@@ -63,12 +64,12 @@ func (config RslintConfig) matchConfigEntries(
 		if isGlobalIgnoreEntry(entry) {
 			continue
 		}
-		if hasFileSelectors(entry) && !isFileMatchedByConfigEntry(filePath, entry, cwd) {
+		if hasFileSelectors(entry) && !matchPath.matchesConfigEntry(entry) {
 			continue
 		}
 
 		ignores := entryIgnorePatternsAt(entryIgnorePatterns, index, entry)
-		if isFileIgnored(filePath, ignores, cwd) {
+		if len(ignores) > 0 && matchPath.isIgnored(ignores) {
 			continue
 		}
 

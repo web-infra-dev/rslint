@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // parseSelector parses an ESLint selector string into a selector tree.
@@ -142,17 +145,17 @@ func (p *parser) parseSequence() (selector, error) {
 		return nil, errors.New("unexpected end of selector")
 	case c == '*':
 		p.pos++
-		head = identifierSelector{Name: "*"}
+		head = newIdentifierSelector("*")
 	case c == '.' || c == '[' || c == ':':
 		// Filters without an explicit head — equivalent to `*` followed by
 		// the filter.
-		head = identifierSelector{Name: "*"}
+		head = newIdentifierSelector("*")
 	case isIdentStart(c):
 		name, err := p.parseIdent()
 		if err != nil {
 			return nil, err
 		}
-		head = identifierSelector{Name: name}
+		head = newIdentifierSelector(name)
 	default:
 		return nil, fmt.Errorf("unexpected character %q at position %d", c, p.pos)
 	}
@@ -161,12 +164,16 @@ func (p *parser) parseSequence() (selector, error) {
 		c := p.peek()
 		switch c {
 		case '.':
-			p.pos++
-			cls, err := p.parseIdent()
-			if err != nil {
-				return nil, err
+			path := make([]string, 0, 2)
+			for !p.eof() && p.peek() == '.' {
+				p.pos++
+				field, err := p.parseIdent()
+				if err != nil {
+					return nil, err
+				}
+				path = append(path, field)
 			}
-			head = classSelector{Inner: head, Class: cls}
+			head = classSelector{Inner: head, Path: path}
 		case '[':
 			attr, err := p.parseAttr(head)
 			if err != nil {
@@ -184,6 +191,14 @@ func (p *parser) parseSequence() (selector, error) {
 		}
 	}
 	return head, nil
+}
+
+func newIdentifierSelector(name string) identifierSelector {
+	name = strings.TrimPrefix(name, "#")
+	if canonical, ok := canonicalEstreeName(name); ok {
+		name = canonical
+	}
+	return identifierSelector{Name: name, Kinds: kindsForEstreeName(name)}
 }
 
 func (p *parser) parseIdent() (string, error) {
@@ -253,7 +268,16 @@ func (p *parser) parseAttrPath() ([]string, error) {
 // them).
 func (p *parser) parseAttrPathSegment() (string, error) {
 	start := p.pos
-	if p.eof() || !isIdentStart(p.peek()) {
+	if p.eof() {
+		return "", fmt.Errorf("expected identifier in attribute path at position %d", p.pos)
+	}
+	if p.peek() >= '0' && p.peek() <= '9' {
+		for !p.eof() && p.peek() >= '0' && p.peek() <= '9' {
+			p.pos++
+		}
+		return p.src[start:p.pos], nil
+	}
+	if !isIdentStart(p.peek()) {
 		return "", fmt.Errorf("expected identifier in attribute path at position %d", p.pos)
 	}
 	p.pos++
@@ -316,8 +340,18 @@ func (p *parser) parseAttrValue() (attrValue, error) {
 		if err != nil {
 			return attrValue{}, err
 		}
-		return attrValue{Kind: attrValueRegex, Regex: pat, Flags: flags}, nil
-	case c == '-' || (c >= '0' && c <= '9'):
+		compiled, compileErr := esregexp.Compile(pat, flags)
+		if compileErr != nil {
+			return attrValue{}, fmt.Errorf("invalid regular expression: %w", compileErr)
+		}
+		return attrValue{
+			Kind:          attrValueRegex,
+			Regex:         pat,
+			Flags:         flags,
+			compiledRegex: compiled,
+			regexPrefix:   anchoredLiteralPrefix(pat, flags),
+		}, nil
+	case c == '.' || (c >= '0' && c <= '9'):
 		num, err := p.parseNumber()
 		if err != nil {
 			return attrValue{}, err
@@ -328,17 +362,58 @@ func (p *parser) parseAttrValue() (attrValue, error) {
 		if err != nil {
 			return attrValue{}, err
 		}
-		switch ident {
-		case "true":
-			return attrValue{Kind: attrValueBool, Bool: true}, nil
-		case "false":
-			return attrValue{Kind: attrValueBool, Bool: false}, nil
-		case "null":
-			return attrValue{Kind: attrValueNull}, nil
+		if ident == "type" && !p.eof() && p.peek() == '(' {
+			typeName, err := p.parseTypeValue()
+			if err != nil {
+				return attrValue{}, err
+			}
+			return attrValue{Kind: attrValueType, Ident: typeName}, nil
 		}
 		return attrValue{Kind: attrValueIdent, Ident: ident}, nil
 	}
 	return attrValue{}, fmt.Errorf("unexpected attribute value at position %d", p.pos)
+}
+
+func (p *parser) parseTypeValue() (string, error) {
+	if p.eof() || p.peek() != '(' {
+		return "", fmt.Errorf("expected ( at position %d", p.pos)
+	}
+	p.pos++
+	p.skipSpaces()
+	start := p.pos
+	for !p.eof() && p.peek() != ')' && p.peek() != ' ' && p.peek() != '\t' && p.peek() != '\n' && p.peek() != '\r' {
+		p.pos++
+	}
+	if start == p.pos {
+		return "", fmt.Errorf("expected type name at position %d", p.pos)
+	}
+	typeName := p.src[start:p.pos]
+	p.skipSpaces()
+	if p.eof() || p.peek() != ')' {
+		return "", fmt.Errorf("expected ) at position %d", p.pos)
+	}
+	p.pos++
+	return typeName, nil
+}
+
+// anchoredLiteralPrefix extracts only the plainly literal ASCII prefix from a
+// start-anchored, case-sensitive, single-line pattern. It is a conservative
+// rejection hint: an empty result keeps the full regexp path, while a non-empty
+// result must prefix every possible match.
+func anchoredLiteralPrefix(pattern, flags string) string {
+	if !strings.HasPrefix(pattern, "^") || strings.ContainsAny(flags, "im") {
+		return ""
+	}
+	end := 1
+	for end < len(pattern) {
+		c := pattern[end]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == ' ' || c == '-' {
+			end++
+			continue
+		}
+		break
+	}
+	return pattern[1:end]
 }
 
 func (p *parser) parseString(quote byte) (string, error) {
@@ -351,7 +426,22 @@ func (p *parser) parseString(quote byte) (string, error) {
 		c := p.src[p.pos]
 		if c == '\\' && p.pos+1 < len(p.src) {
 			next := p.src[p.pos+1]
-			sb.WriteByte(next)
+			switch next {
+			case 'b':
+				sb.WriteByte('\b')
+			case 'f':
+				sb.WriteByte('\f')
+			case 'n':
+				sb.WriteByte('\n')
+			case 'r':
+				sb.WriteByte('\r')
+			case 't':
+				sb.WriteByte('\t')
+			case 'v':
+				sb.WriteByte('\v')
+			default:
+				sb.WriteByte(next)
+			}
 			p.pos += 2
 			continue
 		}
@@ -371,6 +461,7 @@ func (p *parser) parseRegex() (string, string, error) {
 	}
 	p.pos++ // opening /
 	var pat strings.Builder
+	inClass := false
 	for !p.eof() {
 		c := p.src[p.pos]
 		if c == '\\' && p.pos+1 < len(p.src) {
@@ -379,18 +470,43 @@ func (p *parser) parseRegex() (string, string, error) {
 			p.pos += 2
 			continue
 		}
-		if c == '/' {
+		if c == '[' {
+			inClass = true
+			pat.WriteByte(c)
+			p.pos++
+			continue
+		}
+		if c == ']' && inClass {
+			inClass = false
+			pat.WriteByte(c)
+			p.pos++
+			continue
+		}
+		if c == '/' && !inClass {
 			p.pos++ // closing /
 			flagsStart := p.pos
 			for !p.eof() {
 				fc := p.src[p.pos]
-				if fc >= 'a' && fc <= 'z' || fc >= 'A' && fc <= 'Z' {
+				if fc == 'i' || fc == 'm' || fc == 's' || fc == 'u' {
 					p.pos++
 					continue
 				}
 				break
 			}
-			return pat.String(), p.src[flagsStart:p.pos], nil
+			if p.pos < len(p.src) && (p.src[p.pos] >= 'a' && p.src[p.pos] <= 'z' || p.src[p.pos] >= 'A' && p.src[p.pos] <= 'Z') {
+				return "", "", fmt.Errorf("unsupported regular expression flag %q", p.src[p.pos])
+			}
+			pattern := pat.String()
+			if pattern == "" {
+				return "", "", errors.New("empty regular expression")
+			}
+			flags := p.src[flagsStart:p.pos]
+			for i := range len(flags) {
+				if strings.ContainsRune(flags[:i], rune(flags[i])) {
+					return "", "", fmt.Errorf("duplicate regular expression flag %q", flags[i])
+				}
+			}
+			return pattern, flags, nil
 		}
 		pat.WriteByte(c)
 		p.pos++
@@ -400,9 +516,6 @@ func (p *parser) parseRegex() (string, string, error) {
 
 func (p *parser) parseNumber() (float64, error) {
 	start := p.pos
-	if p.peek() == '-' {
-		p.pos++
-	}
 	for !p.eof() && p.src[p.pos] >= '0' && p.src[p.pos] <= '9' {
 		p.pos++
 	}
@@ -439,19 +552,72 @@ func (p *parser) parsePseudo(inner selector) (selector, error) {
 			return nil, err
 		}
 		return wrapPseudo(inner, pseudoSelector{Name: name, N: n}), nil
-	case "is", "matches", "not", "has":
+	case "is", "matches", "not":
 		args, err := p.parsePseudoSelectorArgs()
 		if err != nil {
 			return nil, err
 		}
 		return wrapPseudo(inner, pseudoSelector{Name: name, Args: args}), nil
+	case "has":
+		args, err := p.parseHasSelectorArgs()
+		if err != nil {
+			return nil, err
+		}
+		return wrapPseudo(inner, pseudoSelector{Name: name, Args: args}), nil
+	}
+	className := ecmascript.StringToLowerCase(name)
+	switch className {
 	case "statement", "expression", "declaration", "function", "pattern":
-		// Treat known esquery class pseudos as a no-op match (we don't
-		// model these category sets). The combination with a head
-		// selector still narrows by the head, so this is conservative.
-		return inner, nil
+		return wrapPseudo(inner, pseudoSelector{Name: className}), nil
 	}
 	return nil, fmt.Errorf("unsupported pseudo class %q at position %d", name, p.pos)
+}
+
+func (p *parser) parseHasSelectorArgs() ([]selector, error) {
+	if p.eof() || p.peek() != '(' {
+		return nil, fmt.Errorf("expected ( at position %d", p.pos)
+	}
+	p.pos++
+	p.skipSpaces()
+
+	args := make([]selector, 0, 1)
+	for {
+		if p.eof() {
+			return nil, fmt.Errorf("expected selector at position %d", p.pos)
+		}
+		relative := false
+		relativeKind := combChild
+		if p.peek() == '>' || p.peek() == '+' || p.peek() == '~' {
+			relative = true
+			switch p.peek() {
+			case '+':
+				relativeKind = combAdjacent
+			case '~':
+				relativeKind = combSibling
+			}
+			p.pos++
+			p.skipSpaces()
+		}
+		arg, err := p.parseCompound()
+		if err != nil {
+			return nil, err
+		}
+		if relative {
+			arg = relativeSelector{Kind: relativeKind, Inner: arg}
+		}
+		args = append(args, arg)
+		p.skipSpaces()
+		if p.eof() || p.peek() != ',' {
+			break
+		}
+		p.pos++
+		p.skipSpaces()
+	}
+	if p.eof() || p.peek() != ')' {
+		return nil, fmt.Errorf("expected ) at position %d", p.pos)
+	}
+	p.pos++
+	return args, nil
 }
 
 func wrapPseudo(inner selector, p pseudoSelector) selector {

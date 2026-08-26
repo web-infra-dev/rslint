@@ -1,6 +1,7 @@
 package no_invalid_void_type
 
 import (
+	_ "embed"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,9 +9,32 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no_invalid_void_type.schema.json
+var schemaJSON []byte
+
 type NoInvalidVoidTypeOptions struct {
 	AllowInGenericTypeArguments interface{} `json:"allowInGenericTypeArguments"`
 	AllowAsThisParameter        bool        `json:"allowAsThisParameter"`
+}
+
+func parseOptions(options []any) NoInvalidVoidTypeOptions {
+	opts := NoInvalidVoidTypeOptions{
+		AllowInGenericTypeArguments: true,
+		AllowAsThisParameter:        false,
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]interface{})
+	if v, exists := optsMap["allowInGenericTypeArguments"]; exists {
+		opts.AllowInGenericTypeArguments = v
+	}
+	if v, exists := optsMap["allowAsThisParameter"]; exists {
+		if b, isBool := v.(bool); isBool {
+			opts.AllowAsThisParameter = b
+		}
+	}
+	return opts
 }
 
 // isAllowInGenericTruthy returns true when allowInGenericTypeArguments is not false
@@ -21,6 +45,13 @@ func isAllowInGenericTruthy(opts NoInvalidVoidTypeOptions) bool {
 	}
 	// Array whitelist counts as truthy
 	return true
+}
+
+// isAllowInGenericTrue returns true only for the boolean true option. Upstream
+// treats a whitelist differently from true outside of type references.
+func isAllowInGenericTrue(opts NoInvalidVoidTypeOptions) bool {
+	allow, ok := opts.AllowInGenericTypeArguments.(bool)
+	return ok && allow
 }
 
 // getNotReturnMessageId returns the appropriate message ID based on which options are enabled.
@@ -42,35 +73,23 @@ func getNotReturnMessageId(opts NoInvalidVoidTypeOptions) string {
 func getNotReturnDescription(messageId string) string {
 	switch messageId {
 	case "invalidVoidNotReturnOrThisParamOrGeneric":
-		return "`void` is only valid as a return type, generic type argument, or `this` parameter type."
+		return "void is only valid as a return type or generic type argument or the type of a `this` parameter."
 	case "invalidVoidNotReturnOrThisParam":
-		return "`void` is only valid as a return type or `this` parameter type."
+		return "void is only valid as return type or type of `this` parameter."
 	case "invalidVoidNotReturnOrGeneric":
-		return "`void` is only valid as a return type or generic type argument."
+		return "void is only valid as a return type or generic type argument."
 	default:
-		return "`void` is only valid as a return type."
+		return "void is only valid as a return type."
 	}
 }
 
-// getEntityNameText reconstructs the dotted name from a TypeName node
-// (Identifier or QualifiedName).
-func getEntityNameText(name *ast.Node) string {
+// getGenericName mirrors removing ASCII spaces from SourceCode#getText(typeName).
+// It intentionally preserves comments and escaped identifier spelling.
+func getGenericName(sourceFile *ast.SourceFile, name *ast.Node) string {
 	if name == nil {
 		return ""
 	}
-	if ast.IsIdentifier(name) {
-		return name.AsIdentifier().Text
-	}
-	if name.Kind == ast.KindQualifiedName {
-		qn := name.AsQualifiedName()
-		left := getEntityNameText(qn.Left)
-		if qn.Right == nil {
-			return left
-		}
-		right := qn.Right.AsIdentifier().Text
-		return left + "." + right
-	}
-	return ""
+	return normalizeGenericName(utils.TrimmedNodeText(sourceFile, name))
 }
 
 // normalizeGenericName removes all spaces for whitelist comparison.
@@ -112,36 +131,44 @@ func hasVoidTypeArgument(node *ast.Node) bool {
 	return false
 }
 
-// getParentFunctionDeclarationNode walks up from a union type node to find
-// the enclosing FunctionDeclaration or MethodDeclaration that has a body
-// (i.e., is an implementation, not a declaration). It only returns a node
-// if the union type is in the return type position (not parameter position).
+// isValidUnionType mirrors upstream's valid-union check. Generic option
+// validation is reported on the nested void keyword itself, so it must not
+// cause an additional diagnostic on a sibling void union constituent.
+func isValidUnionType(node *ast.Node) bool {
+	union := node.AsUnionTypeNode()
+	if union == nil || union.Types == nil {
+		return false
+	}
+	for _, member := range union.Types.Nodes {
+		switch member.Kind {
+		case ast.KindVoidKeyword, ast.KindNeverKeyword:
+			continue
+		case ast.KindTypeReference:
+			if hasVoidTypeArgument(member) {
+				continue
+			}
+		}
+		return false
+	}
+	return true
+}
+
+// getParentFunctionDeclarationNode mirrors the ESTree ancestor walk used by
+// upstream. A bodyless Go FunctionDeclaration corresponds to ESTree's
+// TSDeclareFunction and is therefore skipped.
 func getParentFunctionDeclarationNode(unionNode *ast.Node) *ast.Node {
-	child := unionNode
 	current := unionNode.Parent
 	for current != nil {
 		switch current.Kind {
 		case ast.KindFunctionDeclaration:
-			// Only return implementations (nodes with a body)
-			if current.Body() != nil && current.Type() != nil {
-				// Check that we arrived through the return type path
-				if child == current.Type() {
-					return current
-				}
+			if current.Body() != nil {
+				return current
 			}
-			return nil
 		case ast.KindMethodDeclaration:
-			if current.Body() != nil && current.Type() != nil {
-				if child == current.Type() {
-					return current
-				}
+			if current.Body() != nil {
+				return current
 			}
-			return nil
-		case ast.KindParameter:
-			// In parameter position, not return type
-			return nil
 		}
-		child = current
 		current = current.Parent
 	}
 	return nil
@@ -177,6 +204,12 @@ func getContainerMembers(node *ast.Node) []*ast.Node {
 			return nil
 		}
 		return cd.Members.Nodes
+	case ast.KindClassExpression:
+		ce := node.AsClassExpression()
+		if ce == nil || ce.Members == nil {
+			return nil
+		}
+		return ce.Members.Nodes
 	}
 	return nil
 }
@@ -247,201 +280,124 @@ func hasOverloadSignatures(ctx rule.RuleContext, node *ast.Node) bool {
 }
 
 var NoInvalidVoidTypeRule = rule.CreateRule(rule.Rule{
-	Name: "no-invalid-void-type",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := NoInvalidVoidTypeOptions{
-			AllowInGenericTypeArguments: true,
-			AllowAsThisParameter:        false,
-		}
-
-		// Parse options with dual-format support
-		if options != nil {
-			var optsMap map[string]interface{}
-			var ok bool
-
-			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
-				optsMap, ok = optArray[0].(map[string]interface{})
-			} else {
-				optsMap, ok = options.(map[string]interface{})
-			}
-
-			if ok {
-				if v, exists := optsMap["allowInGenericTypeArguments"]; exists {
-					opts.AllowInGenericTypeArguments = v
-				}
-				if v, exists := optsMap["allowAsThisParameter"]; exists {
-					if b, isBool := v.(bool); isBool {
-						opts.AllowAsThisParameter = b
-					}
-				}
-			}
-		}
-
-		reportNotReturn := func(node *ast.Node) {
-			msgId := getNotReturnMessageId(opts)
-			ctx.ReportNode(node, rule.RuleMessage{
-				Id:          msgId,
-				Description: getNotReturnDescription(msgId),
-			})
-		}
-
-		reportUnionConstituent := func(node *ast.Node) {
-			ctx.ReportNode(node, rule.RuleMessage{
-				Id:          "invalidVoidUnionConstituent",
-				Description: "`void` is not valid as a constituent in a union type.",
-			})
-		}
-
-		reportForGeneric := func(node *ast.Node, genericName string) {
-			ctx.ReportNode(node, rule.RuleMessage{
-				Id:          "invalidVoidForGeneric",
-				Description: "`void` is not valid as a type argument for `" + genericName + "`.",
-			})
-		}
-
-		// isVoidNeverUnion checks if a union contains only void and never.
-		isVoidNeverUnion := func(unionNode *ast.Node) bool {
-			union := unionNode.AsUnionTypeNode()
-			if union == nil || union.Types == nil {
-				return false
-			}
-			for _, member := range union.Types.Nodes {
-				if member.Kind != ast.KindVoidKeyword && member.Kind != ast.KindNeverKeyword {
-					return false
-				}
-			}
-			return true
-		}
-
-		// isValidUnionWithGenerics checks whether void in a union is valid when
-		// allowInGenericTypeArguments is truthy. All non-void/never members must be
-		// allowed type references containing void (e.g., void | Promise<void>).
-		isValidUnionWithGenerics := func(unionNode *ast.Node) bool {
-			union := unionNode.AsUnionTypeNode()
-			if union == nil || union.Types == nil {
-				return false
-			}
-			for _, member := range union.Types.Nodes {
-				switch member.Kind {
-				case ast.KindVoidKeyword, ast.KindNeverKeyword:
-					continue
-				case ast.KindTypeReference:
-					if hasVoidTypeArgument(member) {
-						genericName := getEntityNameText(member.AsTypeReferenceNode().TypeName)
-						if isGenericAllowedByWhitelist(opts, genericName) {
-							continue
-						}
-					}
-					return false
-				default:
-					return false
-				}
-			}
-			return true
+	Name:   "no-invalid-void-type",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
+		allowGeneric := isAllowInGenericTruthy(opts)
+		allowAllGenerics := isAllowInGenericTrue(opts)
+		_, hasGenericWhitelist := opts.AllowInGenericTypeArguments.([]interface{})
+		notReturnMessageId := getNotReturnMessageId(opts)
+		notReturnMessage := rule.RuleMessage{
+			Id:          notReturnMessageId,
+			Description: getNotReturnDescription(notReturnMessageId),
 		}
 
 		return rule.RuleListeners{
 			ast.KindVoidKeyword: func(node *ast.Node) {
 				parent := node.Parent
 				if parent == nil {
-					reportNotReturn(node)
+					ctx.ReportNode(node, notReturnMessage)
 					return
 				}
 
 				switch parent.Kind {
 				// --- Union type ---
 				case ast.KindUnionType:
-					// void | never is always valid
-					if isVoidNeverUnion(parent) {
+					if isValidUnionType(parent) {
 						return
 					}
-					// Check if the union is in a function/method return type that has overloads
 					if declaringFunc := getParentFunctionDeclarationNode(parent); declaringFunc != nil {
 						if hasOverloadSignatures(ctx, declaringFunc) {
 							return
 						}
 					}
-					// When generics are allowed, check for valid patterns like void | Promise<void>
-					if isAllowInGenericTruthy(opts) {
-						if isValidUnionWithGenerics(parent) {
-							return
-						}
-						reportUnionConstituent(node)
+					if allowGeneric && !opts.AllowAsThisParameter {
+						ctx.ReportNode(node, rule.RuleMessage{
+							Id:          "invalidVoidUnionConstituent",
+							Description: "void is not valid as a constituent in a union type",
+						})
 						return
 					}
-					// When generics are disabled, any non-void|never union is just invalid void
-					reportNotReturn(node)
+					ctx.ReportNode(node, notReturnMessage)
 
 				// --- Generic type arguments (type-level) ---
 				case ast.KindTypeReference:
-					if !isAllowInGenericTruthy(opts) {
-						reportNotReturn(node)
+					if !allowGeneric {
+						ctx.ReportNode(node, notReturnMessage)
 						return
 					}
-					// Check whitelist
-					if _, isArr := opts.AllowInGenericTypeArguments.([]interface{}); isArr {
-						genericName := getEntityNameText(parent.AsTypeReferenceNode().TypeName)
+					if hasGenericWhitelist {
+						genericName := getGenericName(ctx.SourceFile, parent.AsTypeReferenceNode().TypeName)
 						if !isGenericAllowedByWhitelist(opts, genericName) {
-							reportForGeneric(node, normalizeGenericName(genericName))
+							ctx.ReportNode(node, rule.RuleMessage{
+								Id:          "invalidVoidForGeneric",
+								Description: genericName + " may not have void as a type argument.",
+							})
 							return
 						}
 					}
 
-				// --- Generic type arguments in heritage clauses (extends/implements) ---
-				case ast.KindExpressionWithTypeArguments:
-					if !isAllowInGenericTruthy(opts) {
-						reportNotReturn(node)
+				// --- Non-reference generic type arguments ---
+				case ast.KindExpressionWithTypeArguments, ast.KindNewExpression,
+					ast.KindTaggedTemplateExpression, ast.KindImportType, ast.KindTypeQuery,
+					ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement:
+					if allowAllGenerics {
 						return
 					}
-					// Check whitelist
-					if _, isArr := opts.AllowInGenericTypeArguments.([]interface{}); isArr {
-						expr := parent.AsExpressionWithTypeArguments()
-						genericName := getEntityNameText(expr.Expression)
-						if !isGenericAllowedByWhitelist(opts, genericName) {
-							reportForGeneric(node, normalizeGenericName(genericName))
-							return
-						}
-					}
-
-				// --- Generic type arguments on new expressions ---
-				case ast.KindNewExpression:
-					if !isAllowInGenericTruthy(opts) {
-						reportNotReturn(node)
-						return
-					}
+					ctx.ReportNode(node, notReturnMessage)
 
 				// --- Default type parameter: <T = void> ---
 				case ast.KindTypeParameter:
 					typeParam := parent.AsTypeParameterDeclaration()
-					if typeParam.DefaultType == node && isAllowInGenericTruthy(opts) {
-						return // void as default is valid when generics are allowed
+					if allowGeneric && typeParam.DefaultType != nil && typeParam.DefaultType.Kind == ast.KindVoidKeyword {
+						if typeParam.DefaultType == node {
+							return
+						}
+						ctx.ReportNode(node, rule.RuleMessage{
+							Id:          "invalidVoidNotReturnOrGeneric",
+							Description: "void is only valid as a return type or generic type argument.",
+						})
+						return
 					}
-					reportNotReturn(node)
+					ctx.ReportNode(node, notReturnMessage)
 
 				// --- Valid return type positions ---
 				case ast.KindFunctionType, ast.KindConstructorType,
 					ast.KindFunctionDeclaration, ast.KindMethodDeclaration,
 					ast.KindArrowFunction, ast.KindFunctionExpression,
 					ast.KindMethodSignature, ast.KindCallSignature,
-					ast.KindConstructSignature, ast.KindGetAccessor:
+					ast.KindConstructSignature, ast.KindGetAccessor, ast.KindSetAccessor,
+					ast.KindConstructor, ast.KindIndexSignature, ast.KindTypePredicate:
 					return // always valid
 
-				// --- Parameter: only valid for 'this' parameter ---
+				// --- Parameters ---
 				case ast.KindParameter:
-					if opts.AllowAsThisParameter {
-						param := parent.AsParameterDeclaration()
-						if param != nil && param.Name() != nil {
+					param := parent.AsParameterDeclaration()
+					if param != nil && param.Name() != nil {
+						if param.DotDotDotToken != nil || ast.IsBindingPattern(param.Name()) {
+							return
+						}
+						if opts.AllowAsThisParameter {
 							if id := param.Name().AsIdentifier(); id != nil && id.Text == "this" {
 								return
 							}
 						}
 					}
-					reportNotReturn(node)
+					ctx.ReportNode(node, notReturnMessage)
+
+				// ESTree permits destructuring annotations because their grandparent is
+				// an ObjectPattern or ArrayPattern rather than an Identifier.
+				case ast.KindVariableDeclaration:
+					declaration := parent.AsVariableDeclaration()
+					if declaration != nil && declaration.Name() != nil && ast.IsBindingPattern(declaration.Name()) {
+						return
+					}
+					ctx.ReportNode(node, notReturnMessage)
 
 				// --- Everything else is invalid ---
 				default:
-					reportNotReturn(node)
+					ctx.ReportNode(node, notReturnMessage)
 				}
 			},
 		}

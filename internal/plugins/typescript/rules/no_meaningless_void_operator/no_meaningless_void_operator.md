@@ -29,4 +29,5 @@ foo();
 
 ## Original Documentation
 
-- [typescript-eslint no-meaningless-void-operator](https://typescript-eslint.io/rules/no-meaningless-void-operator)
+- [typescript-eslint: no-meaningless-void-operator](https://typescript-eslint.io/rules/no-meaningless-void-operator)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-meaningless-void-operator.ts)

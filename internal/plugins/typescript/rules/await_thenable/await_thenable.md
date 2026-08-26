@@ -42,4 +42,5 @@ async function baz(iter: AsyncIterable<number>) {
 
 ## Original Documentation
 
-- [typescript-eslint await-thenable](https://typescript-eslint.io/rules/await-thenable)
+- [typescript-eslint: await-thenable](https://typescript-eslint.io/rules/await-thenable)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/await-thenable.ts)

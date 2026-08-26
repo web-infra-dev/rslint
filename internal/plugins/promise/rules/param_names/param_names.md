@@ -57,4 +57,5 @@ new Promise(function (resolve, no) {});
 
 ## Original Documentation
 
-- [eslint-plugin-promise: param-names](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/param-names.md)
+- [eslint-plugin-promise: param-names](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/param-names.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/rules/param-names.js)

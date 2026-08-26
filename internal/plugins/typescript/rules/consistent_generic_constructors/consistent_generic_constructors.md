@@ -23,4 +23,5 @@ const map2: Map<string, number> = new Map<string, number>();
 
 ## Original Documentation
 
-- [typescript-eslint consistent-generic-constructors](https://typescript-eslint.io/rules/consistent-generic-constructors)
+- [typescript-eslint: consistent-generic-constructors](https://typescript-eslint.io/rules/consistent-generic-constructors)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.46.3/packages/eslint-plugin/src/rules/consistent-generic-constructors.ts)

@@ -227,7 +227,7 @@ function buildRuleDocContent(rule: RuleEntry): string {
  *
  * Generated structure:
  *   docs/en/rules/
- *     _meta.json                        ← Overview + one entry per group dir
+ *     _meta.json                        ← section headers + Overview + group dirs
  *     index.mdx                         ← already exists (Overview page)
  *     eslint/
  *       _meta.json                      ← lists individual rules
@@ -270,9 +270,11 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
     return oa !== ob ? oa - ob : a.localeCompare(b);
   });
 
-  // Write top-level _meta.json: Overview + one dir per group
+  // Write top-level _meta.json: grouped overview + one dir per plugin
   const topMeta: unknown[] = [
+    { type: 'section-header', label: 'Rule Status' },
     { type: 'file', name: 'index', label: 'Overview' },
+    { type: 'section-header', label: 'Plugins' },
     ...sortedGroups.map(([slug]) => ({
       type: 'dir',
       name: slug,

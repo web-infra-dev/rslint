@@ -62,4 +62,5 @@ class Foo {
 
 ## Original Documentation
 
-- [ESLint — no-useless-computed-key](https://eslint.org/docs/latest/rules/no-useless-computed-key)
+- [ESLint: no-useless-computed-key](https://eslint.org/docs/latest/rules/no-useless-computed-key)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-useless-computed-key.js)

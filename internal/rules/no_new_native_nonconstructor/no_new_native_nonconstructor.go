@@ -15,7 +15,8 @@ var nativeNonconstructorNames = map[string]struct{}{
 
 // https://eslint.org/docs/latest/rules/no-new-native-nonconstructor
 var NoNewNativeNonconstructorRule = rule.Rule{
-	Name: "no-new-native-nonconstructor",
+	Name:   "no-new-native-nonconstructor",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
@@ -38,7 +39,7 @@ var NoNewNativeNonconstructorRule = rule.Rule{
 				// entry un-declares the builtin, so it no longer resolves to a
 				// known global — ESLint's `globalScope.set.get(name)` would be
 				// undefined and the rule stays silent.
-				if ctx.Globals[name] == utils.GlobalAccessOff {
+				if !ctx.Globals.Access(name).IsDeclared() {
 					return
 				}
 

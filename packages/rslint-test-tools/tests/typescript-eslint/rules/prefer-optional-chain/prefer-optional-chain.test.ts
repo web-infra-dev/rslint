@@ -968,51 +968,9 @@ describe('hand-crafted cases', () => {
         output: '!foo.bar!.baz?.paz;',
       },
       {
-        code: `
-          declare const foo: { bar: string } | null;
-          foo !== null && foo.bar !== null;
-        `,
-        errors: [
-          {
-            messageId: 'preferOptionalChain',
-            suggestions: [
-              {
-                messageId: 'optionalChainSuggest',
-                output: `
-          declare const foo: { bar: string } | null;
-          foo?.bar !== null;
-        `,
-              },
-            ],
-          },
-        ],
-        output: null,
-      },
-      {
         code: 'foo != null && foo.bar != null;',
         errors: [{ messageId: 'preferOptionalChain', suggestions: null }],
         output: 'foo?.bar != null;',
-      },
-      {
-        code: `
-          declare const foo: { bar: string | null } | null;
-          foo != null && foo.bar !== null;
-        `,
-        errors: [
-          {
-            messageId: 'preferOptionalChain',
-            suggestions: [
-              {
-                messageId: 'optionalChainSuggest',
-                output: `
-          declare const foo: { bar: string | null } | null;
-          foo?.bar !== null;
-        `,
-              },
-            ],
-          },
-        ],
-        output: null,
       },
       {
         code: `
@@ -1693,6 +1651,14 @@ describe('hand-crafted cases', () => {
       },
     ],
     valid: [
+      `
+          declare const foo: { bar: string } | null;
+          foo !== null && foo.bar !== null;
+        `,
+      `
+          declare const foo: { bar: string | null } | null;
+          foo != null && foo.bar !== null;
+        `,
       '!a || !b;',
       '!a || a.b;',
       '!a && a.b;',
@@ -1717,6 +1683,52 @@ describe('hand-crafted cases', () => {
       "foo === 'undefined' && foo.length;",
       'foo == bar && foo.bar == null;',
       'foo === 1 && foo.toFixed();',
+      // An existing optional chain closes the logical chain before a comparison.
+      `
+        declare const value: { field: number } | null;
+        value && value?.field === 1;
+      `,
+      `
+        declare const value: { nested: { field: number } } | null;
+        value && value?.nested.field === 1;
+      `,
+      `
+        declare const value: Record<string, number> | null;
+        value && value?.['field'] === 1;
+      `,
+      `
+        declare const value: { method(): number } | null;
+        value && value?.method() === 1;
+      `,
+      `
+        declare const value: { field: number } | null;
+        value && 1 === value?.field;
+      `,
+      // Parentheses stop optional-chain propagation.
+      `
+        declare const value: { nested?: { field: number } } | null;
+        value && (value?.nested).field === 1;
+      `,
+      `
+        declare const value:
+          | { nested?: Record<string, number> }
+          | null;
+        value && (value?.nested)['field'] === 1;
+      `,
+      `
+        declare const value: { method?: () => number } | null;
+        value && (value?.method)() === 1;
+      `,
+      `
+        declare const value:
+          | { nested: { field: { deep: number } } }
+          | null;
+        value && (value?.nested.field).deep === 1;
+      `,
+      `
+        declare const value: { nested?: { field: number } } | null;
+        value && (((value?.nested))).field === 1;
+      `,
       // call arguments are considered
       'foo.bar(a) && foo.bar(a, b).baz;',
       // type parameters are considered

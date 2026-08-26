@@ -184,7 +184,11 @@ func (state *ruleState) collectCalls() {
 }
 
 func (state *ruleState) collectRootCalls(name string, value trackedValue) {
-	if state.isGlobalOff(name) {
+	// ReferenceTracker only starts from variables present in the effective
+	// global scope. This gates both direct roots (for example Temporal) and
+	// global-object aliases (for example globalThis) by ecmaVersion and authored
+	// globals instead of treating every watched spelling as implicitly defined.
+	if !state.isKnownGlobal(name) {
 		return
 	}
 	references := state.globalRootReferences(name)
@@ -197,10 +201,6 @@ func (state *ruleState) collectRootCalls(name string, value trackedValue) {
 		walk := traceWalk{}
 		state.trackExpression(identifier, value, &walk)
 	}
-}
-
-func (state *ruleState) isGlobalOff(name string) bool {
-	return state.ctx.Globals[name] == utils.GlobalAccessOff
 }
 
 func (state *ruleState) globalRootReferences(name string) []*ast.Node {
@@ -559,10 +559,7 @@ func (state *ruleState) trackVariable(symbol *ast.Symbol, value trackedValue, wa
 }
 
 func (state *ruleState) isKnownGlobal(name string) bool {
-	if access := state.ctx.Globals[name]; access != utils.GlobalAccessUnset {
-		return access.IsDeclared()
-	}
-	return nonCallableGlobals[name] || globalObjects[name]
+	return state.ctx.Globals.Access(name).IsDeclared()
 }
 
 func (state *ruleState) trackGlobalVariable(name string, value trackedValue, walk *traceWalk) {
@@ -675,7 +672,8 @@ var directCallMessages = func() map[string]rule.RuleMessage {
 
 // https://eslint.org/docs/latest/rules/no-obj-calls
 var NoObjCallsRule = rule.Rule{
-	Name: "no-obj-calls",
+	Name:   "no-obj-calls",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if !sourceMayUseNonCallableGlobal(ctx.SourceFile) {
 			return rule.RuleListeners{}

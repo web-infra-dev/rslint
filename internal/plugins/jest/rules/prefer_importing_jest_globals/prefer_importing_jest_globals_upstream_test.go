@@ -5,6 +5,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_importing_jest_globals"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -181,8 +182,8 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
-				SourceType: `module`,
-				Options:    []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
+				LanguageOptions: rule.LanguageOptions{SourceType: `module`},
+				Options:         []interface{}{map[string]interface{}{`types`: []interface{}{`jest`}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 13},
 				},
@@ -291,6 +292,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 4, Column: 11, EndColumn: 15},
 				},
@@ -310,6 +312,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 4, Column: 11, EndColumn: 15},
 				},
@@ -333,6 +336,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           })
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
@@ -356,6 +360,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           })
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
@@ -369,13 +374,15 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 4, Column: 11, EndColumn: 15},
 				},
 			},
 			{
-				Code:   "\n        const source = 'globals';\n        const {describe} = require(`@jest/${source}`);\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n      ",
-				Output: []string{"\n        const { expect, test } = require('@jest/globals');\n        const source = 'globals';\n        const {describe} = require(`@jest/${source}`);\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n      "},
+				Code:            "\n        const source = 'globals';\n        const {describe} = require(`@jest/${source}`);\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n      ",
+				Output:          []string{"\n        const { expect, test } = require('@jest/globals');\n        const source = 'globals';\n        const {describe} = require(`@jest/${source}`);\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 5, Column: 11, EndColumn: 15},
 				},
@@ -395,6 +402,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
@@ -418,6 +426,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 7, Column: 11, EndColumn: 17},
 				},
@@ -439,6 +448,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 4, Column: 9, EndColumn: 17},
 				},
@@ -457,6 +467,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           test.each(['hello', 'world'])("%s", (a) => {});
         });
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
@@ -475,14 +486,16 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 17},
 				},
 			},
 			{
 				// Shebang must be at byte 0 — avoid a leading newline from a raw string.
-				Code:   "#!/usr/bin/env node\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n",
-				Output: []string{"#!/usr/bin/env node\n        const { describe, expect, test } = require('@jest/globals');\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n"},
+				Code:            "#!/usr/bin/env node\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n",
+				Output:          []string{"#!/usr/bin/env node\n        const { describe, expect, test } = require('@jest/globals');\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n"},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 2, Column: 9, EndColumn: 17},
 				},
@@ -503,6 +516,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
@@ -523,13 +537,15 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(true).toBeDefined();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
 			},
 			{
-				Code:   "\n        `use strict`;\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n      ",
-				Output: []string{"\n        `use strict`;\n        const { describe, expect, test } = require('@jest/globals');\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n      "},
+				Code:            "\n        `use strict`;\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n      ",
+				Output:          []string{"\n        `use strict`;\n        const { describe, expect, test } = require('@jest/globals');\n        describe(\"suite\", () => {\n          test(\"foo\");\n          expect(true).toBeDefined();\n        })\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
@@ -552,6 +568,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(onClick).toHaveBeenCalled();
         })
       `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 25, EndColumn: 29},
 				},
@@ -574,7 +591,7 @@ func TestPreferImportingJestGlobalsUpstream(t *testing.T) {
           expect(onClick).toHaveBeenCalled();
         })
       `},
-				SourceType: `module`,
+				LanguageOptions: rule.LanguageOptions{SourceType: `module`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 25, EndColumn: 29},
 				},

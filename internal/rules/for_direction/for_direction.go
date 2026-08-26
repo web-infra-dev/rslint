@@ -544,7 +544,8 @@ func (checker *forDirectionChecker) report(node *ast.Node, forStatement *ast.For
 
 // ForDirectionRule enforces that for loop update clauses move the counter in the right direction.
 var ForDirectionRule = rule.Rule{
-	Name: "for-direction",
+	Name:   "for-direction",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		checker := &forDirectionChecker{ctx: ctx}
 		return rule.RuleListeners{ast.KindForStatement: checker.check}

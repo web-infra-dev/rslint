@@ -8,7 +8,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/symbol-description
 var SymbolDescriptionRule = rule.Rule{
-	Name: "symbol-description",
+	Name:   "symbol-description",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -59,10 +60,10 @@ func isUserBoundSymbol(ctx rule.RuleContext, callee *ast.Node) bool {
 	// un-declares the builtin, so it no longer resolves to a known global —
 	// ESLint's `getVariableByName` would return undefined and the rule stays
 	// silent.
-	if ctx.Globals["Symbol"] == utils.GlobalAccessOff {
+	if !ctx.Globals.Access("Symbol").IsDeclared() {
 		return true
 	}
-	if ctx.TypeChecker == nil || ctx.Program == nil {
+	if ctx.TypeChecker == nil || ctx.Program() == nil {
 		return false
 	}
 	sym := ctx.TypeChecker.GetSymbolAtLocation(callee)
@@ -80,7 +81,7 @@ func isUserBoundSymbol(ctx rule.RuleContext, callee *ast.Node) bool {
 			continue
 		}
 		sf := ast.GetSourceFileOfNode(decl)
-		if sf != nil && !utils.IsSourceFileDefaultLibrary(ctx.Program, sf) {
+		if sf != nil && !ctx.Program().IsSourceFileDefaultLibrary(sf) {
 			return true
 		}
 	}

@@ -99,4 +99,5 @@ observable effect here.
 
 ## Original Documentation
 
-- [eslint-plugin-import/no-cycle](https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-cycle.md)
+- [eslint-plugin-import: no-cycle](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-cycle.md)
+- [Source code](https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/src/rules/no-cycle.js)

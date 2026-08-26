@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -479,6 +480,154 @@ func TestNoImportAssignRuleAdversarial(t *testing.T) {
 	)
 }
 
+func TestNoImportAssignRuleUsesAuthoredJavaScriptScopes(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.allow-js.json",
+		t,
+		&NoImportAssignRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `import { value } from "mod";
+function f(value) {
+  /** @import { value } from "types" */
+  value = 1;
+}`,
+				FileName: "jsdoc-import-parameter.js",
+			},
+			{
+				Code: `import * as namespace from "mod";
+function f(namespace) {
+  /** @typedef {object} namespace */
+  namespace.member = 1;
+}`,
+				FileName: "jsdoc-typedef-parameter.js",
+			},
+			{
+				Code: `import * as namespace from "mod";
+function f(namespace) {
+  /** @typedef {object} namespace */
+  Object.assign(namespace, source);
+}`,
+				FileName: "jsdoc-typedef-mutation-parameter.js",
+			},
+			{
+				Code: `import { value } from "mod";
+const f = function value(parameter = (value = 1)) {};`,
+				FileName: "named-function-expression-parameter.js",
+			},
+			{
+				Code: `import { value } from "mod";
+function outer() {
+  let value;
+  function inner(parameter = (value = 1)) { function value() {} }
+}`,
+				FileName: "outer-local-parameter.js",
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import { value } from "mod";
+function f() {
+  /** @import { value } from "types" */
+  value = 1;
+}`,
+				FileName: "jsdoc-import-binding.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 4, Column: 3},
+				},
+			},
+			{
+				Code: `import { value } from "mod";
+function f() {
+  /** @typedef {number} value */
+  value = 1;
+}`,
+				FileName: "jsdoc-typedef-binding.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 4, Column: 3},
+				},
+			},
+			{
+				Code: `import * as namespace from "mod";
+function f() {
+  /** @import { namespace } from "types" */
+  namespace.member = 1;
+}`,
+				FileName: "jsdoc-namespace-binding.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonlyMember", Message: "The members of 'namespace' are read-only.", Line: 4, Column: 3},
+				},
+			},
+			{
+				Code: `import { first, second } from "mod";
+function f() {
+  /** @import { first } from "types" */
+  first = 1;
+}
+second = 2;`,
+				FileName: "jsdoc-multiple-bindings.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'first' is read-only.", Line: 4, Column: 3},
+					{MessageId: "readonly", Message: "'second' is read-only.", Line: 6, Column: 1},
+				},
+			},
+			{
+				Code: `import { callbackValue, other } from "mod";
+function f() {
+  /** @callback callbackValue */
+  callbackValue = 1;
+}
+other = 2;`,
+				FileName: "jsdoc-callback-binding.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'callbackValue' is read-only.", Line: 4, Column: 3},
+					{MessageId: "readonly", Message: "'other' is read-only.", Line: 6, Column: 1},
+				},
+			},
+			{
+				Code: `import { value } from "mod";
+function f(parameter = (value = 1)) { function value() {} }`,
+				FileName: "parameter-initializer.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 2, Column: 25},
+				},
+			},
+			{
+				Code: `import { value } from "mod";
+function f({ item = (value = 1) } = {}) { const value = 2; }`,
+				FileName: "destructured-parameter-initializer.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 2, Column: 22},
+				},
+			},
+			{
+				Code: `import { value } from "mod";
+function f() {
+  /** @import { Type as value } from "types" */
+  { let value; value = 1; }
+  value = 2;
+}`,
+				FileName: "jsdoc-alias-and-block-shadow.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 5, Column: 3},
+				},
+			},
+			{
+				Code: `import * as namespace from "mod";
+function f() {
+  /** @typedef {object} namespace */
+  Object.assign(namespace, source);
+}`,
+				FileName: "jsdoc-typedef-mutation.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonlyMember", Message: "The members of 'namespace' are read-only.", Line: 4, Column: 17},
+				},
+			},
+		},
+	)
+}
+
 func TestNoImportAssignRuleWithoutRefStore(t *testing.T) {
 	fallbackRule := NoImportAssignRule
 	fallbackRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -525,6 +674,15 @@ func TestNoImportAssignRuleWithoutRefStore(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "readonly", Message: "'second' is read-only.", Line: 2},
 					{MessageId: "readonly", Message: "'first' is read-only.", Line: 3},
+				},
+			},
+			{
+				Code: `import { value, other } from "mod";
+function f(parameter = (value = 1)) { function value() {} }`,
+				FileName: "parameter-initializer.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "readonly", Message: "'value' is read-only.", Line: 2, Column: 25},
 				},
 			},
 		},
@@ -612,7 +770,7 @@ func lintNoImportAssignForComparison(
 
 	var diagnostics []noImportAssignDiagnosticFingerprint
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:      program,
+		Program:      lintprogram.NewFromCompiler(program),
 		File:         sourceFile.FileName(),
 		HasTypeInfo:  true,
 		ExcludePaths: []string{},

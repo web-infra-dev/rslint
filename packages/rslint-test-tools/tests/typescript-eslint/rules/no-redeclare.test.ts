@@ -6,6 +6,7 @@ import { getFixturesRootDir } from '../RuleTester';
 const rootDir = getFixturesRootDir();
 const ruleTester = new RuleTester({
   languageOptions: {
+    sourceType: 'script',
     parserOptions: {
       project: './tsconfig.json',
       tsconfigRootDir: rootDir,
@@ -46,7 +47,7 @@ if (true) {
       // SKIP: rslint does not re-interpret `sourceType: module` from the JS
       // languageOptions for a file with no imports/exports.
       code: 'var Object = 0;',
-      languageOptions: { parserOptions: { sourceType: 'module' } },
+      languageOptions: { sourceType: 'module' },
       options: [{ builtinGlobals: true }],
       skip: true,
     },
@@ -83,7 +84,7 @@ if (true) {
     {
       // SKIP: same — `top` is a DOM global per lib.dom.
       code: 'var top = 0;',
-      languageOptions: { parserOptions: { sourceType: 'module' } },
+      languageOptions: { sourceType: 'module' },
       options: [{ builtinGlobals: true }],
       skip: true,
     },
@@ -327,7 +328,7 @@ var a;
           type: AST_NODE_TYPES.Identifier,
         },
       ],
-      languageOptions: { parserOptions: { sourceType: 'module' } },
+      languageOptions: { sourceType: 'module' },
     },
     {
       code: `
@@ -343,7 +344,7 @@ var a;
           type: AST_NODE_TYPES.Identifier,
         },
       ],
-      languageOptions: { parserOptions: { sourceType: 'module' } },
+      languageOptions: { sourceType: 'module' },
     },
     {
       code: 'var Object = 0;',
@@ -494,8 +495,9 @@ type T = 2;
       ],
     },
     {
-      // SKIP: rslint's builtin list does not include the TS DOM lib's
-      // `NodeListOf`; `builtinGlobals` covers ES core names only.
+      // SKIP: rslint does not support parserOptions.lib yet. Without that
+      // explicit option, NodeListOf is correctly absent from the default
+      // esnext scope-manager globals.
       code: `
 type NodeListOf = 1;
       `,

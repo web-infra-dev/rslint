@@ -41,4 +41,5 @@ class C {
 
 ## Original Documentation
 
-- [ESLint no-self-compare](https://eslint.org/docs/latest/rules/no-self-compare)
+- [ESLint: no-self-compare](https://eslint.org/docs/latest/rules/no-self-compare)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-self-compare.js)

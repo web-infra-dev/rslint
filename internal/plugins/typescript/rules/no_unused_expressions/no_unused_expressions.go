@@ -1,10 +1,15 @@
 package no_unused_expressions
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_unused_expressions.schema.json
+var schemaJSON []byte
 
 func unusedExpressionMessage() rule.RuleMessage {
 	return rule.RuleMessage{
@@ -15,9 +20,9 @@ func unusedExpressionMessage() rule.RuleMessage {
 
 // https://typescript-eslint.io/rules/no-unused-expressions
 var NoUnusedExpressionsRule = rule.CreateRule(rule.Rule{
-	Name: "no-unused-expressions",
-	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
+	Name:   "no-unused-expressions",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := utils.ParseNoUnusedExpressionOptions(rawOptions)
 
 		return rule.RuleListeners{

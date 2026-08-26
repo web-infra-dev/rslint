@@ -1,6 +1,7 @@
 package no_irregular_whitespace
 
 import (
+	_ "embed"
 	"sort"
 	"strings"
 
@@ -8,14 +9,16 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed no_irregular_whitespace.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-irregular-whitespace
 var NoIrregularWhitespaceRule = rule.Rule{
-	Name: "no-irregular-whitespace",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-irregular-whitespace",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		checkNoIrregularWhitespace(ctx, opts)
 		return rule.RuleListeners{}
@@ -30,7 +33,7 @@ type irregularWhitespaceOptions struct {
 	skipJSXText   bool
 }
 
-func parseOptions(options any) irregularWhitespaceOptions {
+func parseOptions(options []any) irregularWhitespaceOptions {
 	opts := irregularWhitespaceOptions{
 		skipStrings:   true,
 		skipComments:  false,
@@ -39,24 +42,24 @@ func parseOptions(options any) irregularWhitespaceOptions {
 		skipJSXText:   false,
 	}
 
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
+	if len(options) == 0 {
 		return opts
 	}
+	m, _ := options[0].(map[string]any)
 
-	if v, ok := optsMap["skipStrings"].(bool); ok {
+	if v, ok := m["skipStrings"].(bool); ok {
 		opts.skipStrings = v
 	}
-	if v, ok := optsMap["skipComments"].(bool); ok {
+	if v, ok := m["skipComments"].(bool); ok {
 		opts.skipComments = v
 	}
-	if v, ok := optsMap["skipRegExps"].(bool); ok {
+	if v, ok := m["skipRegExps"].(bool); ok {
 		opts.skipRegExps = v
 	}
-	if v, ok := optsMap["skipTemplates"].(bool); ok {
+	if v, ok := m["skipTemplates"].(bool); ok {
 		opts.skipTemplates = v
 	}
-	if v, ok := optsMap["skipJSXText"].(bool); ok {
+	if v, ok := m["skipJSXText"].(bool); ok {
 		opts.skipJSXText = v
 	}
 

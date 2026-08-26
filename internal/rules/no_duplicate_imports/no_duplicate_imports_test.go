@@ -30,25 +30,25 @@ import { baz } from "os";`},
 			{Code: `import foo, { bar } from "os";
 import * as baz from "os";`},
 			{Code: `import os from "os";
-export { hello } from "hello";`, Options: map[string]interface{}{"includeExports": true}},
+export { hello } from "hello";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import os from "os";
-export * from "hello";`, Options: map[string]interface{}{"includeExports": true}},
+export * from "hello";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import os from "os";
-export { hello as hi } from "hello";`, Options: map[string]interface{}{"includeExports": true}},
+export { hello as hi } from "hello";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import os from "os";
-export default function(){};`, Options: map[string]interface{}{"includeExports": true}},
+export default function(){};`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import { merge } from "lodash-es";
-export { merge as lodashMerge }`, Options: map[string]interface{}{"includeExports": true}},
+export { merge as lodashMerge }`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `export { something } from "os";
-export * as os from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export * as os from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import { something } from "os";
-export * as os from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export * as os from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import * as os from "os";
-export { something } from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export { something } from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import os from "os";
-export * from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export * from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `export { something } from "os";
-export * from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export * from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 
 			// ---- ESLint upstream — TypeScript suite (type-only forms) ----
 			{Code: `import type { Os } from "os";
@@ -71,52 +71,52 @@ import type * as Baz from "os";`},
 			{Code: `import type { Merge } from "lodash-es";
 import type _ from "lodash-es";`},
 			{Code: `import type Os from "os";
-export { type Hello } from "hello";`, Options: map[string]interface{}{"includeExports": true}},
+export { type Hello } from "hello";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import type Os from "os";
-export type * from "hello";`, Options: map[string]interface{}{"includeExports": true}},
+export type * from "hello";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import type Os from "os";
-export { type Hello as Hi } from "hello";`, Options: map[string]interface{}{"includeExports": true}},
+export { type Hello as Hi } from "hello";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import type Os from "os";
-export default function(){};`, Options: map[string]interface{}{"includeExports": true}},
+export default function(){};`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import { type Merge } from "lodash-es";
-export { Merge as lodashMerge }`, Options: map[string]interface{}{"includeExports": true}},
+export { Merge as lodashMerge }`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `export type { Something } from "os";
-export * as os from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export * as os from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import { type Something } from "os";
-export * as os from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export * as os from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import type * as Os from "os";
-export { something } from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export { something } from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import type Os from "os";
-export * from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export * from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `import type Os from "os";
-export type { Something } from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export type { Something } from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 			{Code: `export type { Something } from "os";
-export * from "os";`, Options: map[string]interface{}{"includeExports": true}},
+export * from "os";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 
 			// ---- allowSeparateTypeImports (TS) ----
 			{Code: `import { foo, type Bar } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true}},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true}}},
 			{Code: `import { foo } from "module";
 import type { Bar } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true}},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true}}},
 			{Code: `import { type Foo } from "module";
 import type { Bar } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true}},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true}}},
 			{Code: `import { foo, type Bar } from "module";
 export { type Baz } from "module2";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}}},
 			{Code: `import type { Foo } from "module";
 export { bar, type Baz } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}}},
 			{Code: `import { type Foo } from "module";
 export type { Bar } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}}},
 			{Code: `import type * as Foo from "module";
 export { type Bar } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}}},
 			{Code: `import { type Foo } from "module";
 export type * as Bar from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}}},
 
 			// ---- Extra: locks in disjoint module names (different specifier shapes) ----
 			{Code: `import a from "mod-a";
@@ -125,7 +125,7 @@ import * as c from "mod-c";
 import "mod-d";
 export { e } from "mod-e";
 export * from "mod-f";
-export * as g from "mod-g";`, Options: map[string]interface{}{"includeExports": true}},
+export * as g from "mod-g";`, Options: []any{map[string]interface{}{"includeExports": true}}},
 
 			// ---- Extra: includeExports defaults to false (export collisions ignored) ----
 			// `export { x } from "os"` after `import os from "os"` is invalid only when
@@ -144,7 +144,7 @@ import { type Bar } from "moduleB";`},
 
 			// ---- Extra: empty options object behaves like defaults ----
 			{Code: `import os from "os";
-export { something } from "os";`, Options: map[string]interface{}{}},
+export { something } from "os";`, Options: []any{map[string]interface{}{}}},
 
 			// ---- Extra: side-effect-only repeated across separate modules is fine ----
 			{Code: `import "fs";
@@ -304,7 +304,7 @@ import { baz } from "lodash-es";`,
 			{
 				Code: `export { os } from "os";
 export { something } from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "export",
 					Message:   "'os' export is duplicated.",
@@ -316,7 +316,7 @@ export { something } from "os";`,
 				Code: `import os from "os";
 export { os as foobar } from "os";
 export { something } from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exportAs", Message: "'os' export is duplicated as import.", Line: 2, Column: 1},
 					{MessageId: "export", Message: "'os' export is duplicated.", Line: 3, Column: 1},
@@ -326,7 +326,7 @@ export { something } from "os";`,
 			{
 				Code: `import os from "os";
 export { something } from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'os' export is duplicated as import.",
@@ -337,7 +337,7 @@ export { something } from "os";`,
 			{
 				Code: `import os from "os";
 export * as os from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'os' export is duplicated as import.",
@@ -348,7 +348,7 @@ export * as os from "os";`,
 			{
 				Code: `export * as os from "os";
 import os from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "importAs",
 					Message:   "'os' import is duplicated as export.",
@@ -359,7 +359,7 @@ import os from "os";`,
 			{
 				Code: `import * as modns from "mod";
 export * as  modns from "mod";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'mod' export is duplicated as import.",
@@ -370,7 +370,7 @@ export * as  modns from "mod";`,
 			{
 				Code: `export * from "os";
 export * from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "export",
 					Message:   "'os' export is duplicated.",
@@ -381,7 +381,7 @@ export * from "os";`,
 			{
 				Code: `import "os";
 export * from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'os' export is duplicated as import.",
@@ -460,7 +460,7 @@ import type { Baz } from "lodash-es";`,
 			{
 				Code: `import { type Foo } from "module";
 export type { Bar } from "module";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'module' export is duplicated as import.",
@@ -471,7 +471,7 @@ export type { Bar } from "module";`,
 			{
 				Code: `export { os } from "os";
 export type { Something } from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "export",
 					Message:   "'os' export is duplicated.",
@@ -482,7 +482,7 @@ export type { Something } from "os";`,
 			{
 				Code: `export type { Os } from "os";
 export type { Something } from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "export",
 					Message:   "'os' export is duplicated.",
@@ -494,7 +494,7 @@ export type { Something } from "os";`,
 				Code: `import type { Os } from "os";
 export type { Os as Foobar } from "os";
 export type { Something } from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exportAs", Message: "'os' export is duplicated as import.", Line: 2, Column: 1},
 					{MessageId: "export", Message: "'os' export is duplicated.", Line: 3, Column: 1},
@@ -504,7 +504,7 @@ export type { Something } from "os";`,
 			{
 				Code: `import type { Os } from "os";
 export type { Something } from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'os' export is duplicated as import.",
@@ -515,7 +515,7 @@ export type { Something } from "os";`,
 			{
 				Code: `import type Os from "os";
 export type * as Os from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'os' export is duplicated as import.",
@@ -526,7 +526,7 @@ export type * as Os from "os";`,
 			{
 				Code: `import type * as Modns from "mod";
 export type * as Modns from "mod";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'mod' export is duplicated as import.",
@@ -537,7 +537,7 @@ export type * as Modns from "mod";`,
 			{
 				Code: `export type * from "os";
 export type * from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "export",
 					Message:   "'os' export is duplicated.",
@@ -548,7 +548,7 @@ export type * from "os";`,
 			{
 				Code: `import "os";
 export type { Os } from "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "exportAs",
 					Message:   "'os' export is duplicated as import.",
@@ -561,7 +561,7 @@ export type { Os } from "os";`,
 			{
 				Code: `import { someValue } from 'module';
 import { anotherValue } from 'module';`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "import",
 					Message:   "'module' import is duplicated.",
@@ -572,7 +572,7 @@ import { anotherValue } from 'module';`,
 			{
 				Code: `import type { Merge } from "lodash-es";
 import type { Find } from "lodash-es";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "import",
 					Message:   "'lodash-es' import is duplicated.",
@@ -584,7 +584,7 @@ import type { Find } from "lodash-es";`,
 				Code: `import { someValue, type Foo } from 'module';
 import type { SomeType } from 'module';
 import type { AnotherType } from 'module';`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "import",
 					Message:   "'module' import is duplicated.",
@@ -595,7 +595,7 @@ import type { AnotherType } from 'module';`,
 			{
 				Code: `import { type Foo } from 'module';
 import { type Bar } from 'module';`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "import",
 					Message:   "'module' import is duplicated.",
@@ -606,7 +606,7 @@ import { type Bar } from 'module';`,
 			{
 				Code: `export type { Foo } from "module";
 export type { Bar } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "export",
 					Message:   "'module' export is duplicated.",
@@ -618,7 +618,7 @@ export type { Bar } from "module";`,
 				Code: `import { type Foo } from "module";
 export { type Bar } from "module";
 export { type Baz } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exportAs", Message: "'module' export is duplicated as import.", Line: 2, Column: 1},
 					{MessageId: "export", Message: "'module' export is duplicated.", Line: 3, Column: 1},
@@ -629,7 +629,7 @@ export { type Baz } from "module";`,
 				Code: `import { type Foo } from "module";
 export { type Bar } from "module";
 export { regular } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exportAs", Message: "'module' export is duplicated as import.", Line: 2, Column: 1},
 					{MessageId: "export", Message: "'module' export is duplicated.", Line: 3, Column: 1},
@@ -641,7 +641,7 @@ export { regular } from "module";`,
 import { regular } from "module";
 export { type Bar } from "module";
 export { regular as other } from "module";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true, "includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "import", Message: "'module' import is duplicated.", Line: 2, Column: 1},
 					{MessageId: "exportAs", Message: "'module' export is duplicated as import.", Line: 3, Column: 1},
@@ -652,9 +652,9 @@ export { regular as other } from "module";`,
 
 			// ---- Extra: lock-in tests (upstream branches not directly tested) ----
 
-			// Lock-in: array-form options (rule_tester multi-element shape) — exercises
-			// the `[]interface{}{ map[string]interface{}{} }` JSON path so a
-			// regression in GetOptionsMap is caught here.
+			// Lock-in: the options object arrives from a JSON config as
+			// `[]interface{}{ map[string]interface{}{} }`, so parseOptions must
+			// read the object out of element 0.
 			{
 				Code: `export { os } from "os";
 export { something } from "os";`,
@@ -731,7 +731,7 @@ import type Mod from "mod";`,
 			{
 				Code: `export * from "os";
 import "os";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "importAs",
 					Message:   "'os' import is duplicated as export.",
@@ -804,7 +804,7 @@ import bar from "mod";`,
 			{
 				Code: `export {} from "mod";
 export * from "mod";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "export",
 					Message:   "'mod' export is duplicated.",
@@ -862,7 +862,7 @@ import "mod";
 import d from "mod";
 export { e } from "mod";
 export * from "mod";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "import", Message: "'mod' import is duplicated.", Line: 2, Column: 1},
 					{MessageId: "import", Message: "'mod' import is duplicated.", Line: 3, Column: 1},
@@ -982,7 +982,7 @@ import { d } from "lib-b";`,
 import type { B } from "mod";
 import { c } from "mod";
 import type { D } from "mod";`,
-				Options: map[string]interface{}{"allowSeparateTypeImports": true},
+				Options: []any{map[string]interface{}{"allowSeparateTypeImports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					// node3 (value, named) merges with node1 (value, named) — REPORT.
 					{MessageId: "import", Message: "'mod' import is duplicated.", Line: 3, Column: 1},
@@ -998,10 +998,8 @@ import type { D } from "mod";`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "import", Message: "'mod' import is duplicated.", Line: 2, Column: 1}},
 			},
 
-			// Options: malformed input must not crash and must fall back to
-			// defaults. Passing options=nil explicitly through the rule_tester
-			// path (rather than the default of "no Options field") exercises the
-			// `optsMap == nil` branch in parseOptions.
+			// Options: an explicit nil options value falls back to the defaults,
+			// same as omitting the Options field.
 			{
 				Code: `import "fs";
 import "fs";`,
@@ -1009,36 +1007,11 @@ import "fs";`,
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "import", Message: "'fs' import is duplicated.", Line: 2, Column: 1}},
 			},
 
-			// Options: empty array form (multi-element with no payload) — the
-			// rule_tester unwraps `[]interface{}{}` to nil → defaults.
+			// Options: an empty options array carries no payload → defaults.
 			{
 				Code:    `import "fs"; import "fs";`,
 				Options: []interface{}{},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "import", Message: "'fs' import is duplicated.", Line: 1, Column: 14}},
-			},
-
-			// Options: unknown key is ignored — must NOT silently flip
-			// includeExports on. Pairing import + export under "unknownOption"
-			// stays valid (we'd otherwise report exportAs).
-			{
-				Code:    `import os from "os"; export { x } from "os";`,
-				Options: map[string]interface{}{"unknownOption": true},
-				// No expected errors: a duplicate `import` of `"os"` would be
-				// needed, but the export side is silent under the default.
-				// Replace this with a real duplicate so the case is "invalid":
-				// instead test that a CLI shape with bogus key still detects
-				// genuine import duplicates.
-				// (kept invalid below)
-				Errors: []rule_tester.InvalidTestCaseError{},
-				Skip:   true,
-			},
-
-			// Options: bogus key + genuine duplicate import — still reports.
-			{
-				Code: `import a from "os";
-import b from "os";`,
-				Options: map[string]interface{}{"bogus": "yes", "includeExports": "not-a-bool"},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "import", Message: "'os' import is duplicated.", Line: 2, Column: 1}},
 			},
 
 			// includeExports=true + a chain of three exports of same module.
@@ -1048,7 +1021,7 @@ import b from "os";`,
 				Code: `export { a } from "mod";
 export { b } from "mod";
 export { c } from "mod";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "export", Message: "'mod' export is duplicated.", Line: 2, Column: 1},
 					{MessageId: "export", Message: "'mod' export is duplicated.", Line: 3, Column: 1},
@@ -1062,7 +1035,7 @@ export { c } from "mod";`,
 			{
 				Code: `import type * as Ns from "mod";
 export type * as Ns from "mod";`,
-				Options: map[string]interface{}{"includeExports": true},
+				Options: []any{map[string]interface{}{"includeExports": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exportAs", Message: "'mod' export is duplicated as import.", Line: 2, Column: 1}},
 			},
 

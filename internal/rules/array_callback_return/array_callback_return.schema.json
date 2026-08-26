@@ -1,0 +1,22 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowImplicit": {
+          "type": "boolean"
+        },
+        "checkForEach": {
+          "type": "boolean"
+        },
+        "allowVoid": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

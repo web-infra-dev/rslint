@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -67,6 +68,14 @@ func TestPreferArraySomeExtras(t *testing.T) {
 		// upstream suite as invalid).
 		{Code: `class MyArray extends Array {} function foo(items: MyArray) { if (items.find(fn)) {} }`, Tsx: false},
 		{Code: `class MyArray extends Array {} function foo(items: MyArray) { items.filter(fn).length > 0; }`, Tsx: false},
+		// Type-information classification does not walk interface heritage when
+		// deciding whether a stored `.find()` result is definitely from an array.
+		{Code: `interface Items extends Array<object> {} declare function get(): Items; const found = get().find(fn); if (found) {}`, Tsx: false},
+		// Nullish participates in union classification as a non-target, so this
+		// receiver is unknown rather than definitely an array.
+		{Code: `declare const items: object[] | undefined; const found = items.find(fn); if (found) {}`, Tsx: false},
+		// A function's return annotation does not annotate the function binding.
+		{Code: `function items(): object[] { return [] } const found = items.find(fn); if (found) {}`, Tsx: false},
 
 		// ---- Locks in filter().length arm: `$`-prefixed receiver skipped ----
 		{Code: `$foo.filter(fn).length > 0`},
@@ -96,6 +105,24 @@ func TestPreferArraySomeExtras(t *testing.T) {
 		{
 			Code:   `if ((foo).find(fn)) {}`,
 			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`if ((foo).some(fn)) {}`)},
+		},
+		// ---- Shared type classifier: actual interface heritage wins over a keyed-collection name ----
+		// The local interface is deliberately named Map to exercise the fallback
+		// ordering used by the shared Unicorn type classifier.
+		{Code: `export {}; interface Map<T> extends Array<T> {} function run(xs: Map<number>) { if (xs.find(Boolean)) {} }`, Tsx: false, Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`export {}; interface Map<T> extends Array<T> {} function run(xs: Map<number>) { if (xs.some(Boolean)) {} }`)}},
+		// The type-information path matches the type symbol name without
+		// requiring the declaration to come from the standard library.
+		{
+			Code:   `export {}; interface Array<T> { find(predicate: Function): T | undefined } declare function get(): Array<object>; const found = get().find(fn); if (found) {}`,
+			Tsx:    false,
+			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`export {}; interface Array<T> { find(predicate: Function): T | undefined } declare function get(): Array<object>; const found = get().some(fn); if (found) {}`)},
+		},
+		// A `for…of` const binding has no VariableDeclaration initializer. Its
+		// inferred array type still makes the boolean `.find()` use reportable.
+		{
+			Code:   `declare const arrays: number[][]; declare const fn: (value: number) => boolean; for (const array of arrays) { if (array.find(fn)) {} }`,
+			Tsx:    false,
+			Errors: []rule_tester.InvalidTestCaseError{findErrorExtras(`declare const arrays: number[][]; declare const fn: (value: number) => boolean; for (const array of arrays) { if (array.some(fn)) {} }`)},
 		},
 		// Double-parenthesized call in a control-flow test.
 		{
@@ -259,7 +286,7 @@ func createPreferArraySomeProgram(t testing.TB, fileName, code string) (*compile
 func lintPreferArraySomeWithDemand(program *compiler.Program, sourceFile *ast.SourceFile, demand rule.EditDemand) []rule.RuleDiagnostic {
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:     program,
+		Program:     lintprogram.NewFromCompiler(program),
 		File:        sourceFile.FileName(),
 		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

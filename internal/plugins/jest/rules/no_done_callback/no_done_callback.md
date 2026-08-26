@@ -42,4 +42,5 @@ test('myFunction()', async () => {
 
 ## Original Documentation
 
-- [jest/no-done-callback](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/no-done-callback.md)
+- [eslint-plugin-jest: no-done-callback](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/no-done-callback.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/no-done-callback.ts)

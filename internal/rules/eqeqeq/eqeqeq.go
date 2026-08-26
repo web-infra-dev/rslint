@@ -37,11 +37,6 @@ func looseEquivalent(kind ast.Kind) string {
 	}
 }
 
-// isLooseEquality checks if the operator is == or !=.
-func isLooseEquality(kind ast.Kind) bool {
-	return kind == ast.KindEqualsEqualsToken || kind == ast.KindExclamationEqualsToken
-}
-
 // isStrictEquality checks if the operator is === or !==.
 func isStrictEquality(kind ast.Kind) bool {
 	return kind == ast.KindEqualsEqualsEqualsToken || kind == ast.KindExclamationEqualsEqualsToken
@@ -115,34 +110,26 @@ type eqeqeqOptions struct {
 	nullOption string // "always", "never", "ignore" (only used in "always" mode)
 }
 
-// parseOptions extracts the mode and null sub-option from the rule options.
-func parseOptions(opts any) eqeqeqOptions {
+// parseOptions extracts the mode and null sub-option from the rule options,
+// which take the form ["always", {"null": "ignore"}] / ["smart"] /
+// ["allow-null"].
+func parseOptions(options []any) eqeqeqOptions {
 	result := eqeqeqOptions{
 		mode:       "always",
 		nullOption: "always",
 	}
 
-	if opts == nil {
+	if len(options) == 0 {
 		return result
 	}
 
-	// Options can be:
-	// 1. A string: "always", "smart", "allow-null"
-	// 2. An array: ["always", {"null": "ignore"}]
-	switch v := opts.(type) {
-	case string:
-		result.mode = v
-	case []interface{}:
-		if len(v) > 0 {
-			if modeStr, ok := v[0].(string); ok {
-				result.mode = modeStr
-			}
-		}
-		if len(v) > 1 {
-			if optsMap, ok := v[1].(map[string]interface{}); ok {
-				if nullVal, ok := optsMap["null"].(string); ok {
-					result.nullOption = nullVal
-				}
+	if mode, ok := options[0].(string); ok {
+		result.mode = mode
+	}
+	if len(options) > 1 {
+		if optsMap, ok := options[1].(map[string]any); ok {
+			if nullVal, ok := optsMap["null"].(string); ok {
+				result.nullOption = nullVal
 			}
 		}
 	}
@@ -161,8 +148,7 @@ func parseOptions(opts any) eqeqeqOptions {
 var EqeqeqRule = rule.Rule{
 	Name:   "eqeqeq",
 	Schema: rule.NewSchema(schemaJSON),
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
@@ -195,7 +181,7 @@ var EqeqeqRule = rule.Rule{
 func handleAlwaysMode(ctx rule.RuleContext, binary *ast.BinaryExpression, opKind ast.Kind, left, right *ast.Node, nullOption string) {
 	isNullCheck := utils.IsNullLiteral(left) || utils.IsNullLiteral(right)
 
-	if isLooseEquality(opKind) {
+	if utils.IsLooseEqualityOperator(opKind) {
 		if nullOption == "always" || !isNullCheck {
 			reportEqeqeq(ctx, binary.OperatorToken, left, right, strictEquivalent(opKind))
 		}
@@ -210,7 +196,7 @@ func handleAlwaysMode(ctx rule.RuleContext, binary *ast.BinaryExpression, opKind
 // 2. Comparing two literals of the same type
 // 3. Comparing against null
 func handleSmartMode(ctx rule.RuleContext, binary *ast.BinaryExpression, opKind ast.Kind, left, right *ast.Node) {
-	if !isLooseEquality(opKind) {
+	if !utils.IsLooseEqualityOperator(opKind) {
 		return
 	}
 

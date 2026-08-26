@@ -117,4 +117,5 @@ If you are not using JSX then you can disable this rule.
 
 ## Original Documentation
 
-- [eslint-plugin-react/docs/rules/jsx-max-depth.md](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-max-depth.md)
+- [eslint-plugin-react: jsx-max-depth](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-max-depth.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-max-depth.js)

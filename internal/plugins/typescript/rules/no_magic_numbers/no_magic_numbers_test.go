@@ -110,6 +110,10 @@ class Foo {
 			Options: map[string]interface{}{"ignoreReadonlyClassProperties": true},
 		},
 
+		// ---- TS: readonly properties are decided before the core options ----
+		{Code: `class C { readonly x = 1; }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": true, "ignoreReadonlyClassProperties": true}},
+		{Code: `class C { readonly [1] = foo; }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
+
 		// ---- TS: ignoreTypeIndexes ----
 		{Code: `type Foo = Bar[0];`, Options: map[string]interface{}{"ignoreTypeIndexes": true}},
 		{Code: `type Foo = Bar[-1];`, Options: map[string]interface{}{"ignoreTypeIndexes": true}},
@@ -237,6 +241,13 @@ type Foo = {
 		{Code: `class C { foo = -42; }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": true}},
 		{Code: `class C { readonly x = 100n; }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
 		{Code: `var x = {[42]: true}`},
+
+		// ---- Computed keys of object binding patterns (ESTree makes them the
+		// key of a Property, like an object literal's) ----
+		{Code: `const { [42]: value } = source;`},
+		{Code: `function f({ [42]: value }) {}`},
+		{Code: `for (const { [42]: value } of sources) {}`},
+		{Code: `const { 1: a } = source;`},
 		{Code: `var one; ({one = 1} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var a, b; ({a = 1, b = 2} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
 		{Code: `var x; ({a: x = 42} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
@@ -249,6 +260,8 @@ type Foo = {
 		{Code: `var HOUR = 3600;`},
 		{Code: `foo[0xABn]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
 		{Code: `foo[5.0000000000000001]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
+		{Code: "// eslint-disable-next-line test\nf(42);"},
+		{Code: "/* eslint-disable test */\nf(42);\n/* eslint-enable test */"},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Core ESLint: enforceConst ----
 		{
@@ -507,6 +520,58 @@ class Foo {
 				{MessageId: "noMagic", Message: "No magic number: 6.", Line: 8, Column: 17},
 				{MessageId: "noMagic", Message: "No magic number: 100n.", Line: 9, Column: 24},
 			},
+		},
+
+		// ---- TS: the readonly decision precedes the core ignore options ----
+		{
+			Code:    `class C { readonly x = 1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true, "ignoreReadonlyClassProperties": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 24, EndColumn: 25}},
+		},
+		{
+			Code:    `class C { readonly x = -1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -1.", Line: 1, Column: 24, EndColumn: 26}},
+		},
+		{
+			Code:    `class C { readonly x = +1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 25, EndColumn: 26}},
+		},
+		{
+			Code:   `class C { readonly [1] = foo; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 21, EndColumn: 22}},
+		},
+		{
+			Code:    `class C { accessor x = 1; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 24, EndColumn: 25}},
+		},
+		{
+			Code:    `class C { readonly accessor x = 1; }`,
+			Options: map[string]interface{}{"ignoreReadonlyClassProperties": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 33, EndColumn: 34}},
+		},
+		{
+			Code:    `class C { readonly accessor [1] = 2; }`,
+			Options: map[string]interface{}{"ignoreReadonlyClassProperties": true},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 30, EndColumn: 31},
+				{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 35, EndColumn: 36},
+			},
+		},
+		{
+			Code:   `const { [42]: value = 7 } = source;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 7.", Line: 1, Column: 23, EndColumn: 24}},
+		},
+		{
+			Code:   `const { 1: a = 2 } = source;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 16, EndColumn: 17}},
+		},
+		{
+			Code:    `for (const x of [a = 1]) {}`,
+			Options: map[string]interface{}{"ignoreDefaultValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.", Line: 1, Column: 22, EndColumn: 23}},
 		},
 
 		// ---- TS: ignoreTypeIndexes: false ----
@@ -781,5 +846,13 @@ type Foo = {
 		{Code: `var stats = {avg: 42};`, Options: map[string]interface{}{"detectObjects": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42."}}},
 		{Code: `min = 1;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}}},
 		{Code: `function f() { return 60; }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 60."}}},
+		{
+			Code: `f(/* leading trivia */ 42, /* unary */ -(7), /* bigint */ 9n);`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 24},
+				{MessageId: "noMagic", Message: "No magic number: -7.", Line: 1, Column: 40},
+				{MessageId: "noMagic", Message: "No magic number: 9n.", Line: 1, Column: 59},
+			},
+		},
 	})
 }

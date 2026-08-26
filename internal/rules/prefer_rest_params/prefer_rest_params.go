@@ -7,7 +7,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/prefer-rest-params
 var PreferRestParamsRule = rule.Rule{
-	Name: "prefer-rest-params",
+	Name:   "prefer-rest-params",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {

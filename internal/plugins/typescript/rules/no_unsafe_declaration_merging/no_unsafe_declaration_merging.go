@@ -150,7 +150,8 @@ func (s *mergeRuleState) reportIfUnsafeMerge(declNode *ast.Node, name *ast.Node,
 }
 
 var NoUnsafeDeclarationMergingRule = rule.CreateRule(rule.Rule{
-	Name: "no-unsafe-declaration-merging",
+	Name:   "no-unsafe-declaration-merging",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Declaration merges are almost always pairs. Keep that common path as
 		// a tiny slice scan, and only build an index for unusually large merged

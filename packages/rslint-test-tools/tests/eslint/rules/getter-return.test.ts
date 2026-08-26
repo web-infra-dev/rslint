@@ -45,6 +45,10 @@ ruleTester.run('getter-return', {
       code: 'class foo { get bar(){return;} }',
       options: { allowImplicit: true },
     },
+    {
+      code: 'class foo { get bar(){if (baz) return; return;} }',
+      options: { allowImplicit: true },
+    },
     // Throw statements as valid exit paths
     'var foo = { get bar(){ throw new Error("not implemented"); } };',
     'class foo { get bar(){ if(baz) { throw new Error(); } return true; } }',
@@ -55,6 +59,7 @@ ruleTester.run('getter-return', {
     'class foo { get bar(){ try { return 1; } catch(e) { throw e; } } }',
     'class foo { get bar(){ try { throw new Error(); } catch(e) { return 1; } } }',
     'class foo { get bar(){ try { return 1; } finally { } } }',
+    'class foo { get bar(){ try { return 1; } catch(e) { } } }',
     // Switch with return
     'class foo { get bar(){ switch(x) { case 1: return 1; default: return 2; } } }',
     'class foo { get bar(){ switch(x) { case 1: return 1; case 2: return 2; default: throw new Error(); } } }',
@@ -63,6 +68,9 @@ ruleTester.run('getter-return', {
     // Arrow functions with expression body are implicitly returning (not checked by ESLint)
     'Object.defineProperty(foo, "bar", { get: () => true });',
     'Object.create(foo, { bar: { get: () => true } });',
+    // Only unshadowed global Object/Reflect calls create property descriptors
+    "let Object; Object.defineProperty(foo, 'bar', { get() {} });",
+    'function f(Object) { Object.defineProperties(foo, { bar: { get() {} } }); }',
   ],
 
   invalid: [
@@ -78,6 +86,20 @@ ruleTester.run('getter-return', {
     {
       code: 'var foo = { get bar() { return; } };',
       errors: [{ messageId: 'expected' }],
+    },
+    {
+      code: 'var foo = { get bar() { if (condition) return; } };',
+      errors: [{ messageId: 'expectedAlways' }, { messageId: 'expected' }],
+    },
+    {
+      code: 'var foo = { get bar() {} };',
+      options: { allowImplicit: true },
+      errors: [{ messageId: 'expected' }],
+    },
+    {
+      code: 'var foo = { get bar() { if (baz) return; } };',
+      options: { allowImplicit: true },
+      errors: [{ messageId: 'expectedAlways' }],
     },
     // Class getters without return
     {
@@ -95,6 +117,10 @@ ruleTester.run('getter-return', {
     },
     {
       code: "Object.defineProperty(foo, 'bar', { get(){} });",
+      errors: [{ messageId: 'expected' }],
+    },
+    {
+      code: "Object.defineProperty(foo, 'bar', { get: () => {} });",
       errors: [{ messageId: 'expected' }],
     },
     // Optional chaining (ES2020)
@@ -118,13 +144,13 @@ ruleTester.run('getter-return', {
     },
     // Try/catch where not all paths return
     {
-      code: 'class foo { get bar(){ try { return 1; } catch(e) { } } }',
+      code: 'class foo { get bar(){ try { return value; } catch(e) { } } }',
       errors: [{ messageId: 'expectedAlways' }],
     },
     // finally { return; } overrides try return
     {
       code: 'class foo { get bar(){ try { return 1; } finally { return; } } }',
-      errors: [{ messageId: 'expectedAlways' }],
+      errors: [{ messageId: 'expected' }],
     },
   ],
 });

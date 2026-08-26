@@ -8,7 +8,8 @@ import (
 
 // https://eslint.org/docs/latest/rules/prefer-spread
 var PreferSpreadRule = rule.Rule{
-	Name: "prefer-spread",
+	Name:   "prefer-spread",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

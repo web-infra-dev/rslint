@@ -66,6 +66,9 @@ func TestRestrictTemplateExpressionsRule(t *testing.T) {
 				Code: "class CustomError extends Error {}\nclass Deeper extends CustomError {}\ndeclare const arg: Deeper;\nconst msg = `arg = ${arg}`;\n",
 			},
 			{
+				Code: "interface Extra { extra: true }\ndeclare const Mixed: new () => Error & Extra;\nclass Derived extends Mixed {}\ndeclare const arg: Derived;\nconst msg = `arg = ${arg}`;\n",
+			},
+			{
 				Code: "declare const arg: object;\ndeclare function tag(strings: TemplateStringsArray, ...values: unknown[]): string;\nconst msg = tag`arg = ${arg}`;\n",
 			},
 			{
@@ -336,6 +339,20 @@ func TestRestrictTemplateExpressionsRule(t *testing.T) {
 				},
 			},
 			{
+				Code:    "interface Demo { value: string }\ndeclare const arg: Demo;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allow": []any{map[string]any{"from": "file", "name": "Demo", "path": ""}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "invalidType",
+						Message:   "Invalid type \"Demo\" of template literal expression.",
+						Line:      3,
+						Column:    22,
+						EndLine:   3,
+						EndColumn: 25,
+					},
+				},
+			},
+			{
 				Code:    "declare const arg: bigint;\nconst msg = `arg = ${arg}`;\n",
 				Options: map[string]any{"allowNumber": false},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -473,6 +490,157 @@ func TestRestrictTemplateExpressionsRule(t *testing.T) {
 						EndLine:   2,
 						EndColumn: 25,
 					},
+				},
+			},
+		},
+	)
+}
+
+func TestRestrictTemplateExpressionsEdgeCases(t *testing.T) {
+	invalidType := func(message string) []rule_tester.InvalidTestCaseError {
+		return []rule_tester.InvalidTestCaseError{{
+			MessageId: "invalidType",
+			Message:   message,
+		}}
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&RestrictTemplateExpressionsRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:    "declare const arg: readonly string[];\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+			},
+			{
+				Code:    "const arg = ['foo', 1] as const;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+			},
+			{
+				Code:    "declare const arg: [string, number?];\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+			},
+			{
+				Code:    "declare const arg: [string, ...number[]];\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+			},
+			{
+				Code:    "const msg = `arg = ${[, 2]}`;\n",
+				Options: map[string]any{"allowArray": true},
+			},
+			{
+				Code:    "declare const arg: never[];\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true, "allowNever": true},
+			},
+			{
+				Code: "type Recursive = Recursive[];\ndeclare const arg: Recursive;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{
+					"allowArray": true,
+					"allow":      []any{"Recursive"},
+				},
+			},
+			{
+				Code: "class Base {}\nclass Middle extends Base {}\nclass Leaf extends Middle {}\ndeclare const arg: Leaf;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allow": []any{
+					map[string]any{"from": "file", "name": "Base"},
+				}},
+			},
+			{
+				Code: "interface A { a: 1 }\ninterface B { b: 1 }\ninterface C extends A, B { c: 1 }\ndeclare const arg: C;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allow": []any{
+					map[string]any{"from": "file", "name": "B"},
+				}},
+			},
+			{
+				Code: "class Base<T> { value!: T }\nclass Leaf extends Base<string> {}\ndeclare const arg: Leaf;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allow": []any{
+					map[string]any{"from": "file", "name": "Base"},
+				}},
+			},
+			{
+				Code: "type Custom = { value: string };\ndeclare const arg: Custom;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allow": []any{
+					map[string]any{"from": "file", "name": "Custom"},
+				}},
+			},
+			{
+				Code: "class Child extends URL {}\ndeclare const arg: Child;\nconst msg = `arg = ${arg}`;\n",
+			},
+			{
+				Code: "declare const arg: number & { readonly brand: unique symbol };\nconst msg = `arg = ${arg}`;\n",
+			},
+			{
+				Code: "declare const arg: object;\ndeclare function tag(strings: TemplateStringsArray, ...values: unknown[]): string;\nconst msg = tag`arg = ${arg}`;\n",
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    "declare const arg: [string, number?];\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true, "allowNullish": false},
+				Errors:  invalidType("Invalid type \"[string, (number | undefined)?]\" of template literal expression."),
+			},
+			{
+				Code:    "declare const arg: (string | object)[][];\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+				Errors:  invalidType("Invalid type \"(string | object)[][]\" of template literal expression."),
+			},
+			{
+				Code:    "const msg = `arg = ${[, 2]}`;\n",
+				Options: map[string]any{"allowArray": true, "allowNullish": false},
+				Errors:  invalidType("Invalid type \"(number | undefined)[]\" of template literal expression."),
+			},
+			{
+				Code:    "declare const arg: never[];\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+				Errors:  invalidType("Invalid type \"never[]\" of template literal expression."),
+			},
+			{
+				Code:    "declare const arg: any[];\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true, "allowAny": false},
+				Errors:  invalidType("Invalid type \"any[]\" of template literal expression."),
+			},
+			{
+				Code:    "type Recursive = Recursive[];\ndeclare const arg: Recursive;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+				Errors:  invalidType("Invalid type \"Recursive\" of template literal expression."),
+			},
+			{
+				Code:    "type Left = Right[];\ntype Right = Left[];\ndeclare const arg: Left;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+				Errors:  invalidType("Invalid type \"Left\" of template literal expression."),
+			},
+			{
+				Code:    "class CustomArray extends Array<string> {}\ndeclare const arg: CustomArray;\nconst msg = `arg = ${arg}`;\n",
+				Options: map[string]any{"allowArray": true},
+				Errors:  invalidType("Invalid type \"CustomArray\" of template literal expression."),
+			},
+			{
+				Code:   "class Child extends RegExp {}\ndeclare const arg: Child;\nconst msg = `arg = ${arg}`;\n",
+				Errors: invalidType("Invalid type \"Child\" of template literal expression."),
+			},
+			{
+				Code:   "const arg = new String('value');\nconst msg = `arg = ${arg}`;\n",
+				Errors: invalidType("Invalid type \"String\" of template literal expression."),
+			},
+			{
+				Code:   "declare const arg: unknown;\nconst msg = `arg = ${arg as object}`;\n",
+				Errors: invalidType("Invalid type \"object\" of template literal expression."),
+			},
+			{
+				Code:   "declare const arg: { a: 1 };\nconst msg = `arg = ${arg satisfies object}`;\n",
+				Errors: invalidType("Invalid type \"{ a: 1; }\" of template literal expression."),
+			},
+			{
+				Code:   "declare const arg: object;\nconst msg = `arg = ${(arg)}`;\n",
+				Errors: invalidType("Invalid type \"object\" of template literal expression."),
+			},
+			{
+				Code: "declare const a: object;\ndeclare const b: string;\ndeclare const c: symbol;\nconst msg = `${a} ${b} ${c}`;\n",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalidType", Message: "Invalid type \"object\" of template literal expression."},
+					{MessageId: "invalidType", Message: "Invalid type \"symbol\" of template literal expression."},
 				},
 			},
 		},

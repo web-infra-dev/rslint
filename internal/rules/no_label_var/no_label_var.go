@@ -8,25 +8,23 @@ import (
 
 // https://eslint.org/docs/latest/rules/no-label-var
 //
-// Strategy: hybrid. ESLint's `getVariableByName` walks the scope chain all the
-// way to the global scope, catching both file-local declarations and globals
-// from `env`/`globals`. We approximate it with three complementary checks:
+// ESLint's `getVariableByName` walks the scope chain all the way to the global
+// scope. The same-file binding checks and framework globals view cover those
+// layers without allowing the active TypeScript program to change the result:
 //
 //  1. utils.IsShadowed — fast, works without type info; covers every binding
 //     declared inside the current source file (var/let/const, function, class,
 //     enum, namespace, import, parameter, catch, for-init, function-expression
 //     name, hoisted vars).
-//  2. ctx.Globals — catches names declared via config `languageOptions.globals`
-//     or `/* global foo */` comments, mirroring ESLint's env/globals config.
-//  3. ctx.TypeChecker.GetSymbolsInScope — when type info is available, also
-//     catches globals provided by the tsconfig `lib` (e.g. `window`, `Promise`,
-//     `console`).
-//
-// On a JS file with no tsconfig only steps 1-2 run, so the rule still catches
-// the dominant case (label clashing with a sibling declaration or a declared
-// global).
+//  2. ctx.Refs — resolves binder-owned names in every declaration space at the
+//     label's location, plus value bindings supplied by a file wrapper.
+//  3. The shared default TypeScript type-global set mirrors scope-manager for
+//     TypeScript files without consulting tsconfig libraries.
+//  4. ctx.Globals — catches the selected ECMAScript edition, resolved language
+//     globals, config and inline globals, including explicit `off` overrides.
 var NoLabelVarRule = rule.Rule{
-	Name: "no-label-var",
+	Name:   "no-label-var",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		report := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{
@@ -47,20 +45,29 @@ var NoLabelVarRule = rule.Rule{
 					report(node)
 					return
 				}
-
-				if ctx.Globals[name].IsDeclared() {
+				// scope-manager leaves class type parameters in the lexical scope
+				// chain of static members, while TypeScript's resolver deliberately
+				// hides them there. Preserve the scope-manager answer.
+				if utils.HasEnclosingTypeParameter(node, name) {
+					report(node)
+					return
+				}
+				if ctx.Refs != nil && ctx.Refs.IsNameDefinedInFileWithMeaning(
+					node,
+					name,
+					ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
+				) {
 					report(node)
 					return
 				}
 
-				if ctx.TypeChecker == nil {
+				if !ast.IsInJSFile(node) && rule.IsDefaultTypeScriptTypeGlobal(name) {
+					report(node)
 					return
 				}
-				for _, sym := range ctx.TypeChecker.GetSymbolsInScope(node, ast.SymbolFlagsValue) {
-					if sym != nil && sym.Name == name {
-						report(node)
-						return
-					}
+
+				if ctx.Globals.Access(name).IsDeclared() {
+					report(node)
 				}
 			},
 		}

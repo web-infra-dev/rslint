@@ -35,4 +35,5 @@ if (x > 0) {
 
 ## Original Documentation
 
-- [ESLint no-compare-neg-zero](https://eslint.org/docs/latest/rules/no-compare-neg-zero)
+- [ESLint: no-compare-neg-zero](https://eslint.org/docs/latest/rules/no-compare-neg-zero)
+- [Source code](https://github.com/eslint/eslint/blob/v9.39.1/lib/rules/no-compare-neg-zero.js)

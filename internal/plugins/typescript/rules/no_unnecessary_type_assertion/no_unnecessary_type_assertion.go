@@ -1,9 +1,8 @@
 package no_unnecessary_type_assertion
 
 import (
-	"encoding/json"
+	_ "embed"
 	"slices"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -11,7 +10,11 @@ import (
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+//go:embed no_unnecessary_type_assertion.schema.json
+var schemaJSON []byte
 
 const nullableTypeFlags = checker.TypeFlagsAny |
 	checker.TypeFlagsUnknown |
@@ -42,32 +45,35 @@ func buildUnnecessaryAssertionMessage() rule.RuleMessage {
 
 type NoUnnecessaryTypeAssertionOptions struct {
 	// TODO(port): maybe typeOrValueSpecifier?
-	TypesToIgnore []string `json:"typesToIgnore"`
+	TypesToIgnore []string
 	// Whether to check const assertions on literal values
 	// When true, reports cases like `const foo = 'bar' as const` where the assertion is unnecessary
-	CheckLiteralConstAssertions bool `json:"checkLiteralConstAssertions"`
+	CheckLiteralConstAssertions bool
+}
+
+func parseOptions(options []any) NoUnnecessaryTypeAssertionOptions {
+	opts := NoUnnecessaryTypeAssertionOptions{
+		TypesToIgnore: []string{},
+	}
+	if len(options) == 0 {
+		return opts
+	}
+	optsMap, _ := options[0].(map[string]any)
+	if raw, ok := optsMap["typesToIgnore"].([]any); ok {
+		opts.TypesToIgnore = utils.ToStringSlice(raw)
+	}
+	if value, ok := optsMap["checkLiteralConstAssertions"].(bool); ok {
+		opts.CheckLiteralConstAssertions = value
+	}
+	return opts
 }
 
 var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-type-assertion",
+	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
-		opts := NoUnnecessaryTypeAssertionOptions{}
-		if options != nil {
-			// Try direct type assertion first (for Go tests)
-			if directOpts, ok := options.(NoUnnecessaryTypeAssertionOptions); ok {
-				opts = directOpts
-			} else {
-				// For IPC mode, options come as map[string]interface{}, convert via JSON
-				if jsonBytes, err := json.Marshal(options); err == nil {
-					_ = json.Unmarshal(jsonBytes, &opts)
-				}
-			}
-		}
-		if opts.TypesToIgnore == nil {
-			opts.TypesToIgnore = []string{}
-		}
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
 
 		sourceText := ctx.SourceFile.Text()
 		var fixScanner *scanner.Scanner
@@ -84,7 +90,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			return fixScanner.TokenRange()
 		}
 
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ctx.Program().Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,
@@ -273,7 +279,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 		checkTypeAssertion := func(node *ast.Node) {
 			typeNode := node.Type()
-			if slices.Contains(opts.TypesToIgnore, strings.TrimSpace(sourceText[typeNode.Pos():typeNode.End()])) {
+			if slices.Contains(opts.TypesToIgnore, ecmascript.StringTrim(sourceText[typeNode.Pos():typeNode.End()])) {
 				return
 			}
 

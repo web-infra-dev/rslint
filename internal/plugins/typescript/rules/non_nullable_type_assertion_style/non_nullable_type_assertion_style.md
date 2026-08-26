@@ -22,4 +22,5 @@ const qux = bar as SomeDifferentType;
 
 ## Original Documentation
 
-- [typescript-eslint non-nullable-type-assertion-style](https://typescript-eslint.io/rules/non-nullable-type-assertion-style)
+- [typescript-eslint: non-nullable-type-assertion-style](https://typescript-eslint.io/rules/non-nullable-type-assertion-style)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/non-nullable-type-assertion-style.ts)

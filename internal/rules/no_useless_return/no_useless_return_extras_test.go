@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -43,6 +44,12 @@ func TestNoUselessReturnExtras(t *testing.T) {
 			{Code: `function middleware(req, res, next) { if (!req.user) { res.sendStatus(401); return; } next(); }`},
 			// ---- Real-user: guard clause that is the whole body of the branch ----
 			{Code: `function render(props) { if (!props.visible) return; draw(props); }`},
+			// ---- A `for` whose head has no incrementor leaves the `try` block
+			// with no throwable node, so nothing reaches the `catch` clause ----
+			{Code: `function f() { try { for (var i = 0;;) { break; } return 1; } catch (e) { return; } }`},
+			// ---- The incrementor is laid out where the walk stands, so inside
+			// code nothing reaches it forks nothing either ----
+			{Code: `function f() { throw e; try { for (var i = 0;; i++) { break; } return 1; } catch (e) { return; } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: declaration / container forms — a code path root of every shape the rule can report in ----
@@ -219,6 +226,16 @@ func TestNoUselessReturnExtras(t *testing.T) {
 				Output: []string{`async function load() { try { setBusy(true);  } finally { setBusy(false); } }`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unnecessaryReturn", Line: 1, Column: 46, EndLine: 1, EndColumn: 53},
+				},
+			},
+			// ---- A `for` incrementor inside a `try` block is laid out before
+			// the body, so it is one of the throwable nodes the block forks on
+			// even when the body always leaves the loop abruptly ----
+			{
+				Code:   `function f() { try { for (var i = 0;; i++) { break; } return 1; } catch (e) { return; } }`,
+				Output: []string{`function f() { try { for (var i = 0;; i++) { break; } return 1; } catch (e) {  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 79, EndLine: 1, EndColumn: 86},
 				},
 			},
 			// ---- Real-user: eslint#8026 — the fix must not clash with a no-else-return fix on the same if ----
@@ -432,7 +449,7 @@ function third() { g(); return /* keep */; }`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      program,
+			Program:      lintprogram.NewFromCompiler(program),
 			File:         sourceFile.FileName(),
 			ExcludePaths: []string{},
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {

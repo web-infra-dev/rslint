@@ -29,7 +29,7 @@ function foo(Array) {
 }
 ```
 
-Globals declared through `languageOptions.globals` or a `/* global */` comment carry their own access level: a `readonly` name is reported like a built-in, and a `writable` name may be reassigned — including a built-in whose declaration lifts the default.
+Globals declared through [`languageOptions.globals`](/config/language-options#languageoptionsglobals) or a `/* global */` comment carry their own access level: a `readonly` name is reported like a built-in, and a `writable` name may be reassigned — including a built-in whose declaration lifts the default. The environment maps exported as `globals` from `@rslint/core` use `false` for read-only names and `true` for writable names, so they feed the same access checks directly.
 
 Examples of **incorrect** code with `globals: { BUILD_ID: 'readonly' }`:
 
@@ -55,4 +55,5 @@ This rule accepts an optional object with an `exceptions` property, which is an 
 
 ## Original Documentation
 
-- [ESLint no-global-assign](https://eslint.org/docs/latest/rules/no-global-assign)
+- [ESLint: no-global-assign](https://eslint.org/docs/latest/rules/no-global-assign)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-global-assign.js)

@@ -1,9 +1,14 @@
 package no_return_assign
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+//go:embed no_return_assign.schema.json
+var schemaJSON []byte
 
 // isSentinel mirrors ESLint's SENTINEL_TYPE regex
 // (/^(?:[a-zA-Z]+?Statement|ArrowFunctionExpression|FunctionExpression|ClassExpression)$/):
@@ -20,29 +25,22 @@ func isSentinel(node *ast.Node) bool {
 }
 
 // parseMode extracts the rule mode: "except-parens" (default) or "always".
-// Options come in as a raw string (Go tests) or a []interface{} holding the
-// string at index 0 (JS tests, ESLint option-array convention).
-func parseMode(options any) string {
-	switch v := options.(type) {
-	case string:
-		if v != "" {
-			return v
-		}
-	case []interface{}:
-		if len(v) > 0 {
-			if s, ok := v[0].(string); ok && s != "" {
-				return s
-			}
-		}
+func parseMode(options []any) string {
+	mode := "except-parens"
+	if len(options) == 0 {
+		return mode
 	}
-	return "except-parens"
+	if s, ok := options[0].(string); ok {
+		mode = s
+	}
+	return mode
 }
 
 // https://eslint.org/docs/latest/rules/no-return-assign
 var NoReturnAssignRule = rule.Rule{
-	Name: "no-return-assign",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-return-assign",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		always := parseMode(options) == "always"
 
 		return rule.RuleListeners{

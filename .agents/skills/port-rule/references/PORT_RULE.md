@@ -14,9 +14,9 @@ Your job is porting the **rule's semantics** — given equivalent input, produce
 - `parserOptions.sourceType` override / `parserOptions.ecmaFeatures.*`
 - `env: 'browser' | 'node' | ...`
 
-Note: `languageOptions.globals` and `/*global ...*/` comments are automatically parsed by rslint and exposed through `ctx.Globals`, a `map[string]utils.GlobalAccess` holding ESLint's three access levels. When porting rules that reference global variables, do not skip these test cases; index the map instead — its zero value, `utils.GlobalAccessUnset`, means neither source mentioned the name, so a missing entry falls through to whatever the rule already knows (e.g. `utils.IsECMAScriptGlobal`). Use `ctx.Globals[name] == utils.GlobalAccessOff` for "the name was explicitly un-declared", `ctx.Globals[name].IsDeclared()` for "the name resolves to a global", and `.IsWritable()` where ESLint distinguishes assignable globals (as `no-global-assign` does). Test cases author these the way an ESLint config does: `Globals: map[string]any{"foo": "readonly"}`.
+Note: rslint combines the ECMAScript globals selected by `languageOptions.ecmaVersion` (default `"latest"`), config `languageOptions.globals`, and `/*global ...*/` comments in the immutable `ctx.Globals` view. When porting a rule that resolves global variables, do not skip these cases or keep a private language-global table: use `ctx.Globals.Access(name)` for the final access after language < config < inline precedence. Use `ctx.Globals.Override(name)` only when upstream distinguishes an explicitly authored setting from an implicit language global; the narrower `LanguageAccess`, `ConfigOverride`, and `ConfiguredAccess` methods are for rules whose upstream behavior genuinely depends on provenance. `InlineDeclarations()` provides ordered comment ranges. Test cases author config globals as `Globals: map[string]any{"foo": "readonly"}` and select a version with `LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}`. Access values support `IsDeclared()` and `IsWritable()`; an explicit `off` is not declared.
 
-Note: ESLint's scope manager (`sourceCode.getScope()`, `variable.references`) has no direct equivalent, but the common case — "every identifier that references this declared symbol" — is served by `ctx.Refs.References(sym)`, a lazily built per-file reference index keyed by binder symbols (`decl.Symbol()`). The reverse direction — "what symbol does this identifier resolve to" — is `ctx.Refs.Resolve(node)`: it tries the binder scope walk first (never touches the checker for a same-file symbol) and falls back to the checker automatically for globals/ambient/cross-file symbols the binder can't place, at the cost of a round-trip for that identifier. Use it instead of walking the AST and calling `ctx.TypeChecker.GetSymbolAtLocation` per identifier, which is a known performance killer — and never hand-roll a "try ctx.Refs, fall back to the checker" wrapper, since `Resolve` already is one. See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for semantics and the nil guard.
+Note: ESLint's scope manager (`sourceCode.getScope()`, `variable.references`) has no direct equivalent, but the common case — "every identifier that references this declared symbol" — is served by `ctx.Refs.References(sym)`, a lazily built per-file reference index keyed by binder symbols (`decl.Symbol()`). The reverse direction — "what symbol does this identifier resolve to" — is `ctx.Refs.Resolve(node)`: it tries the binder scope walk first and falls back to the checker for globals/ambient/cross-file symbols the binder can't place. Use `ctx.Refs.ResolveInFile(node)` instead when an ESLint scope rule must deliberately exclude TypeScript lib, ambient, and cross-file declarations (as core `no-undef` does). Never hand-roll a "try ctx.Refs, fall back to the checker" wrapper or walk the AST while calling `ctx.TypeChecker.GetSymbolAtLocation` per identifier. See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for semantics and the nil guard.
 
 Note: every comment in the file is exposed lazily through `ctx.Comments.All()` as a source-ordered, deduplicated `[]*ast.CommentRange`. If your rule needs to scan all comments (directive comments, "is this line comment-only", etc.), iterate that shared slice — do **not** call `utils.ForEachComment(ctx.SourceFile.AsNode(), ...)`, which re-walks the entire token tree from scratch. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#token-and-comment-iteration) for the full comment-handling API and when each function is appropriate.
 
@@ -54,7 +54,7 @@ Three principles follow — internalize them before writing a single test case:
 
 **Coverage bar.** The point of layers 2 + 3 is to prove the Go/tsgo port stays aligned where it structurally diverges from upstream's ESTree implementation — so the bar is _what they cover_, not how many cases they add up to. There is no case-count target. Concretely: every applicable Dimension 4 edge shape and ≥2 real-user shapes from the issue tracker (Phase 1 Step 4), plus every reachable branch locked in (Phase 1 Step 5). A near-empty `_extras_test.go` — or worse, none at all — is a reliable smell that Phase 1 Steps 4 and 5 were skipped: re-walk them before submitting. Phase 4 Step 6's per-layer checkboxes are what enforce this.
 
-**JS tests are not a coverage layer — do not split them.** The three-layer model and the `_upstream_*` / `_extras_*` file split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` exists for a different purpose: it spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape end-to-end. That contract is input-independent — running it against more cases doesn't verify it any better. So:
+**JS tests are not a coverage layer — do not split them.** The three-layer model and the `_upstream_*` / `_extras_*` file split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` exists for a different purpose: it spawns the compiled binary over IPC and verifies catalog inclusion + wire protocol + ESLint-compatible diagnostic shape end-to-end. That contract is input-independent — running it against more cases doesn't verify it any better. So:
 
 - **JS mirrors Layer 1 only** (upstream `valid` / `invalid` cases). Layers 2 and 3 stay in Go.
 - A JS file far smaller than the Go suite — sometimes by 10× or more, depending on whether upstream uses fixture files — is the **expected** state, not "JS is under-tested." The semantic check is "every JS-asserted behavior also has a Go-upstream case"; literal case-count parity is **not** required (see Phase 4 Step 5).
@@ -64,11 +64,11 @@ Three principles follow — internalize them before writing a single test case:
 
 ## Related Documents
 
-| Document                                 | Description                                                         |
-| ---------------------------------------- | ------------------------------------------------------------------- |
-| [AST_PATTERNS.md](AST_PATTERNS.md)       | AST traversal patterns, listeners, TypeChecker, reporting functions |
-| [UTILS_REFERENCE.md](UTILS_REFERENCE.md) | Utility functions in `internal/utils/`                              |
-| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands cheatsheet, file locations, naming conventions, checklist  |
+| Document                                 | Description                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| [AST_PATTERNS.md](AST_PATTERNS.md)       | AST traversal, Program/module services, TypeChecker, and reporting |
+| [UTILS_REFERENCE.md](UTILS_REFERENCE.md) | Utility functions in `internal/utils/`                             |
+| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands cheatsheet, file locations, naming conventions, checklist |
 
 ---
 
@@ -78,16 +78,21 @@ Before starting, familiarize yourself with these key source locations:
 
 ### Core Infrastructure
 
-| File/Directory                        | Description                                                                                                                                                |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `internal/rule/rule.go`               | **Core rule interface** - `Rule` and `RuleListeners`                                                                                                       |
-| `internal/rule/context.go`            | `RuleContext`, edit demand, and diagnostic reporting APIs                                                                                                  |
-| `internal/rule/diagnostic.go`         | `RuleMessage`, `RuleFix`, `RuleSuggestion`, and fix helpers                                                                                                |
-| `internal/rule/ref_store.go`          | Lazy per-file reference index exposed as `ctx.Refs`                                                                                                        |
-| `internal/rule/comment_store.go`      | Lazy canonical comment list exposed as `ctx.Comments`                                                                                                      |
-| `internal/rule/disable_manager.go`    | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                                                    |
-| `internal/config/config.go`           | Registration orchestration and config loading. Per-rule registration data lives in each group's `all.go` — see Phase 3 Step 4 for where to add a new rule. |
-| `internal/rule_tester/rule_tester.go` | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                                                    |
+| File/Directory                          | Description                                                                                        |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `internal/rule/rule.go`                 | **Core rule interface** - `Rule` and `RuleListeners`                                               |
+| `internal/rule/configured.go`           | Enabled `ConfiguredRule` descriptors, shared `RuleEnvironment`, and type-aware filtering           |
+| `internal/rule/context.go`              | `RuleContext`, edit demand, and diagnostic reporting APIs                                          |
+| `internal/rule/diagnostic.go`           | `RuleMessage`, `RuleFix`, `RuleSuggestion`, and fix helpers                                        |
+| `internal/rule/ref_store.go`            | Lazy per-file reference index exposed as `ctx.Refs`                                                |
+| `internal/rule/comment_store.go`        | Lazy canonical comment list exposed as `ctx.Comments`                                              |
+| `internal/rule/disable_manager.go`      | Logic for handling `// rslint-disable` and `// eslint-disable` comments                            |
+| `internal/program/program.go`           | Unified source-generation facade exposed through `ctx.Program()`                                   |
+| `internal/program/module_graph.go`      | Generic module-reference syntax and resolution index exposed by `Program.ModuleGraph()`            |
+| `internal/program/module_resolution.go` | Program-owned module resolution for one source/specifier pair                                      |
+| `internal/config/config.go`             | Configuration models and validation; concrete rule composition remains outside the config package. |
+| `internal/rules/all.go`                 | Final aggregation of core and plugin `all.go` sources into the shared immutable Go rule catalog.   |
+| `internal/rule_tester/rule_tester.go`   | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                            |
 
 ### AST & Type System
 
@@ -157,19 +162,21 @@ Before starting, familiarize yourself with these key source locations:
    - **Priority**: If the user provides an official link, **FIRST** read and analyze that link's content.
    - **Fallback**: If no link is provided, search for the rule documentation (ESLint website or Plugin repo) and source code (GitHub).
    - Find the rule test file (usually `tests/lib/rules/<rule>.js`).
+   - **Source from the latest released tag, not the default branch.** Do not read the rule's behavior off `main`/`master`/HEAD — it may contain half-finished or unreleased changes. Find the upstream project's latest release tag and read the rule's doc/source/tests as they exist at that tag; note the tag, since Phase 2 Step 3 pins the rule doc's links to it — the only record of which upstream version the port targets.
+   - **If the rule (or the specific behavior/option being requested) doesn't exist yet at the latest released tag** — only on the default branch, or in an unpublished PR — stop and tell the user instead of porting it anyway. Don't silently port pre-release behavior just because the user's request didn't mention this.
 
 2. **Determine Rule Origin & Deprecation Status**:
 
    Some rules exist in both core ESLint and typescript-eslint. Before implementing, determine the canonical source:
 
-   | Scenario                                                                         | Registration                                | Test Location                    | Rule Wrapper        |
+   | Scenario                                                                         | Catalog key                                 | Test Location                    | Rule Wrapper        |
    | -------------------------------------------------------------------------------- | ------------------------------------------- | -------------------------------- | ------------------- |
    | **Core ESLint only** (e.g., `no-debugger`)                                       | `"no-debugger"`                             | `tests/eslint/rules/`            | `rule.Rule{}`       |
    | **typescript-eslint only** (e.g., `await-thenable`)                              | `"@typescript-eslint/await-thenable"`       | `tests/typescript-eslint/rules/` | `rule.CreateRule()` |
    | **typescript-eslint extends core** (active, e.g., `no-array-constructor`)        | `"@typescript-eslint/no-array-constructor"` | `tests/typescript-eslint/rules/` | `rule.CreateRule()` |
    | **typescript-eslint deprecated in favor of core** (e.g., `no-loss-of-precision`) | `"no-loss-of-precision"`                    | `tests/eslint/rules/`            | `rule.Rule{}`       |
 
-   **How to check**: Visit the typescript-eslint rule page. If it shows a deprecation notice like _"use the base ESLint rule instead"_, treat it as a **core ESLint rule** — do NOT register with `@typescript-eslint/` prefix.
+   **How to check**: Visit the typescript-eslint rule page. If it shows a deprecation notice like _"use the base ESLint rule instead"_, treat it as a **core ESLint rule** — do NOT use the `@typescript-eslint/` prefix.
 
 3. **Collect Test Cases — Layer 1 (baseline migration)**:
 
@@ -266,6 +273,23 @@ Before starting, familiarize yourself with these key source locations:
    1. **Rule documentation** (or [AST_PATTERNS.md](AST_PATTERNS.md) if the quirk is general, not rule-specific): note the divergence under "Differences from ESLint" / the relevant AST-shape section.
    2. **Test cases**: Lock the current behavior in with a test — typically the ESLint-fails-but-we-pass case stays on the `valid` side with a comment pointing at the underlying quirk, so the behavior can't flip silently.
 
+7. **Identify How the Rule Reads Patterns**:
+
+   If the rule accepts a regexp or a glob — in a rule option, or read out of the source under lint — find the library upstream reads it with. Check the rule's own imports and the plugin's `package.json`, and note the **major version**. Go's standard library and general-purpose glob packages answer differently, so the port has a matching package for each:
+
+   | Upstream reads the pattern with       | Use in the port                                             |
+   | ------------------------------------- | ----------------------------------------------------------- |
+   | a regexp literal or `new RegExp(...)` | `utils/ecmascript/regexp`, imported as `esregexp`           |
+   | `minimatch` at `^3.x`                 | `utils/minimatch3`                                          |
+   | `is-glob`                             | `utils/isglob`                                              |
+   | any other glob package                | **not supported — stop and report to the user (see below)** |
+
+   `depguard` denies `regexp2`, `doublestar` and the standard library's `unicode` under `internal/rules/**` and `internal/plugins/**`, and `forbidigo` denies `strings.ToLower`, `strings.ToUpper` and `strings.TrimSpace` there, so a rule cannot reach past these by accident. Trimming, blankness, casing, character categories and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
+
+   The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks, because RE2 refuses syntax JavaScript accepts and the caller usually swallows the compile error.
+
+   **Only minimatch 3 and is-glob are ported. If the rule reads globs with anything else, stop and report that to the user before writing the port** — do not substitute `minimatch3` or `doublestar` and carry on, and do not port a new glob package on your own initiative. `minimatch@10` is the one to expect: ESLint moved to it for its own flat-config `files`/`ignores` and a plugin may follow, but only the 3.x reading is ported, because that is what the plugin ecosystem pins. `minimatch3` differs from 10 on POSIX character classes; `doublestar` differs on 13 of 37 sampled patterns, and not only on extended glob syntax — `src/**` matches `src` itself under doublestar but not under minimatch, and a leading `!` is a literal rather than a negation. Report which package and version the rule needs and which of its patterns would be misread; the user decides whether to port it, accept a documented divergence, or skip the rule.
+
 ---
 
 ## Phase 2: Implementation (Go)
@@ -323,19 +347,36 @@ grep -rn "^func [a-z]" internal/rules/
 
 If ≥1 rule in the same plugin already defines a near-equivalent helper, you MUST extract the shared helper to `internal/plugins/<plugin>/<plugin>util/` (or an existing shared package) BEFORE adding your new rule. No second copy. This is a hard rule — see _Helper Extraction_ below for the override criterion.
 
-**Check for reusable `internal/utils/` helpers** (SECOND): Before writing any helper function, grep `internal/utils/` for an existing one. Helpful prefixes to search:
+**Use Program capabilities for source-generation questions** (SECOND): before
+adding a helper for filesystem, package scope, source lookup, module resolution,
+or module references, inspect `internal/program/`. Rules receive the same
+backend-neutral facade through `ctx.Program()` in CLI, API, and LSP modes.
+
+- Resolve one specifier with `ctx.Program().ResolveModule(ctx.SourceFile, specifier)`.
+- Enumerate generic import/export/dynamic-import/require/AMD references with
+  `ctx.Program().ModuleGraph().References(file, kinds)`.
+- Cache a rule-specific, configuration-complete index with
+  `rule.CachedByProgram(ctx, key, build)`.
+- Keep rule semantics such as ignored paths, cycle depth, SCCs, and reporting
+  policy in the rule or its plugin helper. `Program.ModuleGraph` reports source
+  facts; it does not decide what a rule considers an edge.
+
+Never branch on how a Program was constructed, recover a raw compiler Program,
+add a parallel runtime/context field, or recreate module resolution under
+`internal/utils`.
+
+**Check for reusable `internal/utils/` helpers** (THIRD): Before writing any helper function, grep `internal/utils/` for an existing one. Helpful prefixes to search:
 
 - `IsSpecific*`, `IsArgument*` — well-known API-call recognition (`Object.defineProperty`-style, member-access patterns, nth-argument-of)
 - `GetStatic*`, `Normalize*` — property-name / literal-value normalization (e.g. `GetStaticPropertyName`, `NormalizeNumericLiteral`, `NormalizeBigIntLiteral`)
 - `AreNodes*`, `IsSame*` — structural / reference AST comparison
 - `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
 - `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries. For "all references to this declared symbol" use `ctx.Refs.References(decl.Symbol())`, and for "what does this identifier resolve to" use `ctx.Refs.Resolve(node)`, which also resolves symbols declared outside this file (globals/ambient/cross-file) via its checker fallback — never a hand-rolled AST walk with `GetSymbolAtLocation` per identifier (see [AST_PATTERNS.md — Resolving Identifiers and Collecting References](AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs))
-- `GetOptionsMap` — options parsing (handles both array and map inputs)
 - **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
 
 See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
 
-**Check for reusable shim utilities** (THIRD): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
+**Check for reusable shim utilities** (FOURTH): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
 
 - `shim/scanner/` — `SkipTrivia` (skip whitespace/comments to find next token position), `GetScannerForSourceFile`, `GetSourceTextOfNodeFromSourceFile` (raw source text — useful when an AST node's `.Text` field has been normalized at parse time)
 - `shim/ast/` — `GetThisContainer`, `IsFunctionLike`, `IsFunctionLikeDeclaration`, `SkipParentheses`, `IsOptionalChain`, and other AST utilities
@@ -383,7 +424,7 @@ var MyCoreRule = rule.Rule{
 - Each callback receives a `*ast.Node` and reports diagnostics through `RuleContext`; reports with optional edits use the deferred methods
 - Options parsing happens inside the `Run` function before returning listeners
 - Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
-- **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. This tells the linter to skip the rule on files without a type checker, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
+- **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. The planner admits it only when the unified Program can provide a checker for that file, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
 - **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
 
 **AST Shim API Warning**: In `github.com/microsoft/typescript-go/shim/ast`:
@@ -407,7 +448,7 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). Write `parseOptions` to take that slice directly and extract the first element's map with `utils.GetOptionsMap()`:
+`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). The framework normalizes options before calling the rule, so write `parseOptions` to take that slice directly, guard its length, and read the first positional option from `options[0]`:
 
 ```go
 Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -417,17 +458,20 @@ Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 func parseOptions(options []any) Options {
     opts := Options{/* defaults */}
-    optsMap := utils.GetOptionsMap(options)
-    if optsMap != nil {
-        // Parse options from optsMap...
+    if len(options) == 0 {
+        return opts
+    }
+    optsMap, _ := options[0].(map[string]any)
+    if value, ok := optsMap["someOption"].(bool); ok {
+        opts.SomeOption = value
     }
     return opts
 }
 ```
 
-`GetOptionsMap` is the only safe extractor — do not reimplement it with a hand-rolled `options[0].(map[string]interface{})` type assertion.
+Do not call `rule.NormalizeOptions` inside `Run` or make `parseOptions` accept a bare map. Configuration loading and `rule_tester.ResolveTestCaseOptions` already normalize inputs to `[]any`; the rule should consume that single representation.
 
-For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...) instead of using `GetOptionsMap`.
+For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...), guarding each position with the corresponding length check before access.
 
 #### Options schema
 
@@ -468,7 +512,10 @@ Before moving on, walk through each check. Each one targets a class of AST-shape
 
 ### Helper Extraction
 
-After Step 2 is done, review each helper for extraction to `internal/utils/`:
+After Step 2 is done, review each helper for extraction. Cross-file source and
+module infrastructure belongs to `internal/program`; plugin-specific shared
+semantics belong to `<plugin>util/`; only general AST/type helpers belong to
+`internal/utils/`.
 
 **Extract if all hold:**
 
@@ -522,6 +569,27 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 [Link to ESLint documentation]
 ````
 
+**Pin the upstream version** — this is how rslint records which upstream release a rule's _behavior_ was ported/verified against, since nothing else in the repo does.
+
+- **Source code link**: always required, always a `github.com/.../blob/<tag>/...` link pinned to the exact released tag you read while porting — never `main`/`master`/`HEAD`.
+- **Doc link**: text is always `<Family/Plugin name>: <rule-name>` (e.g. `eslint-plugin-unicorn: no-thenable`, `ESLint: no-console`, `typescript-eslint: await-thenable`) — colon included, regardless of family. If the docs are plain markdown files in the project's GitHub repo (`eslint-plugin-unicorn`, `-react`, `-jsx-a11y`, `-jest`, `-promise`, `-import`, ...), pin the URL to the same tag as the source link. If the docs live on a custom website (`eslint.org`, `typescript-eslint.io`, `react.dev`, ...), the URL itself can't be pinned to a release — leave it as the plain rule-page URL.
+
+```markdown
+## Original Documentation
+
+- [eslint-plugin-unicorn: no-thenable](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/docs/rules/no-thenable.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/rules/no-thenable.js)
+```
+
+```markdown
+## Original Documentation
+
+- [ESLint: no-console](https://eslint.org/docs/latest/rules/no-console)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.0/lib/rules/no-console.js)
+```
+
+If a later change re-verifies a rule against a newer upstream release, bumping the pinned tag(s) is the entire re-alignment record — do it once the rule's behavior has actually been checked against the newer release, not preemptively.
+
 **Options in examples**: when a code block demonstrates a specific option combination, precede the `javascript` block with a standalone `json` block containing the rule's config entry — shape: `{ "<rule-name>": ["error", { ...options... }] }`. Let prettier format it (single-line when short, multi-line when the options list grows). Keep the `javascript` block pure source code (no annotations). Do **not** wrap the config entry in a `"rules": { ... }` object (redundant here) and do **not** copy upstream linter directives such as `/* eslint <rule>: [...] */` into the examples.
 
 **Writing a "Differences from ESLint" section** (when the rule has one):
@@ -562,12 +630,12 @@ These docstrings are how a reader (or `grep`) confirms a file is doing its assig
 - Use `rule_tester.RunRuleTester` in each test file (one `Test<Name>` function per file is typical; multiple are fine when it improves grouping).
 - Shared fixtures (option-map literals, expected message strings) can live as package-level vars; both files share the same Go package so they compose freely.
 - Invalid cases **MUST** include `Line` and `Column` assertions.
-- Use `map[string]interface{}` to pass options in Go tests.
+- Use `map[string]any` to pass object options in Go tests.
 - Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`.
 
-**Options coverage — MUST exercise the JSON path.** Passing a typed struct directly (e.g. `Options: MyRuleOptions{CheckX: utils.Ref(true)}`) short-circuits the `options.(MyRuleOptions)` type assertion and never exercises `utils.GetOptionsMap` or JSON round-trip. CLI and JS configs always take the JSON path, so a struct-only suite leaves the CLI-facing wiring untested.
+**Options coverage — MUST exercise JSON-decoded shapes.** `rule_tester.ResolveTestCaseOptions` normalizes each test case's options to `[]any` and validates them against the rule's schema before `Run` executes. Use JSON-shaped maps and slices in tests; a typed options struct does not model configuration input and will be rejected by an object schema.
 
-For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field is `map[string]interface{}{...}` (bare object — matches the single-option CLI shape) or `[]interface{}{map[string]interface{}{...}}` (array-wrapped — matches the multi-element / rule_tester shape). This catches bugs like missing `GetOptionsMap` integration, wrong JSON tag casing, and option-name typos that typed structs silently hide. See `no_floating_promises_test.go → TestNoFloatingPromisesOptionParsing` for a reference suite covering both shapes, nil options, empty arrays, malformed values, and nested specifier arrays.
+For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field uses JSON-shaped values. For a single object option, prefer `map[string]any{...}`; use `[]any{...}` when the rule genuinely has multiple positional options. Both forms reach `Run` as a normalized `[]any`, so do not duplicate a single-object case solely to test bare versus array-wrapped input. These cases catch missing `len(options)` / `options[0]` parsing, wrong key casing, and option-name typos.
 
 **Debug Flags**:
 
@@ -651,7 +719,7 @@ Assert that diagnostic count, message, and range are identical in all four modes
 
 ### Step 2: Add JS Tests
 
-**Purpose & scope.** The JS suite is **not** a duplicate of the Go suite. It spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape — a contract that is input-independent. So the JS file **mirrors Layer 1 only** (the upstream `valid` / `invalid` cases). Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) live exclusively in `<rule>_extras_test.go` on the Go side and **must not** be copied into the JS file. See [Testing Philosophy](#testing-philosophy) for the rationale.
+**Purpose & scope.** The JS suite is **not** a duplicate of the Go suite. It spawns the compiled binary over IPC and verifies catalog inclusion + wire protocol + ESLint-compatible diagnostic shape — a contract that is input-independent. So the JS file **mirrors Layer 1 only** (the upstream `valid` / `invalid` cases). Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) live exclusively in `<rule>_extras_test.go` on the Go side and **must not** be copied into the JS file. See [Testing Philosophy](#testing-philosophy) for the rationale.
 
 **Practical rule:** the JS file should assert exactly the upstream `valid` / `invalid` semantic set — nothing less, nothing more. Case **counts** between JS and `<rule>_upstream_test.go` may legitimately differ (one side may inline what the other folds into a fixture file); the contract is semantic-subset equivalence, not numeric parity. If you find yourself reaching for a tsgo-specific edge shape, a Dimension 4 row, a branch lock-in, or a GitHub-issue real-user shape while writing the JS file — stop. Those belong in Go extras.
 
@@ -675,25 +743,25 @@ Assert that diagnostic count, message, and range are identical in all four modes
 
 Add the new test file path to the `include` array.
 
-### Step 4: Register Rule
+### Step 4: Include Rule in the Catalog
 
 **Where to add depends on rule type** (determined by Phase 1 Step 2):
 
-| Rule type                                              | File to edit                         | What to add                                                                |
-| ------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------- |
-| Core ESLint (incl. deprecated typescript-eslint rules) | `internal/rules/all.go`              | Import the rule package; append `package.RuleNameRule` to `GetAllRules()`. |
-| typescript-eslint (active)                             | `internal/plugins/typescript/all.go` | Same — append to that plugin's `GetAllRules()`.                            |
-| Other plugins (react, jest, import, jsx-a11y, …)       | `internal/plugins/<plugin>/all.go`   | Same.                                                                      |
+| Rule type                                              | File to edit                         | What to add                                                              |
+| ------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------ |
+| Core ESLint (incl. deprecated typescript-eslint rules) | `internal/rules/all.go`              | Import the rule package; append `package.RuleNameRule` to `coreRules()`. |
+| typescript-eslint (active)                             | `internal/plugins/typescript/all.go` | Same — append to that plugin's `GetAllRules()`.                          |
+| Other plugins (react, jest, import, jsx-a11y, …)       | `internal/plugins/<plugin>/all.go`   | Same.                                                                    |
 
-Each `all.go` exports a `GetAllRules() []rule.Rule` slice. `RegisterAllRules()` in `internal/config/config.go` iterates each slice and calls `GlobalRuleRegistry.Register(rule.Name, rule)` — **do not edit `config.go` for a new rule**.
+Each plugin `all.go` exports `GetAllRules() []rule.Rule`; core rules use `coreRules()` in `internal/rules/all.go`. `rules.All()` assembles those sources into the shared immutable catalog — **do not edit `internal/config` for a new rule**.
 
-**Registration key vs `rule.Name` must match** — the registrar uses `rule.Name` as the key. How that key is produced depends on the rule wrapper:
+**Catalog key vs `rule.Name` must match** — catalog construction uses `rule.Name` as the key. How that key is produced depends on the rule wrapper:
 
-- **Core rule** — `rule.Rule{Name: "no-debugger", ...}` registers as `"no-debugger"`.
-- **typescript-eslint rule** — `rule.CreateRule(rule.Rule{Name: "no-shadow", ...})` registers as `"@typescript-eslint/no-shadow"`. The factory auto-prefixes; **only** use it for `@typescript-eslint/` rules — using it on a core or other-plugin rule will silently mis-register the rule key.
+- **Core rule** — `rule.Rule{Name: "no-debugger", ...}` appears as `"no-debugger"`.
+- **typescript-eslint rule** — `rule.CreateRule(rule.Rule{Name: "no-shadow", ...})` appears as `"@typescript-eslint/no-shadow"`. The factory auto-prefixes; **only** use it for `@typescript-eslint/` rules — using it on a core or other-plugin rule will silently produce the wrong key.
 - **Other plugins** — `rule.Rule{Name: "react/jsx-key", ...}` — the prefix is part of the literal `Name`, no factory.
 
-**Do NOT register a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status.
+**Do NOT include a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status.
 
 ---
 
@@ -746,7 +814,7 @@ Follow this **strict order** — each step depends on the previous one:
 5. **Verify Go ↔ JS Alignment** (asymmetric — JS is a Layer-1 semantic subset of Go):
 
    The two suites have asymmetric roles (see [Testing Philosophy](#testing-philosophy) and Phase 3 Step 2):
-   - **JS suite** = Layer 1 mirror only. It exists to verify the binary, registration, and wire protocol — not rule logic.
+   - **JS suite** = Layer 1 mirror only. It exists to verify the binary, catalog inclusion, and wire protocol — not rule logic.
    - **Go suite** = Layer 1 + Layer 2 + Layer 3 (full coverage). It is the source of truth for rule behavior.
 
    Two checks:
@@ -1016,7 +1084,7 @@ For complex rules (rules involving scope tracking, autofix, or many configuratio
 If JS tests fail with 0 diagnostics found:
 
 1. **Did you rebuild the binary?** Run `cd packages/rslint && pnpm run build:bin`
-2. **Is the rule registered?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `GetAllRules()` are present.
+2. **Is the rule catalogued?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `coreRules()` or the plugin's `GetAllRules()` are present.
 3. **Are test files included?** Check `rstest.config.mts`
 4. **Is the test-dir `rslint.config.mjs` configured?** Ensure the plugin is listed and the rule is enabled
 5. **Debug Mode**: Use `fmt.Fprintf(os.Stderr, "DEBUG: ...")` in Go code

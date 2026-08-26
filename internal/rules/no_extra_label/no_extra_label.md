@@ -56,4 +56,5 @@ This rule has no options.
 
 ## Original Documentation
 
-- [ESLint rule: no-extra-label](https://eslint.org/docs/latest/rules/no-extra-label)
+- [ESLint: no-extra-label](https://eslint.org/docs/latest/rules/no-extra-label)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-extra-label.js)

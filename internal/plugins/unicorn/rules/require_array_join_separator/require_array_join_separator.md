@@ -21,4 +21,5 @@ const arrayLikeString = Array.prototype.join.call(arrayLike, '');
 
 ## Original Documentation
 
-- [eslint-plugin-unicorn require-array-join-separator](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/require-array-join-separator.md)
+- [eslint-plugin-unicorn: require-array-join-separator](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/require-array-join-separator.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/rules/require-array-join-separator.js)

@@ -73,11 +73,11 @@ func TestUseIsNaNRule(t *testing.T) {
 			// ── switch: enforceForSwitchCase: false ──
 			{
 				Code:    `switch(NaN) { case foo: break; }`,
-				Options: map[string]interface{}{"enforceForSwitchCase": false},
+				Options: []any{map[string]interface{}{"enforceForSwitchCase": false}},
 			},
 			{
 				Code:    `switch(foo) { case NaN: break; }`,
-				Options: map[string]interface{}{"enforceForSwitchCase": false},
+				Options: []any{map[string]interface{}{"enforceForSwitchCase": false}},
 			},
 
 			// ── switch: valid discriminant ──
@@ -106,83 +106,83 @@ func TestUseIsNaNRule(t *testing.T) {
 			// ── indexOf: enforceForIndexOf=true, valid ──
 			{
 				Code:    `foo.indexOf(bar)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.lastIndexOf(bar)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.indexOf(NaN, 0, extra)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.lastIndexOf(NaN, 0, extra)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.indexOf(a, NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.indexOf()`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.indexOf(Nan)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.indexOf((NaN, 1))`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.indexOf((Number.NaN, 1))`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 
 			// ── indexOf: nested comma is NOT resolved (matches ESLint) ──
 			{
 				Code:    `foo.indexOf((a, (b, NaN)))`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 
 			// ── indexOf: not a method call ──
 			{
 				Code:    `indexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `lastIndexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 
 			// ── indexOf: case-sensitive / wrong method ──
 			{
 				Code:    `foo.IndexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 			{
 				Code:    `foo.bar(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 
 			// ── indexOf: computed with identifier (not string literal) ──
 			{
 				Code:    `foo[indexOf](NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 
 			// ── indexOf: new expression ──
 			{
 				Code:    `new foo.indexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 
 			// ── indexOf: indirect call ──
 			{
 				Code:    `foo.indexOf.call(arr, NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 			},
 		},
 		// Invalid cases
@@ -488,82 +488,82 @@ x === NaN;`,
 			// ════════════════════════════════════════
 			{
 				Code:    `foo.indexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.lastIndexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo['indexOf'](NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo['lastIndexOf'](NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    "foo[`indexOf`](NaN)",
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    "foo[`lastIndexOf`](NaN)",
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo?.indexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo?.lastIndexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf?.(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo?.indexOf?.(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `(foo?.indexOf)(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `((foo.indexOf))(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo().indexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.bar.indexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.bar.baz.lastIndexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `(a || b).indexOf(NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 
@@ -572,57 +572,57 @@ x === NaN;`,
 			// ════════════════════════════════════════
 			{
 				Code:    `foo.indexOf(Number.NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf(Number['NaN'])`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf(Number?.NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf((a, NaN))`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf((a, Number.NaN))`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf((NaN))`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf(NaN, 1)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf(NaN, b)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.lastIndexOf(NaN, NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.indexOf(Number.NaN, 1)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 			{
 				Code:    `foo.lastIndexOf(Number.NaN)`,
-				Options: map[string]interface{}{"enforceForIndexOf": true},
+				Options: []any{map[string]interface{}{"enforceForIndexOf": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "indexOfNaN", Line: 1, Column: 1}},
 			},
 

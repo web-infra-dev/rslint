@@ -28,4 +28,5 @@ Examples of **correct** code for this rule:
 
 ## Original Documentation
 
-- [react/jsx-closing-tag-location](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-closing-tag-location.md)
+- [eslint-plugin-react: jsx-closing-tag-location](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-closing-tag-location.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/jsx-closing-tag-location.js)

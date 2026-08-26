@@ -24,4 +24,5 @@ const c: (string | number)[] = [];
 
 ## Original Documentation
 
-- [typescript-eslint array-type](https://typescript-eslint.io/rules/array-type)
+- [typescript-eslint: array-type](https://typescript-eslint.io/rules/array-type)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.39.0/packages/eslint-plugin/src/rules/array-type.ts)

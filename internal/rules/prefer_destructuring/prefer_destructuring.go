@@ -83,12 +83,16 @@ func preferDestructuringMessage(kind string) rule.RuleMessage {
 	}
 }
 
-func identifierName(node *ast.Node) string {
-	if node == nil {
-		return ""
+func skipParentheses(node *ast.Node) *ast.Node {
+	if node != nil && node.Kind == ast.KindParenthesizedExpression {
+		return ast.SkipParentheses(node)
 	}
-	node = ast.SkipParentheses(node)
-	if !ast.IsIdentifier(node) {
+	return node
+}
+
+func identifierName(node *ast.Node) string {
+	node = skipParentheses(node)
+	if node == nil || node.Kind != ast.KindIdentifier {
 		return ""
 	}
 	return node.AsIdentifier().Text
@@ -98,7 +102,7 @@ func matchingObjectPropertyName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
-		if name == nil || !ast.IsIdentifier(name) {
+		if name == nil || name.Kind != ast.KindIdentifier {
 			return "", false
 		}
 		return name.AsIdentifier().Text, true
@@ -107,11 +111,11 @@ func matchingObjectPropertyName(node *ast.Node) (string, bool) {
 		if argument == nil {
 			return "", false
 		}
-		argument = ast.SkipParentheses(argument)
+		argument = skipParentheses(argument)
 		// Keep this narrower than utils.AccessExpressionStaticName: ESLint's
 		// same-name branch accepts string Literals, but not template literals,
 		// numeric keys, dynamic expressions, or TypeScript assertions.
-		if !ast.IsStringLiteral(argument) {
+		if argument.Kind != ast.KindStringLiteral {
 			return "", false
 		}
 		return argument.AsStringLiteral().Text, true
@@ -122,12 +126,12 @@ func matchingObjectPropertyName(node *ast.Node) (string, bool) {
 
 func shouldFix(leftNode, rightNode *ast.Node) bool {
 	leftName := identifierName(leftNode)
-	if leftName == "" || !ast.IsPropertyAccessExpression(rightNode) {
+	if leftName == "" || rightNode.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
 	name := rightNode.AsPropertyAccessExpression().Name()
 	return name != nil &&
-		ast.IsIdentifier(name) &&
+		name.Kind == ast.KindIdentifier &&
 		leftName == name.AsIdentifier().Text
 }
 
@@ -147,7 +151,7 @@ func objectDestructuringFix(
 	// receiver for both source text and comment accounting. Since that receiver
 	// is nested inside the declarator, a comment in either surrounding gap is
 	// exactly a comment the replacement would discard.
-	objectNode = ast.SkipParentheses(objectNode)
+	objectNode = skipParentheses(objectNode)
 	reportRange := utils.TrimNodeTextRange(ctx.SourceFile, reportNode)
 	objectRange := utils.TrimNodeTextRange(ctx.SourceFile, objectNode)
 	comments := ctx.Comments.All()
@@ -199,26 +203,29 @@ func performCheck(
 	// them. Only parentheses are transparent here: TypeScript assertions
 	// around the whole RHS remain non-member expressions, matching
 	// @typescript-eslint/parser's ESTree output.
-	rightNode = ast.SkipParentheses(rightNode)
-	if !ast.IsAccessExpression(rightNode) {
+	rightNode = skipParentheses(rightNode)
+	if rightNode.Kind != ast.KindPropertyAccessExpression &&
+		rightNode.Kind != ast.KindElementAccessExpression {
 		return
 	}
 
 	// ESLint sees an optional member expression behind a ChainExpression and
 	// deliberately ignores it because the equivalent destructuring can throw.
-	if ast.IsOptionalChain(rightNode) {
+	// At this point the node is known to be an access expression, so the flag is
+	// equivalent to ast.IsOptionalChain without another shim call.
+	if rightNode.Flags&ast.NodeFlagsOptionalChain != 0 {
 		return
 	}
 
 	if rightNode.Kind == ast.KindPropertyAccessExpression {
 		name := rightNode.AsPropertyAccessExpression().Name()
-		if name != nil && ast.IsPrivateIdentifier(name) {
+		if name != nil && name.Kind == ast.KindPrivateIdentifier {
 			return
 		}
 	}
 
 	objectNode := utils.AccessExpressionObject(rightNode)
-	if objectNode != nil && ast.SkipParentheses(objectNode).Kind == ast.KindSuperKeyword {
+	if objectNode != nil && skipParentheses(objectNode).Kind == ast.KindSuperKeyword {
 		return
 	}
 
@@ -283,10 +290,14 @@ var PreferDestructuringRule = rule.Rule{
 				)
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if !ast.IsAssignmentExpression(node, true) {
+				assignment := node.AsBinaryExpression()
+				// Most binary expressions are not assignments. Keep the complete
+				// predicate for `=` so legal TypeScript targets and recovery nodes
+				// retain their existing behavior.
+				if assignment.OperatorToken.Kind != ast.KindEqualsToken ||
+					!ast.IsAssignmentExpression(node, true) {
 					return
 				}
-				assignment := node.AsBinaryExpression()
 				performCheck(ctx, opts, assignment.Left, assignment.Right, node, false)
 			},
 		}

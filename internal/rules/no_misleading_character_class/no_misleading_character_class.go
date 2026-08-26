@@ -15,22 +15,26 @@
 package no_misleading_character_class
 
 import (
+	_ "embed"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
+
+//go:embed no_misleading_character_class.schema.json
+var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/no-misleading-character-class
 var NoMisleadingCharacterClassRule = rule.Rule{
-	Name: "no-misleading-character-class",
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.LegacyUnwrapOptions(_options)
+	Name:   "no-misleading-character-class",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		var callTracker *regexpCallTracker
 		if sourceMayUseRegExp(ctx.SourceFile) {
@@ -89,15 +93,16 @@ type ruleOptions struct {
 	allowEscape bool
 }
 
-func parseOptions(opts any) ruleOptions {
-	res := ruleOptions{}
-	m := utils.GetOptionsMap(opts)
-	if m != nil {
-		if v, ok := m["allowEscape"].(bool); ok {
-			res.allowEscape = v
-		}
+func parseOptions(options []any) ruleOptions {
+	opts := ruleOptions{}
+	if len(options) == 0 {
+		return opts
 	}
-	return res
+	m, _ := options[0].(map[string]any)
+	if v, ok := m["allowEscape"].(bool); ok {
+		opts.allowEscape = v
+	}
+	return opts
 }
 
 // ---------------------------------------------------------------------------
@@ -499,7 +504,11 @@ func (tracker *regexpCallTracker) globalObjectRootCanReachRegExp(node *ast.Node)
 }
 
 func (tracker *regexpCallTracker) trackGlobalRoot(name string, value regexpTraceValue) {
-	if tracker.isGlobalOff(name) {
+	// ReferenceTracker starts only from variables that exist in the effective
+	// global scope. This gates globalThis by ecmaVersion and requires host roots
+	// such as window/self/global to be authored through languageOptions.globals
+	// or an inline global directive.
+	if !tracker.ctx.Globals.Access(name).IsDeclared() {
 		tracker.disableRoot(name)
 		return
 	}
@@ -524,10 +533,6 @@ func (tracker *regexpCallTracker) disableRoot(name string) {
 		tracker.disabledRoots = make(map[string]bool)
 	}
 	tracker.disabledRoots[name] = true
-}
-
-func (tracker *regexpCallTracker) isGlobalOff(name string) bool {
-	return tracker.ctx.Globals[name] == utils.GlobalAccessOff
 }
 
 func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name string) bool {
@@ -826,7 +831,7 @@ func (tracker *regexpCallTracker) trackIdentifierVariable(identifier *ast.Node, 
 	}
 
 	name := identifier.AsIdentifier().Text
-	if tracker.ctx.Globals[name].IsDeclared() {
+	if tracker.ctx.Globals.Override(name).IsDeclared() {
 		// The initial index contains only built-in roots. Indexing this
 		// configured-global name also records namespace-only declarations
 		// before deciding whether the assignment target is truly global.
@@ -1347,7 +1352,7 @@ func isSurrogatePair(hi, lo uint32) bool {
 }
 func isSurrogateValue(v uint32) bool { return v >= 0xD800 && v <= 0xDFFF }
 func isCombiningCharacter(cp uint32) bool {
-	return cp <= 0x10FFFF && unicode.Is(unicode.M, rune(cp))
+	return cp <= 0x10FFFF && unicode17.IsMark(rune(cp))
 }
 func isEmojiModifier(cp uint32) bool { return cp >= 0x1F3FB && cp <= 0x1F3FF }
 func isRegionalIndicatorSymbol(cp uint32) bool {
@@ -1464,7 +1469,7 @@ func messageDescriptionFor(kind string) string {
 // This combination catches all the cases in ESLint's test suite that should
 // suppress the suggestion without special-casing.
 func patternValidWithUFlag(pattern string) bool {
-	if _, err := regexp2.Compile(pattern, regexp2.ECMAScript|regexp2.Unicode); err != nil {
+	if _, err := esregexp.Compile(pattern, "u"); err != nil {
 		return false
 	}
 	return !hasInvalidIdentityEscapeForUFlag(pattern)

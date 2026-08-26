@@ -64,4 +64,5 @@ Examples of **correct** code for this rule with `{ "components": ["Anchor"] }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/anchor-has-content](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-has-content.md)
+- [eslint-plugin-jsx-a11y: anchor-has-content](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/anchor-has-content.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/anchor-has-content.js)

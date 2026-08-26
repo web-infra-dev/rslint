@@ -53,21 +53,25 @@ func isPendingCall(node *ast.Node, ctx rule.RuleContext) bool {
 	return true
 }
 
-func parseJestCall(node *ast.Node, ctx rule.RuleContext) *shared.ParsedCall {
-	parsed := utils.ParseJestFnCall(node, ctx)
-	if parsed == nil {
-		return nil
-	}
-	return &shared.ParsedCall{
-		Call: &parsed.ParsedCall,
-		HasSkip: strings.HasPrefix(parsed.Name, "x") ||
-			slices.Contains(parsed.Members, "skip"),
-		HasTodo: slices.Contains(parsed.Members, "todo"),
-	}
-}
-
 var NoDisabledTestsRule = shared.NewRule(shared.Config{
-	Name:                    "jest/no-disabled-tests",
-	Parse:                   parseJestCall,
-	IsStandaloneSkippedCall: isPendingCall,
+	Name: "jest/no-disabled-tests",
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		return shared.Runtime{
+			Parse: func(node *ast.Node) *shared.ParsedCall {
+				parsed := utils.ParseJestFnCall(node, ctx)
+				if parsed == nil {
+					return nil
+				}
+				return &shared.ParsedCall{
+					Call: &parsed.ParsedCall,
+					HasSkip: strings.HasPrefix(parsed.Name, "x") ||
+						slices.Contains(parsed.Members, "skip"),
+					HasTodo: slices.Contains(parsed.Members, "todo"),
+				}
+			},
+			IsStandaloneSkippedCall: func(node *ast.Node) bool {
+				return isPendingCall(node, ctx)
+			},
+		}
+	},
 })

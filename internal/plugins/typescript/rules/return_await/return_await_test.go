@@ -5,7 +5,6 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestParseReturnAwaitOption(t *testing.T) {
@@ -39,11 +38,6 @@ func TestParseReturnAwaitOption(t *testing.T) {
 			name:    "never from JS config",
 			options: []any{"never"},
 			want:    ReturnAwaitOptionNever,
-		},
-		{
-			name:    "legacy structured option",
-			options: []any{ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)}},
-			want:    ReturnAwaitOptionAlways,
 		},
 		{
 			name:    "unknown value falls back to default",
@@ -191,7 +185,7 @@ async function test(unknownParam: unknown) {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionErrorHandlingCorrectnessOnly)},
+			Options: "error-handling-correctness-only",
 		},
 		{Code: `
       async function test() {
@@ -212,7 +206,7 @@ async function test(unknownParam: unknown) {
           return 1;
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -220,15 +214,15 @@ async function test(unknownParam: unknown) {
           return 1;
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code:    "const test = () => 1;",
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code:    "const test = async () => 1;",
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -236,7 +230,7 @@ async function test(unknownParam: unknown) {
           return Promise.resolve(1);
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -250,7 +244,7 @@ async function test(unknownParam: unknown) {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -262,7 +256,7 @@ async function test(unknownParam: unknown) {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -276,7 +270,7 @@ async function test(unknownParam: unknown) {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -292,7 +286,7 @@ async function test(unknownParam: unknown) {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -300,11 +294,11 @@ async function test(unknownParam: unknown) {
           return Promise.resolve(1);
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionNever)},
+			Options: "never",
 		},
 		{
 			Code:    "const test = async () => Promise.resolve(1);",
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionNever)},
+			Options: "never",
 		},
 		{
 			Code: `
@@ -318,7 +312,7 @@ async function test(unknownParam: unknown) {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionNever)},
+			Options: "never",
 		},
 		{
 			Code: `
@@ -326,11 +320,11 @@ async function test(unknownParam: unknown) {
           return await Promise.resolve(1);
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 		},
 		{
 			Code:    "const test = async () => await Promise.resolve(1);",
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 		},
 		{
 			Code: `
@@ -344,7 +338,7 @@ async function test(unknownParam: unknown) {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 		},
 		{
 			Code: `
@@ -358,7 +352,7 @@ async function test(unknownParam: unknown) {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 		},
 		{
 			Code: `
@@ -475,7 +469,7 @@ async function f() {
   using something = bleh;
 }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 		},
 		{
 			Code: `
@@ -490,7 +484,7 @@ async function returnAwait() {
   return await asyncFn();
 }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -507,7 +501,7 @@ async function outerFunction() {
   }
 }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -522,7 +516,7 @@ async function outerFunction() {
   const innerFunction = async () => asyncFn();
 }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 		},
 		{
 			Code: `
@@ -690,7 +684,7 @@ class C<R extends unknown> {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionErrorHandlingCorrectnessOnly)},
+			Options: "error-handling-correctness-only",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -746,7 +740,7 @@ class C<R extends unknown> {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -802,7 +796,7 @@ class C<R extends unknown> {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -877,7 +871,7 @@ class C<R extends unknown> {
         }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "nonPromiseAwait",
@@ -888,7 +882,7 @@ class C<R extends unknown> {
 		{
 			Code:    "const test = async () => await 1;",
 			Output:  []string{"const test = async () =>  1;"},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "nonPromiseAwait",
@@ -899,7 +893,7 @@ class C<R extends unknown> {
 		{
 			Code:    "const test = async () => await Promise.resolve(1);",
 			Output:  []string{"const test = async () =>  Promise.resolve(1);"},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "disallowedPromiseAwait",
@@ -919,7 +913,7 @@ class C<R extends unknown> {
         }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "disallowedPromiseAwait",
@@ -939,7 +933,7 @@ class C<R extends unknown> {
         }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionNever)},
+			Options: "never",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "nonPromiseAwait",
@@ -959,7 +953,7 @@ class C<R extends unknown> {
           }
         }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionNever)},
+			Options: "never",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "disallowedPromiseAwait",
@@ -1015,7 +1009,7 @@ class C<R extends unknown> {
         }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionNever)},
+			Options: "never",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "disallowedPromiseAwait",
@@ -1035,7 +1029,7 @@ class C<R extends unknown> {
         }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "nonPromiseAwait",
@@ -1055,7 +1049,7 @@ class C<R extends unknown> {
         }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1066,7 +1060,7 @@ class C<R extends unknown> {
 		{
 			Code:    "const test = async () => Promise.resolve(1);",
 			Output:  []string{"const test = async () => await Promise.resolve(1);"},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1094,7 +1088,7 @@ async function buzz() {
 }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1132,7 +1126,7 @@ async function buzz() {
 }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1168,7 +1162,7 @@ async function buzz() {
 }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1194,7 +1188,7 @@ async function baz() {}
 const buzz = async () => ((await foo()) ? await bar() : await baz());
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1218,7 +1212,7 @@ async function bar() {}
 const buzz = async () => ((await foo()) ?  1 : await bar());
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1652,7 +1646,7 @@ async function f() {
   }
 }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1688,7 +1682,7 @@ async function f() {
   }
 }
       `,
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1734,7 +1728,7 @@ async function f() {
 }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionAlways)},
+			Options: "always",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "requiredPromiseAwait",
@@ -1772,7 +1766,7 @@ async function outerFunction() {
 }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "disallowedPromiseAwait",
@@ -1806,7 +1800,7 @@ async function outerFunction() {
 }
       `,
 			},
-			Options: ReturnAwaitOptions{Option: utils.Ref(ReturnAwaitOptionInTryCatch)},
+			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "disallowedPromiseAwait",

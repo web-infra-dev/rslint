@@ -26,8 +26,30 @@ ruleTester.run('no-identical-title', {} as never, {
         test.each([3, 4])("case %i", () => {});
       `,
     },
+    {
+      code: `
+        import { test } from "@rstest/playwright";
+        test.describe("a", () => { test("same", () => {}); });
+        test.describe("b", () => { test("same", () => {}); });
+      `,
+    },
   ],
   invalid: [
+    {
+      code: `
+        import.meta.rstest.test("same", () => {});
+        import.meta.rstest.test("same", () => {});
+      `,
+      errors: [{ messageId: 'multipleTestTitle', line: 3, column: 33 }],
+    },
+    {
+      code: `
+        import { test } from "@rstest/playwright";
+        test.describe("same", () => {});
+        test.describe("same", () => {});
+      `,
+      errors: [{ messageId: 'multipleDescribeTitle', line: 4, column: 23 }],
+    },
     {
       code: `
         test("same", () => {});

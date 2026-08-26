@@ -9,18 +9,20 @@ import (
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_identical_title"
 )
 
-func parseJestCall(node *ast.Node, ctx rule.RuleContext) *shared.ParsedCall {
-	parsed := jestUtils.ParseJestFnCall(node, ctx)
-	if parsed == nil {
-		return nil
-	}
-	return &shared.ParsedCall{
-		Call:          &parsed.ParsedCall,
-		Parameterized: slices.Contains(parsed.Members, "each"),
-	}
-}
-
 var NoIdenticalTitleRule = shared.NewRule(shared.Config{
-	Name:  "jest/no-identical-title",
-	Parse: parseJestCall,
+	Name: "jest/no-identical-title",
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		return shared.Runtime{
+			Parse: func(node *ast.Node) *shared.ParsedCall {
+				parsed := jestUtils.ParseJestFnCall(node, ctx)
+				if parsed == nil {
+					return nil
+				}
+				return &shared.ParsedCall{
+					Call:          &parsed.ParsedCall,
+					Parameterized: slices.Contains(parsed.Members, "each"),
+				}
+			},
+		}
+	},
 })

@@ -98,4 +98,5 @@ Examples of **incorrect** code with `{ "ul": ["menu", "menubar"] }`:
 
 ## Original Documentation
 
-- [eslint-plugin-jsx-a11y/no-noninteractive-element-to-interactive-role](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/no-noninteractive-element-to-interactive-role.md)
+- [eslint-plugin-jsx-a11y: no-noninteractive-element-to-interactive-role](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/docs/rules/no-noninteractive-element-to-interactive-role.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/v6.10.2/src/rules/no-noninteractive-element-to-interactive-role.js)

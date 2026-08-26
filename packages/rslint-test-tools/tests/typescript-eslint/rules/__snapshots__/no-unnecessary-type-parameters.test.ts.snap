@@ -1,0 +1,2044 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-type-parameters > invalid 1`] = `
+{
+  "code": "const func = <T,>(param: T) => null;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 2`] = `
+{
+  "code": "const func = <T,>(param: [T]) => null;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 3`] = `
+{
+  "code": "const func = <T,>(param: T[]) => null;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 4`] = `
+{
+  "code": "const f1 = <T,>(): T => {};",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 5`] = `
+{
+  "code": "
+        interface I {
+          <T>(value: T): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 6`] = `
+{
+  "code": "
+        interface I {
+          m<T>(x: T): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 7`] = `
+{
+  "code": "
+        class Joiner<T extends string | number> {
+          join(el: T, other: string) {
+            return [el, other].join(',');
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the class signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 8`] = `
+{
+  "code": "
+        declare class C<V> {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter V is never used in the class signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 25,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 9`] = `
+{
+  "code": "
+        declare class C<T, U> {
+          method(param: T): U;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the class signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 25,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter U is used only once in the class signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 28,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 10`] = `
+{
+  "code": "
+        declare class C {
+          method<T, U>(param: T): U;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter U is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 11`] = `
+{
+  "code": "
+        declare class C {
+          prop: <P>() => P;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter P is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 12`] = `
+{
+  "code": "
+        declare class Foo {
+          foo<T>(this: T): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 13`] = `
+{
+  "code": "
+        function third<A, B, C>(a: A, b: B, c: C): C {
+          return c;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter A is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter B is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 27,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 14`] = `
+{
+  "code": "
+        function foo<T>(_: T) {
+          const x: T = null!;
+          const y: T = null!;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 15`] = `
+{
+  "code": "
+        function foo<T>(_: T): void {
+          const x: T = null!;
+          const y: T = null!;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 16`] = `
+{
+  "code": "
+function foo<T>(_: T): <T>(input: T) => T {
+  const x: T = null!;
+  const y: T = null!;
+  return null!;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 17`] = `
+{
+  "code": "
+        function foo<T>(_: T) {
+          function withX(): T {
+            return null!;
+          }
+          function withY(): T {
+            return null!;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 18`] = `
+{
+  "code": "
+        function parseYAML<T>(input: string): T {
+          return input as any as T;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 28,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 19`] = `
+{
+  "code": "
+        function printProperty<T, K extends keyof T>(obj: T, key: K) {
+          console.log(obj[key]);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter K is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 2,
+        },
+        "start": {
+          "column": 35,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 20`] = `
+{
+  "code": "
+        function fn<T>(param: string) {
+          let v: T = null!;
+          return v;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 21`] = `
+{
+  "code": "
+        function both<
+          Args extends unknown[],
+          CB1 extends (...args: Args) => void,
+          CB2 extends (...args: Args) => void,
+        >(fn1: CB1, fn2: CB2): (...args: Args) => void {
+          return function (...args: Args) {
+            fn1(...args);
+            fn2(...args);
+          };
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter CB1 is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter CB2 is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 22`] = `
+{
+  "code": "
+        function getLength<T extends { length: number }>(x: T) {
+          return x.length;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 2,
+        },
+        "start": {
+          "column": 28,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 23`] = `
+{
+  "code": "
+        interface Lengthy {
+          length: number;
+        }
+        function getLength<T extends Lengthy>(x: T) {
+          return x.length;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 5,
+        },
+        "start": {
+          "column": 28,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 24`] = `
+{
+  "code": "declare function get<T>(): unknown;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is never used in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 25`] = `
+{
+  "code": "declare function get<T>(): T;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 26`] = `
+{
+  "code": "declare function get<T extends object>(): T;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 27`] = `
+{
+  "code": "declare function take<T>(param: T): void;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 28`] = `
+{
+  "code": "declare function take<T extends object>(param: T): void;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 29`] = `
+{
+  "code": "declare function take<T, U = T>(param1: T, param2: U): void;",
+  "diagnostics": [
+    {
+      "message": "Type parameter U is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 30`] = `
+{
+  "code": "declare function take<T, U extends T>(param: T): U;",
+  "diagnostics": [
+    {
+      "message": "Type parameter U is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 31`] = `
+{
+  "code": "declare function take<T, U extends T>(param: U): U;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 32`] = `
+{
+  "code": "declare function get<T, U = T>(param: U): U;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 33`] = `
+{
+  "code": "declare function get<T, U extends T = T>(param: T): U;",
+  "diagnostics": [
+    {
+      "message": "Type parameter U is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 34`] = `
+{
+  "code": "declare function compare<T, U extends T>(param1: T, param2: U): boolean;",
+  "diagnostics": [
+    {
+      "message": "Type parameter U is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 35`] = `
+{
+  "code": "declare function get<T>(param: <U, V>(param: U) => V): T;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter U is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter V is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 36`] = `
+{
+  "code": "declare function get<T>(param: <T, U>(param: T) => U): T;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter U is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 37`] = `
+{
+  "code": "declare function makeReadonlyArray<T>(): readonly T[];",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 38`] = `
+{
+  "code": "declare function makeReadonlyTuple<T>(): readonly [T];",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 39`] = `
+{
+  "code": "declare function makeReadonlyTupleNullish<T>(): readonly [T | null];",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 40`] = `
+{
+  "code": "declare function takeArray<T>(input: T[]): void;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 41`] = `
+{
+  "code": "declare function takeArrayNullish<T>(input: (T | null)[]): void;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 42`] = `
+{
+  "code": "declare function takeTuple<T>(input: [T]): void;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 43`] = `
+{
+  "code": "declare function takeTupleMultiUnrelated<T>(input: [T, number]): void;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 44`] = `
+{
+  "code": "
+        declare function takeTupleMultiUnrelatedNullish<T>(
+          input: [T | null, null],
+        ): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 2,
+        },
+        "start": {
+          "column": 57,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 45`] = `
+{
+  "code": "type Fn = <T>() => T;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 46`] = `
+{
+  "code": "type Fn = <T>() => [];",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is never used in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 47`] = `
+{
+  "code": "
+        type Other = 0;
+        type Fn = <T>() => Other;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is never used in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 48`] = `
+{
+  "code": "
+        type Other = 0 | 1;
+        type Fn = <T>() => Other;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is never used in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 49`] = `
+{
+  "code": "type Fn = <U>(param: U) => void;",
+  "diagnostics": [
+    {
+      "message": "Type parameter U is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 50`] = `
+{
+  "code": "type Ctr = new <T>() => T;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 51`] = `
+{
+  "code": "type Fn = <T>() => { [K in keyof T]: K };",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 52`] = `
+{
+  "code": "type Fn = <T>() => { [K in 'a']: T };",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 53`] = `
+{
+  "code": "type Fn = <T>(value: unknown) => value is T;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 54`] = `
+{
+  "code": "type Fn = <T extends string>() => \`a\${T}b\`;",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 55`] = `
+{
+  "code": "
+        declare function mapObj<K extends string, V>(
+          obj: { [key in K]?: V },
+          fn: (key: K) => number,
+        ): number[];
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter V is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 2,
+        },
+        "start": {
+          "column": 51,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 56`] = `
+{
+  "code": "
+declare function setItem<T>(T): T;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 26,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 57`] = `
+{
+  "code": "
+interface StorageService {
+  setItem<T>({ key: string, value: T }): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is never used in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 58`] = `
+{
+  "code": "
+type Compute<A> = A extends Function ? A : { [K in keyof A]: Compute<A[K]> };
+type Equal<X, Y> =
+  (<T1>() => T1 extends Compute<X> ? 1 : 2) extends
+    (<T2>() => T2 extends Compute<Y> ? 1 : 2)
+  ? true
+  : false;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T1 is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+    {
+      "message": "Type parameter T2 is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 59`] = `
+{
+  "code": "
+function f<T extends any>(x: T): void {
+  // @ts-expect-error
+  x.notAMethod();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 60`] = `
+{
+  "code": "
+class Joiner {
+  join<T extends number>(els: T[]) {
+    return els.map(el => '' + el).join(',');
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 61`] = `
+{
+  "code": "
+function join<T extends string | number>(els: T[]) {
+  return els.map(el => '' + el).join(',');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 62`] = `
+{
+  "code": "
+function join<T extends string & number>(els: T[]) {
+  return els.map(el => '' + el).join(',');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 63`] = `
+{
+  "code": "
+function join<T extends (string & number) | boolean>(els: T[]) {
+  return els.map(el => '' + el).join(',');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 64`] = `
+{
+  "code": "
+function join<T extends (string | number)>(els: T[]) {
+  return els.map(el => '' + el).join(',');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 65`] = `
+{
+  "code": "
+function join<T extends { hoge: string } | { hoge: number }>(els: T['hoge'][]) {
+  return els.map(el => '' + el).join(',');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 66`] = `
+{
+  "code": "
+type A = string;
+type B = string;
+type C = string;
+declare function f<T extends A | B>(): T & C;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-parameters > invalid 67`] = `
+{
+  "code": "
+type A = string;
+type B = string;
+type C = string;
+type D = string;
+declare function f<T extends A extends B ? C : D>(): T | null;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type parameter T is used only once in the function signature.",
+      "messageId": "sole",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 6,
+        },
+        "start": {
+          "column": 20,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-parameters",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

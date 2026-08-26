@@ -89,3 +89,4 @@ Examples of **incorrect** code for this rule with `{ "enforceForJSX": true }`:
 ## Original Documentation
 
 - [ESLint: no-unused-expressions](https://eslint.org/docs/latest/rules/no-unused-expressions)
+- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-unused-expressions.js)

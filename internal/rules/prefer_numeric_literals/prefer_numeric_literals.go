@@ -33,7 +33,8 @@ func useLiteralMessage(system string, functionName string) rule.RuleMessage {
 
 // https://eslint.org/docs/latest/rules/prefer-numeric-literals
 var PreferNumericLiteralsRule = rule.Rule{
-	Name: "prefer-numeric-literals",
+	Name:   "prefer-numeric-literals",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

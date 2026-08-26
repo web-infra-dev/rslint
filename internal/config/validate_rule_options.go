@@ -33,12 +33,12 @@ func (e RuleOptionsError) Error() string {
 //
 // It is meant to run as a separate step right after configuration is
 // resolved and before linting starts, so a bad config fails fast instead of
-// surfacing mid-lint. Validation is skipped for rules that declare no schema
-// yet (rule.Rule.Schema == nil — the pre-framework status quo), for rules
-// not present in the registry (unknown names are not an error here — making
-// them fatal is planned separately), and for disabled ("off") entries.
-// ESLint-plugin rules mounted via the config's object-form `plugins` never
-// carry a Go schema; the Node worker's own ESLint validates their options.
+// surfacing mid-lint. Validation is skipped for rules not present in the
+// catalog (unknown names are not an error here — making them fatal is
+// planned separately) and for disabled ("off") entries. ESLint-plugin rules
+// mounted via the config's object-form `plugins` have catalog entries without a Go
+// schema (rule.Rule.Schema == nil) and are skipped too; the Node worker's
+// own ESLint validates their options.
 //
 // Each entry's options are validated independently, mirroring ESLint, which
 // validates every config array element's options rather than only the final
@@ -52,7 +52,10 @@ func (e RuleOptionsError) Error() string {
 // maps and slices in place, so every options-bearing work item receives a deep
 // copy of its complete raw rule value first. This makes arbitrary aliases
 // between entries safe without serializing independent schema validation.
-func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) (RslintConfig, []RuleOptionsError) {
+func ValidateRuleOptions(config RslintConfig, catalog *rule.Catalog) (RslintConfig, []RuleOptionsError) {
+	if catalog == nil {
+		panic("rule catalog is required")
+	}
 	type workItem struct {
 		entryIndex  int
 		ruleName    string
@@ -85,7 +88,7 @@ func ValidateRuleOptions(config RslintConfig, registry *RuleRegistry) (RslintCon
 				normalizedRules[ruleName] = cloneConfigValue(ruleValue)
 				continue
 			}
-			ruleImpl, exists := registry.GetRule(ruleName)
+			ruleImpl, exists := catalog.Lookup(ruleName)
 			if !exists || ruleImpl.Schema == nil {
 				normalizedRules[ruleName] = cloneConfigValue(ruleValue)
 				continue

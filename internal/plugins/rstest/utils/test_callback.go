@@ -10,35 +10,14 @@ type RstestTestCallbacks struct {
 	Functions          map[*ast.Node]bool
 	ContextReceivers   map[*ast.Symbol]bool
 	ContextExpectNames map[*ast.Symbol]bool
-	fnCalls            *rstestFnCallCache
 }
 
-// rstestFnCallCache memoizes call parsing so that the collection walk and the
-// rule traversal that follows it do not each parse every call expression.
-type rstestFnCallCache struct {
-	ctx    rule.RuleContext
-	parsed map[*ast.Node]*ParsedRstestFnCall
-}
-
-func (cache *rstestFnCallCache) parse(node *ast.Node) *ParsedRstestFnCall {
-	if cache == nil {
-		return nil
-	}
-	if parsed, ok := cache.parsed[node]; ok {
-		return parsed
-	}
-	parsed := ParseRstestFnCallWithOfficialExtensions(node, cache.ctx)
-	cache.parsed[node] = parsed
-	return parsed
-}
-
-// ParseFnCall parses node the way CollectRstestTestCallbacks did, reusing the
-// cached result when the collection walk already visited node.
-func (callbacks RstestTestCallbacks) ParseFnCall(node *ast.Node) *ParsedRstestFnCall {
-	if callbacks.fnCalls == nil {
-		return nil
-	}
-	return callbacks.fnCalls.parse(node)
+// rstestCallbackRegistration ties a callback function back to one of the
+// registrations that runs it. A single function can be registered more than
+// once, so ownership is a slice rather than a single registration.
+type rstestCallbackRegistration struct {
+	call   *ast.Node
+	parsed *ParsedRstestFnCall
 }
 
 type rstestCallbackInfo struct {
@@ -46,47 +25,125 @@ type rstestCallbackInfo struct {
 	name         string
 }
 
-func CollectRstestTestCallbacks(ctx rule.RuleContext) RstestTestCallbacks {
-	result := RstestTestCallbacks{
+// rstestFunctionEntry is one name in the file-wide function index. ambiguous
+// marks a name declared more than once, which makes the entry unusable for
+// attributing a callback.
+type rstestFunctionEntry struct {
+	node      *ast.Node
+	ambiguous bool
+}
+
+func newRstestTestCallbacks() RstestTestCallbacks {
+	return RstestTestCallbacks{
 		Functions:          map[*ast.Node]bool{},
 		ContextReceivers:   map[*ast.Symbol]bool{},
 		ContextExpectNames: map[*ast.Symbol]bool{},
-		fnCalls: &rstestFnCallCache{
-			ctx:    ctx,
-			parsed: map[*ast.Node]*ParsedRstestFnCall{},
+	}
+}
+
+// walkRstestCallbackRegistrations visits every registration accepted by parse
+// together with the function that runs its callback. Callbacks passed by name
+// are held back until the whole file has been seen, so a registration can
+// reference a function declared after it.
+func walkRstestCallbackRegistrations(
+	analysis *RstestCallAnalysis,
+	parse func(*ast.Node) *ParsedRstestFnCall,
+	visit func(function *ast.Node, registration rstestCallbackRegistration),
+) {
+	pending := map[string][]rstestCallbackRegistration{}
+
+	for _, node := range analysis.calls {
+		parsed := parse(node)
+		if parsed == nil {
+			continue
+		}
+		registration := rstestCallbackRegistration{call: node, parsed: parsed}
+		info := analysis.callbackInfo(node)
+		if info.functionNode != nil {
+			visit(info.functionNode, registration)
+		} else if info.name != "" {
+			pending[info.name] = append(pending[info.name], registration)
+		}
+	}
+
+	for name, registrations := range pending {
+		entry := analysis.functions[name]
+		// The index is file-wide and scope-blind, so a name that is declared
+		// twice, or declared inside some other callback, cannot be attributed
+		// to this registration: `describe('s', () => { function cb() {} });
+		// test.concurrent('x', cb)` would otherwise be answered with the nested
+		// `cb`, which `test.concurrent` never runs. Reaching here at all means
+		// the checker could not resolve the identifier, so declining to guess
+		// costs coverage on code that already fails to compile.
+		if entry.node == nil || entry.ambiguous || !isModuleTopLevelFunction(entry.node) {
+			continue
+		}
+		for _, registration := range registrations {
+			visit(entry.node, registration)
+		}
+	}
+}
+
+// collectRstestTestCallbacks records the TestContext bindings each test
+// callback receives. Describe callbacks are deliberately excluded: their
+// parameters are not a TestContext.
+func collectRstestTestCallbacks(analysis *RstestCallAnalysis) RstestTestCallbacks {
+	result := newRstestTestCallbacks()
+	walkRstestCallbackRegistrations(
+		analysis,
+		analysis.ParseTestCall,
+		func(function *ast.Node, registration rstestCallbackRegistration) {
+			recordRstestTestCallback(analysis, &result, function, registration.parsed)
 		},
-	}
-	pending := map[string][]*ParsedRstestFnCall{}
-
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-		if node.Kind == ast.KindCallExpression {
-			parsed := result.fnCalls.parse(node)
-			if parsed != nil && parsed.Kind == RstestFnTypeTest {
-				info := resolveRstestTestCallback(ctx, node.AsCallExpression())
-				if info.functionNode != nil {
-					recordRstestCallback(ctx, &result, info.functionNode, parsed)
-				} else if info.name != "" {
-					pending[info.name] = append(pending[info.name], parsed)
-				}
-			}
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-
-	if ctx.SourceFile != nil {
-		visit(ctx.SourceFile.Node.AsNode())
-	}
-	if len(pending) > 0 {
-		resolvePendingRstestCallbacks(ctx, &result, pending)
-	}
+	)
 	return result
+}
+
+// collectRstestCallbackOwnership indexes both test and describe callbacks by
+// the registrations that run them, which is what an execution mode is
+// inherited through.
+func collectRstestCallbackOwnership(
+	analysis *RstestCallAnalysis,
+) map[*ast.Node][]rstestCallbackRegistration {
+	ownership := map[*ast.Node][]rstestCallbackRegistration{}
+	walkRstestCallbackRegistrations(
+		analysis,
+		analysis.parseRegistrationCall,
+		func(function *ast.Node, registration rstestCallbackRegistration) {
+			ownership[function] = append(ownership[function], registration)
+		},
+	)
+	return ownership
+}
+
+// isModuleTopLevelFunction reports whether function is declared directly at
+// module scope, the one place a file-wide name lookup is visible from every
+// call site in the file. The walk runs only for callbacks the checker failed
+// to resolve, so it is off the common path.
+func isModuleTopLevelFunction(function *ast.Node) bool {
+	if function == nil {
+		return false
+	}
+	for node := function.Parent; node != nil; node = node.Parent {
+		switch node.Kind {
+		case ast.KindSourceFile:
+			return true
+		case ast.KindVariableDeclaration,
+			ast.KindVariableDeclarationList,
+			ast.KindVariableStatement,
+			ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindSatisfiesExpression,
+			ast.KindNonNullExpression,
+			ast.KindTypeAssertionExpression:
+			// The declaration chain a `const cb = () => {}` hangs from, and the
+			// parentheses and TS assertions SkipAssertionsAndParens already
+			// looked through.
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 func resolveRstestTestCallback(
@@ -122,7 +179,7 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 	if argument == nil {
 		return rstestCallbackInfo{}
 	}
-	argument = ast.SkipParentheses(argument)
+	argument = internalUtils.SkipAssertionsAndParens(argument)
 	if argument == nil {
 		return rstestCallbackInfo{}
 	}
@@ -146,7 +203,7 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 		if initializer == nil {
 			return rstestCallbackInfo{}
 		}
-		initializer = ast.SkipParentheses(initializer)
+		initializer = internalUtils.SkipAssertionsAndParens(initializer)
 		if ast.IsFunctionExpressionOrArrowFunction(initializer) {
 			return rstestCallbackInfo{functionNode: initializer, name: name}
 		}
@@ -154,63 +211,13 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 	return rstestCallbackInfo{}
 }
 
-func resolvePendingRstestCallbacks(
-	ctx rule.RuleContext,
-	result *RstestTestCallbacks,
-	pending map[string][]*ParsedRstestFnCall,
-) {
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-
-		name := ""
-		var function *ast.Node
-		switch node.Kind {
-		case ast.KindFunctionDeclaration:
-			declaration := node.AsFunctionDeclaration()
-			if declaration != nil && declaration.Name() != nil {
-				name = declaration.Name().Text()
-				function = node
-			}
-		case ast.KindVariableDeclaration:
-			declaration := node.AsVariableDeclaration()
-			if declaration != nil && declaration.Name() != nil && declaration.Name().Kind == ast.KindIdentifier {
-				name = declaration.Name().AsIdentifier().Text
-				if declaration.Initializer != nil {
-					initializer := ast.SkipParentheses(declaration.Initializer)
-					if ast.IsFunctionExpressionOrArrowFunction(initializer) {
-						function = initializer
-					}
-				}
-			}
-		}
-
-		if function != nil {
-			for _, parsed := range pending[name] {
-				recordRstestCallback(ctx, result, function, parsed)
-			}
-			delete(pending, name)
-		}
-
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-
-	if ctx.SourceFile != nil {
-		visit(ctx.SourceFile.Node.AsNode())
-	}
-}
-
-func recordRstestCallback(
-	ctx rule.RuleContext,
+func recordRstestTestCallback(
+	analysis *RstestCallAnalysis,
 	result *RstestTestCallbacks,
 	function *ast.Node,
 	parsed *ParsedRstestFnCall,
 ) {
+	ctx := analysis.ctx
 	if function == nil {
 		return
 	}
@@ -229,12 +236,16 @@ func recordRstestCallback(
 		return
 	}
 	parameter := parameters[contextIndex].AsParameterDeclaration()
-	if parameter == nil || parameter.Name() == nil || ctx.TypeChecker == nil {
+	if parameter == nil || parameter.Name() == nil {
 		return
 	}
 	name := parameter.Name()
 	switch name.Kind {
 	case ast.KindIdentifier:
+		analysis.addExpectRootName(name.AsIdentifier().Text)
+		if ctx.TypeChecker == nil {
+			return
+		}
 		if symbol := ctx.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
 			result.ContextReceivers[symbol] = true
 		}
@@ -260,6 +271,10 @@ func recordRstestCallback(
 				}
 			}
 			if propertyName != "expect" {
+				continue
+			}
+			analysis.addExpectRootName(binding.Name().AsIdentifier().Text)
+			if ctx.TypeChecker == nil {
 				continue
 			}
 			if symbol := ctx.TypeChecker.GetSymbolAtLocation(binding.Name()); symbol != nil {

@@ -12,6 +12,8 @@ ruleTester.run('no-dupe-keys', {
     // __proto__ as proto setter is allowed to appear multiple times
     'var x = { __proto__: foo, __proto__: bar };',
     'var x = { "__proto__": foo, "__proto__": bar };',
+    '({ a: first, a: second } = source);',
+    '({ ["a"]: first, ["a"]: second } = source);',
   ],
   invalid: [
     {
@@ -54,6 +56,11 @@ ruleTester.run('no-dupe-keys', {
     // Numeric overflow to Infinity: 1e309 and 1e999 both normalize to "Infinity"
     {
       code: 'var x = { [1e309]: "a", [1e999]: "b" };',
+      errors: [{ messageId: 'unexpected' }],
+    },
+    // Parentheses and computed-property brackets are outside ESLint's key range.
+    {
+      code: 'var x = { [("a")]: 1, [(("a"))]: 2 };',
       errors: [{ messageId: 'unexpected' }],
     },
   ],
