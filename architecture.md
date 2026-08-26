@@ -61,9 +61,9 @@ Rslint is a high-performance JavaScript and TypeScript linter, designed as a dro
 │  │  │ LINT CORE                            │  │ ADAPTERS / AUXILIARY     │  │  │
 │  │  │                                      │  │                          │  │  │
 │  │  │  internal/config                     │  │  internal/api            │  │  │
-│  │  │  internal/program/loader             │  │  internal/lsp            │  │  │
-│  │  │  internal/program                    │  │  internal/inspector      │  │  │
-│  │  │  internal/linter / rule / utils      │  │                          │  │  │
+│  │  │  internal/program/loader             │  │  internal/api/server     │  │  │
+│  │  │  internal/program                    │  │  internal/lsp            │  │  │
+│  │  │  internal/linter / rule / utils      │  │  internal/inspector      │  │  │
 │  │  └──────────────────────────────────────┘  └──────────────────────────┘  │  │
 │  └─────────────────────────┬────────────────────────────────────────────────┘  │
 │                            │                                                   │
@@ -102,19 +102,21 @@ The directory map below folds the high-level module relationships into the packa
 
 | Path                           | Purpose                                                                                                                | Key Relationships                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `website/`                     | Documentation site and Playground UI                                                                                   | Uses `packages/rslint-wasm` to run browser linting and `packages/rslint-api` to decode encoded source files; Playground lint requests ultimately reach `internal/linter`, and inspect requests reach `internal/inspector` through `internal/api`                                                                                                                                                                           |
-| `cmd/rslint/`                  | Main Go binary entry point with CLI, API, and LSP modes                                                                | Orchestrates config loading, `internal/program/loader`, lint execution, fixes, and output without selecting a Program backend. JSON config starts at `internal/config`; `--api` is consumed by `packages/rslint` and `packages/rslint-wasm`; `--lsp` is consumed by `packages/vscode-extension`                                                                                                                            |
+| `website/`                     | Documentation site and Playground UI                                                                                   | Uses `packages/rslint-wasm` to run browser linting and `packages/rslint-api` to decode encoded source files; Playground requests pass through `internal/api` and `internal/api/server` before reaching `internal/linter` or `internal/inspector`                                                                                                                                                                           |
+| `cmd/rslint/`                  | Main Go binary entry point with CLI, API, and LSP modes                                                                | Owns mode selection and process stdio/exit-code composition. The default CLI orchestrates config loading, `internal/program/loader`, lint execution, fixes, and output; `--api` delegates concrete requests to `internal/api/server`; `--lsp` delegates to `internal/lsp`                                                                                                                                                  |
 | `internal/output/`             | Report model, summary, colors, and stdout formatters                                                                   | Consumes final sorted `internal/rule` diagnostics and renders `default`, `jsonline`, `github`, or `gitlab`; the CLI is its current consumer, while the package remains available to other repository integrations that need the same output behavior                                                                                                                                                                       |
 | `cmd/tsgo/`                    | ts-go semantic inspection/export tool                                                                                  | Talks directly to `typescript-go` and bypasses the lint framework; consumed by `packages/tsgo` and `crates/tsgo-client`                                                                                                                                                                                                                                                                                                    |
-| `internal/api/`                | stdio IPC protocol and service types for JS/WASM integration                                                           | Shared protocol layer for `cmd/rslint --api`; used by `packages/rslint`, `packages/rslint-wasm`, `internal/linter`, and `internal/inspector`                                                                                                                                                                                                                                                                               |
+| `internal/api/`                | stdio IPC protocol, wire types, and generic bidirectional service for JS/WASM integration                              | Defines the stable request/response boundary used by `packages/rslint`, `packages/rslint-wasm`, and `internal/api/server`; it does not import concrete lint, config, Program-loader, or command implementations                                                                                                                                                                                                            |
+| `internal/api/server/`         | Concrete rslint API request handlers                                                                                   | Implements lint and AST-inspection requests over `internal/api`, owns API-specific paths, overlays, reverse config/plugin adapters, structured responses, and the process-wide AST inspection cache; `cmd/rslint` composes its `Handler` with the parent package's generic `Service`                                                                                                                                       |
 | `internal/config/`             | Configuration models, JSON loading, authored path-space snapshots, matching/merging, and configured-rule evaluation    | Owns the shared extension/default-exclude policy, the `GlobalIgnoreMatcher` consumed by config-candidate discovery, and the `TargetMatcher` consumed by lint-target planning; both matchers share the private config-target resolver. File resolvers receive an immutable `internal/rule.Catalog` explicitly and convert merged rule settings into execution descriptors without owning target walking or config ownership |
-| `internal/config/target/`      | Lint-target planning, explicit-file outcomes, directory walking, canonical deduplication, and config-owner routing     | Imports the parent config model and matching policy through `PathIdentity`, `PathSpaceSnapshot`, and `TargetMatcher`. CLI, API, LSP, and `internal/program/loader` consume `File`, `Plan`, or `OwnerIndex`; the parent config package never imports this child package                                                                                                                                                     |
+| `internal/config/lint/`        | Effective config and rule resolution for already-selected lint targets                                                 | Joins the immutable target/source binding returned by `internal/program/loader` to the owning config's `FileConfigResolver`. CLI and API use the same resolver; it cannot discover targets, infer a different owner, construct Programs, or execute rules                                                                                                                                                                  |
+| `internal/config/target/`      | Lint-target planning, explicit-file outcomes, directory walking, canonical deduplication, and config-owner routing     | Imports the parent config model and matching policy through `PathIdentity`, `PathSpaceSnapshot`, and `TargetMatcher`. It also owns exact-first source-path lookup in immutable source-to-target maps. CLI, API, LSP, `internal/config/lint`, and `internal/program/loader` consume `File`, `Plan`, `OwnerIndex`, or that lookup; the parent config package never imports this child package                                |
 | `internal/config/discovery/`   | Go-owned JS/TS config candidate discovery and immutable catalog construction                                           | Imports the parent config model/matching policy and `target.OwnerScope` as a narrow provenance handoff, batches exact candidates to a host-supplied Node loader, and returns configs/scopes/failures/effective IDs. CLI, API, and LSP call `DiscoverAutomatic` or `LoadExplicitConfig`; neither the parent config package nor target planning imports discovery                                                            |
 | `internal/config/gitignore/`   | Config-scoped `.gitignore` parsing, directory reachability, and pattern projection                                     | Staged JS/TS catalogs carry a filesystem-independent cursor through their existing walk, pruning Git-inaccessible subtrees and freezing observed patterns for lint-target admission; JSON/JSONC and low-level fallback paths reuse the direct collector                                                                                                                                                                    |
 | `internal/inspector/`          | AST/type/symbol/signature/flow inspection for Playground                                                               | Auxiliary backend used mainly by website Playground inspect panels; builds rich semantic data from `typescript-go` programs                                                                                                                                                                                                                                                                                                |
 | `internal/program/`            | Immutable rslint Program facade and source-generation indexes                                                          | Privately adapts project/compiler and root-parser hosts into one source, filesystem, syntax, optional checker, module-resolution, and module-reference contract. `Program.ModuleGraph()` and generation-scoped caches derive from that same authority; adapter identity is not observable by linter or rules                                                                                                               |
-| `internal/program/loader/`     | Run-scoped Program construction and lint-target binding for CLI/API                                                    | Consumes target-owned lint plans, constructs configured projects, binds targets by governing-config order and physical identity, and returns one backend-agnostic Program sequence plus its execution projection. Construction choices and ts-go compatibility details remain private; LSP wraps session-owned Programs directly and does not use this request-scoped loader                                               |
-| `internal/linter/`             | Core lint engine, traversal, and fix application                                                                       | Consumes unified `internal/program.Program` inputs, rules from `internal/rule`, file config from `internal/config`, and optional ts-go `TypeChecker` data; also serves `internal/api` and `internal/lsp`                                                                                                                                                                                                                   |
+| `internal/program/loader/`     | Run-scoped Program construction and lint-target binding for CLI/API                                                    | Consumes target-owned lint plans, limits plain-lint project construction to configs that own selected targets, binds targets by governing-config order and physical identity, and returns one backend-agnostic Program sequence plus its execution projection. Construction choices and ts-go compatibility details remain private; LSP wraps session-owned Programs directly and does not use this request-scoped loader  |
+| `internal/linter/`             | Core lint engine, syntax-diagnostic projection, third-party plugin dispatch, traversal, and fix application            | Consumes unified `internal/program.Program` inputs and prepared `internal/rule` descriptors without importing config or command transports. It projects target syntax diagnostics and plugin inputs from the same prepared plan, returns structured plugin-dispatch outcomes, and serves CLI, API, and LSP integrations                                                                                                    |
 | `internal/lsp/`                | Language Server Protocol implementation                                                                                | Wraps `typescript-go project.Session`, owns transactional config discovery and last-good commit state with `packages/vscode-extension` as the module/plugin host, and invokes `internal/linter` on session-backed programs                                                                                                                                                                                                 |
 | `internal/rule/`               | Rule framework, immutable rule catalogs, configured-rule descriptors, context, diagnostics, fixes, and disable manager | Defines catalog snapshots and exact object-form ESLint-plugin catalog derivation shared by entry points; `internal/linter` consumes its immutable rule environments, listeners, reporting APIs, and Program-derived cache helper                                                                                                                                                                                           |
 | `internal/rule_tester/`        | Go-side rule testing helpers                                                                                           | Supports rule development and complements JS-side testers in `packages/rule-tester` and `packages/rslint-test-tools`                                                                                                                                                                                                                                                                                                       |
@@ -127,7 +129,7 @@ The directory map below folds the high-level module relationships into the packa
 | `packages/rslint/`             | Main npm package with JavaScript API and CLI wrapper                                                                   | Spawns `cmd/rslint --api` in JavaScript runtime environments and uses `internal/api` message shapes                                                                                                                                                                                                                                                                                                                        |
 | `packages/rslint-api/`         | Frontend-facing encoded source file / AST decoding helpers                                                             | Used mainly by website Playground to decode AST/source data returned from the Go API                                                                                                                                                                                                                                                                                                                                       |
 | `packages/rslint-test-tools/`  | Testing utilities and cross-ecosystem rule tests                                                                       | Supports package-side and integration-style tests around the linter and rule ecosystem                                                                                                                                                                                                                                                                                                                                     |
-| `packages/rslint-wasm/`        | Browser/WASM package for running `rslint --api` in a worker                                                            | Starts the browser worker, hosts the wasm runtime, and bridges website Playground requests to `internal/api`, `internal/linter`, and `internal/inspector`                                                                                                                                                                                                                                                                  |
+| `packages/rslint-wasm/`        | Browser/WASM package for running `rslint --api` in a worker                                                            | Starts the browser worker, hosts the wasm runtime, and bridges website Playground requests through `internal/api` and `internal/api/server` to `internal/linter` and `internal/inspector`                                                                                                                                                                                                                                  |
 | `packages/rule-tester/`        | Forked `@typescript-eslint/rule-tester` package used in tests                                                          | JS-side rule testing support that complements Go-side helpers                                                                                                                                                                                                                                                                                                                                                              |
 | `packages/utils/`              | Shared JavaScript utilities                                                                                            | Shared support package for the JS/website tooling layer                                                                                                                                                                                                                                                                                                                                                                    |
 | `packages/vscode-extension/`   | VS Code extension for IDE integration                                                                                  | Resolves the nearest project-local `@rslint/core` per open document, launches that installation's `cmd/rslint --lsp`, serves reverse config/plugin requests, and routes diagnostics/code actions to the document's selected runtime                                                                                                                                                                                        |
@@ -195,7 +197,7 @@ and cannot observe which construction path supplied it.
 3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes. Source-only roots additionally run the ts-go binder so syntax-only rules retain symbols and lexical scopes before their rslint Program is published.
 4. **Semantic Analysis**: The lint plan reads each Program's per-file checker capability once, freezes that result with the file's configured rules, and acquires a checker only for eligible files. LSP can additionally narrow rule eligibility for a request before planning. Program capability, configured-rule eligibility, actual checker delivery, and program-wide diagnostics remain separate decisions.
 5. **Rule Registration**: Enabled rules register listeners keyed by AST kind.
-6. **AST Traversal**: The linter traverses each file once using a DFS walk.
+6. **AST Traversal**: The linter traverses each file once using a DFS walk. It prunes syntax that TypeScript-Go synthesized from JSDoc comments; ESLint-compatible parsers expose that text through comment APIs rather than rule AST listeners.
 7. **Rule Execution**: Listener callbacks inspect nodes and may use syntax only or syntax plus type information.
 8. **Diagnostic Collection**: Findings are reported as `RuleDiagnostic` values, with optional fixes or suggestions.
 9. **Output Generation**: CLI builds one report from the final post-fix diagnostics and passes it to `internal/output`; API returns structured data, and LSP converts diagnostics to LSP diagnostics/code actions.
@@ -228,6 +230,11 @@ Important characteristics:
 - **Node Types**: ts-go `ast.Kind` values
 - **Node Objects**: `*ast.Node` and `*ast.SourceFile`
 - **Traversal Style**: `ForEachChild(...)` with depth-first recursion
+- **JSDoc Boundary**: synthetic syntax reparsed from JSDoc is excluded from
+  rule-listener traversal; comment-aware rules use the shared comment store or
+  TypeScript-Go's explicit JSDoc APIs. Hosted tags can also populate fields on
+  ordinary source nodes, so syntax-sensitive rules use authored-only AST views
+  without removing JSDoc semantics from the type checker.
 - **Source Locations**: node ranges and source-file-aware line/column conversion via scanner helpers
 - **Comments**: exposed through one lazy per-file store for directives and comment-based rules
 
@@ -367,10 +374,16 @@ from the resolved language defaults, while `IsNameDefinedInFile`
 supports scope rules whose query location is not itself an identifier
 reference. `HasNonGlobalTopLevelScope` exposes the corresponding scope fact
 without exposing a language mode or requiring rules to parse paths.
-Config resolution normalizes the per-file `ecmaVersion` into `LanguageOptions`;
-its zero value means the moving `latest` edition. The linter exposes the
-normalized value through `RuleContext.LanguageOptions` and also uses it to
-build one `Globals` value for each native rule context. Rules read
+Config resolution normalizes the per-file `ecmaVersion` and authored top-level
+`languageOptions.sourceType` (`module`, `script`, or `commonjs`) into
+`LanguageOptions`, which is exposed as a whole on each native `RuleContext`.
+`ecmaVersion`'s zero value means the moving `latest` edition. The legacy
+`parserOptions.sourceType` location is not read. The linter resolves
+an omitted source type from the filename (`.cjs` to `commonjs`; `.js`/`.jsx`/
+`.mjs` and TypeScript-flavoured `.ts`/`.tsx`/`.cts`/`.mts` to `module`).
+The remaining zero value has module semantics through `EffectiveSourceType`.
+Source type does not change TypeScript parsing or compiler module resolution. The linter uses the normalized edition to build
+one `Globals` value for each native rule context. Rules read
 `LanguageOptions` when upstream behavior depends on language configuration;
 they use `Globals` for variable-availability decisions. `Globals` owns the
 ESLint-versioned language-global set, resolved language defaults, the authored
@@ -380,20 +393,25 @@ and the effective access after applying their precedence. Rules use
 accessors only when upstream behavior depends on provenance, instead of
 rebuilding the merge. A rule whose upstream semantics add another source, such
 as TypeScript library globals, applies this view last so `ecmaVersion` and
-authored overrides remain authoritative. This keeps the language-global
-composition point extensible for future language options such as `sourceType`;
-non-global wrapper bindings remain a `RefStore` initialization concern.
+authored overrides remain authoritative. Non-global wrapper bindings remain a
+`RefStore` initialization concern.
 
 Before constructing rule contexts, the linter calls `ResolveLanguageDefaults`
-once and passes its concrete `GlobalsInit` and `RefStoreInit` results to their
-respective consumers. Today the resolver selects defaults from the source
-filename: `.js` and `.mjs` contribute a non-global top-level scope; `.cjs`
-additionally contributes writable `exports`, read-only `global`, `module`, and
-`require`, plus the wrapper-local `arguments` binding. Other extensions
-contribute no defaults. The resolver does not inspect `package.json` or authored
-`sourceType`; adding `sourceType` later changes the resolver input and this one
-call site, while `Globals`, `RefStore`, and rules keep consuming the same
-initialization types.
+once and passes its concrete `GlobalsInit`, `RefStoreInit`, and effective
+`LanguageOptions` results to their respective consumers. An omitted source
+type is filled from the filename (`.cjs` → `commonjs`; `.js`/`.jsx`/`.mjs`
+and TypeScript-flavoured extensions `.ts`/`.tsx`/`.cts`/`.mts` → `module`),
+matching espree and typescript-eslint. The resolver then selects inits from
+that effective source type: `commonjs` contributes writable `exports`,
+read-only `global`, `module`, and `require` on every extension, plus — on
+espree-parsed extensions (`.js`/`.jsx`/`.mjs`/`.cjs`) — non-global wrapper
+scope and the wrapper-local `arguments` binding; `module` contributes a
+non-global top-level scope; `script` forces a global program scope even when
+module syntax is present; TypeScript-flavoured `commonjs` keeps that same
+global program scope.
+Authored `sourceType` therefore applies on every extension, including
+`.ts`/`.tsx`. The resolver does not inspect `package.json`. A rule reads
+`RuleContext.LanguageOptions` when its upstream behavior depends on them.
 Every authored alias is normalized to one of ESLint's three access levels —
 `utils.GlobalAccess`, whose zero value means no source mentioned the name.
 Booleans follow the `globals` package: `true` is writable, `false` is read-only.
@@ -480,6 +498,25 @@ type RuleFix struct {
     Range core.TextRange
 }
 ```
+
+`internal/linter` owns the shared producer semantics around this model. Native
+rules, TypeScript syntax/program diagnostics, and reconstructed third-party
+plugin diagnostics all enter the surfaces as `RuleDiagnostic` values. The
+single-file TypeScript syntax projection is shared by CLI/API target
+collection and LSP document linting, while TypeScript program diagnostics keep
+their richer message-chain and related-information formatting. Completed CLI
+and API diagnostic sets are stably ordered by caller-visible file path and
+start byte offset only after each surface has projected paths into its own
+identity space; equal keys retain producer emission order. LSP deliberately
+does not use that completed-set ordering because it publishes native results
+first and merges generation-stamped plugin results later.
+
+After that semantic boundary, representation remains integration-owned. CLI
+builds an `internal/output.Report`, API projects to its 1-based structured wire
+model and flat UTF-16 edit offsets, and LSP projects to 0-based LSP positions
+while retaining its stale-generation and code-action lifecycle. Counts, fix
+passes, path bases, stderr notices, and protocol empty-array rules therefore do
+not belong to a universal diagnostic pipeline.
 
 ### Severity Levels
 
@@ -846,6 +883,19 @@ module or replace its rule/path-space generation. Each document lint snapshot
 samples one committed config generation together with the current project view
 on the serialized server dispatch loop.
 
+Within `internal/lsp`, `server.go` remains the single transport, dispatch-loop,
+and mutable-state owner. `initialization.go` constructs its session;
+`config_discovery.go` owns JS/TS transaction prepare/commit/abort, while
+`config_watch.go` owns watcher registration and event handling together with
+JSON fallback and tsconfig-derived state refresh. `document_sync.go` owns the
+open-buffer mirror and debounce state.
+`document_lint_snapshot.go` then freezes target identity, config ownership, rule
+catalog, and declared projects before `lint_execution.go` selects a session or
+isolated overlay Program. `diagnostics.go` and `code_action.go` consume that same
+snapshot, and `eslint_plugin.go` returns through the server-owned generation
+checks. These are phases of one LSP pipeline, not independently stateful
+services.
+
 An explicit JS/TS `--config` or API `overrideConfigFile` bypasses automatic
 candidate selection and loads the exact module. Its directory remains the
 authored base for relative config content, while the invocation cwd remains the
@@ -944,6 +994,13 @@ overrides are layered after target selection and config resolvers evaluate them
 in those same frozen path spaces.
 `internal/program/loader` consumes the plan but cannot add targets, change
 ownership, or reinterpret config-relative paths.
+
+After Program binding, `internal/config/lint` maps each Program source path
+through its `Resolver` back to that immutable selected target and resolves rules
+only through the target's recorded config owner. In invocation-wide single-config mode an
+unbound source still resolves against that one config; in an automatic
+multi-config catalog an unbound source receives no config. CLI and API share
+this decision and do not reconstruct owner selection independently.
 
 Git collection scope is independent from config-entry origin. Targets
 representable beneath `ScanRoot` share its scope; every requested directory
@@ -1053,6 +1110,10 @@ rslint [options] [files...]
 
 The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli/cli.ts`) and the Go binary (`cmd/rslint/`).
 
+The default Go CLI mode keeps one lint orchestration path in `lint_pipeline.go`. Supporting files own bounded command-layer concerns: `lint_options.go` parses invocation arguments and validates flag combinations; `lint_configuration.go` clones request-owned config maps and renders catalog warnings; `lint_diagnostics.go` normalizes diagnostics and explicit-file warnings; `lint_fix.go` owns one fix application and disk-write pass, while the pipeline retains multi-pass rebuild orchestration; and `eslint_plugin.go` supplies the CLI's owner-directory plugin routing projection and dispatch-failure stderr policy. Target selection remains in `internal/config/target`, source-to-config rule resolution in `internal/config/lint`, Program construction and active-owner project filtering in `internal/program/loader`, syntax/plugin execution and transport-neutral async dispatch in `internal/linter`, and report rendering in `internal/output`.
+
+The Go API mode keeps one lint-request orchestration path in `internal/api/server/lint.go`. Its `Handler` binds lint and AST requests to reverse plugin/config transports; bounded files own reverse config loading and activation, request-scoped overlay and canonical-path projection, API plugin routing/error presentation, and the separate inspector request with its content/options-keyed process cache. `cmd/rslint/api.go` only binds that handler to the generic `internal/api.Service` over process stdio and translates service failure to an exit code. API-specific path bases, opaque plugin routing keys, structured responses, and single-pass in-memory fixes remain inside `internal/api/server`. Config discovery, target planning, owner-bound rule resolution, active-owner project loading, target syntax diagnostics, prepared lint plans, native/plugin execution, and the pure fix algorithm are shared with the CLI through their owning packages.
+
 1. **Node.js Wrapper**: parses args, starts the Go engine, and hosts JS/TS module evaluation plus live third-party plugin objects
 2. **Config Catalog**: for automatic JS/TS discovery or an explicitly selected JS/TS config, Go builds the staged catalog and batches exact module-evaluation requests to Node. If automatic discovery finds no candidate, or a non-JS config was explicitly selected, the existing Go JSON loader path remains in control
 3. **Mode Selection**:
@@ -1060,11 +1121,11 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
    - `--api`: starts the IPC API server
    - default: runs direct CLI linting
 4. **Lint Target Plan**: Go resolves a stable target set from CLI/API scope, the implicit default baseline, explicit config `files`, global ignores, and `.gitignore`
-5. **Project Loading**: one request-scoped `program/loader.Session` resolves normalized tsconfig identities once per load. A focused selection execution retains parsed root metadata while choosing direct winners, then builds the deduplicated winner set in parallel; targets with no direct winner advance an ordered fallback frontier. Full-CWD/no-argument lint and type-check modes retain bounded eager parallel construction. Shared declared paths preserve each active config association and declaration order.
+5. **Project Loading**: one request-scoped `program/loader.Session` resolves normalized tsconfig identities once per load. Plain lint passes the complete resolved config catalog and target plan to the loader; the loader admits project declarations only from config owners represented in that plan. A focused selection execution retains parsed root metadata while choosing direct winners, then builds the deduplicated winner set in parallel; targets with no direct winner advance an ordered fallback frontier. Full-CWD/no-argument lint eagerly builds every declaration from those active owners, while program-wide type-check modes build every project from the complete effective catalog. Shared declared paths preserve each active config association and declaration order.
 6. **Target Binding**: the loader binds each target by exact lexical or canonical filesystem identity in two tiers: first declared direct root, then first declaration-order import-containing Program. It creates source-only Programs for supported unbound CLI targets, including projects with no tsconfig, and returns one ordered Program sequence plus parallel target projections. CLI/API never coordinate compiler construction or implement ownership themselves
-7. **Rule Plan Preparation**: `PrepareLintPlan()` receives one ordered sequence of rslint Programs, retains every selected file, and resolves each eligible file's complete rule set once from the stable lint-target path, never the ts-go source alias. The immutable result freezes the shared rule environment and per-file type eligibility alongside syntax-error and zero-rule files for native accounting while exposing the non-empty file/rule projection needed by third-party plugin dispatch. CLI and native API reuse the same plan for plugin and native execution; LSP keeps its single-document `LintSingleFile` adapter.
+7. **Rule Plan Preparation**: `PrepareLintPlan()` receives one ordered sequence of rslint Programs, retains every selected file, and resolves each eligible file's complete rule set through a caller-supplied handler. CLI and native API back that handler with the same `internal/config/lint` resolver and stable source-to-target binding; LSP uses its single-document config snapshot. The immutable result freezes the shared rule environment and per-file type eligibility alongside syntax-error and zero-rule files for native accounting while exposing the non-empty file/rule projection needed by third-party plugin dispatch.
 8. **Rule Execution**: `RunLinter()` schedules the unified Program sequence over the prepared plan. It asks only the Program facade to acquire checkers, retaining checker-exclusive grouping when available and sharding sufficiently large checker-free generations across at most `GOMAXPROCS` workers. Small checker-free Programs stay in one shard so scheduling and shared-consumer overhead cannot dominate their rule work. Each Program constructor freezes its complete source universe; target/config filters produce a separate execution projection, while cross-file rules always see the full universe. Prepared plans bind the exact Program pointer, so a reparse/fix generation must construct a new Program and plan. Module graphs and other derived structures are cached by Program generation rather than copied into `RuleContext`. The CLI supplies native edit demand independently of rule selection: diagnostics-only for plain lint, autofix-only for writable `--fix` passes, and diagnostics-only for the final verification pass. When `--type-check` is enabled, Phase 2 schedules only Programs that expose complete program diagnostics; source-only generations expose no such capability and require no parallel skip state.
-9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
+9. **Result Aggregation**: `internal/linter` projects target syntax diagnostics and exposes transport-neutral asynchronous plugin dispatch as a structured outcome. CLI and API decide when to start it alongside native linting and supply their own completion observers, retaining surface-owned stderr policy before the buffered outcome is published. CLI collects diagnostics through one run-scoped channel; API maps the same results into its response model
 10. **Fix Passes**: CLI multi-pass `--fix` applies fixes, rebuilds source generations, and rebinds the unchanged target plan after each pass. A file may be owned by a different Program generation after its import graph changes; Program objects are immutable identities and are never refreshed in place
 11. **Report Assembly**: the CLI builds one output report from the final post-fix diagnostics plus run metadata. Diagnostics carry an explicit lint or TypeScript origin, and the report computes error/warning/type-error counts once so the summary and exit policy use the same values; `--quiet` filters rendering only.
 12. **Output Formatting**: the CLI-private output subsystem renders `default`, JSON line, GitHub workflow command, or GitLab Code Quality formats. Only `default` emits a summary; machine-readable formats never emit ANSI styling or a summary.
@@ -1312,7 +1373,7 @@ JSON config supports only bundled plugin names because it cannot represent live 
 ### Integration Points
 
 - **Language Server**: `internal/lsp` exposes diagnostics and code actions
-- **JavaScript API**: `packages/rslint` talks to `cmd/rslint --api` through the versioned `2.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
+- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `2.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 
@@ -1391,7 +1452,8 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │ CLI / API / LSP / Website / WASM / tsgo                   │  ← cmd/, packages/, website/, crates/
 ├───────────────────────────────────────────────────────────┤
 │ Configuration / Target Planning / Program Loading / IPC   │  ← internal/config/, internal/config/target/,
-│ / Inspector                                               │     internal/program/loader/, internal/api/, internal/inspector/
+│ / API Server / Inspector                                  │     internal/program/loader/, internal/api/,
+│                                                           │     internal/api/server/, internal/inspector/
 ├───────────────────────────────────────────────────────────┤
 │ Linter Core / Rule Implementations / Catalog Assembly     │  ← internal/linter/, internal/rules/,
 │                                                           │     internal/plugins/
@@ -1518,7 +1580,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │  packages/rslint-wasm worker                                                 │
 │     │                                                                        │
 │     ▼                                                                        │
-│  wasm cmd/rslint --api                                                       │
+│  wasm cmd/rslint --api -> internal/api/server                                │
 │     │                                                                        │
 │     ├───────────────► internal/linter     -> diagnostics / encoded sources   │
 │     └───────────────► internal/inspector  -> node/type/symbol/flow info      │

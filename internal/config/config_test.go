@@ -508,6 +508,19 @@ func TestExtractLanguageOptions(t *testing.T) {
 			raw:  map[string]any{"ecmaVersion": float64(2020)},
 			want: rule.LanguageOptions{ECMAVersion: 2020},
 		},
+		{
+			name: "source type",
+			raw:  map[string]any{"sourceType": "commonjs"},
+			want: rule.LanguageOptions{SourceType: "commonjs"},
+		},
+		{
+			name: "legacy parserOptions source type is ignored",
+			raw:  map[string]any{"parserOptions": map[string]any{"sourceType": "script"}},
+		},
+		{
+			name: "invalid source type is dropped when validation is skipped",
+			raw:  map[string]any{"sourceType": "esm"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -565,13 +578,14 @@ func TestConfiguredRulesPropagatesLanguageOptions(t *testing.T) {
 	configured, _ := ResolveEnabledRules(catalog, RslintConfig{{
 		LanguageOptions: &LanguageOptions{Raw: map[string]any{
 			"ecmaVersion": float64(16),
+			"sourceType":  "script",
 		}},
 		Rules: Rules{"probe": "error"},
 	}}, "file.js", "", false)
 	if len(configured) != 1 {
 		t.Fatalf("configured rules = %d, want 1", len(configured))
 	}
-	want := rule.LanguageOptions{ECMAVersion: 2025}
+	want := rule.LanguageOptions{ECMAVersion: 2025, SourceType: "script"}
 	if got := configured[0].Environment.LanguageOptions; got != want {
 		t.Fatalf("configured language options = %+v, want %+v", got, want)
 	}
