@@ -4,7 +4,9 @@ import (
 	_ "embed"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -13,16 +15,16 @@ import (
 var schemaJSON []byte
 
 type PreferReadonlyParameterTypesOptions struct {
-	CheckParameterProperties bool     `json:"checkParameterProperties"`
-	IgnoreInferredTypes      bool     `json:"ignoreInferredTypes"`
-	TreatMethodsAsReadonly   bool     `json:"treatMethodsAsReadonly"`
-	Allow                    []string `json:"allow"`
+	CheckParameterProperties bool `json:"checkParameterProperties"`
+	IgnoreInferredTypes      bool `json:"ignoreInferredTypes"`
+	TreatMethodsAsReadonly   bool
+	Allow                    []utils.TypeOrValueSpecifier
 }
 
 func buildShouldBeReadonlyMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "shouldBeReadonly",
-		Description: "Parameter should be a readonly type.",
+		Description: "Parameter should be a read only type.",
 	}
 }
 
@@ -45,65 +47,10 @@ func parseOptions(options []any) PreferReadonlyParameterTypesOptions {
 	if v, ok := optsMap["treatMethodsAsReadonly"].(bool); ok {
 		opts.TreatMethodsAsReadonly = v
 	}
-	if v, ok := optsMap["allow"].([]interface{}); ok {
-		opts.Allow = make([]string, 0, len(v))
-		for _, item := range v {
-			if s, ok := item.(string); ok {
-				opts.Allow = append(opts.Allow, s)
-			}
-		}
+	if v, ok := optsMap["allow"]; ok {
+		opts.Allow = utils.ParseTypeOrValueSpecifiers(v)
 	}
 	return opts
-}
-
-// isReadonlyType checks if a type is readonly
-// This is a simplified implementation that focuses on the most common cases
-func isReadonlyType(t *checker.Type, opts PreferReadonlyParameterTypesOptions) bool {
-	if t == nil {
-		return false
-	}
-
-	flags := checker.Type_flags(t)
-
-	// Primitives are always readonly
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|
-		checker.TypeFlagsBooleanLike|checker.TypeFlagsBigIntLike|
-		checker.TypeFlagsVoidLike|checker.TypeFlagsUndefined|
-		checker.TypeFlagsNull|checker.TypeFlagsNever|
-		checker.TypeFlagsESSymbolLike|checker.TypeFlagsAny|
-		checker.TypeFlagsUnknown) {
-		return true
-	}
-
-	// Enum types
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsEnumLike) {
-		return true
-	}
-
-	// Union types - all members must be readonly
-	if flags&checker.TypeFlagsUnion != 0 {
-		for _, memberType := range t.Types() {
-			if !isReadonlyType(memberType, opts) {
-				return false
-			}
-		}
-		return true
-	}
-
-	// Intersection types - at least one member must be readonly
-	if flags&checker.TypeFlagsIntersection != 0 {
-		for _, memberType := range t.Types() {
-			if isReadonlyType(memberType, opts) {
-				return true
-			}
-		}
-		return false
-	}
-
-	// For now, conservatively treat all object types as NOT readonly
-	// unless they meet specific conditions we can detect
-	// This simplified version will be less accurate but won't cause build errors
-	return false
 }
 
 // checkParameter validates a parameter node
@@ -118,15 +65,27 @@ func checkParameter(ctx rule.RuleContext, param *ast.Node, opts PreferReadonlyPa
 		return
 	}
 
-	// Get the type of the parameter
+	// Reading an authored annotation through GetTypeFromTypeNode preserves its
+	// alias symbol, which is required for allowlist matching around unions.
 	paramType := ctx.TypeChecker.GetTypeAtLocation(param)
+	if paramDecl.Type != nil {
+		paramType = ctx.TypeChecker.GetTypeFromTypeNode(paramDecl.Type)
+	}
 	if paramType == nil {
 		return
 	}
 
-	// Check if the parameter type is readonly
-	if !isReadonlyType(paramType, opts) {
-		ctx.ReportNode(param, buildShouldBeReadonlyMessage())
+	readonly := typescriptutil.IsTypeReadonly(ctx.TypeChecker, paramType, typescriptutil.ReadonlynessOptions{
+		Allow:                  opts.Allow,
+		TreatMethodsAsReadonly: opts.TreatMethodsAsReadonly,
+	}, ctx.Program())
+	if !readonly && !typescriptutil.IsTypeBrandedLiteralLike(ctx.TypeChecker, paramType) {
+		start := param.Pos()
+		if ast.IsParameterPropertyDeclaration(param, param.Parent) {
+			start = paramDecl.Name().Pos()
+		}
+		start = scanner.SkipTrivia(ctx.SourceFile.Text(), start)
+		ctx.ReportRange(core.NewTextRange(start, param.End()), buildShouldBeReadonlyMessage())
 	}
 }
 
@@ -144,6 +103,9 @@ var PreferReadonlyParameterTypesRule = rule.CreateRule(rule.Rule{
 			}
 
 			for _, param := range params {
+				if !opts.CheckParameterProperties && ast.IsParameterPropertyDeclaration(param, node) {
+					continue
+				}
 				checkParameter(ctx, param, opts)
 			}
 		}
@@ -153,13 +115,13 @@ var PreferReadonlyParameterTypesRule = rule.CreateRule(rule.Rule{
 			ast.KindFunctionExpression:  checkParameters,
 			ast.KindArrowFunction:       checkParameters,
 			ast.KindMethodDeclaration:   checkParameters,
-			ast.KindConstructor: func(node *ast.Node) {
-				// For constructors, check parameter properties if enabled
-				if !opts.CheckParameterProperties {
-					return
-				}
-				checkParameters(node)
-			},
+			ast.KindConstructor:         checkParameters,
+			ast.KindGetAccessor:         checkParameters,
+			ast.KindSetAccessor:         checkParameters,
+			ast.KindCallSignature:       checkParameters,
+			ast.KindConstructSignature:  checkParameters,
+			ast.KindFunctionType:        checkParameters,
+			ast.KindMethodSignature:     checkParameters,
 		}
 	},
 })
