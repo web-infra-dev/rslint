@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -209,11 +210,37 @@ func (s *camelcaseState) checkFile() {
 }
 
 func (s *camelcaseState) reportBinding(node *ast.Node, name string) {
+	node = bindingReportIdentifier(node)
 	if _, exists := s.reported[node.Pos()]; exists {
 		return
 	}
 	s.reported[node.Pos()] = struct{}{}
 	s.ctx.ReportRange(utils.GetESTreeBindingIdentifierRange(s.ctx.SourceFile, node), camelcaseMessage(name, false))
+}
+
+// bindingReportIdentifier reproduces scope-manager's binding anchor for an
+// implemented function overload set. The implementation is the syntax node
+// that triggers upstream's FunctionDeclaration listener, but its declared
+// variable retains the first overload signature as identifiers[0]. A purely
+// ambient/body-less declaration never reaches this helper.
+func bindingReportIdentifier(node *ast.Node) *ast.Node {
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindFunctionDeclaration || node.Parent.Body() == nil {
+		return node
+	}
+	symbol := utils.BindingNameSymbol(node)
+	if symbol == nil {
+		return node
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration.Kind != ast.KindFunctionDeclaration {
+			continue
+		}
+		name := declaration.Name()
+		if name != nil && name.Kind == ast.KindIdentifier && name.Text() == node.Text() {
+			return name
+		}
+	}
+	return node
 }
 
 func (s *camelcaseState) reportReference(node *ast.Node, name string) {
@@ -411,8 +438,31 @@ func isPrivatePropertyName(node *ast.Node) bool {
 
 func isAssignedPropertyAccessName(node *ast.Node) bool {
 	parent := node.Parent
-	return parent != nil && parent.Kind == ast.KindPropertyAccessExpression &&
-		parent.AsPropertyAccessExpression().Name() == node && utils.IsWriteReference(parent)
+	if parent == nil || parent.Kind != ast.KindPropertyAccessExpression ||
+		parent.AsPropertyAccessExpression().Name() != node {
+		return false
+	}
+
+	// Espree erases parentheses, but TypeScript assertion and non-null wrappers
+	// remain real ESTree parents. Only parentheses are transparent here.
+	target := utils.OutermostParenthesizedExpression(parent)
+	owner := target.Parent
+	if owner == nil {
+		return false
+	}
+	switch owner.Kind {
+	case ast.KindBinaryExpression:
+		binary := owner.AsBinaryExpression()
+		return binary.Left == target && ast.IsAssignmentOperator(binary.OperatorToken.Kind)
+	case ast.KindPropertyAssignment:
+		property := owner.AsPropertyAssignment()
+		return property.Initializer == target && utils.IsInDestructuringAssignment(owner)
+	case ast.KindArrayLiteralExpression:
+		return utils.IsInDestructuringAssignment(owner)
+	case ast.KindSpreadElement, ast.KindSpreadAssignment:
+		return utils.IsInDestructuringAssignment(owner)
+	}
+	return false
 }
 
 func isExportedName(node *ast.Node) bool {
@@ -438,6 +488,29 @@ func isLabel(node *ast.Node) bool {
 }
 
 func isRuntimeReference(node *ast.Node) bool {
+	if isJsxIntrinsicTagName(node) {
+		return false
+	}
 	return node != nil && !ast.IsPartOfTypeNode(node) && !ast.IsPartOfTypeQuery(node) &&
 		!utils.IsNonReferenceIdentifier(node)
+}
+
+// isJsxIntrinsicTagName reports bare lowercase intrinsic tag identifiers such
+// as both `snake_case` nodes in `<snake_case></snake_case>`. JSX namespace
+// names and dotted component names are distinct upstream shapes and remain
+// eligible for ordinary reference handling.
+func isJsxIntrinsicTagName(node *ast.Node) bool {
+	if node == nil || node.Parent == nil || !scanner.IsIntrinsicJsxName(node.Text()) {
+		return false
+	}
+	var tagName *ast.Node
+	switch node.Parent.Kind {
+	case ast.KindJsxOpeningElement:
+		tagName = node.Parent.AsJsxOpeningElement().TagName
+	case ast.KindJsxSelfClosingElement:
+		tagName = node.Parent.AsJsxSelfClosingElement().TagName
+	case ast.KindJsxClosingElement:
+		tagName = node.Parent.AsJsxClosingElement().TagName
+	}
+	return tagName == node
 }

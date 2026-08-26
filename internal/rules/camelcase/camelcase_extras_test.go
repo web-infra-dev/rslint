@@ -18,6 +18,12 @@ func TestCamelcaseExtras(t *testing.T) {
 		t,
 		&CamelcaseRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Regression: upstream's MemberExpression target helper excludes updates and loop headers ----
+			{Code: `obj.snake_case++; ++obj.other_case; for (obj.third_case in source); for (obj.fourth_case of source);`},
+			// ---- WRAP-03/WRAP-05: TypeScript wrappers stop member assignment-target classification ----
+			{Code: `[obj.snake_case!] = source; [obj.other_case as any] = source;`},
+			// ---- AST-16/VIS-01: lowercase intrinsic JSX tags are not runtime references ----
+			{Code: `const element = <snake_case></snake_case>`, Tsx: true},
 			// ---- Dimension 4: parentheses are transparent to direct-call exclusions ----
 			{Code: `(snake_case)()`},
 			// ---- Dimension 4: optional-chain read-only property ----
@@ -58,6 +64,14 @@ func TestCamelcaseExtras(t *testing.T) {
 			{Code: `this.data.nested.variable_from_backend = "value"`, Options: map[string]any{"properties": "never"}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- AST-03/RANGE-01: an implementation reports the first overload identifier ----
+			{
+				Code: `function snake_case(value_name: string): void; function snake_case(value_name: string) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 20},
+					{MessageId: "notCamelCase", Line: 1, Column: 68, EndLine: 1, EndColumn: 86},
+				},
+			},
 			// ---- Dimension 4: parenthesized declaration initializer remains a reference ----
 			{
 				Code:   `const value = (snake_case)`,
@@ -204,4 +218,16 @@ func TestCamelcaseExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestCamelcaseAllowSchemaRejectsInvalidRegexp(t *testing.T) {
+	invalid := []any{map[string]any{"allow": []any{"["}}}
+	if err := CamelcaseRule.Schema.Validate(invalid); err == nil {
+		t.Fatal("expected an invalid allow regexp to fail schema validation")
+	}
+
+	valid := []any{map[string]any{"allow": []any{`^(?=snake_)snake_case$`}}}
+	if err := CamelcaseRule.Schema.Validate(valid); err != nil {
+		t.Fatalf("expected a valid JavaScript regexp to pass schema validation: %v", err)
+	}
 }
