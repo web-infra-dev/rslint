@@ -37,12 +37,11 @@ func TestDefaultParamLastExtras(t *testing.T) {
 			// ---- Dimension 4: graceful degradation ----
 			{Code: "function empty() {}"},
 			{Code: "function destructured({value}, [fallback] = []) {}"},
-			{Code: "function rest(defaulted = 1, ...values) {}"},
 			// typescript-eslint exposes bodyless declarations as nodes outside the upstream listeners.
 			{Code: "declare function overloaded(optional?: number, required: number): void;"},
 			{Code: "abstract class C { abstract method(optional?: number, required: number): void; }"},
 			{Code: "class C { constructor(optional?: number, required: number); constructor(required: number) {} }"},
-			{Code: "interface I { method(optional?: number, required?: number): void; }"},
+			{Code: "interface I { method(optional?: number, required: number): void; }"},
 			// N/A: spread assignments and standalone rest binding elements cannot occur as function-list members.
 
 			// Locks in upstream isRequiredParameter() RestElement arm: rest does not make a preceding default invalid.
