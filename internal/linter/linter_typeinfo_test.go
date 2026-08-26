@@ -25,12 +25,18 @@ func runProgramCapabilityProbe(
 	rules RuleHandler,
 ) *LintResult {
 	t.Helper()
+	programs := []*lintprogram.Program{sourceProgram}
+	targets := sourceProgram.RootFileNames()
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{targets},
+		SingleThreaded:   true,
+		GetRulesForFile:  rules,
+	})
 	result, err := RunLinter(RunLinterOptions{
-		Programs:        []*lintprogram.Program{sourceProgram},
-		SingleThreaded:  true,
-		ExcludePaths:    []string{},
-		GetRulesForFile: rules,
-		Consumer:        rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		Consumer:       rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)

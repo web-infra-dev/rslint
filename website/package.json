@@ -28,7 +28,6 @@
     "@rsbuild/plugin-sass": "catalog:",
     "@rslint/api": "workspace:*",
     "@rslint/core": "workspace:*",
-    "@rslint/wasm": "workspace:*",
     "@rspress/core": "catalog:",
     "@rspress/plugin-sitemap": "catalog:",
     "@rstack-dev/doc-ui": "catalog:",

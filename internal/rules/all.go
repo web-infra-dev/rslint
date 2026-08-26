@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/block_scoped_var"
+	"github.com/web-infra-dev/rslint/internal/rules/capitalized_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/class_methods_use_this"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
@@ -122,6 +123,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_exports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_globals"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
+	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_properties"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_syntax"
 	"github.com/web-infra-dev/rslint/internal/rules/no_return_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_script_url"
@@ -228,6 +230,7 @@ func coreRules() []rule.Rule {
 		array_callback_return.ArrayCallbackReturnRule,
 		arrow_body_style.ArrowBodyStyleRule,
 		block_scoped_var.BlockScopedVarRule,
+		capitalized_comments.CapitalizedCommentsRule,
 		class_methods_use_this.ClassMethodsUseThisRule,
 		complexity.ComplexityRule,
 		consistent_return.ConsistentReturnRule,
@@ -309,6 +312,7 @@ func coreRules() []rule.Rule {
 		no_restricted_exports.NoRestrictedExportsRule,
 		no_restricted_globals.NoRestrictedGlobalsRule,
 		no_restricted_imports.NoRestrictedImportsRule,
+		no_restricted_properties.NoRestrictedPropertiesRule,
 		no_restricted_syntax.NoRestrictedSyntaxRule,
 		no_multi_assign.NoMultiAssignRule,
 		no_multi_str.NoMultiStrRule,

@@ -90,11 +90,11 @@ export const FlowGraphSection: React.FC<FlowGraphSectionProps> = ({ info }) => {
   };
 
   return (
-    <div className="mt-3 pt-3 border-t border-gray-200">
+    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
       <div className="text-gray-500 text-[10px] mb-2">
         Graph: {info.graph.nodes.length} nodes, {info.graph.edges.length} edges
       </div>
-      <div className="border border-gray-200 rounded bg-gray-50 p-2">
+      <div className="border border-gray-200 rounded bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900">
         <FlowGraphView graph={info.graph} onNodeHover={handleNodeHover} />
       </div>
     </div>
@@ -144,13 +144,13 @@ const FlowInfoArray: React.FC<FlowInfoArrayProps> = ({ label, items }) => {
     <div className="font-mono text-xs leading-relaxed">
       <div className="flex items-center py-0.5">
         <span
-          className="text-[10px] text-gray-500 w-4 flex-shrink-0 text-center cursor-pointer hover:bg-gray-200 rounded"
+          className="text-[10px] text-gray-500 w-4 flex-shrink-0 text-center cursor-pointer hover:bg-gray-200 rounded dark:hover:bg-gray-700"
           onClick={handleToggle}
         >
           {expanded ? '▼' : '▶'}
         </span>
         <span
-          className="text-purple-600 cursor-pointer hover:underline"
+          className="text-purple-600 cursor-pointer hover:underline dark:text-purple-400"
           onClick={handleToggle}
         >
           {label}
@@ -163,7 +163,7 @@ const FlowInfoArray: React.FC<FlowInfoArrayProps> = ({ label, items }) => {
       </div>
       {expanded && (
         <>
-          <div className="ml-4 border-l border-gray-200 pl-2">
+          <div className="ml-4 border-l border-gray-200 pl-2 dark:border-gray-700">
             {items.map((item, index) =>
               item ? (
                 <FlowInfoLazy

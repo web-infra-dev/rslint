@@ -21,6 +21,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -1331,17 +1332,17 @@ func runRuleLeniently(t *testing.T, code string, tsx bool) []rule.RuleDiagnostic
 	}
 
 	var diags []rule.RuleDiagnostic
-	linter.RunLinterInProgram(lintprogram.NewFromCompiler(program), nil, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []linter.ConfiguredRule {
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                lintprogram.NewFromCompiler(program),
+		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
 			if sf.FileName() != filePath {
 				return nil
 			}
 			return []linter.ConfiguredRule{configured}
 		},
-		false,
-		func(d rule.RuleDiagnostic) { diags = append(diags, d) },
-		nil,
-	)
+		OnDiagnostic: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
+	})
 	sort.SliceStable(diags, func(i, j int) bool {
 		return diags[i].Range.Pos() < diags[j].Range.Pos()
 	})

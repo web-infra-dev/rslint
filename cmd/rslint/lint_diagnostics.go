@@ -205,8 +205,8 @@ func collectAllowFileWarnings(
 //
 // Any type-check mode (`--type-check` or `--type-check-only`) must NOT take
 // the short-circuit: Phase 2 runs program-wide and is not gated by the CLI
-// Scope/PerProgramFilter that drives lintedFileCount, so lintedFileCount==0
-// is a normal state in which Phase 2 may still have produced diagnostics.
+// lint-target plan that drives lintedFileCount, so lintedFileCount==0 is a
+// normal state in which Phase 2 may still have produced diagnostics.
 // Short-circuiting there would silently drop type errors that the user
 // explicitly asked for — see website/docs/en/guide/type-checking.md.
 func shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted bool, lintedFileCount int32) bool {

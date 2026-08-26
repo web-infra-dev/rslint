@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func mustPrepareLintPlan(t *testing.T, opts RunLinterOptions) *LintPlan {
+func mustPrepareLintPlan(t *testing.T, opts PrepareLintPlanOptions) *LintPlan {
 	t.Helper()
 	plan, err := PrepareLintPlan(opts)
 	if err != nil {
@@ -26,7 +27,7 @@ func mustPrepareLintPlan(t *testing.T, opts RunLinterOptions) *LintPlan {
 	return plan
 }
 
-func TestLintProjectionReusesUnchangedProgramUniverse(t *testing.T) {
+func TestExactLintProjectionReusesUnchangedProgramUniverse(t *testing.T) {
 	raw, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "export const a = 1;",
 		"b.ts": "export const b = 1;",
@@ -39,57 +40,20 @@ func TestLintProjectionReusesUnchangedProgramUniverse(t *testing.T) {
 	sourceProgram := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{a, b})
 	universe := sourceProgram.SourceFiles()
 
-	scanned := collectFilesToLint(programPlanOptions{
-		Program:      sourceProgram,
-		ExcludePaths: []string{},
-	})
-	if len(scanned) != len(universe) || &scanned[0] != &universe[0] {
-		t.Fatal("unchanged scan projection copied the Program source universe")
+	exact, err := resolveExactProgramFiles(sourceProgram, []string{a.FileName(), b.FileName()})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	exact := collectFilesToLint(programPlanOptions{
-		Program:        sourceProgram,
-		ExcludePaths:   []string{},
-		TargetFiles:    []string{a.FileName(), b.FileName()},
-		HasTargetFiles: true,
-	})
 	if len(exact) != len(universe) || &exact[0] != &universe[0] {
 		t.Fatal("unchanged exact projection copied the Program source universe")
 	}
 
-	excluded := collectFilesToLint(programPlanOptions{
-		Program:      sourceProgram,
-		ExcludePaths: []string{string(b.Path())},
-	})
-	if len(excluded) != 1 || excluded[0] != a || len(universe) != 2 || universe[1] != b {
-		t.Fatalf("filtered projection=%v corrupted universe=%v", excluded, universe)
+	subset, err := resolveExactProgramFiles(sourceProgram, []string{a.FileName()})
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestExactLintProjectionCallsFilterOncePerTarget(t *testing.T) {
-	raw, paths := createTestProgramWithFiles(t, map[string]string{
-		"a.ts": "export const a = 1;",
-		"b.ts": "export const b = 1;",
-	})
-	a := raw.GetSourceFile(paths["a.ts"])
-	b := raw.GetSourceFile(paths["b.ts"])
-	if a == nil || b == nil {
-		t.Fatal("fixture Program did not contain both source files")
-	}
-	sourceProgram := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{a, b})
-	calls := map[string]int{}
-	files := collectFilesToLint(programPlanOptions{
-		Program:        sourceProgram,
-		ExcludePaths:   []string{},
-		TargetFiles:    []string{a.FileName(), b.FileName()},
-		HasTargetFiles: true,
-		FileFilter: func(fileName string) bool {
-			calls[fileName]++
-			return fileName != b.FileName()
-		},
-	})
-	if len(files) != 1 || files[0] != a || calls[a.FileName()] != 1 || calls[b.FileName()] != 1 {
-		t.Fatalf("projection=%v filter calls=%v", files, calls)
+	if len(subset) != 1 || subset[0] != a || len(universe) != 2 || universe[1] != b {
+		t.Fatalf("subset projection=%v corrupted universe=%v", subset, universe)
 	}
 }
 
@@ -133,26 +97,14 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 		}
 	}
 
-	directCalls := make(map[string]int)
-	directResult, err := RunLinter(RunLinterOptions{
-		Programs:        programs,
-		SingleThreaded:  true,
-		TargetFiles:     targets,
-		GetRulesForFile: newRuleHandler(directCalls),
-	})
-	if err != nil {
-		t.Fatalf("direct RunLinter failed: %v", err)
-	}
-
 	preparedCalls := make(map[string]int)
-	preparedOpts := RunLinterOptions{
-		Programs:        programs,
-		SingleThreaded:  true,
-		TargetFiles:     targets,
-		GetRulesForFile: newRuleHandler(preparedCalls),
-	}
-	preparedOpts.PreparedPlan = mustPrepareLintPlan(t, preparedOpts)
-	pluginTargets := preparedOpts.PreparedPlan.Targets()
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
+		TargetsByProgram: targets,
+		GetRulesForFile:  newRuleHandler(preparedCalls),
+	})
+	pluginTargets := plan.Targets()
 	if len(pluginTargets) != 1 || pluginTargets[0].File.FileName() != paths["a.ts"] {
 		t.Fatalf("prepared plugin projection = %+v, want only a.ts", pluginTargets)
 	}
@@ -160,12 +112,12 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 		t.Fatalf("prepared a.ts rules = %d, want native and plugin rules", len(pluginTargets[0].Rules))
 	}
 
-	preparedResult, err := RunLinter(preparedOpts)
+	preparedResult, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       plan,
+	})
 	if err != nil {
 		t.Fatalf("prepared RunLinter failed: %v", err)
-	}
-	if !reflect.DeepEqual(preparedResult, directResult) {
-		t.Fatalf("prepared result = %#v, direct result = %#v", preparedResult, directResult)
 	}
 	if preparedResult.LintedFileCount != 3 {
 		t.Fatalf("prepared LintedFileCount = %d, want zero-rule files included", preparedResult.LintedFileCount)
@@ -175,9 +127,6 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 	}
 	if _, ok := preparedResult.ExecutedRules["type-aware-rule"]; ok {
 		t.Fatal("prepared ExecutedRules retained a type-aware rule for a gap file")
-	}
-	if !reflect.DeepEqual(preparedCalls, directCalls) {
-		t.Fatalf("prepared callback calls = %v, direct callback calls = %v", preparedCalls, directCalls)
 	}
 	if preparedCalls[paths["a.ts"]] != 1 || preparedCalls[paths["gap.ts"]] != 1 || preparedCalls[paths["zero.ts"]] != 1 {
 		t.Fatalf("prepared callback should run exactly once per eligible file, got %v", preparedCalls)
@@ -193,84 +142,80 @@ func TestLintPlanRunsSourceOnlyProgramWithoutChecker(t *testing.T) {
 		t.Fatal("fixture Program did not contain gap.ts")
 	}
 	sourceOnly := mustSourceOnlyTestProgram(t, program, []*ast.SourceFile{file})
-
-	for _, prepared := range []bool{false, true} {
-		t.Run(fmt.Sprintf("prepared=%t", prepared), func(t *testing.T) {
-			nativeRuns := 0
-			typeAwareRuns := 0
-			var reports atomic.Int32
-			opts := RunLinterOptions{
-				Programs:       testPrograms(sourceOnly),
-				SingleThreaded: true,
-				GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-					return []ConfiguredRule{
-						{
-							Name:     "source-only-native",
-							Severity: rule.SeverityError,
-							Run: func(ctx rule.RuleContext) rule.RuleListeners {
-								nativeRuns++
-								if ctx.Program() != sourceOnly || ctx.Program().CanProvideTypeChecker(ctx.SourceFile) || ctx.TypeChecker != nil {
-									t.Fatal("source-only Program received the wrong capabilities")
-								}
-								if !ctx.Program().IsValid() || ctx.Refs == nil || !ctx.SourceFile.IsBound() {
-									t.Fatal("source-only Program lost source or binder services")
-								}
-								return rule.RuleListeners{
-									ast.KindIdentifier: func(node *ast.Node) {
-										if node.Text() == "missing" {
-											ctx.ReportNode(node, rule.RuleMessage{Description: "source-only"})
-										}
-									},
+	nativeRuns := 0
+	typeAwareRuns := 0
+	var reports atomic.Int32
+	programs := testPrograms(sourceOnly)
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{file.FileName()}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			return []ConfiguredRule{
+				{
+					Name:     "source-only-native",
+					Severity: rule.SeverityError,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						nativeRuns++
+						if ctx.Program() != sourceOnly || ctx.Program().CanProvideTypeChecker(ctx.SourceFile) || ctx.TypeChecker != nil {
+							t.Fatal("source-only Program received the wrong capabilities")
+						}
+						if !ctx.Program().IsValid() || ctx.Refs == nil || !ctx.SourceFile.IsBound() {
+							t.Fatal("source-only Program lost source or binder services")
+						}
+						return rule.RuleListeners{
+							ast.KindIdentifier: func(node *ast.Node) {
+								if node.Text() == "missing" {
+									ctx.ReportNode(node, rule.RuleMessage{Description: "source-only"})
 								}
 							},
-						},
-						{
-							Name:             "source-only-type-aware",
-							Severity:         rule.SeverityError,
-							RequiresTypeInfo: true,
-							Run: func(rule.RuleContext) rule.RuleListeners {
-								typeAwareRuns++
-								return nil
-							},
-						},
-					}
+						}
+					},
 				},
-				Consumer: rule.DiagnosticConsumer{
-					Demand: rule.EditDemandNone,
-					Report: func(rule.RuleDiagnostic) {
-						reports.Add(1)
+				{
+					Name:             "source-only-type-aware",
+					Severity:         rule.SeverityError,
+					RequiresTypeInfo: true,
+					Run: func(rule.RuleContext) rule.RuleListeners {
+						typeAwareRuns++
+						return nil
 					},
 				},
 			}
-			if prepared {
-				opts.PreparedPlan = mustPrepareLintPlan(t, opts)
-				targets := opts.PreparedPlan.Targets()
-				if len(targets) != 1 || targets[0].File != file || len(targets[0].Rules) != 1 ||
-					targets[0].Rules[0].Name != "source-only-native" {
-					t.Fatalf("source-only prepared targets = %+v", targets)
-				}
-			}
-
-			result, err := RunLinter(opts)
-			if err != nil {
-				t.Fatalf("RunLinter: %v", err)
-			}
-			if result.LintedFileCount != 1 || nativeRuns != 1 || typeAwareRuns != 0 || reports.Load() != 1 {
-				t.Fatalf(
-					"source-only result differs: files=%d native=%d typeAware=%d reports=%d",
-					result.LintedFileCount,
-					nativeRuns,
-					typeAwareRuns,
-					reports.Load(),
-				)
-			}
-			if _, ok := result.ExecutedRules["source-only-native"]; !ok {
-				t.Fatal("source-only native rule missing from ExecutedRules")
-			}
-			if _, ok := result.ExecutedRules["source-only-type-aware"]; ok {
-				t.Fatal("type-aware rule executed for source-only Program")
-			}
-		})
+		},
+	})
+	targets := plan.Targets()
+	if len(targets) != 1 || targets[0].File != file || len(targets[0].Rules) != 1 ||
+		targets[0].Rules[0].Name != "source-only-native" {
+		t.Fatalf("source-only prepared targets = %+v", targets)
+	}
+	result, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       plan,
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandNone,
+			Report: func(rule.RuleDiagnostic) {
+				reports.Add(1)
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	if result.LintedFileCount != 1 || nativeRuns != 1 || typeAwareRuns != 0 || reports.Load() != 1 {
+		t.Fatalf(
+			"source-only result differs: files=%d native=%d typeAware=%d reports=%d",
+			result.LintedFileCount,
+			nativeRuns,
+			typeAwareRuns,
+			reports.Load(),
+		)
+	}
+	if _, ok := result.ExecutedRules["source-only-native"]; !ok {
+		t.Fatal("source-only native rule missing from ExecutedRules")
+	}
+	if _, ok := result.ExecutedRules["source-only-type-aware"]; ok {
+		t.Fatal("type-aware rule executed for source-only Program")
 	}
 }
 
@@ -285,53 +230,49 @@ func TestSourceOnlyPlanSeparatesUniverseFromExecutionProjection(t *testing.T) {
 		t.Fatal("fixture Program did not contain both source files")
 	}
 	sourceOnly := mustSourceOnlyTestProgram(t, program, []*ast.SourceFile{nil, a, a, a, b})
-	for _, prepared := range []bool{false, true} {
-		t.Run(fmt.Sprintf("prepared=%t", prepared), func(t *testing.T) {
-			var resolved atomic.Int32
-			var runs atomic.Int32
-			opts := RunLinterOptions{
-				Programs:       testPrograms(sourceOnly),
-				SingleThreaded: true,
-				ExcludePaths:   []string{string(b.Path())},
-				GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
-					resolved.Add(1)
-					if file != a {
-						t.Fatalf("resolved rules for %q, want only a.ts", file.FileName())
-					}
-					return []ConfiguredRule{{
-						Name:     "source-only-projection",
-						Severity: rule.SeverityError,
-						Run: func(rule.RuleContext) rule.RuleListeners {
-							runs.Add(1)
-							return nil
-						},
-					}}
+	var resolved atomic.Int32
+	var runs atomic.Int32
+	programs := testPrograms(sourceOnly)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{a.FileName()}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
+			resolved.Add(1)
+			if file != a {
+				t.Fatalf("resolved rules for %q, want only a.ts", file.FileName())
+			}
+			return []ConfiguredRule{{
+				Name:     "source-only-projection",
+				Severity: rule.SeverityError,
+				Run: func(rule.RuleContext) rule.RuleListeners {
+					runs.Add(1)
+					return nil
 				},
-			}
-			if prepared {
-				opts.PreparedPlan = mustPrepareLintPlan(t, opts)
-				plan := opts.PreparedPlan.programs[0]
-				if !slices.Equal(plan.program.SourceFiles(), []*ast.SourceFile{a, b}) {
-					t.Fatalf("source universe = %v, want [a.ts b.ts]", plan.program.SourceFiles())
-				}
-				if len(plan.files) != 1 || plan.files[0].file != a {
-					t.Fatalf("execution projection = %v, want [a.ts]", plan.files)
-				}
-			}
-
-			result, err := RunLinter(opts)
-			if err != nil {
-				t.Fatalf("RunLinter: %v", err)
-			}
-			if result.LintedFileCount != 1 || resolved.Load() != 1 || runs.Load() != 1 {
-				t.Fatalf(
-					"source-only projection result: files=%d resolved=%d runs=%d",
-					result.LintedFileCount,
-					resolved.Load(),
-					runs.Load(),
-				)
-			}
-		})
+			}}
+		},
+	})
+	plan := lintPlan.programs[0]
+	if !slices.Equal(plan.program.SourceFiles(), []*ast.SourceFile{a, b}) {
+		t.Fatalf("source universe = %v, want [a.ts b.ts]", plan.program.SourceFiles())
+	}
+	if len(plan.files) != 1 || plan.files[0].file != a {
+		t.Fatalf("execution projection = %v, want [a.ts]", plan.files)
+	}
+	result, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+	})
+	if err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	if result.LintedFileCount != 1 || resolved.Load() != 1 || runs.Load() != 1 {
+		t.Fatalf(
+			"source-only projection result: files=%d resolved=%d runs=%d",
+			result.LintedFileCount,
+			resolved.Load(),
+			runs.Load(),
+		)
 	}
 }
 
@@ -354,9 +295,11 @@ func TestSourceOnlyProgramSharesModuleGraphAndDerivedCache(t *testing.T) {
 	sourceOnly := mustSourceOnlyTestProgram(t, program, files)
 
 	var cacheBuilds atomic.Int32
-	opts := RunLinterOptions{
-		Programs:       testPrograms(sourceOnly),
-		SingleThreaded: true,
+	programs := testPrograms(sourceOnly)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{files[0].FileName(), files[1].FileName()}},
+		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
 				Name:     "source-only-modules",
@@ -384,9 +327,11 @@ func TestSourceOnlyProgramSharesModuleGraphAndDerivedCache(t *testing.T) {
 				},
 			}}
 		},
-	}
-	opts.PreparedPlan = mustPrepareLintPlan(t, opts)
-	result, err := RunLinter(opts)
+	})
+	result, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
 	}
@@ -415,10 +360,11 @@ func TestSourceOnlyProgramRunsProgramIndexedImportRule(t *testing.T) {
 	sourceOnly := mustSourceOnlyTestProgram(t, program, files)
 
 	var reports atomic.Int32
-	opts := RunLinterOptions{
-		Programs:       testPrograms(sourceOnly),
-		SingleThreaded: true,
-		ExcludePaths:   []string{string(files[1].Path())},
+	programs := testPrograms(sourceOnly)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{files[0].FileName()}},
+		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
 				Name:     no_cycle.NoCycleRule.Name,
@@ -431,6 +377,10 @@ func TestSourceOnlyProgramRunsProgramIndexedImportRule(t *testing.T) {
 				},
 			}}
 		},
+	})
+	result, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(diagnostic rule.RuleDiagnostic) {
 				if diagnostic.RuleName != no_cycle.NoCycleRule.Name {
@@ -439,9 +389,7 @@ func TestSourceOnlyProgramRunsProgramIndexedImportRule(t *testing.T) {
 				reports.Add(1)
 			},
 		},
-	}
-	opts.PreparedPlan = mustPrepareLintPlan(t, opts)
-	result, err := RunLinter(opts)
+	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
 	}
@@ -473,9 +421,15 @@ func checkerFreeExecutionTestOptions(
 		}
 		files = append(files, file)
 	}
-	opts := RunLinterOptions{
-		Programs:       testPrograms(mustSourceOnlyTestProgram(t, program, files)),
-		SingleThreaded: singleThreaded,
+	programs := testPrograms(mustSourceOnlyTestProgram(t, program, files))
+	targets := make([]string, len(files))
+	for index, file := range files {
+		targets[index] = file.FileName()
+	}
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{targets},
+		SingleThreaded:   singleThreaded,
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{{
 				Name:     "checker-free-concurrency",
@@ -483,9 +437,11 @@ func checkerFreeExecutionTestOptions(
 				Run:      run,
 			}}
 		},
+	})
+	return RunLinterOptions{
+		SingleThreaded: singleThreaded,
+		LintPlan:       lintPlan,
 	}
-	opts.PreparedPlan = mustPrepareLintPlan(t, opts)
-	return opts
 }
 
 func TestCheckerFreeLintWorkerCountKeepsSmallSetsSerial(t *testing.T) {
@@ -606,9 +562,9 @@ func TestPrepareLintPlanParallelizesRuleResolution(t *testing.T) {
 	var active atomic.Int32
 	var signaled atomic.Bool
 
-	opts := RunLinterOptions{
-		Programs:    wrapTestPrograms(program),
-		TargetFiles: [][]string{{paths["a.ts"], paths["b.ts"], paths["c.ts"], paths["d.ts"]}},
+	opts := PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(program),
+		TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"], paths["c.ts"], paths["d.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			if active.Add(1) >= 2 && signaled.CompareAndSwap(false, true) {
 				close(twoActive)
@@ -648,10 +604,10 @@ func TestPrepareLintPlanHonorsSingleThreadedOrder(t *testing.T) {
 	})
 	wantOrder := []string{paths["c.ts"], paths["a.ts"], paths["b.ts"]}
 	var gotOrder []string
-	plan := mustPrepareLintPlan(t, RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{wantOrder},
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(program),
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{wantOrder},
 		GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
 			gotOrder = append(gotOrder, file.FileName())
 			return noopRule()
@@ -665,58 +621,205 @@ func TestPrepareLintPlanHonorsSingleThreadedOrder(t *testing.T) {
 	}
 }
 
-func TestPreparedLintPlanPreservesSameFileAcrossPrograms(t *testing.T) {
+func TestPreparedLintPlanPreservesSameFileAcrossProgramsInParallel(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"shared.ts": "const shared = 1;",
 	})
-	calls := 0
-	opts := RunLinterOptions{
-		Programs:       wrapTestPrograms(program, program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["shared.ts"]}, {paths["shared.ts"]}},
+	var calls atomic.Int32
+	programs := wrapTestPrograms(program, program)
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{paths["shared.ts"]}, {paths["shared.ts"]}},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			calls++
+			calls.Add(1)
 			return noopRule()
 		},
-	}
-	opts.PreparedPlan = mustPrepareLintPlan(t, opts)
-	if targets := opts.PreparedPlan.Targets(); len(targets) != 2 {
+	})
+	if targets := plan.Targets(); len(targets) != 2 {
 		t.Fatalf("prepared targets = %d, want one entry per Program", len(targets))
 	}
-	result, err := RunLinter(opts)
+	result, err := RunLinter(RunLinterOptions{
+		LintPlan: plan,
+	})
 	if err != nil {
 		t.Fatalf("RunLinter failed: %v", err)
 	}
 	if result.LintedFileCount != 2 {
 		t.Fatalf("LintedFileCount = %d, want one count per Program", result.LintedFileCount)
 	}
-	if calls != 2 {
-		t.Fatalf("GetRulesForFile calls = %d, want one per Program and no execution-time repeats", calls)
+	if calls.Load() != 2 {
+		t.Fatalf("GetRulesForFile calls = %d, want one per Program and no execution-time repeats", calls.Load())
 	}
 }
 
-func TestRunLinterRejectsPreparedPlanForDifferentProgram(t *testing.T) {
+func TestPrepareLintPlanDeduplicatesTargetsInFirstOccurrenceOrder(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+		"b.ts": "const b = 1;",
+	})
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(raw),
+		TargetsByProgram: [][]string{{paths["b.ts"], paths["a.ts"], paths["b.ts"]}},
+		SingleThreaded:   true,
+		GetRulesForFile:  func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
+	})
+	targets := plan.Targets()
+	if len(targets) != 2 || targets[0].File.FileName() != paths["b.ts"] || targets[1].File.FileName() != paths["a.ts"] {
+		t.Fatalf("deduplicated target order = %v, want [%q %q]", targetFileNames(targets), paths["b.ts"], paths["a.ts"])
+	}
+}
+
+func targetFileNames(targets []LintTarget) []string {
+	fileNames := make([]string, len(targets))
+	for index, target := range targets {
+		fileNames[index] = target.File.FileName()
+	}
+	return fileNames
+}
+
+func TestRunLinterRejectsTypeCheckOnlyProgramsWithLintPlan(t *testing.T) {
 	programA, pathsA := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const a = 1;",
 	})
-	programB, pathsB := createTestProgramWithFiles(t, map[string]string{
+	programB, _ := createTestProgramWithFiles(t, map[string]string{
 		"b.ts": "const b = 1;",
 	})
-	plan := mustPrepareLintPlan(t, RunLinterOptions{
-		Programs:        wrapTestPrograms(programA),
-		SingleThreaded:  true,
-		TargetFiles:     [][]string{{pathsA["a.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
+	var runs atomic.Int32
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(programA),
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{{pathsA["a.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			configured := noopRule()
+			configured[0].Run = func(rule.RuleContext) rule.RuleListeners {
+				runs.Add(1)
+				return nil
+			}
+			return configured
+		},
 	})
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(programB),
-		SingleThreaded:  true,
-		TargetFiles:     [][]string{{pathsB["b.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
-		PreparedPlan:    plan,
+		LintPlan:              plan,
+		TypeCheckOnlyPrograms: wrapTestPrograms(programB),
+		TypeCheck:             true,
 	})
-	if err == nil {
-		t.Fatal("RunLinter accepted a prepared plan bound to a different Program")
+	if !errors.Is(err, errTypeCheckOnlyProgramsWithPlan) || runs.Load() != 0 {
+		t.Fatalf("RunLinter conflict error = %v, rule runs = %d", err, runs.Load())
+	}
+}
+
+func TestPrepareLintPlanRequiresTargetsForEveryProgram(t *testing.T) {
+	raw, _ := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+	})
+	programs := wrapTestPrograms(raw)
+	var ruleCalls atomic.Int32
+	for _, targetsByProgram := range [][][]string{nil, {nil, nil}} {
+		_, err := PrepareLintPlan(PrepareLintPlanOptions{
+			Programs:         programs,
+			TargetsByProgram: targetsByProgram,
+			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+				ruleCalls.Add(1)
+				return noopRule()
+			},
+		})
+		if !errors.Is(err, errTargetsByProgramLength) {
+			t.Fatalf("TargetsByProgram length %d error = %v", len(targetsByProgram), err)
+		}
+	}
+	if ruleCalls.Load() != 0 {
+		t.Fatalf("invalid target projection resolved rules %d times", ruleCalls.Load())
+	}
+}
+
+func TestPrepareLintPlanRequiresRuleHandler(t *testing.T) {
+	raw, _ := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+	})
+	_, err := PrepareLintPlan(PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(raw),
+		TargetsByProgram: [][]string{nil},
+	})
+	if !errors.Is(err, errNilRuleHandler) {
+		t.Fatalf("nil GetRulesForFile error = %v", err)
+	}
+}
+
+func TestPrepareLintPlanRejectsTargetOutsideBoundProgramBeforeRuleResolution(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+	})
+	var ruleCalls atomic.Int32
+	missing := paths["a.ts"] + ".missing"
+	_, err := PrepareLintPlan(PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(raw),
+		TargetsByProgram: [][]string{{paths["a.ts"], missing}},
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			ruleCalls.Add(1)
+			return noopRule()
+		},
+	})
+	if !errors.Is(err, errTargetNotInProgram) || !strings.Contains(err.Error(), missing) {
+		t.Fatalf("missing target error = %v", err)
+	}
+	if ruleCalls.Load() != 0 {
+		t.Fatalf("missing target resolved rules %d times", ruleCalls.Load())
+	}
+}
+
+func TestPrepareLintPlanDoesNotReapplyDefaultExclusions(t *testing.T) {
+	dir := t.TempDir()
+	target := norm(dir, "node_modules/pkg/exact.ts")
+	writeTestFiles(t, dir, map[string]string{"node_modules/pkg/exact.ts": "export const exact = 1;"})
+	raw := gapProgram(t, dir, []string{target})
+	if raw.GetSourceFile(target) == nil {
+		t.Fatalf("fixture Program did not contain %q", target)
+	}
+	var ruleCalls atomic.Int32
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(raw),
+		TargetsByProgram: [][]string{{target}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			ruleCalls.Add(1)
+			return noopRule()
+		},
+	})
+	result, err := RunLinter(RunLinterOptions{LintPlan: plan, SingleThreaded: true})
+	if err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	if result.LintedFileCount != 1 || ruleCalls.Load() != 1 {
+		t.Fatalf("exact excluded-looking target: files=%d ruleCalls=%d", result.LintedFileCount, ruleCalls.Load())
+	}
+}
+
+func TestSyntaxErrorTargetIsCountedWithoutResolvingOrRunningRules(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFiles(t, dir, map[string]string{"broken.ts": "const = ;"})
+	target := norm(dir, "broken.ts")
+	raw := gapProgram(t, dir, []string{target})
+	var ruleCalls atomic.Int32
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         wrapTestPrograms(raw),
+		TargetsByProgram: [][]string{{target}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			ruleCalls.Add(1)
+			return noopRule()
+		},
+	})
+	result, err := RunLinter(RunLinterOptions{LintPlan: plan, SingleThreaded: true})
+	if err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	if result.LintedFileCount != 1 || ruleCalls.Load() != 0 || len(result.ExecutedRules) != 0 {
+		t.Fatalf(
+			"syntax target result: files=%d ruleCalls=%d executed=%v",
+			result.LintedFileCount,
+			ruleCalls.Load(),
+			result.ExecutedRules,
+		)
 	}
 }
 
@@ -725,50 +828,45 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 		"a.ts": "const a = 1;",
 	})
 	var ruleCalls atomic.Int32
-	var filterCalls atomic.Int32
-	opts := RunLinterOptions{
+	planOpts := PrepareLintPlanOptions{
 		Programs:         append(wrapTestPrograms(raw), nil),
-		TargetFiles:      [][]string{{paths["a.ts"]}, nil},
-		PerProgramFilter: []FileFilter{func(string) bool { filterCalls.Add(1); return true }},
+		TargetsByProgram: [][]string{{paths["a.ts"]}, nil},
 		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
 	}
-	if _, err := PrepareLintPlan(opts); !errors.Is(err, errNilProgram) {
+	if _, err := PrepareLintPlan(planOpts); !errors.Is(err, errNilProgram) {
 		t.Fatalf("PrepareLintPlan nil Program error = %v", err)
 	}
-	if ruleCalls.Load() != 0 || filterCalls.Load() != 0 {
-		t.Fatalf("PrepareLintPlan produced side effects before rejecting nil Program: rules=%d filters=%d", ruleCalls.Load(), filterCalls.Load())
-	}
-	if _, err := RunLinter(opts); !errors.Is(err, errNilProgram) {
-		t.Fatalf("RunLinter nil Program error = %v", err)
-	}
-	if ruleCalls.Load() != 0 || filterCalls.Load() != 0 {
-		t.Fatalf("RunLinter produced side effects before rejecting nil Program: rules=%d filters=%d", ruleCalls.Load(), filterCalls.Load())
+	if ruleCalls.Load() != 0 {
+		t.Fatalf("PrepareLintPlan resolved rules before rejecting nil Program: calls=%d", ruleCalls.Load())
 	}
 	typeCheckOnly := RunLinterOptions{
-		Programs:  wrapTestPrograms(raw),
-		TypeCheck: true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(raw),
+		TypeCheck:             true,
 	}
-	typeCheckOnly.Programs = append(typeCheckOnly.Programs, nil)
+	typeCheckOnly.TypeCheckOnlyPrograms = append(typeCheckOnly.TypeCheckOnlyPrograms, nil)
 	if _, err := RunLinter(typeCheckOnly); !errors.Is(err, errNilProgram) {
 		t.Fatalf("type-check-only RunLinter nil Program error = %v", err)
 	}
-	noOp, err := RunLinter(RunLinterOptions{Programs: []*lintprogram.Program{nil}})
+	noOp, err := RunLinter(RunLinterOptions{TypeCheckOnlyPrograms: []*lintprogram.Program{nil}})
 	if err != nil || noOp.LintedFileCount != 0 || len(noOp.ExecutedRules) != 0 {
 		t.Fatalf("no-op RunLinter result = %+v, error = %v", noOp, err)
 	}
 
 	invalid := &lintprogram.Program{}
-	invalidOpts := RunLinterOptions{
-		Programs:        []*lintprogram.Program{invalid},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
+	invalidOpts := PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{invalid},
+		TargetsByProgram: [][]string{nil},
+		GetRulesForFile:  func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
 	}
 	if _, err := PrepareLintPlan(invalidOpts); !errors.Is(err, errInvalidProgram) {
 		t.Fatalf("PrepareLintPlan zero Program error = %v", err)
 	}
-	if _, err := RunLinter(invalidOpts); !errors.Is(err, errInvalidProgram) {
+	if _, err := RunLinter(RunLinterOptions{
+		LintPlan: &LintPlan{programs: []programLintPlan{{program: invalid}}},
+	}); !errors.Is(err, errInvalidProgram) {
 		t.Fatalf("RunLinter zero Program error = %v", err)
 	}
 }
@@ -793,9 +891,10 @@ func TestPreparedLintPlanFreezesProgramTypeCapability(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var runs atomic.Int32
-			opts := RunLinterOptions{
-				Programs:    testPrograms(test.program),
-				TargetFiles: [][]string{{paths["a.ts"]}},
+			programs := testPrograms(test.program)
+			plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+				Programs:         programs,
+				TargetsByProgram: [][]string{{paths["a.ts"]}},
 				GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
 					return []ConfiguredRule{{
 						Name:             "type-aware-probe",
@@ -809,9 +908,8 @@ func TestPreparedLintPlanFreezesProgramTypeCapability(t *testing.T) {
 						},
 					}}
 				},
-			}
-			opts.PreparedPlan = mustPrepareLintPlan(t, opts)
-			if _, err := RunLinter(opts); err != nil {
+			})
+			if _, err := RunLinter(RunLinterOptions{LintPlan: plan}); err != nil {
 				t.Fatalf("RunLinter: %v", err)
 			}
 			if got := runs.Load(); got != test.wantRuns {
@@ -823,6 +921,28 @@ func TestPreparedLintPlanFreezesProgramTypeCapability(t *testing.T) {
 
 func TestLintSingleFileWithoutRuleHandlerIsNoOp(t *testing.T) {
 	LintSingleFile(LintSingleFileOptions{})
+}
+
+func TestLintSingleFileRejectsFileOutsideProgram(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+	})
+	missing := paths["a.ts"] + ".missing"
+	defer func() {
+		recovered := recover()
+		err, ok := recovered.(error)
+		if !ok || !errors.Is(err, errTargetNotInProgram) || !strings.Contains(err.Error(), missing) {
+			t.Fatalf("LintSingleFile panic = %v, want missing-target invariant error", recovered)
+		}
+	}()
+	LintSingleFile(LintSingleFileOptions{
+		Program: lintprogram.NewFromCompiler(raw),
+		File:    missing,
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			t.Fatal("missing single-file target resolved rules")
+			return nil
+		},
+	})
 }
 
 func mustSourceOnlyTestProgram(t testing.TB, typeScript *compiler.Program, files []*ast.SourceFile) *lintprogram.Program {

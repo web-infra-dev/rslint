@@ -2262,9 +2262,9 @@ func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
 	return fs.FS.Realpath(filePath)
 }
 
-func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
+func TestRunConfiguredLintForContent_OverlaysLexicalTargetIntoDefaultExcludedRealpath(t *testing.T) {
 	root := t.TempDir()
-	realRoot := filepath.Join(root, "real-workspace")
+	realRoot := filepath.Join(root, "node_modules", "real-workspace")
 	aliasRoot := filepath.Join(root, "alias-workspace")
 	realFile := filepath.Join(realRoot, "src", "index.ts")
 	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
