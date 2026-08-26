@@ -1988,3 +1988,10 @@ func TestPreferOptionalChainOptionalComparisonBoundaries(t *testing.T) {
 			},
 		})
 }
+
+func TestPreferOptionalChainSuggestionMessage(t *testing.T) {
+	const want = "Change to an optional chain."
+	if got := buildOptionalChainSuggestMessage().Description; got != want {
+		t.Fatalf("suggestion message = %q, want %q", got, want)
+	}
+}
