@@ -184,6 +184,24 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 		push(true)
 	}
 
+	reportThis := func(node *ast.Node) {
+		// A decorator's expression is evaluated at class-definition
+		// time, in the scope surrounding the class — so `this` inside
+		// one belongs to the enclosing frame, not the decorated
+		// member's. `decoratorFrameSkip` counts how many frames on the
+		// stack sit between `this` and the frame that governs it.
+		idx := len(stack) - 1 - decoratorFrameSkip(node, eo.FieldFrameScopedToValue)
+		var valid bool
+		if idx < 0 {
+			valid = eo.TopLevelValid
+		} else {
+			valid = stack[idx]
+		}
+		if !valid {
+			ctx.ReportNode(node, msg)
+		}
+	}
+
 	return rule.RuleListeners{
 		// Non-arrow function-like containers — push a frame whose validity
 		// depends on strict mode, parameter shape, JSDoc, name, and
@@ -245,21 +263,20 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 		// Arrow function: lexical `this`. Intentionally NOT registered so
 		// the enclosing frame governs.
 
-		ast.KindThisKeyword: func(node *ast.Node) {
-			// A decorator's expression is evaluated at class-definition
-			// time, in the scope surrounding the class — so `this` inside
-			// one belongs to the enclosing frame, not the decorated
-			// member's. `decoratorFrameSkip` counts how many frames on the
-			// stack sit between `this` and the frame that governs it.
-			idx := len(stack) - 1 - decoratorFrameSkip(node, eo.FieldFrameScopedToValue)
-			var valid bool
-			if idx < 0 {
-				valid = eo.TopLevelValid
-			} else {
-				valid = stack[idx]
+		ast.KindThisKeyword: reportThis,
+		ast.KindThisType: func(node *ast.Node) {
+			// typescript-estree represents the operand in `typeof this` as
+			// ThisExpression, while tsgo uses ThisType. Ordinary `this` types
+			// remain TSThisType upstream and must not be treated as expressions.
+			if node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery {
+				reportThis(node)
 			}
-			if !valid {
-				ctx.ReportNode(node, msg)
+		},
+		ast.KindIdentifier: func(node *ast.Node) {
+			// In current tsgo parser shapes, the same authored operand may be
+			// represented as an Identifier directly beneath TypeQuery.
+			if node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery && node.AsIdentifier().Text == "this" {
+				reportThis(node)
 			}
 		},
 	}
@@ -436,8 +453,7 @@ func matchesThisTagPattern(value string) bool {
 // argument; ESLint's `getJSDocComment` stops walking at CallExpression
 // parents, so we do too.
 func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) bool {
-	text := sf.Text()
-	if hasThisTagInLeadingComments(fn, comments, text) {
+	if hasThisTagInLeadingComments(fn, comments, sf) {
 		return true
 	}
 	if fn.Kind != ast.KindFunctionExpression {
@@ -463,6 +479,10 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceF
 	// unary expressions, nested calls, and other containers are transparent.
 	for parent != nil && parent.Kind != ast.KindSourceFile {
 		if isJSDocLookupBoundary(parent) {
+			if parent.Kind == ast.KindFunctionExpression || parent.Kind == ast.KindPropertyAssignment {
+				_, hasTag := ancestorJSDocSummary(parent, comments, sf)
+				return hasTag
+			}
 			return false
 		}
 		hasComments, hasTag := ancestorJSDocSummary(parent, comments, sf)
@@ -502,7 +522,10 @@ func ancestorJSDocSummary(node *ast.Node, comments []*ast.CommentRange, sf *ast.
 	if !strings.HasPrefix(raw, "/**") {
 		return hasComments, false
 	}
-	tokenStart := scanner.SkipTrivia(text, node.Pos())
+	tokenStart := estreeNodeStart(node, sf)
+	if !ecmascript.IsBlank(text[closest.End():tokenStart]) {
+		return hasComments, false
+	}
 	lineMap := sf.ECMALineMap()
 	if scanner.ComputeLineOfPosition(lineMap, tokenStart)-scanner.ComputeLineOfPosition(lineMap, closest.End()) > 1 {
 		return hasComments, false
@@ -547,19 +570,24 @@ func isJSDocLookupBoundary(node *ast.Node) bool {
 // merges both leading- and trailing-collected ranges (see
 // `CommentStore.All`), so a plain forward scan over it sees every case
 // uniformly.
-func hasThisTagInLeadingComments(node *ast.Node, comments []*ast.CommentRange, text string) bool {
-	_, hasTag := leadingCommentSummary(node, comments, text)
+func hasThisTagInLeadingComments(node *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) bool {
+	_, hasTag := leadingCommentSummary(node, comments, sf)
 	return hasTag
 }
 
-func leadingCommentSummary(node *ast.Node, comments []*ast.CommentRange, text string) (hasComments, hasTag bool) {
+func leadingCommentSummary(node *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) (hasComments, hasTag bool) {
 	if node == nil {
 		return false, false
 	}
+	text := sf.Text()
+	nodeStart := estreeNodeStart(node, sf)
 	pos := node.Pos()
 	idx := sort.Search(len(comments), func(i int) bool { return comments[i].Pos() >= pos })
 	for i := idx; i < len(comments); i++ {
 		c := comments[i]
+		if c.Pos() >= nodeStart {
+			break
+		}
 		if !ecmascript.IsBlank(text[pos:c.Pos()]) {
 			break
 		}
@@ -570,7 +598,25 @@ func leadingCommentSummary(node *ast.Node, comments []*ast.CommentRange, text st
 		}
 		pos = c.End()
 	}
+	if !ecmascript.IsBlank(text[pos:nodeStart]) {
+		return hasComments, false
+	}
 	return hasComments, hasTag
+}
+
+// estreeNodeStart returns the first token retained in the corresponding ESTree
+// node's range. Parentheses are absent from ESTree, so a comment separated from
+// the semantic node by `(` is not a leading comment of that node itself.
+func estreeNodeStart(node *ast.Node, sf *ast.SourceFile) int {
+	end := node.End()
+	s := scanner.GetScannerForSourceFile(sf, node.Pos())
+	for s.Token() != ast.KindEndOfFile && s.TokenStart() < end {
+		if s.Token() != ast.KindOpenParenToken {
+			return s.TokenStart()
+		}
+		s.Scan()
+	}
+	return scanner.SkipTrivia(sf.Text(), node.Pos())
 }
 
 // stripCommentMarkers removes `/*`/`*/` from block comments and `//` from
