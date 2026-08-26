@@ -364,8 +364,8 @@ func runUnicodeBom(t *testing.T, code string, demand rule.EditDemand) []rule.Rul
 		Programs:         programs,
 		TargetsByProgram: [][]string{{program.GetSourceFile(fileName).FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     UnicodeBomRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {

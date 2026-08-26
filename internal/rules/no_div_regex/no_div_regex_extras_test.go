@@ -151,8 +151,8 @@ func TestNoDivRegexEditDemand(t *testing.T) {
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     NoDivRegexRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

@@ -21,8 +21,8 @@ import (
 
 // triggerOnIdentifierRule reports a warning on every identifier — used to
 // confirm rules really would have fired if Phase 1 had run.
-func triggerOnIdentifierRule() []ConfiguredRule {
-	return []ConfiguredRule{
+func triggerOnIdentifierRule() []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{
 		{
 			Name:     "would-have-fired",
 			Severity: rule.SeverityError,
@@ -168,7 +168,7 @@ func TestTypeCheckOnly_BaselineLintWouldFire(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{paths["a.ts"]}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return triggerOnIdentifierRule()
 		},
 	})
@@ -201,7 +201,7 @@ func TestTypeCheckOnly_EmptyLintPlanDoesNotConstrainTypeCheck(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{nil},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			t.Fatal("empty target projection resolved rules")
 			return nil
 		},
@@ -235,7 +235,7 @@ func TestTypeCheck_IncludesZeroTargetProgramFromLintPlan(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{lintPaths["lint.ts"]}, nil},
 		SingleThreaded:   true,
-		GetRulesForFile:  func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
+		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 	})
 
 	var diagnostics []rule.RuleDiagnostic

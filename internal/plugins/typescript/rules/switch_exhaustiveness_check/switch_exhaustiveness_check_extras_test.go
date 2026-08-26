@@ -450,8 +450,8 @@ func testSwitchExhaustivenessCheckEditDemand(t *testing.T) {
 			Program:     sourceProgram,
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:             SwitchExhaustivenessCheckRule.Name,
 					Severity:         rule.SeverityError,
 					RequiresTypeInfo: SwitchExhaustivenessCheckRule.RequiresTypeInfo,
