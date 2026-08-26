@@ -2,77 +2,30 @@
 
 ## Rule Details
 
-Disallow `.todo` on Rstest `test`, `it`, and `describe` registrations.
+Disallows `.todo` on Rstest `test`, `it`, and `describe` registrations. A todo registration names work that has not been written yet and never runs, so one left in a committed suite is a test that can never fail.
 
-A todo registration is a placeholder: it names work that has not been written
-yet, and the runner reports it without running anything. That is useful while
-drafting, but a `.todo` left in a committed suite is a test that can never fail,
-so this rule flags every one of them.
+Every `.todo` registration is reported, including one combined with other modifiers such as `test.only.todo(...)` or `test.todo.each(...)`. The rule recognizes Rstest globals, `@rstest/core` imports, namespace and `import.meta.rstest` members, same-file aliases, and `@rstest/playwright` registrations; a `test` or `describe` from any other source is left alone. Only the `.todo` accessor registers a todo, so a `todo` property in a test options object is not reported.
 
-Examples of **incorrect** code:
+This rule is the counterpart of `prefer-todo`, which steers empty tests toward `.todo`. Enable at most one of the two.
+
+## Incorrect
 
 ```ts
-test.todo('handles an empty cart');
-it.todo('rejects an expired token');
-describe.todo('checkout flow');
-test.only.todo('rounds the total');
-test.todo.each([1, 2])('case %i');
+test.todo('exports a CSV file');
+
+describe.todo('CSV import');
 ```
 
-Examples of **correct** code:
+## Correct
 
 ```ts
-test('handles an empty cart', () => {
-  expect(total([])).toBe(0);
+test('exports a CSV file', () => {
+  expect(exportCsv([{ name: 'Ada' }])).toBe('name\nAda');
 });
 
-describe('checkout flow', () => {
-  it('rejects an expired token', () => {
-    expect(() => charge(expiredToken)).toThrow();
+describe('CSV import', () => {
+  test('parses a header row', () => {
+    expect(importCsv('name\nAda')).toEqual([{ name: 'Ada' }]);
   });
 });
-
-test.skip('rounds the total', () => {
-  expect(round(1.005)).toBe(1.01);
-});
-```
-
-This rule only reports. It does not autofix and offers no suggestion, because
-the replacement for a todo is the test body, which the rule cannot write.
-
-This rule is the opposite of `prefer-todo`, which steers empty tests toward
-`.todo`. The two cannot both be satisfied, so enable at most one of them.
-
-## What counts as a todo registration
-
-The rule follows a registration through every way Rstest's APIs can be reached:
-
-- globals
-- `@rstest/core` named imports and aliases
-- `require('@rstest/core')`
-- namespace imports and namespace members
-- `import.meta.rstest`
-- same-file `const` aliases
-- `@rstest/playwright` (`test` and `describe`; that package does not export `it`)
-
-A `test` or `describe` that comes from anywhere else keeps its own meaning and is
-never reported.
-
-The report anchors on the `todo` accessor written at the call site, in whatever
-spelling it was written — `.todo`, `['todo']`, or `` [`todo`] ``. When `.todo`
-was applied to an alias rather than at the call site, the call site has no such
-accessor, so the report anchors on the identifier that resolves to the todo
-registration:
-
-```ts
-const pending = test.todo;
-pending('handles an empty cart'); // reported on `pending`
-```
-
-Only the `.todo` modifier registers a todo. A test options object accepts
-`timeout`, `retry`, `repeats`, and `meta`, so a `todo` property written there
-has no effect on the runner and is not reported:
-
-```ts
-test('handles an empty cart', { todo: true }, () => {}); // runs normally
 ```
