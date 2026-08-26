@@ -75,15 +75,9 @@ func TestWarnTodoExtras(t *testing.T) {
 			{Code: `test[0]("case", () => {});`},
 			// A declaration without an initializer must not be read as a require.
 			{Code: `declare const pending: any; pending("case");`},
-			// Dimension 4: the parser does not read a registration through a
-			// non-null assertion or a type assertion, so these fail closed.
-			// Missing a diagnostic here is preferred over inventing one.
-			{Code: `test!.todo("case");`},
-			{Code: `(test as any).todo("case");`},
-			{Code: `(test satisfies unknown).todo("case");`},
 		},
 		[]rule_tester.InvalidTestCase{
-			// Dimension 4: parenthesized receivers and optional chaining.
+			// Dimension 4: transparent wrappers and optional chaining.
 			{
 				Code:   `(test).todo("case");`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 8, 12)},
@@ -99,6 +93,22 @@ func TestWarnTodoExtras(t *testing.T) {
 			{
 				Code:   `test.todo?.("case");`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 6, 10)},
+			},
+			{
+				Code:   `test!.todo("case");`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 7, 11)},
+			},
+			{
+				Code:   `(test as typeof test).todo("case");`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 23, 27)},
+			},
+			{
+				Code:   `(test satisfies typeof test).todo("case");`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 30, 34)},
+			},
+			{
+				Code:   `(<typeof test>test).todo("case");`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 21, 25)},
 			},
 			// A todo registration with no title is still a todo registration.
 			{
@@ -216,6 +226,16 @@ pending("case");`,
 const pending = base.todo;
 pending.each([1])("case", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(3, 1, 8)},
+			},
+			{
+				Code: `const { todo: pending } = test;
+pending("case");`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 8)},
+			},
+			{
+				Code: `const { todo } = test;
+todo("another case");`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 5)},
 			},
 			{
 				Code: `import * as rstest from "@rstest/core";

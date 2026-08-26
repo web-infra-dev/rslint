@@ -381,6 +381,32 @@ func (analysis *RstestCallAnalysis) collectVariableCandidates(
 		}
 		return
 	}
+	if name.Kind == ast.KindObjectBindingPattern {
+		if node.Parent == nil || node.Parent.Kind != ast.KindVariableDeclarationList ||
+			node.Parent.Flags&ast.NodeFlagsConst == 0 {
+			return
+		}
+		root := testFramework.ResolveFirstIdentifier(initializer)
+		if root == nil || root.Kind != ast.KindIdentifier {
+			return
+		}
+		pattern := name.AsBindingPattern()
+		if pattern == nil || pattern.Elements == nil {
+			return
+		}
+		for _, element := range pattern.Elements.Nodes {
+			binding := element.AsBindingElement()
+			if binding == nil || binding.DotDotDotToken != nil || binding.Name() == nil ||
+				binding.Name().Kind != ast.KindIdentifier {
+				continue
+			}
+			*aliases = append(*aliases, rstestAliasCandidate{
+				localName: binding.Name().AsIdentifier().Text,
+				rootName:  root.AsIdentifier().Text,
+			})
+		}
+		return
+	}
 	if name.Kind != ast.KindIdentifier || node.Parent == nil ||
 		node.Parent.Kind != ast.KindVariableDeclarationList ||
 		node.Parent.Flags&ast.NodeFlagsConst == 0 {

@@ -174,7 +174,7 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 	if node == nil {
 		return nil, nil, false, false
 	}
-	node = ast.SkipParentheses(node)
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return nil, nil, false, false
 	}
@@ -245,7 +245,7 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 	if node == nil {
 		return nil, nil, false, false
 	}
-	node = ast.SkipParentheses(node)
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return nil, nil, false, false
 	}
@@ -383,10 +383,10 @@ func resolveRstestRoot(
 
 	tracking := false
 	for _, declaration := range symbol.Declarations {
-		if !isConstRstestVariableDeclaration(declaration) {
+		initializer, bindingParts, ok := constRstestAliasInitializer(declaration)
+		if !ok {
 			continue
 		}
-		initializer := declaration.AsVariableDeclaration().Initializer
 		aliasRoot, aliasParts, aliasRootInvoked, ok := parseRstestChain(initializer)
 		if !ok && isImportMetaRstest(initializer) {
 			if len(parts) == 0 || parts[0].invocation != rstestNotInvoked {
@@ -407,6 +407,7 @@ func resolveRstestRoot(
 		if !ok || aliasRootInvoked {
 			continue
 		}
+		aliasParts = append(aliasParts, bindingParts...)
 		if !tracking {
 			if visited == nil {
 				visited = make(map[*ast.Symbol]bool)
@@ -439,6 +440,45 @@ func resolveRstestRoot(
 	}
 
 	return rstestResolvedAPI{}, 0, false
+}
+
+func constRstestAliasInitializer(
+	declaration *ast.Node,
+) (*ast.Node, []rstestChainPart, bool) {
+	if isConstRstestVariableDeclaration(declaration) {
+		return declaration.AsVariableDeclaration().Initializer, nil, true
+	}
+	if declaration == nil || declaration.Kind != ast.KindBindingElement ||
+		declaration.Parent == nil || declaration.Parent.Kind != ast.KindObjectBindingPattern {
+		return nil, nil, false
+	}
+
+	binding := declaration.AsBindingElement()
+	if binding == nil || binding.DotDotDotToken != nil {
+		return nil, nil, false
+	}
+	variable := internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
+	if !isConstRstestVariableDeclaration(variable) || declaration.Parent.Parent != variable {
+		return nil, nil, false
+	}
+
+	nameNode := binding.PropertyName
+	if nameNode == nil {
+		nameNode = binding.Name()
+	}
+	name, ok := internalUtils.GetStaticStringLiteralValue(nameNode)
+	if !ok && nameNode != nil && nameNode.Kind == ast.KindIdentifier {
+		name = nameNode.AsIdentifier().Text
+		ok = true
+	}
+	if !ok || name == "" {
+		return nil, nil, false
+	}
+
+	return variable.AsVariableDeclaration().Initializer, []rstestChainPart{{
+		name: name,
+		node: nameNode,
+	}}, true
 }
 
 func resolveImportMetaRstestBinding(symbol *ast.Symbol) (string, *ast.Node, bool) {
