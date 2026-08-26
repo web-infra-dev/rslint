@@ -398,11 +398,47 @@ func IsJSDocTypeCastWrapper(node *ast.Node) bool {
 	return node.Kind == ast.KindAsExpression && node.Parent != nil && ast.IsJSDocTypeAssertion(node.Parent)
 }
 
+// ESTreeRuntimeExpression removes syntax that ESTree does not expose around a
+// runtime expression: source parentheses and wrappers synthesized from JSDoc
+// @type/@satisfies casts. Authored TypeScript assertions remain intact.
+func ESTreeRuntimeExpression(node *ast.Node) *ast.Node {
+	for node != nil {
+		node = ast.SkipParentheses(node)
+		expression := JSDocTypeCastExpression(node)
+		if expression == nil {
+			return node
+		}
+		node = expression
+	}
+	return nil
+}
+
+// ESTreeParent returns the first parent that ESTree exposes, skipping source
+// parentheses and wrappers synthesized from JSDoc casts.
+func ESTreeParent(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	parent := node.Parent
+	for parent != nil &&
+		(parent.Kind == ast.KindParenthesizedExpression || IsJSDocTypeCastWrapper(parent)) {
+		parent = parent.Parent
+	}
+	return parent
+}
+
 // ESTreeParameters returns only parameters authored in source. tsgo prepends
 // a reparsed `this` parameter for JSDoc @this, but ESTree keeps the tag solely
 // as a comment.
 func ESTreeParameters(node *ast.Node) []*ast.Node {
 	return slices.DeleteFunc(slices.Clone(node.Parameters()), IsJSDocSyntaxNode)
+}
+
+// ESTreeTypeParameters returns only type parameters authored in source. tsgo
+// materializes JSDoc @template tags on function-like nodes, while ESTree keeps
+// those tags solely as comments.
+func ESTreeTypeParameters(node *ast.Node) []*ast.Node {
+	return slices.DeleteFunc(slices.Clone(node.TypeParameters()), IsJSDocSyntaxNode)
 }
 
 // ESTreeType returns the source-authored type annotation, excluding a type
