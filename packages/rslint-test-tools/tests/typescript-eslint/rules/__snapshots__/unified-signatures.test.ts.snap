@@ -3,6 +3,127 @@
 exports[`unified-signatures > invalid 1`] = `
 {
   "code": "
+declare function f(a: number): void;
+declare function f(a: number): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with identical parameters.",
+      "messageId": "allParametersAreSame",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 2`] = `
+{
+  "code": "
+declare function f(a: number): void;
+declare function f(a: number): void;
+declare function f(a: string): string;
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 2 can be combined into one signature with identical parameters.",
+      "messageId": "allParametersAreSame",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 3`] = `
+{
+  "code": "
+function f(a: number): void;
+function f(a: number): void;
+function f(a: number): void {}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with identical parameters.",
+      "messageId": "allParametersAreSame",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 4`] = `
+{
+  "code": "
+class A {
+  f(a: number): void;
+  f(a: number): void;
+  f(a: number): void {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with identical parameters.",
+      "messageId": "allParametersAreSame",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 4,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 5`] = `
+{
+  "code": "
 function f(a: number): void;
 function f(b: string): void;
 function f(a: number | string): void {}
@@ -30,7 +151,7 @@ function f(a: number | string): void {}
 }
 `;
 
-exports[`unified-signatures > invalid 2`] = `
+exports[`unified-signatures > invalid 6`] = `
 {
   "code": "
 function f(x: number): void;
@@ -62,7 +183,7 @@ function f(x: any): any {
 }
 `;
 
-exports[`unified-signatures > invalid 3`] = `
+exports[`unified-signatures > invalid 7`] = `
 {
   "code": "
 function f(x: number): void;
@@ -94,7 +215,7 @@ function f(x: any): any {
 }
 `;
 
-exports[`unified-signatures > invalid 4`] = `
+exports[`unified-signatures > invalid 8`] = `
 {
   "code": "
 function opt(xs?: number[]): void;
@@ -124,7 +245,7 @@ function opt(...args: any[]) {}
 }
 `;
 
-exports[`unified-signatures > invalid 5`] = `
+exports[`unified-signatures > invalid 9`] = `
 {
   "code": "
 interface I {
@@ -156,7 +277,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 6`] = `
+exports[`unified-signatures > invalid 10`] = `
 {
   "code": "
 interface I {
@@ -188,7 +309,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 7`] = `
+exports[`unified-signatures > invalid 11`] = `
 {
   "code": "
 interface I {
@@ -219,7 +340,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 8`] = `
+exports[`unified-signatures > invalid 12`] = `
 {
   "code": "
 interface I {
@@ -250,7 +371,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 9`] = `
+exports[`unified-signatures > invalid 13`] = `
 {
   "code": "
 interface I {
@@ -281,7 +402,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 10`] = `
+exports[`unified-signatures > invalid 14`] = `
 {
   "code": "
 interface I {
@@ -312,7 +433,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 11`] = `
+exports[`unified-signatures > invalid 15`] = `
 {
   "code": "
 interface I {
@@ -343,7 +464,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 12`] = `
+exports[`unified-signatures > invalid 16`] = `
 {
   "code": "
 interface I {
@@ -374,7 +495,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 13`] = `
+exports[`unified-signatures > invalid 17`] = `
 {
   "code": "
 type T = {
@@ -405,7 +526,7 @@ type T = {
 }
 `;
 
-exports[`unified-signatures > invalid 14`] = `
+exports[`unified-signatures > invalid 18`] = `
 {
   "code": "
 declare class Example {
@@ -436,7 +557,7 @@ declare class Example {
 }
 `;
 
-exports[`unified-signatures > invalid 15`] = `
+exports[`unified-signatures > invalid 19`] = `
 {
   "code": "
 declare class C {
@@ -467,7 +588,7 @@ declare class C {
 }
 `;
 
-exports[`unified-signatures > invalid 16`] = `
+exports[`unified-signatures > invalid 20`] = `
 {
   "code": "
 interface I {
@@ -498,7 +619,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 17`] = `
+exports[`unified-signatures > invalid 21`] = `
 {
   "code": "
 interface I {
@@ -529,7 +650,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 18`] = `
+exports[`unified-signatures > invalid 22`] = `
 {
   "code": "
 interface Generic<T> {
@@ -560,7 +681,7 @@ interface Generic<T> {
 }
 `;
 
-exports[`unified-signatures > invalid 19`] = `
+exports[`unified-signatures > invalid 23`] = `
 {
   "code": "
 function f<T>(x: T[]): void;
@@ -589,7 +710,7 @@ function f<T>(x: T): void;
 }
 `;
 
-exports[`unified-signatures > invalid 20`] = `
+exports[`unified-signatures > invalid 24`] = `
 {
   "code": "
 function f<T extends number>(x: T[]): void;
@@ -618,7 +739,7 @@ function f<T extends number>(x: T): void;
 }
 `;
 
-exports[`unified-signatures > invalid 21`] = `
+exports[`unified-signatures > invalid 25`] = `
 {
   "code": "
 abstract class Foo {
@@ -649,7 +770,7 @@ abstract class Foo {
 }
 `;
 
-exports[`unified-signatures > invalid 22`] = `
+exports[`unified-signatures > invalid 26`] = `
 {
   "code": "
 abstract class C {
@@ -683,7 +804,7 @@ abstract class C {
 }
 `;
 
-exports[`unified-signatures > invalid 23`] = `
+exports[`unified-signatures > invalid 27`] = `
 {
   "code": "
 interface Foo {
@@ -714,7 +835,7 @@ interface Foo {
 }
 `;
 
-exports[`unified-signatures > invalid 24`] = `
+exports[`unified-signatures > invalid 28`] = `
 {
   "code": "
 interface Foo {
@@ -745,7 +866,7 @@ interface Foo {
 }
 `;
 
-exports[`unified-signatures > invalid 25`] = `
+exports[`unified-signatures > invalid 29`] = `
 {
   "code": "
 enum Enum {
@@ -780,7 +901,7 @@ interface IFoo {
 }
 `;
 
-exports[`unified-signatures > invalid 26`] = `
+exports[`unified-signatures > invalid 30`] = `
 {
   "code": "
 export function foo(line: number): number;
@@ -809,7 +930,7 @@ export function foo(line: number, character?: number): number;
 }
 `;
 
-exports[`unified-signatures > invalid 27`] = `
+exports[`unified-signatures > invalid 31`] = `
 {
   "code": "
 declare function foo(line: number): number;
@@ -838,7 +959,7 @@ export function foo(line: number, character?: number): number;
 }
 `;
 
-exports[`unified-signatures > invalid 28`] = `
+exports[`unified-signatures > invalid 32`] = `
 {
   "code": "
 declare module 'foo' {
@@ -869,7 +990,7 @@ declare module 'foo' {
 }
 `;
 
-exports[`unified-signatures > invalid 29`] = `
+exports[`unified-signatures > invalid 33`] = `
 {
   "code": "
 export default function (foo: number): string[];
@@ -898,7 +1019,7 @@ export default function (foo: number, bar?: string): string[];
 }
 `;
 
-exports[`unified-signatures > invalid 30`] = `
+exports[`unified-signatures > invalid 34`] = `
 {
   "code": "
 /**
@@ -931,7 +1052,7 @@ declare function f(x: boolean): void;
 }
 `;
 
-exports[`unified-signatures > invalid 31`] = `
+exports[`unified-signatures > invalid 35`] = `
 {
   "code": "
 /**
@@ -967,7 +1088,7 @@ declare function f(x: boolean): void;
 }
 `;
 
-exports[`unified-signatures > invalid 32`] = `
+exports[`unified-signatures > invalid 36`] = `
 {
   "code": "
 declare function f(x: string): void;
@@ -1003,7 +1124,7 @@ declare function f(x: boolean): void;
 }
 `;
 
-exports[`unified-signatures > invalid 33`] = `
+exports[`unified-signatures > invalid 37`] = `
 {
   "code": "
 export function f(x: string): void;
@@ -1039,7 +1160,7 @@ export function f(x: boolean): void;
 }
 `;
 
-exports[`unified-signatures > invalid 34`] = `
+exports[`unified-signatures > invalid 38`] = `
 {
   "code": "
 /**
@@ -1079,7 +1200,7 @@ function f(x: string): void;
 }
 `;
 
-exports[`unified-signatures > invalid 35`] = `
+exports[`unified-signatures > invalid 39`] = `
 {
   "code": "
 interface I {
@@ -1117,7 +1238,7 @@ interface I {
 }
 `;
 
-exports[`unified-signatures > invalid 36`] = `
+exports[`unified-signatures > invalid 40`] = `
 {
   "code": "
 // a line comment
@@ -1147,7 +1268,7 @@ declare function f(x: boolean): unknown;
 }
 `;
 
-exports[`unified-signatures > invalid 37`] = `
+exports[`unified-signatures > invalid 41`] = `
 {
   "code": "
 function f(this: {}, a: boolean): void;
@@ -1177,7 +1298,7 @@ function f(this: {}, a: boolean | string): void {}
 }
 `;
 
-exports[`unified-signatures > invalid 38`] = `
+exports[`unified-signatures > invalid 42`] = `
 {
   "code": "
 function f(this: {}): void;
@@ -1207,7 +1328,7 @@ function f(this: {}, a?: string): void {}
 }
 `;
 
-exports[`unified-signatures > invalid 39`] = `
+exports[`unified-signatures > invalid 43`] = `
 {
   "code": "
 function f(this: string): void;
@@ -1237,7 +1358,7 @@ function f(this: string | number): void {}
 }
 `;
 
-exports[`unified-signatures > invalid 40`] = `
+exports[`unified-signatures > invalid 44`] = `
 {
   "code": "
 function f(this: string, a: boolean): void;
@@ -1256,6 +1377,537 @@ function f(this: string | number, a: boolean): void {}
         "start": {
           "column": 12,
           "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 45`] = `
+{
+  "code": "
+function f(x: string | number): void;
+function f(x: number | boolean): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string | number | boolean\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 46`] = `
+{
+  "code": "
+function f(value): void;
+function f(value: string): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 47`] = `
+{
+  "code": "
+function f(value: string): void;
+function f(value): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 48`] = `
+{
+  "code": "
+type Alias = string;
+function f(x: Alias): void;
+function f(x: Alias | number): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`Alias | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 49`] = `
+{
+  "code": "
+type Name = string;
+function f(x: Name): void;
+function f(x: string | Name): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`Name | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 50`] = `
+{
+  "code": "
+function f<T>(x: T): void;
+function f<T>(x: T | string): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`T | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 51`] = `
+{
+  "code": "
+function f(x: 'a|b'): void;
+function f(x: 'a|b' | string): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`'a|b' | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 52`] = `
+{
+  "code": "
+function f(x: string /* first */ | number): void;
+function f(x: number | /* second */ string): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 53`] = `
+{
+  "code": "
+declare function fn(a: number): void;
+declare function fn(a: (/* before */ string /* after */)): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 54`] = `
+{
+  "code": "
+function f(x: string & { brand: true }): void;
+function f(x: number | string & /* brand */ { brand: true }): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string & { brand: true } | number | string & /* brand */ { brand: true }\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 55`] = `
+{
+  "code": "
+function f(x: string & { brand: true }): void;
+function f(x: number | string & { brand: true }): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string & { brand: true } | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 56`] = `
+{
+  "code": "
+function f<T, U>(x: () => void): void;
+function f<T, U>(x: T extends U ? string : number): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`(() => void) | (T extends U ? string : number)\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 57`] = `
+{
+  "code": "
+interface Value {}
+function f(x: new () => Value): void;
+function f(x: string): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`(new () => Value) | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 58`] = `
+{
+  "code": "
+interface I {
+  f(x: string | number): void;
+  f(x: number | boolean): void;
+  f(x: symbol): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 3 can be combined into one signature taking \`string | number | boolean\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 59`] = `
+{
+  "code": "
+function f(x: 'a' | 'b'): void;
+function f(x: 'b' | 'c'): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`'a' | 'b' | 'c'\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 60`] = `
+{
+  "code": "
+function f(x: Array<string> | boolean): void;
+function f(x: Array<number> | boolean): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`Array<string> | boolean | Array<number>\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 61`] = `
+{
+  "code": "
+function f(x: Promise | boolean): void;
+function f(x: Promise<string> | boolean): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`Promise | boolean | Promise<string>\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 62`] = `
+{
+  "code": "
+namespace Namespace {
+  export type Value = string;
+}
+function f(x: Namespace.Value): void;
+function f(x: Namespace.Value | string): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`Namespace.Value | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 6,
+        },
+        "start": {
+          "column": 12,
+          "line": 6,
         },
       },
       "ruleName": "@typescript-eslint/unified-signatures",

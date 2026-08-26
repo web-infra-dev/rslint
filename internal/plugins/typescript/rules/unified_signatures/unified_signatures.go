@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -197,6 +198,7 @@ func (a *overloadAnalyzer) methodOverloadKey(node *ast.Node) (string, bool) {
 	prefix := "11"
 	if name.Kind == ast.KindComputedPropertyName {
 		prefix = "01"
+		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
 	}
 	if ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
 		prefix = prefix[:1] + "0"
@@ -225,7 +227,7 @@ func (a *overloadAnalyzer) signaturesCanBeUnified(left, right *ast.Node, outerTy
 	leftParams, rightParams := left.Parameters(), right.Parameters()
 	if a.options.ignoreDifferentlyNamedParameters {
 		for i := range min(len(leftParams), len(rightParams)) {
-			if leftParams[i].Kind == rightParams[i].Kind && staticParameterName(leftParams[i]) != staticParameterName(rightParams[i]) {
+			if parametersHaveSameESTreeShape(leftParams[i], rightParams[i]) && staticParameterName(leftParams[i]) != staticParameterName(rightParams[i]) {
 				return false
 			}
 		}
@@ -308,8 +310,18 @@ func (a *overloadAnalyzer) report(result unifyResult, onlyTwo bool) {
 		if !onlyTwo {
 			otherLine = lineOf(a.ctx.SourceFile, result.signature0)
 		}
-		a.ctx.ReportNode(result.signature1, rule.RuleMessage{Id: "allParametersAreSame", Description: failureStringStart(otherLine) + " with identical parameters."})
+		a.ctx.ReportRange(signatureReportRange(a.ctx.SourceFile, result.signature1), rule.RuleMessage{Id: "allParametersAreSame", Description: failureStringStart(otherLine) + " with identical parameters."})
 	}
+}
+
+func signatureReportRange(sourceFile *ast.SourceFile, signature *ast.Node) core.TextRange {
+	trimmed := utils.TrimNodeTextRange(sourceFile, signature)
+	if signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindConstructor {
+		if parameters := signature.ParameterList(); parameters != nil && parameters.Pos() > 0 {
+			return core.NewTextRange(parameters.Pos()-1, trimmed.End())
+		}
+	}
+	return trimmed
 }
 
 func failureStringStart(otherLine int) string {
@@ -339,6 +351,7 @@ func (a *overloadAnalyzer) unifiedTypeText(left, right *ast.Node) string {
 		if i > 0 {
 			text.WriteString(" | ")
 		}
+		member = skipParenthesizedType(member)
 		memberText := utils.TrimmedNodeText(a.ctx.SourceFile, member)
 		if member.Kind == ast.KindConditionalType || member.Kind == ast.KindConstructorType || member.Kind == ast.KindFunctionType {
 			memberText = "(" + memberText + ")"
@@ -349,6 +362,7 @@ func (a *overloadAnalyzer) unifiedTypeText(left, right *ast.Node) string {
 }
 
 func unionMembers(node *ast.Node) []*ast.Node {
+	node = skipParenthesizedType(node)
 	if node == nil {
 		return nil
 	}
@@ -389,7 +403,11 @@ func isThisParameter(parameter *ast.Node) bool {
 }
 
 func isThisVoidParameter(parameter *ast.Node) bool {
-	return isThisParameter(parameter) && parameter.Type() != nil && parameter.Type().Kind == ast.KindVoidKeyword
+	if !isThisParameter(parameter) {
+		return false
+	}
+	typeNode := skipParenthesizedType(parameter.Type())
+	return typeNode != nil && typeNode.Kind == ast.KindVoidKeyword
 }
 
 func isRestParameter(parameter *ast.Node) bool {
@@ -406,6 +424,14 @@ func parameterMayBeMissing(parameter *ast.Node) bool {
 
 func parametersHaveEqualSigils(left, right *ast.Node) bool {
 	return isRestParameter(left) == isRestParameter(right) && isOptionalParameter(left) == isOptionalParameter(right)
+}
+
+func parametersHaveSameESTreeShape(left, right *ast.Node) bool {
+	if isRestParameter(left) != isRestParameter(right) {
+		return false
+	}
+	leftName, rightName := left.Name(), right.Name()
+	return leftName != nil && rightName != nil && leftName.Kind == rightName.Kind
 }
 
 func parametersAreEqual(sourceFile *ast.SourceFile, left, right *ast.Node) bool {
@@ -429,6 +455,7 @@ func staticParameterName(parameter *ast.Node) string {
 }
 
 func typesAreEqual(sourceFile *ast.SourceFile, left, right *ast.Node) bool {
+	left, right = skipParenthesizedType(left), skipParenthesizedType(right)
 	return left == right || left != nil && right != nil && utils.TrimmedNodeText(sourceFile, left) == utils.TrimmedNodeText(sourceFile, right)
 }
 
@@ -446,7 +473,15 @@ func typeParametersAreEqual(left, right []*ast.Node) bool {
 }
 
 func constraintsAreEqual(left, right *ast.Node) bool {
+	left, right = skipParenthesizedType(left), skipParenthesizedType(right)
 	return left == right || left != nil && right != nil && left.Kind == right.Kind
+}
+
+func skipParenthesizedType(node *ast.Node) *ast.Node {
+	for node != nil && node.Kind == ast.KindParenthesizedType {
+		node = node.AsParenthesizedTypeNode().Type
+	}
+	return node
 }
 
 func signatureUsesOuterTypeParameter(signature *ast.Node, outerTypeParameters []*ast.Node) bool {

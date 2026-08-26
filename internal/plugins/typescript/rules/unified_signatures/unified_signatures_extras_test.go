@@ -51,6 +51,7 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 		{Code: `function f(): void; function f(this: {}): void;`},
 		// Locks in upstream this:void exemption in equal-arity comparisons.
 		{Code: `function f(this: void, x: number): void; function f(this: void, x: string): void;`},
+		{Code: `function f(this: (void), x: number): void; function f(this: (void), x: string): void;`},
 		// Locks in upstream this:void exemption in different-arity comparisons.
 		{Code: `function f(this: void): void; function f(this: void, x?: string): void;`},
 		// Locks in upstream 2+-extra-parameters required-middle arm.
@@ -73,6 +74,49 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
+		// Parentheses and comments around a computed key are transparent in ESTree.
+		{
+			Code: `declare const key: unique symbol;
+interface I {
+  [key](x: string): void;
+  [(key)](x: number): void;
+  [/* comment */ key](x: boolean): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "singleParameterDifference", Line: 4, Column: 11},
+				{MessageId: "singleParameterDifference", Line: 5, Column: 23},
+				{MessageId: "singleParameterDifference", Line: 5, Column: 23},
+			},
+		},
+		// The differently-named option compares names only for the same ESTree parameter shape.
+		{
+			Code:    `interface I { f({x}: {x: string}): void; f(y: number): void; }`,
+			Options: []any{map[string]any{"ignoreDifferentlyNamedParameters": true}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `{x: string} | number`.",
+				Line:      1, Column: 44, EndLine: 1, EndColumn: 53,
+			}},
+		},
+		// Parenthesized types are transparent in the unified type text.
+		{
+			Code: `declare function f(x: (string)): void;
+declare function f(x: number): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `string | number`.",
+				Line:      2, Column: 20, EndLine: 2, EndColumn: 29,
+			}},
+		},
+		{
+			Code: `declare function f(x: (string | number)): void;
+declare function f(x: boolean): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `string | number | boolean`.",
+				Line:      2, Column: 20, EndLine: 2, EndColumn: 30,
+			}},
+		},
 		// A quoted constructor method is not part of the real constructor group.
 		{
 			Code: `declare class C {
