@@ -82,6 +82,7 @@ var NoArrayConstructorRule = rule.Rule{
 	Name:   "no-array-constructor",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		var shadowCache utils.ScopeManagerShadowCache
 		check := func(node *ast.Node) {
 			callee, args, typeArgs := calleeArgsAndTypeArgs(node)
 			if callee == nil {
@@ -133,16 +134,19 @@ var NoArrayConstructorRule = rule.Rule{
 			// keeps a function's parameter initializers in the same scope as its
 			// body declarations, where both TypeScript's resolver and IsShadowed
 			// follow runtime lexical semantics instead.
-			if utils.HasEnclosingParameter(callee, "Array") ||
-				utils.HasEnclosingTypeParameter(callee, "Array") ||
+			if shadowCache.HasEnclosingParameter(callee, "Array") ||
+				shadowCache.HasEnclosingTypeParameter(callee, "Array") ||
 				utils.HasEnclosingClassExpressionName(callee, "Array") ||
-				utils.IsShadowedFromParameterInitializer(callee, "Array") {
+				shadowCache.IsShadowedFromParameterInitializer(callee, "Array") {
 				return
 			}
 			// A config `/* global Array: off */` / `languageOptions.globals`
 			// entry un-declares Espree's builtin. typescript-eslint/parser also
 			// installs its library `Array` variable, which remains visible after
-			// the override, so TypeScript-flavoured files still report.
+			// the override, so TypeScript-flavoured files still report. rslint does
+			// not currently project parserOptions.lib into native rule contexts;
+			// the documented divergence for an explicitly empty lib follows from
+			// preserving that existing API boundary.
 			if ast.IsInJSFile(callee) && !ctx.Globals.Access("Array").IsDeclared() {
 				return
 			}

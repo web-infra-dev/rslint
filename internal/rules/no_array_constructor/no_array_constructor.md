@@ -61,6 +61,7 @@ Array?.(0, 1, 2);
 ## Differences from ESLint
 
 - When the array constructor call is fixed onto a new line right after certain TypeScript-only constructs — a type alias (`type T = Foo`), an ambient or overload function declaration (`declare function foo()`), an import-equals declaration (`import Foo = Bar`), or an `as`/`satisfies` type cast — rslint's autofix inserts a leading `;` that ESLint omits (e.g. `type T = Foo\n;[0, 1]` instead of `type T = Foo\n[0, 1]`). The extra semicolon never changes the resulting code's behavior.
+- In TypeScript files, rslint treats `Array` as a predefined library variable even when `parserOptions.lib` is explicitly empty. For example, with `parserOptions.lib: []` and `globals: { Array: "off" }`, rslint still reports and fixes `Array()`, while typescript-eslint does not. Native rule contexts do not currently expose parser-specific library selection.
 
 ## Original Documentation
 

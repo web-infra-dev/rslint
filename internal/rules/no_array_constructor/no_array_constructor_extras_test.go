@@ -27,6 +27,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -455,6 +456,53 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 	)
 }
 
+func TestNoArrayConstructorEmptyParserLibDivergence(t *testing.T) {
+	program, sourceFile := createNoArrayConstructorProgram(t, "empty-parser-lib.ts", "Array();\n")
+	root := fixtures.GetRootDir()
+	config := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		LanguageOptions: &rslintconfig.LanguageOptions{Raw: map[string]any{
+			"globals": map[string]any{"Array": "off"},
+			"parserOptions": map[string]any{
+				"lib": []any{},
+			},
+		}},
+		Rules: rslintconfig.Rules{"no-array-constructor": "error"},
+	}}
+	configuredRules, merged := rslintconfig.ResolveEnabledRules(
+		rule.NewCatalog(NoArrayConstructorRule),
+		config,
+		sourceFile.FileName(),
+		root.Dir,
+		false,
+	)
+	if merged == nil || len(configuredRules) != 1 {
+		t.Fatalf("resolved rules = %d, merged config = %v; want one configured rule", len(configuredRules), merged != nil)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:         lintprogram.NewFromCompiler(program),
+		File:            sourceFile.FileName(),
+		HasTypeInfo:     true,
+		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule { return configuredRules },
+		ExcludePaths:    []string{},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAutofix,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	})
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+	}
+	fixes := diagnostics[0].Fixes()
+	if len(fixes) != 1 || fixes[0].Text != "[]" {
+		t.Fatalf("fixes = %#v, want one [] replacement", fixes)
+	}
+}
+
 // TestNoArrayConstructorEditDemand verifies that the fix/suggestion builders
 // don't change what the rule reports: diagnostic count, message, and range
 // stay identical across every edit demand, and fixes/suggestions are
@@ -656,6 +704,101 @@ func BenchmarkNoArrayConstructorRepeatedCallsWithParameters(b *testing.B) {
 			source.WriteByte('}')
 
 			program, sourceFile := createNoArrayConstructorProgram(b, "repeated-calls-with-parameters.ts", source.String())
+			var options []any
+			b.ResetTimer()
+			for range b.N {
+				diagnostics := lintNoArrayConstructorWithDemand(program, sourceFile, options, rule.EditDemandNone)
+				if len(diagnostics) != count {
+					b.Fatalf("diagnostics = %d, want %d", len(diagnostics), count)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkNoArrayConstructorRepeatedCallsWithTypeParameters(b *testing.B) {
+	for _, count := range []int{500, 1_000, 2_000, 4_000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			var source strings.Builder
+			source.WriteString("function f<")
+			for i := range count {
+				if i > 0 {
+					source.WriteByte(',')
+				}
+				source.WriteString("T")
+				source.WriteString(strconv.Itoa(i))
+			}
+			source.WriteString(">() {")
+			for range count {
+				source.WriteString("void Array(1, 2);")
+			}
+			source.WriteByte('}')
+
+			program, sourceFile := createNoArrayConstructorProgram(b, "repeated-calls-with-type-parameters.ts", source.String())
+			var options []any
+			b.ResetTimer()
+			for range b.N {
+				diagnostics := lintNoArrayConstructorWithDemand(program, sourceFile, options, rule.EditDemandNone)
+				if len(diagnostics) != count {
+					b.Fatalf("diagnostics = %d, want %d", len(diagnostics), count)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkNoArrayConstructorRepeatedCallsInParameterDecorator(b *testing.B) {
+	for _, count := range []int{500, 1_000, 2_000, 4_000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			var source strings.Builder
+			source.WriteString("class C { m(@dec([")
+			for i := range count {
+				if i > 0 {
+					source.WriteByte(',')
+				}
+				source.WriteString("Array(1, 2)")
+			}
+			source.WriteString("]) x: number")
+			for i := range count {
+				source.WriteString(", p")
+				source.WriteString(strconv.Itoa(i))
+				source.WriteString(": number")
+			}
+			source.WriteString(") {} }")
+
+			program, sourceFile := createNoArrayConstructorProgram(b, "repeated-calls-in-parameter-decorator.ts", source.String())
+			var options []any
+			b.ResetTimer()
+			for range b.N {
+				diagnostics := lintNoArrayConstructorWithDemand(program, sourceFile, options, rule.EditDemandNone)
+				if len(diagnostics) != count {
+					b.Fatalf("diagnostics = %d, want %d", len(diagnostics), count)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkNoArrayConstructorRepeatedCallsInParameterInitializer(b *testing.B) {
+	for _, count := range []int{500, 1_000, 2_000, 4_000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			var source strings.Builder
+			source.WriteString("function f(x = [")
+			for i := range count {
+				if i > 0 {
+					source.WriteByte(',')
+				}
+				source.WriteString("Array(1, 2)")
+			}
+			source.WriteString("]) {")
+			for i := range count {
+				source.WriteString("let p")
+				source.WriteString(strconv.Itoa(i))
+				source.WriteByte(';')
+			}
+			source.WriteByte('}')
+
+			program, sourceFile := createNoArrayConstructorProgram(b, "repeated-calls-in-parameter-initializer.ts", source.String())
 			var options []any
 			b.ResetTimer()
 			for range b.N {
