@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed consistent_type_imports.schema.json
@@ -513,7 +514,7 @@ func fixesToTypeImport(ctx rule.RuleContext, fixStyle string, report *reportValu
 			defaultRange := utils.TrimNodeTextRange(ctx.SourceFile, defaultSpecifier.name)
 			comma, ok := utils.TokenAtOrAfter(ctx.SourceFile, defaultRange.End())
 			if ok && comma.Kind == ast.KindCommaToken {
-				defaultText := strings.TrimSpace(ctx.SourceFile.Text()[defaultRange.Pos():comma.Start])
+				defaultText := ecmascript.StringTrim(ctx.SourceFile.Text()[defaultRange.Pos():comma.Start])
 				fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(position, position), "import type "+defaultText+" from "+sourceText+";\n"))
 				after, ok := utils.TokenAtOrAfter(ctx.SourceFile, comma.End)
 				if ok {
