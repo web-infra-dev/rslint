@@ -42,23 +42,35 @@ type accessorGroup struct {
 }
 
 func accessorName(node *ast.Node) string {
-	return utils.GetFunctionNameWithKindCore(node)
+	name := utils.GetFunctionNameWithKindCore(node)
+	parent := node.Parent
+	if parent == nil || (parent.Kind != ast.KindInterfaceDeclaration && parent.Kind != ast.KindTypeLiteral) {
+		return name
+	}
+	nameNode := node.Name()
+	if nameNode == nil || nameNode.Kind != ast.KindComputedPropertyName {
+		return name
+	}
+	if _, ok := utils.GetStaticPropertyName(nameNode); !ok {
+		return name + " 'null'"
+	}
+	return name
 }
 
-func reportPair(ctx rule.RuleContext, messageID string, former *ast.Node, latter *ast.Node) {
+func reportPair(ctx rule.RuleContext, headLocator *utils.FunctionHeadRangeLocator, messageID string, former *ast.Node, latter *ast.Node) {
 	formerName := accessorName(former)
 	latterName := accessorName(latter)
 	message := fmt.Sprintf("Accessor pair %s and %s should be grouped.", formerName, latterName)
 	if messageID == "invalidOrder" {
 		message = fmt.Sprintf("Expected %s to be before %s.", latterName, formerName)
 	}
-	ctx.ReportRange(utils.GetFunctionHeadLoc(ctx.SourceFile, latter), rule.RuleMessage{
+	ctx.ReportRange(headLocator.Range(latter), rule.RuleMessage{
 		Id:          messageID,
 		Description: message,
 	})
 }
 
-func checkList(ctx rule.RuleContext, members []*ast.Node, opts Options, include func(*ast.Node) bool) {
+func checkList(ctx rule.RuleContext, headLocator *utils.FunctionHeadRangeLocator, members []*ast.Node, opts Options, include func(*ast.Node) bool) {
 	groups := make([]accessorGroup, 0)
 	for index, member := range members {
 		if !include(member) || (member.Kind != ast.KindGetAccessor && member.Kind != ast.KindSetAccessor) {
@@ -94,12 +106,12 @@ func checkList(ctx rule.RuleContext, members []*ast.Node, opts Options, include 
 			formerIndex, latterIndex = setterIndex, getterIndex
 		}
 		if latterIndex-formerIndex > 1 {
-			reportPair(ctx, "notGrouped", members[formerIndex], members[latterIndex])
+			reportPair(ctx, headLocator, "notGrouped", members[formerIndex], members[latterIndex])
 			continue
 		}
 		if (opts.Order == "getBeforeSet" && getterIndex > setterIndex) ||
 			(opts.Order == "setBeforeGet" && setterIndex > getterIndex) {
-			reportPair(ctx, "invalidOrder", members[formerIndex], members[latterIndex])
+			reportPair(ctx, headLocator, "invalidOrder", members[formerIndex], members[latterIndex])
 		}
 	}
 }
@@ -118,19 +130,20 @@ var GroupedAccessorPairsRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		headLocator := utils.NewFunctionHeadRangeLocator(ctx.SourceFile)
 		listeners := rule.RuleListeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
 				object := node.AsObjectLiteralExpression()
 				if object != nil && object.Properties != nil {
-					checkList(ctx, object.Properties.Nodes, opts, typeAccessor)
+					checkList(ctx, headLocator, object.Properties.Nodes, opts, typeAccessor)
 				}
 			},
 			ast.KindClassDeclaration: func(node *ast.Node) {
 				members := node.Members()
-				checkList(ctx, members, opts, func(member *ast.Node) bool {
+				checkList(ctx, headLocator, members, opts, func(member *ast.Node) bool {
 					return concreteAccessor(member) && !ast.IsStatic(member)
 				})
-				checkList(ctx, members, opts, func(member *ast.Node) bool {
+				checkList(ctx, headLocator, members, opts, func(member *ast.Node) bool {
 					return concreteAccessor(member) && ast.IsStatic(member)
 				})
 			},
@@ -138,10 +151,10 @@ var GroupedAccessorPairsRule = rule.Rule{
 		listeners[ast.KindClassExpression] = listeners[ast.KindClassDeclaration]
 		if opts.EnforceForTSTypes {
 			listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
-				checkList(ctx, node.Members(), opts, typeAccessor)
+				checkList(ctx, headLocator, node.Members(), opts, typeAccessor)
 			}
 			listeners[ast.KindTypeLiteral] = func(node *ast.Node) {
-				checkList(ctx, node.Members(), opts, typeAccessor)
+				checkList(ctx, headLocator, node.Members(), opts, typeAccessor)
 			}
 		}
 		return listeners

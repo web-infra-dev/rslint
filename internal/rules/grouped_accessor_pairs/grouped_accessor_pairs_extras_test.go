@@ -20,6 +20,8 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 			// ---- Dimension 4: receiver/expression wrappers ----
 			// Parentheses around the complete dynamic key are transparent.
 			{Code: `({ get [(key)](){}, set [key](value){} })`},
+			// Parentheses nested within a dynamic key remain part of its token stream.
+			{Code: `({ get [(key) + other](){}, middle: true, set [key + other](value){} })`},
 			// TS assertions remain part of a dynamic key's token identity.
 			{Code: `({ get [(key as string)](){}, middle: true, set [key](value){} })`},
 			{Code: `({ get [key!](){}, middle: true, set [key](value){} })`},
@@ -33,6 +35,8 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 			{Code: `({ get [left](){}, middle: true, set [right](value){} })`},
 			{Code: `({ get [left + right](){}, set [left+right](value){} })`},
 			{Code: `({ get [left + right](){}, middle: true, set [left - right](value){} })`},
+			{Code: `({ get [+key](){}, middle: true, set [-key](value){} })`},
+			{Code: `({ get [key++](){}, middle: true, set [key--](value){} })`},
 			// N/A: element access is only an expression inside a computed key;
 			// this rule does not inspect member-access receivers.
 			{Code: `({ get [source['name']](){}, set [source['name']](value){} })`},
@@ -139,6 +143,26 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "notGrouped",
 					Message:   "Accessor pair getter 'a' and setter 'a' should be grouped.",
+				}},
+			},
+			// Decorators are part of the MethodDefinition range used by upstream's
+			// function-head location helper.
+			{
+				Code: `class C { @first() get a(){} field; @second(1) set a(value){} }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "notGrouped",
+					Column:    37,
+					EndColumn: 53,
+				}},
+			},
+			// getFunctionNameWithKind stringifies a dynamic TSMethodSignature key
+			// as the upstream null static-name result.
+			{
+				Code:    `interface I { get [key](): string; middle: true; set [key](value: string); }`,
+				Options: []any{"anyOrder", map[string]any{"enforceForTSTypes": true}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "notGrouped",
+					Message:   "Accessor pair getter 'null' and setter 'null' should be grouped.",
 				}},
 			},
 		},

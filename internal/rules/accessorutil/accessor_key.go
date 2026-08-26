@@ -2,7 +2,6 @@ package accessorutil
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -38,7 +37,7 @@ func MakeKey(node *ast.Node) Key {
 	if nameNode.Kind == ast.KindComputedPropertyName {
 		expr = nameNode.AsComputedPropertyName().Expression
 	}
-	return Key{Kind: KeyDynamic, Expr: ast.SkipParentheses(expr)}
+	return Key{Kind: KeyDynamic, Expr: expr}
 }
 
 func KeysEqual(sourceFile *ast.SourceFile, left Key, right Key) bool {
@@ -55,53 +54,10 @@ func KeysEqual(sourceFile *ast.SourceFile, left Key, right Key) bool {
 	}
 }
 
-// computedKeysEqual mirrors ESLint's token-list comparison while accounting
-// for parentheses that ESTree omits from child expressions. Raw numeric and
-// bigint spelling remains significant because ESLint compares token values.
+// computedKeysEqual mirrors ESLint's token-list comparison. HasSameTokens
+// removes only transparent outer parentheses, preserves nested parentheses,
+// and compares punctuation and operators that tsgo does not expose as child
+// nodes.
 func computedKeysEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.Node) bool {
-	if left == nil || right == nil {
-		return left == right
-	}
-	left = ast.SkipParentheses(left)
-	right = ast.SkipParentheses(right)
-	if left == nil || right == nil {
-		return left == right
-	}
-	if left.Kind != right.Kind {
-		return false
-	}
-	switch left.Kind {
-	case ast.KindIdentifier:
-		return left.AsIdentifier().Text == right.AsIdentifier().Text
-	case ast.KindPrivateIdentifier:
-		return left.AsPrivateIdentifier().Text == right.AsPrivateIdentifier().Text
-	case ast.KindStringLiteral:
-		return left.AsStringLiteral().Text == right.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return left.AsNoSubstitutionTemplateLiteral().Text == right.AsNoSubstitutionTemplateLiteral().Text
-	case ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail,
-		ast.KindRegularExpressionLiteral:
-		return left.Text() == right.Text()
-	case ast.KindNumericLiteral, ast.KindBigIntLiteral:
-		return scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, left, false) ==
-			scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, right, false)
-	}
-	var leftChildren, rightChildren []*ast.Node
-	left.ForEachChild(func(child *ast.Node) bool {
-		leftChildren = append(leftChildren, child)
-		return false
-	})
-	right.ForEachChild(func(child *ast.Node) bool {
-		rightChildren = append(rightChildren, child)
-		return false
-	})
-	if len(leftChildren) != len(rightChildren) {
-		return false
-	}
-	for index := range leftChildren {
-		if !computedKeysEqual(sourceFile, leftChildren[index], rightChildren[index]) {
-			return false
-		}
-	}
-	return true
+	return utils.HasSameTokens(sourceFile, left, right)
 }
