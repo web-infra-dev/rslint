@@ -679,9 +679,6 @@ importers:
       '@rslint/core':
         specifier: workspace:*
         version: link:../packages/rslint
-      '@rslint/wasm':
-        specifier: workspace:*
-        version: link:../packages/rslint-wasm
       '@rspress/core':
         specifier: 'catalog:'
         version: 2.0.18(@rspack/core@2.1.10(@swc/helpers@0.5.23))(@types/mdast@4.0.4)(@types/react@19.2.17)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2)

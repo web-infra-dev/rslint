@@ -2,13 +2,20 @@ package linter
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"runtime"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
+)
+
+var (
+	errNilRuleHandler         = errors.New("linter: GetRulesForFile must not be nil")
+	errTargetNotInProgram     = errors.New("linter: target is not present in its bound Program")
+	errTargetsByProgramLength = errors.New("linter: TargetsByProgram must have one entry per Program")
 )
 
 // LintPlan is the immutable Phase 1 input shared by native lint execution and
@@ -40,6 +47,15 @@ type lintPlanFileRef struct {
 	fileIndex    int
 }
 
+// programRulePlanOptions contains the rule-resolution policy for one already
+// selected Program projection. Target discovery and ownership happen before
+// this boundary.
+type programRulePlanOptions struct {
+	Program         *program.Program
+	SkipSyntaxCheck bool
+	GetRulesForFile RuleHandler
+}
+
 // LintTarget is one non-syntax-error file paired with its non-empty configured
 // rule set. It is a projection of LintPlan for consumers that do not need
 // zero-rule files or per-Program execution metadata.
@@ -52,31 +68,28 @@ type LintTarget struct {
 // Rule resolution uses at most GOMAXPROCS workers unless SingleThreaded is set.
 // GetRulesForFile must therefore support concurrent calls whenever the caller
 // requests normal parallel execution, matching Consumer.Report's run-scoped
-// concurrency requirement. Source-universe validation happens once in the
-// internal/program constructor, before the Program can reach this planner.
-func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
-	if opts.GetRulesForFile == nil {
-		return &LintPlan{}, nil
+// concurrency requirement. Every target must resolve in its corresponding
+// Program; the complete binding is validated before rule resolution begins.
+func PrepareLintPlan(opts PrepareLintPlanOptions) (*LintPlan, error) {
+	if len(opts.TargetsByProgram) != len(opts.Programs) {
+		return nil, errTargetsByProgramLength
 	}
-	// Validate the complete ordered input before target projection invokes a
-	// caller-supplied FileFilter for any earlier Program.
+	// Validate the complete ordered input before rule resolution can produce
+	// side effects for an earlier Program.
 	if err := validatePrograms(opts.Programs); err != nil {
 		return nil, err
 	}
-	if opts.ExcludePaths == nil {
-		opts.ExcludePaths = utils.ExcludePaths
+	if opts.GetRulesForFile == nil {
+		return nil, errNilRuleHandler
 	}
-
 	plan := &LintPlan{programs: make([]programLintPlan, len(opts.Programs))}
-	programOpts := make([]programPlanOptions, len(opts.Programs))
 	totalFiles := 0
 	for programIndex := range opts.Programs {
-		programOpts[programIndex] = programPlanOptionsFor(opts, programIndex)
-		programPlan, err := newProgramLintPlan(programOpts[programIndex])
+		files, err := resolveExactProgramFiles(opts.Programs[programIndex], opts.TargetsByProgram[programIndex])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("linter: Program index %d: %w", programIndex, err)
 		}
-		plan.programs[programIndex] = programPlan
+		plan.programs[programIndex] = programLintPlanFromFiles(opts.Programs[programIndex], files)
 		totalFiles += len(plan.programs[programIndex].files)
 	}
 
@@ -92,7 +105,10 @@ func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 
 	resolve := func(ref lintPlanFileRef, ctx context.Context) {
 		programPlan := &plan.programs[ref.programIndex]
-		resolveProgramLintPlanFile(programOpts[ref.programIndex], programPlan, ref.fileIndex, ctx)
+		resolveProgramLintPlanFile(programRulePlanOptions{
+			Program:         programPlan.program,
+			GetRulesForFile: opts.GetRulesForFile,
+		}, programPlan, ref.fileIndex, ctx)
 	}
 
 	workerCount := min(runtime.GOMAXPROCS(0), len(refs))
@@ -124,23 +140,26 @@ func PrepareLintPlan(opts RunLinterOptions) (*LintPlan, error) {
 	return plan, nil
 }
 
-func newProgramLintPlan(opts programPlanOptions) (programLintPlan, error) {
-	if err := validateProgram(opts.Program); err != nil {
+func newProgramLintPlanForFiles(sourceProgram *program.Program, files []*ast.SourceFile) (programLintPlan, error) {
+	if err := validateProgram(sourceProgram); err != nil {
 		return programLintPlan{}, err
 	}
-	files := collectFilesToLint(opts)
+	return programLintPlanFromFiles(sourceProgram, files), nil
+}
+
+func programLintPlanFromFiles(sourceProgram *program.Program, files []*ast.SourceFile) programLintPlan {
 	filePlans := make([]lintFilePlan, len(files))
 	for index, file := range files {
 		filePlans[index].file = file
 	}
 	return programLintPlan{
-		program: opts.Program,
+		program: sourceProgram,
 		files:   filePlans,
-	}, nil
+	}
 }
 
-func prepareProgramLintPlan(opts programPlanOptions) (programLintPlan, error) {
-	plan, err := newProgramLintPlan(opts)
+func prepareProgramLintPlanForFiles(opts programRulePlanOptions, files []*ast.SourceFile) (programLintPlan, error) {
+	plan, err := newProgramLintPlanForFiles(opts.Program, files)
 	if err != nil {
 		return programLintPlan{}, err
 	}
@@ -151,7 +170,7 @@ func prepareProgramLintPlan(opts programPlanOptions) (programLintPlan, error) {
 	return plan, nil
 }
 
-func resolveProgramLintPlanFile(opts programPlanOptions, plan *programLintPlan, fileIndex int, ctx context.Context) {
+func resolveProgramLintPlanFile(opts programRulePlanOptions, plan *programLintPlan, fileIndex int, ctx context.Context) {
 	filePlan := &plan.files[fileIndex]
 	file := filePlan.file
 	if shouldSkipRulesForSyntax(opts, file, ctx) {
@@ -198,27 +217,50 @@ func (p *LintPlan) Targets() []LintTarget {
 	return targets
 }
 
-func programPlanOptionsFor(opts RunLinterOptions, programIndex int) programPlanOptions {
-	programOpts := programPlanOptions{
-		Program:         opts.Programs[programIndex],
-		ExcludePaths:    opts.ExcludePaths,
-		GetRulesForFile: opts.GetRulesForFile,
+func (p *LintPlan) sourcePrograms() []*program.Program {
+	programs := make([]*program.Program, len(p.programs))
+	for index, programPlan := range p.programs {
+		programs[index] = programPlan.program
+	}
+	return programs
+}
+
+func resolveExactProgramFiles(sourceProgram *program.Program, targets []string) ([]*ast.SourceFile, error) {
+	// Exact target plans commonly select a Program's complete universe in the
+	// same stable order. Preserve the Program-owned slice when selection makes
+	// no change, avoiding a map and pointer-slice allocation without inspecting
+	// how the Program was constructed.
+	files := sourceProgram.SourceFiles()
+	if len(targets) == len(files) {
+		exact := true
+		for fileIndex, target := range targets {
+			file := sourceProgram.GetSourceFile(target)
+			if file == nil {
+				return nil, fmt.Errorf("%w: %q", errTargetNotInProgram, target)
+			}
+			if file != files[fileIndex] {
+				exact = false
+				break
+			}
+		}
+		if exact {
+			return files, nil
+		}
 	}
 
-	if programIndex < len(opts.PerProgramFilter) {
-		programOpts.FileFilter = opts.PerProgramFilter[programIndex]
-	}
-	if opts.TargetFiles != nil {
-		programOpts.HasTargetFiles = true
-		if programIndex < len(opts.TargetFiles) {
-			programOpts.TargetFiles = opts.TargetFiles[programIndex]
+	var filesToLint []*ast.SourceFile
+	seen := make(map[string]struct{}, len(targets))
+	for _, target := range targets {
+		file := sourceProgram.GetSourceFile(target)
+		if file == nil {
+			return nil, fmt.Errorf("%w: %q", errTargetNotInProgram, target)
 		}
-	} else {
-		programOpts.Scope = opts.Scope
-		programOpts.FileFilter = composeOwnedFilter(
-			programOpts.FileFilter,
-			buildOwnedFileSet(programOpts.Program),
-		)
+		fileName := file.FileName()
+		if _, ok := seen[fileName]; ok {
+			continue
+		}
+		seen[fileName] = struct{}{}
+		filesToLint = append(filesToLint, file)
 	}
-	return programOpts
+	return filesToLint, nil
 }

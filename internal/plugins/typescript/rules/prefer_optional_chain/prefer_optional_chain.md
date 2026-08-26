@@ -89,4 +89,4 @@ When set to `true`, the rule will only report on expressions where at least one 
 ## Original Documentation
 
 - [typescript-eslint: prefer-optional-chain](https://typescript-eslint.io/rules/prefer-optional-chain)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-optional-chain.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.68.0/packages/eslint-plugin/src/rules/prefer-optional-chain.ts)

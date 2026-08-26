@@ -733,7 +733,6 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 			File:            sourceFile.FileName(),
 			HasTypeInfo:     true,
 			GetRulesForFile: noDuplicatesConfiguredRules,
-			ExcludePaths:    []string{},
 			Consumer: rule.DiagnosticConsumer{
 				Demand: demand,
 				Report: func(diagnostic rule.RuleDiagnostic) {
@@ -808,7 +807,6 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 		File:            unfixableSourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noDuplicatesConfiguredRules,
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -882,7 +880,6 @@ import type { RequireType } from "conditional-package" with { "resolution-mode":
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noDuplicatesConfiguredRules,
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandNone,
 			Report: func(diagnostic rule.RuleDiagnostic) {

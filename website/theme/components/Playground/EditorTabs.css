@@ -12,3 +12,14 @@
   border-radius: 3px;
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
 }
+
+.dark .monaco-editor .ast-node-highlight {
+  background: rgba(31, 111, 235, 0.35);
+  outline-color: #58a6ff;
+}
+
+.dark .monaco-editor .ast-node-hover-highlight {
+  background: rgba(187, 128, 9, 0.35);
+  outline-color: #d29922;
+  box-shadow: 0 0 0 1px rgba(210, 153, 34, 0.35);
+}

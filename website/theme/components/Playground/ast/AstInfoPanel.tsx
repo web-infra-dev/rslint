@@ -49,9 +49,9 @@ interface SectionProps {
 }
 
 const Section: React.FC<SectionProps> = ({ title, children }) => (
-  <div className="border-b border-gray-200 last:border-b-0">
-    <div className="bg-gray-50 px-3 py-2">
-      <h3 className="text-xs font-semibold tracking-wide text-gray-600">
+  <div className="border-b border-gray-200 last:border-b-0 dark:border-gray-700">
+    <div className="bg-gray-50 px-3 py-2 dark:bg-gray-900">
+      <h3 className="text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-300">
         {title}
       </h3>
     </div>
