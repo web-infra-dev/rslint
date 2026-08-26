@@ -90,7 +90,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 	enterFunction := func(node *ast.Node) {
 		functionStack = append(functionStack, functionInfo{
 			needsReturnType: node.Body() != nil &&
-				node.Type() == nil &&
+				utils.ESTreeType(node) == nil &&
 				node.Kind != ast.KindConstructor &&
 				node.Kind != ast.KindSetAccessor,
 			returnsOnlyFunctions: true,
@@ -126,7 +126,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 	}
 
 	isAllowedFunction := func(node *ast.Node) bool {
-		if opts.allowFunctionsWithoutTypeParameters && node.TypeParameters() == nil {
+		if opts.allowFunctionsWithoutTypeParameters && len(utils.ESTreeTypeParameters(node)) == 0 {
 			return true
 		}
 		if opts.allowIIFEs && isIIFE(node) {
@@ -184,7 +184,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		if isAllowedFunction(node) {
 			return
 		}
-		if opts.allowTypedFunctionExpressions && node.Type() != nil {
+		if opts.allowTypedFunctionExpressions && utils.ESTreeType(node) != nil {
 			return
 		}
 		if !checkFunctionReturnType(node, info) {
@@ -254,7 +254,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 			if info.returnsOnlyFunctions {
 				argument := node.Expression()
 				info.returnsOnlyFunctions = argument != nil &&
-					typescriptutil.IsFunction(ast.SkipParentheses(argument))
+					typescriptutil.IsFunction(utils.ESTreeRuntimeExpression(argument))
 			}
 		},
 	}
@@ -264,7 +264,7 @@ func doesImmediatelyReturnFunctionExpression(node *ast.Node, info functionInfo) 
 	if node.Kind == ast.KindArrowFunction {
 		body := node.AsArrowFunction().Body
 		if body != nil && body.Kind != ast.KindBlock {
-			return typescriptutil.IsFunction(ast.SkipParentheses(body))
+			return typescriptutil.IsFunction(utils.ESTreeRuntimeExpression(body))
 		}
 	}
 	return info.hasReturn && info.returnsOnlyFunctions
@@ -272,14 +272,11 @@ func doesImmediatelyReturnFunctionExpression(node *ast.Node, info functionInfo) 
 
 // isIIFE checks if a function node is the callee of an immediately invoked call expression.
 func isIIFE(node *ast.Node) bool {
-	parent := node.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
+	parent := typescriptutil.GetEffectiveParent(node)
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return false
 	}
-	callee := ast.SkipParentheses(parent.AsCallExpression().Expression)
+	callee := utils.ESTreeRuntimeExpression(parent.AsCallExpression().Expression)
 	return callee == node
 }
 
@@ -321,7 +318,7 @@ func isNameAllowed(sourceFile *ast.SourceFile, node *ast.Node, allowedNames []st
 			}
 		}
 		if funcName == "" {
-			parent := node.Parent
+			parent := typescriptutil.GetEffectiveParent(node)
 			if parent == nil {
 				return false
 			}

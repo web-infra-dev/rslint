@@ -158,14 +158,6 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 		return true
 	}
 
-	// TypeScript-eslint's scope manager exposes authored type references to
-	// core no-undef. TypeScript-Go also parses JSDoc types into its AST,
-	// however, while upstream parsers leave those comments outside the scope
-	// graph. Keep only those synthetic JSDoc identifiers invisible here.
-	if utils.IsInJSDocSyntax(node) {
-		return true
-	}
-
 	// `import("pkg").Name` treats both the module argument and qualifier as
 	// module syntax rather than references. Its type arguments remain normal
 	// type references and are deliberately not skipped.

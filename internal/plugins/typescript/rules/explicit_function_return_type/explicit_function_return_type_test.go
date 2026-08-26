@@ -574,6 +574,14 @@ const f = (gotcha: ObjectWithCallback = { callback: () => {} }): void => {};
 			Options: map[string]interface{}{"allowTypedFunctionExpressions": true},
 		},
 	}, []rule_tester.InvalidTestCase{
+		{
+			Code:     "/** @returns {number} */\nfunction value() { return 1; }",
+			FileName: "file.mjs",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingReturnType", Line: 2, Column: 1},
+			},
+		},
 		// Basic missing return types
 		{
 			Code: `
@@ -1678,4 +1686,115 @@ func runExplicitFunctionReturnTypeWithDemand(
 	}
 	sourceFile.AsNode().ForEachChild(visit)
 	return diagnostics
+}
+
+func TestExplicitFunctionReturnTypeIgnoresHostedJSDocSyntax(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&ExplicitFunctionReturnTypeRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:     "/** @template T */\nfunction f() {}",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options: map[string]interface{}{
+					"allowFunctionsWithoutTypeParameters": true,
+				},
+			},
+			{
+				Code:     "const f = /** @type {() => void} */ (() => {});",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options: map[string]interface{}{
+					"allowedNames":                  []interface{}{"f"},
+					"allowTypedFunctionExpressions": false,
+				},
+			},
+			{
+				Code:     "(/** @type {Function} */ (function () {}))();",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options: map[string]interface{}{
+					"allowIIFEs":                    true,
+					"allowTypedFunctionExpressions": false,
+				},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			hostedJSDocMissingReturnCase(
+				"const f = /** @type {() => void} */ (() => {});",
+				1,
+				41,
+				nil,
+			),
+			hostedJSDocMissingReturnCase(
+				"(/** @type {Function} */ (function () {}))();",
+				1,
+				27,
+				map[string]interface{}{"allowTypedFunctionExpressions": true},
+			),
+			hostedJSDocMissingReturnCase(
+				"const f = /** @satisfies {() => void} */ (() => {});",
+				1,
+				46,
+				nil,
+			),
+			hostedJSDocMissingReturnCase(
+				"/** @type {() => void} */\nconst f = () => {};",
+				2,
+				14,
+				nil,
+			),
+			hostedJSDocMissingReturnCase(
+				"class C {\n  /** @type {() => void} */\n  callback = () => {};\n}",
+				3,
+				3,
+				nil,
+			),
+			hostedJSDocMissingReturnCase(
+				"/** @type {{ callback: () => void }} */\nconst value = { callback: () => {} };",
+				2,
+				17,
+				nil,
+			),
+			hostedJSDocMissingReturnCase(
+				"/** @returns {() => void} */\nfunction outer() { return () => {}; }",
+				2,
+				30,
+				nil,
+			),
+			hostedJSDocMissingReturnCase(
+				"/** @param {() => void} cb */\nfunction outer(cb = () => {}) {}",
+				2,
+				24,
+				map[string]interface{}{"allowedNames": []interface{}{"outer"}},
+			),
+			hostedJSDocMissingReturnCase(
+				"function f() { return /** @type {() => void} */ (() => {}); }",
+				1,
+				53,
+				nil,
+			),
+			hostedJSDocMissingReturnCase(
+				"const f = () => /** @type {() => void} */ (() => {});",
+				1,
+				47,
+				nil,
+			),
+		},
+	)
+}
+
+func hostedJSDocMissingReturnCase(code string, line, column int, options any) rule_tester.InvalidTestCase {
+	return rule_tester.InvalidTestCase{
+		Code:     code,
+		FileName: "file.mjs",
+		TSConfig: "tsconfig.allow-js.json",
+		Options:  options,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "missingReturnType", Line: line, Column: column},
+		},
+	}
 }

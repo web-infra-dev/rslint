@@ -21,7 +21,7 @@ var MaxParamsRule = rule.Rule{
 		opts := parseOptions(options)
 
 		check := func(node *ast.Node) {
-			params := node.Parameters()
+			params := utils.ESTreeParameters(node)
 			effective := len(params)
 			if effective <= opts.max {
 				return

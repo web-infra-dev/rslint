@@ -828,6 +828,23 @@ declare module 'pkg' {
       `,
 		},
 	}, []rule_tester.InvalidTestCase{
+		{
+			Code:     "class Example {\n  /** @private */\n  method() {}\n}",
+			FileName: "file.mjs",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "missingAccessibility",
+					Line:      3,
+					Column:    3,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addExplicitAccessibility", Output: "class Example {\n  /** @private */\n  public method() {}\n}"},
+						{MessageId: "addExplicitAccessibility", Output: "class Example {\n  /** @private */\n  private method() {}\n}"},
+						{MessageId: "addExplicitAccessibility", Output: "class Example {\n  /** @private */\n  protected method() {}\n}"},
+					},
+				},
+			},
+		},
 		// ---- parameterProperties: 'explicit' ----
 		{
 			Code: `
