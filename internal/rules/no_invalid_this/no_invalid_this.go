@@ -534,7 +534,6 @@ func ancestorJSDocSummary(node *ast.Node, comments []*ast.CommentRange, sf *ast.
 	if closest.End() > tokenStart || !ecmascript.IsBlank(text[closest.End():tokenStart]) {
 		return false, false
 	}
-	hasComments = true
 	if closest.Kind != ast.KindMultiLineCommentTrivia {
 		return true, false
 	}
