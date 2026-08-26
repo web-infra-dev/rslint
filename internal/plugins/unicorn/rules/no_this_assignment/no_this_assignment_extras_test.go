@@ -56,6 +56,9 @@ func TestNoThisAssignmentExtras(t *testing.T) {
 			{Code: `({foo: bar = this} = object);`},
 			{Code: `for ([foo = this] of array) {}`},
 			{Code: `[[foo = this] = fallback] = array;`},
+			{Code: `for ({key: self = this} in source) {}`},
+			{Code: `for ([self = this] in source) {}`},
+			{Code: `for ([[self = this] = fallback] in source) {}`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: ESTree erases parenthesized expressions ----

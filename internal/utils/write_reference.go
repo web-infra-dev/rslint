@@ -270,5 +270,6 @@ func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 }
 
 func isArrayOrObjectDestructuringAssignmentPattern(node *ast.Node) bool {
-	return node != nil && ast.IsArrayLiteralOrObjectLiteralDestructuringPattern(node)
+	return node != nil &&
+		(ast.IsArrayLiteralOrObjectLiteralDestructuringPattern(node) || IsInDestructuringAssignment(node))
 }
