@@ -42,7 +42,7 @@ The `inspector` module builds code inspection information for the Playground, pr
 │                            Backend (Go)                                │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
-│  cmd/rslint/api.go: HandleGetAstInfo                                   │
+│  internal/api/server/ast_info.go: HandleGetAstInfo                     │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
 │  │ 1. Get/create cached Program                                     │  │
 │  │ 2. Find node: FindNodeAtPosition(sourceFile, pos, end, kind)     │  │

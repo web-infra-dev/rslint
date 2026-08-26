@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"runtime/pprof"
 	"runtime/trace"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +18,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
@@ -215,7 +214,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	if usesJSConfig {
 		eslintPlugins = configCatalog.EslintPlugins
 	}
-	ruleCatalog, shadowedPluginRules := deriveRuleCatalog(eslintPlugins)
+	ruleCatalog, shadowedPluginRules := rules.All().ForESLintPlugins(eslintPlugins)
 	reportShadowedPluginRules(shadowedPluginRules)
 	var rslintConfig rslintconfig.RslintConfig
 
@@ -324,11 +323,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// a separate step after configuration is fully resolved (including --rule
 	// overrides) and before any linting starts, so a bad config fails fast
 	// with every failure reported at once instead of surfacing mid-lint.
-	var optionsMessages []string
-	configMap, rslintConfig, optionsMessages = validateResolvedRuleOptions(configMap, rslintConfig, ruleCatalog)
-	if len(optionsMessages) > 0 {
-		for _, message := range optionsMessages {
-			fmt.Fprintf(os.Stderr, "error: %s\n", message)
+	var optionErrors []rslintconfig.ResolvedRuleOptionsError
+	configMap, rslintConfig, optionErrors = rslintconfig.ValidateResolvedRuleOptions(configMap, rslintConfig, ruleCatalog)
+	if len(optionErrors) > 0 {
+		for _, optionError := range optionErrors {
+			fmt.Fprintf(os.Stderr, "error: %s\n", optionError.Error())
 		}
 		return 1
 	}
@@ -358,7 +357,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	// --- Lint target discovery and Program loading ---
 	programs := projectSet.Programs()
-	programConfigMap := configMap
 	buildSingleConfigPrograms := buildAllPrograms
 	var (
 		targetPlan             target.Plan
@@ -386,11 +384,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 		if !buildAllPrograms {
 			if configMap != nil {
-				programConfigMap = configsForOwners(configMap, targetPlan.ActiveOwners())
 				if broadProjectLoad {
-					projectSet, err = programSession.BuildProjects(programConfigMap, singleThreaded)
+					projectSet, err = programSession.BuildProjectsForTargetOwners(configMap, targetPlan, singleThreaded)
 				} else {
-					projectSet, err = programSession.BuildTargetProjects(programConfigMap, targetPlan, singleThreaded)
+					projectSet, err = programSession.BuildTargetProjects(configMap, targetPlan, singleThreaded)
 				}
 			} else if len(targetPlan.Files) > 0 {
 				buildSingleConfigPrograms = true
@@ -422,10 +419,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		var rebuilt loader.ProjectSet
 		var err error
 		if configMap != nil {
-			if buildAllPrograms || broadProjectLoad {
-				rebuilt, err = programSession.BuildProjects(programConfigMap, singleThreaded)
+			if buildAllPrograms {
+				rebuilt, err = programSession.BuildProjects(configMap, singleThreaded)
+			} else if broadProjectLoad {
+				rebuilt, err = programSession.BuildProjectsForTargetOwners(configMap, targetPlan, singleThreaded)
 			} else {
-				rebuilt, err = programSession.BuildTargetProjects(programConfigMap, targetPlan, singleThreaded)
+				rebuilt, err = programSession.BuildTargetProjects(configMap, targetPlan, singleThreaded)
 			}
 		} else if buildSingleConfigPrograms {
 			if buildAllPrograms || broadProjectLoad {
@@ -458,7 +457,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}()
 
 	enforcePlugins := usesJSConfig
-	var fileConfigResolver *lintConfigResolver
+	var fileConfigResolver *configLint.Resolver
 
 	// Target discovery already excluded default paths, global ignores, and
 	// .gitignore entries. Target ownership and deduplication were already
@@ -466,12 +465,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Source-only Programs expose no checker or
 	// program-wide diagnostic capability; the linter consumes that distinction
 	// through the common Program contract rather than a parallel skip mask.
-	syntaxDiagnostics := collectTargetSyntacticDiagnostics(
-		programs,
-		targetsByProgram,
-		typeCheck,
-		typeCheckOnly,
-	)
+	var syntaxDiagnostics []rule.RuleDiagnostic
+	if !typeCheckOnly {
+		syntaxDiagnostics = linter.CollectTargetSyntacticDiagnostics(
+			programs,
+			targetsByProgram,
+			typeCheck,
+		)
+	}
 	for _, diagnostic := range syntaxDiagnostics {
 		diagnosticsChan <- diagnostic
 	}
@@ -481,19 +482,19 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// non-nil; Phase 2 (type-check) runs independently.
 	var rulesForFile linter.RuleHandler
 	if !typeCheckOnly {
-		fileConfigResolver = newLintConfigResolver(lintConfigResolverOptions{
-			ConfigMap:               configMap,
-			Config:                  rslintConfig,
-			CurrentDirectory:        currentDirectory,
-			RuleCatalog:             ruleCatalog,
-			EnforcePlugins:          enforcePlugins,
-			LintTargetBySourcePath:  lintTargetBySourcePath,
-			SourceMappingsCanonical: true,
-			PathSpaces:              targetPlan.PathSpaces(),
-			FS:                      fs,
+		fileConfigResolver = configLint.NewResolver(configLint.ResolverOptions{
+			ConfigsByOwner:                      configMap,
+			Config:                              rslintConfig,
+			ConfigDirectory:                     currentDirectory,
+			Catalog:                             ruleCatalog,
+			EnforcePlugins:                      enforcePlugins,
+			TargetsBySourcePath:                 lintTargetBySourcePath,
+			SourceMappingsIncludeCanonicalPaths: true,
+			PathSpaces:                          targetPlan.PathSpaces(),
+			FS:                                  fs,
 		})
 		rulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-			return fileConfigResolver.EnabledRulesForFile(sourceFile.FileName())
+			return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
 		}
 	}
 
@@ -531,13 +532,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// dispatch is skipped so the native-only path pays nothing for the feature.
 	// Both paths consume the same prepared file/rule plan.
 	hasEslintPlugins := !typeCheckOnly && len(eslintPlugins) > 0
-	pluginResolver := pluginConfigResolver{
+	pluginResolver := eslintPluginConfigResolver{
 		lintResolver: fileConfigResolver,
 	}
-	var pluginCh <-chan []rule.RuleDiagnostic
+	var pluginCh <-chan linter.EslintPluginDispatchOutcome
 	if hasEslintPlugins {
-		pluginInputs := buildPluginFileInputs(runOpts.PreparedPlan, pluginResolver)
-		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix), timingCollector)
+		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, pluginResolver.resolve)
+		suggestionsMode := linter.SuggestionsModeOff
+		if fix {
+			suggestionsMode = linter.SuggestionsModeEager
+		}
+		pluginCh = linter.DispatchEslintPluginRulesAsync(ctx, dispatch, pluginInputs, fix, suggestionsMode, timingCollector, reportEslintPluginDispatchOutcome)
 	}
 
 	lintResult, err := linter.RunLinter(runOpts)
@@ -554,7 +559,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Merge eslint-plugin diagnostics (dispatched in parallel) now that the
 	// native diagnostics goroutine has drained.
 	if pluginCh != nil {
-		allDiags = append(allDiags, (<-pluginCh)...)
+		allDiags = append(allDiags, (<-pluginCh).Diagnostics...)
 	}
 	remapDiagnosticTargetPaths(allDiags, lintTargetBySourcePath, fs)
 
@@ -609,19 +614,19 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// Re-lint using the fresh binding derived from the stable target plan.
 			fixTargetsByProgram := newBinding.TargetsByProgram
 			fixLintTargetBySourcePath := newBinding.LintTargetBySourcePath
-			fixConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-				ConfigMap:               configMap,
-				Config:                  rslintConfig,
-				CurrentDirectory:        currentDirectory,
-				RuleCatalog:             ruleCatalog,
-				EnforcePlugins:          enforcePlugins,
-				LintTargetBySourcePath:  newBinding.LintTargetBySourcePath,
-				SourceMappingsCanonical: true,
-				PathSpaces:              targetPlan.PathSpaces(),
-				FS:                      fs,
+			fixConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
+				ConfigsByOwner:                      configMap,
+				Config:                              rslintConfig,
+				ConfigDirectory:                     currentDirectory,
+				Catalog:                             ruleCatalog,
+				EnforcePlugins:                      enforcePlugins,
+				TargetsBySourcePath:                 newBinding.LintTargetBySourcePath,
+				SourceMappingsIncludeCanonicalPaths: true,
+				PathSpaces:                          targetPlan.PathSpaces(),
+				FS:                                  fs,
 			})
 			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
-				return fixConfigResolver.EnabledRulesForFile(sourceFile.FileName())
+				return fixConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
 			}
 			var fixRulesForFile linter.RuleHandler
 			if !typeCheckOnly {
@@ -634,11 +639,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				passEditDemand = rule.EditDemandNone
 			}
 			var passDiags []rule.RuleDiagnostic
-			fixSyntaxDiagnostics := collectTargetSyntacticDiagnostics(
+			fixSyntaxDiagnostics := linter.CollectTargetSyntacticDiagnostics(
 				newBinding.Programs,
 				fixTargetsByProgram,
 				typeCheck,
-				typeCheckOnly,
 			)
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)
 			fixRunOpts := linter.RunLinterOptions{
@@ -669,17 +673,21 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// worker re-reads the post-fix file content, and merging here keeps
 			// plugin diagnostics from being lost when allDiags is replaced.
 			// Each pass prepares a fresh plan for the rebuilt target binding.
-			var fixPluginCh <-chan []rule.RuleDiagnostic
+			var fixPluginCh <-chan linter.EslintPluginDispatchOutcome
 			if hasEslintPlugins {
-				fixPluginInputs := buildPluginFileInputs(fixRunOpts.PreparedPlan, pluginConfigResolver{
+				fixPluginInputs := linter.BuildEslintPluginFileInputs(fixRunOpts.PreparedPlan, eslintPluginConfigResolver{
 					lintResolver: fixConfigResolver,
-				})
-				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix), timingCollector)
+				}.resolve)
+				suggestionsMode := linter.SuggestionsModeOff
+				if fix {
+					suggestionsMode = linter.SuggestionsModeEager
+				}
+				fixPluginCh = linter.DispatchEslintPluginRulesAsync(ctx, dispatch, fixPluginInputs, fix, suggestionsMode, timingCollector, reportEslintPluginDispatchOutcome)
 			}
 			passResult, passErr := linter.RunLinter(fixRunOpts)
 			var fixPluginDiags []rule.RuleDiagnostic
 			if fixPluginCh != nil {
-				fixPluginDiags = <-fixPluginCh
+				fixPluginDiags = (<-fixPluginCh).Diagnostics
 			}
 			if passErr != nil {
 				fmt.Fprintf(os.Stderr, "error running linter after fixes: %v\n", passErr)
@@ -721,21 +729,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	allDiags = deduplicateTypeScriptDiagnostics(allDiags, fs, targetPlan.PreferredCallerPaths())
 
-	// Diagnostics arrive in completion order — programs and, within a
-	// program, file shards run in parallel — so impose a deterministic
-	// order before printing. The key is (file, start position) only,
-	// deliberately with NO end/rule tie-break: ESLint orders same-start
-	// diagnostics by emission order (parent reported before nested child),
-	// and a file's diagnostics are all emitted by a single worker, so under
-	// a STABLE sort this key is already fully deterministic. Keep this
-	// comparator in sync with the --api one in api.go (same policy over
-	// api.Diagnostic).
-	slices.SortStableFunc(allDiags, func(a, b rule.RuleDiagnostic) int {
-		if c := strings.Compare(a.FilePath, b.FilePath); c != 0 {
-			return c
-		}
-		return cmp.Compare(a.Range.Pos(), b.Range.Pos())
-	})
+	// Paths have already been remapped into the caller-visible target space.
+	// Sort the completed set before rendering; same-start diagnostics retain
+	// emission order.
+	linter.StableSortDiagnosticsByFileAndStart(allDiags)
 
 	// Phase 3: Build one report from the final post-fix diagnostics, then let
 	// the CLI output subsystem own format dispatch, colors, and summary text.

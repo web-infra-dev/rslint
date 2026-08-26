@@ -221,11 +221,15 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// A cheap source-text check inside ParseInlineGlobals avoids asking
 		// the store for all comments unless an inline directive is possible.
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
+		var environment rule.RuleEnvironment
+		if filePlan.environment != nil {
+			environment = *filePlan.environment
+		}
 
 		// Resolve immutable language initialization once per file. Globals and
 		// RefStore receive their own concrete data and never inspect the current
 		// selection input (the file extension) themselves.
-		globalsInit, refsInit := rule.ResolveLanguageDefaults(file.FileName())
+		globalsInit, refsInit, languageOptions := rule.ResolveLanguageDefaults(file.FileName(), environment.LanguageOptions)
 
 		fileChecker := chk
 
@@ -241,15 +245,11 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
 		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
-		var environment rule.RuleEnvironment
-		if filePlan.environment != nil {
-			environment = *filePlan.environment
-		}
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
 			Settings:        environment.Settings,
-			LanguageOptions: environment.LanguageOptions,
-			Globals:         rule.NewGlobals(environment.LanguageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
+			LanguageOptions: languageOptions,
+			Globals:         rule.NewGlobals(languageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
 			Comments:        comments,
 			Refs:            refs,
 			BOM:             sourceBOM,
@@ -310,6 +310,13 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		var childVisitor ast.Visitor
 		var patternVisitor func(node *ast.Node)
 		patternVisitor = func(node *ast.Node) {
+			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+				patternVisitor(expression)
+				return
+			}
+			if utils.IsJSDocSyntaxNode(node) {
+				return
+			}
 			runListeners(node.Kind, node)
 			kind := rule.ListenerOnAllowPattern(node.Kind)
 			runListeners(kind, node)
@@ -343,6 +350,13 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			runListeners(rule.ListenerOnExit(node.Kind), node)
 		}
 		childVisitor = func(node *ast.Node) bool {
+			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+				childVisitor(expression)
+				return false
+			}
+			if utils.IsJSDocSyntaxNode(node) {
+				return false
+			}
 			runListeners(node.Kind, node)
 
 			switch node.Kind {

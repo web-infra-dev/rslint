@@ -42,6 +42,9 @@ func TestStringCodeUnits(t *testing.T) {
 			if got := StringCodeUnits(tt.value); !slices.Equal(got, tt.want) {
 				t.Errorf("StringCodeUnits(%q) = %v, want %v", tt.value, got, tt.want)
 			}
+			if got := StringCodeUnitCount(tt.value); got != len(tt.want) {
+				t.Errorf("StringCodeUnitCount(%q) = %d, want %d", tt.value, got, len(tt.want))
+			}
 		})
 	}
 }

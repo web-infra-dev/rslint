@@ -364,25 +364,29 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 				},
 			},
 			{
-				Code: `/*global foo:writable*/ foo = 1;`,
+				Code:            `/*global foo:writable*/ foo = 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
 				},
 			},
 			{
-				Code: `/*global foo:writable*/ foo += 1;`,
+				Code:            `/*global foo:writable*/ foo += 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
 				},
 			},
 			{
-				Code: `/*global foo:writable*/ foo = foo + 1;`,
+				Code:            `/*global foo:writable*/ foo = foo + 1;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
 				},
 			},
 			{
-				Code: `/*global foo:writable*/ foo++;`,
+				Code:            `/*global foo:writable*/ foo++;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					extraUnusedError("foo", false, 1, 10, 13, ""),
 				},
@@ -421,6 +425,98 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 			extraUnusedCase(`let x: any = []; x = (x as any)["concat"](x);`, "x", true, 1, 18, 19, ""),
 			extraUnusedCase(`let x: any = []; x = x!["concat"](x);`, "x", true, 1, 18, 19, ""),
 			extraUnusedCase(`let x: any = []; x = (x satisfies any)["concat"](x);`, "x", true, 1, 18, 19, ""),
+		},
+	)
+}
+
+func TestNoUnusedVarsSourceTypeScopes(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			// vars:"local" ignores program-level bindings only when the effective
+			// source type gives the file a global program scope.
+			{
+				Code:            `var foo;`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `export {}; var foo; let bar; const baz = 1; function fn() {} class C {}`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `import "./foo"; var foo;`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `var foo;`,
+				FileName:        "file.ts",
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// The default source type is module even when no import or export
+			// makes the parser classify the file as an external module.
+			{
+				Code:    `var foo;`,
+				Options: map[string]interface{}{"vars": "local"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			{
+				Code:     `var foo;`,
+				FileName: "source-type.tsx",
+				Options:  map[string]interface{}{"vars": "local"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			{
+				Code:     `var foo;`,
+				FileName: "source-type.jsx",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  map[string]interface{}{"vars": "local"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			{
+				Code:            `var foo;`,
+				FileName:        "file.cjs",
+				TSConfig:        "tsconfig.allow-js.json",
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			{
+				Code:            `var foo;`,
+				FileName:        "source-type-commonjs.jsx",
+				TSConfig:        "tsconfig.allow-js.json",
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			// A nested variable remains local even when script overrides module
+			// syntax at the program boundary.
+			{
+				Code:            "import \"./foo\";\nfunction outer() {\n  var nested;\n  nested = 1;\n}\nouter();",
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedError("nested", true, 4, 3, 9, ""),
+				},
+			},
 		},
 	)
 }

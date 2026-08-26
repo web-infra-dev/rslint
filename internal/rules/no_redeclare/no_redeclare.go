@@ -464,8 +464,7 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 	}
 
 	globals := newProgramGlobalDeclarations(ctx, o, variant.builtinMode)
-	hasNonGlobalTopLevelScope := ast.IsExternalModule(ctx.SourceFile) ||
-		(ctx.Refs != nil && ctx.Refs.HasNonGlobalTopLevelScope())
+	hasNonGlobalTopLevelScope := ctx.Refs != nil && ctx.Refs.HasNonGlobalProgramScope()
 	var handled map[string]bool
 	if len(globals.inlineOrder) > 0 {
 		handled = make(map[string]bool, len(s.order))

@@ -106,7 +106,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-instanceof-builtins': 'error',
     // 'unicorn/no-invalid-argument-count': 'error', // not implemented
     // 'unicorn/no-invalid-character-comparison': 'error', // not implemented
-    // 'unicorn/no-invalid-fetch-options': 'error', // not implemented
+    'unicorn/no-invalid-fetch-options': 'error',
     // 'unicorn/no-invalid-file-input-accept': 'off', // not implemented
     'unicorn/no-invalid-remove-event-listener': 'error',
     // 'unicorn/no-invalid-well-known-symbol-methods': 'error', // not implemented
@@ -174,7 +174,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-unsafe-promise-all-settled-values': 'error', // not implemented
     // 'unicorn/no-unsafe-property-key': 'error', // not implemented
     // 'unicorn/no-unsafe-sqlite-interpolation': 'error', // not implemented
-    // 'unicorn/no-unsafe-string-replacement': 'error', // not implemented
+    'unicorn/no-unsafe-string-replacement': 'error',
     // 'unicorn/no-unused-array-method-return': 'error', // not implemented
     // 'unicorn/no-unused-properties': 'off', // not implemented
     // 'unicorn/no-useless-boolean-cast': 'error', // not implemented

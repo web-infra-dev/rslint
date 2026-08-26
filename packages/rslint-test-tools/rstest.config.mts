@@ -164,6 +164,7 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-mutable-exports.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
+    './tests/eslint-plugin-import/rules/order.test.ts',
 
     // eslint-plugin-react
     './tests/eslint-plugin-react/rules/destructuring-assignment.test.ts',
@@ -457,6 +458,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-regex-literals.test.ts',
     './tests/eslint/rules/preserve-caught-error.test.ts',
     './tests/eslint/rules/no-new-symbol.test.ts',
+    './tests/eslint/rules/no-restricted-exports.test.ts',
     './tests/eslint/rules/no-restricted-globals.test.ts',
     './tests/eslint/rules/no-restricted-imports.test.ts',
     './tests/eslint/rules/no-restricted-syntax.test.ts',
@@ -527,6 +529,7 @@ export default defineConfig({
     './tests/eslint/rules/symbol-description.test.ts',
     './tests/eslint/rules/unicode-bom.test.ts',
     './tests/eslint/rules/sort-keys.test.ts',
+    './tests/eslint/rules/sort-vars.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
@@ -582,6 +585,7 @@ export default defineConfig({
     // rstest
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
+    './tests/rstest/rules/no-alias-methods.test.ts',
     './tests/rstest/rules/no-commented-out-tests.test.ts',
     './tests/rstest/rules/no-conditional-expect.test.ts',
     './tests/rstest/rules/no-conditional-in-test.test.ts',
@@ -594,7 +598,10 @@ export default defineConfig({
     './tests/rstest/rules/no-mocks-import.test.ts',
     './tests/rstest/rules/no-standalone-expect.test.ts',
     './tests/rstest/rules/prefer-called-exactly-once-with.test.ts',
+    './tests/rstest/rules/prefer-each.test.ts',
+    './tests/rstest/rules/prefer-expect-type-of.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
+    './tests/rstest/rules/prefer-todo.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
     './tests/rstest/rules/valid-expect-in-promise.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
@@ -624,9 +631,11 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/no-array-fill-with-reference-type.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-await-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-instanceof-builtins.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-invalid-fetch-options.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-remove-event-listener.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-static-only-class.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-thenable.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-unsafe-string-replacement.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
