@@ -9,17 +9,20 @@ const ruleTester = new RuleTester();
 function withScriptDefaults<T extends ValidTestCase | InvalidTestCase>(
   cases: T[],
 ): T[] {
-  return cases.map((testCase) =>
-    typeof testCase === 'string'
-      ? ({ code: testCase, languageOptions: { sourceType: 'script' } } as T)
-      : ({
-          ...testCase,
-          languageOptions: {
-            sourceType: 'script',
-            ...testCase.languageOptions,
-          },
-        } as T),
-  );
+  return cases.map((testCase) => {
+    if (typeof testCase === 'string') {
+      return { code: testCase, languageOptions: { sourceType: 'script' } } as T;
+    }
+
+    const objectTestCase = testCase as Exclude<T, string>;
+    return {
+      ...objectTestCase,
+      languageOptions: {
+        sourceType: 'script',
+        ...objectTestCase.languageOptions,
+      },
+    } as T;
+  });
 }
 
 ruleTester.run('no-implicit-globals', {
