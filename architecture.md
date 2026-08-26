@@ -494,6 +494,25 @@ type RuleFix struct {
 }
 ```
 
+`internal/linter` owns the shared producer semantics around this model. Native
+rules, TypeScript syntax/program diagnostics, and reconstructed third-party
+plugin diagnostics all enter the surfaces as `RuleDiagnostic` values. The
+single-file TypeScript syntax projection is shared by CLI/API target
+collection and LSP document linting, while TypeScript program diagnostics keep
+their richer message-chain and related-information formatting. Completed CLI
+and API diagnostic sets are stably ordered by caller-visible file path and
+start byte offset only after each surface has projected paths into its own
+identity space; equal keys retain producer emission order. LSP deliberately
+does not use that completed-set ordering because it publishes native results
+first and merges generation-stamped plugin results later.
+
+After that semantic boundary, representation remains integration-owned. CLI
+builds an `internal/output.Report`, API projects to its 1-based structured wire
+model and flat UTF-16 edit offsets, and LSP projects to 0-based LSP positions
+while retaining its stale-generation and code-action lifecycle. Counts, fix
+passes, path bases, stderr notices, and protocol empty-array rules therefore do
+not belong to a universal diagnostic pipeline.
+
 ### Severity Levels
 
 - `SeverityError`: lint error
