@@ -87,6 +87,39 @@ func TestNoRestrictedPropertiesExtras(t *testing.T) {
 			{Code: `({} = foo);`, Options: []any{map[string]any{"object": "foo"}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Review regression: typescript-eslint includes a binding
+			// pattern's authored type annotation in the ObjectPattern range. ----
+			{
+				Code:    `const {bar}: T = foo;`,
+				Options: []any{map[string]any{"property": "bar"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bar' is restricted from being used.",
+					Line:      1, Column: 7, EndLine: 1, EndColumn: 15,
+				}},
+			},
+			{
+				Code: `function f({bar}:
+					LongType) {}`,
+				Options: []any{map[string]any{"property": "bar"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bar' is restricted from being used.",
+					Line:      1, Column: 12, EndLine: 2, EndColumn: 14,
+				}},
+			},
+			{
+				Code:     "/** @type {{bar: string}} */\nconst {bar} = foo;",
+				FileName: "jsdoc-pattern.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Options:  []any{map[string]any{"property": "bar"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedProperty",
+					Message:   "'bar' is restricted from being used.",
+					Line:      2, Column: 7, EndLine: 2, EndColumn: 12,
+				}},
+			},
+
 			// ---- Review regression: object patterns nested under an array rest
 			// target remain ESTree ObjectPattern nodes in assignment, for-of, and
 			// for-in destructuring forms. ----

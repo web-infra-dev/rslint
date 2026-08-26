@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -113,6 +114,27 @@ func isAllowedName(name string, allowedList []string) bool {
 	return false
 }
 
+func reportRange(ctx rule.RuleContext, node *ast.Node) core.TextRange {
+	textRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+	if node.Kind != ast.KindObjectBindingPattern || node.Parent == nil {
+		return textRange
+	}
+
+	var name, typeNode *ast.Node
+	switch node.Parent.Kind {
+	case ast.KindVariableDeclaration:
+		declaration := node.Parent.AsVariableDeclaration()
+		name, typeNode = declaration.Name(), declaration.Type
+	case ast.KindParameter:
+		parameter := node.Parent.AsParameterDeclaration()
+		name, typeNode = parameter.Name(), parameter.Type
+	}
+	if name == node && typeNode != nil && typeNode.Pos() >= node.End() {
+		return core.NewTextRange(textRange.Pos(), typeNode.End())
+	}
+	return textRange
+}
+
 // matchedProperty is the object-side match found for a given (objectName,
 // propertyName) pair: either a specific pair restriction (no allow-list) or a
 // whole-object restriction (with an optional allowProperties list).
@@ -160,7 +182,7 @@ func checkPropertyAccess(ctx rule.RuleContext, r restrictions, node *ast.Node, o
 		if matched.message != "" {
 			messageSuffix = " " + matched.message
 		}
-		ctx.ReportNode(node, rule.RuleMessage{
+		ctx.ReportRange(reportRange(ctx, node), rule.RuleMessage{
 			Id:          "restrictedObjectProperty",
 			Description: fmt.Sprintf("'%s.%s' is restricted from being used.%s%s", objectName, propertyName, allowedPropertiesMessage, messageSuffix),
 		})
@@ -183,7 +205,7 @@ func checkPropertyAccess(ctx rule.RuleContext, r restrictions, node *ast.Node, o
 	if globalProp.message != "" {
 		messageSuffix = " " + globalProp.message
 	}
-	ctx.ReportNode(node, rule.RuleMessage{
+	ctx.ReportRange(reportRange(ctx, node), rule.RuleMessage{
 		Id:          "restrictedProperty",
 		Description: fmt.Sprintf("'%s' is restricted from being used.%s%s", propertyName, allowedObjectsMessage, messageSuffix),
 	})
