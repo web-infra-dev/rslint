@@ -141,6 +141,8 @@ destabilising
 destructures
 desugars
 desync
+dgimsuy
+dgimsuvy
 dialytika
 dirxml
 disqualifier
