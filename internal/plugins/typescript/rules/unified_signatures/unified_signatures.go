@@ -39,6 +39,7 @@ type overloadAnalyzer struct {
 	ctx      rule.RuleContext
 	options  unifiedSignaturesOptions
 	comments []*ast.CommentRange
+	tokens   *scanner.Scanner
 }
 
 var UnifiedSignaturesRule = rule.CreateRule(rule.Rule{
@@ -128,38 +129,85 @@ func (a *overloadAnalyzer) overloadKey(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindFunctionDeclaration:
 		if name := node.Name(); name != nil {
-			return "function_" + name.Text(), true
+			return "function:name:" + name.Text(), true
 		}
 		if ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault) {
-			return "function_export_default", true
+			return "function:export-default", true
 		}
 		return "", false
-	case ast.KindConstructor, ast.KindConstructSignature:
+	case ast.KindConstructor:
+		// tsgo also uses KindConstructor for quoted methods such as
+		// `"constructor"()`. ESTree keeps those as ordinary methods.
+		return a.constructorOverloadKey(node)
+	case ast.KindConstructSignature:
 		return "11constructor", true
 	case ast.KindCallSignature:
 		return "11()", true
 	case ast.KindMethodDeclaration, ast.KindMethodSignature:
-		name := node.Name()
-		if name == nil {
-			return "", false
-		}
-		prefix := "11"
-		if name.Kind == ast.KindComputedPropertyName {
-			prefix = "01"
-		}
-		if ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
-			prefix = prefix[:1] + "0"
-		}
-		switch name.Kind {
-		case ast.KindPrivateIdentifier:
-			return prefix + "private_identifier_" + name.Text(), true
-		case ast.KindIdentifier:
-			return prefix + "identifier_" + name.Text(), true
-		default:
-			return prefix + utils.TrimmedNodeText(a.ctx.SourceFile, name), true
-		}
+		return a.methodOverloadKey(node)
 	default:
 		return "", false
+	}
+}
+
+func (a *overloadAnalyzer) constructorOverloadKey(node *ast.Node) (string, bool) {
+	parameters := node.ParameterList()
+	if parameters == nil {
+		return "", false
+	}
+	openParen := parameters.Pos() - 1
+	if openParen < 0 {
+		return "", false
+	}
+	if a.tokens == nil {
+		a.tokens = scanner.NewScanner()
+		a.tokens.SetText(a.ctx.SourceFile.Text())
+		a.tokens.SetLanguageVariant(a.ctx.SourceFile.LanguageVariant)
+	}
+	a.tokens.ResetTokenState(utils.TrimNodeTextRange(a.ctx.SourceFile, node).Pos())
+	var nameKind ast.Kind
+	var nameText string
+	for a.tokens.Scan(); a.tokens.Token() != ast.KindEndOfFile && a.tokens.TokenEnd() <= openParen; a.tokens.Scan() {
+		nameKind = a.tokens.Token()
+		nameText = a.tokens.TokenText()
+	}
+
+	if nameKind == ast.KindConstructorKeyword && !ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+		return "11constructor", true
+	}
+	prefix := "11"
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+		prefix = "10"
+	}
+	switch nameKind {
+	case ast.KindConstructorKeyword, ast.KindIdentifier:
+		return prefix + "identifier_constructor", true
+	case ast.KindStringLiteral:
+		return prefix + nameText, true
+	default:
+		return "", false
+	}
+}
+
+func (a *overloadAnalyzer) methodOverloadKey(node *ast.Node) (string, bool) {
+	name := node.Name()
+	if name == nil {
+		return "", false
+	}
+	prefix := "11"
+	if name.Kind == ast.KindComputedPropertyName {
+		prefix = "01"
+	}
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+		prefix = prefix[:1] + "0"
+	}
+	switch name.Kind {
+	case ast.KindPrivateIdentifier:
+		return prefix + "private_identifier_" + name.Text(), true
+	case ast.KindIdentifier:
+		return prefix + "identifier_" + name.Text(), true
+	default:
+		return prefix + utils.TrimmedNodeText(a.ctx.SourceFile, name), true
 	}
 }
 
@@ -430,6 +478,8 @@ func typeContainsTypeParameter(typeNode *ast.Node, names map[string]struct{}) bo
 		}
 	case ast.KindArrayType:
 		return typeContainsTypeParameter(typeNode.AsArrayTypeNode().ElementType, names)
+	case ast.KindParenthesizedType:
+		return typeContainsTypeParameter(typeNode.AsParenthesizedTypeNode().Type, names)
 	}
 	return false
 }
