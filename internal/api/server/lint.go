@@ -428,11 +428,18 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// Build one run descriptor and prepared plan shared by native lint and
 	// plugin dispatch, keeping both paths on the exact same file/rule selection.
 	runOpts := linter.RunLinterOptions{
-		Programs:       programs,
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
 		Cwd:            currentDirectory,
-		Scope:          linter.FileScope{Files: allowedFiles},
-		TargetFiles:    targetsByProgram,
+		// The API returns concrete fixes, suggestions, and fixable counts
+		// independently of whether req.Fix later applies autofixes.
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: diagnosticCollector,
+		},
+	}
+	preparedPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: targetsByProgram,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
@@ -451,18 +458,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			// semantics (a rule whose plugin is not declared is skipped).
 			return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
 		},
-		// The API returns concrete fixes, suggestions, and fixable counts
-		// independently of whether req.Fix later applies autofixes.
-		Consumer: rule.DiagnosticConsumer{
-			Demand: rule.EditDemandAll,
-			Report: diagnosticCollector,
-		},
-	}
-	preparedPlan, err := linter.PrepareLintPlan(runOpts)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error preparing lint plan: %w", err)
 	}
-	runOpts.PreparedPlan = preparedPlan
+	runOpts.LintPlan = preparedPlan
 
 	// Metadata is the feature gate: without it there is no plugin target walk,
 	// goroutine, or reverse request. With metadata, dispatch starts before the
@@ -480,7 +480,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			}
 			pluginConfigKeyByOwner = map[string]string{configDirectory: wireConfigDirectory}
 		}
-		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, eslintPluginConfigResolver{
+		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.LintPlan, eslintPluginConfigResolver{
 			lintResolver:           fileConfigResolver,
 			pluginConfigKeyByOwner: pluginConfigKeyByOwner,
 		}.resolve)

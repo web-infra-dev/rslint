@@ -31,10 +31,10 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		{Code: `type Test = { set f(value: number): void };`},
 
 		// Non-method members should be ignored in property mode
-		{Code: `interface Test { (): void; }`},                    // call signature
-		{Code: `interface Test { new (): Test; }`},                // construct signature
-		{Code: `interface Test { [key: string]: any; }`},          // index signature
-		{Code: `interface Test { x: number; y: string; }`},        // regular properties
+		{Code: `interface Test { (): void; }`},                            // call signature
+		{Code: `interface Test { new (): Test; }`},                        // construct signature
+		{Code: `interface Test { [key: string]: any; }`},                  // index signature
+		{Code: `interface Test { x: number; y: string; }`},                // regular properties
 		{Code: `interface Test { f: (a: string) => number; g: number; }`}, // mix
 
 		// =============================================
@@ -147,7 +147,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		// Delimiters: semicolon, comma, none
 		// =============================================
 		{
-			Code: "interface Foo {\n  semi(arg: string): void;\n  comma(arg: string): void,\n  none(arg: string): void\n}",
+			Code:   "interface Foo {\n  semi(arg: string): void;\n  comma(arg: string): void,\n  none(arg: string): void\n}",
 			Output: []string{"interface Foo {\n  semi: (arg: string) => void;\n  comma: (arg: string) => void,\n  none: (arg: string) => void\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -160,7 +160,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		// Multi-line parameters
 		// =============================================
 		{
-			Code: "interface Foo {\n  x(\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ): Baz;\n  y(\n    foo: string,\n    bar: number,\n  ): void;\n}",
+			Code:   "interface Foo {\n  x(\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ): Baz;\n  y(\n    foo: string,\n    bar: number,\n  ): void;\n}",
 			Output: []string{"interface Foo {\n  x: (\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ) => Baz;\n  y: (\n    foo: string,\n    bar: number,\n  ) => void;\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -306,7 +306,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		// =============================================
 		// 3 overloads, same params
 		{
-			Code: "interface Test {\n  foo(): one;\n  foo(): two;\n  foo(): three;\n}",
+			Code:   "interface Test {\n  foo(): one;\n  foo(): two;\n  foo(): three;\n}",
 			Output: []string{"interface Test {\n  foo: (() => one) & (() => two) & (() => three);\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -316,7 +316,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		},
 		// Overloads with different parameters
 		{
-			Code: "interface Test {\n  foo(bar: string): one;\n  foo(bar: number, baz: string): two;\n  foo(): three;\n}",
+			Code:   "interface Test {\n  foo(bar: string): one;\n  foo(bar: number, baz: string): two;\n  foo(): three;\n}",
 			Output: []string{"interface Test {\n  foo: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -326,7 +326,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		},
 		// Overloads with computed property names
 		{
-			Code: "interface Foo {\n  [foo](bar: string): one;\n  [foo](bar: number, baz: string): two;\n  [foo](): three;\n}",
+			Code:   "interface Foo {\n  [foo](bar: string): one;\n  [foo](bar: number, baz: string): two;\n  [foo](): three;\n}",
 			Output: []string{"interface Foo {\n  [foo]: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -336,7 +336,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		},
 		// Two independent overload groups in one interface
 		{
-			Code: "interface Foo {\n  [foo](bar: string): one;\n  [foo](bar: number, baz: string): two;\n  [foo](): three;\n  bar(arg: string): void;\n  bar(baz: number): Foo;\n}",
+			Code:   "interface Foo {\n  [foo](bar: string): one;\n  [foo](bar: number, baz: string): two;\n  [foo](): three;\n  bar(arg: string): void;\n  bar(baz: number): Foo;\n}",
 			Output: []string{"interface Foo {\n  [foo]: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);\n  bar: ((arg: string) => void) & ((baz: number) => Foo);\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -348,7 +348,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		},
 		// Overloads in type literal
 		{
-			Code: "type Foo = {\n  foo(): one;\n  foo(): two;\n  foo(): three;\n}",
+			Code:   "type Foo = {\n  foo(): one;\n  foo(): two;\n  foo(): three;\n}",
 			Output: []string{"type Foo = {\n  foo: (() => one) & (() => two) & (() => three);\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -358,7 +358,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		},
 		// Overloads in declare const
 		{
-			Code: "declare const Foo: {\n  foo(): one;\n  foo(): two;\n  foo(): three;\n}",
+			Code:   "declare const Foo: {\n  foo(): one;\n  foo(): two;\n  foo(): three;\n}",
 			Output: []string{"declare const Foo: {\n  foo: (() => one) & (() => two) & (() => three);\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -754,7 +754,7 @@ func TestMethodSignatureStyleRule(t *testing.T) {
 		// Matches ESLint behavior: skipFix is per-node, not per-group.
 		// =============================================
 		{
-			Code: "interface Test {\n  foo(a: string): string;\n  foo(): this;\n}",
+			Code:   "interface Test {\n  foo(a: string): string;\n  foo(): this;\n}",
 			Output: []string{"interface Test {\n  foo: ((a: string) => string) & (() => this);\n}"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "errorMethod", Line: 2},
@@ -869,10 +869,9 @@ declare namespace External {
 
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      lintprogram.NewFromCompiler(program),
-					File:         sourceFile.FileName(),
-					HasTypeInfo:  true,
-					ExcludePaths: []string{},
+					Program:     lintprogram.NewFromCompiler(program),
+					File:        sourceFile.FileName(),
+					HasTypeInfo: true,
 					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 						return []linter.ConfiguredRule{{
 							Name:     MethodSignatureStyleRule.Name,

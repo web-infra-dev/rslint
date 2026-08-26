@@ -406,7 +406,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
 
   return (
     <div className="result-panel">
-      <div className="flex items-center justify-between bg-gray-50 p-2 flex-shrink-0">
+      <div className="flex items-center justify-between bg-[var(--rp-c-bg-soft)] p-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -414,7 +414,6 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
             size="sm"
             onClick={() => setActiveTab('lint')}
             aria-pressed={activeTab === 'lint'}
-            className="dark:text-accent dark:border-muted/20"
           >
             Errors
             {diagnostics.length > 0 && (
@@ -429,7 +428,6 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
             size="sm"
             onClick={() => setActiveTab('ast')}
             aria-pressed={activeTab === 'ast'}
-            className="dark:text-accent dark:border-muted/20"
           >
             AST (tsgo)
           </Button>
@@ -442,7 +440,6 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
               onRequestTsAst?.();
             }}
             aria-pressed={activeTab === 'ast_ts'}
-            className="dark:text-accent dark:border-muted/20"
           >
             AST (TypeScript)
           </Button>
@@ -453,7 +450,6 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
             variant="outline"
             size="sm"
             onClick={() => copyShareUrl()}
-            className="dark:text-accent dark:border-muted/20"
             title={shareCopied ? 'Copied link' : 'Copy shareable link'}
           >
             {shareCopied ? (
@@ -487,10 +483,10 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
                 <div className="diagnostics-list">
                   {diagnostics.map((diagnostic, index) => (
                     <div key={index} className="diagnostic-item">
-                      <div className="diagnostic-header dark:text-[#1c1d21]">
+                      <div className="diagnostic-header">
                         <h4>{diagnostic.ruleName}</h4>
                       </div>
-                      <div className="diagnostic-message dark:text-[#1c1d21]">
+                      <div className="diagnostic-message">
                         {diagnostic.message} {diagnostic.range.start.line}:
                         {diagnostic.range.start.column} -{' '}
                         {diagnostic.range.end.line}:

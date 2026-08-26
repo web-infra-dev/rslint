@@ -87,7 +87,7 @@ func collectLintedFiles(t *testing.T, programs []*compiler.Program) map[string]i
 	t.Helper()
 	counts := make(map[string]int)
 	_, err := runLinterPositional(
-		programs, true, nil, nil, utils.ExcludePaths,
+		programs, true, nil, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			counts[sf.FileName()]++
 			return noopRule()
@@ -280,7 +280,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 
 	// Baseline: diagnostic count for lib.ts in single-program mode
 	singleDiags := 0
-	runLinterInCompilerProgram(programLib, nil, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(programLib, nil, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
 			if d.FilePath == libPath {
@@ -296,7 +296,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 	multiDiags := 0
 	runLinterPositional(
 		[]*compiler.Program{programLib, programApp},
-		true, nil, nil, utils.ExcludePaths,
+		true, nil, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
 			if d.FilePath == libPath {
@@ -402,9 +402,9 @@ func TestRunLinter_GapProgramOnlyLintsOwnFiles(t *testing.T) {
 	assertTotalLintCount(t, counts, []string{libPath, gap1, gap2})
 }
 
-// LSP path: RunLinterInProgram direct call is NOT affected by ownedFiles filter.
-// Imported file can still be linted when explicitly requested via allowFiles.
-func TestRunLinterInProgram_DirectCallNotFiltered(t *testing.T) {
+// The legacy single-Program test adapter can explicitly select an imported
+// file without restricting selection to the Program's root-file set.
+func TestLegacySingleProgramScopeCanSelectImportedFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	writeTestFiles(t, tmpDir, map[string]string{
 		"app.ts":        "import { lib } from './lib'; export const x = lib;",
@@ -423,9 +423,9 @@ func TestRunLinterInProgram_DirectCallNotFiltered(t *testing.T) {
 		t.Fatal("precondition failed: lib.ts should NOT be in owned set")
 	}
 
-	// Direct RunLinterInProgram call (like LSP) — no ownedFiles filter applied
+	// The explicit compatibility scope is not constrained by root ownership.
 	lintedFiles := make(map[string]int)
-	runLinterInCompilerProgram(program, []string{libPath}, nil, utils.ExcludePaths,
+	runLinterInCompilerProgram(program, []string{libPath}, nil, legacyDefaultExcludedPathSubstrings,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			lintedFiles[sf.FileName()]++
 			return noopRule()

@@ -69,8 +69,8 @@ func collectDiags(t *testing.T, programs []*compiler.Program, singleThreaded boo
 	t.Helper()
 	var mu sync.Mutex
 	var got []diagKey
+	lintPrograms := wrapTestPrograms(programs...)
 	opts := RunLinterOptions{
-		Programs:       wrapTestPrograms(programs...),
 		SingleThreaded: singleThreaded,
 		TypeCheck:      typeCheck,
 		Consumer: rule.DiagnosticConsumer{
@@ -88,7 +88,20 @@ func collectDiags(t *testing.T, programs []*compiler.Program, singleThreaded boo
 		},
 	}
 	if withRules {
-		opts.GetRulesForFile = func(*ast.SourceFile) []ConfiguredRule { return varReportingRule() }
+		targetsByProgram := make([][]string, len(lintPrograms))
+		for index, sourceProgram := range lintPrograms {
+			targetsByProgram[index] = sourceProgram.RootFileNames()
+		}
+		opts.LintPlan = mustPrepareLintPlan(t, PrepareLintPlanOptions{
+			Programs:         lintPrograms,
+			TargetsByProgram: targetsByProgram,
+			SingleThreaded:   singleThreaded,
+			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+				return varReportingRule()
+			},
+		})
+	} else if typeCheck {
+		opts.TypeCheckOnlyPrograms = lintPrograms
 	}
 	if _, err := RunLinter(opts); err != nil {
 		t.Fatal(err)

@@ -849,11 +849,11 @@ let visibleAgain: number;
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var diagnostics []rule.RuleDiagnostic
-			_, err := linter.RunLinter(linter.RunLinterOptions{
-				Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-				SingleThreaded: true,
-				TargetFiles:    [][]string{{sourceFile.FileName()}},
-				ExcludePaths:   []string{},
+			programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+			lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+				Programs:         programs,
+				TargetsByProgram: [][]string{{sourceFile.FileName()}},
+				SingleThreaded:   true,
 				GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 					return []linter.ConfiguredRule{{
 						Name:     "@typescript-eslint/init-declarations",
@@ -863,6 +863,13 @@ let visibleAgain: number;
 						},
 					}}
 				},
+			})
+			if err != nil {
+				t.Fatalf("PrepareLintPlan: %v", err)
+			}
+			_, err = linter.RunLinter(linter.RunLinterOptions{
+				SingleThreaded: true,
+				LintPlan:       lintPlan,
 				Consumer: rule.DiagnosticConsumer{
 					Demand: test.demand,
 					Report: func(diagnostic rule.RuleDiagnostic) {

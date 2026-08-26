@@ -36,16 +36,7 @@ func BenchmarkLinterSyntaxRules(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		linter.RunLinterInProgram(
-			program,
-			nil,
-			nil,
-			utils.ExcludePaths,
-			getRules,
-			false,
-			onDiag,
-			nil,
-		)
+		runLintBenchmark(b, program, getRules, onDiag)
 	}
 }
 
@@ -59,16 +50,35 @@ func BenchmarkLinterTypeAwareRules(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		linter.RunLinterInProgram(
-			program,
-			nil,
-			nil,
-			utils.ExcludePaths,
-			getRules,
-			false,
-			onDiag,
-			nil,
-		)
+		runLintBenchmark(b, program, getRules, onDiag)
+	}
+}
+
+func runLintBenchmark(
+	b *testing.B,
+	sourceProgram *lintprogram.Program,
+	getRulesForFile linter.RuleHandler,
+	onDiagnostic linter.DiagnosticHandler,
+) {
+	b.Helper()
+	plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{sourceProgram},
+		TargetsByProgram: [][]string{sourceProgram.RootFileNames()},
+		SingleThreaded:   true,
+		GetRulesForFile:  getRulesForFile,
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		LintPlan:       plan,
+		SingleThreaded: true,
+		Consumer: rule.DiagnosticConsumer{
+			Report: onDiagnostic,
+		},
+	})
+	if err != nil {
+		b.Fatal(err)
 	}
 }
 

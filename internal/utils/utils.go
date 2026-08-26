@@ -420,10 +420,6 @@ func LineContentEnd(text string, nextLineStart int) int {
 	return nextLineStart
 }
 
-// ExcludePaths contains path substrings that should be excluded from linting.
-// Used by RunLinterInProgram to skip files during program source file iteration.
-var ExcludePaths = []string{"/node_modules/", "bundled:"}
-
 // DefaultExcludeDirNames contains directory names that are always excluded
 // from file scanning. This is the single source of truth for default directory
 // exclusions used by lint-target discovery and source-only Program roots.

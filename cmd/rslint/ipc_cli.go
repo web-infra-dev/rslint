@@ -437,8 +437,8 @@ func shutdownPeer(ch *ipc.Channel, state *runCLIState) bool {
 // classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,
 // mirroring parseLintFlags's positional handling (filepath.Abs +
 // tspath.NormalizePath) so the IPC and flag entry paths produce identical
-// FileScope downstream. An Abs failure is skipped with a stderr warning rather
-// than silently dropping the path.
+// target requests downstream. An Abs failure is skipped with a stderr warning
+// rather than silently dropping the path.
 func classifyPaths(paths []string) (files []string, dirs []string) {
 	for _, p := range paths {
 		absPath, err := filepath.Abs(p)

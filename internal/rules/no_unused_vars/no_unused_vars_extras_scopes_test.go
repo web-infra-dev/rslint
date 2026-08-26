@@ -22,6 +22,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -555,12 +556,10 @@ consume(outer);
 
 	ruleRan := false
 	var diagnostics []rule.RuleDiagnostic
-	linter.RunLinterInProgram(
-		sourceProgram,
-		nil,
-		nil,
-		utils.ExcludePaths,
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                sourceProgram,
+		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			if sourceFile.FileName() != filePath {
 				return nil
 			}
@@ -576,12 +575,10 @@ consume(outer);
 				},
 			}}
 		},
-		false,
-		func(diagnostic rule.RuleDiagnostic) {
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		nil,
-	)
+	})
 
 	if !ruleRan {
 		t.Fatal("core no-unused-vars did not run for gap JavaScript")
@@ -843,12 +840,10 @@ consume(data);`,
 				}
 				var diagnostics []rule.RuleDiagnostic
 				ruleRan := false
-				linter.RunLinterInProgram(
-					sourceProgram,
-					nil,
-					nil,
-					utils.ExcludePaths,
-					func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+				testutil.LintProgram(t, testutil.LintProgramOptions{
+					Program:                sourceProgram,
+					ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+					GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 						if sourceFile.FileName() != filePath {
 							return nil
 						}
@@ -864,12 +859,10 @@ consume(data);`,
 							},
 						}}
 					},
-					false,
-					func(diagnostic rule.RuleDiagnostic) {
+					OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 						diagnostics = append(diagnostics, diagnostic)
 					},
-					nil,
-				)
+				})
 				if !ruleRan {
 					t.Fatal("core no-unused-vars did not run")
 				}
@@ -947,7 +940,6 @@ assigned = 2;
 					},
 				}}
 			},
-			ExcludePaths: []string{},
 			Consumer: rule.DiagnosticConsumer{
 				Demand: demand,
 				Report: func(diagnostic rule.RuleDiagnostic) {

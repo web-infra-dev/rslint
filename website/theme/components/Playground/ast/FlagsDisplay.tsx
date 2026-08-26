@@ -17,7 +17,7 @@ export const FlagsDisplay: React.FC<FlagsDisplayProps> = ({ flags, names }) => {
       onMouseLeave={() => setShowTooltip(false)}
     >
       <span
-        className={`font-medium text-blue-900 ${
+        className={`font-medium text-blue-900 dark:text-blue-300 ${
           hasNames
             ? 'cursor-help border-b border-dashed border-blue-400 hover:border-blue-600'
             : ''
