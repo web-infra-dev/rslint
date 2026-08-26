@@ -72,6 +72,11 @@ func TestSortImportsExtras(t *testing.T) {
 			{Code: "import { /* keep */ b, a } from 'values';", Errors: []rule_tester.InvalidTestCaseError{memberError("a", 1, 24, 25)}},
 			// Locks in fix comment suppression for a comment immediately inside the closing brace.
 			{Code: "import { b, a /* keep */ } from 'values';", Errors: []rule_tester.InvalidTestCaseError{memberError("a", 1, 13, 14)}},
+			// Comments contained within a specifier move with that specifier and do not suppress the fix.
+			{Code: "import { b /* keep */ as c, a } from 'values';", Output: []string{"import { a, b /* keep */ as c } from 'values';"}, Errors: []rule_tester.InvalidTestCaseError{memberError("a", 1, 29, 30)}},
+			{Code: "import { b as /* keep */ c, a } from 'values';", Output: []string{"import { a, b as /* keep */ c } from 'values';"}, Errors: []rule_tester.InvalidTestCaseError{memberError("a", 1, 29, 30)}},
+			{Code: "import { 'b' /* keep */ as c, a } from 'values';", Output: []string{"import { a, 'b' /* keep */ as c } from 'values';"}, Errors: []rule_tester.InvalidTestCaseError{memberError("a", 1, 31, 32)}},
+			{Code: "import { type b /* keep */ as c, a } from 'values';", Output: []string{"import { a, type b /* keep */ as c } from 'values';"}, Errors: []rule_tester.InvalidTestCaseError{memberError("a", 1, 34, 35)}},
 			// Locks in UTF-16 code-unit ordering in the reverse direction.
 			{Code: "import { 豈, 𐐀 } from 'unicode';", Output: []string{"import { 𐐀, 豈 } from 'unicode';"}, Errors: []rule_tester.InvalidTestCaseError{memberError("𐐀", 1, 13, 15)}},
 		},

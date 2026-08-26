@@ -151,13 +151,21 @@ func buildMemberFix(ctx rule.RuleContext, members []importMember, namedNode *ast
 	if len(members) < 2 || namedNode == nil {
 		return nil
 	}
-	namedRange := utils.TrimNodeTextRange(ctx.SourceFile, namedNode)
-	if utils.HasCommentInSpan(ctx.Comments.All(), namedRange.Pos(), namedRange.End()) {
-		return nil
-	}
 	ranges := make([]core.TextRange, len(members))
 	for i, member := range members {
 		ranges[i] = utils.TrimNodeTextRange(ctx.SourceFile, member.node)
+	}
+	namedRange := utils.TrimNodeTextRange(ctx.SourceFile, namedNode)
+	comments := ctx.Comments.All()
+	gapStart := namedRange.Pos()
+	for _, memberRange := range ranges {
+		if utils.HasCommentInSpan(comments, gapStart, memberRange.Pos()) {
+			return nil
+		}
+		gapStart = memberRange.End()
+	}
+	if utils.HasCommentInSpan(comments, gapStart, namedRange.End()) {
+		return nil
 	}
 	sorted := slices.Clone(members)
 	slices.SortStableFunc(sorted, func(a, b importMember) int {
