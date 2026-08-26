@@ -162,6 +162,11 @@ func TestBlockScopedVarExtras(t *testing.T) {
 			outOfScope("function f() { if (true) { var [a, ...rest] = [1]; } rest; }",
 				scopeErr("rest", 1, 39, 1, 54)),
 
+			// ---- Review regression: an ordinary expression inside an assignment
+			// ---- target is not an AssignmentPattern and contributes one reference.
+			outOfScope("function f(){if(condition){var self;}({a:({self:self=1}).x}=source);}",
+				scopeErr("self", 1, 32, 1, 49)),
+
 			// ---- Dimension 2: 3-level nesting, innermost declaration leaks past its own block only ----
 			outOfScope("function f() { if (true) { if (true) { if (true) { var a = 1; } a; } } }",
 				scopeErr("a", 1, 56, 1, 65)),

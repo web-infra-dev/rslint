@@ -498,8 +498,8 @@ func lintOrderWithDemand(program *compiler.Program, sourceFile *ast.SourceFile, 
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(), HasTypeInfo: true,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name: order.OrderRule.Name, Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners { return order.OrderRule.Run(ctx, options) },
 			}}

@@ -196,6 +196,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
+	"github.com/web-infra-dev/rslint/internal/rules/vars_on_top"
 	"github.com/web-infra-dev/rslint/internal/rules/yoda"
 )
 
@@ -359,6 +360,7 @@ func coreRules() []rule.Rule {
 		prefer_template.PreferTemplateRule,
 		no_this_before_super.NoThisBeforeSuperRule,
 		no_var.NoVarRule,
+		vars_on_top.VarsOnTopRule,
 		no_void.NoVoidRule,
 		no_warning_comments.NoWarningCommentsRule,
 		no_with.NoWithRule,

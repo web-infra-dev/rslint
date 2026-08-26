@@ -584,8 +584,8 @@ const suppressed = maybe as string;
 			Programs:         programs,
 			TargetsByProgram: [][]string{{sourceFile.FileName()}},
 			SingleThreaded:   true,
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:             NonNullableTypeAssertionStyleRule.Name,
 					Severity:         rule.SeverityError,
 					RequiresTypeInfo: NonNullableTypeAssertionStyleRule.RequiresTypeInfo,

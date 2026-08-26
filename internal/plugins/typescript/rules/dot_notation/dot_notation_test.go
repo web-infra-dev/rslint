@@ -423,8 +423,8 @@ func TestDotNotationEditDemand(t *testing.T) {
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        sourceFile.FileName(),
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:             DotNotationRule.Name,
 					Severity:         rule.SeverityError,
 					RequiresTypeInfo: DotNotationRule.RequiresTypeInfo,

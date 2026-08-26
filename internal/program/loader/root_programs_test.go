@@ -200,8 +200,8 @@ func TestRootProgramSupportsCrossFileImportRules(t *testing.T) {
 			plan.Files[1].Path,
 		}},
 		SingleThreaded: true,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{
 				{
 					Name:     no_cycle.NoCycleRule.Name,
 					Severity: rule.SeverityError,
