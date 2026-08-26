@@ -1,0 +1,1268 @@
+// Rstest Snapshot v1
+
+exports[`unified-signatures > invalid 1`] = `
+{
+  "code": "
+function f(a: number): void;
+function f(b: string): void;
+function f(a: number | string): void {}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 2`] = `
+{
+  "code": "
+function f(x: number): void;
+function f(x: string): void;
+function f(x: any): any {
+  return x;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 3`] = `
+{
+  "code": "
+function f(x: number): void;
+function f(x: string): void;
+function f(x: any): any {
+  return x;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 4`] = `
+{
+  "code": "
+function opt(xs?: number[]): void;
+function opt(xs: number[], y: string): void;
+function opt(...args: any[]) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 5`] = `
+{
+  "code": "
+interface I {
+  a0(): void;
+  a0(x: string): string;
+  a0(x: number): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 3 can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 5,
+        },
+        "start": {
+          "column": 6,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 6`] = `
+{
+  "code": "
+interface I {
+  a0(): void;
+  a0(x: string): string;
+  a0(x: number): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 3 can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 5,
+        },
+        "start": {
+          "column": 6,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 7`] = `
+{
+  "code": "
+interface I {
+  a1(): void;
+  a1(x: number): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 8`] = `
+{
+  "code": "
+interface I {
+  a3(): void;
+  a3(x: number, y?: number, ...z: number[]): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with a rest parameter.",
+      "messageId": "omittingRestParameter",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 4,
+        },
+        "start": {
+          "column": 29,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 9`] = `
+{
+  "code": "
+interface I {
+  b(): void;
+  b(...x: number[]): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with a rest parameter.",
+      "messageId": "omittingRestParameter",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 10`] = `
+{
+  "code": "
+interface I {
+  c(): void;
+  c(x?: number): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 11`] = `
+{
+  "code": "
+interface I {
+  c2(x?: number): void;
+  c2(x?: string): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 12`] = `
+{
+  "code": "
+interface I {
+  d(x: number): void;
+  d(x: string): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 13`] = `
+{
+  "code": "
+type T = {
+  (): void;
+  (x: number): void;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 4,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 14`] = `
+{
+  "code": "
+declare class Example {
+  #privateMethod(a: number): void;
+  #privateMethod(a: number, b?: string): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 4,
+        },
+        "start": {
+          "column": 29,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 15`] = `
+{
+  "code": "
+declare class C {
+  constructor();
+  constructor(x: number);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 16`] = `
+{
+  "code": "
+interface I {
+  f(x: number);
+  f(x: string | boolean);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string | boolean\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 17`] = `
+{
+  "code": "
+interface I {
+  f(x: number);
+  f(x: [string, boolean]);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | [string, boolean]\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 18`] = `
+{
+  "code": "
+interface Generic<T> {
+  y(x: T[]): void;
+  y(x: T): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`T[] | T\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 19`] = `
+{
+  "code": "
+function f<T>(x: T[]): void;
+function f<T>(x: T): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`T[] | T\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 20`] = `
+{
+  "code": "
+function f<T extends number>(x: T[]): void;
+function f<T extends number>(x: T): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`T[] | T\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 21`] = `
+{
+  "code": "
+abstract class Foo {
+  public abstract f(x: number): void;
+  public abstract f(x: string): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 22`] = `
+{
+  "code": "
+abstract class C {
+  a(b: string): void;
+  /**
+   * @deprecate
+   */
+  a(b: number): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 5,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 23`] = `
+{
+  "code": "
+interface Foo {
+  'f'(x: string): void;
+  'f'(x: number): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 24`] = `
+{
+  "code": "
+interface Foo {
+  new (x: string): Foo;
+  new (x: number): Foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 25`] = `
+{
+  "code": "
+enum Enum {
+  Func = 'function',
+}
+
+interface IFoo {
+  [Enum.Func](x: string): void;
+  [Enum.Func](x: number): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 8,
+        },
+        "start": {
+          "column": 15,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 26`] = `
+{
+  "code": "
+export function foo(line: number): number;
+export function foo(line: number, character?: number): number;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 3,
+        },
+        "start": {
+          "column": 35,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 27`] = `
+{
+  "code": "
+declare function foo(line: number): number;
+export function foo(line: number, character?: number): number;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 3,
+        },
+        "start": {
+          "column": 35,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 28`] = `
+{
+  "code": "
+declare module 'foo' {
+  export default function (foo: number): string[];
+  export default function (foo: number, bar?: string): string[];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 4,
+        },
+        "start": {
+          "column": 41,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 29`] = `
+{
+  "code": "
+export default function (foo: number): string[];
+export default function (foo: number, bar?: string): string[];
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 3,
+        },
+        "start": {
+          "column": 39,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 30`] = `
+{
+  "code": "
+/**
+ * @deprecate
+ */
+declare function f(x: string): void;
+declare function f(x: number): void;
+declare function f(x: boolean): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 6 can be combined into one signature taking \`number | boolean\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 7,
+        },
+        "start": {
+          "column": 20,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 31`] = `
+{
+  "code": "
+/**
+ * @deprecate
+ */
+declare function f(x: string): void;
+/**
+ * @deprecate
+ */
+declare function f(x: number): void;
+declare function f(x: boolean): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 5 can be combined into one signature taking \`string | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 9,
+        },
+        "start": {
+          "column": 20,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 32`] = `
+{
+  "code": "
+declare function f(x: string): void;
+/**
+ * @deprecate
+ */
+declare function f(x: number): void;
+/**
+ * @deprecate
+ */
+declare function f(x: boolean): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 6 can be combined into one signature taking \`number | boolean\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 10,
+        },
+        "start": {
+          "column": 20,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 33`] = `
+{
+  "code": "
+export function f(x: string): void;
+/**
+ * @deprecate
+ */
+export function f(x: number): void;
+/**
+ * @deprecate
+ */
+export function f(x: boolean): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 6 can be combined into one signature taking \`number | boolean\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 10,
+        },
+        "start": {
+          "column": 19,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 34`] = `
+{
+  "code": "
+/**
+ * This signature does something.
+ */
+
+/**
+ * This signature does something else.
+ */
+function f(x: number): void;
+
+/**
+ * This signature does something else.
+ */
+function f(x: string): void;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 14,
+        },
+        "start": {
+          "column": 12,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 35`] = `
+{
+  "code": "
+interface I {
+  f(x: string): void;
+  /**
+   * @deprecate
+   */
+  f(x: number): void;
+  /**
+   * @deprecate
+   */
+  f(x: boolean): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This overload and the one on line 7 can be combined into one signature taking \`number | boolean\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 11,
+        },
+        "start": {
+          "column": 5,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 36`] = `
+{
+  "code": "
+// a line comment
+declare function f(x: number): unknown;
+declare function f(x: boolean): unknown;
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`number | boolean\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 37`] = `
+{
+  "code": "
+function f(this: {}, a: boolean): void;
+function f(this: {}, a: string): void;
+function f(this: {}, a: boolean | string): void {}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`boolean | string\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 38`] = `
+{
+  "code": "
+function f(this: {}): void;
+function f(this: {}, a: string): void;
+function f(this: {}, a?: string): void {}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature with an optional parameter.",
+      "messageId": "omittingSingleParameter",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 39`] = `
+{
+  "code": "
+function f(this: string): void;
+function f(this: number): void;
+function f(this: string | number): void {}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unified-signatures > invalid 40`] = `
+{
+  "code": "
+function f(this: string, a: boolean): void;
+function f(this: number, a: boolean): void;
+function f(this: string | number, a: boolean): void {}
+      ",
+  "diagnostics": [
+    {
+      "message": "These overloads can be combined into one signature taking \`string | number\`.",
+      "messageId": "singleParameterDifference",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unified-signatures",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

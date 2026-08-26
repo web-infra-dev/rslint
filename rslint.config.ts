@@ -74,6 +74,7 @@ export default defineConfig([
       '@typescript-eslint/prefer-regexp-exec': 'error',
       '@typescript-eslint/prefer-ts-expect-error': 'error',
       '@typescript-eslint/switch-exhaustiveness-check': 'warn',
+      '@typescript-eslint/unified-signatures': 'warn',
       'no-console': ['error', { allow: ['warn', 'error'] }],
     },
   },
