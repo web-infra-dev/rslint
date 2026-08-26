@@ -15,6 +15,8 @@ import (
 func TestNoInferrableTypesRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoInferrableTypesRule, []rule_tester.ValidTestCase{
 		// No type annotation - valid
+		{Code: "/** @type {number} */\nconst fromJSDoc = 10;", FileName: "file.mjs", TSConfig: "tsconfig.allow-js.json"},
+		{Code: "/** @param {number} value */\nfunction f(value = 10) {}", FileName: "file.mjs", TSConfig: "tsconfig.allow-js.json"},
 		{Code: `const a = 10;`},
 		{Code: `const a = true;`},
 		{Code: `const a = 'str';`},

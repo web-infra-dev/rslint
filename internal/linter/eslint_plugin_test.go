@@ -19,6 +19,68 @@ func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) Configured
 	return ConfiguredRule{Name: name, Options: opts, Severity: sev, IsEslintPluginRule: true}
 }
 
+func TestDispatchEslintPluginRulesAsyncPublishesAfterCompletionObserver(t *testing.T) {
+	dispatchError := errors.New("transport closed")
+	observerStarted := make(chan EslintPluginDispatchOutcome, 1)
+	releaseObserver := make(chan struct{})
+	defer func() {
+		select {
+		case <-releaseObserver:
+		default:
+			close(releaseObserver)
+		}
+	}()
+	receiveOutcome := func(name string, ch <-chan EslintPluginDispatchOutcome) EslintPluginDispatchOutcome {
+		t.Helper()
+		select {
+		case outcome := <-ch:
+			return outcome
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for %s", name)
+			return EslintPluginDispatchOutcome{}
+		}
+	}
+	outcomeCh := DispatchEslintPluginRulesAsync(
+		context.Background(),
+		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			return nil, dispatchError
+		},
+		[]EslintPluginFileInput{{
+			Path: "/repo/a.ts",
+			Rules: []rule.ConfiguredRule{{
+				Name:               "external/rule",
+				Severity:           rule.SeverityError,
+				IsEslintPluginRule: true,
+			}},
+		}},
+		false,
+		SuggestionsModeOff,
+		nil,
+		func(outcome EslintPluginDispatchOutcome) {
+			observerStarted <- outcome
+			<-releaseObserver
+		},
+	)
+
+	observed := receiveOutcome("completion observer", observerStarted)
+	if !errors.Is(observed.DispatchError, dispatchError) {
+		t.Fatalf("observer error = %v, want %v", observed.DispatchError, dispatchError)
+	}
+	select {
+	case <-outcomeCh:
+		t.Fatal("outcome was published before the completion observer returned")
+	default:
+	}
+	close(releaseObserver)
+	outcome := receiveOutcome("published outcome", outcomeCh)
+	if !errors.Is(outcome.DispatchError, dispatchError) {
+		t.Fatalf("published error = %v, want %v", outcome.DispatchError, dispatchError)
+	}
+	if len(outcome.Diagnostics) != 1 || outcome.Diagnostics[0].RuleName != "rslint/plugin-lint-error" {
+		t.Fatalf("diagnostics = %v, want dispatch failure diagnostic", outcome.Diagnostics)
+	}
+}
+
 func TestBuildEslintPluginFileInput_EffectiveLanguageOptions(t *testing.T) {
 	raw := map[string]any{
 		"parserOptions": map[string]any{"ecmaFeatures": map[string]any{"jsx": true}},
@@ -877,5 +939,167 @@ func TestDispatchEslintPlugin_RealErrorOutranksCanceled(t *testing.T) {
 	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {})
 	if !errors.Is(err, boom) {
 		t.Fatalf("expected the real transport error to surface, got %v", err)
+	}
+}
+
+func TestBuildEslintPluginFileInputsUsesPreparedPlan(t *testing.T) {
+	compilerProgram, paths := createTestProgramWithFiles(t, map[string]string{
+		"native.ts": "export const native = 1;\n",
+		"plugin.ts": "export const plugin = 1;\n",
+	})
+	nativeFile := compilerProgram.GetSourceFile(paths["native.ts"])
+	pluginFile := compilerProgram.GetSourceFile(paths["plugin.ts"])
+	if nativeFile == nil || pluginFile == nil {
+		t.Fatalf("prepared plan fixtures are missing: native=%v plugin=%v", nativeFile != nil, pluginFile != nil)
+	}
+	nativeRule := ConfiguredRule{Name: "native/rule", Severity: rule.SeverityError}
+	pluginConfiguredRule := pluginRule("external/rule", []any{"option"}, rule.SeverityWarning)
+	plan := &LintPlan{programs: []programLintPlan{{files: []lintFilePlan{
+		{file: nativeFile, rules: []ConfiguredRule{nativeRule}},
+		{file: pluginFile, rules: []ConfiguredRule{nativeRule, pluginConfiguredRule}},
+	}}}}
+
+	resolveCalls := 0
+	inputs := BuildEslintPluginFileInputs(plan, func(filePath string) EslintPluginFileConfig {
+		resolveCalls++
+		if filePath != paths["plugin.ts"] {
+			t.Errorf("resolved config for %q, want only plugin.ts", filePath)
+		}
+		return EslintPluginFileConfig{
+			ConfigKey:       "owner-key",
+			LanguageOptions: map[string]any{"sourceType": "module"},
+			Settings:        map[string]any{"workspace": true},
+		}
+	})
+
+	if resolveCalls != 1 {
+		t.Fatalf("config resolver calls = %d, want one for plugin targets only", resolveCalls)
+	}
+	if len(inputs) != 1 {
+		t.Fatalf("plugin inputs = %d, want 1", len(inputs))
+	}
+	input := inputs[0]
+	if input.Path != paths["plugin.ts"] || input.SourceFile != pluginFile || input.Text != nil {
+		t.Errorf("input source frame = %+v, want prepared plugin.ts source", input)
+	}
+	if input.ConfigKey != "owner-key" || input.LanguageOptions["sourceType"] != "module" || input.Settings["workspace"] != true {
+		t.Errorf("input config projection = %+v", input)
+	}
+	if len(input.Rules) != 1 || input.Rules[0].Name != "external/rule" {
+		t.Errorf("input rules = %v, want only the plugin rule", input.Rules)
+	}
+
+	withoutConfig := BuildEslintPluginFileInputs(plan, nil)
+	if len(withoutConfig) != 1 || withoutConfig[0].ConfigKey != "" {
+		t.Errorf("nil config resolver inputs = %+v, want one input without a routing key", withoutConfig)
+	}
+}
+
+func TestDispatchEslintPluginRulesWithOutcomeSurfacesFailure(t *testing.T) {
+	goodText := "good\n"
+	badText := "bad\n"
+	files := []EslintPluginFileInput{
+		{
+			Path:      "/repo/good.ts",
+			ConfigKey: "/repo",
+			Text:      &goodText,
+			Rules:     []ConfiguredRule{pluginRule("external/rule", []any{"good"}, rule.SeverityWarning)},
+		},
+		{
+			Path:      "/repo/bad.ts",
+			ConfigKey: "/repo",
+			Text:      &badText,
+			Rules:     []ConfiguredRule{pluginRule("external/rule", []any{"bad"}, rule.SeverityError)},
+		},
+	}
+	dispatchError := errors.New("WorkerPool: closed")
+	dispatch := func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		file := request.Files[0]
+		if file.Path == "/repo/bad.ts" {
+			return nil, dispatchError
+		}
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+			FilePath: file.Path,
+			Diagnostics: []EslintPluginDiagnostic{{
+				RuleName: "external/rule",
+				Message:  "reported before another batch failed",
+				StartPos: 0,
+				EndPos:   4,
+			}},
+		}}}, nil
+	}
+
+	outcome := DispatchEslintPluginRulesWithOutcome(
+		context.Background(),
+		dispatch,
+		files,
+		false,
+		SuggestionsModeOff,
+		nil,
+	)
+	if !errors.Is(outcome.DispatchError, dispatchError) {
+		t.Fatalf("dispatch error = %v, want %v", outcome.DispatchError, dispatchError)
+	}
+	if len(outcome.Diagnostics) != 2 {
+		t.Fatalf("diagnostics = %d, want partial result plus failure: %+v", len(outcome.Diagnostics), outcome.Diagnostics)
+	}
+	if outcome.Diagnostics[0].RuleName != "external/rule" {
+		t.Errorf("first diagnostic = %q, want successful batch result", outcome.Diagnostics[0].RuleName)
+	}
+	failure := outcome.Diagnostics[1]
+	if failure.RuleName != "rslint/plugin-lint-error" || failure.Severity != rule.SeverityError {
+		t.Errorf("failure diagnostic = %q/%v", failure.RuleName, failure.Severity)
+	}
+	if failure.FilePath != files[0].Path {
+		t.Errorf("failure path = %q, want first input %q", failure.FilePath, files[0].Path)
+	}
+	if !strings.Contains(failure.Message.Description, dispatchError.Error()) {
+		t.Errorf("failure message = %q, want dispatch error", failure.Message.Description)
+	}
+}
+
+func TestDispatchEslintPluginRulesWithOutcomePreservesCancellation(t *testing.T) {
+	dispatch := func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		return nil, context.Canceled
+	}
+	outcome := DispatchEslintPluginRulesWithOutcome(
+		context.Background(),
+		dispatch,
+		[]EslintPluginFileInput{{
+			Path:      "/repo/a.ts",
+			ConfigKey: "/repo",
+			Rules:     []ConfiguredRule{pluginRule("external/rule", nil, rule.SeverityError)},
+		}},
+		false,
+		SuggestionsModeOff,
+		nil,
+	)
+	if !errors.Is(outcome.DispatchError, context.Canceled) {
+		t.Fatalf("dispatch error = %v, want context.Canceled", outcome.DispatchError)
+	}
+	if len(outcome.Diagnostics) != 0 {
+		t.Errorf("cancellation diagnostics = %v, want none", outcome.Diagnostics)
+	}
+}
+
+func TestDispatchEslintPluginRulesWithOutcomeSkipsEmptyInput(t *testing.T) {
+	called := false
+	dispatch := func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		called = true
+		return &EslintPluginLintResult{}, nil
+	}
+	outcome := DispatchEslintPluginRulesWithOutcome(
+		context.Background(),
+		dispatch,
+		nil,
+		false,
+		SuggestionsModeOff,
+		nil,
+	)
+	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 0 {
+		t.Errorf("empty dispatch outcome = %+v, want zero value", outcome)
+	}
+	if called {
+		t.Error("dispatch called for empty input")
 	}
 }

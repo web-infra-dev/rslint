@@ -2,6 +2,7 @@ package no_restricted_syntax
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // nodesAtField enumerates the children of `parent` that sit at the named
@@ -217,7 +218,7 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 			}
 		}
 	case "params":
-		params := parent.Parameters()
+		params := utils.ESTreeParameters(parent)
 		if params == nil {
 			return nil
 		}
@@ -310,7 +311,7 @@ func listChildrenOf(parent *ast.Node) [][]*ast.Node {
 		}
 	}
 	if isFunctionLikeForParams(parent) {
-		if params := parent.Parameters(); len(params) > 0 {
+		if params := utils.ESTreeParameters(parent); len(params) > 0 {
 			add(params)
 		}
 	}

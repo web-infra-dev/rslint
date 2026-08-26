@@ -9,6 +9,11 @@ import (
 
 func TestDefaultParamLastRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &DefaultParamLastRule, []rule_tester.ValidTestCase{
+		{
+			Code:     "/** @param {number} [a] */\nfunction f(a, b) {}",
+			FileName: "file.mjs",
+			TSConfig: "tsconfig.allow-js.json",
+		},
 		// Valid: no parameters
 		{Code: `function f() {}`},
 

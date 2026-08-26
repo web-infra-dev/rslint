@@ -15,6 +15,11 @@ import (
 
 func TestNoUnnecessaryTypeParametersUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeParametersRule, []rule_tester.ValidTestCase{
+		{
+			Code:     "/** @template T */\nfunction identity(value) { return value; }",
+			FileName: "file.mjs",
+			TSConfig: "tsconfig.allow-js.json",
+		},
 		{Code: `
 class ClassyArray<T> {
   arr: T[];

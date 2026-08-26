@@ -162,6 +162,66 @@ func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.Configu
 	}, true
 }
 
+// EslintPluginFileConfig is the config projection required to dispatch one
+// prepared lint target to a third-party plugin host. Integrations resolve it
+// from their own config ownership model, keeping the linter independent from
+// config package types and transport-specific routing identities.
+type EslintPluginFileConfig struct {
+	ConfigKey       string
+	LanguageOptions map[string]any
+	Settings        map[string]any
+}
+
+// EslintPluginFileConfigResolver resolves the plugin-facing config projection
+// for one Program source path.
+type EslintPluginFileConfigResolver func(filePath string) EslintPluginFileConfig
+
+// BuildEslintPluginFileInputs projects third-party plugin inputs from the same
+// prepared file/rule plan consumed by native linting. Pure-native targets do
+// not invoke resolveConfig.
+func BuildEslintPluginFileInputs(
+	plan *LintPlan,
+	resolveConfig EslintPluginFileConfigResolver,
+) []EslintPluginFileInput {
+	targets := plan.Targets()
+	if len(targets) == 0 {
+		return nil
+	}
+	var inputs []EslintPluginFileInput
+	for _, target := range targets {
+		if !hasEslintPluginRule(target.Rules) {
+			continue
+		}
+		filePath := target.File.FileName()
+		var fileConfig EslintPluginFileConfig
+		if resolveConfig != nil {
+			fileConfig = resolveConfig(filePath)
+		}
+		input, ok := BuildEslintPluginFileInput(
+			filePath,
+			fileConfig.ConfigKey,
+			target.Rules,
+			fileConfig.LanguageOptions,
+			fileConfig.Settings,
+			nil,
+			target.File,
+		)
+		if ok {
+			inputs = append(inputs, input)
+		}
+	}
+	return inputs
+}
+
+func hasEslintPluginRule(rules []rule.ConfiguredRule) bool {
+	for _, configuredRule := range rules {
+		if configuredRule.IsEslintPluginRule {
+			return true
+		}
+	}
+	return false
+}
+
 // eslintPluginShutdownSentinel is the ONLY benign parseError the worker emits:
 // a graceful pool teardown (pool.shutdown()) racing an in-flight task. Every
 // other parseError means the file did NOT finish linting — the native parser
@@ -245,6 +305,90 @@ func DispatchEslintPluginRules(
 		}
 	}
 	return canceledErr
+}
+
+// EslintPluginDispatchOutcome is the result of one plugin dispatch.
+// DispatchError is retained for surface logging. A non-cancellation failure
+// also contributes a synthetic error diagnostic so it cannot produce a false
+// successful lint result.
+type EslintPluginDispatchOutcome struct {
+	Diagnostics   []rule.RuleDiagnostic
+	DispatchError error
+}
+
+// DispatchEslintPluginRulesAsync starts plugin dispatch in parallel with the
+// caller's native lint pass. onComplete runs in the dispatch goroutine before
+// the outcome becomes observable, allowing each command surface to preserve
+// its own error-reporting policy even when it returns before receiving the
+// result.
+func DispatchEslintPluginRulesAsync(
+	ctx context.Context,
+	dispatch EslintPluginDispatcher,
+	inputs []EslintPluginFileInput,
+	fix bool,
+	suggestionsMode string,
+	timing *TimingCollector,
+	onComplete func(EslintPluginDispatchOutcome),
+) <-chan EslintPluginDispatchOutcome {
+	ch := make(chan EslintPluginDispatchOutcome, 1)
+	go func() {
+		outcome := DispatchEslintPluginRulesWithOutcome(
+			ctx,
+			dispatch,
+			inputs,
+			fix,
+			suggestionsMode,
+			timing,
+		)
+		if onComplete != nil {
+			onComplete(outcome)
+		}
+		ch <- outcome
+	}()
+	return ch
+}
+
+// DispatchEslintPluginRulesWithOutcome dispatches plugin rules and collects
+// their diagnostics into a structured result. Command integrations own when
+// dispatch starts and the terminal policy for DispatchError.
+func DispatchEslintPluginRulesWithOutcome(
+	ctx context.Context,
+	dispatch EslintPluginDispatcher,
+	inputs []EslintPluginFileInput,
+	fix bool,
+	suggestionsMode string,
+	timing *TimingCollector,
+) EslintPluginDispatchOutcome {
+	var diagnostics []rule.RuleDiagnostic
+	err := DispatchEslintPluginRules(
+		ctx,
+		dispatch,
+		inputs,
+		fix,
+		suggestionsMode,
+		timing,
+		func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		diagnostics = append(diagnostics, NewEslintPluginErrorDiagnostic(
+			eslintPluginDispatchFailurePath(inputs),
+			"rslint/plugin-lint-error",
+			"ESLint plugin lint dispatch failed: "+err.Error(),
+		))
+	}
+	return EslintPluginDispatchOutcome{
+		Diagnostics:   diagnostics,
+		DispatchError: err,
+	}
+}
+
+func eslintPluginDispatchFailurePath(inputs []EslintPluginFileInput) string {
+	if len(inputs) > 0 {
+		return inputs[0].Path
+	}
+	return ""
 }
 
 // dispatchOneBatch sends one batch's reverse request and rebuilds its

@@ -3,16 +3,11 @@ package main
 import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
-// These helpers define command-layer path identities used by diagnostic
-// remapping and config routing. Program loading owns its own private identity
-// index; keeping these presentation/routing helpers here avoids coupling cmd
-// consumers to loader internals.
-func exactFilesystemPathID(filePath string) string {
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
-}
-
+// These live-filesystem helpers are used only while reconciling CLI TypeScript
+// diagnostics. Frozen target/config paths use config.ExactPathID directly.
 func authoritativeFilesystemPath(filePath string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	if fsys != nil {
@@ -24,5 +19,5 @@ func authoritativeFilesystemPath(filePath string, fsys vfs.FS) string {
 }
 
 func canonicalFilesystemPathID(filePath string, fsys vfs.FS) string {
-	return exactFilesystemPathID(authoritativeFilesystemPath(filePath, fsys))
+	return rslintconfig.ExactPathID(authoritativeFilesystemPath(filePath, fsys))
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_inferrable_types.schema.json
@@ -301,6 +302,9 @@ var NoInferrableTypesRule = rule.CreateRule(rule.Rule{
 
 		checkDeclaration := func(reportStartNode *ast.Node, reportEndNode *ast.Node, typeAnnotation *ast.Node, initializer *ast.Node, postfixToken *ast.Node) {
 			if reportStartNode == nil || reportEndNode == nil || typeAnnotation == nil || initializer == nil {
+				return
+			}
+			if utils.IsJSDocSyntaxNode(typeAnnotation) {
 				return
 			}
 
