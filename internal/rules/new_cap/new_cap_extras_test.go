@@ -6,6 +6,7 @@
 package new_cap
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -47,6 +48,8 @@ func TestNewCapExtras(t *testing.T) {
 		// Locks in isCapAllowed() Date.UTC arm: static element access is a
 		// MemberExpression too, and its object is the direct Date identifier.
 		{Code: `Date["UTC"]();`},
+		{Code: `Date.UTC();`, Options: map[string]any{"properties": false}},
+		{Code: `Date["UTC"]();`, Options: map[string]any{"properties": false}},
 
 		// Locks in isCapAllowed() allowedMap arm 1: property-name exception.
 		{Code: "service.Factory();", Options: map[string]any{"capIsNewExceptions": []any{"Factory"}}},
@@ -136,6 +139,11 @@ func TestNewCapExtras(t *testing.T) {
 		// MemberExpressions, never a direct Identifier.
 		{Code: "Factory();", Options: map[string]any{"properties": false}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "upper", Line: 1, Column: 1, EndLine: 1, EndColumn: 8}}},
 
+		// UTC is special only on Date. Other receivers remain reportable even
+		// when ordinary property calls are disabled.
+		{Code: "service.UTC();", Options: map[string]any{"properties": false}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "upper", Line: 1, Column: 9, EndLine: 1, EndColumn: 12}}},
+		{Code: `service["UTC"]();`, Options: map[string]any{"properties": false}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "upper", Line: 1, Column: 9, EndLine: 1, EndColumn: 14}}},
+
 		// ---- Real-user: ESLint #14970. Intl.DateTimeFormat is callable
 		// without new at runtime, but the rule intentionally still reports it
 		// as a constructor-style name. ----
@@ -155,6 +163,23 @@ func TestNewCapExtras(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "upper", Line: 2, Column: 15, EndLine: 2, EndColumn: 26}},
 		},
 	})
+}
+
+var getCapBenchmarkResult capitalization
+
+func benchmarkGetCapLongName(b *testing.B) {
+	name := strings.Repeat("a", 1<<20)
+	b.ResetTimer()
+	for range b.N {
+		getCapBenchmarkResult = getCap(name)
+	}
+}
+
+func TestGetCapLongNameAllocation(t *testing.T) {
+	result := testing.Benchmark(benchmarkGetCapLongName)
+	if bytes := result.AllocedBytesPerOp(); bytes > 1024 {
+		t.Fatalf("getCap allocated %d bytes per long name; want constant-space classification", bytes)
+	}
 }
 
 func TestNewCapPatternSchema(t *testing.T) {

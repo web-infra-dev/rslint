@@ -2,6 +2,7 @@ package new_cap
 
 import (
 	_ "embed"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -106,15 +107,11 @@ const (
 // one UTF-16 code unit here, so an astral letter begins with a lone high
 // surrogate and is consequently non-alphabetic for this rule.
 func getCap(name string) capitalization {
-	units := ecmascript.StringCodeUnits(name)
-	if len(units) == 0 {
+	firstRune, size := utf8.DecodeRuneInString(name)
+	if size == 0 || firstRune > 0xFFFF {
 		return capitalizationNonAlpha
 	}
-	unit := units[0]
-	if unit >= 0xD800 && unit <= 0xDFFF {
-		return capitalizationNonAlpha
-	}
-	first := string(rune(unit))
+	first := string(firstRune)
 	lower := ecmascript.StringToLowerCase(first)
 	upper := ecmascript.StringToUpperCase(first)
 	if lower == upper {
@@ -200,9 +197,7 @@ func isAllowed(
 	}
 	if name == "UTC" && ast.IsAccessExpression(callee) {
 		object := ast.SkipParentheses(utils.AccessExpressionObject(callee))
-		if object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == "Date" {
-			return true
-		}
+		return object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == "Date"
 	}
 	return skipProperties && ast.IsAccessExpression(callee)
 }
