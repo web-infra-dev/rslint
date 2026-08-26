@@ -76,6 +76,7 @@ export default defineConfig({
     './tests/eslint/rules/default-case.test.ts',
     './tests/eslint/rules/dot-notation.test.ts',
     './tests/eslint/rules/func-names.test.ts',
+    './tests/eslint/rules/grouped-accessor-pairs.test.ts',
     './tests/eslint/rules/no-case-declarations.test.ts',
     './tests/eslint/rules/no-console.test.ts',
     './tests/eslint/rules/no-continue.test.ts',

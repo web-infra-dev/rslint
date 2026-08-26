@@ -1,0 +1,19 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["anyOrder", "getBeforeSet", "setBeforeGet"]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "enforceForTSTypes": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 2
+}
