@@ -135,6 +135,27 @@ func TestWarnTodoExtras(t *testing.T) {
 				Code:   `describe.todo.for([1])("suite", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 10, 14)},
 			},
+			// A chained `test`/`describe` stays chainable in Rstest, so a
+			// conditional modifier or a second `.todo` after `.todo` is still a
+			// todo registration.
+			{
+				Code:   `test.todo.runIf(cond)("case", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 6, 10)},
+			},
+			{
+				Code:   `test.todo.skipIf(cond)("case", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 6, 10)},
+			},
+			{
+				Code:   `describe.todo.runIf(cond)("suite", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 10, 14)},
+			},
+			// Two `.todo` accessors register one todo, so one report is issued,
+			// anchored on the first accessor.
+			{
+				Code:   `test.todo.todo("case", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 6, 10)},
+			},
 			// A member chain broken across lines, with a comment in it.
 			{
 				Code: `test

@@ -23,10 +23,26 @@ func upstreamError(line int, column int, endColumn int) rule_tester.InvalidTestC
 
 // Upstream: @vitest/eslint-plugin v1.6.27 tests/warn-todo.test.ts.
 //
-// Two upstream cases move because Rstest's TestOptions has no `todo` field
-// (rstest 2d7652e6 packages/core/src/types/api.ts:53-78): the invalid
-// `test("foo", { todo: true }, fn)` case becomes valid here, and the already
-// valid `{ todo: false }` case stays valid for the same reason.
+// Three divergences from upstream, all of them deliberate; the cases that show
+// them live in warn_todo_extras_test.go, except where noted.
+//
+//  1. Rstest's TestOptions has no `todo` field (rstest 2d7652e6
+//     packages/core/src/types/api.ts:53-78), so `todo` written there is an
+//     ordinary unknown property with no effect on the runner. Two upstream
+//     cases move accordingly, both of them in this file: the invalid
+//     `test("foo", { todo: true }, fn)` case becomes valid, and the already
+//     valid `{ todo: false }` case stays valid for the same reason.
+//  2. A computed `todo` accessor is reported. Upstream matches the member only
+//     when it is an identifier (src/rules/warn-todo.ts), so `test['todo']("x")`
+//     and its template-literal spelling go unreported there. Both register the
+//     same todo, so both are reported here.
+//  3. A modifier chained after `.todo` keeps the registration. Upstream
+//     validates the whole chain against a fixed allowlist
+//     (src/utils/valid-vitest-fn-call-chains.ts), which holds no entry for
+//     `todo.runIf`, `todo.skipIf` or `todo.todo`, so those calls parse as
+//     nothing at all upstream. Rstest's `test` and `describe` return a
+//     chainable API, so each of those forms still registers a todo and is
+//     reported.
 func TestWarnTodoUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
