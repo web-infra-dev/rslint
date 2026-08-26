@@ -30,6 +30,14 @@ func TestCamelcaseExtras(t *testing.T) {
 			{Code: `declare function snake_case(value_name: number): void; interface Shape { property_name: string }`},
 			// ---- Dimension 4: body-less abstract members are TS-only declaration forms ----
 			{Code: `abstract class Shape { abstract propertyName: string; abstract methodName(value_name: string): void }`},
+			// ---- tsgo collapses TSAbstract* and AccessorProperty into ordinary class-member kinds ----
+			{Code: `abstract class Shape {
+				abstract property_name: string
+				abstract method_name(value_name: string): void
+				abstract get getter_name(): string
+				abstract set setter_name(value_name: string)
+			}
+			class Box { accessor property_name = 1; accessor #private_name = 2 }`},
 			// ---- Dimension 4: empty/spread containers degrade without masking siblings ----
 			{Code: `const empty = {}; const copy = { ...source }; const [] = list; const {} = source`},
 			// ---- Dimension 4: private read uses do not create a second property report ----
@@ -94,6 +102,14 @@ func TestCamelcaseExtras(t *testing.T) {
 			{
 				Code:   "class Box {\n  #private_name;\n}",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notCamelCasePrivate", Message: "#private_name is not in camel case.", Line: 2, Column: 3, EndLine: 2, EndColumn: 16}},
+			},
+			// ---- Ambient class members remain PropertyDefinition/MethodDefinition upstream ----
+			{
+				Code: `declare class Box { property_name: string; method_name(): void }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Line: 1, Column: 21, EndLine: 1, EndColumn: 34},
+					{MessageId: "notCamelCase", Line: 1, Column: 44, EndLine: 1, EndColumn: 55},
+				},
 			},
 			// ---- Dimension 4: static identifier and dynamic string keys do not pair ----
 			{

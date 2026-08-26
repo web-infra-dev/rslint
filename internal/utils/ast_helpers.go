@@ -37,6 +37,14 @@ func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
 	return current
 }
 
+// IsPlainClassMember reports whether a tsgo class member maps to ESTree's
+// MethodDefinition or PropertyDefinition. Abstract members and auto-accessors
+// use TypeScript-specific ESTree node kinds instead.
+func IsPlainClassMember(member *ast.Node) bool {
+	return member != nil &&
+		!ast.HasSyntacticModifier(member, ast.ModifierFlagsAbstract|ast.ModifierFlagsAccessor)
+}
+
 // IsImportAttributeKey reports whether node is an import attribute key in a
 // static import/re-export or in a dynamic import options object. These keys
 // are fixed by the import-attributes protocol rather than freely chosen

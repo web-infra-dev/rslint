@@ -384,12 +384,14 @@ func isPropertyName(node *ast.Node) bool {
 		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		if parent.Parent == nil || parent.Parent.Kind != ast.KindObjectLiteralExpression {
 			return parent.Parent != nil &&
-				(parent.Parent.Kind == ast.KindClassDeclaration || parent.Parent.Kind == ast.KindClassExpression)
+				(parent.Parent.Kind == ast.KindClassDeclaration || parent.Parent.Kind == ast.KindClassExpression) &&
+				utils.IsPlainClassMember(parent)
 		}
 		return !utils.IsInDestructuringAssignment(parent)
 	case ast.KindPropertyDeclaration:
 		return parent.Parent != nil &&
-			(parent.Parent.Kind == ast.KindClassDeclaration || parent.Parent.Kind == ast.KindClassExpression)
+			(parent.Parent.Kind == ast.KindClassDeclaration || parent.Parent.Kind == ast.KindClassExpression) &&
+			utils.IsPlainClassMember(parent)
 	}
 	return false
 }
@@ -401,7 +403,8 @@ func isPrivatePropertyName(node *ast.Node) bool {
 	switch node.Parent.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindPropertyDeclaration:
 		owner := node.Parent.Parent
-		return owner != nil && (owner.Kind == ast.KindClassDeclaration || owner.Kind == ast.KindClassExpression)
+		return owner != nil && (owner.Kind == ast.KindClassDeclaration || owner.Kind == ast.KindClassExpression) &&
+			utils.IsPlainClassMember(node.Parent)
 	}
 	return false
 }

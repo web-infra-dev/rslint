@@ -409,7 +409,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		// non-pattern branch and is therefore gated on `properties`.
 		switch effectiveParent.Parent.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return isPlainClassMember(effectiveParent)
+			return utils.IsPlainClassMember(effectiveParent)
 		case ast.KindObjectLiteralExpression:
 			return isValidPlainProperty(opts, effectiveParent.Name(), node)
 		}
@@ -418,7 +418,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		return false
 
 	case ast.KindPropertyDeclaration:
-		if !isPlainClassMember(effectiveParent) {
+		if !utils.IsPlainClassMember(effectiveParent) {
 			return false
 		}
 		pd := effectiveParent.AsPropertyDeclaration()
@@ -703,23 +703,13 @@ func isValidComputedPropertyNameOwner(owner *ast.Node) bool {
 		// ESTree Property, whose non-pattern branch requires `!parent.computed`.
 		switch owner.Parent.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return isPlainClassMember(owner)
+			return utils.IsPlainClassMember(owner)
 		}
 		return false
 	case ast.KindPropertyDeclaration:
-		return isPlainClassMember(owner)
+		return utils.IsPlainClassMember(owner)
 	}
 	return false
-}
-
-// isPlainClassMember reports whether a class member maps to ESTree's
-// MethodDefinition/PropertyDefinition — the two unconditional entries in
-// upstream's dispatch. An `abstract` or `accessor` member does not: it
-// becomes a TSAbstractMethodDefinition, TSAbstractPropertyDefinition,
-// TSAbstractAccessorProperty or AccessorProperty instead, none of which are
-// supported parents, so their names go unchecked.
-func isPlainClassMember(member *ast.Node) bool {
-	return !ast.HasSyntacticModifier(member, ast.ModifierFlagsAbstract|ast.ModifierFlagsAccessor)
 }
 
 // isValidMemberExpressionTarget reports whether a non-computed
