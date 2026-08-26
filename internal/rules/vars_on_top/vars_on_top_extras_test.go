@@ -13,6 +13,9 @@ import (
 func TestVarsOnTopExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &VarsOnTopRule,
 		[]rule_tester.ValidTestCase{
+			// Espree omits transparent parentheses around string expressions.
+			{Code: "(('directive')); var x;"},
+			{Code: "function f() { ('directive'); var x; }"},
 			// ---- Dimension 4: static block has no directive/import prefix ----
 			{Code: "class C { static { var x; var y; } }", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022}},
 			// Locks in upstream isVarOnTop()'s directive/import skip arm.
@@ -23,6 +26,8 @@ func TestVarsOnTopExtras(t *testing.T) {
 			{Code: "function f() { if (ok) { let x = 1; } }"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// TypeScript expression wrappers are not transparent ESTree parentheses.
+			{Code: "('directive' as const); var x;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: varsOnTopMessage.Description}}},
 			// ---- Dimension 4: static block after executable statement ----
 			{Code: "class C { static { foo(); var x; } }", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: varsOnTopMessage.Description, Line: 1, Column: 27}}},
 			// ---- Dimension 4: loop and labeled statement boundaries ----

@@ -82,6 +82,7 @@ func looksLikeDirective(node *ast.Node) bool {
 		return false
 	}
 	expression := node.AsExpressionStatement().Expression
+	expression = ast.SkipParentheses(expression)
 	return expression != nil && expression.Kind == ast.KindStringLiteral
 }
 
