@@ -317,6 +317,34 @@ class BufferedLog {
   }
 }
     `},
+
+			// ---- Source-type, JSDoc, callback, and field parity regressions ----
+			{
+				Code:            `export {}; this; function f(){ this; }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `@dec(function(){ this; }) class C {}`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `function foo() { "use strict"; this; }`,
+				FileName:        "legacy.js",
+				TSConfig:        "tsconfig.allowJs.json",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+			},
+			{Code: `export {}; function f(){ /* @thisX */ function g(){ this; } }`},
+			{Code: "export {}; function f(){ /** \u00a0@this */ function g(){ this; } }"},
+			{Code: "export {}; function f(){ /** \ufeff@this */ function g(){ this; } }"},
+			{Code: `export {}; /** @this */ const x = [function(){ this; }];`},
+			{Code: `export {}; /** @this */ const x = !function(){ this; };`},
+			{Code: `export {}; /** @this */ const [x = function(){ this; }] = [];`},
+			{Code: `export {}; Uint8Array.from([], function () { this; }, obj);`},
+			{Code: `export {}; BigInt64Array['from']([], function () { this; }, obj);`},
+			{Code: `class C { accessor x = function(){ this; } }`},
+			{Code: `/** @this */ foo(function(){ this; } as any);`},
+			{Code: `/** @this */ foo(function(){ this; } satisfies Function);`},
+			{Code: `/** @this */ foo(function(){ this; }!);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: ElementAccessExpression .call with null receiver ----
@@ -597,6 +625,37 @@ function outer() {
 }
     `,
 				Errors: unexpected(5, 20),
+			},
+
+			// ---- Source-type, JSDoc, strictness, and decorator parity regressions ----
+			{
+				Code:            `this; function f(){ this; }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedThis", Line: 1, Column: 1},
+					{MessageId: "unexpectedThis", Line: 1, Column: 21},
+				},
+			},
+			{Code: `export {}; /* @this */ const x = [function(){ this; }];`, Errors: unexpected(1, 47)},
+			{Code: "export {}; /** @this */\n\nconst x = [function(){ this; }];", Errors: unexpected(3, 24)},
+			{Code: `export {}; function outer() { class C { @dec((@d(this) class I {})) m(){} } }`, Errors: unexpected(1, 50)},
+			{
+				Code:            `export {}; function foo(){ this; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3},
+				Errors:          unexpected(1, 28),
+			},
+			{
+				Code:            `class C { m(){ function foo(){ this; } } }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3},
+				Errors:          unexpected(1, 32),
+			},
+			{Code: `enum E { X = (function(){ this; }, 1) }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: unexpected(1, 27)},
+			{Code: `class C { @dec(function(){ this; }) m(){} }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: unexpected(1, 28)},
+			{Code: `/** @this */ function outer(){ return function(){ this; }; }`, Errors: unexpected(1, 51)},
+			{
+				Code:            `function f(x: number){ 'use strict'; this; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+				Errors:          unexpected(1, 38),
 			},
 		},
 	)

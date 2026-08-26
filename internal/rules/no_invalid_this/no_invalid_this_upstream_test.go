@@ -64,6 +64,8 @@ func TestNoInvalidThisUpstream(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{
 				Code:            `function foo() { 'use strict'; this.eval(); }`,
+				FileName:        "legacy.js",
+				TSConfig:        "tsconfig.allowJs.json",
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3},
 			},
 

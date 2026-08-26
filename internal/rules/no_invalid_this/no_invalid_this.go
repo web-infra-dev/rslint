@@ -333,7 +333,7 @@ func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int, isModul
 			}
 			return true
 		}
-		if ecmaVersion != 3 && ast.IsFunctionLike(current) && !skipDecoratedClassBody {
+		if (ecmaVersion != 3 || !sf.IsJS()) && ast.IsFunctionLike(current) && !skipDecoratedClassBody {
 			body := current.Body()
 			if body != nil && body.Kind == ast.KindBlock && utils.HasUseStrictDirective(body) {
 				return true
@@ -341,9 +341,11 @@ func isStrictFunction(fn *ast.Node, sf *ast.SourceFile, ecmaVersion int, isModul
 		}
 	}
 
-	// Strict-mode directives were introduced in ES5. In ES3, only the
-	// syntax-imposed contexts handled above can make the function strict.
-	if ecmaVersion == 3 {
+	// Strict-mode directives were introduced in ES5. In an ES3 JavaScript
+	// source, only the syntax-imposed contexts handled above can make the
+	// function strict. typescript-eslint keeps directives active for TypeScript
+	// sources even when languageOptions.ecmaVersion is 3.
+	if ecmaVersion == 3 && sf.IsJS() {
 		return false
 	}
 	if utils.HasUseStrictDirective(sf.AsNode()) {
@@ -442,11 +444,12 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceF
 		return false
 	}
 
-	// ESTree discards parentheses and TypeScript expression wrappers, so find
-	// the first semantic parent before applying its direct-call exception.
+	// ESTree discards parentheses, so find the first semantic parent before
+	// applying its direct-call exception. TypeScript assertion wrappers remain
+	// visible in typescript-estree and must participate in the ancestor walk.
 	current := fn
 	parent := current.Parent
-	for parent != nil && ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions) {
+	for parent != nil && ast.IsOuterExpression(parent, ast.OEKParentheses) {
 		current = parent
 		parent = current.Parent
 	}
@@ -459,12 +462,12 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceF
 	// intentionally broader than a hand-picked expression list: arrays,
 	// unary expressions, nested calls, and other containers are transparent.
 	for parent != nil && parent.Kind != ast.KindSourceFile {
+		if isJSDocLookupBoundary(parent) {
+			return false
+		}
 		hasComments, hasTag := ancestorJSDocSummary(parent, comments, sf)
 		if hasComments {
 			return hasTag
-		}
-		if isJSDocLookupBoundary(parent) {
-			return false
 		}
 		current = parent
 		parent = current.Parent
