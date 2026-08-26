@@ -347,6 +347,9 @@ class BufferedLog {
 			{Code: `/** @this */ foo(function(){ this; }!);`},
 			{Code: `const outer = /** @this */ function(){ return function(){ this; }; };`},
 			{Code: `const o = { /** @this */ p: [function(){ this; }] };`},
+			{Code: `const outer = /** @this */ () => function(){ this; };`},
+			{Code: `const { /** @this */ p = [function(){ this; }] } = obj;`},
+			{Code: `class C { /** @this */ x = [function(){ this; }]; }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: ElementAccessExpression .call with null receiver ----
@@ -657,6 +660,9 @@ function outer() {
 			{Code: `foo(/** @this */ (function(){ this; } as any));`, Errors: unexpected(1, 31)},
 			{Code: `foo(/** @this */ (function(){ this; } satisfies Function));`, Errors: unexpected(1, 31)},
 			{Code: `type T = typeof this;`, Errors: unexpected(1, 17)},
+			{Code: `type T = typeof this.x;`, Errors: unexpected(1, 17)},
+			{Code: `class C { x: typeof this; }`, Errors: unexpected(1, 21)},
+			{Code: `class C { accessor x: typeof this = 1; }`, Errors: unexpected(1, 30)},
 			{
 				Code:            `function f(x: number){ 'use strict'; this; }`,
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},

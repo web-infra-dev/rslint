@@ -69,8 +69,8 @@ type EngineOptions struct {
 	// always-valid frame covers. ESLint core opens it as a code path rooted
 	// at the initializer *value* (`onCodePathStart` for the
 	// class-field-initializer path, plus `AccessorProperty > *.value`), so
-	// the positions visited before the value — the decorators and a
-	// computed key — see the enclosing scope instead: true.
+	// the positions visited before the value — decorators, a computed key,
+	// and the type annotation — see the enclosing scope instead: true.
 	// typescript-eslint's wrapper instead pushes on `PropertyDefinition` /
 	// `AccessorProperty` entry, so the field's frame covers the whole
 	// member and swallows the report in both positions: false. Method-likes
@@ -167,14 +167,17 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 		push(true)
 	}
 
-	// enterPropertyDeclaration defers the push past a computed key exactly
-	// like `enterMethodLike` — but only under `FieldFrameScopedToValue`.
+	// enterPropertyDeclaration defers the physical push past a computed key
+	// exactly like `enterMethodLike` — but only under
+	// `FieldFrameScopedToValue`.
 	// Core ESLint gives a class field's *value* position its own
 	// implicit-function code path (`PropertyDefinition#value` — see
 	// `isDefaultThisBinding`'s doc comment) but does NOT extend that
 	// treatment to the key: a computed key (`[this.foo]`) is evaluated at
 	// class-definition time in the *enclosing* scope, not the field's own
-	// context, so it must see whatever frame was already on the stack. The
+	// context, so it must see whatever frame was already on the stack. A
+	// type annotation is visited after the key; enclosingFrameSkip therefore
+	// looks past this physical frame until the initializer begins. The
 	// wrapper's `PropertyDefinition()` / `AccessorProperty()` listeners push
 	// on entry unconditionally, so there the key is covered too.
 	enterPropertyDeclaration := func(node *ast.Node) {
@@ -188,9 +191,9 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 		// A decorator's expression is evaluated at class-definition
 		// time, in the scope surrounding the class — so `this` inside
 		// one belongs to the enclosing frame, not the decorated
-		// member's. `decoratorFrameSkip` counts how many frames on the
+		// member's. `enclosingFrameSkip` counts how many frames on the
 		// stack sit between `this` and the frame that governs it.
-		idx := len(stack) - 1 - decoratorFrameSkip(node, eo.FieldFrameScopedToValue)
+		idx := len(stack) - 1 - enclosingFrameSkip(node, eo.FieldFrameScopedToValue)
 		var valid bool
 		if idx < 0 {
 			valid = eo.TopLevelValid
@@ -268,18 +271,35 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 			// typescript-estree represents the operand in `typeof this` as
 			// ThisExpression, while tsgo uses ThisType. Ordinary `this` types
 			// remain TSThisType upstream and must not be treated as expressions.
-			if node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery {
+			if isTypeQueryRoot(node) {
 				reportThis(node)
 			}
 		},
 		ast.KindIdentifier: func(node *ast.Node) {
 			// In current tsgo parser shapes, the same authored operand may be
-			// represented as an Identifier directly beneath TypeQuery.
-			if node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery && node.AsIdentifier().Text == "this" {
+			// represented as an Identifier beneath TypeQuery or at the left root
+			// of its qualified entity name.
+			if node.AsIdentifier().Text == "this" && isTypeQueryRoot(node) {
 				reportThis(node)
 			}
 		},
 	}
+}
+
+// isTypeQueryRoot reports whether node is the root entity of a TypeQuery,
+// either directly (`typeof this`) or through the left side of one or more
+// QualifiedNames (`typeof this.x.y`). A right-side name is merely a property
+// segment and must not be treated as the queried `this` expression.
+func isTypeQueryRoot(node *ast.Node) bool {
+	current := node
+	for current != nil && current.Parent != nil && current.Parent.Kind == ast.KindQualifiedName {
+		qualified := current.Parent.AsQualifiedName()
+		if qualified == nil || qualified.Left != current {
+			return false
+		}
+		current = current.Parent
+	}
+	return current != nil && current.Parent != nil && current.Parent.Kind == ast.KindTypeQuery
 }
 
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
@@ -479,11 +499,13 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceF
 	// unary expressions, nested calls, and other containers are transparent.
 	for parent != nil && parent.Kind != ast.KindSourceFile {
 		if isJSDocLookupBoundary(parent) {
-			if parent.Kind == ast.KindFunctionExpression || parent.Kind == ast.KindPropertyAssignment {
-				_, hasTag := ancestorJSDocSummary(parent, comments, sf)
-				return hasTag
+			// getJSDocComment checks the reached boundary itself unless it is a
+			// FunctionDeclaration (or Program, excluded by the loop condition).
+			if parent.Kind == ast.KindFunctionDeclaration {
+				return false
 			}
-			return false
+			_, hasTag := ancestorJSDocSummary(parent, comments, sf)
+			return hasTag
 		}
 		hasComments, hasTag := ancestorJSDocSummary(parent, comments, sf)
 		if hasComments {
@@ -503,34 +525,28 @@ func ancestorJSDocSummary(node *ast.Node, comments []*ast.CommentRange, sf *ast.
 		return false, false
 	}
 	text := sf.Text()
-	pos := node.Pos()
-	idx := sort.Search(len(comments), func(i int) bool { return comments[i].Pos() >= pos })
-	var closest *ast.CommentRange
-	for i := idx; i < len(comments); i++ {
-		comment := comments[i]
-		if !ecmascript.IsBlank(text[pos:comment.Pos()]) {
-			break
-		}
-		hasComments = true
-		closest = comment
-		pos = comment.End()
+	tokenStart := estreeNodeStart(node, sf)
+	idx := sort.Search(len(comments), func(i int) bool { return comments[i].Pos() >= tokenStart })
+	if idx == 0 {
+		return false, false
 	}
-	if closest == nil || closest.Kind != ast.KindMultiLineCommentTrivia {
-		return hasComments, false
+	closest := comments[idx-1]
+	if closest.End() > tokenStart || !ecmascript.IsBlank(text[closest.End():tokenStart]) {
+		return false, false
+	}
+	hasComments = true
+	if closest.Kind != ast.KindMultiLineCommentTrivia {
+		return true, false
 	}
 	raw := text[closest.Pos():closest.End()]
 	if !strings.HasPrefix(raw, "/**") {
-		return hasComments, false
-	}
-	tokenStart := estreeNodeStart(node, sf)
-	if !ecmascript.IsBlank(text[closest.End():tokenStart]) {
-		return hasComments, false
+		return true, false
 	}
 	lineMap := sf.ECMALineMap()
 	if scanner.ComputeLineOfPosition(lineMap, tokenStart)-scanner.ComputeLineOfPosition(lineMap, closest.End()) > 1 {
-		return hasComments, false
+		return true, false
 	}
-	return hasComments, matchesThisTagPattern(stripCommentMarkers(raw, closest.Kind))
+	return true, matchesThisTagPattern(stripCommentMarkers(raw, closest.Kind))
 }
 
 func isJSDocLookupBoundary(node *ast.Node) bool {
@@ -608,6 +624,11 @@ func leadingCommentSummary(node *ast.Node, comments []*ast.CommentRange, sf *ast
 // node's range. Parentheses are absent from ESTree, so a comment separated from
 // the semantic node by `(` is not a leading comment of that node itself.
 func estreeNodeStart(node *ast.Node, sf *ast.SourceFile) int {
+	if node.Kind == ast.KindArrowFunction {
+		// A parenthesized arrow's opening `(` belongs to its ESTree range as
+		// the parameter-list token; it is not an erased grouping wrapper.
+		return scanner.SkipTrivia(sf.Text(), node.Pos())
+	}
 	end := node.End()
 	s := scanner.GetScannerForSourceFile(sf, node.Pos())
 	for s.Token() != ast.KindEndOfFile && s.TokenStart() < end {
@@ -914,7 +935,7 @@ func isArrayFromMethod(node *ast.Node) bool {
 		strings.HasSuffix(receiver.AsIdentifier().Text, "Array")
 }
 
-// decoratorFrameSkip reports how many frames the `this` at `thisNode` must
+// enclosingFrameSkip reports how many frames the `this` at `thisNode` must
 // look past on the validity stack before reaching the frame that governs
 // it. It walks the ancestor chain outward from `thisNode` until it meets
 // the construct whose frame is on top of the stack at visit time.
@@ -937,10 +958,13 @@ func isArrayFromMethod(node *ast.Node) bool {
 // reached through its body or initializer — owns the stack top, so the
 // walk stops there with whatever has been counted so far.
 //
-// A class field takes part in either kind of hop only when
-// `FieldFrameScopedToValue` says so; otherwise its frame is already on the
-// stack for both positions and the walk stops there.
-func decoratorFrameSkip(thisNode *ast.Node, fieldFrameScopedToValue bool) int {
+// A core class field's physical frame is already on the stack while tsgo
+// visits a non-computed field's type annotation (and after a computed key),
+// even though upstream's field-value frame is not logically active there.
+// That position costs one skip and remains transparent. A wrapper field takes
+// part in either kind of hop only when `FieldFrameScopedToValue` says so;
+// otherwise its whole-member frame governs and the walk stops there.
+func enclosingFrameSkip(thisNode *ast.Node, fieldFrameScopedToValue bool) int {
 	skip := 0
 	prev, current := thisNode, thisNode.Parent
 	for current != nil {
@@ -971,6 +995,11 @@ func decoratorFrameSkip(thisNode *ast.Node, fieldFrameScopedToValue bool) int {
 		case ast.KindPropertyDeclaration:
 			if !fieldFrameScopedToValue {
 				return skip
+			}
+			property := current.AsPropertyDeclaration()
+			if property != nil && property.Type == prev {
+				skip++
+				break
 			}
 			fallthrough
 		case ast.KindMethodDeclaration, ast.KindConstructor,

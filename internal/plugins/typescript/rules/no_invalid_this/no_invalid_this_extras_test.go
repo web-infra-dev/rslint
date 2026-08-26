@@ -474,6 +474,13 @@ function setup() {
 			{Code: `/** @this */ foo(function(){ this; }!);`},
 			{Code: `const outer = /** @this */ function(){ return function(){ this; }; };`},
 			{Code: `const o = { /** @this */ p: [function(){ this; }] };`},
+			{Code: `const outer = /** @this */ () => function(){ this; };`},
+			{Code: `const { /** @this */ p = [function(){ this; }] } = obj;`},
+			{Code: `class C { /** @this */ x = [function(){ this; }]; }`},
+			// The wrapper scopes its field frame to the complete member, so type
+			// annotations remain masked just like decorators and computed keys.
+			{Code: `class C { x: typeof this; }`},
+			{Code: `class C { accessor x: typeof this = 1; }`},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -872,6 +879,7 @@ function outer() {
 			{Code: `foo(/** @this */ (function(){ this; } as any));`, Errors: unexpected(1, 31)},
 			{Code: `foo(/** @this */ (function(){ this; } satisfies Function));`, Errors: unexpected(1, 31)},
 			{Code: `type T = typeof this;`, Errors: unexpected(1, 17)},
+			{Code: `type T = typeof this.x;`, Errors: unexpected(1, 17)},
 			{
 				Code:            `function f(x: number){ 'use strict'; this; }`,
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
