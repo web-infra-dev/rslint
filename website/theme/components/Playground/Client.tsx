@@ -7,7 +7,9 @@ import { ResizableSplitPane, type GetAstInfoResponse } from './ast';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/theme/components/ui/select';
@@ -356,14 +358,19 @@ const Playground: React.FC = () => {
                       aria-label="Select @rslint/wasm version"
                       disabled={wasmVersions.length === 0}
                     >
-                      <SelectValue placeholder="Loading..." />
+                      <SelectValue placeholder="Loading...">
+                        {selectedVersion ? `v${selectedVersion}` : undefined}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {wasmVersions.map((version) => (
-                        <SelectItem key={version} value={version}>
-                          {version}
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        <SelectLabel>Rslint Core</SelectLabel>
+                        {wasmVersions.map((version) => (
+                          <SelectItem key={version} value={version}>
+                            v{version}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </div>
