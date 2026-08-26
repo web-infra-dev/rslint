@@ -6,11 +6,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// Compatibility alias keeps linter-focused callers source-compatible while
-// ownership lives in internal/rule. New framework code should name
-// rule.ConfiguredRule directly.
-type ConfiguredRule = rule.ConfiguredRule
-
 type RuleHandler = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule
 type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 

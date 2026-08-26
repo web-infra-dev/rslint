@@ -1323,7 +1323,7 @@ func runRuleLeniently(t *testing.T, code string, tsx bool) []rule.RuleDiagnostic
 		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
 	}
 
-	configured := linter.ConfiguredRule{
+	configured := rule.ConfiguredRule{
 		Name:     NoNonoctalDecimalEscapeRule.Name,
 		Severity: rule.SeverityWarning,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -1335,11 +1335,11 @@ func runRuleLeniently(t *testing.T, code string, tsx bool) []rule.RuleDiagnostic
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                lintprogram.NewFromCompiler(program),
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
+		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			if sf.FileName() != filePath {
 				return nil
 			}
-			return []linter.ConfiguredRule{configured}
+			return []rule.ConfiguredRule{configured}
 		},
 		OnDiagnostic: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 	})

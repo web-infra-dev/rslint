@@ -676,9 +676,9 @@ func createExhaustiveDepsProgram(t testing.TB, fileName string, code string) (*c
 	return program, sourceFile
 }
 
-func exhaustiveDepsConfiguredRules(options []any) func(*ast.SourceFile) []linter.ConfiguredRule {
-	return func(*ast.SourceFile) []linter.ConfiguredRule {
-		return []linter.ConfiguredRule{{
+func exhaustiveDepsConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
+	return func(*ast.SourceFile) []rule.ConfiguredRule {
+		return []rule.ConfiguredRule{{
 			Name:     ExhaustiveDepsRule.Name,
 			Severity: rule.SeverityError,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {

@@ -220,8 +220,8 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 		Programs:         programs,
 		TargetsByProgram: [][]string{{tsxPath}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(_ *ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(_ *ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "react-hooks/exhaustive-deps",
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
