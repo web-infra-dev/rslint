@@ -37,6 +37,51 @@ func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
 	return current
 }
 
+// IsImportAttributeKey reports whether node is an import attribute key in a
+// static import/re-export or in a dynamic import options object. These keys
+// are fixed by the import-attributes protocol rather than freely chosen
+// identifier or property names.
+func IsImportAttributeKey(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	parent := node.Parent
+
+	// import data from "./data.json" with { type: "json" }
+	if parent.Kind == ast.KindImportAttribute && parent.AsImportAttribute().Name() == node {
+		return true
+	}
+
+	// import("./data.json", { with: { type: "json" } })
+	switch parent.Kind {
+	case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
+		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+	default:
+		return false
+	}
+	if parent.Name() != node {
+		return false
+	}
+	objectExpression := parent.Parent
+	if objectExpression == nil || objectExpression.Kind != ast.KindObjectLiteralExpression {
+		return false
+	}
+	outer := OutermostParenthesizedExpression(objectExpression)
+	container := outer.Parent
+	if container == nil {
+		return false
+	}
+	if container.Kind == ast.KindCallExpression {
+		call := container.AsCallExpression()
+		return call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword &&
+			call.Arguments != nil && len(call.Arguments.Nodes) > 1 && call.Arguments.Nodes[1] == outer
+	}
+	if container.Kind == ast.KindPropertyAssignment && container.AsPropertyAssignment().Initializer == outer {
+		return IsImportAttributeKey(container.Name())
+	}
+	return false
+}
+
 // IsCommaOperator reports whether node is a BinaryExpression whose operator is
 // the comma token — tsgo's collapsed form of ESLint's SequenceExpression.
 func IsCommaOperator(node *ast.Node) bool {

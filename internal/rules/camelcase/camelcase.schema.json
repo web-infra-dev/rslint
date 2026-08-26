@@ -1,0 +1,23 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "ignoreDestructuring": { "type": "boolean" },
+        "ignoreImports": { "type": "boolean" },
+        "ignoreGlobals": { "type": "boolean" },
+        "properties": { "enum": ["always", "never"] },
+        "allow": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
