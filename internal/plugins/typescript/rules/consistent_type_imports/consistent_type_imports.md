@@ -84,6 +84,13 @@ annotations. Set it to `false` to allow them.
 type Model = import('./models').Model;
 ```
 
+## Differences from ESLint
+
+The pinned upstream implementation stores module sources in a plain JavaScript
+object, so imports from `"constructor"`, `"toString"`, `"__proto__"`, or
+`"hasOwnProperty"` throw while linting. The Go map intentionally handles these
+names normally and still reports and fixes the import.
+
 ## Original Documentation
 
 - [typescript-eslint: consistent-type-imports](https://typescript-eslint.io/rules/consistent-type-imports)
