@@ -313,7 +313,6 @@ func lintPreferNodeProtocolWithDemand(
 				},
 			}}
 		},
-		ExcludePaths: []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {

@@ -728,7 +728,6 @@ func TestFirstEditDemand(t *testing.T) {
 					File:            sourceFile.FileName(),
 					HasTypeInfo:     true,
 					GetRulesForFile: firstConfiguredRules,
-					ExcludePaths:    []string{},
 					Consumer: rule.DiagnosticConsumer{
 						Demand: demand,
 						Report: func(diagnostic rule.RuleDiagnostic) {

@@ -188,10 +188,17 @@ func TestRootProgramSupportsCrossFileImportRules(t *testing.T) {
 	if len(diagnostics) != 0 {
 		t.Fatalf("unexpected source-only Program syntax diagnostics: %+v", diagnostics)
 	}
+	if len(programs) != 1 {
+		t.Fatalf("source-only Program count = %d, want 1", len(programs))
+	}
 
 	var cycleReports, defaultReports int
-	opts := linter.RunLinterOptions{
-		Programs:       programs,
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs: programs,
+		TargetsByProgram: [][]string{{
+			plan.Files[0].Path,
+			plan.Files[1].Path,
+		}},
 		SingleThreaded: true,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return []linter.ConfiguredRule{
@@ -214,6 +221,13 @@ func TestRootProgramSupportsCrossFileImportRules(t *testing.T) {
 				},
 			}
 		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	result, err := linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
 			switch diagnostic.RuleName {
 			case no_cycle.NoCycleRule.Name:
@@ -224,12 +238,7 @@ func TestRootProgramSupportsCrossFileImportRules(t *testing.T) {
 				t.Errorf("unexpected source-only Program import diagnostic: %+v", diagnostic)
 			}
 		}},
-	}
-	opts.PreparedPlan, err = linter.PrepareLintPlan(opts)
-	if err != nil {
-		t.Fatalf("PrepareLintPlan: %v", err)
-	}
-	result, err := linter.RunLinter(opts)
+	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
 	}

@@ -621,7 +621,6 @@ func lintExhaustiveDepsWithDemand(
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: exhaustiveDepsConfiguredRules(options),
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {

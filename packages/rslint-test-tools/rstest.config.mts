@@ -462,6 +462,7 @@ export default defineConfig({
     './tests/eslint/rules/no-restricted-exports.test.ts',
     './tests/eslint/rules/no-restricted-globals.test.ts',
     './tests/eslint/rules/no-restricted-imports.test.ts',
+    './tests/eslint/rules/no-restricted-properties.test.ts',
     './tests/eslint/rules/no-restricted-syntax.test.ts',
     './tests/eslint/rules/no-obj-calls.test.ts',
     './tests/eslint/rules/no-setter-return.test.ts',

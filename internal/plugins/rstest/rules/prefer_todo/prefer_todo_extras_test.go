@@ -424,9 +424,8 @@ test("options", { timeout: 100 }, () => {});`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			ExcludePaths: []string{},
+			Program: lintprogram.NewFromCompiler(program),
+			File:    sourceFile.FileName(),
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{{
 					Name:     prefer_todo.PreferTodoRule.Name,

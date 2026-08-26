@@ -245,23 +245,27 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	}
 	diagnostics := []rule.RuleDiagnostic{}
 	var diagnosticsMu sync.Mutex
-	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-		SingleThreaded: true,
-		Scope: linter.FileScope{
-			Files: []string{sourceFile.FileName()},
-		},
+	programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{sourceFile.FileName()}},
+		SingleThreaded:   true,
 		GetRulesForFile: func(_ *ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{
-				{
-					Name:     "test",
-					Severity: rule.SeverityError,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return NoDeprecatedRule.Run(ctx, rule_tester.ResolveTestCaseOptions(t, &NoDeprecatedRule, options))
-					},
+			return []linter.ConfiguredRule{{
+				Name:     "test",
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return NoDeprecatedRule.Run(ctx, rule_tester.ResolveTestCaseOptions(t, &NoDeprecatedRule, options))
 				},
-			}
+			}}
 		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(diagnostic rule.RuleDiagnostic) {
 				diagnosticsMu.Lock()

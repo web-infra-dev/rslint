@@ -411,10 +411,9 @@ expect(fn).not['toThrowError']();`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			HasTypeInfo:  true,
-			ExcludePaths: []string{},
+			Program:     lintprogram.NewFromCompiler(program),
+			File:        sourceFile.FileName(),
+			HasTypeInfo: true,
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{{
 					Name:     NoAliasMethodsRule.Name,
