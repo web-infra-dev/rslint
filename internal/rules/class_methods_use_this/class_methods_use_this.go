@@ -87,6 +87,7 @@ type stackEntry struct {
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 	var stack *stackEntry
+	headLocator := utils.NewFunctionHeadRangeLocator(ctx.SourceFile)
 
 	// pushMember pushes a class-member context whose `member` is the given
 	// node. Mirrors upstream's pushContext(member) when the member's parent
@@ -115,6 +116,19 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			stack = stack.parent
 		}
 		return old
+	}
+
+	lastDecorator := func(node *ast.Node) *ast.Node {
+		if node == nil || node.Modifiers() == nil {
+			return nil
+		}
+		var last *ast.Node
+		for _, modifier := range node.Modifiers().Nodes {
+			if modifier.Kind == ast.KindDecorator {
+				last = modifier
+			}
+		}
+		return last
 	}
 
 	// classImplementsInterface reports whether the class node has an
@@ -262,7 +276,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		}
 
 		name := utils.GetFunctionNameWithKindCore(node)
-		loc := utils.GetFunctionHeadLoc(ctx.SourceFile, node)
+		loc := headLocator.Range(node)
 		ctx.ReportRange(
 			loc,
 			rule.RuleMessage{
@@ -299,16 +313,25 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	// bodied identically — pushing anonymous when Body() == nil, member when
 	// non-nil — keeping the stack balanced against the unconditional pop on
 	// the member's exit listener.
-	enterClassLikeMember := func(node *ast.Node) {
-		if name := ast.GetNameOfDeclaration(node); name != nil && name.Kind == ast.KindComputedPropertyName {
-			// Defer push to ComputedPropertyName:exit.
-			return
-		}
+	pushClassLikeMember := func(node *ast.Node) {
 		if node.Body() == nil {
 			pushAnonymous()
 			return
 		}
 		pushMember(node)
+	}
+
+	enterClassLikeMember := func(node *ast.Node) {
+		if name := ast.GetNameOfDeclaration(node); name != nil && name.Kind == ast.KindComputedPropertyName {
+			// Defer push to ComputedPropertyName:exit.
+			return
+		}
+		if lastDecorator(node) != nil {
+			// ESTree enters the member's FunctionExpression only after visiting
+			// decorators. Defer the frame until the final decorator exits.
+			return
+		}
+		pushClassLikeMember(node)
 	}
 
 	// enterFreestandingFunction handles FunctionExpression and ArrowFunction
@@ -355,6 +378,19 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		}
 	}
 
+	markTypeQueryThis := func(node *ast.Node) {
+		if node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery {
+			markUsesThis(node)
+		}
+	}
+
+	markTypeQueryIdentifierThis := func(node *ast.Node) {
+		if node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery &&
+			node.AsIdentifier().Text == "this" {
+			markUsesThis(node)
+		}
+	}
+
 	return rule.RuleListeners{
 		// Function declarations always carry their own `this` context but
 		// are never reportable members — push anonymous, pop on exit.
@@ -387,7 +423,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// non-computed keys push on enter, but computed keys defer the push
 		// to ComputedPropertyName:exit.
 		ast.KindPropertyDeclaration: func(node *ast.Node) {
-			if isComputedKey(node) {
+			if isComputedKey(node) || lastDecorator(node) != nil {
 				return
 			}
 			pushAnonymous()
@@ -413,6 +449,18 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				}
 			}
 		},
+		rule.ListenerOnExit(ast.KindDecorator): func(node *ast.Node) {
+			parent := node.Parent
+			if parent == nil || lastDecorator(parent) != node || isComputedKey(parent) {
+				return
+			}
+			switch parent.Kind {
+			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+				pushClassLikeMember(parent)
+			case ast.KindPropertyDeclaration:
+				pushAnonymous()
+			}
+		},
 
 		// Static blocks have their own `this`; isolate them.
 		ast.KindClassStaticBlockDeclaration:                      func(*ast.Node) { pushAnonymous() },
@@ -420,5 +468,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 		ast.KindThisKeyword:  markUsesThis,
 		ast.KindSuperKeyword: markUsesThis,
+		ast.KindThisType:     markTypeQueryThis,
+		ast.KindIdentifier:   markTypeQueryIdentifierThis,
 	}
 }

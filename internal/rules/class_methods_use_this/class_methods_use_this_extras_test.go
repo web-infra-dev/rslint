@@ -42,6 +42,22 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 		t,
 		&ClassMethodsUseThisRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Review regression: TypeScript type-query `this` counts as use ----
+			{Code: `class C { foo(value: typeof this) {} }`},
+			{Code: `class C { foo(): typeof this {} }`},
+			{Code: `class C { foo<T extends typeof this>() {} }`},
+			{Code: `class C { foo(value: Array<typeof this>) {} }`},
+			{Code: `class C { foo = (value: typeof this) => {}; }`},
+
+			// A field decorator runs before the field value frame. Its `this`
+			// therefore belongs to the enclosing method, as it does in ESTree.
+			{
+				Code: `class C { foo() { return class { @dec(this) field = () => {}; }; } }`,
+				Options: coreOptions(map[string]interface{}{
+					"enforceForClassFields": false,
+				}),
+			},
+
 			// ---- Dimension 4: receiver wrappers — parenthesized this ----
 			{Code: `class C { foo() { return (this).value; } }`},
 			{Code: `class C { foo() { return ((this)).value; } }`},
@@ -131,6 +147,37 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			{Code: `class C extends B { foo() { super.foo(); } }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// A plain `this` type is TSThisType upstream, not the ThisExpression
+			// operand of a type query, so it does not count as runtime `this` use.
+			{
+				Code:   `class C { foo(value: this) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'foo'.", 1, 11, 1, 14)},
+			},
+
+			// ---- Review regression: decorators execute outside member frames ----
+			{
+				Code:   `class C { @dec(this) foo() {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'foo'.", 1, 11, 1, 25)},
+			},
+			{
+				Code:   `class C extends B { @dec(super.value) foo() {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'foo'.", 1, 21, 1, 42)},
+			},
+			{
+				Code:   `class C { @dec(() => this.value) get foo() {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class getter 'foo'.", 1, 11, 1, 41)},
+			},
+			{
+				Code:   `class C { @dec(this) set foo(value) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class setter 'foo'.", 1, 11, 1, 29)},
+			},
+
+			// Decorated field heads include the decorator in ESLint's range.
+			{
+				Code:   `class C { @dec(this) field = () => {}; }`,
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'field'.", 1, 11, 1, 30)},
+			},
+
 			// ---- Options contract: omitted options and [{}] have identical defaults ----
 			{
 				Code:   `class C { foo() {} }`,
