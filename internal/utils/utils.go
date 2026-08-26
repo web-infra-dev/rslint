@@ -460,6 +460,16 @@ func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
 	return text[1 : lastSlash+1], text[lastSlash+2:]
 }
 
+// RegExpLiteralStringValue returns the value produced by
+// RegExp.prototype.toString for a regular-expression literal. JavaScript emits
+// flags in canonical order even when the source authored them differently.
+func RegExpLiteralStringValue(text string) string {
+	pattern, flags := ExtractRegexPatternAndFlags(text)
+	canonicalFlags := []byte(flags)
+	slices.Sort(canonicalFlags)
+	return "/" + pattern + "/" + string(canonicalFlags)
+}
+
 // ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape:
 // the single option element is either a bare number (`3`) or an object
 // (`{max: 3}` / `{maximum: 3}`). `maximum` wins only when it coerces to a

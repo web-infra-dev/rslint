@@ -125,6 +125,11 @@ func TestYodaExtras(t *testing.T) {
 			// ---- Bug fix: RegExp.prototype.toString canonicalizes flags, so source
 			// spellings with the same flags in different orders are equal bounds ----
 			{Code: `if (/a/mi <= x && x < /a/im) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 <= a[/a/mi] && a[/a/im] < 2) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
+			// ---- Bug fix: surrounding tokens come from the parsed token stream, so a
+			// preceding interpolated template cannot hide the range's parentheses ----
+			{Code: "`${seed}`; if (0 <= x && x < 1) {}", Options: []any{"never", map[string]any{"exceptRange": true}}},
 
 			// ---- Bug fix: a string range bound is coerced by JS's ToNumber, which
 			// reads an unsigned `0x`/`0o`/`0b` integer, unlike Go's own float parsing ----
@@ -243,6 +248,33 @@ func TestYodaExtras(t *testing.T) {
 				Output:  []string{`f() > /a/ in obj`},
 				Options: "never",
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 1}},
+			},
+			{
+				Code:    "`${seed}`; function *f(){yield(1)<a}",
+				Output:  []string{"`${seed}`; function *f(){yield a>(1)}"},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `/a/ < (x)as number`,
+				Output:  []string{`(x) > /a/ as number`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `/a/ < (x)satisfies number`,
+				Output:  []string{`(x) > /a/ satisfies number`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+
+			// ---- Bug fix: private access syntax never aliases an ordinary computed
+			// string key in upstream's same-reference comparison ----
+			{
+				Code:    `class C { #x = 0; m() { if (0 <= this.#x && this['#x'] < 1) {} } }`,
+				Output:  []string{`class C { #x = 0; m() { if (this.#x >= 0 && this['#x'] < 1) {} } }`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
 			},
 
 			// ---- Bug fix: reversing the UTF-16 bounds makes the range descend, so

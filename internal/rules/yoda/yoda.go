@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"slices"
 	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -286,12 +285,9 @@ func normalizedLiteralValue(node *ast.Node) (literalValue, bool) {
 		// including regex literals — it only checks node.type, not the
 		// runtime type of node.value. JS's abstract relational comparison
 		// then coerces a RegExp operand via ToPrimitive, which falls back to
-		// RegExp.prototype.toString() (there is no valueOf override), i.e.
-		// its source text. Treat it as a string bound for the same reason.
-		pattern, flags := utils.ExtractRegexPatternAndFlags(node.Text())
-		canonicalFlags := []byte(flags)
-		slices.Sort(canonicalFlags)
-		return literalValue{kind: "string", str: "/" + pattern + "/" + string(canonicalFlags)}, true
+		// RegExp.prototype.toString() (there is no valueOf override), including
+		// canonical flag order. Treat it as a string bound for the same reason.
+		return literalValue{kind: "string", str: utils.RegExpLiteralStringValue(node.Text())}, true
 	case ast.KindPrefixUnaryExpression:
 		unary := node.AsPrefixUnaryExpression()
 		if unary.Operator != ast.KindMinusToken {
@@ -445,7 +441,8 @@ func buildFlippedText(sf *ast.SourceFile, node *ast.Node) string {
 		nodeRange := utils.TrimNodeTextRange(sf, node)
 		if after, ok := utils.TokenAtOrAfter(sf, nodeRange.End()); ok &&
 			after.Start == nodeRange.End() &&
-			(after.Kind == ast.KindInKeyword || after.Kind == ast.KindInstanceOfKeyword) &&
+			(after.Kind == ast.KindInKeyword || after.Kind == ast.KindInstanceOfKeyword ||
+				after.Kind == ast.KindAsKeyword || after.Kind == ast.KindSatisfiesKeyword) &&
 			flipped[len(flipped)-1] != ' ' {
 			flipped += " "
 		}

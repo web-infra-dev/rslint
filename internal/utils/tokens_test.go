@@ -51,3 +51,16 @@ func TestTokenBeforePositionDoesNotTreatDivisionAsRegularExpression(t *testing.T
 		t.Fatalf("TokenBeforePosition() = %#v, want the identifier after division", token)
 	}
 }
+
+func TestTokenBeforePositionAfterInterpolatedTemplate(t *testing.T) {
+	code := "`${seed}`; function *f(){yield(1)<a}"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, code, core.ScriptKindTS)
+
+	token, ok := TokenBeforePosition(sourceFile, strings.Index(code, "(1)"))
+	if !ok || token.Kind != ast.KindYieldKeyword || token.Text != "yield" {
+		t.Fatalf("TokenBeforePosition() = %#v, %v, want the yield keyword", token, ok)
+	}
+}

@@ -1702,7 +1702,7 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 		case ast.KindFalseKeyword:
 			return "false", true
 		case ast.KindRegularExpressionLiteral:
-			return expr.AsRegularExpressionLiteral().Text, true
+			return RegExpLiteralStringValue(expr.AsRegularExpressionLiteral().Text), true
 		}
 		return "", false
 	default:
@@ -1841,8 +1841,8 @@ func NormalizeBigIntLiteral(text string) string {
 //   - StringLiteral: returns the string value
 //   - NumericLiteral: returns the normalized numeric string (e.g. "0x1" → "1")
 //   - NoSubstitutionTemplateLiteral: returns the template text
-//   - RegularExpressionLiteral: returns the source text (e.g. /foo/g),
-//     matching JavaScript's implicit toString coercion when used as a property key
+//   - RegularExpressionLiteral: returns RegExp.prototype.toString's canonical
+//     value (e.g. /foo/mi becomes /foo/im) for property-key coercion
 //   - NullKeyword / TrueKeyword / FalseKeyword: return "null" / "true" / "false"
 //   - BigIntLiteral: returns the normalized decimal string (e.g. "1n" → "1")
 //
@@ -1862,7 +1862,7 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text, true
 	case ast.KindRegularExpressionLiteral:
-		return node.AsRegularExpressionLiteral().Text, true
+		return RegExpLiteralStringValue(node.AsRegularExpressionLiteral().Text), true
 	case ast.KindNullKeyword:
 		return "null", true
 	case ast.KindTrueKeyword:
@@ -2014,7 +2014,7 @@ func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
-		if name != nil {
+		if name != nil && name.Kind != ast.KindPrivateIdentifier {
 			return name.Text(), true
 		}
 	case ast.KindElementAccessExpression:
