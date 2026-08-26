@@ -532,6 +532,7 @@ export default defineConfig({
     './tests/eslint/rules/symbol-description.test.ts',
     './tests/eslint/rules/unicode-bom.test.ts',
     './tests/eslint/rules/sort-keys.test.ts',
+    './tests/eslint/rules/sort-imports.test.ts',
     './tests/eslint/rules/sort-vars.test.ts',
 
     // eslint-plugin-jest
