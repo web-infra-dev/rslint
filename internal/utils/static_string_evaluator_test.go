@@ -1,3 +1,5 @@
+// cspell:ignore truenull
+
 package utils
 
 import (
@@ -32,6 +34,54 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const stringCall = String(\"then\");\n" +
 		"const stringNumberCall = String(1 + 2);\n" +
 		"const stringNoArgumentCall = String();\n" +
+		"const uppercase = \"get\".toUpperCase();\n" +
+		"const uppercaseExpansion = \"ß\".toUpperCase();\n" +
+		"const uppercaseStaticExtraArgument = \"get\".toUpperCase(1);\n" +
+		"const uppercaseExtraArgument = \"get\".toUpperCase(unknown);\n" +
+		"const lowercase = \"HEAD\".toLowerCase();\n" +
+		"const lowercaseFinalSigma = \"ΟΣ\".toLowerCase();\n" +
+		"const fromCharCode = String.fromCharCode(71, 69, 84);\n" +
+		"const fromCharCodeNegativeModulo = String.fromCharCode(-4294967225);\n" +
+		"const fromCharCodeHexString = String.fromCharCode(\"0x47\");\n" +
+		"const fromCharCodeNEL = String.fromCharCode(\"\u008571\");\n" +
+		"const fromCharCodeBOM = String.fromCharCode(\"\uFEFF71\");\n" +
+		"const fromCharCodeSpread = String.fromCharCode(...[72, 69, 65, 68]);\n" +
+		"const arrayOfFirst = Array.of(\"GET\")[0];\n" +
+		"const arrayOfSpread = Array.of(...[\"HEAD\"])[0];\n" +
+		"const stringSlice = \"xGETy\".slice(1, 4);\n" +
+		"const stringSliceDefault = \"GET\".slice(undefined);\n" +
+		"const stringSliceUtf16 = \"😀GETx\".slice(2, 5);\n" +
+		"const stringSubstring = \"xHEADy\".substring(1, 5);\n" +
+		"const stringSubstringReversed = \"HEAD\".substring(4, 0);\n" +
+		"const stringSubstr = \"xGETy\".substr(1, 3);\n" +
+		"const stringSubstrNegative = \"xxGET\".substr(-3);\n" +
+		"const stringSubstrEmptyLength = \"GET\".substr(0, 0);\n" +
+		"const stringCharAt = \"GETx\".charAt(0);\n" +
+		"const stringCharAtDefault = \"GET\".charAt();\n" +
+		"const stringCharAtOutOfRange = \"GET\".charAt(9);\n" +
+		"const stringConcat = \"G\".concat(\"ET\");\n" +
+		"const stringConcatMany = \"HE\".concat(\"A\", \"D\");\n" +
+		"const stringConcatCoercion = \"n\".concat(1, true, null);\n" +
+		"const stringConcatUnknown = \"G\".concat(unknownValue);\n" +
+		"const unaryPlusString = String(+\"71\");\n" +
+		"const unaryPlusBoolean = String(+true);\n" +
+		"const unaryMinusString = String(-\"1\");\n" +
+		"const unaryTildeString = String(~\"1\");\n" +
+		"const unaryPlusInvalid = String(+\"nope\");\n" +
+		"const unaryPlusUnknown = String(+unknownValue);\n" +
+		"const strictEqualNumbers = +\"71\" === 71 ? \"then\" : \"no\";\n" +
+		"const strictEqualStrings = \"a\" === \"a\" ? \"then\" : \"no\";\n" +
+		"const strictUnequalStrings = \"a\" !== \"b\" ? \"then\" : \"no\";\n" +
+		"const strictEqualAcrossKinds = (1 as any) === \"1\" ? \"no\" : \"then\";\n" +
+		"const strictEqualNullish = (null as any) === undefined ? \"no\" : \"then\";\n" +
+		"const strictEqualObjects = ({} as any) === {} ? \"then\" : \"no\";\n" +
+		"const strictEqualUnknown = unknownValue === \"a\" ? \"then\" : \"no\";\n" +
+		"const StringAlias = String;\n" +
+		"const aliasFromCharCode = StringAlias.fromCharCode(71, 69, 84);\n" +
+		"const ArrayAlias = Array;\n" +
+		"const aliasArrayOf = ArrayAlias.of(\"GET\")[0];\n" +
+		"{ const String = {fromCharCode: () => \"GET\"}; const shadowedFromCharCode = String.fromCharCode(71); }\n" +
+		"{ const Array = {of: () => [\"GET\"]}; const shadowedArrayOf = Array.of(\"GET\")[0]; }\n" +
 		"const stringRaw = String.raw`then`;\n" +
 		"const stringRawSubstitution = String.raw`th${\"e\"}n`;\n" +
 		"const RawString = String;\n" +
@@ -63,6 +113,7 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const numeric = 1 + 2;\n" +
 		"const unknownUse = unknownValue;\n" +
 		"const stableArray = [\"\", \"message\"];\n" +
+		"const stableObject = {message: \"value\"};\n" +
 		"const stableArrayUse = stableArray[0];\n" +
 		"const writtenArray = [\"\"];\n" +
 		"writtenArray[0] = \"message\";\n" +
@@ -132,6 +183,52 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "stringCall", want: "then", ok: true},
 		{name: "stringNumberCall", want: "3", ok: true},
 		{name: "stringNoArgumentCall", want: "", ok: true},
+		{name: "uppercase", want: "GET", ok: true},
+		{name: "uppercaseExpansion", want: "SS", ok: true},
+		{name: "uppercaseStaticExtraArgument", want: "GET", ok: true},
+		{name: "uppercaseExtraArgument"},
+		{name: "lowercase", want: "head", ok: true},
+		{name: "lowercaseFinalSigma", want: "ος", ok: true},
+		{name: "fromCharCode", want: "GET", ok: true},
+		{name: "fromCharCodeNegativeModulo", want: "G", ok: true},
+		{name: "fromCharCodeHexString", want: "G", ok: true},
+		{name: "fromCharCodeNEL", want: "\x00", ok: true},
+		{name: "fromCharCodeBOM", want: "G", ok: true},
+		{name: "fromCharCodeSpread", want: "HEAD", ok: true},
+		{name: "arrayOfFirst", want: "GET", ok: true},
+		{name: "arrayOfSpread", want: "HEAD", ok: true},
+		{name: "stringSlice", want: "GET", ok: true},
+		{name: "stringSliceDefault", want: "GET", ok: true},
+		{name: "stringSliceUtf16", want: "GET", ok: true},
+		{name: "stringSubstring", want: "HEAD", ok: true},
+		{name: "stringSubstringReversed", want: "HEAD", ok: true},
+		{name: "stringSubstr", want: "GET", ok: true},
+		{name: "stringSubstrNegative", want: "GET", ok: true},
+		{name: "stringSubstrEmptyLength", want: "", ok: true},
+		{name: "stringCharAt", want: "G", ok: true},
+		{name: "stringCharAtDefault", want: "G", ok: true},
+		{name: "stringCharAtOutOfRange", want: "", ok: true},
+		{name: "stringConcat", want: "GET", ok: true},
+		{name: "stringConcatMany", want: "HEAD", ok: true},
+		{name: "stringConcatCoercion", want: "n1truenull", ok: true},
+		{name: "stringConcatUnknown"},
+		{name: "unaryPlusString", want: "71", ok: true},
+		{name: "unaryPlusBoolean", want: "1", ok: true},
+		{name: "unaryMinusString", want: "-1", ok: true},
+		{name: "unaryTildeString", want: "-2", ok: true},
+		{name: "unaryPlusInvalid", want: "NaN", ok: true},
+		{name: "unaryPlusUnknown"},
+		{name: "strictEqualNumbers", want: "then", ok: true},
+		{name: "strictEqualStrings", want: "then", ok: true},
+		{name: "strictUnequalStrings", want: "then", ok: true},
+		{name: "strictEqualAcrossKinds", want: "then", ok: true},
+		{name: "strictEqualNullish", want: "then", ok: true},
+		{name: "strictEqualObjects"},
+		{name: "strictEqualUnknown"},
+		{name: "aliasFromCharCode", want: "GET", ok: true},
+		{name: "aliasArrayOf", want: "GET", ok: true},
+		{name: "shadowedFromCharCode"},
+		{name: "shadowedArrayOf"},
 		{name: "stringRaw", want: "then", ok: true},
 		{name: "stringRawSubstitution", want: "then", ok: true},
 		{name: "stringRawAlias", want: "then", ok: true},
@@ -181,6 +278,16 @@ func TestStaticStringEvaluator(t *testing.T) {
 				t.Fatalf("Eval(%s) = (%q, %v), want (%q, %v)", tt.name, got, ok, tt.want, tt.ok)
 			}
 		})
+	}
+
+	if isArray, known := staticEvaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "stableArray")); !known || !isArray {
+		t.Fatalf("EvalArrayValue(stableArray) = (%v, %v), want (true, true)", isArray, known)
+	}
+	if isArray, known := staticEvaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "stableObject")); !known || isArray {
+		t.Fatalf("EvalArrayValue(stableObject) = (%v, %v), want (false, true)", isArray, known)
+	}
+	if isArray, known := staticEvaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "unknownUse")); known || isArray {
+		t.Fatalf("EvalArrayValue(unknownUse) = (%v, %v), want (false, false)", isArray, known)
 	}
 }
 

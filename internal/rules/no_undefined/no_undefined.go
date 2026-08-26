@@ -113,9 +113,6 @@ func isNonBindingUndefinedPosition(node *ast.Node) bool {
 	if utils.IsImportTypeSyntax(node) {
 		return true
 	}
-	if utils.IsInJSDocSyntax(node) {
-		return true
-	}
 	if ast.IsJsxTagName(node) {
 		return true
 	}

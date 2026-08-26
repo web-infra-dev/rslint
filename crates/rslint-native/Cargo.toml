@@ -9,7 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = "3.9.0"
+napi = "3.12.1"
 napi-derive = "3.5.6"
 oxc_allocator = "0.133.0"
 # oxc_ast is a direct dependency solely to enable its `serialize` feature, which provides

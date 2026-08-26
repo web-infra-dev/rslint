@@ -1,0 +1,1175 @@
+// Rstest Snapshot v1
+
+exports[`no-underscore-dangle > invalid 1`] = `
+{
+  "code": "var _foo = 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_foo'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 2`] = `
+{
+  "code": "var foo_ = 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in 'foo_'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 3`] = `
+{
+  "code": "function _foo() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_foo'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 4`] = `
+{
+  "code": "function foo_() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in 'foo_'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 5`] = `
+{
+  "code": "var __proto__ = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '__proto__'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 6`] = `
+{
+  "code": "foo._bar;",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 7`] = `
+{
+  "code": "this._prop;",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_prop'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 8`] = `
+{
+  "code": "class foo { constructor() { super._prop; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_prop'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 9`] = `
+{
+  "code": "class foo { constructor() { this._prop; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_prop'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 10`] = `
+{
+  "code": "class foo { _onClick() { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_onClick'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 11`] = `
+{
+  "code": "class foo { onClick_() { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in 'onClick_'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 12`] = `
+{
+  "code": "const o = { _onClick() { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_onClick'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 13`] = `
+{
+  "code": "const o = { onClick_() { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in 'onClick_'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 14`] = `
+{
+  "code": "this.constructor._bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 15`] = `
+{
+  "code": "function foo(_bar) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 16`] = `
+{
+  "code": "(function foo(_bar) {})",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 17`] = `
+{
+  "code": "function foo(bar, _foo) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_foo'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 18`] = `
+{
+  "code": "const foo = { onClick(_bar) { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 19`] = `
+{
+  "code": "const foo = (_bar) => {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 20`] = `
+{
+  "code": "function foo(_bar = 0) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 21`] = `
+{
+  "code": "const foo = { onClick(_bar = 0) { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 22`] = `
+{
+  "code": "const foo = (_bar = 0) => {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 23`] = `
+{
+  "code": "function foo(..._bar) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 24`] = `
+{
+  "code": "const foo = { onClick(..._bar) { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 25`] = `
+{
+  "code": "const foo = (..._bar) => {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 26`] = `
+{
+  "code": "const [foo, _bar] = [1, 2]",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 27`] = `
+{
+  "code": "const [_foo = 1] = arr",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_foo'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 28`] = `
+{
+  "code": "const [foo, ..._rest] = [1, 2, 3]",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_rest'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 29`] = `
+{
+  "code": "const [foo, [bar_, baz]] = [1, [2, 3]]",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in 'bar_'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 30`] = `
+{
+  "code": "const { _foo, bar } = { _foo: 1, bar: 2 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_foo'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 31`] = `
+{
+  "code": "const { _foo = 1 } = obj",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_foo'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 32`] = `
+{
+  "code": "const { bar: _foo = 1 } = obj",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_foo'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 33`] = `
+{
+  "code": "const { foo: _foo, bar } = { foo: 1, bar: 2 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_foo'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 34`] = `
+{
+  "code": "const { foo, ..._rest} = { foo: 1, bar: 2, baz: 3 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_rest'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 35`] = `
+{
+  "code": "const { foo: [_bar, { a: _a, b } ] } = { foo: [1, { a: 'a', b: 'b' }] }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+    {
+      "message": "Unexpected dangling '_' in '_a'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 36`] = `
+{
+  "code": "const { foo: [_bar, { a: _a, b } ] } = { foo: [1, { a: 'a', b: 'b' }] }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_a'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 37`] = `
+{
+  "code": "const [{ foo: [_bar, _, { bar: _baz }] }] = [{ foo: [1, 2, { bar: 'a' }] }]",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+    {
+      "message": "Unexpected dangling '_' in '_baz'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 38`] = `
+{
+  "code": "const { foo, bar: { baz, _qux } } = { foo: 1, bar: { baz: 3, _qux: 4 } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_qux'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 39`] = `
+{
+  "code": "class foo { #_bar() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '#_bar'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 40`] = `
+{
+  "code": "class foo { #bar_() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '#bar_'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 41`] = `
+{
+  "code": "class foo { _field; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '_field'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 42`] = `
+{
+  "code": "class foo { #_field; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '#_field'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 43`] = `
+{
+  "code": "class foo { field_; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in 'field_'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-underscore-dangle > invalid 44`] = `
+{
+  "code": "class foo { #field_; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected dangling '_' in '#field_'.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-underscore-dangle",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,5 +1,6 @@
 # Custom Dictionary Words
 aavascript
+abce
 accesskey
 accum
 acdfg
@@ -62,6 +63,7 @@ bivariance
 bizz
 bleh
 Blis
+blockignore
 bmatcuk
 bodyless
 braillelabel
@@ -89,6 +91,7 @@ cdylib
 centralising
 CHARCLASS
 checkerpool
+Citi
 classnames
 CLASSSET
 clazz
@@ -273,6 +276,8 @@ Isnt
 jakebailey
 jiti
 Jpan
+Jscs
+jscs
 jsnum
 jsonc
 jsonline
@@ -348,6 +353,7 @@ mousein
 mouseout
 mousemove
 msvc
+Mtavruli
 multibyte
 multifile
 multilines
@@ -416,6 +422,7 @@ optgroup
 optionable
 Orya
 osvfs
+otherthing
 outputfixes
 ovsx
 oxendict
@@ -425,6 +432,7 @@ pagefooter
 pageheader
 pagelist
 parenless
+parenthesization
 parsecache
 pendings
 perr
@@ -434,6 +442,7 @@ picomatch
 Pipeable
 pollable
 posinset
+postamble
 Prag
 preact
 prebundle
@@ -613,6 +622,8 @@ txtar
 txtarfs
 typeparam
 typescriptutil
+Über
+über
 unaliased
 unbnound
 uncast
@@ -668,6 +679,7 @@ vitest
 vname
 Värde
 walltime
+Warang
 wasi
 wasmer
 wasmfs

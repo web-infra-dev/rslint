@@ -582,10 +582,6 @@ func TestParseRstestExpectCallChaiInvalidChains(t *testing.T) {
 				Errors: parsedExpectError(fmt.Sprintf(invalid, "to have foo equal")),
 			},
 			{
-				Code:   `expect(x).to.be.a("string").that.foo.contain("x");`,
-				Errors: parsedExpectError(fmt.Sprintf(invalid, "to be a that foo contain")),
-			},
-			{
 				Code:   `expect(x).not().to.equal(y);`,
 				Errors: parsedExpectError(fmt.Sprintf(invalid, "not to equal")),
 			},
@@ -623,6 +619,52 @@ func TestParseRstestExpectCallChaiInvalidChains(t *testing.T) {
 				Code: `expect(x)[matcherName];`,
 				Errors: parsedExpectError(
 					"entry=expect head=true expression=element members=[matcherName] modifiers=[] matcher= matchers=[] reason=matcher-not-found static=false",
+				),
+			},
+		},
+	)
+}
+
+// TestParseRstestExpectCallTruncatesAfterMatcher pins the chain ending at the
+// first member the grammar does not recognise once a matcher has already been
+// found. Everything past that point reads a property of the assertion's own
+// result, so failing the parse would turn ordinary code such as
+// expect(a).toBe(1).message into a diagnostic. Members the grammar rejects
+// before any matcher still fail the parse — see
+// TestParseRstestExpectCallChaiInvalidChains.
+func TestParseRstestExpectCallTruncatesAfterMatcher(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectChainParseProbe,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `expect(x).toBe(1).message;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[toBe message] modifiers=[] matcher=toBe matchers=[toBe:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(x).toBe(1)[key];`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=element members=[toBe key] modifiers=[] matcher=toBe matchers=[toBe:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(x).toBe(1)[key]();`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[toBe key] modifiers=[] matcher=toBe matchers=[toBe:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(x).resolves.toBe(1).message;`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=property members=[resolves toBe message] modifiers=[resolves] matcher=toBe matchers=[toBe:call] reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(x).to.be.a("string").that.foo.contain("x");`,
+				Errors: parsedExpectError(
+					"entry=expect head=true expression=call members=[to be a that foo contain] modifiers=[] matcher=a matchers=[a:call] reason=none static=false",
 				),
 			},
 		},

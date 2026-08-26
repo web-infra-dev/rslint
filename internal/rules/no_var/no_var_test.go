@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -24,40 +25,46 @@ func TestNoVarRule(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			// ================================================================
-			// Script mode (no import/export → global scope → no fix)
+			// Explicit TypeScript script mode (global scope → no fix)
 			// ================================================================
 			{
-				Code: `var foo = bar;`,
+				Code:            `var foo = bar;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `var foo = bar, toast = most;`,
+				Code:            `var foo = bar, toast = most;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `if (true) { var x = 1; }`,
+				Code:            `if (true) { var x = 1; }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 13},
 				},
 			},
 			{
-				Code: `for (var i = 0; i < 10; i++) {}`,
+				Code:            `for (var i = 0; i < 10; i++) {}`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 6},
 				},
 			},
 			{
-				Code: `var { a, b } = { a: 1, b: 2 };`,
+				Code:            `var { a, b } = { a: 1, b: 2 };`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `declare var declaredVar: number;`,
+				Code:            `declare var declaredVar: number;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 1},
 				},
@@ -66,6 +73,33 @@ func TestNoVarRule(t *testing.T) {
 			// ================================================================
 			// Module mode: basic fixes (var → let)
 			// ================================================================
+			{
+				Code:     `var defaultModule = 1;`,
+				FileName: "default-module.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Output:   []string{`let defaultModule = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
+			{
+				Code:     `var commonJS = 1;`,
+				FileName: "commonjs.cjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Output:   []string{`let commonJS = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
+			{
+				Code:     `var event = 1;`,
+				FileName: "global-name.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Output:   []string{`let event = 1;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
 			{
 				Code:   `export {}; var foo = 1;`,
 				Output: []string{`export {}; let foo = 1;`},
@@ -183,10 +217,27 @@ func TestNoVarRule(t *testing.T) {
 			},
 			// export var
 			{
-				Code:   `export var exported = 1;`,
-				Output: []string{`export let exported = 1;`},
+				Code: `export var exported = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpectedVar", Line: 1, Column: 8},
+					{MessageId: "unexpectedVar", Line: 1, Column: 8, EndLine: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code: `export declare var exported: number;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar", Line: 1, Column: 8, EndLine: 1, EndColumn: 37},
+				},
+			},
+			{
+				Code: `export /* gap */ declare var exported: number;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar", Line: 1, Column: 18, EndLine: 1, EndColumn: 47},
+				},
+			},
+			{
+				Code: `export var exported = 1`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar", Line: 1, Column: 8, EndLine: 1, EndColumn: 24},
 				},
 			},
 			// declare var in module
@@ -203,6 +254,15 @@ func TestNoVarRule(t *testing.T) {
 				Output: []string{`declare namespace NS { let nsVar: string; }`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar", Line: 1, Column: 24},
+				},
+			},
+			// Only declarations directly in `declare global` are ignored. A nested
+			// namespace has its own TSModuleBlock and is reported by ESLint.
+			{
+				Code:   `declare global { namespace NS { var nested: string; } }`,
+				Output: []string{`declare global { namespace NS { let nested: string; } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar", Line: 1, Column: 33, EndLine: 1, EndColumn: 52},
 				},
 			},
 			// declare module
@@ -233,6 +293,14 @@ func TestNoVarRule(t *testing.T) {
 			},
 			{
 				Code: "export {}; switch (0) { case 0: var sw = 1; break; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
+			// A for initializer is not directly parented by SwitchCase and remains fixable.
+			{
+				Code:   "export {}; switch (0) { case 0: for (var i = 0; i < 1; i++) {} }",
+				Output: []string{"export {}; switch (0) { case 0: for (let i = 0; i < 1; i++) {} }"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar"},
 				},
@@ -338,6 +406,16 @@ func TestNoVarRule(t *testing.T) {
 			{
 				Code:   "export {}; function f() { var {a, b = a} = {}; }",
 				Output: []string{"export {}; function f() { let {a, b = a} = {}; }"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedVar"},
+				},
+			},
+			// A previous declarator is initialized before a later initializer runs.
+			{
+				Code:     "var a = 1, b = a;",
+				FileName: "backward-reference.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Output:   []string{"let a = 1, b = a;"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedVar"},
 				},

@@ -545,7 +545,16 @@ func findRstestExpectModifiersAndMatchers(
 			return nil, nil, RstestExpectParseReasonModifierUnknown
 		}
 		if isComputedDynamicMemberName(member.Node) {
-			return nil, nil, RstestExpectParseReasonMatcherNotFound
+			// The runtime value of a computed identifier key is unknowable, so
+			// the member is neither a modifier nor a matcher. Classifying it
+			// unknown rather than failing the whole parse keeps a statically
+			// resolved matcher earlier in the chain visible, which is what
+			// eslint-plugin-vitest and eslint-plugin-jest both do.
+			chains[i] = rstestExpectChainEntry{
+				Entry: member,
+				Kind:  rstestExpectChainUnknown,
+			}
+			continue
 		}
 		chains[i] = classifyRstestExpectChainEntry(
 			member,
@@ -621,7 +630,12 @@ func findRstestExpectModifiersAndMatchers(
 			// Chai permits modifiers between assertions in a multi-matcher
 			// chain, e.g. .a("string").that.does.not.contain("x").
 		case rstestExpectChainUnknown:
-			return nil, nil, RstestExpectParseReasonModifierUnknown
+			// A member the chain grammar does not recognise ends the
+			// assertion: everything after it reads a property of the
+			// assertion's own result, e.g. expect(a).toBe(1).message or
+			// expect(a).toBe(1)[key]. The assertion itself already parsed, so
+			// the chain is truncated here instead of failing.
+			return modifiers, matchers, RstestExpectParseReasonNone
 		}
 	}
 

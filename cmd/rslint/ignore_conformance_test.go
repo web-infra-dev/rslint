@@ -10,8 +10,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
+	"github.com/web-infra-dev/rslint/internal/api/server"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 
 func TestCLIAndAPIIgnoreConformance(t *testing.T) {
@@ -191,7 +193,7 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 				t.Fatalf("CLI ignored target must exit cleanly: stdout=%q stderr=%q", stdout, stderr)
 			}
 
-			response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+			response, err := (&server.Handler{}).HandleLint(api.LintRequest{
 				Config:           configJSON,
 				ConfigDirectory:  configDir,
 				WorkingDirectory: configDir,
@@ -246,9 +248,9 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 				[]string{tspath.NormalizePath(secondTarget)},
 			),
 		},
-		Scopes: map[string]rslintconfig.LintDiscoveryScope{
-			tspath.NormalizePath(firstDir):  {Files: []string{tspath.NormalizePath(firstTarget)}, ExplicitOnly: true},
-			tspath.NormalizePath(secondDir): {Files: []string{tspath.NormalizePath(secondTarget)}, ExplicitOnly: true},
+		Scopes: map[string]target.OwnerScope{
+			tspath.NormalizePath(firstDir):  {ExplicitFiles: []string{tspath.NormalizePath(firstTarget)}, ExplicitOnly: true},
+			tspath.NormalizePath(secondDir): {ExplicitFiles: []string{tspath.NormalizePath(secondTarget)}, ExplicitOnly: true},
 		},
 	}
 
@@ -302,10 +304,10 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 				[]string{tspath.NormalizePath(explicitTarget)},
 			),
 		},
-		Scopes: map[string]rslintconfig.LintDiscoveryScope{
+		Scopes: map[string]target.OwnerScope{
 			tspath.NormalizePath(ignoredDir): {
-				Files:        []string{tspath.NormalizePath(explicitTarget)},
-				ExplicitOnly: true,
+				ExplicitFiles: []string{tspath.NormalizePath(explicitTarget)},
+				ExplicitOnly:  true,
 			},
 		},
 	}
@@ -372,17 +374,17 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 				[]string{tspath.NormalizePath(childOwnedTarget)},
 			),
 		},
-		Scopes: map[string]rslintconfig.LintDiscoveryScope{
+		Scopes: map[string]target.OwnerScope{
 			tspath.NormalizePath(workspace): {
-				Files: []string{
+				ExplicitFiles: []string{
 					tspath.NormalizePath(parentOwnedTarget),
 					tspath.NormalizePath(parentIgnoredTarget),
 				},
 				ExplicitOnly: true,
 			},
 			tspath.NormalizePath(childDir): {
-				Files:        []string{tspath.NormalizePath(childOwnedTarget)},
-				ExplicitOnly: true,
+				ExplicitFiles: []string{tspath.NormalizePath(childOwnedTarget)},
+				ExplicitOnly:  true,
 			},
 		},
 	}

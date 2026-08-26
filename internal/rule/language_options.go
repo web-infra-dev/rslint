@@ -9,6 +9,17 @@ package rule
 // rule.
 type LanguageOptions struct {
 	ECMAVersion int `json:"ecmaVersion"`
+	// SourceType is the normalized source goal selected for the file. An empty
+	// value has ESLint's default module semantics; file-specific defaults are
+	// resolved before the options reach a RuleContext.
+	SourceType string `json:"sourceType"`
+}
+
+// IsValidSourceType reports whether value is one of ESLint's accepted source
+// goals. Empty represents an omitted option and is valid for normalized Go
+// values, but it is not a valid explicitly authored config value.
+func IsValidSourceType(value string) bool {
+	return value == "module" || value == "script" || value == "commonjs"
 }
 
 // NormalizeECMAScriptVersion normalizes an Espree/ESLint-compatible numeric
@@ -32,4 +43,17 @@ func (o LanguageOptions) EffectiveECMAVersion() int {
 		return LatestECMAScriptVersion
 	}
 	return o.ECMAVersion
+}
+
+// EffectiveSourceType returns the source goal selected for this file. The
+// zero value follows ESLint flat config's module default.
+// ResolveLanguageDefaults fills an exact, case-sensitive .cjs extension to
+// commonjs and every other filename to module before rules receive these
+// options. Authored commonjs or script on a TypeScript extension keeps a global
+// program scope; consult ctx.Refs when scope facts matter.
+func (o LanguageOptions) EffectiveSourceType() string {
+	if o.SourceType == "" {
+		return "module"
+	}
+	return o.SourceType
 }

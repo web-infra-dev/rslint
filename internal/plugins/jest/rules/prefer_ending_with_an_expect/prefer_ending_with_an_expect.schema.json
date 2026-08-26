@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "assertFunctionNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "additionalTestBlockFunctions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

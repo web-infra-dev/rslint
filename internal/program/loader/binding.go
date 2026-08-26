@@ -10,22 +10,20 @@ import (
 	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
-// only the unified Program sequence, lint projection, and source/config path
+// only the unified Program sequence, lint projection, and source/target path
 // mappings needed by integrations; compiler and parser assembly details remain
 // private to the loader. Its slices and maps are immutable after LoadCLI or
 // LoadAPI returns.
 type LoadResult struct {
-	compilerPrograms           []*compiler.Program
-	Programs                   []*lintprogram.Program
-	TargetsByProgram           [][]string
-	TargetPathBySourcePath     map[string]string
-	ConfigPathBySourcePath     map[string]string
-	OwnerConfigDirBySourcePath map[string]string
+	compilerPrograms       []*compiler.Program
+	Programs               []*lintprogram.Program
+	TargetsByProgram       [][]string
+	LintTargetBySourcePath map[string]target.File
 }
 
 func sourceOnlyCompilerOptions() *core.CompilerOptions {
@@ -53,14 +51,19 @@ func canonicalPathID(filePath string, fsys vfs.FS) string {
 	return exactPathID(authoritativePath(filePath, fsys))
 }
 
-func storeSourcePathMapping(mapping map[string]string, sourcePath string, canonicalSourcePath string, value string) {
+func storeSourceTargetMapping(
+	mapping map[string]target.File,
+	sourcePath string,
+	canonicalSourcePath string,
+	target target.File,
+) {
 	if mapping == nil {
 		return
 	}
 	normalizedSource := tspath.NormalizePath(sourcePath)
-	mapping[normalizedSource] = value
+	mapping[normalizedSource] = target
 	if canonicalSourcePath != "" {
-		mapping[exactPathID(canonicalSourcePath)] = value
+		mapping[exactPathID(canonicalSourcePath)] = target
 	}
 }
 
@@ -84,7 +87,7 @@ func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.S
 // across all Programs in the pass.
 type programFileIndex struct {
 	programs              []*compiler.Program
-	targets               []rslintconfig.DiscoveredLintTarget
+	targets               []target.File
 	fsys                  vfs.FS
 	singleThreaded        bool
 	initialized           bool
@@ -97,7 +100,7 @@ type programFileIndex struct {
 
 func newProgramFileIndex(
 	programs []*compiler.Program,
-	targets []rslintconfig.DiscoveredLintTarget,
+	targets []target.File,
 	fsys vfs.FS,
 	singleThreaded bool,
 ) *programFileIndex {
@@ -348,15 +351,15 @@ func (index *programFileIndex) buildPrograms(programIndexes []int) {
 }
 
 func groupUnboundTargets(
-	targets []rslintconfig.DiscoveredLintTarget,
+	targets []target.File,
 	currentDirectory string,
 	useCaseSensitive bool,
-) [][]rslintconfig.DiscoveredLintTarget {
+) [][]target.File {
 	if len(targets) == 0 {
 		return nil
 	}
 
-	groups := make([][]rslintconfig.DiscoveredLintTarget, 0, 1)
+	groups := make([][]target.File, 0, 1)
 	keysByGroup := make([]map[tspath.Path]struct{}, 0, 1)
 	for _, target := range targets {
 		key := tspath.ToPath(target.Path, currentDirectory, useCaseSensitive)
@@ -401,7 +404,7 @@ func orderedProgramIndexesForConfig(set ProjectSet, configDir string) []int {
 
 func (s *Session) appendCompatibilityPrograms(
 	binding *LoadResult,
-	targets []rslintconfig.DiscoveredLintTarget,
+	targets []target.File,
 	currentDirectory string,
 	singleThreaded bool,
 ) error {
@@ -445,11 +448,7 @@ func (s *Session) appendCompatibilityPrograms(
 			}
 			sourcePath := sourceFile.FileName()
 			binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-			if tspath.NormalizePath(sourcePath) != target.Path {
-				storeSourcePathMapping(binding.OwnerConfigDirBySourcePath, sourcePath, target.CanonicalPath, target.ConfigDirectory)
-				storeSourcePathMapping(binding.ConfigPathBySourcePath, sourcePath, target.CanonicalPath, binding.ConfigPathBySourcePath[tspath.NormalizePath(target.Path)])
-				storeSourcePathMapping(binding.TargetPathBySourcePath, sourcePath, target.CanonicalPath, target.Path)
-			}
+			storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath, target.CanonicalPath, target)
 		}
 	}
 	return nil
@@ -459,8 +458,8 @@ func finalizeResult(binding *LoadResult) {
 	for i := range binding.TargetsByProgram {
 		sort.Strings(binding.TargetsByProgram[i])
 	}
-	if len(binding.TargetPathBySourcePath) == 0 {
-		binding.TargetPathBySourcePath = nil
+	if len(binding.LintTargetBySourcePath) == 0 {
+		binding.LintTargetBySourcePath = nil
 	}
 }
 
@@ -468,7 +467,7 @@ func finalizeResult(binding *LoadResult) {
 // returning only unified Programs to the caller.
 func (s *Session) LoadAPI(
 	set ProjectSet,
-	plan rslintconfig.LintTargetPlan,
+	plan target.Plan,
 	currentDirectory string,
 	singleThreaded bool,
 ) (LoadResult, error) {
@@ -483,7 +482,7 @@ func (s *Session) LoadAPI(
 	return binding, nil
 }
 
-func allRootsSupportedByParser(targets []rslintconfig.DiscoveredLintTarget, useCaseSensitive bool) bool {
+func allRootsSupportedByParser(targets []target.File, useCaseSensitive bool) bool {
 	options := sourceOnlyCompilerOptions()
 	supportedExtensions := tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule(options, tspath.AllSupportedExtensions)
 	for _, target := range targets {
@@ -507,7 +506,7 @@ func allRootsSupportedByParser(targets []rslintconfig.DiscoveredLintTarget, useC
 
 func (s *Session) appendRootPrograms(
 	binding *LoadResult,
-	groups [][]rslintconfig.DiscoveredLintTarget,
+	groups [][]target.File,
 	currentDirectory string,
 	singleThreaded bool,
 ) error {
@@ -544,7 +543,7 @@ func (s *Session) appendRootPrograms(
 // facade cannot admit retain the compatibility compiler behavior internally.
 func (s *Session) LoadCLI(
 	set ProjectSet,
-	plan rslintconfig.LintTargetPlan,
+	plan target.Plan,
 	currentDirectory string,
 	singleThreaded bool,
 ) (LoadResult, error) {

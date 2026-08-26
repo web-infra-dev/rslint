@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -81,7 +82,6 @@ func (f consistentTypeDefinitionsFixer) beforeEqualsEnd(from int, to int) (int, 
 }
 
 func (f consistentTypeDefinitionsFixer) typeAliasFix(node *ast.Node, typeAlias *ast.TypeAliasDeclaration) []rule.RuleFix {
-	sourceText := f.sourceFile.Text()
 	declarationRange := utils.TrimNodeTextRange(f.sourceFile, node)
 	typeKeywordStart, typeKeywordEnd, ok := f.tokenBounds(declarationRange.Pos(), declarationRange.End(), ast.KindTypeKeyword)
 	if !ok {
@@ -91,9 +91,7 @@ func (f consistentTypeDefinitionsFixer) typeAliasFix(node *ast.Node, typeAlias *
 	nameRange := utils.TrimNodeTextRange(f.sourceFile, typeAlias.Name())
 	nameOrTypeParametersEnd := nameRange.End()
 	if typeAlias.TypeParameters != nil && len(typeAlias.TypeParameters.Nodes) > 0 {
-		lastParameter := typeAlias.TypeParameters.Nodes[len(typeAlias.TypeParameters.Nodes)-1]
-		lastRange := utils.TrimNodeTextRange(f.sourceFile, lastParameter)
-		nameOrTypeParametersEnd = lastRange.End() + 1
+		nameOrTypeParametersEnd = scanner.GetRangeOfTokenAtPosition(f.sourceFile, typeAlias.TypeParameters.End()).End()
 	}
 
 	bodyRange := utils.TrimNodeTextRange(f.sourceFile, ast.SkipTypeParentheses(typeAlias.Type))
@@ -102,12 +100,13 @@ func (f consistentTypeDefinitionsFixer) typeAliasFix(node *ast.Node, typeAlias *
 		return nil
 	}
 
-	replacement := sourceText[declarationRange.Pos():typeKeywordStart] +
-		"interface" +
-		sourceText[typeKeywordEnd:beforeEqualsEnd] +
-		" " +
-		sourceText[bodyRange.Pos():bodyRange.End()]
-	return []rule.RuleFix{rule.RuleFixReplaceRange(declarationRange, replacement)}
+	return []rule.RuleFix{
+		// Match the upstream fixer's three edits so the merged ESLint-compatible
+		// fix starts at `type`, leaving modifiers such as `export` untouched.
+		rule.RuleFixReplaceRange(core.NewTextRange(typeKeywordStart, typeKeywordEnd), "interface"),
+		rule.RuleFixReplaceRange(core.NewTextRange(beforeEqualsEnd, bodyRange.Pos()), " "),
+		rule.RuleFixRemoveRange(core.NewTextRange(bodyRange.End(), declarationRange.End())),
+	}
 }
 
 func (f consistentTypeDefinitionsFixer) interfaceFix(node *ast.Node, interfaceDeclaration *ast.InterfaceDeclaration) []rule.RuleFix {
@@ -122,9 +121,10 @@ func (f consistentTypeDefinitionsFixer) interfaceFix(node *ast.Node, interfaceDe
 	nameText := sourceText[nameRange.Pos():nameRange.End()]
 	typeNameEnd := nameRange.End()
 	if interfaceDeclaration.TypeParameters != nil && len(interfaceDeclaration.TypeParameters.Nodes) > 0 {
-		lastParameter := interfaceDeclaration.TypeParameters.Nodes[len(interfaceDeclaration.TypeParameters.Nodes)-1]
-		lastRange := utils.TrimNodeTextRange(f.sourceFile, lastParameter)
-		typeNameEnd = lastRange.End() + 1
+		// NodeList.End() points at the closing `>` token's full start. Scanning
+		// from there preserves comments, trailing commas, and whitespace before
+		// `>` that a last-parameter-end + 1 calculation would truncate.
+		typeNameEnd = scanner.GetRangeOfTokenAtPosition(f.sourceFile, interfaceDeclaration.TypeParameters.End()).End()
 	}
 
 	var bodyStartScanPosition int
@@ -148,7 +148,6 @@ func (f consistentTypeDefinitionsFixer) interfaceFix(node *ast.Node, interfaceDe
 		return nil
 	}
 
-	bodyText := sourceText[openBracePosition:declarationRange.End()]
 	var extendsTypes []string
 	if interfaceDeclaration.HeritageClauses != nil {
 		for _, clause := range interfaceDeclaration.HeritageClauses.Nodes {
@@ -166,19 +165,36 @@ func (f consistentTypeDefinitionsFixer) interfaceFix(node *ast.Node, interfaceDe
 	}
 
 	isDefaultExport := ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) && ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault)
-	prefix := sourceText[declarationRange.Pos():interfaceKeywordStart]
+	fixCount := 2
 	if isDefaultExport {
-		prefix = ""
+		fixCount += 2 // Remove the export wrapper and append a default export.
+	} else if len(extendsTypes) > 0 {
+		fixCount++ // Append the heritage types after the body.
 	}
-	replacement := prefix + "type" + sourceText[interfaceKeywordEnd:typeNameEnd] + " = " + bodyText
+	fixes := make([]rule.RuleFix, 0, fixCount)
+	if isDefaultExport {
+		fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(declarationRange.Pos(), interfaceKeywordStart)))
+	}
+	fixes = append(fixes,
+		rule.RuleFixReplaceRange(core.NewTextRange(interfaceKeywordStart, interfaceKeywordEnd), "type"),
+		rule.RuleFixReplaceRange(core.NewTextRange(typeNameEnd, openBracePosition), " = "),
+	)
+
+	var suffix string
 	if len(extendsTypes) > 0 {
-		replacement += " & " + strings.Join(extendsTypes, " & ")
+		suffix += " & " + strings.Join(extendsTypes, " & ")
 	}
 	if isDefaultExport {
-		replacement += "\nexport default " + nameText
+		suffix += "\nexport default " + nameText
+	}
+	if suffix != "" {
+		fixes = append(fixes, rule.RuleFixReplaceRange(
+			core.NewTextRange(declarationRange.End(), declarationRange.End()),
+			suffix,
+		))
 	}
 
-	return []rule.RuleFix{rule.RuleFixReplaceRange(declarationRange, replacement)}
+	return fixes
 }
 
 // ConsistentTypeDefinitionsRule enforces consistent type definitions
