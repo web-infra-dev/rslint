@@ -20,8 +20,10 @@ func TestUnifiedSignaturesExtras(t *testing.T) {
 		{Code: `interface I { 0(x: string): void; "0"(x: number): void; }`},
 		{Code: `declare class C { #f(x: string): void; f(x: number): void; }`},
 		{Code: `declare const a: unique symbol; declare const b: unique symbol; interface I { [a](x: string): void; [b](x: number): void; }`},
+		{Code: `declare class C { constructor(x: string); "constructor"(x: number); }`},
 		// ---- Dimension 4: declaration/container forms ----
 		{Code: `const C = class { f(x: string): void; f(x: number): void; };`},
+		{Code: `declare module "m" { export default function (x: string): void; function export_default(x: number): void; }`},
 		// Function expressions and arrows cannot declare overload signatures.
 		// Async/generator overload signatures are rejected by TypeScript's grammar.
 		// ---- Dimension 4: nesting/traversal boundaries ----
@@ -63,6 +65,7 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 		{Code: `interface I { f(x: string, y: number): void; f(x: number, y: string): void; }`},
 		// Locks in upstream outer-type-parameter usage parity arm.
 		{Code: `interface I<T> { f(x: T[]): void; f(x: number): void; }`},
+		{Code: `interface I<T> { f(x: (T)): void; f(x: string): void; }`},
 		// Locks in upstream type-parameter-name equality arm.
 		{Code: `function f<T>(x: T): void; function f<U>(x: U): void;`},
 		// Locks in upstream constraint-kind equality arm.
@@ -70,6 +73,19 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
+		// A quoted constructor method is not part of the real constructor group.
+		{
+			Code: `declare class C {
+  constructor(x: string);
+  constructor(x: number);
+  "constructor"(x: boolean): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `string | number`.",
+				Line:      3, Column: 15, EndLine: 3, EndColumn: 24,
+			}},
+		},
 		// ---- Real-user: typescript-eslint#12504 duplicate union members ----
 		{
 			Code: `function f(a: number | string): void;
