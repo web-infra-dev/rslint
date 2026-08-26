@@ -75,6 +75,11 @@ func TestNoThisAssignmentExtras(t *testing.T) {
 			invalid(`self ||= this;`, `self ||= this`, "self"),
 			invalid(`self ??= this;`, `self ??= this`, "self"),
 
+			// ---- Review regression: ordinary expressions inside assignment targets are not patterns ----
+			invalid(`({a: ({self: self = this}).x} = source);`, `self = this`, "self"),
+			invalid(`({a: call({self: self = this})} = source);`, `self = this`, "self"),
+			invalid(`for ({a: (condition ? {self: self = this} : fallback).x} in source) {}`, `self = this`, "self"),
+
 			// ---- Real-user: issue #997 proposal shapes ----
 			invalid(`const that = this; function foo() { return that.foo; }`, `that = this`, "that"),
 

@@ -270,6 +270,24 @@ func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 }
 
 func isArrayOrObjectDestructuringAssignmentPattern(node *ast.Node) bool {
-	return node != nil &&
-		(ast.IsArrayLiteralOrObjectLiteralDestructuringPattern(node) || IsInDestructuringAssignment(node))
+	if node == nil || (node.Kind != ast.KindArrayLiteralExpression && node.Kind != ast.KindObjectLiteralExpression) {
+		return false
+	}
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	if parent.Kind == ast.KindBinaryExpression {
+		binary := parent.AsBinaryExpression()
+		return binary != nil && binary.OperatorToken != nil &&
+			binary.OperatorToken.Kind == ast.KindEqualsToken && binary.Left == node
+	}
+	if parent.Kind == ast.KindForInStatement || parent.Kind == ast.KindForOfStatement {
+		statement := parent.AsForInOrOfStatement()
+		return statement != nil && statement.Initializer == node
+	}
+	if parent.Kind == ast.KindPropertyAssignment {
+		return isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
+	}
+	return isArrayOrObjectDestructuringAssignmentPattern(parent)
 }
