@@ -81,9 +81,15 @@ func TestPluginConfigResolverPreservesResolutionModes(t *testing.T) {
 func TestReportEslintPluginDispatchOutcome(t *testing.T) {
 	var stderr strings.Builder
 	writeEslintPluginDispatchOutcome(&stderr, linter.EslintPluginDispatchOutcome{
+		Notices: []linter.EslintPluginProtocolNotice{
+			{Kind: linter.EslintPluginMissingFileResult, FilePath: "/repo/a.ts"},
+			{Kind: linter.EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/b.ts", RuleName: "plugin/extra"},
+		},
 		DispatchError: errors.New("transport closed"),
 	})
-	if want := "rslint: eslint-plugin lint error: transport closed\n"; stderr.String() != want {
+	if want := "rslint: plugin-lint returned no result for \"/repo/a.ts\"\n" +
+		"rslint: plugin diagnostic for unconfigured rule \"plugin/extra\" in \"/repo/b.ts\"\n" +
+		"rslint: eslint-plugin lint error: transport closed\n"; stderr.String() != want {
 		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
 	}
 

@@ -248,22 +248,15 @@ type Server struct {
 	// on a serialized config transaction and is captured before dispatching work
 	// to a goroutine.
 	eslintPluginConfigGeneration string
-	// fixAllNativeLint, when non-nil, overrides the per-pass native lint used by
-	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
-	// used, driving an isolated overlay Program); tests inject a mock to exercise the
-	// plugin-fix fold loop without spinning up a language service.
-	fixAllNativeLint func(
-		ctx context.Context,
-		uri lsproto.DocumentUri,
-		pass int,
-		content string,
-		snapshot documentLintSnapshot,
-	) (lintPassResult, error)
+	// speculativeGeneration, when non-nil, overrides speculative generation
+	// acquisition. Production leaves it nil and builds Programs from one captured
+	// editor environment; tests may inject generations while execution remains in
+	// the linter-owned pipeline.
+	speculativeGeneration speculativeGenerationAcquire
 
-	// pluginReverseTimeout bounds each eslint-plugin reverse request to the
-	// client (rslint/pluginLint) on BOTH paths: source.fixAll (summed across
-	// passes, where it runs on the dispatch loop as a blocking method) and the
-	// background diagnostics dispatch (per request). A wedged or mid-rebuild
+	// pluginReverseTimeout bounds one background eslint-plugin reverse request
+	// and the aggregate plugin budget for all source.fixAll observations. The
+	// latter runs on the dispatch loop as a blocking method. A wedged or mid-rebuild
 	// client that never answers would otherwise stall editor interaction or leak
 	// the dispatch goroutine + its pending-request entry. On expiry fixAll folds
 	// native-only fixes and the diagnostics dispatch is dropped. Zero means use
@@ -847,16 +840,16 @@ func (s *Server) SetCompilerOptionsForInferredProjects(options *core.CompilerOpt
 	}
 }
 
-// defaultPluginReverseTimeout caps each eslint-plugin reverse request to the
-// client — the source.fixAll passes (summed) and each background diagnostics
-// dispatch. It is a generous BACKSTOP, not a precise budget: a superseded
+// defaultPluginReverseTimeout caps the aggregate source.fixAll plugin budget and
+// each background diagnostics request. It is a generous BACKSTOP, not a precise
+// budget: a superseded
 // diagnostics dispatch is already discarded by the generation stamp, so this
 // only has to bound a client that is genuinely wedged (never answers and is
 // never superseded). 30s sits well above any legitimate single-file plugin lint
 // — so a slow-but-valid lint is never cut off — while still freeing a dead
 // client's goroutine and unblocking the fixAll dispatch loop in bounded time.
-// (Fine-grained supersede cancellation via $/cancelRequest, which would let this
-// be tightened, is a separate follow-up; see dispatchPluginLint.)
+// Superseding prepared document generations normally cancel earlier through
+// $/cancelRequest; this deadline remains the no-supersede backstop.
 const defaultPluginReverseTimeout = 30 * time.Second
 
 func isBlockingMethod(method lsproto.Method) bool {
