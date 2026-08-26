@@ -59,6 +59,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			{Code: `var o = { get a() {}, set 'a'(foo) {} };`, Options: bothOpts},
 			{Code: `var o = { get ['abc']() {}, set ['abc'](foo) {} };`, Options: bothOpts},
 			{Code: `var o = { get [1e2]() {}, set 100(foo) {} };`, Options: bothOpts},
+			{Code: `var o = { get [/a/mi]() {}, set [/a/im](foo) {} };`, Options: bothOpts},
 			{Code: "var o = { get abc() {}, set [`abc`](foo) {} };", Options: bothOpts},
 			{Code: `var o = { get ['123']() {}, set 123(foo) {} };`, Options: bothOpts},
 

@@ -1702,7 +1702,7 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 		case ast.KindFalseKeyword:
 			return "false", true
 		case ast.KindRegularExpressionLiteral:
-			return expr.AsRegularExpressionLiteral().Text, true
+			return ecmascript.CanonicalizeRegExpLiteral(expr.AsRegularExpressionLiteral().Text), true
 		}
 		return "", false
 	default:

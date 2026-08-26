@@ -80,6 +80,22 @@ func TestGetStaticPropertyNameDetachedNumericLiteral(t *testing.T) {
 	}
 }
 
+func TestGetStaticPropertyNameRegularExpressionLiteral(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, `({ [/a/mi]: 0 })`, core.ScriptKindTS)
+	property := findFirstNodeOfKind(t, sourceFile, ast.KindPropertyAssignment)
+	nameNode := property.Name()
+	if nameNode == nil {
+		t.Fatal("property has no name")
+	}
+	got, ok := GetStaticPropertyName(nameNode)
+	if !ok || got != "/a/im" {
+		t.Fatalf("GetStaticPropertyName() = (%q, %v), want (%q, true)", got, ok, "/a/im")
+	}
+}
+
 func TestRadixLiteralValueRejectsMalformedText(t *testing.T) {
 	for _, raw := range []string{
 		"",

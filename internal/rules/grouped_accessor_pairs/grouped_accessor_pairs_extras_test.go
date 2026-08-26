@@ -59,6 +59,9 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 			{Code: `class Empty {}`},
 			{Code: `abstract class C { abstract get name(): string; abstract set name(value: string); }`},
 			{Code: `declare class C { get name(): string; set name(value: string); }`},
+			// ESTree omits empty class elements, while tsgo exposes them as
+			// SemicolonClassElement nodes. They do not separate an accessor pair.
+			{Code: `class C { get name(){} ; set name(value){} }`},
 			// N/A: rest elements in binding patterns are not object-literal members.
 
 			// Locks in upstream areEqualKeys() cross-kind arm: a public string key
@@ -76,6 +79,21 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 			{Code: `interface I { get a(): string; middle: true; set a(value: string); }`, Options: []any{"anyOrder", map[string]any{"enforceForTSTypes": false}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Empty class elements do not take precedence over an order violation.
+			{
+				Code:    `class C { set name(value){} ; get name(){} }`,
+				Options: []any{"getBeforeSet"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidOrder"}},
+			},
+			// RegExp property values use RegExp.prototype.toString(), whose flags
+			// are emitted in canonical order.
+			{
+				Code: `({ get [/a/mi](){}, middle: true, set [/a/im](value){} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "notGrouped",
+					Message:   "Accessor pair getter '/a/im' and setter '/a/im' should be grouped.",
+				}},
+			},
 			// ---- Real-user: ESLint issue #12277 object spread ----
 			{
 				Code: `({ get a(){}, ...source, set a(value){} })`,

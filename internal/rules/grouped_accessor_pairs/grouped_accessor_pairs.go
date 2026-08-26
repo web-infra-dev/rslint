@@ -125,6 +125,19 @@ func typeAccessor(member *ast.Node) bool {
 	return member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor
 }
 
+// ESTree does not include empty class elements (`;`) in ClassBody.body, while
+// tsgo exposes them as SemicolonClassElement nodes. Remove them before using
+// member indexes to decide whether two accessors are adjacent.
+func estreeClassMembers(members []*ast.Node) []*ast.Node {
+	filtered := make([]*ast.Node, 0, len(members))
+	for _, member := range members {
+		if member.Kind != ast.KindSemicolonClassElement {
+			filtered = append(filtered, member)
+		}
+	}
+	return filtered
+}
+
 var GroupedAccessorPairsRule = rule.Rule{
 	Name:   "grouped-accessor-pairs",
 	Schema: rule.NewSchema(schemaJSON),
@@ -139,7 +152,7 @@ var GroupedAccessorPairsRule = rule.Rule{
 				}
 			},
 			ast.KindClassDeclaration: func(node *ast.Node) {
-				members := node.Members()
+				members := estreeClassMembers(node.Members())
 				checkList(ctx, headLocator, members, opts, func(member *ast.Node) bool {
 					return concreteAccessor(member) && !ast.IsStatic(member)
 				})
