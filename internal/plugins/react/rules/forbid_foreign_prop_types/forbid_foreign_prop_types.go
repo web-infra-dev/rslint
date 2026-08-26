@@ -106,37 +106,6 @@ func isAllowedAssignment(node *ast.Node, allow bool) bool {
 	return false
 }
 
-// isJsxTagName reports whether `node` is the TagName of a JSX element
-// (or any link in a dotted JSX tag chain like `<Foo.Bar.Baz />`). tsgo
-// represents dotted JSX tags as `PropertyAccessExpression`, but ESTree
-// uses a distinct `JSXMemberExpression` node type — ESLint's
-// `MemberExpression` listener does NOT fire on JSXMemberExpression.
-// We exclude this case to align byte-for-byte.
-func isJsxTagName(node *ast.Node) bool {
-	// Walk up the PA chain (each inner PA is the `.Expression` of its
-	// outer PA). If the outermost reaches a Jsx* element TagName, skip.
-	outer := node
-	for {
-		p := outer.Parent
-		if p == nil || p.Kind != ast.KindPropertyAccessExpression {
-			break
-		}
-		if p.AsPropertyAccessExpression().Expression != outer {
-			break
-		}
-		outer = p
-	}
-	parent := outer.Parent
-	if parent == nil {
-		return false
-	}
-	switch parent.Kind {
-	case ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement, ast.KindJsxClosingElement:
-		return true
-	}
-	return false
-}
-
 // findPropTypesKey returns the first element whose effective key is the
 // Identifier `propTypes`, or nil. Shared between the
 // ObjectBindingPattern listener (declaration form) and the
@@ -206,7 +175,7 @@ var ForbidForeignPropTypesRule = rule.Rule{
 				if isAssignmentLHS(node) {
 					return
 				}
-				if isJsxTagName(node) {
+				if utils.IsInJsxTagName(node) {
 					return
 				}
 				if isAllowedAssignment(node, opts.allowInPropTypes) {

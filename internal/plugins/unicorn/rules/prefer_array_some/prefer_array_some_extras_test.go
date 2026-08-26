@@ -298,7 +298,6 @@ func lintPreferArraySomeWithDemand(program *compiler.Program, sourceFile *ast.So
 				},
 			}}
 		},
-		ExcludePaths: []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {
