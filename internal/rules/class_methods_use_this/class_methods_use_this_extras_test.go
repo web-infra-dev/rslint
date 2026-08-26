@@ -48,6 +48,8 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			{Code: `class C { foo<T extends typeof this>() {} }`},
 			{Code: `class C { foo(value: Array<typeof this>) {} }`},
 			{Code: `class C { foo = (value: typeof this) => {}; }`},
+			{Code: `class C { foo(value: typeof this.value) {} }`},
+			{Code: `class C { foo(value: typeof this.value.deep) {} }`},
 
 			// A field decorator runs before the field value frame. Its `this`
 			// therefore belongs to the enclosing method, as it does in ESTree.

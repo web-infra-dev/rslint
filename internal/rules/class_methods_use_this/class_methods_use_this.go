@@ -379,15 +379,28 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	}
 
 	markTypeQueryThis := func(node *ast.Node) {
-		if node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery {
-			markUsesThis(node)
+		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text != "this" {
+			return
 		}
-	}
 
-	markTypeQueryIdentifierThis := func(node *ast.Node) {
-		if node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery &&
-			node.AsIdentifier().Text == "this" {
-			markUsesThis(node)
+		for node.Parent != nil {
+			parent := node.Parent
+			switch parent.Kind {
+			case ast.KindTypeQuery:
+				markUsesThis(node)
+				return
+			case ast.KindQualifiedName:
+				if parent.AsQualifiedName().Left != node {
+					return
+				}
+			case ast.KindPropertyAccessExpression:
+				if parent.AsPropertyAccessExpression().Expression != node {
+					return
+				}
+			default:
+				return
+			}
+			node = parent
 		}
 	}
 
@@ -469,6 +482,6 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		ast.KindThisKeyword:  markUsesThis,
 		ast.KindSuperKeyword: markUsesThis,
 		ast.KindThisType:     markTypeQueryThis,
-		ast.KindIdentifier:   markTypeQueryIdentifierThis,
+		ast.KindIdentifier:   markTypeQueryThis,
 	}
 }
