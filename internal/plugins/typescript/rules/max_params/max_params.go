@@ -34,9 +34,9 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 
 	check := func(node *ast.Node) {
-		params := node.Parameters()
+		params := utils.ESTreeParameters(node)
 		effective := len(params)
-		if !opts.countVoidThis && utils.IsThisVoidParameter(ast.GetThisParameter(node)) {
+		if !opts.countVoidThis && len(params) > 0 && utils.IsThisVoidParameter(params[0]) {
 			effective--
 		}
 		if effective <= opts.max {

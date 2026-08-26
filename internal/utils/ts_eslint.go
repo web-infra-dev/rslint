@@ -193,9 +193,9 @@ func GetForStatementHeadLoc(
  * - `export default function() {}` → `function`
  */
 func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
-	// ESTree exposes no node for parentheses, so a parenthesized function
-	// value still has the property that holds it as its parent.
-	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	// ESTree exposes neither parentheses nor hosted JSDoc cast wrappers, so the
+	// function value still has the property that holds it as its parent.
+	parent := ESTreeParent(node)
 
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
@@ -547,7 +547,7 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 	isAsync := flags&ast.FunctionFlagsAsync != 0
 	isGenerator := flags&ast.FunctionFlagsGenerator != 0
 
-	parent := node.Parent
+	parent := ESTreeParent(node)
 	isStatic, isPrivate := false, false
 	// Direct class member (MethodDeclaration / GetAccessor / SetAccessor):
 	// modifiers and private-key live on the function-like node itself.
@@ -827,7 +827,7 @@ func getFunctionDisplayName(node *ast.Node) string {
 			return s
 		}
 	}
-	parent := node.Parent
+	parent := ESTreeParent(node)
 	if parent == nil {
 		return ""
 	}
