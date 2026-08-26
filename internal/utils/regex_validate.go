@@ -36,11 +36,19 @@ func IsValidRegexPattern(pattern string, flags RegexFlags) bool {
 		}
 	}
 
+	compilePattern := pattern
 	compileFlags := ""
 	if flags.UV() {
 		compileFlags = "u"
 	}
-	if _, err := esregexp.Compile(pattern, compileFlags); err != nil {
+	if flags.UnicodeSets {
+		// The runtime compiler implements u grammar, where escapes such as
+		// `\&` are invalid even inside a class. In v grammar the reserved class
+		// punctuators may be escaped, so feed the compiler an equivalent hex
+		// escape and leave the original spelling to the v-specific scanner.
+		compilePattern = normalizeVClassPunctuatorEscapes(pattern)
+	}
+	if _, err := esregexp.Compile(compilePattern, compileFlags); err != nil {
 		return false
 	}
 
@@ -59,6 +67,109 @@ func IsValidRegexPattern(pattern string, flags RegexFlags) bool {
 		return false
 	}
 	return true
+}
+
+// IsValidRegexPatternForECMAVersion additionally rejects pattern features
+// that had not entered the configured ECMAScript edition yet.
+func IsValidRegexPatternForECMAVersion(pattern string, flags RegexFlags, ecmaVersion int) bool {
+	return IsValidRegexPattern(pattern, flags) && regexFeaturesAvailable(pattern, flags, ecmaVersion)
+}
+
+func normalizeVClassPunctuatorEscapes(pattern string) string {
+	var result strings.Builder
+	result.Grow(len(pattern))
+	classDepth := 0
+	for i := 0; i < len(pattern); {
+		if pattern[i] == '[' {
+			classDepth++
+			result.WriteByte(pattern[i])
+			i++
+			continue
+		}
+		if pattern[i] == ']' && classDepth > 0 {
+			classDepth--
+			result.WriteByte(pattern[i])
+			i++
+			continue
+		}
+		if pattern[i] == '\\' && i+1 < len(pattern) && classDepth > 0 &&
+			strings.IndexByte(reservedClassSetPunctuators, pattern[i+1]) >= 0 {
+			const hex = "0123456789abcdef"
+			c := pattern[i+1]
+			result.WriteString(`\x`)
+			result.WriteByte(hex[c>>4])
+			result.WriteByte(hex[c&0xf])
+			i += 2
+			continue
+		}
+		if pattern[i] == '\\' && i+1 < len(pattern) {
+			result.WriteString(pattern[i : i+2])
+			i += 2
+			continue
+		}
+		result.WriteByte(pattern[i])
+		i++
+	}
+	return result.String()
+}
+
+func regexFeaturesAvailable(pattern string, flags RegexFlags, ecmaVersion int) bool {
+	for i := 0; i < len(pattern); {
+		switch pattern[i] {
+		case '\\':
+			if i+1 < len(pattern) && ecmaVersion < 2018 &&
+				(pattern[i+1] == 'p' || pattern[i+1] == 'P' || pattern[i+1] == 'k') {
+				return false
+			}
+			step, ok := SkipPatternEscape(pattern, i, flags)
+			if !ok {
+				return false
+			}
+			i += step
+		case '[':
+			end, ok := ClassEnd(pattern, i, flags)
+			if !ok {
+				return false
+			}
+			if ecmaVersion < 2018 && strings.Contains(pattern[i:end], `\p`) ||
+				ecmaVersion < 2018 && strings.Contains(pattern[i:end], `\P`) {
+				return false
+			}
+			i = end
+		default:
+			if pattern[i] == '(' && i+2 < len(pattern) && pattern[i+1] == '?' {
+				if pattern[i+2] == '<' && ecmaVersion < 2018 {
+					return false
+				}
+				if ecmaVersion < 2025 && isInlineModifierGroup(pattern[i+2:]) {
+					return false
+				}
+			}
+			i++
+		}
+	}
+	return true
+}
+
+func isInlineModifierGroup(suffix string) bool {
+	seenFlag := false
+	seenDash := false
+	for i := range len(suffix) {
+		switch suffix[i] {
+		case 'i', 'm', 's':
+			seenFlag = true
+		case '-':
+			if seenDash {
+				return false
+			}
+			seenDash = true
+		case ':':
+			return seenFlag
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // hasInvalidSyntaxCharForUFlag reports whether the pattern contains an
@@ -217,7 +328,7 @@ func hasInvalidClassBodyForVFlag(pattern string, start, end int, flags RegexFlag
 			// `&&` is the intersection operator, legal between two operands —
 			// and a range is not an operand. Every other doubled punctuator is
 			// reserved.
-			if c != '&' || elements == 0 || lastWasRange || i+2 >= last || pattern[i+2] == '&' {
+			if c != '&' || elements != 1 || lastWasRange || i+2 >= last || pattern[i+2] == '&' {
 				return true
 			}
 			i += 2
@@ -249,7 +360,7 @@ func hasInvalidClassBodyForVFlag(pattern string, start, end int, flags RegexFlag
 			lastWasRange = true
 		}
 	}
-	return false
+	return sawOperator && elements != 1
 }
 
 // classSetElement consumes one element of a v-flag class body at pattern[i],
@@ -290,6 +401,14 @@ func classSetElement(pattern string, i, last int, flags RegexFlags) (classSetEle
 func hasUnresolvedNamedBackreferenceForUFlag(pattern string) bool {
 	var names, refs []string
 	for i := 0; i < len(pattern); {
+		if pattern[i] == '[' {
+			end, ok := ClassEnd(pattern, i, RegexFlags{Unicode: true})
+			if !ok {
+				return false
+			}
+			i = end
+			continue
+		}
 		if pattern[i] == '\\' {
 			if i+1 >= len(pattern) {
 				return false

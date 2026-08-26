@@ -46,8 +46,48 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 			// ---- Dimension 3: a non-static (side-effecting) flags argument is
 			// never reported, matching a non-literal flags identifier ----
 			{Code: "new RegExp('foo', getFlags())"},
+			// ReferenceTracker drops a global root after any write to that
+			// binding, so a reassigned RegExp must not be treated as the builtin.
+			{Code: "RegExp = custom; RegExp('foo')"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ReferenceTracker follows a stable local alias of the builtin.
+			{
+				Code: "const R = RegExp; R('foo')",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId:   "requireUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `const R = RegExp; R('foo', "u")`}},
+					},
+				},
+			},
+			{
+				Code: "let R; R = RegExp; new R('foo')",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId:   "requireUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `let R; R = RegExp; new R('foo', "u")`}},
+					},
+				},
+			},
+			{
+				Code: "const { RegExp: R } = globalThis; R('foo')",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId:   "requireUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `const { RegExp: R } = globalThis; R('foo', "u")`}},
+					},
+				},
+			},
+			{
+				Code: "function fake() {} (fake, RegExp)('foo')",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId:   "requireUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `function fake() {} (fake, RegExp)('foo', "u")`}},
+					},
+				},
+			},
 			// ---- Dimension 4: optional call — tsgo keeps `?.` as a flag on the
 			// CallExpression rather than an ESTree ChainExpression wrapper ----
 			{
@@ -173,6 +213,22 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 5},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "requireUFlag", Line: 1, Column: 1, EndLine: 1, EndColumn: 6},
+				},
+			},
+			// Pattern features are gated by the configured edition, not just by
+			// the availability of the u/v flag itself.
+			{
+				Code:            `new RegExp("(?<a>x)")`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireUFlag"},
+				},
+			},
+			{
+				Code:            `new RegExp("(?i:a)")`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireUFlag"},
 				},
 			},
 			// Locks in isValidWithUnicodeFlag's ecmaVersion <= 2023 arm at its
@@ -322,6 +378,29 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 					},
 				},
 			},
+			// Each side of a v-class intersection must be one class-set operand;
+			// a multi-element union cannot be used as the right operand.
+			{
+				Code:            "/[a&&bc]/",
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireVFlag"},
+				},
+			},
+			// Escaped reserved punctuators are v-only class-set characters and
+			// must not be rejected by an intermediate u-mode compilation.
+			{
+				Code:            `/[\&]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId:   "requireVFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: `/[\&]/v`}},
+					},
+				},
+			},
 			// ---- Ordinary ranges and unions keep their suggestion under `v` ----
 			{
 				Code:            "/[a-z0-9_]/",
@@ -351,6 +430,14 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 					},
 				},
 			},
+			// Group-like text inside a character class does not declare a named
+			// capture for an external backreference.
+			{
+				Code: `/[(?<a>x)]\k<a>/`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "requireUFlag"},
+				},
+			},
 			// ---- Dimension 4: parenthesized flags argument — ESTree has no
 			// parenthesis node, so the fix rewrites the literal inside ----
 			{
@@ -376,6 +463,57 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+// TestRequireUnicodeRegexpSourceOnlyConstantFlags exercises the supported
+// source-only Program path where the linter supplies binder references but no
+// TypeChecker. Local constant flags must still be folded.
+func TestRequireUnicodeRegexpSourceOnlyConstantFlags(t *testing.T) {
+	t.Parallel()
+
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	rawProgram, sourceFile, err := helper.CreateTestProgram(
+		`const flags = "g"; RegExp("foo", flags);`,
+		"source-only.ts",
+		"tsconfig.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceProgram, err := lintprogram.NewFromBoundSources(rawProgram, rawProgram.SourceFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:      sourceProgram,
+		File:         sourceFile.FileName(),
+		HasTypeInfo:  false,
+		ExcludePaths: []string{},
+		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+			return []linter.ConfiguredRule{{
+				Name:     RequireUnicodeRegexpRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if ctx.TypeChecker != nil {
+						t.Fatal("source-only Program unexpectedly supplied a TypeChecker")
+					}
+					return RequireUnicodeRegexpRule.Run(ctx, nil)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAll,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	})
+
+	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "requireUFlag" {
+		t.Fatalf("diagnostics = %#v, want one requireUFlag", diagnostics)
+	}
 }
 
 // TestRequireUnicodeRegexpEditDemand exercises Dimension 3 (autofix

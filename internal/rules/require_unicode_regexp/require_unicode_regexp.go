@@ -60,12 +60,12 @@ func isValidWithUnicodeFlag(ecmaVersion int, pattern string, requireFlag string)
 		if ecmaVersion <= 2023 {
 			return false
 		}
-		return utils.IsValidRegexPattern(pattern, utils.RegexFlags{UnicodeSets: true})
+		return utils.IsValidRegexPatternForECMAVersion(pattern, utils.RegexFlags{UnicodeSets: true}, ecmaVersion)
 	}
 	if ecmaVersion <= 5 {
 		return false
 	}
-	return utils.IsValidRegexPattern(pattern, utils.RegexFlags{Unicode: true})
+	return utils.IsValidRegexPatternForECMAVersion(pattern, utils.RegexFlags{Unicode: true}, ecmaVersion)
 }
 
 // buildLiteralFix mirrors upstream's Literal[regex] fixer: it either swaps an
@@ -176,12 +176,11 @@ var RequireUnicodeRegexpRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		requireFlag := parseOptions(options)
-		evaluator := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
+		evaluator := utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+		callTracker := newRegexpCallTracker(ctx)
 
-		checkCall := func(node *ast.Node, callee *ast.Node, argsList *ast.NodeList) {
-			if !utils.IsBuiltinGlobalCallee(callee, "RegExp", func(name string) bool {
-				return ctx.Globals.Access(name).IsDeclared()
-			}) {
+		checkCall := func(node *ast.Node, argsList *ast.NodeList) {
+			if !callTracker.isCall(node) {
 				return
 			}
 
@@ -249,11 +248,11 @@ var RequireUnicodeRegexpRule = rule.Rule{
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				checkCall(node, call.Expression, call.Arguments)
+				checkCall(node, call.Arguments)
 			},
 			ast.KindNewExpression: func(node *ast.Node) {
 				newExpr := node.AsNewExpression()
-				checkCall(node, newExpr.Expression, newExpr.Arguments)
+				checkCall(node, newExpr.Arguments)
 			},
 		}
 	},
