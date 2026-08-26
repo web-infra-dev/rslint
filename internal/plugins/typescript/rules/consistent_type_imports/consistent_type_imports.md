@@ -2,26 +2,86 @@
 
 ## Rule Details
 
-Enforce consistent usage of type imports. TypeScript allows marking imports as type-only using `import type`, which ensures the import is erased at compile time. This rule enforces that type-only imports use the `import type` syntax, and can optionally disallow `import()` type annotations.
+Enforce consistent use of type-only imports. TypeScript erases imports marked
+with `type`, which makes their runtime behavior explicit and works with module
+settings that preserve value imports.
 
-The `prefer` option supports `"type-imports"` (default) and `"no-type-imports"`. The `disallowTypeAnnotations` option (default `true`) forbids using `import()` in type annotations.
-
-Examples of **incorrect** code for this rule:
+Examples of **incorrect** code for this rule with the default options:
 
 ```typescript
-import { MyType } from './types'; // MyType is only used as a type
+import { Model, createModel } from './models';
 
-type Foo = import('./types').Bar; // disallowTypeAnnotations
+export function create(): Model {
+  return createModel();
+}
+
+type External = import('./external').External;
 ```
 
-Examples of **correct** code for this rule:
+Examples of **correct** code for this rule with the default options:
 
 ```typescript
-import type { MyType } from './types';
+import type { Model } from './models';
+import { createModel } from './models';
 
-import { value } from './values';
+export function create(): Model {
+  return createModel();
+}
+```
 
-import { value, type MyType } from './mixed';
+### `prefer`
+
+The default, `"type-imports"`, requires imports used only in type positions to
+be marked as type-only. `"no-type-imports"` instead forbids both top-level and
+inline `type` modifiers.
+
+```json
+{
+  "consistent-type-imports": ["error", { "prefer": "no-type-imports" }]
+}
+```
+
+```typescript
+import { Model } from './models';
+
+type LocalModel = Model;
+```
+
+### `fixStyle`
+
+When `prefer` is `"type-imports"`, `"separate-type-imports"` (the default)
+moves type-only names into a separate declaration. `"inline-type-imports"`
+keeps named type imports in the value declaration when possible.
+
+```json
+{
+  "consistent-type-imports": [
+    "error",
+    { "fixStyle": "inline-type-imports" }
+  ]
+}
+```
+
+```typescript
+import { type Model, createModel } from './models';
+```
+
+### `disallowTypeAnnotations`
+
+`disallowTypeAnnotations` defaults to `true` and reports `import()` type
+annotations. Set it to `false` to allow them.
+
+```json
+{
+  "consistent-type-imports": [
+    "error",
+    { "disallowTypeAnnotations": false }
+  ]
+}
+```
+
+```typescript
+type Model = import('./models').Model;
 ```
 
 ## Original Documentation
