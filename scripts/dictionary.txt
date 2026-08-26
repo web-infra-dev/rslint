@@ -170,6 +170,7 @@ esmodule
 espree
 esregexp
 estree
+esutils
 eszett
 Ethi
 exclam
