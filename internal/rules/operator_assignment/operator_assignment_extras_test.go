@@ -485,9 +485,8 @@ func TestOperatorAssignmentEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			ExcludePaths: []string{},
+			Program: lintprogram.NewFromCompiler(program),
+			File:    sourceFile.FileName(),
 			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{{
 					Name:     OperatorAssignmentRule.Name,

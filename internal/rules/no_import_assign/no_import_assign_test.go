@@ -770,10 +770,9 @@ func lintNoImportAssignForComparison(
 
 	var diagnostics []noImportAssignDiagnosticFingerprint
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:      lintprogram.NewFromCompiler(program),
-		File:         sourceFile.FileName(),
-		HasTypeInfo:  true,
-		ExcludePaths: []string{},
+		Program:     lintprogram.NewFromCompiler(program),
+		File:        sourceFile.FileName(),
+		HasTypeInfo: true,
 		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
 			return []linter.ConfiguredRule{{
 				Name:     NoImportAssignRule.Name,

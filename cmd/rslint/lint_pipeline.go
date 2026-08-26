@@ -477,9 +477,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		diagnosticsChan <- diagnostic
 	}
 
-	// In --type-check-only mode, skip the lint phase entirely by passing
-	// nil for GetRulesForFile. RunLinter's Phase 1 is gated on this being
-	// non-nil; Phase 2 (type-check) runs independently.
+	// --type-check-only has no lint plan. RunLinter's type-check phase runs
+	// independently over the complete Program sequence.
 	var rulesForFile linter.RuleHandler
 	if !typeCheckOnly {
 		fileConfigResolver = configLint.NewResolver(configLint.ResolverOptions{
@@ -503,14 +502,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		nativeEditDemand = rule.EditDemandAutofix
 	}
 	runOpts := linter.RunLinterOptions{
-		Programs:        programs,
-		SingleThreaded:  singleThreaded,
-		Cwd:             cwd,
-		Scope:           linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-		TargetFiles:     targetsByProgram,
-		GetRulesForFile: rulesForFile,
-		TypeCheck:       typeCheck,
-		Timing:          timingCollector,
+		SingleThreaded: singleThreaded,
+		Cwd:            cwd,
+		TypeCheck:      typeCheck,
+		Timing:         timingCollector,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: nativeEditDemand,
 			Report: func(d rule.RuleDiagnostic) {
@@ -518,14 +513,23 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			},
 		},
 	}
-	preparedPlan, planErr := linter.PrepareLintPlan(runOpts)
-	if planErr != nil {
-		close(diagnosticsChan)
-		wg.Wait()
-		fmt.Fprintf(os.Stderr, "error preparing lint plan: %v\n", planErr)
-		return 1
+	if typeCheckOnly {
+		runOpts.TypeCheckOnlyPrograms = programs
+	} else {
+		preparedPlan, planErr := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+			Programs:         programs,
+			TargetsByProgram: targetsByProgram,
+			SingleThreaded:   singleThreaded,
+			GetRulesForFile:  rulesForFile,
+		})
+		if planErr != nil {
+			close(diagnosticsChan)
+			wg.Wait()
+			fmt.Fprintf(os.Stderr, "error preparing lint plan: %v\n", planErr)
+			return 1
+		}
+		runOpts.LintPlan = preparedPlan
 	}
-	runOpts.PreparedPlan = preparedPlan
 	// Dispatch eslint-plugin rules to the Node worker in parallel with the
 	// native lint pass; results are awaited + merged before output / --fix.
 	// ONLY when plugins are actually configured — otherwise the whole reverse-
@@ -537,7 +541,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 	var pluginCh <-chan linter.EslintPluginDispatchOutcome
 	if hasEslintPlugins {
-		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.PreparedPlan, pluginResolver.resolve)
+		pluginInputs := linter.BuildEslintPluginFileInputs(runOpts.LintPlan, pluginResolver.resolve)
 		suggestionsMode := linter.SuggestionsModeOff
 		if fix {
 			suggestionsMode = linter.SuggestionsModeEager
@@ -646,14 +650,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			)
 			passDiags = append(passDiags, fixSyntaxDiagnostics...)
 			fixRunOpts := linter.RunLinterOptions{
-				Programs:        newBinding.Programs,
-				SingleThreaded:  singleThreaded,
-				Cwd:             cwd,
-				Scope:           linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-				TargetFiles:     fixTargetsByProgram,
-				GetRulesForFile: fixRulesForFile,
-				TypeCheck:       typeCheck,
-				Timing:          timingCollector,
+				SingleThreaded: singleThreaded,
+				Cwd:            cwd,
+				TypeCheck:      typeCheck,
+				Timing:         timingCollector,
 				Consumer: rule.DiagnosticConsumer{
 					Demand: passEditDemand,
 					Report: func(d rule.RuleDiagnostic) {
@@ -663,19 +663,24 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 					},
 				},
 			}
-			fixPreparedPlan, planErr := linter.PrepareLintPlan(fixRunOpts)
+			fixPreparedPlan, planErr := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+				Programs:         newBinding.Programs,
+				TargetsByProgram: fixTargetsByProgram,
+				SingleThreaded:   singleThreaded,
+				GetRulesForFile:  fixRulesForFile,
+			})
 			if planErr != nil {
 				fmt.Fprintf(os.Stderr, "error preparing lint plan after fixes: %v\n", planErr)
 				return 1
 			}
-			fixRunOpts.PreparedPlan = fixPreparedPlan
+			fixRunOpts.LintPlan = fixPreparedPlan
 			// Re-dispatch plugin rules each pass (only when configured): the
 			// worker re-reads the post-fix file content, and merging here keeps
 			// plugin diagnostics from being lost when allDiags is replaced.
 			// Each pass prepares a fresh plan for the rebuilt target binding.
 			var fixPluginCh <-chan linter.EslintPluginDispatchOutcome
 			if hasEslintPlugins {
-				fixPluginInputs := linter.BuildEslintPluginFileInputs(fixRunOpts.PreparedPlan, eslintPluginConfigResolver{
+				fixPluginInputs := linter.BuildEslintPluginFileInputs(fixRunOpts.LintPlan, eslintPluginConfigResolver{
 					lintResolver: fixConfigResolver,
 				}.resolve)
 				suggestionsMode := linter.SuggestionsModeOff

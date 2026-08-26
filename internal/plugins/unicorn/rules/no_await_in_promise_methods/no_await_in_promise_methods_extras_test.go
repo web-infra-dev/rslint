@@ -187,7 +187,6 @@ func TestNoAwaitInPromiseMethodsEditDemand(t *testing.T) {
 					},
 				}}
 			},
-			ExcludePaths: []string{},
 			Consumer: rule.DiagnosticConsumer{
 				Demand: demand,
 				Report: func(diagnostic rule.RuleDiagnostic) {
