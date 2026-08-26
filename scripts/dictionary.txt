@@ -90,6 +90,7 @@ Cbar
 cdylib
 centralising
 CHARCLASS
+cerialize
 checkerpool
 Citi
 classnames

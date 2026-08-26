@@ -40,6 +40,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/max_nested_callbacks"
 	"github.com/web-infra-dev/rslint/internal/rules/max_params"
 	"github.com/web-infra-dev/rslint/internal/rules/max_statements"
+	"github.com/web-infra-dev/rslint/internal/rules/new_cap"
 	"github.com/web-infra-dev/rslint/internal/rules/no_alert"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
@@ -252,6 +253,7 @@ func coreRules() []rule.Rule {
 		max_nested_callbacks.MaxNestedCallbacksRule,
 		max_params.MaxParamsRule,
 		max_statements.MaxStatementsRule,
+		new_cap.NewCapRule,
 		no_alert.NoAlertRule,
 		no_async_promise_executor.NoAsyncPromiseExecutorRule,
 		no_await_in_loop.NoAwaitInLoopRule,
