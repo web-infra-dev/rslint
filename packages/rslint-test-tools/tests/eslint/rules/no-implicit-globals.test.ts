@@ -6,22 +6,23 @@ import {
 
 const ruleTester = new RuleTester();
 
-function withScriptDefaults<T extends ValidTestCase | InvalidTestCase>(
-  cases: T[],
-): T[] {
+function withScriptDefaults(cases: InvalidTestCase[]): InvalidTestCase[];
+function withScriptDefaults(cases: ValidTestCase[]): ValidTestCase[];
+function withScriptDefaults(
+  cases: (ValidTestCase | InvalidTestCase)[],
+): (ValidTestCase | InvalidTestCase)[] {
   return cases.map((testCase) => {
     if (typeof testCase === 'string') {
-      return { code: testCase, languageOptions: { sourceType: 'script' } } as T;
+      return { code: testCase, languageOptions: { sourceType: 'script' } };
     }
 
-    const objectTestCase = testCase as Exclude<T, string>;
     return {
-      ...objectTestCase,
+      ...testCase,
       languageOptions: {
         sourceType: 'script',
-        ...objectTestCase.languageOptions,
+        ...testCase.languageOptions,
       },
-    } as T;
+    };
   });
 }
 

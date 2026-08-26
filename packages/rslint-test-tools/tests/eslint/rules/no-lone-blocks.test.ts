@@ -1,9 +1,33 @@
-import { RuleTester } from '../rule-tester';
+import {
+  RuleTester,
+  type InvalidTestCase,
+  type ValidTestCase,
+} from '../rule-tester';
 
 const ruleTester = new RuleTester();
 
+function withScriptDefaults(cases: InvalidTestCase[]): InvalidTestCase[];
+function withScriptDefaults(cases: ValidTestCase[]): ValidTestCase[];
+function withScriptDefaults(
+  cases: (ValidTestCase | InvalidTestCase)[],
+): (ValidTestCase | InvalidTestCase)[] {
+  return cases.map((testCase) => {
+    if (typeof testCase === 'string') {
+      return { code: testCase, languageOptions: { sourceType: 'script' } };
+    }
+
+    return {
+      ...testCase,
+      languageOptions: {
+        sourceType: 'script',
+        ...testCase.languageOptions,
+      },
+    };
+  });
+}
+
 ruleTester.run('no-lone-blocks', {
-  valid: [
+  valid: withScriptDefaults([
     // Blocks that belong to a containing statement (not lone).
     'if (foo) { if (bar) { baz(); } }',
     'if (foo) { bar(); } else { baz(); }',
@@ -32,7 +56,10 @@ ruleTester.run('no-lone-blocks', {
     '{ const x = 1; }',
     '{ class Bar {} }',
     "'use strict'; { function bar() {} }",
-    'export {}; { function bar() {} }',
+    {
+      code: 'export {}; { function bar() {} }',
+      languageOptions: { sourceType: 'module' },
+    },
     '{ let x; var y; }',
     '{ var x; let y; }',
     '{ let x; const y = 1; class Z {} }',
@@ -121,8 +148,8 @@ async function f() {
     bar();
 }
 `,
-  ],
-  invalid: [
+  ]),
+  invalid: withScriptDefaults([
     // Trivial program-scope lone blocks.
     {
       code: '{}',
@@ -475,5 +502,5 @@ class C {
 `,
       errors: [{ messageId: 'redundantNestedBlock' }],
     },
-  ],
+  ]),
 });
