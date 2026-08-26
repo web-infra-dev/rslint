@@ -276,7 +276,7 @@ func signaturesDifferByOptionalOrRestParameter(sourceFile *ast.SourceFile, left,
 		}
 	}
 	for i := range shorter {
-		if !typesAreEqual(sourceFile, shorter[i].Type(), longer[i].Type()) {
+		if !typesAreEqual(sourceFile, parameterTypeAnnotation(shorter[i]), parameterTypeAnnotation(longer[i])) {
 			return unifyResult{}, false
 		}
 	}
@@ -295,7 +295,7 @@ func (a *overloadAnalyzer) report(result unifyResult, onlyTwo bool) {
 		}
 		a.ctx.ReportNode(result.parameter1, rule.RuleMessage{
 			Id:          "singleParameterDifference",
-			Description: fmt.Sprintf("%s taking `%s`.", failureStringStart(otherLine), a.unifiedTypeText(result.parameter0.Type(), result.parameter1.Type())),
+			Description: fmt.Sprintf("%s taking `%s`.", failureStringStart(otherLine), a.unifiedTypeText(parameterTypeAnnotation(result.parameter0), parameterTypeAnnotation(result.parameter1))),
 		})
 	case unifyExtraParameter:
 		if !onlyTwo {
@@ -406,7 +406,7 @@ func isThisVoidParameter(parameter *ast.Node) bool {
 	if !isThisParameter(parameter) {
 		return false
 	}
-	typeNode := skipParenthesizedType(parameter.Type())
+	typeNode := skipParenthesizedType(parameterTypeAnnotation(parameter))
 	return typeNode != nil && typeNode.Kind == ast.KindVoidKeyword
 }
 
@@ -427,6 +427,10 @@ func parametersHaveEqualSigils(left, right *ast.Node) bool {
 }
 
 func parametersHaveSameESTreeShape(left, right *ast.Node) bool {
+	leftHasInitializer, rightHasInitializer := parameterHasInitializer(left), parameterHasInitializer(right)
+	if leftHasInitializer || rightHasInitializer {
+		return leftHasInitializer == rightHasInitializer
+	}
 	if isRestParameter(left) != isRestParameter(right) {
 		return false
 	}
@@ -435,7 +439,18 @@ func parametersHaveSameESTreeShape(left, right *ast.Node) bool {
 }
 
 func parametersAreEqual(sourceFile *ast.SourceFile, left, right *ast.Node) bool {
-	return parametersHaveEqualSigils(left, right) && typesAreEqual(sourceFile, left.Type(), right.Type())
+	return parametersHaveEqualSigils(left, right) && typesAreEqual(sourceFile, parameterTypeAnnotation(left), parameterTypeAnnotation(right))
+}
+
+func parameterHasInitializer(parameter *ast.Node) bool {
+	return parameter != nil && parameter.AsParameterDeclaration().Initializer != nil
+}
+
+func parameterTypeAnnotation(parameter *ast.Node) *ast.Node {
+	if parameter == nil || parameterHasInitializer(parameter) {
+		return nil
+	}
+	return parameter.Type()
 }
 
 func firstParameterDifference(sourceFile *ast.SourceFile, left, right []*ast.Node) int {
@@ -448,7 +463,7 @@ func firstParameterDifference(sourceFile *ast.SourceFile, left, right []*ast.Nod
 }
 
 func staticParameterName(parameter *ast.Node) string {
-	if parameter == nil || parameter.Name() == nil || parameter.Name().Kind != ast.KindIdentifier {
+	if parameter == nil || parameterHasInitializer(parameter) || parameter.Name() == nil || parameter.Name().Kind != ast.KindIdentifier {
 		return ""
 	}
 	return parameter.Name().Text()
@@ -493,7 +508,7 @@ func signatureUsesOuterTypeParameter(signature *ast.Node, outerTypeParameters []
 		names[parameter.Name().Text()] = struct{}{}
 	}
 	for _, parameter := range signature.Parameters() {
-		if typeContainsTypeParameter(parameter.Type(), names) {
+		if typeContainsTypeParameter(parameterTypeAnnotation(parameter), names) {
 			return true
 		}
 	}
@@ -513,6 +528,8 @@ func typeContainsTypeParameter(typeNode *ast.Node, names map[string]struct{}) bo
 		}
 	case ast.KindArrayType:
 		return typeContainsTypeParameter(typeNode.AsArrayTypeNode().ElementType, names)
+	case ast.KindTypeOperator:
+		return typeContainsTypeParameter(typeNode.AsTypeOperatorNode().Type, names)
 	case ast.KindParenthesizedType:
 		return typeContainsTypeParameter(typeNode.AsParenthesizedTypeNode().Type, names)
 	}

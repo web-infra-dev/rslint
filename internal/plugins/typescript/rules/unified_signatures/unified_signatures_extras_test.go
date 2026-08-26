@@ -67,6 +67,8 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 		// Locks in upstream outer-type-parameter usage parity arm.
 		{Code: `interface I<T> { f(x: T[]): void; f(x: number): void; }`},
 		{Code: `interface I<T> { f(x: (T)): void; f(x: string): void; }`},
+		{Code: `interface I<T> { f(x: keyof T): void; f(x: string): void; }`},
+		{Code: `interface I<T> { f(x: readonly T[]): void; f(x: string): void; }`},
 		// Locks in upstream type-parameter-name equality arm.
 		{Code: `function f<T>(x: T): void; function f<U>(x: U): void;`},
 		// Locks in upstream constraint-kind equality arm.
@@ -96,6 +98,24 @@ interface I {
 				MessageId: "singleParameterDifference",
 				Message:   "These overloads can be combined into one signature taking `{x: string} | number`.",
 				Line:      1, Column: 44, EndLine: 1, EndColumn: 53,
+			}},
+		},
+		{
+			Code:    `declare function f(x: string = ""): void; declare function f(y: number): void;`,
+			Options: []any{map[string]any{"ignoreDifferentlyNamedParameters": true}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `number`.",
+				Line:      1, Column: 62, EndLine: 1, EndColumn: 71,
+			}},
+		},
+		{
+			Code:    `declare function f(x: string = ""): void; declare function f(y: number = 0): void;`,
+			Options: []any{map[string]any{"ignoreDifferentlyNamedParameters": true}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Message:   "These overloads can be combined into one signature with identical parameters.",
+				Line:      1, Column: 43, EndLine: 1, EndColumn: 83,
 			}},
 		},
 		// Parenthesized types are transparent in the unified type text.
