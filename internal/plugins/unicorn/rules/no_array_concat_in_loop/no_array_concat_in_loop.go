@@ -33,6 +33,17 @@ func checkAssignment(ctx rule.RuleContext, node *ast.Node) {
 		return
 	}
 
+	// ESTree splits `a = b` into `AssignmentExpression` and, inside a
+	// destructuring pattern, `AssignmentPattern`; upstream only visits the
+	// former. TypeScript parses both as an equals `BinaryExpression`, so a
+	// destructuring default such as `[result = result.concat(x)] = source`
+	// would otherwise be reported. It assigns once when the destructured
+	// value is `undefined` rather than accumulating, so skip any equals
+	// expression that is itself an assignment target.
+	if node.Parent == nil || ast.IsAssignmentTarget(node) {
+		return
+	}
+
 	left := ast.SkipParentheses(binary.Left)
 	if left == nil || !ast.IsIdentifier(left) {
 		return

@@ -79,6 +79,15 @@ func TestNoArrayConcatInLoopExtras(t *testing.T) {
 			jsValid(`let result = []; for (const chunk of chunks) { class Box { method() { result = result.concat(chunk); } } }`),
 			jsValid(`let result = []; for (const chunk of chunks) { const append = async function* () { result = result.concat(chunk); }; }`),
 
+			// Locks in the destructuring-default gate: TypeScript parses these
+			// as equals binary expressions, but ESTree makes them
+			// `AssignmentPattern` nodes that upstream never visits.
+			jsValid(`let result = []; for (const chunk of chunks) { [result = result.concat(chunk)] = source; }`),
+			jsValid(`let result = []; for (const chunk of chunks) { [[result = result.concat(chunk)]] = source; }`),
+			jsValid(`let result = []; for (const chunk of chunks) { ({value: result = result.concat(chunk)} = source); }`),
+			jsValid(`let result = []; for (const chunk of chunks) { [...[result = result.concat(chunk)]] = source; }`),
+			jsValid(`let result = []; for (const chunk of chunks) { for ([result = result.concat(chunk)] of sources) {} }`),
+
 			// Locks in the loop-body declaration guard.
 			jsValid(`for (const chunk of chunks) { let result = []; result = result.concat(chunk); }`),
 
@@ -155,6 +164,13 @@ for (const chunk of chunks) {
 			invalidConcatTS(`let result = [] satisfies string[];
 for (const chunk of chunks) {
 	result = ((result satisfies string[])).concat(chunk);
+}`),
+
+			// An array literal that is not a destructuring target still holds a
+			// real assignment expression, which upstream reports.
+			invalidConcat(`let result = [];
+for (const chunk of chunks) {
+	sink = [result = result.concat(chunk)];
 }`),
 
 			// ---- Dimension 4: nearest nested loop owns the assignment ----
