@@ -1,4 +1,15 @@
 /* Monaco Editor specific styles - cannot be done with Tailwind */
+
+/* Body-level host for Monaco hover/suggest widgets, above the site nav bar */
+.playground-overflow-widgets {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 100000;
+}
+
 .monaco-editor .ast-node-highlight {
   background: rgba(198, 228, 255, 0.65);
   outline: 1px solid #0969da;

@@ -34,6 +34,22 @@ window.MonacoEnvironment = {
 
 export type EditorTabType = 'code' | 'rslint' | 'tsconfig';
 
+/**
+ * Monaco renders hover/suggest widgets inside the editor by default, where the
+ * overflow guard clips them against the top edge and the site nav paints over
+ * them. Hosting the widgets in a body-level node escapes both.
+ */
+let overflowWidgetsNode: HTMLElement | undefined;
+function getOverflowWidgetsNode(): HTMLElement | undefined {
+  if (typeof document === 'undefined') return undefined;
+  if (!overflowWidgetsNode) {
+    overflowWidgetsNode = document.createElement('div');
+    overflowWidgetsNode.className = 'monaco-editor playground-overflow-widgets';
+    document.body.appendChild(overflowWidgetsNode);
+  }
+  return overflowWidgetsNode;
+}
+
 export interface EditorTabsRef {
   getValue: () => string | undefined;
   getCodeValue: () => string | undefined;
@@ -311,6 +327,8 @@ export const EditorTabs = ({
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
+      overflowWidgetsDomNode: getOverflowWidgetsNode(),
     });
     codeEditorRef.current = editor;
 
@@ -395,6 +413,8 @@ export const EditorTabs = ({
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
+      overflowWidgetsDomNode: getOverflowWidgetsNode(),
     });
     rslintEditorRef.current = editor;
 
@@ -417,6 +437,8 @@ export const EditorTabs = ({
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
+      overflowWidgetsDomNode: getOverflowWidgetsNode(),
     });
     tsconfigEditorRef.current = editor;
 
