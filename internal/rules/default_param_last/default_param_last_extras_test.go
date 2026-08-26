@@ -90,10 +90,15 @@ func TestDefaultParamLastExtras(t *testing.T) {
 				Code:   "class C { field = (defaulted = 1, required) => {}; }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "shouldBeLast", Line: 1, Column: 20, EndLine: 1, EndColumn: 33}},
 			},
-			// ESTree parameter ranges exclude decorators, including when more than one is present.
+			// Ordinary ESTree parameter ranges exclude decorators, including when more than one is present.
 			{
 				Code:   "class C { method(@first @second optional?: number, required: number) {} }",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "shouldBeLast", Line: 1, Column: 33, EndLine: 1, EndColumn: 50}},
+			},
+			// TSParameterProperty wrapper ranges include decorators, unlike ordinary parameters.
+			{
+				Code:   "class C { constructor(@dec public readonly optional?: number, private required: number) {} }",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "shouldBeLast", Line: 1, Column: 23, EndLine: 1, EndColumn: 61}},
 			},
 
 			// ---- Dimension 4: nesting/traversal boundaries ----

@@ -44,7 +44,11 @@ var DefaultParamLastRule = rule.Rule{
 			}
 			for i := range lastRequired {
 				if !isRequiredParameter(params[i]) {
-					ctx.ReportRange(utils.NodeTextRangeSkippingDecorators(ctx.SourceFile, params[i]), shouldBeLastMessage)
+					reportRange := utils.NodeTextRangeSkippingDecorators(ctx.SourceFile, params[i])
+					if ast.IsParameterPropertyDeclaration(params[i], node) {
+						reportRange = utils.TrimNodeTextRange(ctx.SourceFile, params[i])
+					}
+					ctx.ReportRange(reportRange, shouldBeLastMessage)
 				}
 			}
 		}
