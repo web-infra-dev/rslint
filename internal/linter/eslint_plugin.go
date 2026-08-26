@@ -316,9 +316,41 @@ type EslintPluginDispatchOutcome struct {
 	DispatchError error
 }
 
+// DispatchEslintPluginRulesAsync starts plugin dispatch in parallel with the
+// caller's native lint pass. onComplete runs in the dispatch goroutine before
+// the outcome becomes observable, allowing each command surface to preserve
+// its own error-reporting policy even when it returns before receiving the
+// result.
+func DispatchEslintPluginRulesAsync(
+	ctx context.Context,
+	dispatch EslintPluginDispatcher,
+	inputs []EslintPluginFileInput,
+	fix bool,
+	suggestionsMode string,
+	timing *TimingCollector,
+	onComplete func(EslintPluginDispatchOutcome),
+) <-chan EslintPluginDispatchOutcome {
+	ch := make(chan EslintPluginDispatchOutcome, 1)
+	go func() {
+		outcome := DispatchEslintPluginRulesWithOutcome(
+			ctx,
+			dispatch,
+			inputs,
+			fix,
+			suggestionsMode,
+			timing,
+		)
+		if onComplete != nil {
+			onComplete(outcome)
+		}
+		ch <- outcome
+	}()
+	return ch
+}
+
 // DispatchEslintPluginRulesWithOutcome dispatches plugin rules and collects
-// their diagnostics into a structured result. Command integrations own
-// concurrent scheduling and the terminal policy for DispatchError.
+// their diagnostics into a structured result. Command integrations own when
+// dispatch starts and the terminal policy for DispatchError.
 func DispatchEslintPluginRulesWithOutcome(
 	ctx context.Context,
 	dispatch EslintPluginDispatcher,

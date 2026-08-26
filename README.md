@@ -14,11 +14,11 @@
 
 Rslint is a high-performance, ESLint-compatible linter for JavaScript and TypeScript.
 
-Powered by [typescript-go](https://github.com/microsoft/typescript-go), it delivers a faster drop-in experience with type-aware rules and optional type checking in the same run.
+Powered by [TypeScript's native compiler](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/), it delivers a faster drop-in experience with type-aware rules and optional type checking in the same run.
 
 ## ✨ Goals
 
-- 🚀 **Lightning Fast**: Powered by typescript-go, delivering 20-40x faster linting performance compared to traditional ESLint setups.
+- 🚀 **Lightning Fast**: Powered by TypeScript's native compiler, delivering 20-40x faster linting performance compared to traditional ESLint setups.
 - ⚡ **Minimal Configuration**: Typed linting enabled by default with minimal setup required — no complex configuration needed.
 - 📦 **Best Effort ESLint Compatible**: Compatible with most ESLint and TypeScript-ESLint configurations, significantly reducing migration costs.
 - 🎯 **TypeScript First**: Uses TypeScript Compiler semantics as the single source of truth, ensuring 100% consistency and eliminating edge-case bugs.

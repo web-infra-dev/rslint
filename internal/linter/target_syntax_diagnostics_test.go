@@ -1,11 +1,14 @@
 package linter
 
 import (
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 func syntaxDiagnosticTestProgram(t *testing.T) (*compiler.Program, string) {
@@ -64,5 +67,34 @@ func TestCollectTargetSyntacticDiagnosticsDeduplicatesSharedTargets(t *testing.T
 	)
 	if len(diagnostics) != 1 {
 		t.Fatalf("shared syntax diagnostics = %d, want 1: %v", len(diagnostics), diagnostics)
+	}
+}
+
+func TestCollectFileSyntacticDiagnosticsProjectsTypeScriptFields(t *testing.T) {
+	compilerProgram, targetPath := syntaxDiagnosticTestProgram(t)
+	sourceFile := compilerProgram.GetSourceFile(targetPath)
+	if sourceFile == nil {
+		t.Fatalf("compiler Program does not contain %q", targetPath)
+	}
+	program := lintprogram.NewFromCompiler(compilerProgram)
+	raw := program.SyntacticDiagnostics(context.Background(), sourceFile)
+	diagnostics := CollectFileSyntacticDiagnostics(context.Background(), program, sourceFile)
+	if len(raw) == 0 || len(diagnostics) != len(raw) {
+		t.Fatalf("projected diagnostics = %d, raw diagnostics = %d", len(diagnostics), len(raw))
+	}
+
+	got := diagnostics[0]
+	want := raw[0]
+	if got.SourceFile != sourceFile || got.FilePath != targetPath {
+		t.Fatalf("source identity = (%T, %q), want source file and %q", got.SourceFile, got.FilePath, targetPath)
+	}
+	if got.Range.Pos() != want.Loc().Pos() || got.Range.End() != want.Loc().End() {
+		t.Fatalf("range = [%d,%d), want [%d,%d)", got.Range.Pos(), got.Range.End(), want.Loc().Pos(), want.Loc().End())
+	}
+	if !strings.HasPrefix(got.RuleName, "TypeScript(TS") || got.Message.Description != want.String() {
+		t.Fatalf("identity/message = (%q, %q), want TypeScript code and %q", got.RuleName, got.Message.Description, want.String())
+	}
+	if got.Severity != rule.SeverityError || got.Origin != rule.DiagnosticOriginTypeScript || !got.PreFormatted {
+		t.Fatalf("severity/origin/preformatted = (%v, %v, %v)", got.Severity, got.Origin, got.PreFormatted)
 	}
 }

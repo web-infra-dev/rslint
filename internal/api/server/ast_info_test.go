@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -30,7 +30,7 @@ func TestHandleGetAstInfoProgramCacheInvalidation(t *testing.T) {
 		cache.mu.Unlock()
 	})
 
-	handler := &IPCHandler{}
+	handler := &Handler{}
 	loadProgram := func(content string, compilerOptions map[string]any) *compiler.Program {
 		t.Helper()
 		response, err := handler.HandleGetAstInfo(api.GetAstInfoRequest{
