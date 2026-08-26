@@ -9,6 +9,11 @@ import (
 
 func TestNoUnnecessaryTypeArgumentsRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeArgumentsRule, []rule_tester.ValidTestCase{
+		{
+			Code:     "/** @template [T=string] */\nclass Base {}\n/** @augments {Base<string>} */\nclass Derived extends Base {}",
+			FileName: "file.mjs",
+			TSConfig: "tsconfig.allow-js.json",
+		},
 		{Code: "f<>();"},
 		{Code: "f<string>();"},
 		{Code: "expect().toBe<>();"},
