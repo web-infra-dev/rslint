@@ -473,10 +473,19 @@ func matchesThisTagPattern(value string) bool {
 // argument; ESLint's `getJSDocComment` stops walking at CallExpression
 // parents, so we do too.
 func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) bool {
-	if hasThisTagInLeadingComments(fn, comments, sf) {
-		return true
+	if fn.Kind == ast.KindFunctionDeclaration {
+		if exported, hasTag := thisTagAfterExportModifiers(fn, comments, sf); exported {
+			if hasTag {
+				return true
+			}
+			// Comments before the export wrapper are not leading comments of the
+			// ESTree FunctionDeclaration. They apply only through the ordinary
+			// adjacent-JSDoc lookup, which requires a /** ... */ block.
+			_, hasTag = ancestorJSDocSummary(fn, comments, sf)
+			return hasTag
+		}
 	}
-	if fn.Kind == ast.KindFunctionDeclaration && hasThisTagAfterExportModifiers(fn, comments, sf) {
+	if hasThisTagInLeadingComments(fn, comments, sf) {
 		return true
 	}
 	if fn.Kind != ast.KindFunctionExpression {
@@ -520,10 +529,11 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceF
 	return false
 }
 
-// hasThisTagAfterExportModifiers handles exported declarations, whose ts-go
-// range begins at `export` while ESTree's declaration starts after the export
-// modifiers. Comments in that gap belong to the function upstream.
-func hasThisTagAfterExportModifiers(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) bool {
+// thisTagAfterExportModifiers handles exported declarations, whose ts-go range
+// begins at `export` while ESTree's declaration starts after the export
+// modifiers. Comments in that gap belong to the function upstream. exported
+// distinguishes a declaration with no matching tag from a non-exported one.
+func thisTagAfterExportModifiers(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) (exported, hasTag bool) {
 	s := scanner.GetScannerForSourceFile(sf, fn.Pos())
 	exportModifierEnd := -1
 	for s.Token() != ast.KindEndOfFile && s.TokenStart() < fn.End() {
@@ -532,7 +542,7 @@ func hasThisTagAfterExportModifiers(fn *ast.Node, comments []*ast.CommentRange, 
 			exportModifierEnd = s.TokenEnd()
 		default:
 			if exportModifierEnd < 0 {
-				return false
+				return false, false
 			}
 			declarationStart := s.TokenStart()
 			text := sf.Text()
@@ -541,18 +551,18 @@ func hasThisTagAfterExportModifiers(fn *ast.Node, comments []*ast.CommentRange, 
 			for i := idx; i < len(comments) && comments[i].Pos() < declarationStart; i++ {
 				comment := comments[i]
 				if !ecmascript.IsBlank(text[pos:comment.Pos()]) {
-					return false
+					return true, false
 				}
 				if matchesThisTagPattern(stripCommentMarkers(text[comment.Pos():comment.End()], comment.Kind)) {
-					return true
+					return true, true
 				}
 				pos = comment.End()
 			}
-			return false
+			return true, false
 		}
 		s.Scan()
 	}
-	return false
+	return exportModifierEnd >= 0, false
 }
 
 // ancestorJSDocSummary mirrors findJSDocComment after getJSDocComment has

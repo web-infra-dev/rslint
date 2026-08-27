@@ -336,6 +336,7 @@ class BufferedLog {
 			{Code: `export {}; function f(){ /* @thisX */ function g(){ this; } }`},
 			{Code: `export /* @this */ function foo(){ this; }`},
 			{Code: `export default /* @this */ function foo(){ this; }`},
+			{Code: `/** @this */ export function foo(){ this; }`},
 			{Code: "export {}; function f(){ /** \u00a0@this */ function g(){ this; } }"},
 			{Code: "export {}; function f(){ /** \ufeff@this */ function g(){ this; } }"},
 			{Code: `export {}; /** @this */ const x = [function(){ this; }];`},
@@ -644,6 +645,8 @@ function outer() {
 				},
 			},
 			{Code: `export {}; /* @this */ const x = [function(){ this; }];`, Errors: unexpected(1, 47)},
+			{Code: `/* @this */ export function foo(){ this; }`, Errors: unexpected(1, 36)},
+			{Code: "// @this\nexport function foo(){ this; }", Errors: unexpected(2, 24)},
 			{Code: "export {}; /** @this */\n\nconst x = [function(){ this; }];", Errors: unexpected(3, 24)},
 			{Code: `export {}; function outer() { class C { @dec((@d(this) class I {})) m(){} } }`, Errors: unexpected(1, 50)},
 			{
