@@ -113,7 +113,7 @@ export interface LintResult {
   warningCount: number;
   fixableErrorCount: number;
   fixableWarningCount: number;
-  output?: string; // present only when fix:true changed the file
+  output?: string; // present when fix:true applied at least one fix to the file
 }
 
 interface PluginLintSession {
@@ -448,6 +448,7 @@ export class Rslint {
       : null;
     try {
       const files = selectedFiles.map((file) => file.lexicalPath);
+      const overlay = this.#resolveOverlay();
       const response = await this.#service.lint(
         {
           config: usesNativeDiscovery ? undefined : overrideConfig,
@@ -467,12 +468,18 @@ export class Rslint {
           files,
           canonicalFiles: selectedFiles.map((file) => file.canonicalPath),
           // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
-          fileContents: this.#resolveOverlay(),
+          fileContents: overlay,
           fix: this.#fix,
         },
         discoverySession?.handlers ?? {},
       );
-      const contents = await this.#readDiagnosticContents(response, this.#cwd);
+      const multiEditSources = await this.#resolveMultiEditSources(
+        response,
+        this.#cwd,
+        pathResolver,
+        overlay,
+        selectedFiles,
+      );
       // The multi-config native path returns absolute identities. Relative
       // values remain accepted for low-level/older implementations.
       const linted = response.lintedFiles
@@ -482,9 +489,12 @@ export class Rslint {
               : path.resolve(this.#cwd, file),
           )
         : files;
-      return this.#toLintResults(response, this.#cwd, linted, contents).sort(
-        (a, b) => nativePathIdentity.compare(a.filePath, b.filePath),
-      );
+      return this.#toLintResults(
+        response,
+        this.#cwd,
+        linted,
+        multiEditSources,
+      ).sort((a, b) => nativePathIdentity.compare(a.filePath, b.filePath));
     } finally {
       await discoverySession?.shutdown();
     }
@@ -634,28 +644,87 @@ export class Rslint {
     return this.#normalizedOverrideConfig;
   }
 
-  async #readDiagnosticContents(
+  async #resolveMultiEditSources(
     response: LintResponse,
     configDirectory: string,
+    pathResolver: RunPathResolver,
+    overlay?: Record<string, string>,
+    resolvedFiles: readonly ResolvedFilesystemPath[] = [],
   ): Promise<Record<string, string>> {
-    // Read source for each file that produced a diagnostic so mergeFixes can
-    // gap-fill multi-edit fixes (parity with lintText, which has the source
-    // in-hand). Only diagnosed files are read; a lint with no findings reads
-    // nothing.
+    // Read only sources required to gap-fill multi-edit fixes or suggestions.
+    // Single edits need no source text, and an Output entry already carries the
+    // authoritative final generation.
+    const toAbs = (filePath: string): string =>
+      path.isAbsolute(filePath)
+        ? path.normalize(filePath)
+        : path.resolve(configDirectory, filePath);
+    const outputPaths = new Set(
+      Object.keys(response.output ?? {}).map((filePath) =>
+        nativePathIdentity.key(toAbs(filePath)),
+      ),
+    );
+    const diagnostics = (response.diagnostics ?? []).filter((diagnostic) => {
+      const needsSource =
+        (diagnostic.fixes?.length ?? 0) > 1 ||
+        diagnostic.suggestions?.some(
+          (suggestion) => (suggestion.fixes?.length ?? 0) > 1,
+        );
+      return (
+        needsSource &&
+        !outputPaths.has(nativePathIdentity.key(toAbs(diagnostic.filePath)))
+      );
+    });
+    if (diagnostics.length === 0) return {};
+
+    const overlayEntries = Object.entries(overlay ?? {});
+    const resolvedOverlayFiles = await pathResolver.resolveAll(
+      overlayEntries.map(([filePath]) => toAbs(filePath)),
+    );
+    const overlayByPath = new Map<string, string>();
+    for (const [index, [, source]] of overlayEntries.entries()) {
+      overlayByPath.set(resolvedOverlayFiles[index].lexicalKey, source);
+    }
+    for (const [index, [, source]] of overlayEntries.entries()) {
+      const canonicalKey = resolvedOverlayFiles[index].canonicalKey;
+      if (!overlayByPath.has(canonicalKey)) {
+        overlayByPath.set(canonicalKey, source);
+      }
+    }
+    // Go materializes each selected lexical path through its canonical identity.
+    // Mirror that request-known equivalence here so a diagnostic projected back
+    // to a symlink alias still finds the exact virtual source that was linted.
+    // Canonical content wins when callers supplied conflicting alias entries,
+    // matching the Program's physical source identity.
+    for (const file of resolvedFiles) {
+      const source =
+        overlayByPath.get(file.canonicalKey) ??
+        overlayByPath.get(file.lexicalKey);
+      if (source !== undefined) {
+        overlayByPath.set(file.canonicalKey, source);
+        overlayByPath.set(file.lexicalKey, source);
+      }
+    }
     const contents: Record<string, string> = {};
-    for (const d of response.diagnostics ?? []) {
-      const abs = path.isAbsolute(d.filePath)
-        ? path.normalize(d.filePath)
-        : path.resolve(configDirectory, d.filePath);
-      if (!(abs in contents)) {
-        try {
-          // A BOM is never part of the text a fix range indexes — Go strips it
-          // and reports it separately, matching ESLint's SourceCode — so strip
-          // it here too and the gap-fill slices line up.
-          contents[abs] = stripBOM(await readFile(abs, 'utf8'));
-        } catch {
-          // Unreadable (e.g. virtual/deleted) — mergeFixes degrades to first edit.
-        }
+    const contentPaths = new Set<string>();
+    for (const d of diagnostics) {
+      const abs = toAbs(d.filePath);
+      const key = nativePathIdentity.key(abs);
+      if (contentPaths.has(key)) continue;
+
+      const overlaySource = overlayByPath.get(key);
+      if (overlaySource !== undefined) {
+        contents[abs] = stripBOM(overlaySource);
+        contentPaths.add(key);
+        continue;
+      }
+      try {
+        // A BOM is never part of the text a fix range indexes — Go strips it
+        // and reports it separately, matching ESLint's SourceCode — so strip
+        // it here too and the gap-fill slices line up.
+        contents[abs] = stripBOM(await readFile(abs, 'utf8'));
+        contentPaths.add(key);
+      } catch {
+        // Unreadable (e.g. virtual/deleted) — mergeFixes degrades to first edit.
       }
     }
     return contents;
@@ -673,6 +742,16 @@ export class Rslint {
     const contentByPath = new Map<string, string>();
     for (const [filePath, source] of Object.entries(contents ?? {})) {
       contentByPath.set(nativePathIdentity.key(filePath), source);
+    }
+
+    // Remaining diagnostics after a multi-round fix refer to the final source
+    // generation. Use that exact text (without its optional BOM) when merging
+    // multi-edit fixes and suggestions; never gap-fill from stale disk/input.
+    const outputByPath = new Map<string, string>();
+    for (const [filePath, fixed] of Object.entries(response.output ?? {})) {
+      const key = nativePathIdentity.key(toAbs(filePath));
+      outputByPath.set(key, fixed);
+      contentByPath.set(key, stripBOM(fixed));
     }
 
     // Every linted file gets a result, even with zero messages (ESLint shape).
@@ -696,12 +775,6 @@ export class Rslint {
         byFile.set(key, bucket);
       }
       bucket.messages.push(toLintMessage(d, contentByPath.get(key)));
-    }
-
-    // Wire `output` is keyed by relative path; remap to absolute.
-    const outputByPath = new Map<string, string>();
-    for (const [rel, fixed] of Object.entries(response.output ?? {})) {
-      outputByPath.set(nativePathIdentity.key(toAbs(rel)), fixed);
     }
 
     const results: LintResult[] = [];

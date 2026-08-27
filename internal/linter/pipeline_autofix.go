@@ -33,7 +33,7 @@ func runAutofixPipeline(
 		return commitFinalChanges(ctx, request, result, state)
 	}
 
-	for roundIndex := range request.autofix.MaxRounds {
+	for roundIndex := range request.autofix.maxRounds {
 		if err := ctx.Err(); err != nil {
 			return result, err
 		}
@@ -59,6 +59,7 @@ func runAutofixPipeline(
 		result.fix.verified = false
 		result.fix.rounds = append(result.fix.rounds, round)
 		result.fix.finalChanges = state.finalChanges()
+		result.fix.finalSources = state.finalSources()
 		if round.RestoredInitial {
 			result.Observation = initialObservation
 			result.fix.verified = true
@@ -71,7 +72,7 @@ func runAutofixPipeline(
 			return result, err
 		}
 
-		lastAllowedRound := roundIndex+1 == request.autofix.MaxRounds
+		lastAllowedRound := roundIndex+1 == request.autofix.maxRounds
 		if lastAllowedRound && !request.autofix.VerifyAfterLastRound {
 			return commitFinalChanges(ctx, request, result, state)
 		}
@@ -116,6 +117,7 @@ func commitFinalChanges(
 	state *autofixState,
 ) (PipelineResult, error) {
 	result.fix.finalChanges = state.finalChanges()
+	result.fix.finalSources = state.finalSources()
 	if request.commit == nil {
 		return result, ctx.Err()
 	}
