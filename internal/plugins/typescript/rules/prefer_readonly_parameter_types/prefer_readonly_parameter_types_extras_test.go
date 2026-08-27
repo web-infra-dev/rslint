@@ -78,7 +78,7 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		// Computed unique-symbol properties need symbol-aware type lookup.
 		{Code: `declare const tag: unique symbol; interface S { readonly [tag]: string[] } function f(value: S) {}`},
 		{Code: `interface S { readonly [Symbol.iterator]: string[] } function f(value: S) {}`},
-		// Homomorphic mapped types without a modifier inherit the source property.
+		// Mapped types without key remapping or a modifier inherit the source property.
 		{Code: `interface S { readonly item: string } type M<T> = { [K in keyof T]: T[K] }; function f(value: M<S>) {}`},
 		// Explicit +readonly applies after key remapping and to unique-symbol keys.
 		{Code: "interface S { item: string } type M<T> = { +readonly [K in keyof T as `get${Capitalize<K & string>}`]: T[K] }; function f(value: M<S>) {}"},
@@ -133,7 +133,7 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		{Code: `declare const tag: unique symbol; interface S { readonly [tag]: string } type M<T> = { -readonly [K in keyof T]: T[K] }; function f(value: M<S>) {}`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(133, 144)}},
 		// A mutable computed-symbol property is still rejected before deep traversal.
 		{Code: `declare const tag: unique symbol; interface S { [tag]: string } function f(value: S) {}`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(76, 84)}},
-		// Homomorphic mapped types also inherit mutability from their source.
+		// Mapped types without key remapping also inherit source mutability.
 		{Code: `interface S { item: string } type M<T> = { [K in keyof T]: T[K] }; function f(value: M<S>) {}`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(79, 90)}},
 		// Key remapping does not inherit readonly from the source property.
 		{Code: "interface S { readonly item: string } type M<T> = { [K in keyof T as `get${Capitalize<K & string>}`]: T[K] }; function f(value: M<S>) {}", Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(122, 133)}},
