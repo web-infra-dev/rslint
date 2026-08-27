@@ -1,15 +1,63 @@
 .playground-container {
   height: calc(100vh - 72px);
-  background: #ffffff;
+  color: var(--rp-c-text-1);
+  background: var(--rp-c-bg);
 }
 
 .editor-panel {
   height: 100%;
-  background: #ffffff;
+  background: var(--rp-c-bg);
   position: relative;
 }
 
 .result-panel {
   height: 100%;
-  background: #ffffff;
+  background: var(--rp-c-bg);
+}
+
+/* AST inspector utilities use a compact syntax palette. Keep those colors
+ * readable when the surrounding Rspress theme switches to dark mode. */
+.dark .playground-container .text-gray-900 {
+  color: var(--rp-c-text-1);
+}
+
+.dark .playground-container .text-gray-700,
+.dark .playground-container .text-gray-600 {
+  color: var(--rp-c-text-2);
+}
+
+.dark .playground-container .text-gray-500,
+.dark .playground-container .text-gray-400 {
+  color: var(--rp-c-text-3);
+}
+
+.dark .playground-container .text-blue-900,
+.dark .playground-container .text-blue-700,
+.dark .playground-container .text-blue-600 {
+  color: #60a5fa;
+}
+
+.dark .playground-container .text-purple-600 {
+  color: #c084fc;
+}
+
+.dark .playground-container .text-cyan-600 {
+  color: #22d3ee;
+}
+
+.dark .playground-container .text-green-600 {
+  color: #4ade80;
+}
+
+.dark .playground-container .border-gray-200 {
+  border-color: var(--rp-c-divider-light);
+}
+
+.dark .playground-container .bg-gray-50 {
+  background-color: var(--rp-c-bg-soft);
+}
+
+.dark .playground-container .hover\:bg-gray-100:hover,
+.dark .playground-container .hover\:bg-gray-200:hover {
+  background-color: var(--rp-c-bg-mute);
 }

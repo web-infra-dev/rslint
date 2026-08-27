@@ -24,5 +24,5 @@ func runCLI(args []string) int {
 		return 0
 	}
 	// js/wasm has no Node IPC host, so no eslint-plugin dispatch (nil).
-	return executeLintPipeline(parsed, context.Background(), nil)
+	return handleLintCommand(parsed, context.Background(), nil)
 }

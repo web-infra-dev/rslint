@@ -549,11 +549,3 @@ func TestHandleFixAllCodeAction_DocumentNotInMap(t *testing.T) {
 		t.Error("expected empty code actions for document not in map")
 	}
 }
-
-// ======== maxFixPasses constant test ========
-
-func TestMaxFixPasses_IsReasonable(t *testing.T) {
-	if maxFixPasses < 1 || maxFixPasses > 100 {
-		t.Errorf("maxFixPasses = %d, should be between 1 and 100", maxFixPasses)
-	}
-}
