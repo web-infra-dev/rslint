@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -493,7 +493,7 @@ type configuredRuleView struct {
 	hasRun             bool
 }
 
-func configuredRuleViews(rules []linter.ConfiguredRule) []configuredRuleView {
+func configuredRuleViews(rules []rule.ConfiguredRule) []configuredRuleView {
 	views := make([]configuredRuleView, len(rules))
 	for index, configuredRule := range rules {
 		views[index] = configuredRuleView{

@@ -76,12 +76,12 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 	}
 
 	newRuleHandler := func(calls map[string]int) RuleHandler {
-		return func(file *ast.SourceFile) []ConfiguredRule {
+		return func(file *ast.SourceFile) []rule.ConfiguredRule {
 			calls[file.FileName()]++
 			switch file.FileName() {
 			case paths["a.ts"]:
 				rules := noopRule()
-				return append(rules, ConfiguredRule{
+				return append(rules, rule.ConfiguredRule{
 					Name:               "community/plugin-rule",
 					Severity:           rule.SeverityWarning,
 					IsEslintPluginRule: true,
@@ -90,7 +90,7 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 				typeAwareRule := noopRule()[0]
 				typeAwareRule.Name = "type-aware-rule"
 				typeAwareRule.RequiresTypeInfo = true
-				return []ConfiguredRule{typeAwareRule}
+				return []rule.ConfiguredRule{typeAwareRule}
 			default:
 				return nil
 			}
@@ -150,8 +150,8 @@ func TestLintPlanRunsSourceOnlyProgramWithoutChecker(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{file.FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{
 				{
 					Name:     "source-only-native",
 					Severity: rule.SeverityError,
@@ -237,12 +237,12 @@ func TestSourceOnlyPlanSeparatesUniverseFromExecutionProjection(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{a.FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
 			resolved.Add(1)
 			if file != a {
 				t.Fatalf("resolved rules for %q, want only a.ts", file.FileName())
 			}
-			return []ConfiguredRule{{
+			return []rule.ConfiguredRule{{
 				Name:     "source-only-projection",
 				Severity: rule.SeverityError,
 				Run: func(rule.RuleContext) rule.RuleListeners {
@@ -300,8 +300,8 @@ func TestSourceOnlyProgramSharesModuleGraphAndDerivedCache(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{files[0].FileName(), files[1].FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "source-only-modules",
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -365,8 +365,8 @@ func TestSourceOnlyProgramRunsProgramIndexedImportRule(t *testing.T) {
 		Programs:         programs,
 		TargetsByProgram: [][]string{{files[0].FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     no_cycle.NoCycleRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -430,8 +430,8 @@ func checkerFreeExecutionTestOptions(
 		Programs:         programs,
 		TargetsByProgram: [][]string{targets},
 		SingleThreaded:   singleThreaded,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "checker-free-concurrency",
 				Severity: rule.SeverityError,
 				Run:      run,
@@ -565,7 +565,7 @@ func TestPrepareLintPlanParallelizesRuleResolution(t *testing.T) {
 	opts := PrepareLintPlanOptions{
 		Programs:         wrapTestPrograms(program),
 		TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"], paths["c.ts"], paths["d.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			if active.Add(1) >= 2 && signaled.CompareAndSwap(false, true) {
 				close(twoActive)
 			}
@@ -608,7 +608,7 @@ func TestPrepareLintPlanHonorsSingleThreadedOrder(t *testing.T) {
 		Programs:         wrapTestPrograms(program),
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{wantOrder},
-		GetRulesForFile: func(file *ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(file *ast.SourceFile) []rule.ConfiguredRule {
 			gotOrder = append(gotOrder, file.FileName())
 			return noopRule()
 		},
@@ -630,7 +630,7 @@ func TestPreparedLintPlanPreservesSameFileAcrossProgramsInParallel(t *testing.T)
 	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 		Programs:         programs,
 		TargetsByProgram: [][]string{{paths["shared.ts"]}, {paths["shared.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			calls.Add(1)
 			return noopRule()
 		},
@@ -661,7 +661,7 @@ func TestPrepareLintPlanDeduplicatesTargetsInFirstOccurrenceOrder(t *testing.T) 
 		Programs:         wrapTestPrograms(raw),
 		TargetsByProgram: [][]string{{paths["b.ts"], paths["a.ts"], paths["b.ts"]}},
 		SingleThreaded:   true,
-		GetRulesForFile:  func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
+		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 	})
 	targets := plan.Targets()
 	if len(targets) != 2 || targets[0].File.FileName() != paths["b.ts"] || targets[1].File.FileName() != paths["a.ts"] {
@@ -689,7 +689,7 @@ func TestRunLinterRejectsTypeCheckOnlyProgramsWithLintPlan(t *testing.T) {
 		Programs:         wrapTestPrograms(programA),
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{{pathsA["a.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			configured := noopRule()
 			configured[0].Run = func(rule.RuleContext) rule.RuleListeners {
 				runs.Add(1)
@@ -718,7 +718,7 @@ func TestPrepareLintPlanRequiresTargetsForEveryProgram(t *testing.T) {
 		_, err := PrepareLintPlan(PrepareLintPlanOptions{
 			Programs:         programs,
 			TargetsByProgram: targetsByProgram,
-			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				ruleCalls.Add(1)
 				return noopRule()
 			},
@@ -754,7 +754,7 @@ func TestPrepareLintPlanRejectsTargetOutsideBoundProgramBeforeRuleResolution(t *
 	_, err := PrepareLintPlan(PrepareLintPlanOptions{
 		Programs:         wrapTestPrograms(raw),
 		TargetsByProgram: [][]string{{paths["a.ts"], missing}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
@@ -780,7 +780,7 @@ func TestPrepareLintPlanDoesNotReapplyDefaultExclusions(t *testing.T) {
 		Programs:         wrapTestPrograms(raw),
 		TargetsByProgram: [][]string{{target}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
@@ -804,7 +804,7 @@ func TestSyntaxErrorTargetIsCountedWithoutResolvingOrRunningRules(t *testing.T) 
 		Programs:         wrapTestPrograms(raw),
 		TargetsByProgram: [][]string{{target}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
@@ -831,7 +831,7 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 	planOpts := PrepareLintPlanOptions{
 		Programs:         append(wrapTestPrograms(raw), nil),
 		TargetsByProgram: [][]string{{paths["a.ts"]}, nil},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			ruleCalls.Add(1)
 			return noopRule()
 		},
@@ -859,7 +859,7 @@ func TestRunLinterRejectsNilProgramBeforeLintSideEffects(t *testing.T) {
 	invalidOpts := PrepareLintPlanOptions{
 		Programs:         []*lintprogram.Program{invalid},
 		TargetsByProgram: [][]string{nil},
-		GetRulesForFile:  func(*ast.SourceFile) []ConfiguredRule { return noopRule() },
+		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 	}
 	if _, err := PrepareLintPlan(invalidOpts); !errors.Is(err, errInvalidProgram) {
 		t.Fatalf("PrepareLintPlan zero Program error = %v", err)
@@ -895,8 +895,8 @@ func TestPreparedLintPlanFreezesProgramTypeCapability(t *testing.T) {
 			plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
 				Programs:         programs,
 				TargetsByProgram: [][]string{{paths["a.ts"]}},
-				GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-					return []ConfiguredRule{{
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{
 						Name:             "type-aware-probe",
 						RequiresTypeInfo: true,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -938,7 +938,7 @@ func TestLintSingleFileRejectsFileOutsideProgram(t *testing.T) {
 	LintSingleFile(LintSingleFileOptions{
 		Program: lintprogram.NewFromCompiler(raw),
 		File:    missing,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			t.Fatal("missing single-file target resolved rules")
 			return nil
 		},

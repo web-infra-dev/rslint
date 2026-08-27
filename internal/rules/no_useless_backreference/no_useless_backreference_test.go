@@ -7,7 +7,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -675,8 +674,8 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: lintprogram.NewFromCompiler(program),
 		Files:   []string{sourceFile.FileName()},
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     NoUselessBackreferenceRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -733,8 +732,8 @@ first("\\1(a)");
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program: sourceProgram,
 		Files:   []string{sourceFile.FileName()},
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     NoUselessBackreferenceRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {

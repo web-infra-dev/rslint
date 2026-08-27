@@ -194,6 +194,30 @@ func TestModuleSettingsIsCoreModuleSpecifier(t *testing.T) {
 	}
 }
 
+func TestIsNodeBuiltinSpecifier(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		specifier string
+		want      bool
+	}{
+		{specifier: "buffer", want: true},
+		{specifier: "node:buffer", want: true},
+		{specifier: "fs/promises", want: true},
+		{specifier: "node:sqlite", want: true},
+		{specifier: "buffer/"},
+		{specifier: "fs/not-a-builtin"},
+		{specifier: "node:sqlite/database"},
+		{specifier: ""},
+	}
+
+	for _, test := range tests {
+		if got := import_utils.IsNodeBuiltinSpecifier(test.specifier); got != test.want {
+			t.Errorf("IsNodeBuiltinSpecifier(%q) = %v, want %v", test.specifier, got, test.want)
+		}
+	}
+}
+
 func TestIsScopedModuleSpecifier(t *testing.T) {
 	t.Parallel()
 

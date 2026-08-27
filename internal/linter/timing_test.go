@@ -3,11 +3,13 @@ package linter
 import (
 	"testing"
 	"time"
+
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 func TestTimingCollectorAddFile(t *testing.T) {
 	c := NewTimingCollector()
-	rules := []ConfiguredRule{{Name: "x"}, {Name: "y"}}
+	rules := []rule.ConfiguredRule{{Name: "x"}, {Name: "y"}}
 	c.addFile("a.ts", rules, []time.Duration{time.Millisecond, 2 * time.Millisecond})
 	c.addFile("b.ts", rules[:1], []time.Duration{3 * time.Millisecond})
 
@@ -24,7 +26,7 @@ func TestTimingCollectorAddFileRepeated(t *testing.T) {
 	// --fix re-lint passes fold the same file into the collector again:
 	// time keeps accruing but the file must not be counted twice.
 	c := NewTimingCollector()
-	rules := []ConfiguredRule{{Name: "x"}}
+	rules := []rule.ConfiguredRule{{Name: "x"}}
 	c.addFile("a.ts", rules, []time.Duration{time.Millisecond})
 	c.addFile("a.ts", rules, []time.Duration{2 * time.Millisecond})
 

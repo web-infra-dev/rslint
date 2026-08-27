@@ -1,0 +1,42 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "newIsCap": {
+          "type": "boolean"
+        },
+        "capIsNew": {
+          "type": "boolean"
+        },
+        "newIsCapExceptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "newIsCapExceptionPattern": {
+          "type": "string",
+          "format": "regex"
+        },
+        "capIsNewExceptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "capIsNewExceptionPattern": {
+          "type": "string",
+          "format": "regex"
+        },
+        "properties": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

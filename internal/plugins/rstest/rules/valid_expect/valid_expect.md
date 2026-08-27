@@ -2,55 +2,29 @@
 
 ## Rule Details
 
-Enforce valid `expect()` usage in Rstest. `expect` must be called with the
-right number of arguments, must be followed by a matcher, and asynchronous
-assertions must be awaited or returned so their failures are not lost.
+Validates Rstest `expect` calls: they need the required arguments and a matcher, and asynchronous assertions must be awaited or returned so failures are not lost.
 
-Examples of incorrect code:
+Rstest supports a message as the second `expect` argument and Chai-style property assertions; both are accepted by the rule.
+
+## Incorrect
 
 ```ts
-expect();                       // notEnoughArgs
-expect(value);                  // matcherNotFound
-expect(value).toBe;             // matcherNotCalled
-expect(value).notAModifier();   // modifierUnknown
+expect(user);
 
-test("async", async () => {
-  expect(promise).resolves.toBe(1); // asyncMustBeAwaited
+test('loads a user', async () => {
+  expect(loadUser()).resolves.toMatchObject({ name: 'Ada' });
 });
 ```
 
-Examples of correct code:
+## Correct
 
 ```ts
-expect(value).toBe(1);
-expect(value).not.toBe(2);
-expect(value, "message").toBe(1);   // second message argument is allowed
+expect(user).toMatchObject({ name: 'Ada' });
 
-test("async", async () => {
-  await expect(promise).resolves.toBe(1);
-  await expect(promise).rejects.toThrow();
+test('loads a user', async () => {
+  await expect(loadUser()).resolves.toMatchObject({ name: 'Ada' });
 });
 ```
-
-## Rstest specifics
-
-rstest's `expect` comes from `@vitest/expect` + chai, so this rule follows the
-vitest behavior where it differs from jest:
-
-- **A second argument to `expect` is allowed** when it is a message string or
-  template literal (`expect(value, "msg")`), and `expect.poll(fn, options)` /
-  `expect.element(el, options)` accept an options object. These do not trigger
-  `tooManyArgs`.
-- **Chai property matchers are valid** without a call: `expect(value).to.be.ok`,
-  `expect(spy).to.have.been.called`. They are not reported as `matcherNotCalled`.
-- **Forms with no assertion factory carry no assertion**: `expect.assertions(1)`,
-  `expect.hasAssertions()`, asymmetric matchers such as `expect.any(Number)` and
-  bare chains such as `expect.resolves.toBe(1)` or `expect.toResolve()` are not
-  subject to argument or await checks.
-
-`expect` is recognized from globals, `@rstest/core` imports and aliases,
-`require`, namespace access, `import.meta.rstest`, test-context `expect`
-(`test('x', ({ expect }) => ...)`), and `@rstest/playwright`.
 
 ## Options
 
@@ -59,19 +33,21 @@ vitest behavior where it differs from jest:
   "rstest/valid-expect": [
     "error",
     {
-      "alwaysAwait": false,
-      "asyncMatchers": ["toReject", "toResolve"],
-      "minArgs": 1,
-      "maxArgs": 1
+      "alwaysAwait": true,
+      "asyncMatchers": ["toReject", "toResolve", "toSettle"],
+      "maxArgs": 2
     }
   ]
 }
 ```
 
-- **`alwaysAwait`** — require every async assertion to be awaited, disallowing
-  `return`.
-- **`asyncMatchers`** — matcher names treated as asynchronous (must be awaited).
-- **`minArgs`** / **`maxArgs`** — the required argument count for `expect`.
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `alwaysAwait` | `boolean` | `false` | Require async assertions to be awaited instead of allowing `return`. |
+| `asyncMatchers` | `string[]` | `["toReject", "toResolve"]` | Matcher names treated as asynchronous. Setting it replaces the default list. |
+| `minArgs` | `number` | `1` | Minimum number of arguments for `expect`. |
+| `maxArgs` | `number` | `1` | Maximum number of arguments for `expect`. |
 
-The rule provides an automatic fix that inserts `await` (and `async` on the
-enclosing function) for async assertions that are not awaited.
+## Autofix
+
+An async assertion that is neither awaited nor returned is fixed by adding `await`, and by marking the enclosing function `async` when it is not already. Argument-count and matcher problems are reported without a fix.

@@ -43,8 +43,8 @@ func setupDualRootFixture(t *testing.T) string {
 
 // varReportingRule reports every `var` keyword usage — enough to produce
 // deterministic diagnostics on every fixture file, including dual-root ones.
-func varReportingRule() []ConfiguredRule {
-	return []ConfiguredRule{{
+func varReportingRule() []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{{
 		Name:     "test/no-var",
 		Severity: rule.SeverityError,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -96,7 +96,7 @@ func collectDiags(t *testing.T, programs []*compiler.Program, singleThreaded boo
 			Programs:         lintPrograms,
 			TargetsByProgram: targetsByProgram,
 			SingleThreaded:   singleThreaded,
-			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return varReportingRule()
 			},
 		})
