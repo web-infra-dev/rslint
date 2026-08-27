@@ -1,59 +1,41 @@
 # no-nested-ternary
 
-📝 Disallow nested ternary expressions.
+## Rule Details
 
-💼🚫 This rule is enabled in the ✅ `recommended` config.
+Improved version of the core ESLint [`no-nested-ternary`](https://eslint.org/docs/latest/rules/no-nested-ternary) rule. It allows cases where the nested ternary is only one level and wrapped in parentheses.
 
-🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
+Unparenthesized or deeply nested ternaries force readers to track multiple conditions and branches at once, so this rule permits only clearly parenthesized single-level nesting.
 
-Improved version of the [`no-nested-ternary`](https://eslint.org/docs/latest/rules/no-nested-ternary) ESLint rule. This rule allows cases where the nested ternary is only one level and wrapped in parens.
+Examples of **incorrect** code for this rule:
 
-Unparenthesized or deeply nested ternaries make readers track multiple conditions and branches at once, so this rule permits only clearly parenthesized single-level nesting.
-
-## Examples
-
-```js
-// ❌
+```javascript
 const foo = i > 5 ? i < 100 ? true : false : true;
-
-// ✅
-const foo = i > 5 ? (i < 100 ? true : false) : true;
 ```
 
-```js
-// ❌
+```javascript
 const foo = i > 5 ? true : (i < 100 ? true : (i < 1000 ? true : false));
 ```
 
-```js
-// ✅
+```javascript
+const foo = i > 5 ? true : (i < 100 ? (i > 50 ? false : true) : false);
+```
+
+Examples of **correct** code for this rule:
+
+```javascript
+const foo = i > 5 ? true : (i < 100 ? true : false);
+```
+
+```javascript
+const foo = i > 5 ? (i < 100 ? true : false) : true;
+```
+
+```javascript
+const foo = i > 5 ? (i < 100 ? true : false) : (i < 100 ? true : false);
+```
+
+```javascript
 const foo = i > 5 || i < 100 || i < 1000;
-```
-
-## Partly fixable
-
-This rule is only fixable when the nesting is up to one level. The rule will wrap the nested ternary in parens:
-
-```js
-const foo = i > 5 ? i < 100 ? true : false : true
-```
-
-will get fixed to
-
-```js
-const foo = i > 5 ? (i < 100 ? true : false) : true
-```
-
-## Disabling ESLint `no-nested-ternary`
-
-We recommend disabling the ESLint `no-nested-ternary` rule in favor of this one:
-
-```js
-{
-	rules: {
-		'no-nested-ternary': 'off',
-	},
-}
 ```
 
 ## Original Documentation
