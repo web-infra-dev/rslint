@@ -16,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_exactly_once_with"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_once"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_times"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_each"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
@@ -45,6 +46,7 @@ func GetAllRules() []rule.Rule {
 		no_mocks_import.NoMocksImportRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		prefer_called_exactly_once_with.PreferCalledExactlyOnceWithRule,
+		prefer_called_once.PreferCalledOnceRule,
 		prefer_called_times.PreferCalledTimesRule,
 		prefer_each.PreferEachRule,
 		prefer_expect_type_of.PreferExpectTypeOfRule,
