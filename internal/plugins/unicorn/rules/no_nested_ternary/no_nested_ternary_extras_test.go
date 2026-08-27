@@ -1,11 +1,16 @@
 package no_nested_ternary_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_nested_ternary"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -172,4 +177,79 @@ func TestNoNestedTernaryExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNoNestedTernaryEditDemand(t *testing.T) {
+	t.Parallel()
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/edit-demand.ts",
+		Path:     "/edit-demand.ts",
+	}, "const value = outer ? inner ? yes : no : fallback;", core.ScriptKindTS)
+
+	run := func(demand rule.EditDemand) rule.RuleDiagnostic {
+		t.Helper()
+
+		comments := rule.NewCommentStore(sourceFile)
+		diagnostics := make([]rule.RuleDiagnostic, 0, 1)
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       comments,
+			DisableManager: rule.NewDisableManager(sourceFile, comments),
+		}.WithDiagnosticConsumer(
+			no_nested_ternary.NoNestedTernaryRule.Name,
+			rule.SeverityError,
+			rule.DiagnosticConsumer{
+				Demand: demand,
+				Report: func(diagnostic rule.RuleDiagnostic) {
+					diagnostics = append(diagnostics, diagnostic)
+				},
+			},
+		)
+
+		listeners := no_nested_ternary.NoNestedTernaryRule.Run(ctx, nil)
+		var visit ast.Visitor
+		visit = func(node *ast.Node) bool {
+			if listener := listeners[node.Kind]; listener != nil {
+				listener(node)
+			}
+			return node.ForEachChild(visit)
+		}
+		sourceFile.AsNode().ForEachChild(visit)
+		if len(diagnostics) != 1 {
+			t.Fatalf("demand %d: diagnostics = %d, want 1", demand, len(diagnostics))
+		}
+		return diagnostics[0]
+	}
+
+	diagnosticsOnly := run(rule.EditDemandNone)
+	autofixOnly := run(rule.EditDemandAutofix)
+	suggestionOnly := run(rule.EditDemandSuggestion)
+	allEdits := run(rule.EditDemandAll)
+
+	withoutEdits := func(diagnostic rule.RuleDiagnostic) rule.RuleDiagnostic {
+		diagnostic.FixesPtr = nil
+		diagnostic.Suggestions = nil
+		return diagnostic
+	}
+	for demand, diagnostic := range map[rule.EditDemand]rule.RuleDiagnostic{
+		rule.EditDemandNone:       diagnosticsOnly,
+		rule.EditDemandAutofix:    autofixOnly,
+		rule.EditDemandSuggestion: suggestionOnly,
+	} {
+		if got, want := withoutEdits(diagnostic), withoutEdits(allEdits); !reflect.DeepEqual(got, want) {
+			t.Errorf("demand %d changed diagnostic identity:\ngot  %#v\nwant %#v", demand, got, want)
+		}
+	}
+	if diagnosticsOnly.FixesPtr != nil || suggestionOnly.FixesPtr != nil {
+		t.Fatal("a non-autofix demand materialized fixes")
+	}
+	if autofixOnly.FixesPtr == nil || allEdits.FixesPtr == nil ||
+		!reflect.DeepEqual(*autofixOnly.FixesPtr, *allEdits.FixesPtr) {
+		t.Fatal("autofix and all-edits demands produced different fixes")
+	}
+	if diagnosticsOnly.Suggestions != nil || autofixOnly.Suggestions != nil ||
+		suggestionOnly.Suggestions != nil || allEdits.Suggestions != nil {
+		t.Fatal("autofix-only rule materialized suggestions")
+	}
 }

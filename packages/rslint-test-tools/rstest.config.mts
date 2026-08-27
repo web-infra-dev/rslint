@@ -633,6 +633,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/no-instanceof-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-fetch-options.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-remove-event-listener.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-nested-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-static-only-class.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-thenable.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unsafe-string-replacement.test.ts',
