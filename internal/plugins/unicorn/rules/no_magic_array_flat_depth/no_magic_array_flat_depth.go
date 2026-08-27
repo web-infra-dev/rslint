@@ -63,10 +63,12 @@ var NoMagicArrayFlatDepthRule = rule.Rule{
 				}
 
 				// Skip when the receiver is statically known NOT to be an array
-				// (e.g. a typed `Set`). Type-aware check; without the type checker
-				// this branch is a no-op, matching upstream's behavior on JS / gap
-				// files.
-				if unicornutil.IsKnownNonArray(ctx, call.Object) {
+				// (e.g. a typed `Set`). Mirrors upstream's
+				// `shouldSkipKnownNonArrayReceiver`: typed arrays stay
+				// reportable, but receivers like `new Set()` are skipped, and
+				// directly-visible mismatches like `"x".flat(2)` or
+				// `({flat(){}}).flat(2)` are always reported.
+				if unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, call.Object) {
 					return
 				}
 

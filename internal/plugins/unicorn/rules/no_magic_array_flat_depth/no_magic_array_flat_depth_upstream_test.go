@@ -24,6 +24,12 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 				Code:     `function f(foo: {flat(depth: number): void}) { foo.flat(2); }`,
 				FileName: "file.ts",
 			},
+			// `shouldSkipKnownNonArrayReceiver` skip case — a typed `Set` is
+			// known not to be an array, so the rule legitimately skips it.
+			{
+				Code:     `function f(foo: Set<number>) { foo.flat(2); }`,
+				FileName: "file.ts",
+			},
 
 			// ---- depth is 1 (the default) ----
 			jsValid(`array.flat(1)`),
@@ -59,6 +65,38 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			{
 				Code:     `function f(foo: number[][]) { foo.flat(2); }`,
 				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+
+			// `shouldSkipKnownNonArrayReceiver` regression cases — these
+			// receivers are directly visible (mismatch is at the call site)
+			// so the rule MUST still report them, even though
+			// `isKnownNonIndexedCollection` would otherwise skip them.
+			{
+				Code:     `({flat(){}}).flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `"x".flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			// Typed array — shares most of Array's method surface, but
+			// `flat()` isn't on its prototype, so reporting the broken call
+			// is the right call.
+			{
+				Code:     `new Uint8Array().flat(2)`,
+				FileName: "file.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: messageID,
 					Message:   messageString,
