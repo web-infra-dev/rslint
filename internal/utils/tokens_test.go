@@ -68,13 +68,17 @@ func TestTokenBeforePositionAfterInterpolatedTemplate(t *testing.T) {
 func TestCanTokenTextsBeAdjacentFixBoundaries(t *testing.T) {
 	for _, tt := range []struct {
 		left, right string
+		want        bool
 	}{
-		{left: "return", right: "/a/"},
-		{left: "/a/", right: "instanceof"},
-		{left: "1.", right: "satisfies"},
+		{left: "return", right: "/a/", want: false},
+		{left: "/a/", right: "instanceof", want: false},
+		{left: "1.", right: "satisfies", want: false},
+		{left: "return", right: `"a"`, want: true},
+		{left: `"a"`, right: "instanceof", want: true},
+		{left: "return", right: "`a`", want: true},
 	} {
-		if CanTokenTextsBeAdjacent(tt.left, tt.right) {
-			t.Errorf("CanTokenTextsBeAdjacent(%q, %q) = true, want false", tt.left, tt.right)
+		if got := CanTokenTextsBeAdjacent(tt.left, tt.right); got != tt.want {
+			t.Errorf("CanTokenTextsBeAdjacent(%q, %q) = %v, want %v", tt.left, tt.right, got, tt.want)
 		}
 	}
 }
