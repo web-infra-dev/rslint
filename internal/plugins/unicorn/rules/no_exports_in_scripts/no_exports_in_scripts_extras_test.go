@@ -79,22 +79,16 @@ func TestNoExportsInScriptsExtras(t *testing.T) {
 				Code:     "#!/usr/bin/env node\nfunction foo() { return 1; }\nconsole.log(foo());",
 				FileName: "file.mjs",
 			},
+
+			// ---- Upstream parity: TypeScript `export =` is represented as
+			// TSExportAssignment by typescript-estree, not an ESTree export
+			// declaration, so unicorn v72 does not report it. ----
+			{
+				Code:     "#!/usr/bin/env node\nconst foo = 1;\nexport = foo;",
+				FileName: "file.ts",
+			},
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- Dimension 4: BOM-prefixed shebang is a tsgo lock-in —
-			// `SourceFile.Text()` strips a leading BOM, so the gate
-			// `text[0] == '#' && text[1] == '!'` succeeds and the rule
-			// fires. This diverges from upstream (which keeps the BOM in
-			// `lines[0]` and so does not fire), but matches how every
-			// other rslint rule that gates on `scanner.GetShebang` behaves.
-			{
-				Code:     "\uFEFF#!/usr/bin/env node\nexport const foo = 1;",
-				FileName: "file.mjs",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: messageID, Line: 2, Column: 1, EndLine: 2, EndColumn: 22},
-				},
-			},
-
 			// ---- Dimension 1: a CRLF shebang still trips the gate, the
 			// export is reported on line 2. ----
 			{
@@ -127,14 +121,30 @@ func TestNoExportsInScriptsExtras(t *testing.T) {
 				},
 			},
 
-			// ---- Branch lock-in: `export = foo` (TypeScript legacy CommonJS
-			// interop) is `KindExportAssignment` and must still be reported
-			// under a shebang. 13 chars + 1 = EndColumn 14. ----
+			// ---- Upstream parity: typescript-estree wraps an exported
+			// import-equals declaration in ExportNamedDeclaration. ----
 			{
-				Code:     "#!/usr/bin/env node\nconst foo = 1;\nexport = foo;",
+				Code:     "#!/usr/bin/env node\nexport import Alias = require('pkg');",
 				FileName: "file.ts",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: messageID, Line: 3, Column: 1, EndLine: 3, EndColumn: 14},
+					{MessageId: messageID, Line: 2, Column: 1, EndLine: 2, EndColumn: 38},
+				},
+			},
+			{
+				Code:     "#!/usr/bin/env node\nexport import Alias = Namespace.Value;",
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: messageID, Line: 2, Column: 1, EndLine: 2, EndColumn: 39},
+				},
+			},
+
+			// ---- The same import-equals node can occur inside a namespace;
+			// the listener must preserve upstream's nested-node behavior. ----
+			{
+				Code:     "#!/usr/bin/env node\nnamespace Outer {\n  export import Alias = Namespace.Value;\n}",
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: messageID, Line: 3, Column: 3, EndLine: 3, EndColumn: 41},
 				},
 			},
 

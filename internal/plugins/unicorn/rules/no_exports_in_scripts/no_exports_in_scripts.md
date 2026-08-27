@@ -55,5 +55,5 @@ export const foo = 1;
 
 ## Original Documentation
 
-- [eslint-plugin-unicorn: no-exports-in-scripts](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/no-exports-in-scripts.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/no-exports-in-scripts.js)
+- [eslint-plugin-unicorn: no-exports-in-scripts](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v72.0.0/docs/rules/no-exports-in-scripts.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v72.0.0/rules/no-exports-in-scripts.js)

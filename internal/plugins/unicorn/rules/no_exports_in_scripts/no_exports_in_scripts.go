@@ -25,14 +25,14 @@ func message() rule.RuleMessage {
 // the source. The check is a syntactic modifier lookup on the node itself, so
 // it correctly handles `export const x = 1;`, `export function foo() {}`,
 // `export class Foo {}`, `export interface Foo {}`, `export type ...`,
-// `export enum ...`, and `export namespace ...`. `KindExportDeclaration`
-// and `KindExportAssignment` are *already* export-only nodes and do not
-// need this check.
+// `export enum ...`, `export namespace ...`, and TypeScript
+// `export import ...` declarations. `KindExportDeclaration` is already an
+// export-only node and does not need this check.
 func isExported(node *ast.Node) bool {
 	return node != nil && ast.HasSyntacticModifier(node, ast.ModifierFlagsExport)
 }
 
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/no-exports-in-scripts.js
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v72.0.0/rules/no-exports-in-scripts.js
 var NoExportsInScriptsRule = rule.Rule{
 	Name:   "unicorn/no-exports-in-scripts",
 	Schema: rule.EmptyArraySchema,
@@ -43,16 +43,6 @@ var NoExportsInScriptsRule = rule.Rule{
 		// no shebang is present; this matches ESLint's `sourceCode.lines[0]
 		// .startsWith('#!')` exactly — a shebang in a comment or string
 		// never matches because the file does not literally start with `#!`.
-		//
-		// tsgo divergence: tsgo's `SourceFile.Text()` strips a leading BOM
-		// (the BOM is exposed via `ctx.HasBOM()`), so a file written as
-		// `<BOM>#!...` looks identical to a plain `#!...` file to this
-		// check. Upstream ESLint does not strip the BOM, so
-		// `lines[0].startsWith('#!')` is false for the BOM-prefixed form
-		// and the upstream rule does not fire. We follow the rslint
-		// convention (treat the shebang as the file's first content) and
-		// fire here; a future lock-in could special-case the BOM if
-		// matching upstream becomes important.
 		text := ctx.SourceFile.Text()
 		if scanner.GetShebang(text) == "" {
 			return rule.RuleListeners{}
@@ -74,13 +64,14 @@ var NoExportsInScriptsRule = rule.Rule{
 			// underlying declaration, so each surface form is a distinct
 			// node kind with `ModifierFlagsExport` set. A single helper
 			// checks the modifier for all of them.
-			ast.KindVariableStatement:    reportIfExported,
-			ast.KindFunctionDeclaration:  reportIfExported,
-			ast.KindClassDeclaration:     reportIfExported,
-			ast.KindInterfaceDeclaration: reportIfExported,
-			ast.KindTypeAliasDeclaration: reportIfExported,
-			ast.KindEnumDeclaration:      reportIfExported,
-			ast.KindModuleDeclaration:    reportIfExported,
+			ast.KindVariableStatement:       reportIfExported,
+			ast.KindFunctionDeclaration:     reportIfExported,
+			ast.KindClassDeclaration:        reportIfExported,
+			ast.KindInterfaceDeclaration:    reportIfExported,
+			ast.KindTypeAliasDeclaration:    reportIfExported,
+			ast.KindEnumDeclaration:         reportIfExported,
+			ast.KindModuleDeclaration:       reportIfExported,
+			ast.KindImportEqualsDeclaration: reportIfExported,
 
 			// ---- tsgo divergence: ExportDeclaration keeps ESTree's
 			// shape for `export {...}`, `export * from '...'`,
@@ -91,11 +82,14 @@ var NoExportsInScriptsRule = rule.Rule{
 				ctx.ReportNode(node, message())
 			},
 
-			// ---- tsgo divergence: ExportAssignment covers `export
-			// default ...` (ESTree ExportDefaultDeclaration) and
-			// `export = ...` (TypeScript's legacy CommonJS-interop form).
+			// ---- tsgo divergence: ExportAssignment covers both `export
+			// default ...` (ESTree ExportDefaultDeclaration) and `export =
+			// ...` (ESTree TSExportAssignment). Upstream reports only the
+			// former.
 			ast.KindExportAssignment: func(node *ast.Node) {
-				ctx.ReportNode(node, message())
+				if !node.AsExportAssignment().IsExportEquals {
+					ctx.ReportNode(node, message())
+				}
 			},
 		}
 	},
