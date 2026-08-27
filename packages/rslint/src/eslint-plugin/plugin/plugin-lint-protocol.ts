@@ -38,11 +38,10 @@ export interface EslintPluginLintRequest {
   files: ReadonlyArray<{
     path: string;
     /**
-     * Optional file content override. The CLI host leaves it absent —
-     * the worker reads from disk via `readFileSync` (and re-reads
-     * post-fix content across `--fix` passes). The LSP host sends it so
-     * an unsaved editor buffer's overlay text is linted instead of the
-     * stale on-disk copy. Also used by in-process test harnesses.
+     * Optional file content override. The initial CLI generation leaves it
+     * absent so the worker can read disk without a whole-repository clone.
+     * Overlay-backed hosts and later in-memory autofix generations send it so
+     * the worker observes the same immutable source generation as native lint.
      */
     text?: string;
     /**

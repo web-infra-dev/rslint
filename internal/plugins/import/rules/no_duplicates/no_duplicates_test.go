@@ -733,7 +733,6 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 			File:            sourceFile.FileName(),
 			HasTypeInfo:     true,
 			GetRulesForFile: noDuplicatesConfiguredRules,
-			ExcludePaths:    []string{},
 			Consumer: rule.DiagnosticConsumer{
 				Demand: demand,
 				Report: func(diagnostic rule.RuleDiagnostic) {
@@ -808,7 +807,6 @@ func TestNoDuplicatesEditDemand(t *testing.T) {
 		File:            unfixableSourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noDuplicatesConfiguredRules,
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -882,7 +880,6 @@ import type { RequireType } from "conditional-package" with { "resolution-mode":
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noDuplicatesConfiguredRules,
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandNone,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -930,8 +927,8 @@ func createNoDuplicatesProgram(t testing.TB, fileName string, code string) (*com
 	return program, sourceFile
 }
 
-func noDuplicatesConfiguredRules(*ast.SourceFile) []linter.ConfiguredRule {
-	return []linter.ConfiguredRule{{
+func noDuplicatesConfiguredRules(*ast.SourceFile) []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{{
 		Name:     no_duplicates.NoDuplicatesRule.Name,
 		Severity: rule.SeverityError,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {

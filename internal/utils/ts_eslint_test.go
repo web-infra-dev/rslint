@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func TestGetStaticPropertyNameNumericLiteral(t *testing.T) {
@@ -23,6 +24,11 @@ func TestGetStaticPropertyNameNumericLiteral(t *testing.T) {
 			name: "binary above 2^53",
 			code: "({ 0b1000000000000000000000000000000000000000000000000001010000001: 0 })",
 			want: "1152921504606847500",
+		},
+		{
+			name: "binary matching Acorn stepwise rounding",
+			code: "({ 0b10100010000111101000011111100111101111100110100011110110000010100: 0 })",
+			want: "23363847825694777000",
 		},
 		{
 			name: "octal above 2^53",
@@ -114,6 +120,16 @@ func TestRadixLiteralValueRejectsMalformedText(t *testing.T) {
 				t.Fatalf("radixLiteralValue(%q) unexpectedly succeeded", raw)
 			}
 		})
+	}
+}
+
+func TestRadixLiteralValueMatchesAcornRounding(t *testing.T) {
+	value, ok := radixLiteralValue("0b10100010000111101000011111100111101111100110100011110110000010100")
+	if !ok {
+		t.Fatal("radixLiteralValue() unexpectedly failed")
+	}
+	if got, want := ecmascript.NumberToString(value), "23363847825694777000"; got != want {
+		t.Fatalf("radixLiteralValue() = %q, want %q", got, want)
 	}
 }
 

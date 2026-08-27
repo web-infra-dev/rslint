@@ -391,11 +391,10 @@ type Reported = { [key: string]: unknown };`
 
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:      sourceProgram,
-		File:         sourceFile.FileName(),
-		ExcludePaths: []string{},
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		Program: sourceProgram,
+		File:    sourceFile.FileName(),
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "@typescript-eslint/consistent-indexed-object-style",
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -461,11 +460,10 @@ type Suggest = Record<Key, unknown>;
 				t.Helper()
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      sourceProgram,
-					File:         sourceFile.FileName(),
-					ExcludePaths: []string{},
-					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-						return []linter.ConfiguredRule{{
+					Program: sourceProgram,
+					File:    sourceFile.FileName(),
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{
 							Name:     ConsistentIndexedObjectStyleRule.Name,
 							Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {

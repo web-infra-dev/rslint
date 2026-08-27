@@ -1,48 +1,27 @@
 # valid-expect-in-promise
 
-Require promise chains containing Rstest assertions to be returned, awaited, or consumed by a safe promise sink.
+## Rule Details
 
-Rstest has two official assertion interfaces:
+Requires promise chains containing Rstest assertions to be returned or awaited. Otherwise the test can finish before the assertion runs or before its failure is reported.
 
-```ts
-expect(actual).toBe(expected);
-assert.equal(actual, expected);
-```
+Both Rstest `expect` and Chai `assert` calls are recognized. A promise chain may also be returned from the test callback.
 
-`expect` is Rstest's extended `@vitest/expect` and Chai interface. `assert` is Chai's function-style interface exported by `@rstest/core`. They share the Chai assertion engine but are not aliases; `assert` does not contribute to `expect.assertions()` bookkeeping. Both throw assertion errors, so both have the same floating-promise risk:
+## Incorrect
 
 ```ts
-test('loads a value', () => {
-  load().then(value => {
-    assert.equal(value, 'ready');
+test('loads a user', () => {
+  loadUser().then((user) => {
+    expect(user.name).toBe('Ada');
   });
 });
 ```
 
-Return or await the chain:
+## Correct
 
 ```ts
-test('loads a value', async ({ expect }) => {
-  await load().then(value => {
-    expect(value).toBe('ready');
+test('loads a user', async () => {
+  await loadUser().then((user) => {
+    expect(user.name).toBe('Ada');
   });
 });
 ```
-
-The rule recognizes Rstest globals, `@rstest/core` imports and requires, namespace objects, `import.meta.rstest`, TestContext `expect`, and `@rstest/playwright` `expect`. It does not treat Node, direct Chai, or locally defined `assert` functions as Rstest assertions.
-
-Rstest does not support Jest-style `done` callbacks. A regular test callback's first argument is `TestContext`; `test.for` receives context as its second callback argument, while `test.each` receives case values only. All of these callbacks are analyzed.
-
-The rule follows promises stored in local bindings, including statically mappable array and object destructuring, and requires every reachable path to consume them. `Promise.resolve` and `Promise.all` preserve assertion failure. `Promise.reject` and `Promise.allSettled` are not safe sinks.
-
-A logical assignment stores the chain like a plain assignment does, and its right-hand side is only evaluated when the store happens, so `pending ||= load().then(...)` followed by `await pending` is consumed. In the other direction a promise is truthy and non-nullish, so a later `||=` or `??=` cannot replace the promise a binding already holds, while `&&=` always does and discards it.
-
-The chain also reaches its binding through `||`, `??`, `&&`, either branch of a conditional, and the right-hand side of a comma, because each of those evaluates the chain on exactly the paths where the binding receives it. `let pending = fallback || load().then(...)` is therefore tracked, and so is the longhand `pending = pending || load().then(...)`, which keeps the promise the binding already holds for the same reason `||=` does. The preserving direction is narrower and not symmetric with this one: a write leaves the promise a binding holds in place only when every path through the right-hand side evaluates to it, so `pending = pending || other` and `pending = (setup(), pending)` preserve it while `pending = other || pending`, `pending = other ?? pending`, `pending = ready && pending` and `pending = condition ? pending : other` each drop it on one path and are reported.
-
-An array literal in a binding holds the chain, and only an element-wise consumption of that binding reaches it: `await Promise.all(pending)` and `for await (const settled of pending)` consume it, while `await pending` awaits the array itself and leaves the chain floating. A spread of the binding into another array literal carries every element with it, so `await Promise.all([...pending])` and `for await (const settled of [...pending])` consume it too, and an element access such as `await pending[0]` reaches an element rather than the array.
-
-A chain is consumed only when it is awaited, returned, wrapped in `Promise.resolve` or `Promise.all`, placed in an array literal that `Promise.all` or a `for await` consumes, consumed element-wise by `for await`, or handed to an `expect(...).resolves` / `.rejects` sink. Every other position leaves it floating: `Promise.race` and `Promise.any`, any other wrapper call such as `helper(chain)`, `void chain` and `throw chain`, a property of an object literal that is not destructured straight into a binding, an array literal that is never consumed element-wise, a tagged template interpolation, and a compound arithmetic assignment such as `count += chain`, which stores no promise at all.
-
-An awaited chain is safe only when its rejection can escape the test callback. An enclosing `catch` that may swallow the rejection, or a `finally` block that may `return`, `break`, or `continue`, does not count as safe consumption. A `catch` that always rethrows preserves the failure.
-
-This rule has no options and does not provide an autofix.

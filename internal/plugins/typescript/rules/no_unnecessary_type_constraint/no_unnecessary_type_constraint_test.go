@@ -1725,7 +1725,6 @@ func lintNoUnnecessaryTypeConstraintWithDemand(
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noUnnecessaryTypeConstraintConfiguredRules,
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -1757,8 +1756,8 @@ func createNoUnnecessaryTypeConstraintProgram(
 	return program, sourceFile
 }
 
-func noUnnecessaryTypeConstraintConfiguredRules(*ast.SourceFile) []linter.ConfiguredRule {
-	return []linter.ConfiguredRule{{
+func noUnnecessaryTypeConstraintConfiguredRules(*ast.SourceFile) []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{{
 		Name:     NoUnnecessaryTypeConstraintRule.Name,
 		Severity: rule.SeverityError,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {
