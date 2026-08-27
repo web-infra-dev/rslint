@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
@@ -149,8 +150,8 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 	// trailing decimal point from swallowing the following word operator.
 	// These boundaries occur when fixes move regexp and `1.` literals next to
 	// statement keywords or operators such as `in`, `as`, and `satisfies`.
-	if (scanner.IsIdentifierPart(leftRune) && rightRune == '/') ||
-		(leftRune == '/' && scanner.IsIdentifierPart(rightRune)) ||
+	if (scanner.IsIdentifierPart(leftRune) && rightRune == '/' && startsWithRegularExpressionLiteral(right)) ||
+		(leftRune == '/' && scanner.IsIdentifierPart(rightRune) && endsWithRegularExpressionLiteral(left)) ||
 		(leftRune == '.' && scanner.IsIdentifierPart(rightRune)) {
 		return false
 	}
@@ -161,6 +162,30 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 		return false
 	}
 	return true
+}
+
+func startsWithRegularExpressionLiteral(text string) bool {
+	tokens := tokensOfText(text)
+	return len(tokens) > 0 &&
+		tokens[0].Start == 0 &&
+		tokens[0].Kind == ast.KindRegularExpressionLiteral &&
+		ecmascript.IsValidRegexLiteral(tokens[0].Text)
+}
+
+func endsWithRegularExpressionLiteral(text string) bool {
+	tokens := tokensOfText(text)
+	return len(tokens) > 0 &&
+		tokens[len(tokens)-1].End == len(text) &&
+		tokens[len(tokens)-1].Kind == ast.KindRegularExpressionLiteral &&
+		ecmascript.IsValidRegexLiteral(tokens[len(tokens)-1].Text)
+}
+
+func tokensOfText(text string) []SourceToken {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/token-adjacency.ts",
+		Path:     "/token-adjacency.ts",
+	}, text, core.ScriptKindTS)
+	return TokensOfNode(sourceFile, sourceFile.AsNode())
 }
 
 func startsWithEscapedIdentifier(text string) bool {

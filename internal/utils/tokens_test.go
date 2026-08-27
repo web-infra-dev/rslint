@@ -72,6 +72,11 @@ func TestCanTokenTextsBeAdjacentFixBoundaries(t *testing.T) {
 	}{
 		{left: "return", right: "/a/", want: false},
 		{left: "/a/", right: "instanceof", want: false},
+		{left: "return", right: "/a/ > value", want: false},
+		{left: "value > /a/", right: "instanceof", want: false},
+		{left: "/", right: "0b111", want: true},
+		{left: "foo/", right: "bar", want: true},
+		{left: "foo", right: "/bar", want: true},
 		{left: "1.", right: "satisfies", want: false},
 		{left: "return", right: `"a"`, want: true},
 		{left: `"a"`, right: "instanceof", want: true},
