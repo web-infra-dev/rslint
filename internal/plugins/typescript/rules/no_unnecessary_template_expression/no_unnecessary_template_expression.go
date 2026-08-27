@@ -204,15 +204,17 @@ var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		reportSingleInterpolation := func(templateNode *ast.Node, spanExpr *ast.Node, spanLiteral *ast.Node) {
-			expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, spanExpr)
-			replacement := ctx.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
-			if !utils.IsStrongPrecedenceNode(spanExpr) && typescriptutil.IsWeakPrecedenceParent(templateNode) {
-				replacement = "(" + replacement + ")"
-			}
-			ctx.ReportRangeWithFixes(
+			ctx.ReportRangeWithDeferredFixes(
 				core.NewTextRange(spanExpr.Pos()-2, spanLiteral.Pos()+1),
 				buildNoUnnecessaryTemplateExpressionMessage(),
-				rule.RuleFixReplace(ctx.SourceFile, templateNode, replacement),
+				func() []rule.RuleFix {
+					expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, spanExpr)
+					replacement := ctx.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
+					if !utils.IsStrongPrecedenceNode(spanExpr) && typescriptutil.IsWeakPrecedenceParent(templateNode) {
+						replacement = "(" + replacement + ")"
+					}
+					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, templateNode, replacement)}
+				},
 			)
 		}
 
@@ -256,11 +258,10 @@ var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 		}
 
 		type interpolationInfo struct {
-			expression           *ast.Node
-			literal              *ast.TemplateMiddleOrTail
-			previousQuasiEnd     int
-			previousQuasiRawText string
-			nextQuasiRawText     string
+			expression       *ast.Node
+			literal          *ast.TemplateMiddleOrTail
+			previousLiteral  *ast.TemplateMiddleOrTail
+			previousQuasiEnd int
 		}
 
 		checkTemplateSpans := func(templateSpans *ast.NodeList, head *ast.TemplateHeadNode) {
@@ -268,19 +269,16 @@ var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 			for i := range len(templateSpans.Nodes) {
 				span := templateSpans.Nodes[i]
 				var prevQuasiEnd int
-				var prevQuasiRawText string
+				var previousLiteral *ast.TemplateMiddleOrTail
 				if i == 0 {
 					prevQuasiEnd = head.End()
-					prevQuasiRawText = templateHeadRawText(ctx.SourceFile, head)
 				} else {
-					var previousLiteral *ast.TemplateMiddleOrTail
 					if templateSpans.Nodes[i-1].Kind == ast.KindTemplateSpan {
 						previousLiteral = templateSpans.Nodes[i-1].AsTemplateSpan().Literal
 					} else {
 						previousLiteral = templateSpans.Nodes[i-1].AsTemplateLiteralTypeSpan().Literal
 					}
 					prevQuasiEnd = previousLiteral.End()
-					prevQuasiRawText = templateLiteralRawText(ctx.SourceFile, previousLiteral)
 				}
 
 				var expr *ast.Node
@@ -299,42 +297,50 @@ var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 					continue
 				}
 				infos = append(infos, interpolationInfo{
-					expression:           expr,
-					literal:              literal,
-					previousQuasiEnd:     prevQuasiEnd,
-					previousQuasiRawText: prevQuasiRawText,
-					nextQuasiRawText:     templateLiteralRawText(ctx.SourceFile, literal),
+					expression:       expr,
+					literal:          literal,
+					previousLiteral:  previousLiteral,
+					previousQuasiEnd: prevQuasiEnd,
 				})
 			}
 
 			nextCharacterIsOpeningCurlyBrace := false
 			for i := len(infos) - 1; i >= 0; i-- {
 				info := infos[i]
-				if info.nextQuasiRawText != "" {
-					nextCharacterIsOpeningCurlyBrace = strings.HasPrefix(info.nextQuasiRawText, "{")
-				}
-
-				expressionFixes, nextIsCurly, ok := interpolationFixes(ctx.SourceFile, info.expression, nextCharacterIsOpeningCurlyBrace)
-				nextCharacterIsOpeningCurlyBrace = nextIsCurly
 				reportRange := core.NewTextRange(info.previousQuasiEnd-2, utils.TrimNodeTextRange(ctx.SourceFile, info.literal).Pos()+1)
-				if !ok {
-					ctx.ReportRange(reportRange, buildNoUnnecessaryTemplateExpressionMessage())
-					continue
-				}
+				ctx.ReportRangeWithDeferredFixes(reportRange, buildNoUnnecessaryTemplateExpressionMessage(), func() []rule.RuleFix {
+					nextQuasiRawText := templateLiteralRawText(ctx.SourceFile, info.literal)
+					if nextQuasiRawText != "" {
+						nextCharacterIsOpeningCurlyBrace = strings.HasPrefix(nextQuasiRawText, "{")
+					}
 
-				expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, info.expression)
-				fixes := []rule.RuleFix{
-					rule.RuleFixRemoveRange(core.NewTextRange(reportRange.Pos(), expressionRange.Pos())),
-					rule.RuleFixRemoveRange(core.NewTextRange(expressionRange.End(), reportRange.End())),
-				}
-				fixes = append(fixes, expressionFixes...)
-				if nextCharacterIsOpeningCurlyBrace && endsWithUnescapedDollarSign(info.previousQuasiRawText) {
-					fixes = append(fixes, rule.RuleFixReplaceRange(
-						core.NewTextRange(info.previousQuasiEnd-3, info.previousQuasiEnd-2),
-						"\\$",
-					))
-				}
-				ctx.ReportRangeWithFixes(reportRange, buildNoUnnecessaryTemplateExpressionMessage(), fixes...)
+					expressionFixes, nextIsCurly, ok := interpolationFixes(ctx.SourceFile, info.expression, nextCharacterIsOpeningCurlyBrace)
+					nextCharacterIsOpeningCurlyBrace = nextIsCurly
+					if !ok {
+						return nil
+					}
+
+					expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, info.expression)
+					fixes := []rule.RuleFix{
+						rule.RuleFixRemoveRange(core.NewTextRange(reportRange.Pos(), expressionRange.Pos())),
+						rule.RuleFixRemoveRange(core.NewTextRange(expressionRange.End(), reportRange.End())),
+					}
+					fixes = append(fixes, expressionFixes...)
+
+					var previousQuasiRawText string
+					if info.previousLiteral == nil {
+						previousQuasiRawText = templateHeadRawText(ctx.SourceFile, head)
+					} else {
+						previousQuasiRawText = templateLiteralRawText(ctx.SourceFile, info.previousLiteral)
+					}
+					if nextCharacterIsOpeningCurlyBrace && endsWithUnescapedDollarSign(previousQuasiRawText) {
+						fixes = append(fixes, rule.RuleFixReplaceRange(
+							core.NewTextRange(info.previousQuasiEnd-3, info.previousQuasiEnd-2),
+							"\\$",
+						))
+					}
+					return fixes
+				})
 			}
 		}
 

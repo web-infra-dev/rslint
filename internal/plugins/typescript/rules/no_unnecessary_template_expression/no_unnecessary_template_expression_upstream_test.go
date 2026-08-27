@@ -1,3 +1,7 @@
+// TestNoUnnecessaryTemplateExpressionUpstream migrates the full valid/invalid
+// suite from upstream packages/eslint-plugin/tests/rules/no-unnecessary-template-expression.test.ts
+// 1:1. rslint-specific autofix and edge-shape lock-ins live in
+// no_unnecessary_template_expression_extras_test.go.
 package no_unnecessary_template_expression
 
 import (
@@ -7,7 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoUnnecessaryTemplateExpressionRule(t *testing.T) {
+func TestNoUnnecessaryTemplateExpressionUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTemplateExpressionRule, []rule_tester.ValidTestCase{
 		{Code: "const string = 'a';"},
 		{Code: "const string = `a`;"},
