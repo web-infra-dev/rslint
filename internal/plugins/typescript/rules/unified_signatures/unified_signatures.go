@@ -130,10 +130,11 @@ func (a *overloadAnalyzer) overloadKey(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindFunctionDeclaration:
 		if name := node.Name(); name != nil {
-			return "function:name:" + name.Text(), true
+			return name.Text(), true
 		}
 		if ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault) {
-			return "function:export-default", true
+			// Upstream falls back to the raw ESTree exporting-node type.
+			return "ExportDefaultDeclaration", true
 		}
 		return "", false
 	case ast.KindConstructor:

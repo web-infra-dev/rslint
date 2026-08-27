@@ -76,6 +76,17 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
+		// Upstream's anonymous default-export fallback is the raw ESTree node type,
+		// so a declaration with that exact name belongs to the same overload group.
+		{
+			Code: `declare function ExportDefaultDeclaration(x: string): void;
+export default function (x: number): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Line:      2,
+				Column:    26,
+			}},
+		},
 		// Parentheses and comments around a computed key are transparent in ESTree.
 		{
 			Code: `declare const key: unique symbol;
