@@ -2,6 +2,7 @@ package no_array_constructor
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -50,6 +51,9 @@ func calleeArgsAndTypeArgs(node *ast.Node) (callee *ast.Node, args *ast.NodeList
 // node has no parentheses at all, e.g. a bare `new Array`.
 func findOpenParen(sourceFile *ast.SourceFile, calleeEnd int, nodeEnd int) (pos int, found bool) {
 	text := sourceFile.Text()
+	if calleeEnd < 0 || nodeEnd < calleeEnd || nodeEnd > len(text) {
+		return 0, false
+	}
 	p := calleeEnd
 	for p < nodeEnd {
 		p = scanner.SkipTrivia(text, p)
@@ -75,6 +79,130 @@ func countNonSpread(args *ast.NodeList) int {
 		}
 	}
 	return count
+}
+
+func diagnosticTouchesRange(diagnostics []*ast.Diagnostic, textRange core.TextRange) bool {
+	for _, diagnostic := range diagnostics {
+		// Missing-token diagnostics are zero-width and can sit exactly at the
+		// recovered call's end, so intersection is intentionally inclusive.
+		if diagnostic != nil && diagnostic.Pos() <= textRange.End() && diagnostic.End() >= textRange.Pos() {
+			return true
+		}
+	}
+	return false
+}
+
+type arrayConstructorEditPlan struct {
+	sourceFile  *ast.SourceFile
+	comments    *rule.CommentStore
+	node        *ast.Node
+	callee      *ast.Node
+	args        *ast.NodeList
+	reportRange core.TextRange
+
+	classified    bool
+	editable      bool
+	shouldSuggest bool
+	argsStart     int
+	argsEnd       int
+}
+
+func (p *arrayConstructorEditPlan) classify() {
+	if p.classified {
+		return
+	}
+	p.classified = true
+
+	sourceText := p.sourceFile.Text()
+	start, end := p.reportRange.Pos(), p.reportRange.End()
+	calleeEnd := p.callee.End()
+	if start < 0 || start > end || end > len(sourceText) || calleeEnd < start || calleeEnd > end {
+		return
+	}
+	if p.node.Flags&(ast.NodeFlagsThisNodeHasError|ast.NodeFlagsThisNodeOrAnySubNodesHasError) != 0 ||
+		diagnosticTouchesRange(p.sourceFile.Diagnostics(), p.reportRange) ||
+		// Despite its name, JSDiagnostics contains JavaScript-file syntax
+		// diagnostics (for example, TypeScript-only syntax in a .js file).
+		// JSDocDiagnostics is intentionally excluded: malformed comment types
+		// do not recover the call AST, and the edit preserves argument text.
+		diagnosticTouchesRange(p.sourceFile.JSDiagnostics(), p.reportRange) {
+		return
+	}
+	if p.args != nil {
+		for _, arg := range p.args.Nodes {
+			if ast.NodeIsMissing(arg) || arg.Kind == ast.KindOmittedExpression {
+				return
+			}
+		}
+	}
+
+	openParen, hasParens := findOpenParen(p.sourceFile, calleeEnd, end)
+	commentBound := end
+	if hasParens {
+		closeParen := end - 1
+		if openParen >= closeParen || sourceText[closeParen] != ')' {
+			return
+		}
+		p.argsStart = openParen + 1
+		p.argsEnd = closeParen
+		commentBound = openParen
+	} else {
+		// Only NewExpression permits a valid constructor call without its own
+		// parentheses (`new Array` or `new (Array)`). A CallExpression with a
+		// nil argument list is necessarily recovered or synthetic.
+		if p.node.Kind != ast.KindNewExpression || p.args != nil {
+			return
+		}
+		p.argsStart = end
+		p.argsEnd = end
+	}
+
+	p.editable = true
+	p.shouldSuggest = ast.IsOptionalChainRoot(p.node) ||
+		(p.args != nil && len(p.args.Nodes) > 0 && countNonSpread(p.args) < 2) ||
+		utils.HasCommentInSpan(p.comments.All(), start, commentBound)
+}
+
+func (p *arrayConstructorEditPlan) replacement() (text string, addSemicolon bool) {
+	addSemicolon = utils.IsStartOfExpressionStatement(p.sourceFile, p.node) &&
+		utils.NeedsPrecedingSemicolon(p.sourceFile, p.node)
+	if p.argsStart == p.argsEnd {
+		if addSemicolon {
+			return ";[]", true
+		}
+		return "[]", false
+	}
+
+	argsText := p.sourceFile.Text()[p.argsStart:p.argsEnd]
+	if addSemicolon {
+		return ";[" + argsText + "]", true
+	}
+	return "[" + argsText + "]", false
+}
+
+func (p *arrayConstructorEditPlan) buildFixes() []rule.RuleFix {
+	p.classify()
+	if !p.editable || p.shouldSuggest {
+		return nil
+	}
+	fixText, _ := p.replacement()
+	return []rule.RuleFix{rule.RuleFixReplaceRange(p.reportRange, fixText)}
+}
+
+func (p *arrayConstructorEditPlan) buildSuggestions() []rule.RuleSuggestion {
+	p.classify()
+	if !p.editable || !p.shouldSuggest {
+		return nil
+	}
+	fixText, addSemicolon := p.replacement()
+	msg := useLiteralMessage()
+	if addSemicolon {
+		msg = useLiteralAfterSemicolonMessage()
+	}
+	return []rule.RuleSuggestion{{
+		Message:  msg,
+		FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(p.reportRange, fixText)},
+	}}
 }
 
 // https://eslint.org/docs/latest/rules/no-array-constructor
@@ -151,67 +279,32 @@ var NoArrayConstructorRule = rule.Rule{
 				return
 			}
 
-			nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			openParen, hasParens := findOpenParen(ctx.SourceFile, callee.End(), nodeRange.End())
-			argsText := ""
-			commentBound := nodeRange.End()
-			if hasParens {
-				argsText = ctx.SourceFile.Text()[openParen+1 : nodeRange.End()-1]
-				commentBound = openParen
+			reportRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+			plan := arrayConstructorEditPlan{
+				sourceFile:  ctx.SourceFile,
+				comments:    ctx.Comments,
+				node:        node,
+				callee:      callee,
+				args:        args,
+				reportRange: reportRange,
 			}
-			fixText := "[" + argsText + "]"
 
 			// NOTE: Unlike ESLint, utils.NeedsPrecedingSemicolon doesn't model
 			// TypeScript-only node kinds (type positions, ambient/overload
 			// function declarations, import-equals declarations), so it falls
-			// back to the conservative "needs a semicolon" answer there —
-			// e.g. after `type T = Foo` or `import Foo = Bar`. The extra `;`
-			// never changes behavior, only adds a redundant character; see
-			// the rule doc's "Differences from ESLint" section.
-			addSemicolon := utils.IsStartOfExpressionStatement(ctx.SourceFile, node) &&
-				utils.NeedsPrecedingSemicolon(ctx.SourceFile, node)
-			if addSemicolon {
-				fixText = ";" + fixText
-			}
-
-			// Replacing the call with an array literal directly (rather than
-			// as an opt-in suggestion) is only safe when doing so can't
-			// change runtime behavior or silently drop source text:
-			//   - `Array?.(...)` short-circuits to `undefined` when `Array`
-			//     is nullish; `[...]` always evaluates.
-			//   - A single spread plus at most one more argument
-			//     (`Array(5, ...args)`) is equivalent to the sparse-array
-			//     single-argument form when the spread happens to be empty
-			//     at runtime — an outcome an autofix must not risk.
-			//   - A comment between the node's start and the call's own
-			//     opening paren (`Array/*a*/()`) would be silently discarded
-			//     by the fix. Comments inside the argument list itself don't
-			//     count: the fix copies that text through verbatim.
-			shouldSuggest := ast.IsOptionalChainRoot(node) ||
-				(args != nil && len(args.Nodes) > 0 && countNonSpread(args) < 2) ||
-				utils.HasCommentInSpan(ctx.Comments.All(), nodeRange.Pos(), commentBound)
-
-			buildFixes := func() []rule.RuleFix {
-				if shouldSuggest {
-					return nil
-				}
-				return []rule.RuleFix{rule.RuleFixReplaceRange(nodeRange, fixText)}
-			}
-			buildSuggestions := func() []rule.RuleSuggestion {
-				if !shouldSuggest {
-					return nil
-				}
-				msg := useLiteralMessage()
-				if addSemicolon {
-					msg = useLiteralAfterSemicolonMessage()
-				}
-				return []rule.RuleSuggestion{{
-					Message:  msg,
-					FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(nodeRange, fixText)},
-				}}
-			}
-
-			ctx.ReportNodeWithDeferredFixesAndSuggestions(node, preferLiteralMessage(), buildFixes, buildSuggestions)
+			// back to the conservative "needs a semicolon" answer there. The
+			// edit plan keeps that existing behavior, but computes it only when
+			// the consumer requests the matching edit category.
+			//
+			// The same deferred plan classifies optional calls, risky spreads,
+			// comments, and parser-recovery boundaries. A malformed call keeps
+			// its diagnostic but never receives an edit that could drop source.
+			ctx.ReportRangeWithDeferredFixesAndSuggestions(
+				reportRange,
+				preferLiteralMessage(),
+				plan.buildFixes,
+				plan.buildSuggestions,
+			)
 		}
 
 		return rule.RuleListeners{
