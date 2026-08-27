@@ -31,3 +31,7 @@ test('notifies the listener once', () => {
 ## Autofix
 
 Renames the matcher to `toHaveBeenCalledTimes` and inserts the count `1` into its argument list. Nothing else in the assertion changes: the expect root as written at the call site, `expect.soft`, the second `message` argument of `expect(actual, message)`, the modifier chain, the accessor's own quoting, and the surrounding line breaks and comments are all left as they are.
+
+## Relationship to other rules
+
+This rule is the exact inverse of `rstest/prefer-called-once`, which rewrites `toHaveBeenCalledTimes(1)` back into `toHaveBeenCalledOnce()`. Enable one or the other, never both: with both on, every call-count assertion is reported no matter how it is written, and the two autofixes undo each other.
