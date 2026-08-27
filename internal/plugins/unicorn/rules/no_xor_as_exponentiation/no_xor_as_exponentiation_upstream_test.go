@@ -55,9 +55,10 @@ func TestNoXorAsExponentiationUpstream(t *testing.T) {
 			jsValid(`2 ** 8`),
 
 			// ---- TypeScript: operand is a `TSAsExpression`, not a literal ----
-			// rslint does not differentiate AsExpression from its operand at the
-			// rule layer; Skip: the upstream parser boundary is not relevant here.
-			{Code: `(2 as number) ^ 8`, Skip: true},
+			// rslint preserves the AsExpression wrapper after SkipParentheses, so the
+			// inner literal doesn't match `isDecimalIntegerNumeric`. Run as `.ts` to
+			// exercise the TypeScript parser path.
+			{Code: `(2 as number) ^ 8`, FileName: "file.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Plain decimal-integer pairs ----
