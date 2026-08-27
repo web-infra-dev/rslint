@@ -17,10 +17,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/id_match"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -53,6 +53,24 @@ func TestIdMatchExtrasNoProject(t *testing.T) {
 				"Identifier 'Record' does not match the pattern '^(X|Foo|string)$'.",
 				"Identifier 'Array' does not match the pattern '^(X|Foo|string)$'.",
 				"Identifier 'Partial' does not match the pattern '^(X|Foo|string)$'.",
+			},
+		},
+		{
+			// ---- A tuple label is authored even when it spells a library type ----
+			name:    "library name as tuple label",
+			code:    "type X = [Record: string];",
+			options: []any{`^(X|string)$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^(X|string)$'.",
+			},
+		},
+		{
+			// ---- An import-type member belongs to the imported module ----
+			name:    "library name as import type member",
+			code:    `type X = import("./m").Record;`,
+			options: []any{`^X$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^X$'.",
 			},
 		},
 		{
@@ -121,11 +139,10 @@ func lintWithoutProject(t *testing.T, code string, options []any) []string {
 	}
 
 	messages := make([]string, 0, 2)
-	if _, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{sourceProgram},
-		SingleThreaded: true,
-		Scope:          linter.FileScope{Files: []string{fileName}},
-		ExcludePaths:   []string{},
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                sourceProgram,
+		Files:                  []string{fileName},
+		ExcludedPathSubstrings: []string{},
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:        "id-match",
@@ -139,14 +156,9 @@ func lintWithoutProject(t *testing.T, code string, options []any) []string {
 				},
 			}}
 		},
-		Consumer: rule.DiagnosticConsumer{
-			Demand: rule.EditDemandAll,
-			Report: func(diagnostic rule.RuleDiagnostic) {
-				messages = append(messages, diagnostic.Message.Description)
-			},
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
+			messages = append(messages, diagnostic.Message.Description)
 		},
-	}); err != nil {
-		t.Fatalf("RunLinter: %v", err)
-	}
+	})
 	return messages
 }

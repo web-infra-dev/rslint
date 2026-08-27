@@ -353,7 +353,7 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 	// tsconfig owns and stays quiet in one a tsconfig does. This list is the
 	// type-capable global scope typescript-eslint seeds, which is where its
 	// own scope model finds these names.
-	if rule.IsDefaultTypeScriptTypeGlobal(name) && !isQualifiedTypeMember(node) &&
+	if rule.IsDefaultTypeScriptTypeGlobal(name) && isTypeGlobalReference(node) &&
 		!r.isDeclaredInFile(node, name) {
 		return true
 	}
@@ -365,14 +365,13 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 	return !utils.IsSymbolDeclaredInFile(symbol, r.ctx.SourceFile)
 }
 
-// isQualifiedTypeMember reports whether node is the authored member on the
-// right of a dotted type name. A spelling such as `Record` is seeded in the
-// TypeScript global scope, but `Record` in `Foo.Record` belongs to `Foo` and
-// must not inherit the global name's exemption.
-func isQualifiedTypeMember(node *ast.Node) bool {
-	parent := node.Parent
-	return parent != nil && parent.Kind == ast.KindQualifiedName &&
-		parent.AsQualifiedName().Right == node
+// isTypeGlobalReference reports whether node is a reference that can resolve
+// through TypeScript's global type scope. Declaration and property names such
+// as tuple labels are authored names, while an import-type qualifier names an
+// export of the imported module; neither inherits an exemption merely because
+// it is spelled `Record`, `Array`, or another standard-library type name.
+func isTypeGlobalReference(node *ast.Node) bool {
+	return !isNonReferenceIdentifier(node) && !utils.IsImportTypeSyntax(node)
 }
 
 // checkConstructor reports a class constructor. tsgo spells its name with a

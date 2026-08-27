@@ -169,6 +169,35 @@ let x: Local_1;`,
 					},
 				},
 			},
+			// ---- Type-position names are not always global type references ----
+			{
+				Code:    `type X = [Record: string];`,
+				Options: []any{`^(X|string)$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^(X|string)$'.`,
+						Line:      1,
+						Column:    11,
+						EndLine:   1,
+						EndColumn: 17,
+					},
+				},
+			},
+			{
+				Code:    `type X = import("./m").Record;`,
+				Options: []any{`^X$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^X$'.`,
+						Line:      1,
+						Column:    24,
+						EndLine:   1,
+						EndColumn: 30,
+					},
+				},
+			},
 			// ---- A type the file imports is the author's too ----
 			{
 				Code: `import type { Foo_1 } from './m';
