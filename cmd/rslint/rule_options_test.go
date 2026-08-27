@@ -29,7 +29,7 @@ func TestCLIInvalidRuleOptionsFailFastBeforeLinting(t *testing.T) {
 		t.Fatalf("write app.js: %v", err)
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         "rslint.jsonc",
 		Format:         "default",
 		NoColor:        true,
@@ -71,7 +71,7 @@ func TestCLIValidRuleOptionsLintNormally(t *testing.T) {
 		t.Fatalf("write app.js: %v", err)
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         "rslint.jsonc",
 		Format:         "default",
 		NoColor:        true,

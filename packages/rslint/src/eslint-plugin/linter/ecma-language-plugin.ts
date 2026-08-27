@@ -94,21 +94,17 @@ export interface RuleConfig {
 /** Per-file lint request input (called by Worker dispatcher per task).
  *
  * The Worker reads source text from disk via `fs.readFileSync(filePath)`
- * by default — text is intentionally NOT carried over IPC. This drops
- * the structuredClone cost of shipping every file's contents across
- * the worker_threads boundary (~60 MB on a 5000-file repo).
+ * when the task has no inline `text`. The initial CLI generation uses that
+ * fast path to avoid shipping every file's contents across worker_threads
+ * (~60 MB on a 5000-file repo).
  *
- * Multi-pass --fix coherence is preserved because cmd/rslint's
- * applyFixPass writes fixes to disk BEFORE re-dispatching the next
- * lint pass — the worker reads the post-fix contents.
- *
- * `text` here is an in-process override for unit tests that want to
- * exercise `lintFile` against an in-memory source. The wire shape
- * (engine.ts → worker postMessage) NEVER carries text.
+ * Overlay-backed hosts and every later in-memory autofix generation carry
+ * `text`, so native and plugin rules observe one source generation without
+ * mutating disk between rounds. Tests may use the same override directly.
  */
 export interface LintFileRequest {
   filePath: string;
-  /** In-process override for tests. The IPC wire shape never carries this. */
+  /** Complete source override for overlay or in-memory generations. */
   text?: string;
   /**
    * Forwarded subset of user `languageOptions`. Only the fields the
