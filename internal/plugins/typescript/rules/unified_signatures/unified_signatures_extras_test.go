@@ -24,6 +24,13 @@ func TestUnifiedSignaturesExtras(t *testing.T) {
 		// ---- Dimension 4: declaration/container forms ----
 		{Code: `const C = class { f(x: string): void; f(x: number): void; };`},
 		{Code: `declare module "m" { export default function (x: string): void; function export_default(x: number): void; }`},
+		// The raw fallback collision stays scoped to one declaration container.
+		{Code: `declare function ExportDefaultDeclaration(x: string): void; declare module "m" { export default function (x: number): void; }`},
+		// Grouping by the raw key does not bypass the ordinary compatibility checks.
+		{Code: `declare function ExportDefaultDeclaration(x: string): string; export default function (x: number): number;`},
+		{Code: `declare function ExportDefaultDeclaration(x: string): void; export default function (y: number): void;`, Options: []any{map[string]any{"ignoreDifferentlyNamedParameters": true}}},
+		{Code: `/** one */ declare function ExportDefaultDeclaration(x: string): void;
+/** two */ export default function (x: number): void;`, Options: []any{map[string]any{"ignoreOverloadsWithDifferentJSDoc": true}}},
 		// Function expressions and arrows cannot declare overload signatures.
 		// Async/generator overload signatures are rejected by TypeScript's grammar.
 		// ---- Dimension 4: nesting/traversal boundaries ----
@@ -86,6 +93,38 @@ export default function (x: number): void;`,
 				Line:      2,
 				Column:    26,
 			}},
+		},
+		// Statement order does not change the raw fallback collision.
+		{
+			Code: `export default function (x: string): void;
+declare function ExportDefaultDeclaration(x: number): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "singleParameterDifference", Line: 2, Column: 43}},
+		},
+		// The same keying applies inside module blocks.
+		{
+			Code: `declare module "m" {
+  function ExportDefaultDeclaration(x: string): void;
+  export default function (x: number): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "singleParameterDifference", Line: 3, Column: 28}},
+		},
+		// Named and anonymous declarations join one larger overload group.
+		{
+			Code: `declare function ExportDefaultDeclaration(x: string): void;
+declare function ExportDefaultDeclaration(x: number): void;
+export default function (x: boolean): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "singleParameterDifference", Line: 2, Column: 43},
+				{MessageId: "singleParameterDifference", Line: 3, Column: 26},
+				{MessageId: "singleParameterDifference", Line: 3, Column: 26},
+			},
+		},
+		// Ordinary same-name function overloads retain their grouping after removing
+		// the rslint-only key namespace.
+		{
+			Code: `declare function ExportDefaultDeclaration(x: string): void;
+declare function ExportDefaultDeclaration(x: number): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "singleParameterDifference", Line: 2, Column: 43}},
 		},
 		// Parentheses and comments around a computed key are transparent in ESTree.
 		{
