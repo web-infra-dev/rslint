@@ -19,3 +19,8 @@ Examples of **correct** code for this rule:
 const bytes = 2 ** 10;
 const cube = 3 ** 3;
 ```
+
+## Original Documentation
+
+- [eslint-plugin-unicorn: no-xor-as-exponentiation](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v73.0.0/docs/rules/no-xor-as-exponentiation.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v73.0.0/rules/no-xor-as-exponentiation.js)
