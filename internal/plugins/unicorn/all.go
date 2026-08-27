@@ -51,7 +51,7 @@ func GetAllRules() []rule.Rule {
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
 		prefer_set_has.PreferSetHasRule,
-	prefer_ternary.PreferTernaryRule,
+		prefer_ternary.PreferTernaryRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,
 		require_number_to_fixed_digits_argument.RequireNumberToFixedDigitsArgumentRule,
 	}

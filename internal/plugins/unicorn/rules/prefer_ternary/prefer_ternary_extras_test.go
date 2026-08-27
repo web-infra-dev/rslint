@@ -334,7 +334,7 @@ if (test) {
 					{
 						MessageId: "prefer-ternary",
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-							{MessageId: "prefer-ternary/suggestion", Output: "const x = test ? c : (a + b);"},
+							{MessageId: "prefer-ternary/suggestion", Output: "const x = test ? c : a + b;"},
 						},
 					},
 				},

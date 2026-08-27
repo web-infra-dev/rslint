@@ -662,6 +662,11 @@ func hasSideEffectInDeferredBody(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
+	for _, decorator := range node.Decorators() {
+		if hasSideEffect(decorator) {
+			return true
+		}
+	}
 	switch node.Kind {
 	case ast.KindMethodDeclaration:
 		method := node.AsMethodDeclaration()
@@ -798,10 +803,14 @@ func shouldAddParenthesesToConditionalExpressionChild(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindAwaitExpression,
 		ast.KindYieldExpression,
-		ast.KindBinaryExpression, // AssignmentExpression
 		ast.KindAsExpression,
 		ast.KindTypeAssertionExpression:
 		return true
+	}
+	if node.Kind == ast.KindBinaryExpression {
+		binary := node.AsBinaryExpression()
+		return binary != nil && binary.OperatorToken != nil &&
+			(isAssignmentOperatorKind(binary.OperatorToken.Kind) || binary.OperatorToken.Kind == ast.KindCommaToken)
 	}
 	return false
 }
@@ -1068,7 +1077,7 @@ func buildFix(ctx rule.RuleContext, ifNode *ast.Node, result mergeResult) []rule
 	// replacement into the prior statement.
 	ifPrev := utils.TrimNodeTextRange(ctx.SourceFile, ifNode).Pos()
 	if prev, ok := utils.TokenBeforePosition(ctx.SourceFile, ifPrev); ok {
-		if !isControlStatementBody(ifNode) && needsSemicolonBeforeAfterText(prev, fixed) {
+		if !isControlStatementBody(ifNode) && needsSemicolonBeforeAfterText(ctx.SourceFile, prev, fixed) {
 			fixed = ";" + fixed
 		}
 	}
@@ -1088,8 +1097,12 @@ func isControlStatementBody(node *ast.Node) bool {
 		return p.ThenStatement == node || p.ElseStatement == node
 	case ast.KindForStatement:
 		return node.Parent.AsForStatement().Statement == node
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		return node.Parent.AsForInOrOfStatement().Statement == node
 	case ast.KindWhileStatement:
 		return node.Parent.AsWhileStatement().Statement == node
+	case ast.KindWithStatement:
+		return node.Parent.AsWithStatement().Statement == node
 	}
 	return false
 }
@@ -1111,7 +1124,7 @@ func renderMergeOperand(ctx rule.RuleContext, operand any) string {
 // needsSemicolonBeforeAfterText mirrors unicorn's `needsSemicolon` for the
 // fixed-output case: does the result, when placed where the if was, need a
 // leading `;` to prevent ASI from continuing the prior statement?
-func needsSemicolonBeforeAfterText(prev utils.SourceToken, replacement string) bool {
+func needsSemicolonBeforeAfterText(sourceFile *ast.SourceFile, prev utils.SourceToken, replacement string) bool {
 	if replacement == "" {
 		return false
 	}
@@ -1135,6 +1148,8 @@ func needsSemicolonBeforeAfterText(prev utils.SourceToken, replacement string) b
 		ast.KindFalseKeyword,
 		ast.KindNullKeyword:
 		return true
+	case ast.KindCloseBraceToken:
+		return sourceFile != nil && ast.IsObjectLiteralExpression(ast.GetNodeAtPosition(sourceFile, prev.Start, false))
 	}
 	return false
 }
