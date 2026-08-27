@@ -708,7 +708,7 @@ function* asyncGenerator() {
   ],
 });
 // base eslint tests
-// https://github.com/eslint/eslint/blob/3a4eaf921543b1cd5d1df4ea9dec02fab396af2a/tests/lib/rules/require-await.js#L25-L274
+// https://github.com/eslint/eslint/blob/v10.9.1/tests/lib/rules/require-await.js
 ruleTester.run('require-await', {
   valid: [
     `
@@ -780,6 +780,12 @@ for await (let num of asyncIterable) {
   console.log(num);
 }
       `,
+    },
+    {
+      code: 'await using resource = getResource();',
+    },
+    {
+      code: 'async function run() { await using resource = getResource(); }',
     },
     {
       code: `
@@ -1223,6 +1229,84 @@ for await (let num of asyncIterable) {
           }
         }
       `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: noFormat`class A {
+  a
+  async [b]() { return 0; }
+}`,
+      errors: [
+        {
+          data: { name: 'Async method' },
+          messageId: 'missingAwait',
+          suggestions: [
+            {
+              messageId: 'removeAsync',
+              output: `class A {
+  a
+  [b]() { return 0; }
+}`,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: noFormat`class A {
+  a = 0
+  async in() { return 0; }
+}`,
+      errors: [
+        {
+          data: { name: "Async method 'in'" },
+          messageId: 'missingAwait',
+          suggestions: [
+            {
+              messageId: 'removeAsync',
+              output: `class A {
+  a = 0
+  ;in() { return 0; }
+}`,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `const obj = {
+  foo,
+  async in() { return 0; }
+};`,
+      errors: [
+        {
+          data: { name: "Async method 'in'" },
+          messageId: 'missingAwait',
+          suggestions: [
+            {
+              messageId: 'removeAsync',
+              output: `const obj = {
+  foo,
+  in() { return 0; }
+};`,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'async function run() { using resource = getResource(); }',
+      errors: [
+        {
+          data: { name: "Async function 'run'" },
+          messageId: 'missingAwait',
+          suggestions: [
+            {
+              messageId: 'removeAsync',
+              output: 'function run() { using resource = getResource(); }',
             },
           ],
         },

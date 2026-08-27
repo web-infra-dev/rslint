@@ -5,8 +5,10 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildMissingAwaitMessage(node *ast.Node) rule.RuleMessage {
@@ -195,12 +197,131 @@ func functionOuterName(node *ast.Node) string {
 	return ""
 }
 
-//nolint:unused
 func buildRemoveAsyncMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "removeAsync",
 		Description: "Remove 'async'.",
 	}
+}
+
+type asyncKeywordInfo struct {
+	tokenRange  core.TextRange
+	removeRange core.TextRange
+}
+
+func findAsyncKeyword(sourceFile *ast.SourceFile, node *ast.Node) (asyncKeywordInfo, bool) {
+	modifiers := node.Modifiers()
+	if modifiers == nil {
+		return asyncKeywordInfo{}, false
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier == nil || modifier.Kind != ast.KindAsyncKeyword {
+			continue
+		}
+		tokenRange := utils.TrimNodeTextRange(sourceFile, modifier)
+		removeEnd := ecmascript.SkipLeadingWhitespace(sourceFile.Text(), tokenRange.End(), len(sourceFile.Text()))
+		return asyncKeywordInfo{
+			tokenRange:  tokenRange,
+			removeRange: core.NewTextRange(tokenRange.Pos(), removeEnd),
+		}, true
+	}
+	return asyncKeywordInfo{}, false
+}
+
+func shouldReplaceAsyncWithSemicolon(sourceFile *ast.SourceFile, node *ast.Node, asyncInfo asyncKeywordInfo) bool {
+	nextToken, ok := utils.TokenAtOrAfter(sourceFile, asyncInfo.tokenRange.End())
+	if !ok {
+		return false
+	}
+
+	if nextToken.Kind == ast.KindOpenParenToken &&
+		utils.IsStartOfExpressionStatement(sourceFile, node) &&
+		utils.NeedsPrecedingSemicolon(sourceFile, node) {
+		return true
+	}
+
+	if node.Kind != ast.KindMethodDeclaration {
+		return false
+	}
+	return utils.NeedsClassMemberLeadingSemicolon(
+		sourceFile,
+		ast.GetContainingClass(node),
+		node,
+		nextToken,
+		utils.ClassMemberLeadingSemicolonOptions{},
+	)
+}
+
+func typeReferenceNamed(node *ast.Node, name string) (*ast.TypeReferenceNode, bool) {
+	node = ast.SkipTypeParentheses(node)
+	if node == nil || node.Kind != ast.KindTypeReference {
+		return nil, false
+	}
+	reference := node.AsTypeReferenceNode()
+	if reference == nil || reference.TypeName == nil || reference.TypeName.Kind != ast.KindIdentifier {
+		return nil, false
+	}
+	return reference, reference.TypeName.AsIdentifier().Text == name
+}
+
+func returnTypeSuggestionFixes(sourceFile *ast.SourceFile, node *ast.Node, isGenerator bool) []rule.RuleFix {
+	returnType := node.Type()
+	if returnType == nil {
+		return nil
+	}
+
+	if isGenerator {
+		if reference, ok := typeReferenceNamed(returnType, "AsyncGenerator"); ok {
+			return []rule.RuleFix{
+				rule.RuleFixReplaceRange(utils.TrimNodeTextRange(sourceFile, reference.TypeName), "Generator"),
+			}
+		}
+		return nil
+	}
+
+	reference, ok := typeReferenceNamed(returnType, "Promise")
+	if !ok || reference.TypeArguments == nil || len(reference.TypeArguments.Nodes) == 0 {
+		return nil
+	}
+	openAngle, hasOpenAngle := utils.TokenAtOrAfter(sourceFile, reference.TypeName.End())
+	returnTypeRange := utils.TrimNodeTextRange(sourceFile, ast.SkipTypeParentheses(returnType))
+	closeAngle, hasCloseAngle := utils.TokenBeforePosition(sourceFile, returnTypeRange.End())
+	if !hasOpenAngle || openAngle.Kind != ast.KindLessThanToken ||
+		!hasCloseAngle || closeAngle.Kind != ast.KindGreaterThanToken {
+		return nil
+	}
+
+	return []rule.RuleFix{
+		rule.RuleFixRemoveRange(closeAngle.Range()),
+		rule.RuleFixRemoveRange(core.NewTextRange(
+			utils.TrimNodeTextRange(sourceFile, reference.TypeName).Pos(),
+			openAngle.End,
+		)),
+	}
+}
+
+func reportMissingAwait(ctx rule.RuleContext, node *ast.Node, isGenerator bool) {
+	reportRange := utils.GetFunctionHeadLoc(ctx.SourceFile, node)
+	message := buildMissingAwaitMessage(node)
+	ctx.ReportRangeWithDeferredSuggestions(reportRange, message, func() []rule.RuleSuggestion {
+		asyncInfo, ok := findAsyncKeyword(ctx.SourceFile, node)
+		if !ok {
+			return nil
+		}
+
+		replacement := ""
+		if shouldReplaceAsyncWithSemicolon(ctx.SourceFile, node, asyncInfo) {
+			replacement = ";"
+		}
+		fixes := []rule.RuleFix{
+			rule.RuleFixReplaceRange(asyncInfo.removeRange, replacement),
+		}
+		fixes = append(fixes, returnTypeSuggestionFixes(ctx.SourceFile, node, isGenerator)...)
+		return []rule.RuleSuggestion{{
+			Message:  buildRemoveAsyncMessage(),
+			FixesArr: fixes,
+		}}
+	})
 }
 
 type scopeInfo struct {
@@ -312,131 +433,11 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 		exitFunction := func(node *ast.Node) {
 			scope := &scopes[len(scopes)-1]
 			if scope.functionFlags&ast.FunctionFlagsAsync != 0 && !scope.hasAwait && (scope.functionFlags&ast.FunctionFlagsGenerator == 0 || !scope.isAsyncYield) {
-				// TODO(port): implement suggestions
-				// // If the function belongs to a method definition or
-				// // property, then the function's range may not include the
-				// // `async` keyword and we should look at the parent instead.
-				// const nodeWithAsyncKeyword =
-				//   (node.parent.type === AST_NODE_TYPES.MethodDefinition &&
-				//     node.parent.value === node) ||
-				//   (node.parent.type === AST_NODE_TYPES.Property &&
-				//     node.parent.method &&
-				//     node.parent.value === node)
-				//     ? node.parent
-				//     : node;
-				//
-				// const asyncToken = nullThrows(
-				//   context.sourceCode.getFirstToken(
-				//     nodeWithAsyncKeyword,
-				//     token => token.value === 'async',
-				//   ),
-				//   'The node is an async function, so it must have an "async" token.',
-				// );
-				//
-				// const asyncRange: Readonly<AST.Range> = [
-				//   asyncToken.range[0],
-				//   nullThrows(
-				//     context.sourceCode.getTokenAfter(asyncToken, {
-				//       includeComments: true,
-				//     }),
-				//     'There will always be a token after the "async" keyword.',
-				//   ).range[0],
-				// ] as const;
-				//
-				// // Removing the `async` keyword can cause parsing errors if the
-				// // current statement is relying on automatic semicolon insertion.
-				// // If ASI is currently being used, then we should replace the
-				// // `async` keyword with a semicolon.
-				// const nextToken = nullThrows(
-				//   context.sourceCode.getTokenAfter(asyncToken),
-				//   'There will always be a token after the "async" keyword.',
-				// );
-				// const addSemiColon =
-				//   nextToken.type === AST_TOKEN_TYPES.Punctuator &&
-				//   (nextToken.value === '[' || nextToken.value === '(') &&
-				//   (nodeWithAsyncKeyword.type === AST_NODE_TYPES.MethodDefinition ||
-				//     isStartOfExpressionStatement(nodeWithAsyncKeyword)) &&
-				//   needsPrecedingSemicolon(context.sourceCode, nodeWithAsyncKeyword);
-				//
-				// const changes = [
-				//   { range: asyncRange, replacement: addSemiColon ? ';' : undefined },
-				// ];
-				//
-				// // If there's a return type annotation and it's a
-				// // `Promise<T>`, we can also change the return type
-				// // annotation to just `T` as part of the suggestion.
-				// // Alternatively, if the function is a generator and
-				// // the return type annotation is `AsyncGenerator<T>`,
-				// // then we can change it to `Generator<T>`.
-				// if (
-				//   node.returnType?.typeAnnotation.type ===
-				//   AST_NODE_TYPES.TSTypeReference
-				// ) {
-				//   if (scopeInfo.isGen) {
-				//     if (hasTypeName(node.returnType.typeAnnotation, 'AsyncGenerator')) {
-				//       changes.push({
-				//         range: node.returnType.typeAnnotation.typeName.range,
-				//         replacement: 'Generator',
-				//       });
-				//     }
-				//   } else if (
-				//     hasTypeName(node.returnType.typeAnnotation, 'Promise') &&
-				//     node.returnType.typeAnnotation.typeArguments != null
-				//   ) {
-				//     const openAngle = nullThrows(
-				//       context.sourceCode.getFirstToken(
-				//         node.returnType.typeAnnotation,
-				//         token =>
-				//           token.type === AST_TOKEN_TYPES.Punctuator &&
-				//           token.value === '<',
-				//       ),
-				//       'There are type arguments, so the angle bracket will exist.',
-				//     );
-				//     const closeAngle = nullThrows(
-				//       context.sourceCode.getLastToken(
-				//         node.returnType.typeAnnotation,
-				//         token =>
-				//           token.type === AST_TOKEN_TYPES.Punctuator &&
-				//           token.value === '>',
-				//       ),
-				//       'There are type arguments, so the angle bracket will exist.',
-				//     );
-				//     changes.push(
-				//       // Remove the closing angled bracket.
-				//       { range: closeAngle.range, replacement: undefined },
-				//       // Remove the "Promise" identifier
-				//       // and the opening angled bracket.
-				//       {
-				//         range: [
-				//           node.returnType.typeAnnotation.typeName.range[0],
-				//           openAngle.range[1],
-				//         ],
-				//         replacement: undefined,
-				//       },
-				//     );
-				//   }
-				// }
-				//
-				// context.report({
-				//   loc: getFunctionHeadLoc(node, context.sourceCode),
-				//   node,
-				//   messageId: 'missingAwait',
-				//   data: {
-				//     name: upperCaseFirst(getFunctionNameWithKind(node)),
-				//   },
-				//   suggest: [
-				//     {
-				//       messageId: 'removeAsync',
-				//       fix: (fixer): RuleFix[] =>
-				//         changes.map(change =>
-				//           change.replacement != null
-				//             ? fixer.replaceTextRange(change.range, change.replacement)
-				//             : fixer.removeRange(change.range),
-				//         ),
-				//     },
-				//   ],
-				// });
-				ctx.ReportRange(utils.GetFunctionHeadLoc(ctx.SourceFile, node), buildMissingAwaitMessage(node))
+				reportMissingAwait(
+					ctx,
+					node,
+					scope.functionFlags&ast.FunctionFlagsGenerator != 0,
+				)
 			}
 
 			scopes = scopes[:len(scopes)-1]
