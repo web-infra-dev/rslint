@@ -99,20 +99,10 @@ func TestGetMemberEntriesRejectsDynamicElementAccess(t *testing.T) {
 }
 
 func TestResolveFirstIdentifier(t *testing.T) {
-	for _, code := range []string{
-		"((test).each)`table`('name', () => {})",
-		`test!.todo("case")`,
-		`(test as typeof test).todo("case")`,
-		`(test satisfies typeof test).todo("case")`,
-		`(<typeof test>test).todo("case")`,
-	} {
-		t.Run(code, func(t *testing.T) {
-			_, call := parseFirstCall(t, code)
-			identifier := ResolveFirstIdentifier(call.AsCallExpression().Expression)
-			if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.AsIdentifier().Text != "test" {
-				t.Fatalf("first identifier = %#v, want test", identifier)
-			}
-		})
+	_, call := parseFirstCall(t, "((test).each)`table`('name', () => {})")
+	identifier := ResolveFirstIdentifier(call.AsCallExpression().Expression)
+	if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.AsIdentifier().Text != "test" {
+		t.Fatalf("first identifier = %#v, want test", identifier)
 	}
 }
 

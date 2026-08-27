@@ -196,7 +196,7 @@ func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}
-	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
+	node = ast.SkipParentheses(node)
 	if node == nil {
 		return nil
 	}

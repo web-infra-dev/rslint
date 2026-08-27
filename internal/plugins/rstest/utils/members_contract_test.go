@@ -107,8 +107,6 @@ func TestSemanticFieldsSurviveAliases(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{Code: `const skipped = test.skip; skipped("case", cb);`, Errors: flagged},
 			{Code: `const todoTest = test.todo; todoTest("case");`, Errors: flagged},
-			{Code: `const { todo: pending } = test; pending("case");`, Errors: flagged},
-			{Code: `const { todo } = test; todo("case");`, Errors: flagged},
 			{Code: `const focused = test.only; focused("case", cb);`, Errors: flagged},
 			{Code: `const focusedEach = test.only.each([1]); focusedEach("case", cb);`, Errors: flagged},
 			{Code: `const forCase = test.for([1]); forCase("case", cb);`, Errors: flagged},

@@ -94,22 +94,6 @@ func TestWarnTodoExtras(t *testing.T) {
 				Code:   `test.todo?.("case");`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 6, 10)},
 			},
-			{
-				Code:   `test!.todo("case");`,
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 7, 11)},
-			},
-			{
-				Code:   `(test as typeof test).todo("case");`,
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 23, 27)},
-			},
-			{
-				Code:   `(test satisfies typeof test).todo("case");`,
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 30, 34)},
-			},
-			{
-				Code:   `(<typeof test>test).todo("case");`,
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 21, 25)},
-			},
 			// A todo registration with no title is still a todo registration.
 			{
 				Code:   `test.todo();`,
@@ -185,15 +169,6 @@ suite.todo("suite", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 7, 11)},
 			},
 			{
-				Code: `const { ["test"]: check } = require("@rstest/core");
-check.todo("case");`,
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 7, 11)},
-			},
-			{
-				Code:   "const { [`test`]: check } = require(\"@rstest/core\");\ncheck.todo(\"case\");",
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 7, 11)},
-			},
-			{
 				Code: `import * as rstest from "@rstest/core";
 rstest.test.todo("case");`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 13, 17)},
@@ -235,25 +210,6 @@ pending("case");`,
 const pending = base.todo;
 pending.each([1])("case", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(3, 1, 8)},
-			},
-			{
-				Code: `const { todo: pending } = test;
-pending("case");`,
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 8)},
-			},
-			{
-				Code: `const { todo } = test;
-todo("another case");`,
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 5)},
-			},
-			{
-				Code: `const { ["todo"]: pending } = test;
-pending("case");`,
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 8)},
-			},
-			{
-				Code:   "const { [`todo`]: pending } = test;\npending(\"case\");",
-				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 8)},
 			},
 			// A todo registration remains one when used as another call's argument.
 			{
