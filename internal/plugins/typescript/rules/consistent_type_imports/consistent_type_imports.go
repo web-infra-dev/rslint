@@ -242,7 +242,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				allUsedImportsAreTypes := len(report.valueSpecifiers) == 0 && len(report.unusedSpecifiers) == 0
 				if allUsedImportsAreTypes {
 					declaration := report.node.AsImportDeclaration()
-					if declaration.Attributes != nil {
+					if hasImportAttributes(declaration) {
 						continue
 					}
 					ctx.ReportNodeWithDeferredFixes(report.node, messageTypeOverValue(), func() []rule.RuleFix {
@@ -452,7 +452,7 @@ func firstCommentOrPosition(text string, start int, end int) int {
 func fixesToTypeImport(ctx rule.RuleContext, fixStyle string, report *reportValueImport, imports *sourceImports) []rule.RuleFix {
 	defaultSpecifier, namedSpecifiers, namespaceSpecifier := classifySpecifiers(report.allSpecifiers)
 	if namespaceSpecifier != nil && defaultSpecifier == nil {
-		if report.node.AsImportDeclaration().Attributes != nil {
+		if hasImportAttributes(report.node.AsImportDeclaration()) {
 			return nil
 		}
 		return insertTopLevelTypeFixes(ctx, report.node, false)
@@ -526,6 +526,14 @@ func fixesToTypeImport(ctx rule.RuleContext, fixStyle string, report *reportValu
 	}
 	fixes = append(fixes, removeNamed...)
 	return fixes
+}
+
+func hasImportAttributes(declaration *ast.ImportDeclaration) bool {
+	if declaration == nil || declaration.Attributes == nil {
+		return false
+	}
+	attributes := declaration.Attributes.AsImportAttributes()
+	return attributes != nil && attributes.Attributes != nil && len(attributes.Attributes.Nodes) > 0
 }
 
 func classifySpecifiers(specifiers []importSpecifier) (defaultSpecifier *importSpecifier, named []*importSpecifier, namespace *importSpecifier) {

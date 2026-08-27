@@ -91,6 +91,10 @@ object, so imports from `"constructor"`, `"toString"`, `"__proto__"`, or
 `"hasOwnProperty"` throw while linting. The Go map intentionally handles these
 names normally and still reports and fixes the import.
 
+With `"inline-type-imports"`, rslint also emits a valid inline fix when an
+earlier default-only or default-plus-namespace value import from the same module
+causes the pinned upstream implementation to suppress its fix.
+
 ## Original Documentation
 
 - [typescript-eslint: consistent-type-imports](https://typescript-eslint.io/rules/consistent-type-imports)

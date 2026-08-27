@@ -31,6 +31,44 @@ func TestConsistentTypeImportsExtras(t *testing.T) {
 		// ---- Real-user: typescript-eslint#2455 the classic JSX factory is an implicit value use ----
 		{Code: `import React from 'react'; export const C: React.FC = () => <div />;`, FileName: "test.tsx"},
 	}, []rule_tester.InvalidTestCase{
+		// ---- ECMAScript trim: a BOM between the default binding and comma is whitespace ----
+		{
+			Code: "import Def\uFEFF, { A } from 'foo'; A(); type T = Def;",
+			Output: []string{`import type Def from 'foo';
+import { A } from 'foo'; A(); type T = Def;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "someImportsAreOnlyTypes", Line: 1, Column: 1}},
+		},
+		// ---- Empty import attributes do not block safe type-only rewrites ----
+		{
+			Code:   `import Foo from 'foo' with {}; type T = Foo;`,
+			Output: []string{`import type Foo from 'foo' with {}; type T = Foo;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
+		{
+			Code:   `import * as N from 'foo' with {}; type T = N.Foo;`,
+			Output: []string{`import type * as N from 'foo' with {}; type T = N.Foo;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
+		{
+			Code:   `import { A } from 'foo' with {}; type T = A;`,
+			Output: []string{`import type { A } from 'foo' with {}; type T = A;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
+		// ---- Deliberate divergence: emit a valid inline fix despite an earlier default-only value import ----
+		{
+			Code: `import Def from 'foo';
+import Def2, { B } from 'foo';
+const a = Def;
+const b = Def2;
+type T = B;`,
+			Options: map[string]interface{}{"fixStyle": "inline-type-imports"},
+			Output: []string{`import Def from 'foo';
+import Def2, { type B } from 'foo';
+const a = Def;
+const b = Def2;
+type T = B;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "someImportsAreOnlyTypes", Line: 2, Column: 1}},
+		},
 		// ---- Dimension 4: nested qualified type name ----
 		{
 			Code:   `import Foo from 'foo'; type T = Foo.Bar.Baz;`,
@@ -78,8 +116,8 @@ func TestConsistentTypeImportsEditDemand(t *testing.T) {
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
 			File:    sourceFile.FileName(),
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     ConsistentTypeImportsRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

@@ -1,4 +1,0 @@
-{
-  "extends": "./tsconfig.virtual.json",
-  "include": ["fixtures/**/*.ts", "fixtures/**/*.tsx"]
-}
