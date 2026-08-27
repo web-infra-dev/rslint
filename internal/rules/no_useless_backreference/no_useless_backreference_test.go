@@ -7,11 +7,11 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -671,13 +671,11 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 	}
 
 	var diagnostics []rule.RuleDiagnostic
-	linter.RunLinterInProgram(
-		lintprogram.NewFromCompiler(program),
-		[]string{sourceFile.FileName()},
-		nil,
-		nil,
-		func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program: lintprogram.NewFromCompiler(program),
+		Files:   []string{sourceFile.FileName()},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     NoUselessBackreferenceRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -685,12 +683,10 @@ func TestImportedRegExpConstructorAlias(t *testing.T) {
 				},
 			}}
 		},
-		false,
-		func(diagnostic rule.RuleDiagnostic) {
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		nil,
-	)
+	})
 	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "forward" {
 		t.Fatalf("diagnostics = %#v; want one forward report", diagnostics)
 	}
@@ -733,13 +729,11 @@ first("\\1(a)");
 	if err != nil {
 		t.Fatal(err)
 	}
-	linter.RunLinterInProgram(
-		sourceProgram,
-		[]string{sourceFile.FileName()},
-		nil,
-		nil,
-		func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program: sourceProgram,
+		Files:   []string{sourceFile.FileName()},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     NoUselessBackreferenceRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -747,12 +741,10 @@ first("\\1(a)");
 				},
 			}}
 		},
-		false,
-		func(diagnostic rule.RuleDiagnostic) {
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		nil,
-	)
+	})
 	if len(diagnostics) != 6 {
 		t.Fatalf("diagnostics = %#v; want six forward reports", diagnostics)
 	}

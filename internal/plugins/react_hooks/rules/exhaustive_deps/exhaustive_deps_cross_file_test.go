@@ -215,13 +215,13 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 		}
 	}()
 
-	if _, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-		SingleThreaded: true,
-		Scope:          linter.FileScope{Files: []string{tsxPath}},
-		ExcludePaths:   []string{},
-		GetRulesForFile: func(_ *ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+	programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{tsxPath}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(_ *ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "react-hooks/exhaustive-deps",
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -229,6 +229,13 @@ declare function setTimeout(handler: () => void, timeout: number): number;
 				},
 			}}
 		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	if _, err := linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,
 			Report: func(d rule.RuleDiagnostic) {

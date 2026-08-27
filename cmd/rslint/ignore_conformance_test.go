@@ -175,7 +175,7 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			code, stdout, stderr := runLintPipelineForTest(t, configDir, lintArgs{
+			code, stdout, stderr := runLintCommandForTest(t, configDir, lintArgs{
 				Config:         configPath,
 				AllowFiles:     []string{tspath.NormalizePath(target)},
 				Format:         "default",
@@ -254,7 +254,7 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 		},
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 		ConfigCatalog:  catalog,
 		Format:         "jsonline",
 		NoColor:        true,
@@ -311,7 +311,7 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 			},
 		},
 	}
-	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 		ConfigCatalog:  catalog,
 		AllowFiles:     []string{tspath.NormalizePath(explicitTarget)},
 		AllowDirs:      []string{tspath.NormalizePath(ignoredDir)},
@@ -396,7 +396,7 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 		{name: "concurrent"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+			code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 				ConfigCatalog:  catalog,
 				Format:         "jsonline",
 				NoColor:        true,

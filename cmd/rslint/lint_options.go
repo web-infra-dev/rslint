@@ -184,9 +184,9 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 			// uses unresolved CWD-based paths. Resolving only file args would
 			// create a format mismatch causing failures in lint-target detection,
 			// config matching, dir scoping, and gitignore checks.
-			// Edge cases (e.g. user passes a symlink-resolved absolute path)
-			// are handled by isFileAllowed's os.SameFile fallback in linter.go
-			// and program file index realpath aliases during target binding.
+			// Lexical and canonical aliases are frozen during target discovery;
+			// the Program loader then resolves those aliases while binding the
+			// exact target projection.
 			normalized := tspath.NormalizePath(absPath)
 			info, statErr := os.Stat(absPath)
 			if statErr == nil && info.IsDir() {

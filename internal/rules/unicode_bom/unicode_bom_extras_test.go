@@ -359,13 +359,13 @@ func runUnicodeBom(t *testing.T, code string, demand rule.EditDemand) []rule.Rul
 	assert.NilError(t, err)
 
 	var diagnostics []rule.RuleDiagnostic
-	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-		SingleThreaded: true,
-		Scope:          linter.FileScope{Files: []string{program.GetSourceFile(fileName).FileName()}},
-		ExcludePaths:   []string{},
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+	programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{program.GetSourceFile(fileName).FileName()}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     UnicodeBomRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -373,6 +373,11 @@ func runUnicodeBom(t *testing.T, code string, demand rule.EditDemand) []rule.Rul
 				},
 			}}
 		},
+	})
+	assert.NilError(t, err)
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },

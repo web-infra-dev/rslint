@@ -112,6 +112,15 @@ interface FooInterface {
 		{Code: "let a: readonly Array<number>[] = [[]];", Options: map[string]interface{}{"default": "generic", "readonly": "array"}},
 		{Code: "let a: Readonly = [];", Options: map[string]interface{}{"default": "generic", "readonly": "array"}},
 		{Code: "const x: Readonly<string> = 'a';", Options: map[string]interface{}{"default": "array"}},
+
+		// jsdoc is skipped
+		{
+			Code: `/** @type {Array<{ size: number, unpackedSize: number; files: Array<{ path: string; size: number; }>; }>} */
+const [before, after] = JSON.parse(output);`,
+			FileName: "checkPackageSize.mjs",
+			Options:  map[string]interface{}{"default": "array"},
+			TSConfig: "tsconfig.allow-js.json",
+		},
 	}, []rule_tester.InvalidTestCase{
 		// Base cases - errors with array option
 		{
@@ -499,12 +508,11 @@ type ReadonlySimple = readonly Value[];`,
 
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      lintprogram.NewFromCompiler(program),
-					File:         sourceFile.FileName(),
-					HasTypeInfo:  true,
-					ExcludePaths: []string{},
-					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-						return []linter.ConfiguredRule{{
+					Program:     lintprogram.NewFromCompiler(program),
+					File:        sourceFile.FileName(),
+					HasTypeInfo: true,
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{
 							Name:     ArrayTypeRule.Name,
 							Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
