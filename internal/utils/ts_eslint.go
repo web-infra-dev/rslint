@@ -2530,9 +2530,10 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 }
 
 // HasSameTokens reports whether two nodes produce the same token stream when
-// viewed at the raw-source level — matching ESLint's
+// viewed at the token-value level — matching ESLint's
 // `sourceCode.getTokens(a)` vs `sourceCode.getTokens(b)` semantics, which
-// preserves the original source form of each literal. Unlike
+// preserves the original source form of each literal while decoding identifier
+// escapes. Unlike
 // [AreNodesStructurallyEqual], this helper distinguishes:
 //
 //   - `'a'` vs `"a"` (different quote style)
@@ -2541,8 +2542,8 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 //   - `1e2` vs `100` / `1.0` vs `1`
 //
 // Implementation: we recurse on the AST using [ast.SkipParentheses] and
-// [ast.Node.ForEachChild]. At leaf nodes (no children — identifiers,
-// literals, keyword tokens) we compare the raw source slice via
+// [ast.Node.ForEachChild]. Identifier leaves compare their parsed text; other
+// leaves (literals and keyword tokens) compare the raw source slice via
 // [scanner.GetSourceTextOfNodeFromSourceFile]. For composite nodes we
 // recurse on children pairwise AND scan the "gaps" between children
 // (and before/after the first/last child) with [scanner.Scanner] to pick
@@ -2588,9 +2589,14 @@ func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 	if a.Kind != b.Kind {
 		return false
 	}
+	// ESLint identifier tokens expose their decoded value, so `foo` and
+	// `\u0066oo` are the same token even though their source text differs.
+	if a.Kind == ast.KindIdentifier {
+		return a.AsIdentifier().Text == b.AsIdentifier().Text
+	}
 	aKids, bKids := collectKids(a), collectKids(b)
 	// Leaves (no children via ForEachChild). Two sub-classes collide here:
-	//   1. True leaves (Identifier, Literal, keyword tokens) — raw source
+	//   1. True leaves (Literal, keyword tokens) — raw source
 	//      text is exactly the single token's text, so raw-text equality
 	//      is correct.
 	//   2. Empty composites (`[]`, `{}`) — raw text includes the brackets

@@ -79,6 +79,12 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 			{Code: `interface I { get a(): string; middle: true; set a(value: string); }`, Options: []any{"anyOrder", map[string]any{"enforceForTSTypes": false}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Identifier tokens compare by their decoded value, so an escaped
+			// spelling still names the same dynamic accessor key.
+			{
+				Code:   `({ get [foo](){}, middle: true, set [\u0066oo](value){} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
+			},
 			// Empty class elements do not take precedence over an order violation.
 			{
 				Code:    `class C { set name(value){} ; get name(){} }`,
