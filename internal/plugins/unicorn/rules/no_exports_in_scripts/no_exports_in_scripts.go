@@ -8,8 +8,10 @@ package no_exports_in_scripts
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const messageID = "no-exports-in-scripts"
@@ -28,8 +30,20 @@ func message() rule.RuleMessage {
 // `export enum ...`, `export namespace ...`, and TypeScript
 // `export import ...` declarations. `KindExportDeclaration` is already an
 // export-only node and does not need this check.
-func isExported(node *ast.Node) bool {
-	return node != nil && ast.HasSyntacticModifier(node, ast.ModifierFlagsExport)
+func exportedDeclarationRange(node *ast.Node, sourceFile *ast.SourceFile) (core.TextRange, bool) {
+	if node == nil || !ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) {
+		return core.TextRange{}, false
+	}
+	modifiers := node.Modifiers()
+	if modifiers == nil {
+		return core.TextRange{}, false
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier.Kind == ast.KindExportKeyword {
+			return core.NewTextRange(utils.TrimNodeTextRange(sourceFile, modifier).Pos(), node.End()), true
+		}
+	}
+	return core.TextRange{}, false
 }
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v72.0.0/rules/no-exports-in-scripts.js
@@ -49,8 +63,8 @@ var NoExportsInScriptsRule = rule.Rule{
 		}
 
 		reportIfExported := func(node *ast.Node) {
-			if isExported(node) {
-				ctx.ReportNode(node, message())
+			if reportRange, ok := exportedDeclarationRange(node, ctx.SourceFile); ok {
+				ctx.ReportRange(reportRange, message())
 			}
 		}
 

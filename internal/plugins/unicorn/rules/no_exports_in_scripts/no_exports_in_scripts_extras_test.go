@@ -87,6 +87,14 @@ func TestNoExportsInScriptsExtras(t *testing.T) {
 				Code:     "#!/usr/bin/env node\nconst foo = 1;\nexport = foo;",
 				FileName: "file.ts",
 			},
+
+			// The directive applies to the authored `export` line, matching
+			// upstream's ExportNamedDeclaration wrapper rather than the
+			// decorator at the start of the flattened tsgo class node.
+			{
+				Code:     "#!/usr/bin/env node\n@dec\n// eslint-disable-next-line test\nexport class C {}",
+				FileName: "file.ts",
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 1: a CRLF shebang still trips the gate, the
@@ -188,6 +196,37 @@ func TestNoExportsInScriptsExtras(t *testing.T) {
 				FileName: "file.ts",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: messageID, Line: 2, Column: 1, EndLine: 2, EndColumn: 39},
+				},
+			},
+
+			// A directive before the decorator does not suppress the export
+			// on the following line; the diagnostic begins at `export`.
+			{
+				Code:     "#!/usr/bin/env node\n// eslint-disable-next-line test\n@dec\nexport class C {}",
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: messageID, Line: 4, Column: 1, EndLine: 4, EndColumn: 18},
+				},
+			},
+			{
+				Code:     "#!/usr/bin/env node\n@dec\nexport class C {}",
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: messageID, Line: 3, Column: 1, EndLine: 3, EndColumn: 18},
+				},
+			},
+			{
+				Code:     "#!/usr/bin/env node\n@dec\nexport default class C {}",
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: messageID, Line: 3, Column: 1, EndLine: 3, EndColumn: 26},
+				},
+			},
+			{
+				Code:     "#!/usr/bin/env node\nexport @dec class C {}",
+				FileName: "file.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: messageID, Line: 2, Column: 1, EndLine: 2, EndColumn: 23},
 				},
 			},
 
