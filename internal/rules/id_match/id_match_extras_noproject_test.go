@@ -74,6 +74,77 @@ func TestIdMatchExtrasNoProject(t *testing.T) {
 			},
 		},
 		{
+			// ---- A type query reads a value, not the global type namespace ----
+			name:    "library name in type query",
+			code:    "type X = typeof Partial;",
+			options: []any{`^X$`},
+			want: []string{
+				"Identifier 'Partial' does not match the pattern '^X$'.",
+			},
+		},
+		{
+			// ---- A computed type member also reads a value ----
+			name:    "library name as computed type member",
+			code:    "type X = { [Partial]: string };",
+			options: []any{`^(X|string)$`},
+			want: []string{
+				"Identifier 'Partial' does not match the pattern '^(X|string)$'.",
+			},
+		},
+		{
+			// ---- Heritage type references still use the global type namespace ----
+			name:    "library names in heritage type reference",
+			code:    "interface X extends Partial<Record<string, string>> {}",
+			options: []any{`^(X|string)$`},
+		},
+		{
+			name:    "library name as function type parameter",
+			code:    "type X = (Record: string) => void;",
+			options: []any{`^(X|string|void)$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^(X|string|void)$'.",
+			},
+		},
+		{
+			name:    "library name as property signature",
+			code:    "type X = { Record: string };",
+			options: []any{`^(X|string)$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^(X|string)$'.",
+			},
+		},
+		{
+			name:    "library name as mapped type parameter",
+			code:    "type X = { [Record in string]: string };",
+			options: []any{`^(X|string)$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^(X|string)$'.",
+			},
+		},
+		{
+			name:    "library name as infer binding and reference",
+			code:    "type X = string extends infer Record ? Record : never;",
+			options: []any{`^(X|string|never)$`},
+			want: []string{
+				"Identifier 'Record' does not match the pattern '^(X|string|never)$'.",
+				"Identifier 'Record' does not match the pattern '^(X|string|never)$'.",
+			},
+		},
+		{
+			name:    "library names in chained import type qualifier",
+			code:    `type X = import("./m").Array.Record;`,
+			options: []any{`^X$`},
+			want: []string{
+				"Identifier 'Array' does not match the pattern '^X$'.",
+				"Identifier 'Record' does not match the pattern '^X$'.",
+			},
+		},
+		{
+			name:    "library name as import type argument",
+			code:    `type X = import("./m").T<Partial<string>>;`,
+			options: []any{`^(X|T|string)$`},
+		},
+		{
 			// ---- A name the file declares itself is the author's ----
 			name:    "shadowed library type",
 			code:    "type Record = 1;\nlet x: Record;",

@@ -314,13 +314,17 @@ func (r *idMatch) isDeclaredInFile(node *ast.Node, name string) bool {
 }
 
 // isNonReferenceIdentifier reports whether an identifier names something rather
-// than reading it. It extends utils.IsNonReferenceIdentifier with the two
-// places tsgo writes one identifier where ESLint's AST writes two over the same
-// range: a shorthand property, whose key half is no reference, and an
+// than reading it. Import-type qualifiers name exports of another module, not
+// globals in this file. It also extends utils.IsNonReferenceIdentifier with the
+// two places tsgo writes one identifier where ESLint's AST writes two over the
+// same range: a shorthand property, whose key half is no reference, and an
 // un-aliased export specifier, whose exported half is no reference. Upstream
 // dedupes such a pair by range, so the half that is not a reference is the one
 // that decides.
 func isNonReferenceIdentifier(node *ast.Node) bool {
+	if utils.IsImportTypeSyntax(node) {
+		return true
+	}
 	if parent := node.Parent; parent != nil && parent.Name() == node {
 		switch parent.Kind {
 		case ast.KindShorthandPropertyAssignment:
@@ -371,7 +375,7 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 // export of the imported module; neither inherits an exemption merely because
 // it is spelled `Record`, `Array`, or another standard-library type name.
 func isTypeGlobalReference(node *ast.Node) bool {
-	return !isNonReferenceIdentifier(node) && !utils.IsImportTypeSyntax(node)
+	return !isNonReferenceIdentifier(node)
 }
 
 // checkConstructor reports a class constructor. tsgo spells its name with a

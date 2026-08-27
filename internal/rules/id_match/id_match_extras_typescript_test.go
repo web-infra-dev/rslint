@@ -30,6 +30,10 @@ func TestIdMatchExtrasTypescript(t *testing.T) {
 				Code:    `let x: ReadonlyArray<number>;`,
 				Options: []any{`^x$`},
 			},
+			{
+				Code:    `interface X extends Partial<Record<string, string>> {}`,
+				Options: []any{`^(X|string)$`},
+			},
 			// ---- `as const` names no declaration ----
 			{
 				Code:    `const x = 1 as const;`,
@@ -195,6 +199,56 @@ let x: Local_1;`,
 						Column:    24,
 						EndLine:   1,
 						EndColumn: 30,
+					},
+				},
+			},
+			{
+				Code:    `type X = import("./m").Array.Record;`,
+				Options: []any{`^X$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Array' does not match the pattern '^X$'.`,
+						Line:      1,
+						Column:    24,
+						EndLine:   1,
+						EndColumn: 29,
+					},
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^X$'.`,
+						Line:      1,
+						Column:    30,
+						EndLine:   1,
+						EndColumn: 36,
+					},
+				},
+			},
+			{
+				Code:    `type X = typeof Partial;`,
+				Options: []any{`^X$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Partial' does not match the pattern '^X$'.`,
+						Line:      1,
+						Column:    17,
+						EndLine:   1,
+						EndColumn: 24,
+					},
+				},
+			},
+			{
+				Code:    `type X = { [Partial]: string };`,
+				Options: []any{`^(X|string)$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Partial' does not match the pattern '^(X|string)$'.`,
+						Line:      1,
+						Column:    13,
+						EndLine:   1,
+						EndColumn: 20,
 					},
 				},
 			},
