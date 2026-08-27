@@ -34,7 +34,7 @@ func TestCommittedAutofixCommitsOnlyFinalDeltaOnce(t *testing.T) {
 		provider,
 		committer,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: MaxFixRounds},
+		AutofixPolicy{},
 		nil,
 	))
 	if err != nil {
@@ -93,7 +93,7 @@ func TestAutofixTerminalCommitErrorReturnsConfirmedExternalState(t *testing.T) {
 		provider,
 		committer,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 1},
+		autofixPolicyForTest(1, AutofixPolicy{}),
 		nil,
 	))
 	if err == nil || !strings.Contains(err.Error(), "partial commit") {
@@ -126,7 +126,7 @@ func TestAutofixPropagatesCancellationFromTerminalCommitter(t *testing.T) {
 		provider,
 		committer,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 1},
+		autofixPolicyForTest(1, AutofixPolicy{}),
 		nil,
 	))
 	if !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), commitErr.Error()) {
@@ -144,7 +144,7 @@ func TestCommittedAutofixRejectsNilCommitterBeforeAcquisition(t *testing.T) {
 		provider,
 		nil,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 1},
+		autofixPolicyForTest(1, AutofixPolicy{}),
 		nil,
 	))
 	if err == nil || !strings.Contains(err.Error(), "committer must not be nil") {
@@ -167,7 +167,7 @@ func TestAutofixPipelineRejectsFalseTerminalCommitConfirmation(t *testing.T) {
 		provider,
 		committer,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 1},
+		autofixPolicyForTest(1, AutofixPolicy{}),
 		nil,
 	))
 	if err == nil || !strings.Contains(err.Error(), "confirmed 0 of 1") {

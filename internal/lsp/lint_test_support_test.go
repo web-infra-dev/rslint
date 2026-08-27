@@ -127,7 +127,6 @@ func runSpeculativeFixAllForTest(
 			PluginFailure: linter.PluginDiscardOnFailure,
 		},
 		linter.AutofixPolicy{
-			MaxRounds:                maxFixRounds,
 			StopOnTargetSyntaxErrors: true,
 		},
 		dispatch,

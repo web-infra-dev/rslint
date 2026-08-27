@@ -549,11 +549,3 @@ func TestHandleFixAllCodeAction_DocumentNotInMap(t *testing.T) {
 		t.Error("expected empty code actions for document not in map")
 	}
 }
-
-// ======== maxFixRounds constant test ========
-
-func TestMaxFixRounds_IsReasonable(t *testing.T) {
-	if maxFixRounds < 1 || maxFixRounds > 100 {
-		t.Errorf("maxFixRounds = %d, should be between 1 and 100", maxFixRounds)
-	}
-}

@@ -106,13 +106,10 @@ func isFixAllRequest(ctx *lsproto.CodeActionContext) bool {
 	return false
 }
 
-// maxFixRounds is the maximum number of non-empty change-set commits when two
-// rules produce fixes that undo each other.
-const maxFixRounds = linter.MaxFixRounds
-
 // handleFixAllCodeAction computes all auto-fixes for the given URI using
 // bounded rounds: each observation lints an isolated overlay and each non-empty
-// planned change set advances it by one round, until stable or maxFixRounds.
+// planned change set advances it by one round, until stable or the linter-owned
+// product limit.
 // This handles cascading fixes (e.g. no-wrapper-object-types fix triggers no-inferrable-types).
 // It does NOT push diagnostics or update s.diagnostics — that is left to the
 // subsequent didSave handler in the normal save flow.
@@ -152,9 +149,6 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 			PluginFailure: linter.PluginDiscardOnFailure,
 		},
 		linter.AutofixPolicy{
-			MaxRounds:                maxFixRounds,
-			VerifyAfterLastRound:     false,
-			VerificationDemand:       linter.ArtifactDemand{},
 			StopOnTargetSyntaxErrors: true,
 		},
 		budgetedDispatch,
