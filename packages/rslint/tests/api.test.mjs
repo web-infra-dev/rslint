@@ -91,13 +91,21 @@ describe('lint fix:true', async (t) => {
         [virtual_entry]: fileContent,
       },
       fix: true,
+      includeEncodedSourceFiles: true,
     });
 
     // fix:true applies fixes in-band and returns the fixed source per file in
     // `output` (array-type rewrites `Array<string>` → `string[]`); the fix is
     // not written to disk.
     expect(diags.output).toBeDefined();
-    expect(diags.fixableErrorCount).toBe(1);
+    expect(diags.diagnostics).toEqual([]);
+    expect(diags.errorCount).toBe(0);
+    expect(diags.fixableErrorCount).toBe(0);
+    const encoded = diags.encodedSourceFiles['src/virtual.ts'];
+    const buffer = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+    expect(new RemoteSourceFile(buffer, new TextDecoder()).text).toBe(
+      'let a: string[] = [];',
+    );
     expect({
       input: fileContent,
       output: diags.output,

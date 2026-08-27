@@ -106,3 +106,20 @@ func (s *autofixState) finalChanges() []FileChange {
 	}
 	return changes
 }
+
+func (s *autofixState) finalSources() []SourceFileSnapshot {
+	paths := make([]string, 0, len(s.appliedDiagnostics))
+	for path := range s.appliedDiagnostics {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	files := make([]SourceFileSnapshot, 0, len(paths))
+	for _, path := range paths {
+		text, known := s.text(path)
+		if !known {
+			continue
+		}
+		files = append(files, SourceFileSnapshot{Path: path, Text: text})
+	}
+	return files
+}

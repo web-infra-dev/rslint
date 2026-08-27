@@ -151,6 +151,8 @@ static outputFixes(results: LintResult[]): Promise<void>
 
 Writes the `output` of fixed results back to disk.
 
+With `fix: true`, rslint runs up to ten lint-fix rounds. Result messages and counts describe the final in-memory source; findings removed by applied fixes do not remain in `messages`.
+
 ```ts
 const rslint = new Rslint({ fix: true });
 const results = await rslint.lintFiles(['src/**/*.ts']);

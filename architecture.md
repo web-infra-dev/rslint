@@ -201,7 +201,7 @@ and cannot observe which construction path supplied it.
 6. **AST Traversal**: The linter traverses each file once using a DFS walk. It prunes syntax that TypeScript-Go synthesized from JSDoc comments; ESLint-compatible parsers expose that text through comment APIs rather than rule AST listeners.
 7. **Rule Execution**: Listener callbacks inspect nodes and may use syntax only or syntax plus type information.
 8. **Diagnostic Collection**: Findings are reported as `RuleDiagnostic` values, with optional fixes or suggestions.
-9. **Output Generation**: `RunPipeline` returns the last successful observation plus any final in-memory file delta. CLI optionally commits that delta to disk once and builds a report from final diagnostics, API returns structured data and maps its one-round delta to `output`, and LSP maps fix-all's delta to a whole-document edit.
+9. **Output Generation**: `RunPipeline` returns the last successful observation, the final in-memory delta, and final text for every target to which a fix was applied. CLI optionally commits the net delta to disk once and builds a report from final diagnostics, API returns final structured data plus per-fixed-file `output` (including a file restored to its input), and LSP maps fix-all's net delta to a whole-document edit.
 
 ### Error Recovery Strategy
 
@@ -579,8 +579,8 @@ stages. The lifecycle is:
    fix rounds; the generation provider only projects the immutable snapshot
    needed for the next observation.
 6. Re-materialize and re-observe the new snapshot until stable, restored to the
-   initial state, or bounded by `MaxFixRounds`; an adapter that returns a stale
-   generation is rejected before execution.
+   initial state, or bounded by the linter-owned ten-round product limit; an
+   adapter that returns a stale generation is rejected before execution.
 7. After successful completion only, optionally call `FinalChangeCommitter`
    once with the net initial-to-final delta. Intermediate changes are never
    exposed as persistence commands.
@@ -621,10 +621,12 @@ Important behavior differences by integration:
 - **LSP normal diagnostics and API**: request all native edits because fixes and
   suggestions are response metadata even when they are not immediately applied
 - **LSP speculative fix-all passes**: request native autofixes only
-- **API**: `lint({ fix: true })` selects the same core autofix use case with a
-  one-round/no-verification policy and returns its final memory delta per file
-  in `output`; the JS side persists it via `Rslint.outputFixes`. Unlike CLI, it
-  does not request cross-generation re-linting.
+- **API**: `lint({ fix: true })` selects the same linter-owned ten-round autofix
+  lifecycle as CLI and requests a complete final observation. Diagnostics,
+  counts, encoded sources, and remaining edit metadata therefore describe the
+  final in-memory source; `output` includes every file to which a fix was
+  applied, even if later rounds restored its initial text. The JS side alone
+  persists that output through `Rslint.outputFixes`.
 
 ## 8. Configuration & Directives
 
@@ -1189,8 +1191,9 @@ the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider
 maps any core snapshot onto the request's existing file-content/canonical-path
-overlay; the selected one-round autofix policy maps the returned memory delta
-to the response instead of implementing a separate fix path. API-specific path
+overlay; the core-owned bounded autofix lifecycle returns a verified final
+observation plus per-fixed-file source for the response instead of requiring a
+separate API fix path. API-specific path
 bases, opaque plugin routing keys, reverse transports, structured responses,
 and the inspector cache remain in `internal/api/server`; planning, execution,
 and mutation sequencing do not.
@@ -1412,13 +1415,13 @@ goroutines remain outside that guarantee.
   generations, API requests, LSP lint passes, and config reloads never share a
   plan cache. Merged config maps and configured-rule slices returned by the
   resolver are immutable shared state.
-- **Program Loader Session Boundary**: one CLI invocation or API lint request owns one `program/loader.Session`, created only after the request's overlay/canonical VFS wrappers are complete. The session privately composes compiler construction, source snapshots, metadata caches, project loading, target binding, and fix-generation invalidation. It is never global, never shared across API requests, and is not used by LSP, whose project session has a different invalidation model.
+- **Program Loader Generation Boundary**: the initial CLI/API observation and each changed autofix observation own a `program/loader.Session`, created only after that generation's overlay/canonical VFS wrappers are complete. A session privately composes compiler construction, source snapshots, metadata caches, project loading, and target binding for one immutable filesystem view. It is never global, never shared across API requests, and is not used by LSP, whose project session has a different invalidation model.
 - **Run/Request-Scoped Program Metadata**: successful `package.json` reads and explicitly registered root, project-reference, and extended tsconfig reads are snapshotted for the context lifetime. Keys remain exact caller paths—no cleaning, case folding, resolving real paths, or symlink merging—and failed reads are retried. Per-key read single-flight avoids duplicate concurrent I/O; generation swaps make future VFS writes safe without clearing a live map. Arbitrary JSON and non-metadata reads bypass this layer.
 - **Extended Config Parse Reuse**: the context implements ts-go's `ExtendedConfigCache` shim contract and shares common `extends` parse results across Programs. Parsing occurs outside map locks and publishes with `LoadOrStore`, avoiding recursive cross-cycle lock ordering; rare concurrent misses may duplicate parsing but share the winning immutable result and still single-flight raw bytes. Root `ParsedCommandLine` values and parsed `package.json` objects are not cached.
-- **Run/Request-Scoped Source Snapshots**: CLI runs and individual API requests share immutable source text/hash snapshots across project and transient root-parser hosts. Keys are the exact compiler-host source names, never real paths, so lexical, overlay, and symlink aliases remain distinct. Concurrent misses for one key share the successful read/hash operation; failed reads are shared only by the overlapping callers and are not retained. The source layer in one cache binds to one filesystem view across its generations; compiler hosts using another view bypass this layer while retaining content-keyed AST reuse. Snapshot sharing never publishes a bound AST across rslint Program generations.
-- **Generation-Based Fix Invalidation**: after every CLI fix write attempt, the compiler host atomically installs an empty source generation before any Program rebuild. Swapping generations rather than clearing a live map prevents an older in-flight read from repopulating the new generation. The API fix path only returns output and does not mutate or rebuild its overlay, while LSP remains version/didChange-driven.
-- **Run-Scoped Parse Reuse**: CLI Program rebuilds within one invocation and Programs within one API request share the existing content-keyed AST parse cache. Concurrent misses for the same full parse key are single-flight, so bounded Program construction does not duplicate parsing. Source-generation invalidation does not clear AST entries, so unchanged bytes can reuse their `SourceFile`. The cache is discarded with its run/request and is never repository-persistent or shared across lint requests.
-- **Bounded Multi-Pass Fixing**: `--fix` and LSP `fixAll` intentionally rerun lint after applying edits, but cap the cascade at `maxFixPasses = 10`
+- **Generation-Scoped Source Snapshots**: Programs built for one CLI/API observation share immutable source text/hash snapshots across project and transient root-parser hosts. Keys are the exact compiler-host source names, never real paths, so lexical, overlay, and symlink aliases remain distinct. Concurrent misses for one key share the successful read/hash operation; failed reads are shared only by the overlapping callers and are not retained. The next changed autofix observation receives a fresh session bound to its new overlay, so no source snapshot crosses generation boundaries and no bound AST is published across rslint Programs.
+- **Core-Owned Fix Generations**: after each successful fix round, `internal/linter` advances only its private source memory. CLI/API generation providers project that snapshot onto a fresh request-local overlay and rebuild Programs without mutating the base medium; CLI alone commits the final net delta to disk once. LSP speculative generations remain isolated from its document/session state, which still advances only through versioned document events.
+- **Generation-Scoped Parse Reuse**: all Programs within one CLI/API observation share that loader session's content-keyed AST parse cache. Concurrent misses for the same full parse key are single-flight, so multi-Program construction does not duplicate parsing. A changed autofix observation starts a fresh cache for its new source generation; caches are never repository-persistent or shared across lint requests.
+- **Bounded Multi-Pass Fixing**: CLI `--fix`, API `fix: true`, and LSP `fixAll` share the linter-owned limit of ten writable rounds. CLI and API request a final observation after the tenth write so their diagnostics describe the returned source; LSP consumes only the net text delta and does not pay for that extra observation.
 
 ### Memory Management
 
