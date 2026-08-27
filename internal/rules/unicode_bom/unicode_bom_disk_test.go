@@ -16,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
 )
@@ -181,16 +182,14 @@ func lintFile(t *testing.T, filePath string, fs vfs.FS) []rule.RuleDiagnostic {
 
 	ruleRan := false
 	var diagnostics []rule.RuleDiagnostic
-	linter.RunLinterInProgram(
-		lintprogram.NewFromCompiler(program),
-		nil,
-		nil,
-		utils.ExcludePaths,
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                lintprogram.NewFromCompiler(program),
+		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 			if sourceFile.FileName() != filePath {
 				return nil
 			}
-			return []linter.ConfiguredRule{{
+			return []rule.ConfiguredRule{{
 				Name:     UnicodeBomRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -199,12 +198,10 @@ func lintFile(t *testing.T, filePath string, fs vfs.FS) []rule.RuleDiagnostic {
 				},
 			}}
 		},
-		false,
-		func(diagnostic rule.RuleDiagnostic) {
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		nil,
-	)
+	})
 	assert.Assert(t, ruleRan, "the rule did not run for %s", filePath)
 
 	return diagnostics

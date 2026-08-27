@@ -1655,13 +1655,20 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		FS:                                  fs,
 	})
 	var diagnostics []rule.RuleDiagnostic
-	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       binding.Programs,
-		SingleThreaded: true,
-		TargetFiles:    targetsByProgram,
-		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         binding.Programs,
+		TargetsByProgram: targetsByProgram,
+		SingleThreaded:   true,
+		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			return fileConfigResolver.EnabledRulesForSourcePath(sf.FileName())
 		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,
 			Report: func(d rule.RuleDiagnostic) {

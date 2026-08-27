@@ -7,7 +7,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestRunLinterInProgram_AllowDirsBasic(t *testing.T) {
@@ -19,8 +18,8 @@ func TestRunLinterInProgram_AllowDirsBasic(t *testing.T) {
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
 	lintedFileNames := []string{}
 
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
@@ -47,8 +46,8 @@ func TestRunLinterInProgram_AllowDirsNoFalsePrefix(t *testing.T) {
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
 	lintedFileNames := []string{}
 
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
@@ -79,8 +78,8 @@ func TestRunLinterInProgram_AllowDirsAndFilesOR(t *testing.T) {
 	lintedFiles := runLinterInCompilerProgram(program,
 		[]string{paths["lib/b.ts"]}, // allowFiles
 		[]string{srcDir},            // allowDirs
-		utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
+		legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
@@ -103,8 +102,8 @@ func TestRunLinterInProgram_AllowDirsEmpty(t *testing.T) {
 		"a.ts": "const a = 1;",
 	})
 
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -120,8 +119,8 @@ func TestRunLinterInProgram_BothNilLintsAll(t *testing.T) {
 		"b.ts": "const b = 2;",
 	})
 
-	lintedFiles := runLinterInCompilerProgram(program, nil, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	lintedFiles := runLinterInCompilerProgram(program, nil, nil, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -142,8 +141,8 @@ func TestRunLinterInProgram_MultipleAllowDirs(t *testing.T) {
 	libDir := tmpDirPath(t, paths, "lib/b.ts")
 	lintedFileNames := []string{}
 
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir, libDir}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir, libDir}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
@@ -169,8 +168,8 @@ func TestRunLinterInProgram_AllowDirsWithEmptyAllowFiles(t *testing.T) {
 
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
 
-	lintedFiles := runLinterInCompilerProgram(program, []string{}, []string{srcDir}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	lintedFiles := runLinterInCompilerProgram(program, []string{}, []string{srcDir}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -185,8 +184,8 @@ func TestRunLinterInProgram_AllowDirsNoMatchInProgram(t *testing.T) {
 		"src/a.ts": "const a = 1;",
 	})
 
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{"/nonexistent/dir"}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{"/nonexistent/dir"}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -206,8 +205,8 @@ func TestRunLinterInProgram_NestedAllowDirs(t *testing.T) {
 	componentsDir := tmpDirPath(t, paths, "src/components/b.ts")
 	lintedFileNames := []string{}
 
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{componentsDir}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{componentsDir}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
@@ -231,8 +230,8 @@ func TestRunLinterInProgram_AllowDirsEmptyString(t *testing.T) {
 	})
 
 	// Empty string as allowDir should not match anything
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{""}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{""}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -250,8 +249,8 @@ func TestRunLinterInProgram_AllowDirsTrailingSlash(t *testing.T) {
 
 	// Trailing slash should still work
 	srcDir := tmpDirPath(t, paths, "src/a.ts") + "/"
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -268,8 +267,8 @@ func TestRunLinterInProgram_AllowDirsSameAsFilePath(t *testing.T) {
 
 	// Using the exact file path as allowDir should NOT match
 	// (a file is not "inside" itself)
-	lintedFiles := runLinterInCompilerProgram(program, nil, []string{paths["src/a.ts"]}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	lintedFiles := runLinterInCompilerProgram(program, nil, []string{paths["src/a.ts"]}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -291,8 +290,8 @@ func TestRunLinterInProgram_AllowDirsAndFilesOverlap(t *testing.T) {
 	lintedFiles := runLinterInCompilerProgram(program,
 		[]string{paths["src/a.ts"]},
 		[]string{srcDir},
-		utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+		legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) { diagnosticCount++ }, nil,
 		nil,
 	)
@@ -372,8 +371,8 @@ func TestRunLinter_AllowDirsIntegration(t *testing.T) {
 	})
 
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
-	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, []string{srcDir}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, []string{srcDir}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -401,8 +400,8 @@ func TestRunLinter_MultiplePrograms(t *testing.T) {
 		true,
 		[]string{pathsA["a.ts"], pathsB["b.ts"]},
 		nil,
-		utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule {
+		legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
@@ -436,8 +435,8 @@ func TestRunLinter_MultipleProgramsWithAllowDirs(t *testing.T) {
 		true,
 		nil,
 		[]string{srcDirA, srcDirB},
-		utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+		legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -461,7 +460,7 @@ func TestRunLinterInProgram_SkipTakesPriorityOverAllowDirs(t *testing.T) {
 	// allowDirs would include src/a.ts, but skipFiles should take priority
 	lintedFiles := runLinterInCompilerProgram(program, nil, []string{srcDir},
 		[]string{"src"}, // skip pattern matching "src" in path
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -478,7 +477,7 @@ func TestRunLinterInProgram_SkipTakesPriorityOverAllowFiles(t *testing.T) {
 
 	lintedFiles := runLinterInCompilerProgram(program, []string{paths["src/a.ts"]}, nil,
 		[]string{"src"}, // skip pattern matching "src" in path
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -494,8 +493,8 @@ func TestRunLinterInProgram_BothEmptyNonNil(t *testing.T) {
 	})
 
 	// Both non-nil but empty → filter is active, nothing passes
-	lintedFiles := runLinterInCompilerProgram(program, []string{}, []string{}, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+	lintedFiles := runLinterInCompilerProgram(program, []string{}, []string{}, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
 	)
@@ -511,8 +510,8 @@ func TestRunLinterInProgram_EmptyNonNilRules(t *testing.T) {
 	})
 
 	diagnosticCount := 0
-	lintedFiles := runLinterInCompilerProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []ConfiguredRule { return []ConfiguredRule{} }, // empty non-nil
+	lintedFiles := runLinterInCompilerProgram(program, []string{paths["a.ts"]}, nil, legacyDefaultExcludedPathSubstrings,
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return []rule.ConfiguredRule{} }, // empty non-nil
 		false, func(d rule.RuleDiagnostic) { diagnosticCount++ }, nil,
 		nil,
 	)
