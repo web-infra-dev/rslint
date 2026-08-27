@@ -374,7 +374,11 @@ func (analysis *RstestCallAnalysis) collectVariableCandidates(
 			}
 			importedName := binding.Name().Text()
 			if binding.PropertyName != nil {
-				importedName = binding.PropertyName.Text()
+				var ok bool
+				importedName, ok = staticRstestBindingPropertyName(binding.PropertyName)
+				if !ok {
+					continue
+				}
 			}
 			analysis.candidates[binding.Name().Text()] |=
 				rstestImportedCandidateKind(importedName)

@@ -185,6 +185,15 @@ suite.todo("suite", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 7, 11)},
 			},
 			{
+				Code: `const { ["test"]: check } = require("@rstest/core");
+check.todo("case");`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 7, 11)},
+			},
+			{
+				Code:   "const { [`test`]: check } = require(\"@rstest/core\");\ncheck.todo(\"case\");",
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 7, 11)},
+			},
+			{
 				Code: `import * as rstest from "@rstest/core";
 rstest.test.todo("case");`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 13, 17)},
@@ -236,6 +245,20 @@ pending("case");`,
 				Code: `const { todo } = test;
 todo("another case");`,
 				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 5)},
+			},
+			{
+				Code: `const { ["todo"]: pending } = test;
+pending("case");`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 8)},
+			},
+			{
+				Code:   "const { [`todo`]: pending } = test;\npending(\"case\");",
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(2, 1, 8)},
+			},
+			// A todo registration remains one when used as another call's argument.
+			{
+				Code:   `consume(test.todo("case"));`,
+				Errors: []rule_tester.InvalidTestCaseError{extrasError(1, 14, 18)},
 			},
 			{
 				Code: `import * as rstest from "@rstest/core";

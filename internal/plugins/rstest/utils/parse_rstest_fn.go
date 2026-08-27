@@ -466,11 +466,7 @@ func constRstestAliasInitializer(
 	if nameNode == nil {
 		nameNode = binding.Name()
 	}
-	name, ok := internalUtils.GetStaticStringLiteralValue(nameNode)
-	if !ok && nameNode != nil && nameNode.Kind == ast.KindIdentifier {
-		name = nameNode.AsIdentifier().Text
-		ok = true
-	}
+	name, ok := staticRstestBindingPropertyName(nameNode)
 	if !ok || name == "" {
 		return nil, nil, false
 	}
@@ -495,12 +491,8 @@ func resolveImportMetaRstestBinding(symbol *ast.Symbol) (string, *ast.Node, bool
 		}
 		binding := declaration.AsBindingElement()
 		if binding.PropertyName != nil {
-			name, ok := internalUtils.GetStaticStringLiteralValue(binding.PropertyName)
-			if ok {
+			if name, ok := staticRstestBindingPropertyName(binding.PropertyName); ok {
 				return name, binding.PropertyName, true
-			}
-			if binding.PropertyName.Kind == ast.KindIdentifier {
-				return binding.PropertyName.AsIdentifier().Text, binding.PropertyName, true
 			}
 		}
 		name := binding.Name()
@@ -509,6 +501,16 @@ func resolveImportMetaRstestBinding(symbol *ast.Symbol) (string, *ast.Node, bool
 		}
 	}
 	return "", nil, false
+}
+
+// staticRstestBindingPropertyName recognizes the static property forms that
+// object destructuring can use for Rstest API bindings. Dynamic keys remain
+// unresolved because their runtime value cannot be determined safely.
+func staticRstestBindingPropertyName(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	return internalUtils.GetStaticPropertyName(node)
 }
 
 func isConstRstestVariableDeclaration(declaration *ast.Node) bool {

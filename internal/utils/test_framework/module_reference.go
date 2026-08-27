@@ -187,7 +187,7 @@ func resolveModuleRequireBinding(declaration *ast.Node, importModule string) (st
 		return "", nil, false
 	}
 	if binding.PropertyName != nil {
-		if name := propertyName(binding.PropertyName); name != "" {
+		if name, ok := internalUtils.GetStaticPropertyName(binding.PropertyName); ok && name != "" {
 			return name, binding.PropertyName, true
 		}
 	}
