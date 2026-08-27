@@ -96,6 +96,28 @@ import Value from 'foo'; Value(); type T = Type.Foo;`},
 			Output:  []string{`import { /* keep */ Foo } from 'foo'; type T = Foo;`},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "avoidImportType", Line: 1, Column: 10}},
 		},
+		// An implicit JSX factory reference resolves in the JSX site's lexical scope.
+		{
+			Code:     `import React from 'react'; type T = React.FC; function f(React: unknown) { return <div />; }`,
+			FileName: "test.tsx",
+			Output:   []string{`import type React from 'react'; type T = React.FC; function f(React: unknown) { return <div />; }`},
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
+		// The fragment path obeys the same lexical shadowing rule.
+		{
+			Code:     `import React from 'react'; type T = React.FC; function f(React: unknown) { return <>x</>; }`,
+			FileName: "test.tsx",
+			Output:   []string{`import type React from 'react'; type T = React.FC; function f(React: unknown) { return <>x</>; }`},
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
+		// A tsconfig-defined factory also resolves at the individual JSX site.
+		{
+			Code:     `import * as preact from 'preact'; type T = preact.JSX.Element; function f(preact: unknown) { return <div />; }`,
+			FileName: "test.tsx",
+			TSConfig: "tsconfig.block-scoped-var-jsx.json",
+			Output:   []string{`import type * as preact from 'preact'; type T = preact.JSX.Element; function f(preact: unknown) { return <div />; }`},
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "typeOverValue", Line: 1, Column: 1}},
+		},
 	})
 }
 

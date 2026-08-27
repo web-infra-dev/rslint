@@ -49,6 +49,13 @@ type sourceImports struct {
 	typeOnlyNamedImport *ast.Node
 }
 
+type implicitJSXReferences struct {
+	factory             string
+	fragmentFactory     string
+	factoryUsed         bool
+	fragmentFactoryUsed bool
+}
+
 func messageAvoidImportType() rule.RuleMessage {
 	return rule.RuleMessage{Id: "avoidImportType", Description: "Use an `import` instead of an `import type`."}
 }
@@ -160,8 +167,8 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	bySource := map[string]*sourceImports{}
 	orderedSources := []*sourceImports{}
 	hasDecorator := false
-	hasJSX := false
-	hasJSXFragment := false
+	jsxSites := []*ast.Node{}
+	jsxFragmentSites := []*ast.Node{}
 	guardDecoratorMetadata := false
 	if program := ctx.Program(); program != nil && program.Options() != nil {
 		compilerOptions := program.Options()
@@ -170,11 +177,11 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	if guardDecoratorMetadata {
 		listeners[ast.KindDecorator] = func(*ast.Node) { hasDecorator = true }
 	}
-	listeners[ast.KindJsxElement] = func(*ast.Node) { hasJSX = true }
-	listeners[ast.KindJsxSelfClosingElement] = func(*ast.Node) { hasJSX = true }
-	listeners[ast.KindJsxFragment] = func(*ast.Node) {
-		hasJSX = true
-		hasJSXFragment = true
+	listeners[ast.KindJsxElement] = func(node *ast.Node) { jsxSites = append(jsxSites, node) }
+	listeners[ast.KindJsxSelfClosingElement] = func(node *ast.Node) { jsxSites = append(jsxSites, node) }
+	listeners[ast.KindJsxFragment] = func(node *ast.Node) {
+		jsxSites = append(jsxSites, node)
+		jsxFragmentSites = append(jsxFragmentSites, node)
 	}
 
 	listeners[ast.KindImportDeclaration] = func(node *ast.Node) {
@@ -233,9 +240,10 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if hasDecorator {
 			return
 		}
+		implicitJSX := resolveImplicitJSXReferences(ctx, jsxSites, jsxFragmentSites)
 		for _, imports := range orderedSources {
 			for _, report := range imports.reports {
-				applyImplicitJSXReferences(ctx, report, hasJSX, hasJSXFragment)
+				applyImplicitJSXReferences(report, implicitJSX)
 				if len(report.typeSpecifiers) == 0 {
 					continue
 				}
@@ -259,9 +267,9 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	return listeners
 }
 
-func applyImplicitJSXReferences(ctx rule.RuleContext, report *reportValueImport, hasJSX, hasFragment bool) {
+func resolveImplicitJSXReferences(ctx rule.RuleContext, jsxSites, fragmentSites []*ast.Node) implicitJSXReferences {
 	if ctx.Program() == nil || ctx.Program().Options() == nil {
-		return
+		return implicitJSXReferences{}
 	}
 	options := ctx.Program().Options()
 	factory := "React"
@@ -272,10 +280,19 @@ func applyImplicitJSXReferences(ctx rule.RuleContext, report *reportValueImport,
 	if options.JsxFragmentFactory != "" {
 		fragmentFactory = typescriptutil.JSXFactoryRoot(options.JsxFragmentFactory)
 	}
+	return implicitJSXReferences{
+		factory:             factory,
+		fragmentFactory:     fragmentFactory,
+		factoryUsed:         hasUnshadowedJSXSite(ctx, jsxSites, factory),
+		fragmentFactoryUsed: hasUnshadowedJSXSite(ctx, fragmentSites, fragmentFactory),
+	}
+}
+
+func applyImplicitJSXReferences(report *reportValueImport, implicit implicitJSXReferences) {
 	remaining := report.typeSpecifiers[:0]
 	for _, specifier := range report.typeSpecifiers {
-		used := hasJSX && specifier.name.Text() == factory
-		used = used || hasFragment && fragmentFactory != "" && specifier.name.Text() == fragmentFactory
+		used := implicit.factoryUsed && specifier.name.Text() == implicit.factory
+		used = used || implicit.fragmentFactoryUsed && specifier.name.Text() == implicit.fragmentFactory
 		if used {
 			report.valueSpecifiers = append(report.valueSpecifiers, specifier)
 		} else {
@@ -283,6 +300,19 @@ func applyImplicitJSXReferences(ctx rule.RuleContext, report *reportValueImport,
 		}
 	}
 	report.typeSpecifiers = remaining
+}
+
+func hasUnshadowedJSXSite(ctx rule.RuleContext, sites []*ast.Node, name string) bool {
+	if name == "" || ctx.SourceFile == nil {
+		return false
+	}
+	boundary := ctx.SourceFile.AsNode()
+	for _, site := range sites {
+		if !utils.IsNameShadowedBetween(site, boundary, name) {
+			return true
+		}
+	}
+	return false
 }
 
 func importSource(node *ast.Node) string {
