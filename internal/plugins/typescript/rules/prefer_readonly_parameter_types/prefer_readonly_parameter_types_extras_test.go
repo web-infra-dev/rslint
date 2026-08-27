@@ -56,8 +56,19 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		{Code: `function f(value: { readonly [key: string]: { readonly x: number }; readonly [key: number]: { readonly x: number } }) {}`},
 		// Locks in the private-property exemption.
 		{Code: `class Secret { value = 1; #mutable = []; } function f(value: Readonly<Secret>) {}`},
+		// Private properties stay exempt during deep value traversal.
+		{Code: `class State { #items: string[] = [] } function consume(value: State) {}`},
+		// Upstream considers only string and number index signatures.
+		{Code: `type T = { [key: symbol]: string[] }; function f(value: T) {}`},
+		{Code: "type T = { [key: `prefix-${string}`]: string[] }; function f(value: T) {}"},
 		// Locks in treatMethodsAsReadonly=true for mutable collection methods.
 		{Code: `function f(value: ReadonlySet<string>) {}`, Options: map[string]any{"treatMethodsAsReadonly": true}},
+		// Mapped property symbols retain their source method semantics.
+		{Code: `interface S { method(): void } type M<T> = { [K in keyof T]: T[K] }; function f(value: M<S>) {}`, Options: map[string]any{"treatMethodsAsReadonly": true}},
+		// Const declarations are readonly property declarations upstream.
+		{Code: `namespace Constants { export const version = 1 } function consume(value: typeof Constants) {}`},
+		// Readonly assignment declarations from checked JavaScript are also readonly.
+		{Code: `const state = {}; Object.defineProperty(state, "items", { value: [], writable: false }); /** @param {typeof state} value */ function consume(value) {}`, FileName: "file.mjs", TSConfig: "tsconfig.allow-js.json"},
 		// Locks in default option equivalence: omitted options and [{}] are identical.
 		{Code: `function f(value: Readonly<{ x: string }>) {}`, Options: map[string]any{}},
 		// ---- Real-user: #1790 computed unique-symbol brand ----
@@ -97,6 +108,8 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		{Code: `function f(value: { [key: string]: string }) {}`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(12, 44)}},
 		// Locks in treatMethodsAsReadonly=false's method-property branch.
 		{Code: `function f(value: ReadonlySet<string>) {}`, Options: map[string]any{"treatMethodsAsReadonly": false}, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(12, 38)}},
+		// A mapped -readonly modifier applies to computed unique-symbol keys.
+		{Code: `declare const tag: unique symbol; interface S { readonly [tag]: string } type M<T> = { -readonly [K in keyof T]: T[K] }; function f(value: M<S>) {}`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(133, 144)}},
 		// Locks in allowlist provenance: a file type does not match a lib specifier.
 		{Code: `interface Local { x: string } function f(value: Local) {}`, Options: map[string]any{"allow": []any{map[string]any{"from": "lib", "name": "Local"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "shouldBeReadonly", Message: "Parameter should be a read only type.", Line: 1, Column: 42, EndLine: 1, EndColumn: 54}}},
 		// ---- Real-user: #8013 mutable Set remains rejected beside ReadonlySet ----

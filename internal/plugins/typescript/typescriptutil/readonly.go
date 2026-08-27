@@ -169,7 +169,7 @@ func isReadonlyObject(
 ) readonlyness {
 	properties := typeChecker.GetPropertiesOfType(t)
 	for _, property := range properties {
-		if options.TreatMethodsAsReadonly && property.Flags&ast.SymbolFlagsMethod != 0 {
+		if options.TreatMethodsAsReadonly && isMethodProperty(property) {
 			continue
 		}
 		if isPrivateProperty(property) {
@@ -181,6 +181,9 @@ func isReadonlyObject(
 	}
 
 	for _, property := range properties {
+		if isPrivateProperty(property) {
+			continue
+		}
 		// tsgo materializes the array's well-known symbol property as a mapped
 		// object whose inherited method keys appear mutable. Upstream treats the same
 		// well-known-symbol member as readonly; it cannot be assigned through a
@@ -201,6 +204,10 @@ func isReadonlyObject(
 	}
 
 	for _, indexInfo := range typeChecker.GetIndexInfosOfType(t) {
+		keyFlags := checker.Type_flags(indexInfo.KeyType())
+		if keyFlags&(checker.TypeFlagsString|checker.TypeFlagsNumber) == 0 {
+			continue
+		}
 		if !indexInfo.IsReadonly() {
 			return readonlynessMutable
 		}
@@ -217,6 +224,23 @@ func isReadonlyObject(
 	}
 
 	return readonlynessReadonly
+}
+
+func isMethodProperty(property *ast.Symbol) bool {
+	if property.Flags&ast.SymbolFlagsMethod != 0 {
+		return true
+	}
+	if declaration := property.ValueDeclaration; declaration != nil {
+		if symbol := declaration.Symbol(); symbol != nil && symbol.Flags&ast.SymbolFlagsMethod != 0 {
+			return true
+		}
+	}
+	if len(property.Declarations) > 0 {
+		if symbol := property.Declarations[len(property.Declarations)-1].Symbol(); symbol != nil && symbol.Flags&ast.SymbolFlagsMethod != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func isPrivateProperty(property *ast.Symbol) bool {
@@ -268,11 +292,41 @@ func isPropertyReadonly(typeChecker *checker.Checker, t *checker.Type, name stri
 		return true
 	}
 	for _, declaration := range property.Declarations {
-		if declaration.ModifierFlags()&ast.ModifierFlagsReadonly != 0 {
+		if declaration.ModifierFlags()&ast.ModifierFlagsReadonly != 0 ||
+			isConstVariableDeclaration(declaration) ||
+			isReadonlyAssignmentDeclaration(typeChecker, declaration) {
 			return true
 		}
 	}
 	return checker.GetDeclarationModifierFlagsFromSymbol(property)&ast.ModifierFlagsReadonly != 0
+}
+
+func isConstVariableDeclaration(declaration *ast.Node) bool {
+	return declaration.Kind == ast.KindVariableDeclaration &&
+		declaration.Parent != nil &&
+		declaration.Parent.Flags&ast.NodeFlagsConstant != 0
+}
+
+func isReadonlyAssignmentDeclaration(typeChecker *checker.Checker, declaration *ast.Node) bool {
+	if declaration.Kind != ast.KindCallExpression || !ast.IsBindableObjectDefinePropertyCall(declaration) {
+		return false
+	}
+	arguments := declaration.Arguments()
+	descriptorType := typeChecker.GetTypeAtLocation(arguments[2])
+	if typeChecker.GetPropertyOfType(descriptorType, "value") != nil {
+		writableProperty := typeChecker.GetPropertyOfType(descriptorType, "writable")
+		if writableProperty == nil {
+			return false
+		}
+		var writableType *checker.Type
+		if valueDeclaration := writableProperty.ValueDeclaration; valueDeclaration != nil && valueDeclaration.Kind == ast.KindPropertyAssignment {
+			writableType = typeChecker.GetTypeAtLocation(valueDeclaration.Initializer())
+		} else {
+			writableType = checker.Checker_getTypeOfSymbol(typeChecker, writableProperty)
+		}
+		return utils.IsFalseLiteralType(writableType)
+	}
+	return typeChecker.GetPropertyOfType(descriptorType, "set") == nil
 }
 
 func isWellKnownSymbolName(name string) bool {
@@ -280,7 +334,16 @@ func isWellKnownSymbolName(name string) bool {
 		return false
 	}
 	rest := strings.TrimPrefix(name, ast.InternalSymbolNamePrefix+"@")
-	return strings.Contains(rest, "@")
+	if index := strings.LastIndexByte(rest, '@'); index >= 0 {
+		rest = rest[:index]
+	}
+	// cspell:ignore unscopables
+	switch rest {
+	case "asyncDispose", "asyncIterator", "dispose", "hasInstance", "isConcatSpreadable", "iterator", "match", "matchAll", "metadata", "replace", "search", "species", "split", "toPrimitive", "toStringTag", "unscopables":
+		return true
+	default:
+		return false
+	}
 }
 
 // IsTypeBrandedLiteralLike reports whether t is a branded primitive/literal
