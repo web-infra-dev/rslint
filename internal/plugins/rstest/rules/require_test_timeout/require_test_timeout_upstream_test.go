@@ -1,7 +1,7 @@
 // TestRequireTestTimeoutUpstream migrates the upstream Vitest suite one case at
 // a time. Cases upstream reports but this port deliberately accepts are kept
-// here, in the valid list, each labelled with what upstream does — see the
-// "Differences from the Vitest rule" section of require_test_timeout.md.
+// here, in the valid list, each labelled with what upstream does and why this
+// rule stays silent.
 package require_test_timeout_test
 
 import (

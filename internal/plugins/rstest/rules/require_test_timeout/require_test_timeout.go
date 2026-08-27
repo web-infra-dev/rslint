@@ -20,8 +20,9 @@ var missingTimeoutMessage = rule.RuleMessage{
 //
 // The rule only reports on timeoutAbsent and timeoutNegative: everything it
 // cannot read is timeoutUnknown, which exempts. Upstream instead reports the
-// unreadable shapes (its `Number.NaN` branch), and this port deliberately
-// diverges — see require_test_timeout.md.
+// unreadable shapes through its `Number.NaN` branch; reporting a timeout that
+// is merely written somewhere unreadable is a false positive, and TypeScript
+// already rejects a `timeout` that is not a number.
 type timeoutFinding uint8
 
 const (
