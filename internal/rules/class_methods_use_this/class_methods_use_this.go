@@ -239,20 +239,14 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	}
 
 	// classFieldOfFunctionLike returns the surrounding PropertyDeclaration
-	// when `node` is the initializer of a class field, walking through any
-	// ParenthesizedExpression wrappers. ESTree elides parentheses, so
-	// upstream's `PropertyDefinition > ArrowFunctionExpression.value` selector
-	// matches whether or not the arrow is paren-wrapped; tsgo preserves the
-	// parens, so we recover the same shape via `ast.WalkUpParenthesizedExpressions`.
+	// when `node` is the initializer of a class field, walking through wrappers
+	// that ESTree elides. In addition to parentheses, tsgo inserts assertion
+	// wrappers for JSDoc @type and @satisfies casts in JavaScript, while ESTree
+	// retains those casts only as comments. Therefore upstream's
+	// `PropertyDefinition > ArrowFunctionExpression.value` selector
+	// still sees the function directly under the field in all of these forms.
 	classFieldOfFunctionLike := func(node *ast.Node) *ast.Node {
-		parent := node.Parent
-		if parent == nil {
-			return nil
-		}
-		// WalkUpParenthesizedExpressions advances past ParenthesizedExpression
-		// ancestors; passes through unchanged when `parent` is not itself a
-		// paren (covering the common, non-wrapped case).
-		parent = ast.WalkUpParenthesizedExpressions(parent)
+		parent := utils.ESTreeParent(node)
 		if parent != nil && parent.Kind == ast.KindPropertyDeclaration {
 			return parent
 		}

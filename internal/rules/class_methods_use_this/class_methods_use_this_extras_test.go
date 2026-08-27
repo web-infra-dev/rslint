@@ -156,6 +156,26 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			{Code: `class C extends B { foo() { super.foo(); } }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Review regression: JSDoc casts are transparent around class-field functions ----
+			{
+				Code:     `class A { field = /** @type {() => void} */ (() => {}); }`,
+				FileName: "jsdoc-cast-arrow.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "missingThis"}},
+			},
+			{
+				Code:     `class A { field = /** @type {() => void} */ (function () {}); }`,
+				FileName: "jsdoc-cast-function.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "missingThis"}},
+			},
+			{
+				Code:     `class A { field = /** @satisfies {() => void} */ (() => {}); }`,
+				FileName: "jsdoc-satisfies-arrow.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "missingThis"}},
+			},
+
 			// Abstract properties do not create a frame, but the following
 			// concrete method still does and reports independently.
 			{
