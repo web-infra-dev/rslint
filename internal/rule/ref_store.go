@@ -524,24 +524,42 @@ func functionExpressionSelfBinding(fn *ast.Node, name string, meaning ast.Symbol
 // environment global rather than to a declaration in this file, mirroring
 // ESLint's sourceCode.isGlobalReference for the given declaration spaces.
 //
-// A global script file needs its own answer: ESLint keeps that file's top-level
-// declarations and the configured globals in one global-scope variable, so any
-// definition of the name there — a type-only `interface` or `type` included —
-// clears the global reference. Inner scopes hold separate variables, and a
-// value reference only resolves to one declared in a requested space, so a
-// type-only declaration inside a namespace or function leaves it global.
+// A global program scope needs its own answer: ESLint keeps that file's
+// top-level declarations and the configured globals in one global-scope
+// variable, so any definition of the name there — a type-only `interface` or
+// `type` included — clears the global reference. Inner scopes and module
+// program scopes hold separate variables, and a value reference only resolves
+// to one declared in a requested space, so a type-only declaration there
+// leaves it global.
 func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meaning ast.SymbolFlags) bool {
 	if s == nil || location == nil || name == "" {
 		return false
 	}
-	if s.sourceFile != nil && ast.IsGlobalSourceFile(s.sourceFile.AsNode()) &&
-		hasAuthoredDeclaration(s.sourceFile.Locals[name]) {
+	if !s.HasNonGlobalProgramScope() && s.hasAuthoredProgramDefinition(name) {
+		return false
+	}
+	// When a JSDoc import and an authored import bind the same local name,
+	// ts-go can retain only the synthesized declaration on the resolved symbol.
+	// The source scan is the authoritative evidence that the local exists.
+	if s.hasAuthoredImportBinding(name) {
 		return false
 	}
 	if hasAuthoredDeclaration(s.resolveName(location, name, meaning)) {
 		return false
 	}
 	return meaning&ast.SymbolFlagsValue == 0 || !s.HasImplicitWrapperBinding(name)
+}
+
+// hasAuthoredProgramDefinition reports whether the file spells a definition
+// that typescript-eslint places in its global Program scope. Dotted namespace
+// segments are present in ts-go's file locals for namespace resolution, but
+// typescript-eslint creates no variable definition for them.
+func (s *RefStore) hasAuthoredProgramDefinition(name string) bool {
+	if s.sourceFile == nil {
+		return false
+	}
+	symbol := s.sourceFile.Locals[name]
+	return hasAuthoredDeclaration(symbol) && !isQualifiedNamespaceNameOnly(symbol)
 }
 
 // IsGlobalReference is IsGlobalNameReference using the declaration-space

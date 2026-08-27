@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -267,12 +268,31 @@ function foo(a: any) {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTes
 			// them claims the name for the whole file even from another declaration
 			// space; a nested one, and a module's top level, reach only their own scope.
 			{Code: `const exports = {}; exports.foo = 1;`, FileName: "authored.cjs", TSConfig: "tsconfig.allow-js.json", Options: deny("exports"), Errors: []rule_tester.InvalidTestCaseError{restricted("exports", 1, 7), restricted("exports", 1, 21)}},
-			{Code: "interface Number { q: string }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 2, 1)}},
-			{Code: "const Number = 1;\nlet x: Number;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 7), restricted("Number", 2, 8)}},
-			{Code: "namespace Number { export type A = 1; }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 2, 1)}},
+			{Code: "interface Number { q: string }\nNumber;", Options: deny("Number"), LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 2, 1)}},
+			{Code: "const Number = 1;\nlet x: Number;", Options: deny("Number"), LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 7), restricted("Number", 2, 8)}},
+			{Code: "namespace Number { export type A = 1; }\nNumber;", Options: deny("Number"), LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 2, 1)}},
 			{Code: "function f() { interface Number { q: string } }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 26)}},
 			{Code: "declare global { interface Number { q: string } }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 28)}},
 			{Code: "import {} from 'x';\ninterface Number { q: string }\nNumber;", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 2, 11)}},
+			{
+				Code:            "interface Promise {} Promise;",
+				Options:         deny("Promise"),
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors:          []rule_tester.InvalidTestCaseError{restricted("Promise", 1, 11)},
+			},
+			{
+				Code:            "namespace Promise.Inner {} Promise;",
+				Options:         deny("Promise"),
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{restricted("Promise", 1, 11)},
+			},
+			{
+				Code:     "/** @import { Promise } from \"x\" */\nimport { Promise } from \"y\";\nPromise;",
+				FileName: "jsdoc-and-authored-import.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  deny("Promise"),
+				Errors:   []rule_tester.InvalidTestCaseError{restricted("Promise", 2, 10), restricted("Promise", 3, 1)},
+			},
 
 			// Locks in upstream isReferenceToGlobalVariable() on a qualified type name: the
 			// right side names a member and is always checked, while the left side is a
