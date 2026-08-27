@@ -34,7 +34,7 @@ baz(...strArray);
 
 ## Differences from typescript-eslint
 
-rslint also checks the element type of non-array iterable spreads, including type parameters constrained to `Iterable` or an array type. typescript-eslint currently ignores these spread arguments.
+rslint also checks the element type of non-tuple iterable spreads, including ordinary arrays and type parameters constrained to `Iterable` or an array type. typescript-eslint currently ignores these spread arguments.
 
 ## Original Documentation
 

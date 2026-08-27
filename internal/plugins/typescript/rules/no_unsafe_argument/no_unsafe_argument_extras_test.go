@@ -463,6 +463,54 @@ function forward<T extends readonly any[]>(values: T): void {
 				}},
 			},
 			{
+				// A non-tuple spread does not consume the next fixed parameter for later arguments.
+				Code: `
+declare function acceptValues(first: string, second: number): void;
+declare const values: string[];
+acceptValues(...values, 1 as any);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    25,
+					EndLine:   4,
+					EndColumn: 33,
+				}},
+			},
+			{
+				// A non-tuple spread preserves the upstream receiver for a later argument even when a rest parameter exists.
+				Code: `
+declare function acceptValues(first: string, ...rest: number[]): void;
+declare const values: string[];
+acceptValues(...values, 1 as any);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    25,
+					EndLine:   4,
+					EndColumn: 33,
+				}},
+			},
+			{
+				// Ordinary array spreads participate in rslint's iterable element-type check.
+				Code: `
+declare function acceptSets(...values: Set<string>[]): void;
+declare const values: Set<any>[];
+acceptSets(...values);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `Set<any>` assigned to a parameter of type `Set<string>`.",
+					Line:      4,
+					Column:    12,
+					EndLine:   4,
+					EndColumn: 21,
+				}},
+			},
+			{
 				// ---- Dimension 4: one parenthesized argument; ESTree excludes parens ----
 				Code: `
 declare function acceptNumber(value: number): void;

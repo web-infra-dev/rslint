@@ -272,7 +272,11 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 								spreadElementType = utils.GetNumberIndexType(ctx.TypeChecker, constrainedType)
 							}
 						}
-						parameterType := signature.getNextParameterType()
+						// Match upstream's argument alignment for an indeterminate-length
+						// spread: inspect the current parameter without advancing the real
+						// signature cursor used by later arguments.
+						spreadSignature := signature
+						parameterType := spreadSignature.getNextParameterType()
 						if spreadElementType != nil && parameterType != nil {
 							_, _, unsafe := utils.IsUnsafeAssignment(
 								spreadElementType,
@@ -287,9 +291,6 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 								))
 							}
 						}
-						// The spread can supply any number of values, so subsequent
-						// arguments can only be compared with a rest parameter.
-						signature.consumeRemainingArguments()
 					}
 
 				default:
