@@ -123,7 +123,7 @@ func mutableEmptyArrayDeclaration(variable *ast.Symbol) *ast.Node {
 
 func nearestLoop(node *ast.Node) *ast.Node {
 	for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
-		if ast.IsFunctionLike(ancestor) {
+		if isFunctionBoundary(node, ancestor) {
 			return nil
 		}
 		if ast.IsIterationStatement(ancestor, false) {
@@ -131,6 +131,32 @@ func nearestLoop(node *ast.Node) *ast.Node {
 		}
 	}
 	return nil
+}
+
+// isFunctionBoundary mirrors ESTree's function boundary for the node being
+// inspected. ts-go represents methods and accessors as function-like nodes,
+// but their computed names and decorators are evaluated in the enclosing
+// scope, outside the method's FunctionExpression. Only their parameters and
+// bodies stop the search for an enclosing loop.
+func isFunctionBoundary(node *ast.Node, function *ast.Node) bool {
+	if !ast.IsFunctionLike(function) {
+		return false
+	}
+
+	switch function.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		if nodeInside(node, function.Body()) {
+			return true
+		}
+		for current := node.Parent; current != nil && current != function; current = current.Parent {
+			if current.Kind == ast.KindParameter {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
 }
 
 func loopBody(loop *ast.Node) *ast.Node {

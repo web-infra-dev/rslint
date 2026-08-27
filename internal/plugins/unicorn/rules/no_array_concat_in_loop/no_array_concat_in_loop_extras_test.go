@@ -111,6 +111,29 @@ func TestNoArrayConcatInLoopExtras(t *testing.T) {
 			// N/A: autofix boundaries and edit-demand invariance do not apply; this rule has no edits.
 		},
 		[]rule_tester.InvalidTestCase{
+			// A computed member name and a member decorator are evaluated in the
+			// enclosing loop scope, not in the method's function scope.
+			invalidConcat(`let result = [];
+for (const chunk of chunks) {
+	class Box { [result = result.concat(chunk)](result) {} }
+}`),
+			invalidConcat(`let result = [];
+for (const chunk of chunks) {
+	class Box { static async *[result = result.concat(chunk)]() {} }
+}`),
+			invalidConcat(`let result = [];
+for (const chunk of chunks) {
+	({ [result = result.concat(chunk)]() {} });
+}`),
+			invalidConcat(`let result = [];
+for (const chunk of chunks) {
+	({ get [result = result.concat(chunk)]() { return undefined; } });
+}`),
+			invalidConcatTS(`let result = [];
+for (const chunk of chunks) {
+	class Box { @((result = result.concat(chunk))) method() {} }
+}`),
+
 			// A top-level declaration is module-scoped, not global-scoped.
 			func() rule_tester.InvalidTestCase {
 				testCase := invalidConcat(`let result = [];
