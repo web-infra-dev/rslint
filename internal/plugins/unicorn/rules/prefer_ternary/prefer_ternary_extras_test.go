@@ -111,14 +111,16 @@ if (test) { x = next; }`},
 let x = new C();
 if (test) { x = next; }`},
 
-			// ---- N2: parameter default values are walked ----
-			// Method bodies are deferred, but a side-effecting default
-			// value fires when the method is called. The upstream
-			// hasSideEffect visitor walks parameter initializers, so
-			// the let-then-if check sees the side effect and refuses
-			// to offer the collapse.
-			{Code: `let x = {m(x = sideEffect()) {}};
-if (test) { x = next; }`},
+			// Static property-name evaluation is scope-free upstream: a local
+			// constant must not make x[key] match x.bar.
+			{Code: `const key = 'bar';
+if (t) { x[key] = a; } else { x.bar = b; }`},
+			// Parentheses are transparent in ESTree classification gates.
+			{Code: `function f() { if (t) { return (a ? b : c); } else { return d; } }`},
+			{Code: `function f() { if (t) { return (true); } else { return ((false)); } }`},
+			{Code: `if (t) { x = (a ? b : c); } else { x = d; }`},
+			{Code: `let x = (a ? b : c);
+if (t) { x = d; }`},
 
 			// ---- N1: private field vs string-keyed property ----
 			// `this.#x` and `this["#x"]` are different assignment
@@ -136,6 +138,51 @@ if (test) { x = next; }`},
 }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Parentheses around a conditional operand must suppress the merge.
+			// These deferred-member parameter defaults and constructor bodies are
+			// not evaluated when their object/class is created, so they may move.
+			{
+				Code: `let x = {m(v = sideEffect()) {}};
+if (t) { x = next; }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "prefer-ternary",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "prefer-ternary/suggestion", Output: "const x = t ? next : {m(v = sideEffect()) {}};"}},
+				}},
+			},
+			{
+				Code: `let x = {set m(v = sideEffect()) {}};
+if (t) { x = next; }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "prefer-ternary",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "prefer-ternary/suggestion", Output: "const x = t ? next : {set m(v = sideEffect()) {}};"}},
+				}},
+			},
+			{
+				Code: `let x = class { constructor() { sideEffect(); } };
+if (t) { x = next; }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "prefer-ternary",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "prefer-ternary/suggestion", Output: "const x = t ? next : class { constructor() { sideEffect(); } };"}},
+				}},
+			},
+			{
+				Code:     `while (keep) if (t) { (x).y = a; } else { (x).y = b; }`,
+				Output:   []string{`while (keep) (x).y = t ? a : b;`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code:     `if (keep) if (t) { (x).y = a; } else { (x).y = b; }`,
+				Output:   []string{`if (keep) (x).y = t ? a : b;`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code:     `for (;;) if (t) { (x).y = a; } else { (x).y = b; }`,
+				Output:   []string{`for (;;) (x).y = t ? a : b;`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
 			// ---- Dimension 4: nested return if/else inside a function body ----
 			// Walks through the bare form (no block) to confirm the
 			// ExpressionStatement unwrapping handles the case where the

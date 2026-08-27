@@ -49,17 +49,10 @@ var PreferTernaryRule = rule.Rule{
 			}
 		}
 
-		// The static evaluator is optional: a nil evaluator just means the
-		// computed-key fast path falls back to literal-only static names.
-		// On JS/gap files where no TypeChecker is available we still
-		// construct a no-scope evaluator so literal concatenation
-		// (`x['b' + 'ar']`) keeps folding — identifier resolution is
-		// unavailable in that mode, but literal expressions retain
-		// upstream parity.
+		// Upstream evaluates property keys without scope. Keep the comparison
+		// literal-only even when a TypeChecker is available: local constants
+		// must not make `x[key]` equivalent to `x.bar`.
 		staticStrings := utils.NewStaticStringEvaluatorWithoutScope()
-		if ctx.TypeChecker != nil {
-			staticStrings = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
-		}
 
 		return rule.RuleListeners{
 			ast.KindIfStatement: func(node *ast.Node) {
@@ -184,11 +177,19 @@ func getNodeBody(node *ast.Node) *ast.Node {
 
 // isConditionalExpression mirrors upstream's `isTernary` helper.
 func isConditionalExpression(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
 	return node != nil && node.Kind == ast.KindConditionalExpression
 }
 
 // isBooleanLiteral reports whether node is the literal `true` or `false`.
 func isBooleanLiteral(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
 	return node != nil && (node.Kind == ast.KindTrueKeyword || node.Kind == ast.KindFalseKeyword)
 }
 
@@ -641,12 +642,11 @@ func hasSideEffect(node *ast.Node) bool {
 		return hasSideEffectInChildren(node)
 	case ast.KindMethodDeclaration,
 		ast.KindGetAccessor,
-		ast.KindSetAccessor:
+		ast.KindSetAccessor,
+		ast.KindConstructor:
 		// Method / getter / setter bodies don't run until called, so the
-		// body must be skipped — but the immediately evaluated name
-		// (computed key) and parameter initializers are walked so
-		// `{'x' + 'y'() {}}` and `m(x = sideEffect()) {}` still trip
-		// the predicate.
+		// body and parameters must be skipped. Only a computed name is
+		// evaluated while constructing an object/class.
 		return hasSideEffectInDeferredBody(node)
 	}
 	return hasSideEffectInChildren(node)
@@ -671,9 +671,6 @@ func hasSideEffectInDeferredBody(node *ast.Node) bool {
 		if hasSideEffect(method.Name()) {
 			return true
 		}
-		if hasSideEffectInParameters(method.Parameters) {
-			return true
-		}
 		return false
 	case ast.KindGetAccessor:
 		acc := node.AsGetAccessorDeclaration()
@@ -681,9 +678,6 @@ func hasSideEffectInDeferredBody(node *ast.Node) bool {
 			return false
 		}
 		if hasSideEffect(acc.Name()) {
-			return true
-		}
-		if hasSideEffectInParameters(acc.Parameters) {
 			return true
 		}
 		return false
@@ -695,40 +689,9 @@ func hasSideEffectInDeferredBody(node *ast.Node) bool {
 		if hasSideEffect(acc.Name()) {
 			return true
 		}
-		if hasSideEffectInParameters(acc.Parameters) {
-			return true
-		}
 		return false
-	case ast.KindFunctionDeclaration:
-		fn := node.AsFunctionDeclaration()
-		if fn == nil {
-			return false
-		}
-		if hasSideEffect(fn.Name()) {
-			return true
-		}
-		if hasSideEffectInParameters(fn.Parameters) {
-			return true
-		}
+	case ast.KindConstructor:
 		return false
-	}
-	return false
-}
-
-// hasSideEffectInParameters walks parameter declarations and reports
-// whether any default-value initializer has a side effect. The parameter
-// identifier itself is pure, so only the initializer is checked.
-func hasSideEffectInParameters(params *ast.NodeList) bool {
-	if params == nil {
-		return false
-	}
-	for _, p := range params.Nodes {
-		if p == nil {
-			continue
-		}
-		if hasSideEffect(p.Initializer()) {
-			return true
-		}
 	}
 	return false
 }
@@ -1105,12 +1068,30 @@ func buildFix(ctx rule.RuleContext, ifNode *ast.Node, result mergeResult) []rule
 	// replacement into the prior statement.
 	ifPrev := utils.TrimNodeTextRange(ctx.SourceFile, ifNode).Pos()
 	if prev, ok := utils.TokenBeforePosition(ctx.SourceFile, ifPrev); ok {
-		if needsSemicolonBeforeAfterText(prev, fixed) {
+		if !isControlStatementBody(ifNode) && needsSemicolonBeforeAfterText(prev, fixed) {
 			fixed = ";" + fixed
 		}
 	}
 
 	return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, ifNode, fixed)}
+}
+
+// isControlStatementBody reports whether node is an unbraced control-flow
+// body. A leading semicolon there would turn the body into an empty statement.
+func isControlStatementBody(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	switch node.Parent.Kind {
+	case ast.KindIfStatement:
+		p := node.Parent.AsIfStatement()
+		return p.ThenStatement == node || p.ElseStatement == node
+	case ast.KindForStatement:
+		return node.Parent.AsForStatement().Statement == node
+	case ast.KindWhileStatement:
+		return node.Parent.AsWhileStatement().Statement == node
+	}
+	return false
 }
 
 // renderMergeOperand returns the source text for a merge operand. A string
