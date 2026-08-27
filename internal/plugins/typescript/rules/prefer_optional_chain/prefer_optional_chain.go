@@ -71,7 +71,7 @@ func buildPreferOptionalChainMessage() rule.RuleMessage {
 func buildOptionalChainSuggestMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "optionalChainSuggest",
-		Description: "Change to an optional chain expression. This may change the return type of the expression and some TypeScript errors may occur.",
+		Description: "Change to an optional chain.",
 	}
 }
 

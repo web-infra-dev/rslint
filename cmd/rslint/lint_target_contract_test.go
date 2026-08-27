@@ -93,7 +93,7 @@ func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 	}
 	writeLintTargetContractFiles(t, dir, files)
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         "rslint.jsonc",
 		Format:         "default",
 		NoColor:        true,
@@ -138,7 +138,7 @@ func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 
 	run := func(t *testing.T, typeCheck bool) []lintTargetContractDiagnostic {
 		t.Helper()
-		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 			Config:         "rslint.jsonc",
 			AllowFiles:     []string{selected},
 			Format:         "jsonline",
@@ -199,7 +199,7 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 	selected := tspath.NormalizePath(filepath.Join(dir, "selected.js"))
 	unselected := filepath.Join(dir, "unselected.js")
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         "rslint.jsonc",
 		AllowFiles:     []string{selected},
 		Fix:            true,

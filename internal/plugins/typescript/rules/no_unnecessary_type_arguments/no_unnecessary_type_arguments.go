@@ -123,6 +123,9 @@ var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
 				return
 			}
 			arg := arguments.Nodes[i]
+			if utils.IsJSDocSyntaxNode(arg) {
+				return
+			}
 			param := parameters[i]
 
 			defaultType := param.AsTypeParameterDeclaration().DefaultType

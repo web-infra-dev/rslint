@@ -103,7 +103,7 @@ export const ResizableSplitPane: React.FC<ResizableSplitPaneProps> = ({
 
       {/* Divider */}
       <div
-        className={`relative h-full cursor-col-resize bg-gray-200 hover:bg-blue-400 ${
+        className={`relative h-full cursor-col-resize bg-gray-200 hover:bg-blue-400 dark:bg-gray-700 dark:hover:bg-blue-500 ${
           isDragging ? 'bg-blue-500' : ''
         }`}
         style={{ width: '4px', flexShrink: 0 }}

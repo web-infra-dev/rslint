@@ -424,6 +424,14 @@ func jsdocOnlyScope(symbol *ast.Symbol, name string) *ast.Node {
 			return node
 		}
 	}
+	// JSDoc template parameters on classes are resolved from the class's type
+	// parameter environment rather than a Locals table. A reparsed clone is
+	// attached directly to the class, so leave the class before looking for an
+	// authored outer declaration.
+	declaration := symbol.Declarations[0]
+	if declaration.Kind == ast.KindTypeParameter && declaration.Parent != nil && ast.IsClassLike(declaration.Parent) {
+		return declaration.Parent
+	}
 	return nil
 }
 

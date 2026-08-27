@@ -24,9 +24,9 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -469,7 +469,7 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 		t.Fatalf("create program: %v", err)
 	}
 
-	configured := linter.ConfiguredRule{
+	configured := rule.ConfiguredRule{
 		Name:     impl.Name,
 		Severity: rule.SeverityWarning,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -490,17 +490,17 @@ func countDiagnosticsForRule(t *testing.T, fileName, source string, impl rule.Ru
 	}
 
 	count := 0
-	linter.RunLinterInProgram(sourceProgram, nil, nil, utils.ExcludePaths,
-		func(sf *tsast.SourceFile) []linter.ConfiguredRule {
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                sourceProgram,
+		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+		GetRulesForFile: func(sf *tsast.SourceFile) []rule.ConfiguredRule {
 			if sf.FileName() != filePath {
 				return nil
 			}
-			return []linter.ConfiguredRule{configured}
+			return []rule.ConfiguredRule{configured}
 		},
-		false,
-		func(d rule.RuleDiagnostic) { count++ },
-		nil,
-	)
+		OnDiagnostic: func(d rule.RuleDiagnostic) { count++ },
+	})
 	return count
 }
 
@@ -595,7 +595,7 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 	}
 
 	var sawNilChecker, sawAnyListener bool
-	probe := linter.ConfiguredRule{
+	probe := rule.ConfiguredRule{
 		Name:     "gap-probe",
 		Severity: rule.SeverityWarning,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -611,12 +611,12 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 	}
 	configured := append(sweep, probe)
 
-	linter.RunLinterInProgram(sourceProgram, nil, nil, utils.ExcludePaths,
-		func(sf *tsast.SourceFile) []linter.ConfiguredRule { return configured },
-		false,
-		func(d rule.RuleDiagnostic) {},
-		nil,
-	)
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                sourceProgram,
+		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+		GetRulesForFile:        func(sf *tsast.SourceFile) []rule.ConfiguredRule { return configured },
+		OnDiagnostic:           func(d rule.RuleDiagnostic) {},
+	})
 
 	if !sawAnyListener {
 		t.Fatal("probe listener never fired; test fixture is not being traversed")
@@ -630,16 +630,16 @@ func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 // that does not set RequiresTypeInfo: true. Each rule is run with nil
 // options — the point is to exercise the listener / TypeChecker plumbing,
 // not to test correctness of the report payloads.
-func collectNonTypeAwareRules(t *testing.T) []linter.ConfiguredRule {
+func collectNonTypeAwareRules(t *testing.T) []rule.ConfiguredRule {
 	t.Helper()
 	all := baseRuleCatalog().AllRules()
-	out := make([]linter.ConfiguredRule, 0, len(all))
+	out := make([]rule.ConfiguredRule, 0, len(all))
 	for name, impl := range all {
 		if impl.RequiresTypeInfo {
 			continue
 		}
 		ruleImpl := impl
-		out = append(out, linter.ConfiguredRule{
+		out = append(out, rule.ConfiguredRule{
 			Name:     name,
 			Severity: rule.SeverityWarning,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {

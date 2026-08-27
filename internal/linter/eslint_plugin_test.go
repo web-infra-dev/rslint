@@ -15,15 +15,49 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) ConfiguredRule {
-	return ConfiguredRule{Name: name, Options: opts, Severity: sev, IsEslintPluginRule: true}
+func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) rule.ConfiguredRule {
+	return rule.ConfiguredRule{Name: name, Options: opts, Severity: sev, IsEslintPluginRule: true}
+}
+
+func TestDispatchEslintPluginRulesAsyncPublishesStructuredOutcome(t *testing.T) {
+	dispatchError := errors.New("transport closed")
+	outcomeCh := DispatchEslintPluginRulesAsync(
+		context.Background(),
+		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			return nil, dispatchError
+		},
+		[]EslintPluginFileInput{{
+			Path: "/repo/a.ts",
+			Rules: []rule.ConfiguredRule{{
+				Name:               "external/rule",
+				Severity:           rule.SeverityError,
+				IsEslintPluginRule: true,
+			}},
+		}},
+		false,
+		SuggestionsModeOff,
+		nil,
+	)
+
+	var outcome EslintPluginDispatchOutcome
+	select {
+	case outcome = <-outcomeCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for async plugin outcome")
+	}
+	if !errors.Is(outcome.DispatchError, dispatchError) {
+		t.Fatalf("published error = %v, want %v", outcome.DispatchError, dispatchError)
+	}
+	if len(outcome.Diagnostics) != 1 || outcome.Diagnostics[0].RuleName != "rslint/plugin-lint-error" {
+		t.Fatalf("diagnostics = %v, want dispatch failure diagnostic", outcome.Diagnostics)
+	}
 }
 
 func TestBuildEslintPluginFileInput_EffectiveLanguageOptions(t *testing.T) {
 	raw := map[string]any{
 		"parserOptions": map[string]any{"ecmaFeatures": map[string]any{"jsx": true}},
 	}
-	rules := []ConfiguredRule{{
+	rules := []rule.ConfiguredRule{{
 		Name:               "plugin/rule",
 		IsEslintPluginRule: true,
 		Environment:        &rule.RuleEnvironment{},
@@ -83,10 +117,10 @@ func TestDispatchEslintPlugin_GroupsBySignature(t *testing.T) {
 	// A,B share (configKey + rule + options) → one batch; C differs in
 	// options → another; D differs in configKey → another. 3 batches total.
 	files := []EslintPluginFileInput{
-		{Path: "/a.ts", ConfigKey: "/cfg", Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
-		{Path: "/b.ts", ConfigKey: "/cfg", Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
-		{Path: "/c.ts", ConfigKey: "/cfg", Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o2"}, rule.SeverityError)}},
-		{Path: "/d.ts", ConfigKey: "/other", Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
+		{Path: "/a.ts", ConfigKey: "/cfg", Rules: []rule.ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
+		{Path: "/b.ts", ConfigKey: "/cfg", Rules: []rule.ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
+		{Path: "/c.ts", ConfigKey: "/cfg", Rules: []rule.ConfiguredRule{pluginRule("uc/x", []any{"o2"}, rule.SeverityError)}},
+		{Path: "/d.ts", ConfigKey: "/other", Rules: []rule.ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
 	}
 	var (
 		mu      sync.Mutex
@@ -130,8 +164,8 @@ func TestDispatchEslintPlugin_SeverityDoesNotFragmentBatches(t *testing.T) {
 	// so these must share exactly ONE batch — yet each file keeps its severity.
 	ta, tb := "a\n", "b\n"
 	files := []EslintPluginFileInput{
-		{Path: "/a.ts", ConfigKey: "/cfg", Text: &ta, Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
-		{Path: "/b.ts", ConfigKey: "/cfg", Text: &tb, Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityWarning)}},
+		{Path: "/a.ts", ConfigKey: "/cfg", Text: &ta, Rules: []rule.ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
+		{Path: "/b.ts", ConfigKey: "/cfg", Text: &tb, Rules: []rule.ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityWarning)}},
 	}
 	var (
 		mu         sync.Mutex
@@ -182,7 +216,7 @@ func TestDispatchEslintPlugin_ConcurrentBatchesAllEmitted(t *testing.T) {
 			Path:      fmt.Sprintf("/f%d.ts", i),
 			ConfigKey: "/cfg",
 			Text:      &texts[i],
-			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct options → distinct batch
+			Rules:     []rule.ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct options → distinct batch
 		}
 	}
 	var (
@@ -235,7 +269,7 @@ func TestDispatchEslintPlugin_BatchFailureDoesNotAbortOthers(t *testing.T) {
 			Path:      fmt.Sprintf("/f%d.ts", i),
 			ConfigKey: "/cfg",
 			Text:      &texts[i],
-			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)},
+			Rules:     []rule.ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)},
 		}
 	}
 	wantErr := errors.New("boom")
@@ -278,7 +312,7 @@ func TestDispatchEslintPlugin_FirstBatchErrorWins(t *testing.T) {
 			Path:      fmt.Sprintf("/f%d.ts", i),
 			ConfigKey: "/cfg",
 			Text:      &texts[i],
-			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct options → own batch, order f0..f5
+			Rules:     []rule.ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct options → own batch, order f0..f5
 		}
 	}
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
@@ -300,7 +334,7 @@ func TestDispatchEslintPlugin_FirstBatchErrorWins(t *testing.T) {
 func TestDispatchEslintPlugin_SeverityReattachAndClamp(t *testing.T) {
 	text := "abc\n" // len 4 bytes
 	files := []EslintPluginFileInput{
-		{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityWarning)}},
+		{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityWarning)}},
 	}
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
@@ -346,7 +380,7 @@ func TestDispatchEslintPlugin_SeverityReattachAndClamp(t *testing.T) {
 func TestDispatchEslintPlugin_ParseErrorClasses(t *testing.T) {
 	text := "x"
 	mkFiles := func() []EslintPluginFileInput {
-		return []EslintPluginFileInput{{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}}}
+		return []EslintPluginFileInput{{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}}}
 	}
 	run := func(fr EslintPluginFileResult) []rule.RuleDiagnostic {
 		dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
@@ -420,7 +454,7 @@ func TestDispatchEslintPlugin_ParseErrorClasses(t *testing.T) {
 
 func TestDispatchEslintPlugin_Cancelled(t *testing.T) {
 	text := "x"
-	files := []EslintPluginFileInput{{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}}}
+	files := []EslintPluginFileInput{{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}}}
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: "/a.ts", Cancelled: true}}}, nil
 	}
@@ -432,7 +466,7 @@ func TestDispatchEslintPlugin_Cancelled(t *testing.T) {
 
 func TestDispatchEslintPlugin_MissingResultNoPanic(t *testing.T) {
 	text := "x"
-	files := []EslintPluginFileInput{{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}}}
+	files := []EslintPluginFileInput{{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}}}
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: nil}, nil // no result for /a.ts
 	}
@@ -502,7 +536,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 	// bytes 6..12 (two 3-byte runes), so a [6,12] worker offset must land on them.
 	sf := newTextSourceFile("const 变量 = 1;")
 	files := []EslintPluginFileInput{
-		{Path: "/a.ts", ConfigKey: "/cfg", SourceFile: sf, Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}},
+		{Path: "/a.ts", ConfigKey: "/cfg", SourceFile: sf, Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}},
 	}
 	dispatch := func(_ context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
@@ -533,7 +567,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 	const code = "const x = 1;"
 	bomText := "\ufeff" + code
 	files2 := []EslintPluginFileInput{
-		{Path: "/b.ts", ConfigKey: "/cfg", Text: &bomText, Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}},
+		{Path: "/b.ts", ConfigKey: "/cfg", Text: &bomText, Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}},
 	}
 	dispatch2 := func(_ context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
@@ -569,7 +603,7 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 
 	// (c) Neither SourceFile nor Text -> surface a 'no source frame' error.
 	files3 := []EslintPluginFileInput{
-		{Path: "/c.ts", ConfigKey: "/cfg", Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}},
+		{Path: "/c.ts", ConfigKey: "/cfg", Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}},
 	}
 	dispatch3 := func(_ context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
@@ -678,7 +712,7 @@ func TestDispatchEslintPlugin_MultipleRulesPerFile(t *testing.T) {
 	text := "x\n"
 	files := []EslintPluginFileInput{{
 		Path: "/a.ts", ConfigKey: "/cfg", Text: &text,
-		Rules: []ConfiguredRule{
+		Rules: []rule.ConfiguredRule{
 			pluginRule("uc/a", []any{"o"}, rule.SeverityError),
 			pluginRule("uc/b", nil, rule.SeverityWarning),
 		},
@@ -720,8 +754,8 @@ func TestDispatchEslintPlugin_MultipleRulesPerFile(t *testing.T) {
 // TestDispatchEslintPlugin_DeadlineExceededSurfaces pins that when a batch's
 // dispatch fails with context.DeadlineExceeded (the LSP fixAll timeout firing),
 // DispatchEslintPluginRules surfaces an error for which errors.Is(err,
-// context.DeadlineExceeded) holds — so lintPluginRulesSync's timeout branch
-// recognizes it — while the other (completed) batches still emit their
+// context.DeadlineExceeded) holds — so an integration's timeout policy can
+// recognize it — while the other (completed) batches still emit their
 // diagnostics. (No mutex on the emitted map on purpose: onDiagnostic stays
 // single-threaded, so -race catches a regression that emits concurrently.)
 func TestDispatchEslintPlugin_DeadlineExceededSurfaces(t *testing.T) {
@@ -735,7 +769,7 @@ func TestDispatchEslintPlugin_DeadlineExceededSurfaces(t *testing.T) {
 			Path:      fmt.Sprintf("/f%d.ts", i),
 			ConfigKey: "/cfg",
 			Text:      &texts[i],
-			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct option → distinct batch
+			Rules:     []rule.ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct option → distinct batch
 		}
 	}
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
@@ -771,7 +805,7 @@ func TestDispatchEslintPlugin_FixAndSuggestionsRebuilt(t *testing.T) {
 	text := "const x = 1;\n"
 	files := []EslintPluginFileInput{{
 		Path: "/a.ts", ConfigKey: "/cfg", Text: &text,
-		Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)},
+		Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)},
 	}}
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
@@ -827,7 +861,7 @@ func TestDispatchEslintPlugin_EmitsInBatchOrderDespiteOutOfOrderCompletion(t *te
 			Path:      fmt.Sprintf("/f%d.ts", i),
 			ConfigKey: "/cfg",
 			Text:      &texts[i],
-			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct option → own batch
+			Rules:     []rule.ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct option → own batch
 		}
 	}
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
@@ -862,7 +896,7 @@ func TestDispatchEslintPlugin_RealErrorOutranksCanceled(t *testing.T) {
 			Path:      fmt.Sprintf("/f%d.ts", i),
 			ConfigKey: "/cfg",
 			Text:      &txt,
-			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)},
+			Rules:     []rule.ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)},
 		}
 	}
 	files := []EslintPluginFileInput{mkFile(0), mkFile(1)}
@@ -890,11 +924,11 @@ func TestBuildEslintPluginFileInputsUsesPreparedPlan(t *testing.T) {
 	if nativeFile == nil || pluginFile == nil {
 		t.Fatalf("prepared plan fixtures are missing: native=%v plugin=%v", nativeFile != nil, pluginFile != nil)
 	}
-	nativeRule := ConfiguredRule{Name: "native/rule", Severity: rule.SeverityError}
+	nativeRule := rule.ConfiguredRule{Name: "native/rule", Severity: rule.SeverityError}
 	pluginConfiguredRule := pluginRule("external/rule", []any{"option"}, rule.SeverityWarning)
 	plan := &LintPlan{programs: []programLintPlan{{files: []lintFilePlan{
-		{file: nativeFile, rules: []ConfiguredRule{nativeRule}},
-		{file: pluginFile, rules: []ConfiguredRule{nativeRule, pluginConfiguredRule}},
+		{file: nativeFile, rules: []rule.ConfiguredRule{nativeRule}},
+		{file: pluginFile, rules: []rule.ConfiguredRule{nativeRule, pluginConfiguredRule}},
 	}}}}
 
 	resolveCalls := 0
@@ -941,13 +975,13 @@ func TestDispatchEslintPluginRulesWithOutcomeSurfacesFailure(t *testing.T) {
 			Path:      "/repo/good.ts",
 			ConfigKey: "/repo",
 			Text:      &goodText,
-			Rules:     []ConfiguredRule{pluginRule("external/rule", []any{"good"}, rule.SeverityWarning)},
+			Rules:     []rule.ConfiguredRule{pluginRule("external/rule", []any{"good"}, rule.SeverityWarning)},
 		},
 		{
 			Path:      "/repo/bad.ts",
 			ConfigKey: "/repo",
 			Text:      &badText,
-			Rules:     []ConfiguredRule{pluginRule("external/rule", []any{"bad"}, rule.SeverityError)},
+			Rules:     []rule.ConfiguredRule{pluginRule("external/rule", []any{"bad"}, rule.SeverityError)},
 		},
 	}
 	dispatchError := errors.New("WorkerPool: closed")
@@ -1006,7 +1040,7 @@ func TestDispatchEslintPluginRulesWithOutcomePreservesCancellation(t *testing.T)
 		[]EslintPluginFileInput{{
 			Path:      "/repo/a.ts",
 			ConfigKey: "/repo",
-			Rules:     []ConfiguredRule{pluginRule("external/rule", nil, rule.SeverityError)},
+			Rules:     []rule.ConfiguredRule{pluginRule("external/rule", nil, rule.SeverityError)},
 		}},
 		false,
 		SuggestionsModeOff,
@@ -1017,6 +1051,48 @@ func TestDispatchEslintPluginRulesWithOutcomePreservesCancellation(t *testing.T)
 	}
 	if len(outcome.Diagnostics) != 0 {
 		t.Errorf("cancellation diagnostics = %v, want none", outcome.Diagnostics)
+	}
+}
+
+func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T) {
+	text := "const value = 1;"
+	files := []EslintPluginFileInput{
+		{
+			Path:  "/repo/present.ts",
+			Text:  &text,
+			Rules: []rule.ConfiguredRule{pluginRule("external/configured", nil, rule.SeverityWarning)},
+		},
+		{
+			Path:  "/repo/missing.ts",
+			Text:  &text,
+			Rules: []rule.ConfiguredRule{pluginRule("external/configured", nil, rule.SeverityWarning)},
+		},
+	}
+	outcome := DispatchEslintPluginRulesWithOutcome(
+		context.Background(),
+		func(_ context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+				FilePath: "/repo/present.ts",
+				Diagnostics: []EslintPluginDiagnostic{{
+					RuleName: "external/unconfigured",
+					Message:  "unexpected diagnostic",
+				}},
+			}}}, nil
+		},
+		files,
+		false,
+		SuggestionsModeOff,
+		nil,
+	)
+	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 1 {
+		t.Fatalf("outcome = %+v, want one usable diagnostic and no dispatch error", outcome)
+	}
+	want := []EslintPluginProtocolNotice{
+		{Kind: EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/present.ts", RuleName: "external/unconfigured"},
+		{Kind: EslintPluginMissingFileResult, FilePath: "/repo/missing.ts"},
+	}
+	if !reflect.DeepEqual(outcome.Notices, want) {
+		t.Fatalf("notices = %+v, want %+v", outcome.Notices, want)
 	}
 }
 

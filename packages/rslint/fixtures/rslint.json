@@ -23,7 +23,8 @@
       "@typescript-eslint/no-wrapper-object-types": "error",
       "@typescript-eslint/no-inferrable-types": "error",
       "prefer-const": "off",
-      "one-var": "off"
+      "one-var": "off",
+      "capitalized-comments": "off"
     },
     "plugins": ["@typescript-eslint"]
   }

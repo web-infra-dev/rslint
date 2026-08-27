@@ -338,7 +338,7 @@ func checkMemberAccess(ctx rule.RuleContext, node *ast.Node, opts noUnderscoreDa
 	// `<Foo._bar />` is a JSXMemberExpression upstream, a kind the rule has no
 	// listener for, while tsgo spells a JSX tag name with the same
 	// PropertyAccessExpression it uses for value member access.
-	if isJsxTagName(node) {
+	if utils.IsInJsxTagName(node) {
 		return
 	}
 
@@ -354,19 +354,6 @@ func checkMemberAccess(ctx rule.RuleContext, node *ast.Node, opts noUnderscoreDa
 	}
 
 	reportIfDangling(ctx, utils.TrimNodeTextRange(ctx.SourceFile, node), identifier, identifier, opts)
-}
-
-// isJsxTagName reports whether node is part of the dotted tag name of a JSX
-// element — `<a.b.c />` nests one PropertyAccessExpression inside another, so
-// every link has to climb to the outermost one before asking.
-func isJsxTagName(node *ast.Node) bool {
-	current := node
-	for current.Parent != nil && current.Parent.Kind == ast.KindPropertyAccessExpression {
-		current = current.Parent
-	}
-	parent := current.Parent
-	return parent != nil &&
-		(ast.IsJsxOpeningElement(parent) || ast.IsJsxSelfClosingElement(parent) || ast.IsJsxClosingElement(parent))
 }
 
 func memberPropertyNode(node *ast.Node) *ast.Node {

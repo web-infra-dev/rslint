@@ -1,21 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"io"
-	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
-	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
@@ -58,29 +53,6 @@ func TestPluginConfigResolverUsesOwnerAsRoutingKey(t *testing.T) {
 	}
 }
 
-func TestPluginConfigResolverUsesAPIRoutingOverride(t *testing.T) {
-	const (
-		configDirectory = "/repo"
-		sourcePath      = "/repo/src/a.ts"
-		routingKey      = "opaque-api-config-key"
-	)
-	resolver := eslintPluginConfigResolver{
-		lintResolver: newPluginLintResolverForTest(configLint.ResolverOptions{
-			ConfigsByOwner: map[string]rslintconfig.RslintConfig{
-				configDirectory: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-			},
-			TargetsBySourcePath: map[string]target.File{
-				sourcePath: pluginTargetForTest(sourcePath, configDirectory),
-			},
-		}),
-		pluginConfigDirectoryByOwner: map[string]string{configDirectory: routingKey},
-	}
-
-	if got := resolver.resolve(sourcePath).ConfigKey; got != routingKey {
-		t.Errorf("routing key = %q, want API override %q", got, routingKey)
-	}
-}
-
 func TestPluginConfigResolverPreservesResolutionModes(t *testing.T) {
 	configMap := map[string]rslintconfig.RslintConfig{
 		"/repo": {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
@@ -106,116 +78,28 @@ func TestPluginConfigResolverPreservesResolutionModes(t *testing.T) {
 	}
 }
 
-func TestDispatchEslintPluginRulesAsyncReportsFailureBeforeResultIsObserved(t *testing.T) {
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("create stderr pipe: %v", err)
-	}
-	previous := os.Stderr
-	os.Stderr = writer
-	defer func() {
-		os.Stderr = previous
-		_ = writer.Close()
-		_ = reader.Close()
-	}()
-
-	type readResult struct {
-		line string
-		err  error
-	}
-	lineRead := make(chan readResult, 1)
-	go func() {
-		line, readErr := bufio.NewReader(reader).ReadString('\n')
-		lineRead <- readResult{line: strings.ReplaceAll(line, "\r\n", "\n"), err: readErr}
-	}()
-
-	dispatchError := errors.New("transport closed")
-	diagnosticsCh := dispatchEslintPluginRulesAsync(
-		context.Background(),
-		func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-			return nil, dispatchError
+func TestReportEslintPluginDispatchOutcome(t *testing.T) {
+	var stderr strings.Builder
+	writeEslintPluginDispatchOutcome(&stderr, linter.EslintPluginDispatchOutcome{
+		Notices: []linter.EslintPluginProtocolNotice{
+			{Kind: linter.EslintPluginMissingFileResult, FilePath: "/repo/a.ts"},
+			{Kind: linter.EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/b.ts", RuleName: "plugin/extra"},
 		},
-		[]linter.EslintPluginFileInput{{
-			Path: "/repo/a.ts",
-			Rules: []rule.ConfiguredRule{{
-				Name:               "external/rule",
-				Severity:           rule.SeverityError,
-				IsEslintPluginRule: true,
-			}},
-		}},
-		false,
-		linter.SuggestionsModeOff,
-		nil,
-	)
-
-	select {
-	case result := <-lineRead:
-		if result.err != nil {
-			t.Fatalf("read stderr: %v", result.err)
-		}
-		if want := "rslint: eslint-plugin lint error: transport closed\n"; result.line != want {
-			t.Fatalf("stderr = %q, want %q", result.line, want)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("dispatch failure was not written before the result channel was observed")
-	}
-
-	diagnostics := <-diagnosticsCh
-	if len(diagnostics) != 1 || diagnostics[0].RuleName != "rslint/plugin-lint-error" {
-		t.Fatalf("diagnostics = %v, want the dispatch failure diagnostic", diagnostics)
-	}
-}
-
-func TestDispatchEslintPluginRulesAsyncKeepsCancellationSilent(t *testing.T) {
-	var diagnostics []rule.RuleDiagnostic
-	stderr := captureStderrForTest(t, func() {
-		diagnostics = <-dispatchEslintPluginRulesAsync(
-			context.Background(),
-			func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-				return nil, context.Canceled
-			},
-			[]linter.EslintPluginFileInput{{
-				Path: "/repo/a.ts",
-				Rules: []rule.ConfiguredRule{{
-					Name:               "external/rule",
-					Severity:           rule.SeverityError,
-					IsEslintPluginRule: true,
-				}},
-			}},
-			false,
-			linter.SuggestionsModeOff,
-			nil,
-		)
+		DispatchError: errors.New("transport closed"),
 	})
-	if len(diagnostics) != 0 {
-		t.Errorf("cancellation diagnostics = %v, want none", diagnostics)
+	if want := "rslint: plugin-lint returned no result for \"/repo/a.ts\"\n" +
+		"rslint: plugin diagnostic for unconfigured rule \"plugin/extra\" in \"/repo/b.ts\"\n" +
+		"rslint: eslint-plugin lint error: transport closed\n"; stderr.String() != want {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
 	}
-	if stderr != "" {
-		t.Errorf("cancellation stderr = %q, want none", stderr)
-	}
-}
 
-func captureStderrForTest(t *testing.T, action func()) string {
-	t.Helper()
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("create stderr pipe: %v", err)
+	stderr.Reset()
+	writeEslintPluginDispatchOutcome(&stderr, linter.EslintPluginDispatchOutcome{
+		DispatchError: context.Canceled,
+	})
+	if stderr.Len() != 0 {
+		t.Fatalf("cancellation stderr = %q, want none", stderr.String())
 	}
-	previous := os.Stderr
-	os.Stderr = writer
-	action()
-	os.Stderr = previous
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close stderr writer: %v", err)
-	}
-	output, err := io.ReadAll(reader)
-	if err != nil {
-		t.Fatalf("read stderr: %v", err)
-	}
-	if err := reader.Close(); err != nil {
-		t.Fatalf("close stderr reader: %v", err)
-	}
-	return strings.ReplaceAll(string(output), "\r\n", "\n")
 }
 
 func pluginTargetForTest(path string, configDirectory string) target.File {

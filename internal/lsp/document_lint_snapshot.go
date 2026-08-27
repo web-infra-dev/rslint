@@ -29,6 +29,7 @@ type documentLintSnapshot struct {
 	configResolved        bool
 	typeScriptConfigPaths []string
 	usesJavaScriptConfig  bool
+	pluginGeneration      string
 	unavailable           bool
 }
 
@@ -292,6 +293,7 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 		configResolved:        !selection.configMissing,
 		typeScriptConfigPaths: typeScriptConfigPaths,
 		usesJavaScriptConfig:  selection.usesJSConfig,
+		pluginGeneration:      s.eslintPluginConfigGeneration,
 		unavailable:           selection.usesJSConfig && unavailable,
 	}
 }

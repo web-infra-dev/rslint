@@ -550,10 +550,10 @@ func TestHandleFixAllCodeAction_DocumentNotInMap(t *testing.T) {
 	}
 }
 
-// ======== maxFixPasses constant test ========
+// ======== maxFixRounds constant test ========
 
-func TestMaxFixPasses_IsReasonable(t *testing.T) {
-	if maxFixPasses < 1 || maxFixPasses > 100 {
-		t.Errorf("maxFixPasses = %d, should be between 1 and 100", maxFixPasses)
+func TestMaxFixRounds_IsReasonable(t *testing.T) {
+	if maxFixRounds < 1 || maxFixRounds > 100 {
+		t.Errorf("maxFixRounds = %d, should be between 1 and 100", maxFixRounds)
 	}
 }

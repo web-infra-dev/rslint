@@ -72,14 +72,13 @@ func TestRunLinterDiagnosticConsumerEditDemand(t *testing.T) {
 			suggestionBuilderCalls := 0
 			var got []rule.RuleDiagnostic
 			timing := NewTimingCollector()
-
-			_, err := RunLinter(RunLinterOptions{
-				Programs:       wrapTestPrograms(program),
-				SingleThreaded: true,
-				TargetFiles:    [][]string{{paths["edits.ts"]}},
-				Timing:         timing,
-				GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-					return []ConfiguredRule{{
+			programs := wrapTestPrograms(program)
+			lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+				Programs:         programs,
+				SingleThreaded:   true,
+				TargetsByProgram: [][]string{{paths["edits.ts"]}},
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{
 						Name:     "edit-demand",
 						Severity: rule.SeverityWarning,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -98,6 +97,11 @@ func TestRunLinterDiagnosticConsumerEditDemand(t *testing.T) {
 						},
 					}}
 				},
+			})
+			_, err := RunLinter(RunLinterOptions{
+				SingleThreaded: true,
+				LintPlan:       lintPlan,
+				Timing:         timing,
 				Consumer: rule.DiagnosticConsumer{
 					Demand: testCase.demand,
 					Report: func(d rule.RuleDiagnostic) { got = append(got, d) },
@@ -168,12 +172,13 @@ func TestRunLinterDeferredFixesSkipSuppressedDiagnostic(t *testing.T) {
 
 	builderCalls := 0
 	var got []rule.RuleDiagnostic
-	_, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["suppressed.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{{paths["suppressed.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "deferred-rule",
 				Severity: rule.SeverityWarning,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -191,6 +196,10 @@ func TestRunLinterDeferredFixesSkipSuppressedDiagnostic(t *testing.T) {
 				},
 			}}
 		},
+	})
+	_, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAutofix,
 			Report: func(d rule.RuleDiagnostic) { got = append(got, d) },
@@ -219,12 +228,13 @@ func TestRunLinterDeferredBuilderMayDeclineArtifact(t *testing.T) {
 
 	builderCalls := 0
 	var got []rule.RuleDiagnostic
-	_, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["decline.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{{paths["decline.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "decline-fix",
 				Severity: rule.SeverityWarning,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -240,6 +250,10 @@ func TestRunLinterDeferredBuilderMayDeclineArtifact(t *testing.T) {
 				},
 			}}
 		},
+	})
+	_, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAutofix,
 			Report: func(d rule.RuleDiagnostic) { got = append(got, d) },
@@ -289,12 +303,13 @@ func TestRunLinterLegacyReportsRespectEditDemand(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var got []rule.RuleDiagnostic
-			_, err := RunLinter(RunLinterOptions{
-				Programs:       wrapTestPrograms(program),
-				SingleThreaded: true,
-				TargetFiles:    [][]string{{paths["legacy.ts"]}},
-				GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-					return []ConfiguredRule{{
+			programs := wrapTestPrograms(program)
+			lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+				Programs:         programs,
+				SingleThreaded:   true,
+				TargetsByProgram: [][]string{{paths["legacy.ts"]}},
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{
 						Name:     "legacy-report",
 						Severity: rule.SeverityWarning,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -308,6 +323,10 @@ func TestRunLinterLegacyReportsRespectEditDemand(t *testing.T) {
 						},
 					}}
 				},
+			})
+			_, err := RunLinter(RunLinterOptions{
+				SingleThreaded: true,
+				LintPlan:       lintPlan,
 				Consumer: rule.DiagnosticConsumer{
 					Demand: testCase.demand,
 					Report: func(d rule.RuleDiagnostic) { got = append(got, d) },
@@ -337,12 +356,13 @@ func TestRunLinterDiscardingConsumerSkipsDeferredEdits(t *testing.T) {
 	}
 
 	builderCalls := 0
-	result, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["discarded.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{{paths["discarded.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "discarded",
 				Severity: rule.SeverityWarning,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -358,6 +378,10 @@ func TestRunLinterDiscardingConsumerSkipsDeferredEdits(t *testing.T) {
 				},
 			}}
 		},
+	})
+	result, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			// A nil report callback means there is no consumer. Even a
 			// contradictory demand must not make discarded edits materialize.

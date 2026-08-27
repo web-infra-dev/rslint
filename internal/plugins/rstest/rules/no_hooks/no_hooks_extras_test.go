@@ -392,10 +392,11 @@ setup(() => {});
 	}
 
 	diagnosticCount := 0
-	result, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{program},
-		SingleThreaded: true,
-		ExcludePaths:   []string{},
+	programs := []*lintprogram.Program{program}
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{fileName}},
+		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:             no_hooks.NoHooksRule.Name,
@@ -406,6 +407,13 @@ setup(() => {});
 				},
 			}}
 		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	result, err := linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(rule.RuleDiagnostic) { diagnosticCount++ },
 		},

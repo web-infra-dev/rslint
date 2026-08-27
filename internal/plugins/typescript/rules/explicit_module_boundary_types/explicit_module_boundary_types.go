@@ -199,21 +199,22 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		// only `foo`, not the access modifier. Mirror that by switching the
 		// report range to the binding name.
 		reportTarget := param
-		if !isRest && ast.HasSyntacticModifier(param, ast.ModifierFlagsParameterPropertyModifier) {
+		if !isRest && utils.ESTreeModifierFlags(param)&ast.ModifierFlagsParameterPropertyModifier != 0 {
 			reportTarget = nameNode
 		}
-		if pd.Type == nil {
+		paramType := utils.ESTreeType(param)
+		if paramType == nil {
 			reportParam(reportTarget, "missingArgType", "missingArgTypeUnnamed", nameNode, isRest)
 			return
 		}
-		if !opts.allowArgumentsExplicitlyTypedAsAny && pd.Type.Kind == ast.KindAnyKeyword {
+		if !opts.allowArgumentsExplicitlyTypedAsAny && paramType.Kind == ast.KindAnyKeyword {
 			reportParam(reportTarget, "anyTypedArg", "anyTypedArgUnnamed", nameNode, isRest)
 			return
 		}
 	}
 
 	checkParameters := func(node *ast.Node) {
-		for _, p := range node.Parameters() {
+		for _, p := range utils.ESTreeParameters(node) {
 			checkParameter(p)
 		}
 	}
@@ -374,7 +375,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		}
 		checkedFunctions[node] = true
 
-		if isAllowedName(node.Parent) ||
+		if isAllowedName(typescriptutil.GetEffectiveParent(node)) ||
 			typescriptutil.IsTypedFunctionExpression(node, opts.allowTypedFunctionExpressions) ||
 			typescriptutil.AncestorHasReturnType(node) {
 			return
@@ -396,7 +397,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		// check for constructors / set-accessors; always check parameters.
 		isConstructor := node.Kind == ast.KindConstructor
 		isSetAccessor := node.Kind == ast.KindSetAccessor
-		if !isConstructor && !isSetAccessor && node.Type() == nil {
+		if !isConstructor && !isSetAccessor && utils.ESTreeType(node) == nil {
 			// Upstream reports on the TSEmptyBodyFunctionExpression node,
 			// which spans from `(` to (typically) the trailing `;`. tsgo
 			// doesn't model the empty body separately — emulate the range by
@@ -413,7 +414,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		// Filter out private and #private members. AccessorProperty is a
 		// PropertyDeclaration with the `accessor` modifier in tsgo, so the
 		// same handling applies.
-		if ast.HasSyntacticModifier(node, ast.ModifierFlagsPrivate) {
+		if utils.ESTreeModifierFlags(node)&ast.ModifierFlagsPrivate != 0 {
 			return
 		}
 		name := node.Name()
@@ -445,6 +446,13 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 			return
 		}
 		alreadyVisited[node] = true
+		if utils.IsJSDocSyntaxNode(node) {
+			return
+		}
+		if expression := utils.ESTreeRuntimeExpression(node); expression != node {
+			checkNode(expression)
+			return
+		}
 
 		switch node.Kind {
 		case ast.KindArrowFunction, ast.KindFunctionExpression:
@@ -522,7 +530,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		return false
 	}
 	isExportedHigherOrderFunction := func(node *ast.Node) bool {
-		current := node.Parent
+		current := typescriptutil.GetEffectiveParent(node)
 		for current != nil {
 			if current.Kind == ast.KindReturnStatement {
 				// upstream skips the wrapping Block — `current.parent.parent`.
@@ -542,7 +550,7 @@ func run(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 			if checkedFunctions[current] {
 				return true
 			}
-			current = current.Parent
+			current = typescriptutil.GetEffectiveParent(current)
 		}
 		return false
 	}
@@ -654,7 +662,7 @@ func isValidFunctionReturnType(node *ast.Node, returns []*ast.Node, opts options
 	if opts.allowHigherOrderFunctions && typescriptutil.DoesImmediatelyReturnFunctionExpression(node, returns) {
 		return true
 	}
-	if node.Type() != nil {
+	if utils.ESTreeType(node) != nil {
 		return true
 	}
 	// Constructor / set-accessor never need a return type.
@@ -758,7 +766,11 @@ func collectMetadata(
 	assignmentsMap map[*ast.Symbol][]*ast.Node,
 	currentFn *ast.Node,
 ) {
-	if node == nil {
+	if node == nil || utils.IsJSDocSyntaxNode(node) {
+		return
+	}
+	if expression := utils.ESTreeRuntimeExpression(node); expression != node {
+		collectMetadata(ctx, expression, returnsMap, assignmentsMap, currentFn)
 		return
 	}
 	switch node.Kind {
