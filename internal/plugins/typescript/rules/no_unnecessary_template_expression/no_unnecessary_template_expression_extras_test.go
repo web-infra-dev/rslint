@@ -26,13 +26,24 @@ func TestNoUnnecessaryTemplateExpressionExtras(t *testing.T) {
 		"tsconfig.json",
 		t,
 		&NoUnnecessaryTemplateExpressionRule,
-		[]rule_tester.ValidTestCase{
-			// ---- Dimension 4: every ECMAScript line terminator preserves intentional trailing whitespace ----
-			{Code: "`trailing whitespace: ${' '}\r`;"},
-			{Code: "`trailing whitespace: ${' '}\u2028`;"},
-			{Code: "`trailing whitespace: ${' '}\u2029`;"},
-		},
+		nil,
 		[]rule_tester.InvalidTestCase{
+			// Locks in upstream startsWithNewLine(): only LF and CRLF preserve intentional trailing whitespace.
+			{
+				Code:   "`trailing whitespace: ${' '}\r`;",
+				Output: []string{"`trailing whitespace:  \r`;"},
+				Errors: []rule_tester.InvalidTestCaseError{errorWithMessage()},
+			},
+			{
+				Code:   "`trailing whitespace: ${' '}\u2028`;",
+				Output: []string{"`trailing whitespace:  \u2028`;"},
+				Errors: []rule_tester.InvalidTestCaseError{errorWithMessage()},
+			},
+			{
+				Code:   "`trailing whitespace: ${' '}\u2029`;",
+				Output: []string{"`trailing whitespace:  \u2029`;"},
+				Errors: []rule_tester.InvalidTestCaseError{errorWithMessage()},
+			},
 			// Locks in upstream getReportDescriptors() literal arm: numeric and bigint values use JavaScript String conversion.
 			{
 				Code:   "`${0o25}-${0b1010}-${0x25}-${1n}`;",
@@ -73,6 +84,12 @@ func TestNoUnnecessaryTemplateExpressionExtras(t *testing.T) {
 					errorWithMessage(), errorWithMessage(), errorWithMessage(),
 				},
 			},
+			// Locks in JavaScript RegExp stringification's canonical flag order.
+			{
+				Code:   "`${/a/mig}`;",
+				Output: []string{"`/a/gim`;"},
+				Errors: []rule_tester.InvalidTestCaseError{errorWithMessage()},
+			},
 			// ---- Dimension 4: template literal type interpolation ----
 			{
 				Code:   "type Value = `pre-${'suffix'}`;",
@@ -84,6 +101,28 @@ func TestNoUnnecessaryTemplateExpressionExtras(t *testing.T) {
 				Code:   "declare const value: string; `${value || ''}`.length;",
 				Output: []string{"declare const value: string; (value || '').length;"},
 				Errors: []rule_tester.InvalidTestCaseError{errorWithMessage()},
+			},
+			// Locks in ESTree-transparent parentheses when moving a single interpolation.
+			{
+				Code:   "declare const s: string; `${(s)}`.length;",
+				Output: []string{"declare const s: string; s.length;"},
+				Errors: []rule_tester.InvalidTestCaseError{errorWithMessage()},
+			},
+			{
+				Code:   "type U = 'a' | 'b'; type T = `${(U)}`;",
+				Output: []string{"type U = 'a' | 'b'; type T = U;"},
+				Errors: []rule_tester.InvalidTestCaseError{errorWithMessage()},
+			},
+			// Locks in the logical ESTree range for a parenthesized sequence expression.
+			{
+				Code:   "declare const s: string; `${(0, s)}`.length;",
+				Output: []string{"declare const s: string; (0, s).length;"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noUnnecessaryTemplateExpression",
+					Line:      1,
+					Column:    28,
+					EndColumn: 35,
+				}},
 			},
 		},
 	)

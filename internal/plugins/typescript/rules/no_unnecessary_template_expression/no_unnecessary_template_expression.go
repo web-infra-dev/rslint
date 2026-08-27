@@ -40,10 +40,7 @@ func isFixableIdentifier(node *ast.Node) bool {
 }
 
 func startsWithNewline(str string) bool {
-	for _, r := range str {
-		return ecmascript.IsLineTerminator(r)
-	}
-	return false
+	return strings.HasPrefix(str, "\n") || strings.HasPrefix(str, "\r\n")
 }
 
 func isWhitespace(str string) bool {
@@ -105,6 +102,38 @@ func interpolationValueNode(node *ast.Node) *ast.Node {
 		return node.AsLiteralTypeNode().Literal
 	}
 	return node
+}
+
+func skipESTreeTransparentParentheses(node *ast.Node) *ast.Node {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindParenthesizedExpression:
+			node = node.AsParenthesizedExpression().Expression
+		case ast.KindParenthesizedType:
+			node = node.AsParenthesizedTypeNode().Type
+		default:
+			return node
+		}
+	}
+	return nil
+}
+
+func canonicalizeRegularExpressionFlags(text string) string {
+	slash := strings.LastIndexByte(text, '/')
+	if slash < 0 || slash == len(text)-1 {
+		return text
+	}
+
+	flags := text[slash+1:]
+	var output strings.Builder
+	output.Grow(len(text))
+	output.WriteString(text[:slash+1])
+	for _, flag := range "dgimsuvy" {
+		if strings.ContainsRune(flags, flag) {
+			output.WriteRune(flag)
+		}
+	}
+	return output.String()
 }
 
 func templateHeadRawText(sourceFile *ast.SourceFile, node *ast.TemplateHeadNode) string {
@@ -186,6 +215,7 @@ func interpolationFixes(sourceFile *ast.SourceFile, interpolation *ast.Node, nex
 		return nil, false, false
 	}
 	if node.Kind == ast.KindRegularExpressionLiteral {
+		replacement = canonicalizeRegularExpressionFlags(replacement)
 		replacement = strings.ReplaceAll(replacement, "\\", "\\\\")
 	}
 	replacement = escapeTemplateMetacharacters(replacement)
@@ -203,14 +233,15 @@ var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		reportSingleInterpolation := func(templateNode *ast.Node, spanExpr *ast.Node, spanLiteral *ast.Node) {
+		reportSingleInterpolation := func(templateNode *ast.Node, spanExpr *ast.Node) {
+			logicalExpression := skipESTreeTransparentParentheses(spanExpr)
+			expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, logicalExpression)
 			ctx.ReportRangeWithDeferredFixes(
-				core.NewTextRange(spanExpr.Pos()-2, spanLiteral.Pos()+1),
+				core.NewTextRange(expressionRange.Pos()-2, expressionRange.End()+1),
 				buildNoUnnecessaryTemplateExpressionMessage(),
 				func() []rule.RuleFix {
-					expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, spanExpr)
 					replacement := ctx.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
-					if !utils.IsStrongPrecedenceNode(spanExpr) && typescriptutil.IsWeakPrecedenceParent(templateNode) {
+					if !utils.IsStrongPrecedenceNode(logicalExpression) && typescriptutil.IsWeakPrecedenceParent(templateNode) {
 						replacement = "(" + replacement + ")"
 					}
 					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, templateNode, replacement)}
@@ -357,7 +388,7 @@ var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 					constraintType, _ := utils.GetConstraintInfo(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(firstSpan.Expression))
 
 					if constraintType != nil && isUnderlyingTypeString(constraintType) {
-						reportSingleInterpolation(node, firstSpan.Expression, firstSpan.Literal)
+						reportSingleInterpolation(node, firstSpan.Expression)
 						return
 					}
 				}
@@ -372,7 +403,7 @@ var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 					constraintType, isTypeParameter := utils.GetConstraintInfo(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(firstSpan.Type))
 
 					if constraintType != nil && !isTypeParameter && isUnderlyingTypeString(constraintType) && !isEnumMemberType(constraintType) {
-						reportSingleInterpolation(node, firstSpan.Type, firstSpan.Literal)
+						reportSingleInterpolation(node, firstSpan.Type)
 						return
 					}
 				}
