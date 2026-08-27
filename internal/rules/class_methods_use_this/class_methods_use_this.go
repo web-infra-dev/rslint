@@ -296,8 +296,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	// representation routes those through TSAbstractMethodDefinition /
 	// TSDeclareMethod nodes so the FunctionExpression listener never sees
 	// them, and tsgo collapses them onto the same kind. Match upstream by
-	// pushing an anonymous frame so the matching exit pop is balanced but
-	// never reports.
+	// leaving the enclosing frame active for the complete bodyless node.
 	//
 	// Computed-key members defer the push until ComputedPropertyName:exit
 	// so `this` inside `[this.foo]() {}` attributes to the enclosing scope,
@@ -309,16 +308,19 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	// The computed-key deferral also applies to *bodyless* members:
 	// `abstract [this.foo](): void` must let `this` in the computed key flow
 	// to the enclosing scope, not be eaten by the bodyless anonymous frame.
-	// The matching ComputedPropertyName:exit branch handles bodyless and
-	// bodied identically — pushing anonymous when Body() == nil, member when
-	// non-nil — keeping the stack balanced against the unconditional pop on
-	// the member's exit listener.
+	// The matching ComputedPropertyName:exit branch pushes a frame only for a
+	// bodied member; bodyless members never push or pop a frame.
 	pushClassLikeMember := func(node *ast.Node) {
 		if node.Body() == nil {
-			pushAnonymous()
 			return
 		}
 		pushMember(node)
+	}
+
+	exitClassLikeMember := func(node *ast.Node) {
+		if node.Body() != nil {
+			exitFunction(node)
+		}
 	}
 
 	enterClassLikeMember := func(node *ast.Node) {
@@ -405,10 +407,19 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	}
 
 	return rule.RuleListeners{
-		// Function declarations always carry their own `this` context but
-		// are never reportable members — push anonymous, pop on exit.
-		ast.KindFunctionDeclaration:                      func(*ast.Node) { pushAnonymous() },
-		rule.ListenerOnExit(ast.KindFunctionDeclaration): func(*ast.Node) { popContext() },
+		// Function declarations with bodies carry their own `this` context but
+		// are never reportable members. Bodyless TypeScript declarations map to
+		// TSDeclareFunction upstream and therefore leave the enclosing frame active.
+		ast.KindFunctionDeclaration: func(node *ast.Node) {
+			if node.Body() != nil {
+				pushAnonymous()
+			}
+		},
+		rule.ListenerOnExit(ast.KindFunctionDeclaration): func(node *ast.Node) {
+			if node.Body() != nil {
+				popContext()
+			}
+		},
 
 		ast.KindFunctionExpression:                      enterFreestandingFunction,
 		rule.ListenerOnExit(ast.KindFunctionExpression): exitFreestandingFunction,
@@ -417,13 +428,13 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		rule.ListenerOnExit(ast.KindArrowFunction): exitFreestandingFunction,
 
 		ast.KindMethodDeclaration:                      enterClassLikeMember,
-		rule.ListenerOnExit(ast.KindMethodDeclaration): exitFunction,
+		rule.ListenerOnExit(ast.KindMethodDeclaration): exitClassLikeMember,
 		ast.KindGetAccessor:                            enterClassLikeMember,
-		rule.ListenerOnExit(ast.KindGetAccessor):       exitFunction,
+		rule.ListenerOnExit(ast.KindGetAccessor):       exitClassLikeMember,
 		ast.KindSetAccessor:                            enterClassLikeMember,
-		rule.ListenerOnExit(ast.KindSetAccessor):       exitFunction,
+		rule.ListenerOnExit(ast.KindSetAccessor):       exitClassLikeMember,
 		ast.KindConstructor:                            enterClassLikeMember,
-		rule.ListenerOnExit(ast.KindConstructor):       exitFunction,
+		rule.ListenerOnExit(ast.KindConstructor):       exitClassLikeMember,
 
 		// Class field key/value scope split. Upstream:
 		//   `PropertyDefinition > *.key:exit` → pushContext()
@@ -452,12 +463,8 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				pushAnonymous()
 			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 				// Deferred push for computed-key class members. Bodyless
-				// members (abstract / overload signatures) get an anonymous
-				// frame so the matching exit pop stays balanced without
-				// reporting; bodied members get a real member frame.
-				if parent.Body() == nil {
-					pushAnonymous()
-				} else {
+				// members never enter the upstream function listener.
+				if parent.Body() != nil {
 					pushMember(parent)
 				}
 			}

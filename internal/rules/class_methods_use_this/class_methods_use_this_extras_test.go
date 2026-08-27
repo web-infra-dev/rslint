@@ -101,6 +101,10 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			{Code: `abstract class C { abstract foo(): void; }`},
 			{Code: `declare class C { foo(): void; field: number; }`},
 			{Code: `class C { foo(value: string): void; foo(value: number): void; foo(value: unknown) { this.value = value; } }`},
+			{Code: `class Outer { outer() { return class Inner { method(x: typeof this.x): void; }; } }`},
+			{Code: `class Outer { outer() { return class Inner { static method(x: typeof this.x): void; }; } }`},
+			{Code: `class Outer { outer() { abstract class Inner { abstract get value(): typeof this.x; } return Inner; } }`},
+			{Code: `class Outer { outer() { function inner(x: typeof this.x): void; return inner; } }`},
 
 			// ---- Dimension 4: class-field function wrappers ----
 			{Code: `class C { foo = (() => { this.value; }); }`},
