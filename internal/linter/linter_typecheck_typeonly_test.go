@@ -6,25 +6,23 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// These tests exercise the "type-check only" code path: GetRulesForFile=nil
-// combined with TypeCheck=true. The contract is:
+// These tests exercise the "type-check only" code path: LintPlan=nil combined
+// with TypeCheck=true. The contract is:
 //
 //   1. Phase 1 (lint rules) is skipped entirely — no rule diagnostics, no
 //      LintedFileCount, no ExecutedRules.
 //   2. Phase 2 (type-check) still produces tsc-aligned diagnostics.
-//   3. PerProgramFilter is a Phase-1-only concern; it does NOT suppress
-//      Phase 2 diagnostics. This locks the contract documented in
-//      website/docs/en/guide/type-checking.md (type-check mirrors
-//      `tsgo --noEmit`, ignoring rslint-side filters).
+//   3. A lint plan does not constrain Phase 2 diagnostics. This locks the
+//      contract documented in website/docs/en/guide/type-checking.md
+//      (type-check mirrors `tsgo --noEmit`, ignoring lint targets).
 //   4. Source-only Programs expose no Phase 2 capability.
 
 // triggerOnIdentifierRule reports a warning on every identifier — used to
 // confirm rules really would have fired if Phase 1 had run.
-func triggerOnIdentifierRule() []ConfiguredRule {
-	return []ConfiguredRule{
+func triggerOnIdentifierRule() []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{
 		{
 			Name:     "would-have-fired",
 			Severity: rule.SeverityError,
@@ -59,11 +57,9 @@ func TestTypeCheckOnly_NoLintDiagnostics(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		ExcludePaths:    utils.ExcludePaths,
-		GetRulesForFile: nil, // <-- type-check-only path
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -74,7 +70,7 @@ func TestTypeCheckOnly_NoLintDiagnostics(t *testing.T) {
 
 	_, lintDiags := classifyDiagnostics(diags)
 	if len(lintDiags) != 0 {
-		t.Fatalf("expected no lint diagnostics with GetRulesForFile=nil, got %d: %+v", len(lintDiags), lintDiags)
+		t.Fatalf("expected no lint diagnostics with LintPlan=nil, got %d: %+v", len(lintDiags), lintDiags)
 	}
 }
 
@@ -85,11 +81,9 @@ func TestTypeCheckOnly_StillReportsTSErrors(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		ExcludePaths:    utils.ExcludePaths,
-		GetRulesForFile: nil,
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -121,11 +115,9 @@ func TestTypeCheckOnly_LintedFileCountIsZero(t *testing.T) {
 	})
 
 	result, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		ExcludePaths:    utils.ExcludePaths,
-		GetRulesForFile: nil,
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(rule.RuleDiagnostic) {},
 		},
@@ -144,11 +136,9 @@ func TestTypeCheckOnly_ExecutedRulesIsEmpty(t *testing.T) {
 	})
 
 	result, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		ExcludePaths:    utils.ExcludePaths,
-		GetRulesForFile: nil,
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(rule.RuleDiagnostic) {},
 		},
@@ -165,20 +155,26 @@ func TestTypeCheckOnly_ExecutedRulesIsEmpty(t *testing.T) {
 }
 
 // TestTypeCheckOnly_BaselineLintWouldFire is a sanity check: with the same
-// program but a real GetRulesForFile, lint diagnostics WOULD fire — proving
-// the absence above is due to nil, not due to the file being un-lintable.
+// Program but a real lint plan, lint diagnostics WOULD fire — proving the
+// absence above is due to the missing plan, not an unlintable file.
 func TestTypeCheckOnly_BaselineLintWouldFire(t *testing.T) {
-	program, _ := createTestProgramWithFiles(t, map[string]string{
+	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const a = 1; const b = 2;",
 	})
 
 	var diags []rule.RuleDiagnostic
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{paths["a.ts"]}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return triggerOnIdentifierRule()
+		},
+	})
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		ExcludePaths:    utils.ExcludePaths,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return triggerOnIdentifierRule() },
-		TypeCheck:       false,
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -188,30 +184,32 @@ func TestTypeCheckOnly_BaselineLintWouldFire(t *testing.T) {
 	}
 	_, lintDiags := classifyDiagnostics(diags)
 	if len(lintDiags) == 0 {
-		t.Fatal("baseline expectation broken: rule was supposed to fire when GetRulesForFile is non-nil")
+		t.Fatal("baseline expectation broken: rule was supposed to fire with a lint plan")
 	}
 }
 
-// TestTypeCheckOnly_PerProgramFilterIgnoredByTypeCheck locks Claim B from
-// the design discussion: a PerProgramFilter that rejects ALL files still
-// does not suppress type-check diagnostics. This mirrors `tsgo --noEmit`
-// semantics — type-check scope is the tsconfig-determined program, not the
-// rslint-side ignore set.
-func TestTypeCheckOnly_PerProgramFilterIgnoredByTypeCheck(t *testing.T) {
+// TestTypeCheckOnly_EmptyLintPlanDoesNotConstrainTypeCheck verifies that an
+// empty Phase 1 projection does not suppress Program-wide diagnostics.
+func TestTypeCheckOnly_EmptyLintPlanDoesNotConstrainTypeCheck(t *testing.T) {
 	program, _ := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x: number = 'hello';",
 	})
 
-	rejectAll := func(string) bool { return false }
-
 	var diags []rule.RuleDiagnostic
-	_, err := RunLinter(RunLinterOptions{
-		Programs:         wrapTestPrograms(program),
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{nil},
 		SingleThreaded:   true,
-		ExcludePaths:     utils.ExcludePaths,
-		PerProgramFilter: []FileFilter{rejectAll},
-		GetRulesForFile:  nil,
-		TypeCheck:        true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			t.Fatal("empty target projection resolved rules")
+			return nil
+		},
+	})
+	_, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		TypeCheck:      true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -221,7 +219,45 @@ func TestTypeCheckOnly_PerProgramFilterIgnoredByTypeCheck(t *testing.T) {
 	}
 	tsDiags, _ := classifyDiagnostics(diags)
 	if len(tsDiags) == 0 {
-		t.Fatal("PerProgramFilter rejecting all files should NOT suppress type-check diagnostics, but got none")
+		t.Fatal("empty lint plan suppressed type-check diagnostics")
+	}
+}
+
+func TestTypeCheck_IncludesZeroTargetProgramFromLintPlan(t *testing.T) {
+	lintProgram, lintPaths := createTestProgramWithFiles(t, map[string]string{
+		"lint.ts": "const lintTarget = 1;",
+	})
+	typeCheckProgram, typeCheckPaths := createTestProgramWithFiles(t, map[string]string{
+		"type-error.ts": "const value: number = 'wrong';",
+	})
+	programs := wrapTestPrograms(lintProgram, typeCheckProgram)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{lintPaths["lint.ts"]}, nil},
+		SingleThreaded:   true,
+		GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
+	})
+
+	var diagnostics []rule.RuleDiagnostic
+	result, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		TypeCheck:      true,
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("RunLinter returned error: %v", err)
+	}
+	if result.LintedFileCount != 1 {
+		t.Fatalf("LintedFileCount = %d, want 1", result.LintedFileCount)
+	}
+	typeDiagnostics, _ := classifyDiagnostics(diagnostics)
+	if len(typeDiagnostics) == 0 || typeDiagnostics[0].FilePath != typeCheckPaths["type-error.ts"] {
+		t.Fatalf("zero-target Program type diagnostics = %+v", typeDiagnostics)
 	}
 }
 
@@ -239,10 +275,9 @@ func TestTypeCheckOnly_SkipsSourceOnlyProgram(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       testPrograms(sourceOnly),
-		SingleThreaded: true,
-		ExcludePaths:   utils.ExcludePaths,
-		TypeCheck:      true,
+		TypeCheckOnlyPrograms: testPrograms(sourceOnly),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -257,7 +292,7 @@ func TestTypeCheckOnly_SkipsSourceOnlyProgram(t *testing.T) {
 }
 
 // TestTypeCheckOnly_TypeCheckFalseProducesNothing closes the matrix: even
-// when GetRulesForFile is nil, if TypeCheck is also false there should be
+// when LintPlan is nil, if TypeCheck is also false there should be
 // no diagnostics at all (no work done in either phase).
 func TestTypeCheckOnly_TypeCheckFalseProducesNothing(t *testing.T) {
 	program, _ := createTestProgramWithFiles(t, map[string]string{
@@ -266,11 +301,9 @@ func TestTypeCheckOnly_TypeCheckFalseProducesNothing(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		ExcludePaths:    utils.ExcludePaths,
-		GetRulesForFile: nil,
-		TypeCheck:       false,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             false,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},

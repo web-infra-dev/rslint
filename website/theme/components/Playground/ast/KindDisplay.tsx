@@ -16,7 +16,7 @@ export const KindDisplay: React.FC<KindDisplayProps> = ({ kind, kindName }) => {
       onMouseLeave={() => setShowTooltip(false)}
     >
       <span
-        className={`font-medium text-blue-900 ${
+        className={`font-medium text-blue-900 dark:text-blue-300 ${
           hasKindName
             ? 'cursor-help border-b border-dashed border-blue-400 hover:border-blue-600'
             : ''

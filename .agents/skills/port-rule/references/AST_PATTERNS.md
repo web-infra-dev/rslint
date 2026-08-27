@@ -132,6 +132,19 @@ tsgo does not have a `ChainExpression` wrapper. Instead, every link in an option
 
 When porting a rule that switches on "is the argument a `ChainExpression`?", translate to `ast.IsOptionalChain(arg)` on the tsgo-side argument after `ast.SkipParentheses`.
 
+### Dotted JSX Tag Names
+
+ESTree represents a dotted JSX tag such as `<Foo.Bar.Baz />` with
+`JSXMemberExpression` nodes. tsgo instead uses the same nested
+`KindPropertyAccessExpression` nodes as ordinary value access. An ESLint rule
+that listens to `MemberExpression` therefore does not visit these tag-name
+links, while the equivalent tsgo listener will unless it excludes them.
+
+Use `utils.IsInJsxTagName(node)` before handling a property-access node. The
+helper climbs through every link in the dotted chain, so it excludes both the
+inner `Foo.Bar` and outer `Foo.Bar.Baz` nodes while leaving property access in
+JSX attributes and children untouched.
+
 ### Literal Kinds
 
 ESTree uses one `Literal` node carrying a typed `value`. tsgo splits the literal family across kinds, and booleans / null are keyword tokens rather than literal nodes:
