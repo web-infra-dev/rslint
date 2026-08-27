@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"runtime"
@@ -8,8 +9,39 @@ import (
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/scanner"
 
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+// documentProgressiveDiagnostics implements the presentation and asynchronous
+// admission ports of a progressive lint request. It does not decide producer
+// order or eligibility; RunPipeline calls these capabilities in that order.
+type documentProgressiveDiagnostics struct {
+	server           *Server
+	uri              lsproto.DocumentUri
+	generation       uint64
+	pluginGeneration string
+}
+
+func (p *documentProgressiveDiagnostics) PublishBaseline(
+	ctx context.Context,
+	diagnostics []rule.RuleDiagnostic,
+) {
+	if diagnostics == nil {
+		diagnostics = []rule.RuleDiagnostic{}
+	}
+	p.server.diagnostics[p.uri] = diagnostics
+	lspDiagnostics := make([]*lsproto.Diagnostic, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		lspDiagnostics = append(lspDiagnostics, convertRuleDiagnosticToLSP(diagnostic))
+	}
+	if err := p.server.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
+		Uri:         p.uri,
+		Diagnostics: lspDiagnostics,
+	}); err != nil {
+		log.Printf("Error publishing diagnostics: %v", err)
+	}
+}
 
 func (s *Server) invalidateOpenDocumentDiagnostics() {
 	for uri := range s.documents {
@@ -58,9 +90,9 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 		return
 	}
 
-	// Supersede the previous plugin pass before linting. Native diagnostics are
-	// published synchronously below; the next plugin pass is stamped with this
-	// generation so the main loop can reject an older result.
+	// Supersede the previous enrichment before linting. The request-scoped
+	// presentation adapter is stamped so the main loop can reject an older
+	// asynchronous result.
 	s.docGeneration[uri]++
 	generation := s.docGeneration[uri]
 	s.cancelInflightPluginDispatch(uri)
@@ -76,7 +108,20 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 		return
 	}
 
-	lintResult, err := s.runConfiguredLint(uri, ctx, snapshot)
+	presentation := &documentProgressiveDiagnostics{
+		server:           s,
+		uri:              uri,
+		generation:       generation,
+		pluginGeneration: snapshot.pluginGeneration,
+	}
+	_, err := linter.RunPipeline(ctx, linter.NewProgressiveLintRequest(
+		&documentGenerationProvider{server: s, uri: uri, snapshot: snapshot},
+		linter.ArtifactDemand{
+			Native: rule.EditDemandAll,
+			Plugin: rule.EditDemandAll,
+		},
+		presentation,
+	))
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		delete(s.diagnostics, uri)
@@ -88,31 +133,6 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 		}
 		return
 	}
-	ruleDiags := lintResult.Diagnostics
-
-	s.diagnostics[uri] = ruleDiags
-
-	// Must use empty slice (not nil) so JSON serializes as [] instead of null
-	lspDiags := make([]*lsproto.Diagnostic, 0, len(ruleDiags))
-	for _, d := range ruleDiags {
-		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d))
-	}
-
-	if err := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
-		Uri:         uri,
-		Diagnostics: lspDiags,
-	}); err != nil {
-		log.Printf("Error publishing diagnostics: %v", err)
-	}
-
-	// Dispatch eslint-plugin rules off the main loop. The reverse request
-	// MUST NOT run synchronously here — it would block the dispatch loop (and
-	// thus all editor interaction) until the Node worker replies. Results merge
-	// back via pluginResultCh on the main loop (s.diagnostics is lock-free).
-	if !lintResult.HasSyntaxErrors {
-		s.dispatchPluginLintWithSnapshot(uri, generation, snapshot)
-	}
-
 	// The pacer cannot see that the lint just dropped what it derived.
 	go runtime.GC()
 }

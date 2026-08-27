@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
@@ -105,13 +106,13 @@ func isFixAllRequest(ctx *lsproto.CodeActionContext) bool {
 	return false
 }
 
-// maxFixPasses is the maximum number of lint-fix cycles to prevent infinite loops
-// when two rules produce fixes that undo each other.
-const maxFixPasses = 10
+// maxFixRounds is the maximum number of non-empty change-set commits when two
+// rules produce fixes that undo each other.
+const maxFixRounds = linter.MaxFixRounds
 
 // handleFixAllCodeAction computes all auto-fixes for the given URI using
-// multi-pass fixing: each pass lints and applies fixes to an isolated overlay,
-// repeating until no more fixes are found or maxFixPasses is reached.
+// bounded rounds: each observation lints an isolated overlay and each non-empty
+// planned change set advances it by one round, until stable or maxFixRounds.
 // This handles cascading fixes (e.g. no-wrapper-object-types fix triggers no-inferrable-types).
 // It does NOT push diagnostics or update s.diagnostics — that is left to the
 // subsequent didSave handler in the normal save flow.
@@ -133,15 +134,52 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 		return empty, nil
 	}
 	originalContent := s.documents[uri]
+	provider := s.newSpeculativeGenerationProvider(uri, originalContent, snapshot)
 
-	currentContent := s.computeFixAllContent(ctx, uri, originalContent, snapshot)
+	// Bound eslint-plugin reverse requests across the whole fix-all operation.
+	// Native work remains on the caller context because it is in-process; once
+	// this plugin budget expires, later observations continue native-only.
+	budgetedDispatch, cancelPlugin := s.pluginDispatchWithinBudget(ctx, snapshot.pluginGeneration)
+	defer cancelPlugin()
+	pipelineResult, err := linter.RunPipeline(ctx, linter.NewAutofixRequest(
+		provider,
+		linter.ObservationPolicy{
+			Demand: linter.ArtifactDemand{
+				Native: rule.EditDemandAutofix,
+				Plugin: rule.EditDemandAutofix,
+			},
+			Plugin:        linter.PluginAfterNativeJoined,
+			PluginFailure: linter.PluginDiscardOnFailure,
+		},
+		linter.AutofixPolicy{
+			MaxRounds:                maxFixRounds,
+			VerifyAfterLastRound:     false,
+			VerificationDemand:       linter.ArtifactDemand{},
+			StopOnTargetSyntaxErrors: true,
+		},
+		budgetedDispatch,
+	))
+	reportFixAllPluginOutcomes(uri, pipelineResult.PluginOutcomes())
+	if err != nil {
+		// Preserve the established LSP policy: a later observation failure still
+		// returns the pipeline's earlier, valid request-local memory result.
+		log.Printf("Error running lint for fixAll: %v", err)
+	}
+	currentContent, contentErr := speculativeContentFromResult(
+		pipelineResult,
+		snapshot.target.Path,
+		originalContent,
+	)
+	if contentErr != nil {
+		return empty, contentErr
+	}
 
 	if currentContent == originalContent {
 		return empty, nil
 	}
 
 	// Produce a single TextEdit that replaces the entire document content.
-	// Individual per-fix TextEdits can't be composed across passes (offsets shift),
+	// Individual per-fix TextEdits cannot be composed across rounds (offsets shift),
 	// so we replace the whole document with the final result.
 	lastLine, lastChar := computeEndPosition(originalContent)
 
@@ -170,93 +208,44 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 	}, nil
 }
 
-// computeFixAllContent runs the multi-pass lint→fix loop and returns the final
-// fixed content (== originalContent when nothing changed). Each pass folds
-// eslint-plugin fixes into the native fixes so source.fixAll applies both, on
-// the SAME content (so their byte offsets align with ApplyRuleFixes's input).
-// The per-pass native lint goes through s.fixAllNativeLint, which tests override
-// to drive the fold loop without a real TS session.
-func (s *Server) computeFixAllContent(
-	ctx context.Context,
-	uri lsproto.DocumentUri,
+func speculativeContentFromResult(
+	result linter.PipelineResult,
+	targetPath string,
 	originalContent string,
-	snapshot documentLintSnapshot,
-) string {
-	nativeLint := s.fixAllNativeLint
-	if nativeLint == nil {
-		nativeLint = s.defaultFixAllNativeLint
+) (string, error) {
+	applied, ok := result.AppliedFixes()
+	if !ok || len(applied.FinalChanges) == 0 {
+		return originalContent, nil
 	}
-
-	// Bound the eslint-plugin reverse requests across the WHOLE fixAll, not per
-	// pass: source.fixAll runs inline on the dispatch loop, so a wedged or
-	// mid-rebuild client that never answers rslint/pluginLint must not
-	// freeze editor interaction — nor multiply the stall by maxFixPasses. Only
-	// the plugin pass gets this deadline; the native pass keeps the original ctx
-	// (it is in-process and does not depend on a client reply). Once the budget
-	// expires lintPluginRulesSync returns nil and the remaining passes fold
-	// native-only fixes.
-	pluginTimeout := s.pluginReverseTimeout
-	if pluginTimeout <= 0 {
-		pluginTimeout = defaultPluginReverseTimeout
+	if len(applied.FinalChanges) != 1 || applied.FinalChanges[0].Path != targetPath {
+		return "", fmt.Errorf("invalid LSP fix result for %q", targetPath)
 	}
-	pluginCtx, cancelPlugin := context.WithTimeout(ctx, pluginTimeout)
-	defer cancelPlugin()
-
-	currentContent := originalContent
-	for pass := range maxFixPasses {
-		lintResult, err := nativeLint(ctx, uri, pass, currentContent, snapshot)
-		if err != nil {
-			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
-			break
-		}
-		if lintResult.HasSyntaxErrors {
-			break
-		}
-		ruleDiags := lintResult.Diagnostics
-
-		// Fold in eslint-plugin fixes so source.fixAll applies plugin rule fixes
-		// too, not just native. The plugin pass lints the SAME currentContent, so
-		// its fix byte offsets align with ApplyRuleFixes's input; suggestionsMode
-		// is "off" because fixAll applies only autofixes.
-		// Skip the plugin pass once the budget is spent: lintPluginRulesSync on an
-		// already-expired pluginCtx would still enqueue a (wasted) reverse request
-		// to the client before returning nil.
-		if pluginCtx.Err() == nil {
-			if pluginDiags := s.lintPluginRulesSyncWithSnapshot(
-				pluginCtx,
-				uri,
-				currentContent,
-				true,
-				linter.SuggestionsModeOff,
-				snapshot,
-			); len(pluginDiags) > 0 {
-				ruleDiags = append(ruleDiags, pluginDiags...)
-			}
-		}
-
-		fixedContent, _, wasFixed := linter.ApplyRuleFixes(currentContent, ruleDiags)
-		if !wasFixed {
-			break
-		}
-		currentContent = fixedContent
-		if currentContent == originalContent {
-			break // cycle detected — fixes reverted to original content
-		}
-	}
-	return currentContent
+	return applied.FinalChanges[0].After, nil
 }
 
-// defaultFixAllNativeLint builds each pass from an isolated editor overlay.
-// The pass number is intentionally unused: speculative content never enters
-// the real TypeScript Session, regardless of how many fix cycles run.
-func (s *Server) defaultFixAllNativeLint(
-	ctx context.Context,
-	uri lsproto.DocumentUri,
-	_ int,
-	content string,
-	snapshot documentLintSnapshot,
-) (lintPassResult, error) {
-	return s.runConfiguredLintForContentWithSnapshot(uri, ctx, content, snapshot)
+func reportFixAllPluginOutcomes(uri lsproto.DocumentUri, records []linter.PluginDispatchRecord) {
+	// A failed observation must not hide protocol notices produced by later
+	// observations. Consume every structured notice before coalescing repeated
+	// whole-operation transport failures to one log entry.
+	for _, record := range records {
+		reportLSPPluginProtocolNotices(record.Notices)
+	}
+	for _, record := range records {
+		err := record.DispatchError
+		if err == nil {
+			continue
+		}
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			log.Printf("[rslint] eslint-plugin fixAll for %s timed out (client unresponsive); applying native-only fixes", uri)
+		case errors.Is(err, context.Canceled):
+		default:
+			log.Printf("[rslint] eslint-plugin fixAll lint error for %s: %v", uri, err)
+		}
+		// One whole-operation budget can make every later observation report the
+		// same terminal error; one log entry is sufficient.
+		return
+	}
 }
 
 // computeEndPosition returns the line and UTF-16 character offset of the end
