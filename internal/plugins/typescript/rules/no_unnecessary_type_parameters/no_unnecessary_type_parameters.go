@@ -73,6 +73,9 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, descriptor string) {
 	var counts map[*ast.Node]int
 
 	for _, typeParamNode := range typeParams {
+		if utils.IsJSDocSyntaxNode(typeParamNode) {
+			continue
+		}
 		typeParam := typeParamNode.AsTypeParameterDeclaration()
 		if typeParam == nil {
 			continue

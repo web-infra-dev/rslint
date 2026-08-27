@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -96,18 +96,19 @@ type EslintPluginLintResult struct {
 }
 
 // EslintPluginDispatcher sends one batch reverse-request to the Node host
-// and returns its result. The CLI implements it over the generic IPC
+// and returns its result. It must honor ctx and return after cancellation:
+// joined execution cannot release SourceFile-backed generation state while a
+// dispatcher may still read it. The CLI implements this over the generic IPC
 // channel; the LSP server over an `rslint/pluginLint` request.
 type EslintPluginDispatcher func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error)
 
-// EslintPluginFileInput is one file's plugin-lint input as the caller
-// (CLI/LSP) assembles it before dispatch.
+// EslintPluginFileInput is the linter's generation-local representation of one
+// plugin-lint input before wire batching.
 type EslintPluginFileInput struct {
 	Path string
-	// Text is the overlay source SENT TO THE WORKER on the wire. The LSP sets
-	// it to the unsaved-buffer content; the CLI leaves it nil so the worker
-	// reads disk itself (avoids the ~60MB structuredClone of shipping every
-	// file's text across the worker_threads boundary).
+	// Text is the generation source SENT TO THE WORKER on the wire. Overlay
+	// hosts and later autofix generations set it; the initial CLI generation
+	// leaves it nil so the worker can read disk without a whole-repository clone.
 	Text *string
 	// SourceFile is the frame Go REBUILDS diagnostics against (Go-local; never
 	// sent on the wire). The CLI sets it to the ts-go *ast.SourceFile the native
@@ -125,11 +126,10 @@ type EslintPluginFileInput struct {
 }
 
 // BuildEslintPluginFileInput assembles one file's plugin-lint input from its
-// enabled rules + per-file languageOptions/settings. Shared by the CLI and LSP
-// hosts (F1): both filter the IsEslintPluginRule subset and assemble the input;
-// it returns ok=false when the file has no plugin rules (caller skips dispatch).
-// The caller supplies the frame: sourceFile (CLI — the native ts-go SourceFile)
-// or text (LSP — the overlay the worker lints); see EslintPluginFileInput.
+// enabled rules and config projection. It returns ok=false when the file has no
+// plugin rules. Product execution reaches this primitive through
+// BuildEslintPluginFileInputs and RunPipeline; direct callers must supply a
+// coherent text/source frame themselves.
 func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.ConfiguredRule, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) (EslintPluginFileInput, bool) {
 	var pluginRules []rule.ConfiguredRule
 	var normalizedLanguageOptions rule.LanguageOptions
@@ -160,6 +160,66 @@ func BuildEslintPluginFileInput(filePath, configKey string, rules []rule.Configu
 		Settings:        settings,
 		Rules:           pluginRules,
 	}, true
+}
+
+// EslintPluginFileConfig is the config projection required to dispatch one
+// prepared lint target to a third-party plugin host. Integrations resolve it
+// from their own config ownership model, keeping the linter independent from
+// config package types and transport-specific routing identities.
+type EslintPluginFileConfig struct {
+	ConfigKey       string
+	LanguageOptions map[string]any
+	Settings        map[string]any
+}
+
+// EslintPluginFileConfigResolver resolves the plugin-facing config projection
+// for one Program source path.
+type EslintPluginFileConfigResolver func(filePath string) EslintPluginFileConfig
+
+// BuildEslintPluginFileInputs projects third-party plugin inputs from the same
+// prepared file/rule plan consumed by native linting. Pure-native targets do
+// not invoke resolveConfig.
+func BuildEslintPluginFileInputs(
+	plan *LintPlan,
+	resolveConfig EslintPluginFileConfigResolver,
+) []EslintPluginFileInput {
+	targets := plan.Targets()
+	if len(targets) == 0 {
+		return nil
+	}
+	var inputs []EslintPluginFileInput
+	for _, target := range targets {
+		if !hasEslintPluginRule(target.Rules) {
+			continue
+		}
+		filePath := target.File.FileName()
+		var fileConfig EslintPluginFileConfig
+		if resolveConfig != nil {
+			fileConfig = resolveConfig(filePath)
+		}
+		input, ok := BuildEslintPluginFileInput(
+			filePath,
+			fileConfig.ConfigKey,
+			target.Rules,
+			fileConfig.LanguageOptions,
+			fileConfig.Settings,
+			nil,
+			target.File,
+		)
+		if ok {
+			inputs = append(inputs, input)
+		}
+	}
+	return inputs
+}
+
+func hasEslintPluginRule(rules []rule.ConfiguredRule) bool {
+	for _, configuredRule := range rules {
+		if configuredRule.IsEslintPluginRule {
+			return true
+		}
+	}
+	return false
 }
 
 // eslintPluginShutdownSentinel is the ONLY benign parseError the worker emits:
@@ -201,12 +261,34 @@ func DispatchEslintPluginRules(
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 ) error {
+	_, err := dispatchEslintPluginRules(
+		ctx,
+		dispatch,
+		files,
+		fix,
+		suggestionsMode,
+		timing,
+		onDiagnostic,
+	)
+	return err
+}
+
+func dispatchEslintPluginRules(
+	ctx context.Context,
+	dispatch EslintPluginDispatcher,
+	files []EslintPluginFileInput,
+	fix bool,
+	suggestionsMode string,
+	timing *TimingCollector,
+	onDiagnostic DiagnosticHandler,
+) ([]EslintPluginProtocolNotice, error) {
 	if len(files) == 0 || dispatch == nil {
-		return nil
+		return nil, nil
 	}
 
 	batches := groupEslintPluginFiles(files)
 	batchDiags := make([][]rule.RuleDiagnostic, len(batches))
+	batchNotices := make([][]EslintPluginProtocolNotice, len(batches))
 	batchErrs := make([]error, len(batches))
 
 	var g errgroup.Group
@@ -216,8 +298,18 @@ func DispatchEslintPluginRules(
 			// Each batch writes only its own slot, so concurrent batches share
 			// no state; diagnostics are emitted serially after Wait. The timing
 			// collector is the one mutex-guarded exception, merged per file.
-			batchErrs[i] = dispatchOneBatch(ctx, dispatch, batch, fix, suggestionsMode, timing,
-				func(d rule.RuleDiagnostic) { batchDiags[i] = append(batchDiags[i], d) })
+			batchErrs[i] = dispatchOneBatch(
+				ctx,
+				dispatch,
+				batch,
+				fix,
+				suggestionsMode,
+				timing,
+				func(d rule.RuleDiagnostic) { batchDiags[i] = append(batchDiags[i], d) },
+				func(notice EslintPluginProtocolNotice) {
+					batchNotices[i] = append(batchNotices[i], notice)
+				},
+			)
 			return nil
 		})
 	}
@@ -227,6 +319,10 @@ func DispatchEslintPluginRules(
 		for _, d := range diags {
 			onDiagnostic(d)
 		}
+	}
+	var notices []EslintPluginProtocolNotice
+	for _, batch := range batchNotices {
+		notices = append(notices, batch...)
 	}
 	// A real (non-cancellation) error outranks a cooperative cancel: with batches
 	// running concurrently, a later batch's genuine transport failure must not be
@@ -238,13 +334,112 @@ func DispatchEslintPluginRules(
 			continue
 		}
 		if !errors.Is(batchErr, context.Canceled) {
-			return batchErr
+			return notices, batchErr
 		}
 		if canceledErr == nil {
 			canceledErr = batchErr
 		}
 	}
-	return canceledErr
+	return notices, canceledErr
+}
+
+// EslintPluginProtocolNoticeKind identifies a recoverable worker-protocol
+// anomaly. Integrations decide how to present these structured notices; the
+// linter never writes process output.
+type EslintPluginProtocolNoticeKind uint8
+
+const (
+	EslintPluginMissingFileResult EslintPluginProtocolNoticeKind = iota
+	EslintPluginUnconfiguredDiagnostic
+)
+
+// EslintPluginProtocolNotice describes a recoverable plugin response anomaly.
+// The diagnostic stream remains usable, so notices are deliberately separate
+// from DispatchError and its failure policy.
+type EslintPluginProtocolNotice struct {
+	Kind     EslintPluginProtocolNoticeKind
+	FilePath string
+	RuleName string
+}
+
+// EslintPluginDispatchOutcome is the result of one plugin dispatch.
+// DispatchError is retained for surface logging. A non-cancellation failure
+// also contributes a synthetic error diagnostic so it cannot produce a false
+// successful lint result.
+type EslintPluginDispatchOutcome struct {
+	Diagnostics   []rule.RuleDiagnostic
+	Notices       []EslintPluginProtocolNotice
+	DispatchError error
+}
+
+// DispatchEslintPluginRulesAsync is the lower-level asynchronous dispatch
+// primitive. RunPipeline owns its scheduling relative to native lint in
+// product entrypoints.
+func DispatchEslintPluginRulesAsync(
+	ctx context.Context,
+	dispatch EslintPluginDispatcher,
+	inputs []EslintPluginFileInput,
+	fix bool,
+	suggestionsMode string,
+	timing *TimingCollector,
+) <-chan EslintPluginDispatchOutcome {
+	ch := make(chan EslintPluginDispatchOutcome, 1)
+	go func() {
+		outcome := DispatchEslintPluginRulesWithOutcome(
+			ctx,
+			dispatch,
+			inputs,
+			fix,
+			suggestionsMode,
+			timing,
+		)
+		ch <- outcome
+	}()
+	return ch
+}
+
+// DispatchEslintPluginRulesWithOutcome dispatches plugin rules and collects
+// their diagnostics into a structured result. RunPipeline applies product
+// scheduling and failure policy around this lower-level operation.
+func DispatchEslintPluginRulesWithOutcome(
+	ctx context.Context,
+	dispatch EslintPluginDispatcher,
+	inputs []EslintPluginFileInput,
+	fix bool,
+	suggestionsMode string,
+	timing *TimingCollector,
+) EslintPluginDispatchOutcome {
+	var diagnostics []rule.RuleDiagnostic
+	notices, err := dispatchEslintPluginRules(
+		ctx,
+		dispatch,
+		inputs,
+		fix,
+		suggestionsMode,
+		timing,
+		func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		diagnostics = append(diagnostics, NewEslintPluginErrorDiagnostic(
+			eslintPluginDispatchFailurePath(inputs),
+			"rslint/plugin-lint-error",
+			"ESLint plugin lint dispatch failed: "+err.Error(),
+		))
+	}
+	return EslintPluginDispatchOutcome{
+		Diagnostics:   diagnostics,
+		Notices:       notices,
+		DispatchError: err,
+	}
+}
+
+func eslintPluginDispatchFailurePath(inputs []EslintPluginFileInput) string {
+	if len(inputs) > 0 {
+		return inputs[0].Path
+	}
+	return ""
 }
 
 // dispatchOneBatch sends one batch's reverse request and rebuilds its
@@ -259,6 +454,7 @@ func dispatchOneBatch(
 	suggestionsMode string,
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
+	onNotice func(EslintPluginProtocolNotice),
 ) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -273,7 +469,7 @@ func dispatchOneBatch(
 	if res == nil {
 		return nil
 	}
-	return applyEslintPluginResults(batch, res, timing, onDiagnostic)
+	return applyEslintPluginResults(batch, res, timing, onDiagnostic, onNotice)
 }
 
 // dispatchConcurrency bounds how many plugin-lint batches are dispatched
@@ -366,7 +562,13 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestio
 	}
 }
 
-func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLintResult, timing *TimingCollector, onDiagnostic DiagnosticHandler) error {
+func applyEslintPluginResults(
+	batch []EslintPluginFileInput,
+	res *EslintPluginLintResult,
+	timing *TimingCollector,
+	onDiagnostic DiagnosticHandler,
+	onNotice func(EslintPluginProtocolNotice),
+) error {
 	byPath := map[string]*EslintPluginFileResult{}
 	for i := range res.Results {
 		byPath[res.Results[i].FilePath] = &res.Results[i]
@@ -374,7 +576,12 @@ func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLi
 	for _, f := range batch {
 		fr, ok := byPath[f.Path]
 		if !ok {
-			fmt.Fprintf(os.Stderr, "rslint: plugin-lint returned no result for %q\n", f.Path)
+			if onNotice != nil {
+				onNotice(EslintPluginProtocolNotice{
+					Kind:     EslintPluginMissingFileResult,
+					FilePath: f.Path,
+				})
+			}
 			continue
 		}
 		if fr.Cancelled {
@@ -436,7 +643,13 @@ func applyEslintPluginResults(batch []EslintPluginFileInput, res *EslintPluginLi
 			sev, known := sevByRule[d.RuleName]
 			if !known {
 				sev = rule.SeverityError
-				fmt.Fprintf(os.Stderr, "rslint: plugin diagnostic for unconfigured rule %q in %q\n", d.RuleName, f.Path)
+				if onNotice != nil {
+					onNotice(EslintPluginProtocolNotice{
+						Kind:     EslintPluginUnconfiguredDiagnostic,
+						FilePath: f.Path,
+						RuleName: d.RuleName,
+					})
+				}
 			}
 			start := clamp(d.StartPos)
 			end := clamp(d.EndPos)
@@ -487,13 +700,10 @@ func eslintPluginSourceFile(f EslintPluginFileInput) (ast.SourceFileLike, bool) 
 		return f.SourceFile, true
 	}
 	if f.Text != nil {
-		return newTextSourceFile(strings.TrimPrefix(*f.Text, utf8BOM)), true
+		return newTextSourceFile(strings.TrimPrefix(*f.Text, utils.BOM)), true
 	}
 	return nil, false
 }
-
-// utf8BOM is the UTF-8 encoding of U+FEFF (bytes EF BB BF).
-const utf8BOM = "\ufeff"
 
 func makeEslintPluginErrorDiagnostic(path string, sf ast.SourceFileLike, ruleName, msg string) rule.RuleDiagnostic {
 	return rule.RuleDiagnostic{

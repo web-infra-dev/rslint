@@ -2794,12 +2794,11 @@ func TestOneVarEditDemand(t *testing.T) {
 
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      lintprogram.NewFromCompiler(program),
-					File:         sourceFile.FileName(),
-					HasTypeInfo:  true,
-					ExcludePaths: []string{},
-					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-						return []linter.ConfiguredRule{{
+					Program:     lintprogram.NewFromCompiler(program),
+					File:        sourceFile.FileName(),
+					HasTypeInfo: true,
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{
 							Name:     OneVarRule.Name,
 							Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -2993,12 +2992,11 @@ func TestOneVarDisableDirectives(t *testing.T) {
 
 			diagnosticCount := 0
 			linter.LintSingleFile(linter.LintSingleFileOptions{
-				Program:      lintprogram.NewFromCompiler(program),
-				File:         sourceFile.FileName(),
-				HasTypeInfo:  true,
-				ExcludePaths: []string{},
-				GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-					return []linter.ConfiguredRule{
+				Program:     lintprogram.NewFromCompiler(program),
+				File:        sourceFile.FileName(),
+				HasTypeInfo: true,
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{
 						{
 							Name:     OneVarRule.Name,
 							Severity: rule.SeverityError,

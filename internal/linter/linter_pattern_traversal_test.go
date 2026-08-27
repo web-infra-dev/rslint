@@ -13,12 +13,13 @@ func runPatternTraversalTest(t *testing.T, source string, listeners rule.RuleLis
 	t.Helper()
 
 	program, paths := createTestProgramWithFiles(t, map[string]string{"input.ts": source})
-	_, err := RunLinter(RunLinterOptions{
-		Programs:       wrapTestPrograms(program),
-		SingleThreaded: true,
-		TargetFiles:    [][]string{{paths["input.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
+	programs := wrapTestPrograms(program)
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		SingleThreaded:   true,
+		TargetsByProgram: [][]string{{paths["input.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "pattern-traversal",
 				Severity: rule.SeverityWarning,
 				Run: func(rule.RuleContext) rule.RuleListeners {
@@ -26,6 +27,10 @@ func runPatternTraversalTest(t *testing.T, source string, listeners rule.RuleLis
 				},
 			}}
 		},
+	})
+	_, err := RunLinter(RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 	})
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)

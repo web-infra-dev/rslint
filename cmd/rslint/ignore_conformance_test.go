@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
+	"github.com/web-infra-dev/rslint/internal/api/server"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -174,7 +175,7 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			code, stdout, stderr := runLintPipelineForTest(t, configDir, lintArgs{
+			code, stdout, stderr := runLintCommandForTest(t, configDir, lintArgs{
 				Config:         configPath,
 				AllowFiles:     []string{tspath.NormalizePath(target)},
 				Format:         "default",
@@ -192,7 +193,7 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 				t.Fatalf("CLI ignored target must exit cleanly: stdout=%q stderr=%q", stdout, stderr)
 			}
 
-			response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+			response, err := (&server.Handler{}).HandleLint(api.LintRequest{
 				Config:           configJSON,
 				ConfigDirectory:  configDir,
 				WorkingDirectory: configDir,
@@ -253,7 +254,7 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 		},
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 		ConfigCatalog:  catalog,
 		Format:         "jsonline",
 		NoColor:        true,
@@ -310,7 +311,7 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 			},
 		},
 	}
-	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 		ConfigCatalog:  catalog,
 		AllowFiles:     []string{tspath.NormalizePath(explicitTarget)},
 		AllowDirs:      []string{tspath.NormalizePath(ignoredDir)},
@@ -395,7 +396,7 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 		{name: "concurrent"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+			code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 				ConfigCatalog:  catalog,
 				Format:         "jsonline",
 				NoColor:        true,

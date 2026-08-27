@@ -24,6 +24,60 @@ func (e RuleOptionsError) Error() string {
 	return fmt.Sprintf("invalid options for rule %q: %v", e.RuleName, e.Err)
 }
 
+// ResolvedRuleOptionsError adds the owning config directory when validation is
+// performed over a multi-config catalog. Single-config validation leaves the
+// directory empty and retains the ordinary RuleOptionsError message.
+type ResolvedRuleOptionsError struct {
+	RuleOptionsError
+	ConfigDirectory string
+}
+
+func (e ResolvedRuleOptionsError) Error() string {
+	message := e.RuleOptionsError.Error()
+	if e.ConfigDirectory == "" {
+		return message
+	}
+	return fmt.Sprintf("%s (config at %s)", message, e.ConfigDirectory)
+}
+
+// ValidateResolvedRuleOptions validates either one invocation-wide config or
+// every owner in a multi-config catalog. A nil configsByOwner selects
+// single-config mode; a non-nil empty map remains multi-config mode. Owner
+// validation order is deterministic, and the inputs are never mutated.
+func ValidateResolvedRuleOptions(
+	configsByOwner map[string]RslintConfig,
+	config RslintConfig,
+	catalog *rule.Catalog,
+) (map[string]RslintConfig, RslintConfig, []ResolvedRuleOptionsError) {
+	if configsByOwner == nil {
+		normalized, optionErrors := ValidateRuleOptions(config, catalog)
+		resolvedErrors := make([]ResolvedRuleOptionsError, 0, len(optionErrors))
+		for _, optionError := range optionErrors {
+			resolvedErrors = append(resolvedErrors, ResolvedRuleOptionsError{RuleOptionsError: optionError})
+		}
+		return nil, normalized, resolvedErrors
+	}
+
+	ownerDirectories := make([]string, 0, len(configsByOwner))
+	for directory := range configsByOwner {
+		ownerDirectories = append(ownerDirectories, directory)
+	}
+	slices.Sort(ownerDirectories)
+	normalizedByOwner := make(map[string]RslintConfig, len(configsByOwner))
+	var resolvedErrors []ResolvedRuleOptionsError
+	for _, directory := range ownerDirectories {
+		normalized, optionErrors := ValidateRuleOptions(configsByOwner[directory], catalog)
+		normalizedByOwner[directory] = normalized
+		for _, optionError := range optionErrors {
+			resolvedErrors = append(resolvedErrors, ResolvedRuleOptionsError{
+				RuleOptionsError: optionError,
+				ConfigDirectory:  directory,
+			})
+		}
+	}
+	return normalizedByOwner, config, resolvedErrors
+}
+
 // ValidateRuleOptions validates every enabled rule's options in config against
 // the rule's declared schema and returns a normalized config plus every failure
 // (not just the first) sorted by rule name for deterministic output. The input

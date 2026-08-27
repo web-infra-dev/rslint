@@ -106,7 +106,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-instanceof-builtins': 'error',
     // 'unicorn/no-invalid-argument-count': 'error', // not implemented
     // 'unicorn/no-invalid-character-comparison': 'error', // not implemented
-    // 'unicorn/no-invalid-fetch-options': 'error', // not implemented
+    'unicorn/no-invalid-fetch-options': 'error',
     // 'unicorn/no-invalid-file-input-accept': 'off', // not implemented
     'unicorn/no-invalid-remove-event-listener': 'error',
     // 'unicorn/no-invalid-well-known-symbol-methods': 'error', // not implemented
@@ -144,7 +144,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-static-only-class': 'error',
     // 'unicorn/no-subtraction-comparison': 'error', // not implemented
     'unicorn/no-thenable': 'error',
-    // 'unicorn/no-this-assignment': 'error', // not implemented
+    'unicorn/no-this-assignment': 'error',
     // 'unicorn/no-this-outside-of-class': 'error', // not implemented
     // 'unicorn/no-top-level-assignment-in-function': 'error', // not implemented
     // 'unicorn/no-top-level-side-effects': 'error', // not implemented
@@ -198,7 +198,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-useless-switch-case': 'error',
     // 'unicorn/no-useless-template-literals': 'error', // not implemented
     // 'unicorn/no-useless-undefined': 'error', // not implemented
-    // 'unicorn/no-xor-as-exponentiation': 'error', // not implemented
+    'unicorn/no-xor-as-exponentiation': 'error',
     // 'unicorn/no-zero-fractions': 'error', // not implemented
     // 'unicorn/number-literal-case': 'error', // not implemented
     // 'unicorn/numeric-separators-style': 'error', // not implemented

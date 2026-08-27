@@ -196,7 +196,12 @@ func memberHeadStart(sf *ast.SourceFile, node *ast.Node) int {
 	mods := node.Modifiers()
 	if mods != nil {
 		var lastDecoratorEnd = -1
+		hasJSDocModifier := false
 		for _, m := range mods.Nodes {
+			if utils.IsJSDocSyntaxNode(m) {
+				hasJSDocModifier = true
+				continue
+			}
 			if m.Kind == ast.KindDecorator {
 				lastDecoratorEnd = m.End()
 				continue
@@ -205,6 +210,9 @@ func memberHeadStart(sf *ast.SourceFile, node *ast.Node) int {
 		}
 		if lastDecoratorEnd >= 0 {
 			return scanner.SkipTrivia(sf.Text(), lastDecoratorEnd)
+		}
+		if hasJSDocModifier {
+			return scanner.SkipTrivia(sf.Text(), node.Pos())
 		}
 	}
 	return utils.TrimNodeTextRange(sf, node).Pos()
@@ -218,9 +226,13 @@ func methodOrPropertyHeadEnd(sf *ast.SourceFile, node *ast.Node) int {
 		// Compute position of the `constructor` keyword: it is the next token
 		// after any modifiers. Then add the length of the keyword.
 		text := sf.Text()
-		ctorStart := utils.TrimNodeTextRange(sf, node).Pos()
-		if mods := node.Modifiers(); mods != nil && len(mods.Nodes) > 0 {
-			ctorStart = scanner.SkipTrivia(text, mods.Nodes[len(mods.Nodes)-1].End())
+		ctorStart := memberHeadStart(sf, node)
+		if mods := node.Modifiers(); mods != nil {
+			for _, modifier := range mods.Nodes {
+				if !utils.IsJSDocSyntaxNode(modifier) {
+					ctorStart = scanner.SkipTrivia(text, modifier.End())
+				}
+			}
 		}
 		return ctorStart + len("constructor")
 	}
@@ -239,7 +251,7 @@ func findPublicKeyword(sf *ast.SourceFile, node *ast.Node) (kwRange core.TextRan
 		return core.TextRange{}, 0, false
 	}
 	for _, m := range mods.Nodes {
-		if m.Kind != ast.KindPublicKeyword {
+		if utils.IsJSDocSyntaxNode(m) || m.Kind != ast.KindPublicKeyword {
 			continue
 		}
 		return utils.TrimNodeTextRange(sf, m), m.End(), true
@@ -358,7 +370,7 @@ var ExplicitMemberAccessibilityRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			accessibility := accessibilityOf(node.ModifierFlags())
+			accessibility := accessibilityOf(utils.ESTreeModifierFlags(node))
 			switch check {
 			case levelNoPublic:
 				if accessibility != "public" {
@@ -414,7 +426,7 @@ var ExplicitMemberAccessibilityRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			accessibility := accessibilityOf(node.ModifierFlags())
+			accessibility := accessibilityOf(utils.ESTreeModifierFlags(node))
 			switch propCheck {
 			case levelNoPublic:
 				if accessibility != "public" {

@@ -162,9 +162,9 @@ func collectProgramTypeDiagnostics(
 
 	var diags []rule.RuleDiagnostic
 	_, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:       programs,
-		SingleThreaded: true,
-		TypeCheck:      true,
+		TypeCheckOnlyPrograms: programs,
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				diags = append(diags, d)
@@ -1793,7 +1793,7 @@ func TestTargetPlanActiveOwnersSelectOnlyGoverningConfigs(t *testing.T) {
 			ParserOptions: &rslintconfig.ParserOptions{Project: []string{"./missing.json"}},
 		}}},
 	}
-	active := activeConfigsForTest(configMap, target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/a/index.ts",
+	active := configsForActiveOwners(configMap, target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/a/index.ts",
 		CanonicalPath: "/repo/a/index.ts"}, ConfigDirectory: "/repo/a",
 	}}})
 	if len(active) != 1 || active["/repo/a"] == nil {
@@ -1825,13 +1825,41 @@ func TestPlainProgramSetSkipsInactiveConfigProjects(t *testing.T) {
 		CanonicalPath: tspath.ResolvePath(activeDir, "index.ts")}, ConfigDirectory: activeDir,
 	}}}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-
-	activeConfigMap := activeConfigsForTest(configMap, plan)
-	set, err := buildProjectsForConfigs(activeConfigMap, true, newBuildContext(fsys))
-	if err != nil || len(set.compilerPrograms) != 1 {
-		t.Fatalf("plain lint should build only the active config Program: programs=%d err=%v", len(set.compilerPrograms), err)
+	emptySet, err := sessionForTest(newBuildContext(fsys)).BuildProjectsForTargetOwners(
+		configMap,
+		target.Plan{},
+		true,
+	)
+	if err != nil || len(emptySet.compilerPrograms) != 0 {
+		t.Fatalf("an empty target plan must not build config projects: programs=%d err=%v", len(emptySet.compilerPrograms), err)
 	}
-	if _, err := buildProjectsForConfigs(configMap, true, newBuildContext(fsys)); err == nil || !strings.Contains(err.Error(), "missing.json") {
+
+	builders := []struct {
+		name  string
+		build func(*Session) (ProjectSet, error)
+	}{
+		{
+			name: "all projects from active owners",
+			build: func(session *Session) (ProjectSet, error) {
+				return session.BuildProjectsForTargetOwners(configMap, plan, true)
+			},
+		},
+		{
+			name: "targeted projects from active owners",
+			build: func(session *Session) (ProjectSet, error) {
+				return session.BuildTargetProjects(configMap, plan, true)
+			},
+		},
+	}
+	for _, builder := range builders {
+		t.Run(builder.name, func(t *testing.T) {
+			set, err := builder.build(sessionForTest(newBuildContext(fsys)))
+			if err != nil || len(set.compilerPrograms) != 1 {
+				t.Fatalf("plain lint should build only the active config Program: programs=%d err=%v", len(set.compilerPrograms), err)
+			}
+		})
+	}
+	if _, err := sessionForTest(newBuildContext(fsys)).BuildProjects(configMap, true); err == nil || !strings.Contains(err.Error(), "missing.json") {
 		t.Fatalf("the all-project type-check scope must still reject the inactive missing project, got %v", err)
 	}
 }

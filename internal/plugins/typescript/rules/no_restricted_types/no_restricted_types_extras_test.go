@@ -1073,7 +1073,6 @@ func lintNoRestrictedTypesWithDemand(
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noRestrictedTypesConfiguredRules(options),
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -1133,9 +1132,9 @@ func createNoRestrictedTypesProgram(t testing.TB, fileName string, code string) 
 	return program, sourceFile
 }
 
-func noRestrictedTypesConfiguredRules(options []any) func(*ast.SourceFile) []linter.ConfiguredRule {
-	return func(*ast.SourceFile) []linter.ConfiguredRule {
-		return []linter.ConfiguredRule{{
+func noRestrictedTypesConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
+	return func(*ast.SourceFile) []rule.ConfiguredRule {
+		return []rule.ConfiguredRule{{
 			Name:     NoRestrictedTypesRule.Name,
 			Severity: rule.SeverityError,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {

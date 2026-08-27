@@ -586,7 +586,6 @@ func lintPreserveCaughtErrorWithDemand(
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: preserveCaughtErrorConfiguredRules(options),
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -597,9 +596,9 @@ func lintPreserveCaughtErrorWithDemand(
 	return diagnostics
 }
 
-func preserveCaughtErrorConfiguredRules(options []any) func(*ast.SourceFile) []linter.ConfiguredRule {
-	return func(*ast.SourceFile) []linter.ConfiguredRule {
-		return []linter.ConfiguredRule{{
+func preserveCaughtErrorConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
+	return func(*ast.SourceFile) []rule.ConfiguredRule {
+		return []rule.ConfiguredRule{{
 			Name:     PreserveCaughtErrorRule.Name,
 			Severity: rule.SeverityError,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {
